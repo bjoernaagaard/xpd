@@ -1,0 +1,36 @@
+# np.where with one argument and np.nonzero return a tuple with one array of positions per
+# dimension. Its length is the number of dimensions, 1 for a flat array, and a tuple that holds
+# an array is always true, even when no value matched. The fix is unsafe on purpose, because it
+# changes the result to the one the code meant.
+id: where-tuple-length
+language: python
+severity: error
+message: $F returns a tuple with one array per dimension, so its length is the number of dimensions and not the number of matches. Write $NP.count_nonzero($C).
+rule:
+  pattern: len($F($C))
+constraints:
+  F: { regex: '^(np|numpy)\.(where|nonzero)$' }
+transform:
+  NP: { replace: { source: $F, replace: '\.\w+$', by: '' } }
+fix: $NP.count_nonzero($C)
+metadata: { fix: unsafe }
+---
+id: where-tuple-length
+language: python
+severity: error
+message: $F returns a tuple with one array per dimension, and that tuple is true even when nothing matched. Write $NP.any($C).
+rule:
+  pattern: $F($C)
+  any:
+    - inside: { kind: if_statement, field: condition }
+    - inside: { kind: elif_clause, field: condition }
+    - inside: { kind: while_statement, field: condition }
+    - inside: { kind: not_operator, field: argument }
+    - inside: { kind: boolean_operator }
+    - { inside: { kind: conditional_expression }, nthChild: 2 }
+constraints:
+  F: { regex: '^(np|numpy)\.(where|nonzero)$' }
+transform:
+  NP: { replace: { source: $F, replace: '\.\w+$', by: '' } }
+fix: $NP.any($C)
+metadata: { fix: unsafe }

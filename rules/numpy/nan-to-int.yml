@@ -1,0 +1,24 @@
+# Casting NaN to a whole number has no right answer. NumPy 2.5 gives the smallest int64 with a
+# RuntimeWarning, and the value differs between platforms. A cast whose input the code fills
+# with np.nan, as in np.where(m, x, np.nan).astype(int), meets NaN whenever that branch is taken.
+id: nan-to-int
+language: python
+severity: warning
+message: This casts an array that holds np.nan to $T, and NaN becomes -9223372036854775808. Keep the float array, or replace NaN with a whole number before the cast.
+rule:
+  any:
+    - pattern: $E.astype($T)
+    - pattern: $E.astype($T, $$$REST)
+constraints:
+  T: { regex: '^(int|["'']u?int\d*["'']|(np|numpy)\.(int_|intp|uintp|int8|int16|int32|int64|uint8|uint16|uint32|uint64))$' }
+  E:
+    any:
+      - matches: fills-nan
+      - kind: parenthesized_expression
+        has: { matches: fills-nan }
+utils:
+  fills-nan:
+    kind: call
+    has: { field: function, regex: '^(np|numpy)\.(where|full|full_like|array|asarray|select)$' }
+    all:
+      - has: { field: arguments, has: { stopBy: end, regex: '^(np|numpy)\.nan$' } }

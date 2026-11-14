@@ -1,0 +1,58 @@
+# A mask cast to whole numbers holds 0 and 1, and an index of 0s and 1s picks the first and the
+# second element again and again. When the mask is computed from the array it indexes, as in
+# y[(y > 15).astype(int)], a filter was meant. A lookup such as classes[(score > t).astype(int)],
+# which maps each mask value to one of two labels, is left alone. ~ on those numbers gives -1 and
+# -2, not the opposite mask.
+id: int-mask-as-index
+language: python
+severity: error
+message: $M.astype($T) turns the mask into 0s and 1s, so this index picks element 0 and element 1 over and over. Index with the mask itself, $X[$M].
+rule:
+  kind: subscript
+  all:
+    - has: { field: value, pattern: $X }
+    - has: { field: subscript, pattern: $M.astype($T) }
+    - has: { field: subscript, has: { stopBy: end, pattern: $X } }
+constraints:
+  M: { matches: mask }
+  T: { matches: int-type }
+utils:
+  int-type: { regex: '^(int|["'']int\d*["'']|(np|numpy)\.(int_|intp|int8|int16|int32|int64|uint8|uint\d+))$' }
+  mask:
+    any:
+      - kind: parenthesized_expression
+        has:
+          any:
+            - kind: comparison_operator
+            - kind: binary_operator
+              has: { field: operator, regex: '^[&|^]$' }
+            - kind: unary_operator
+              has: { field: operator, regex: ^~$ }
+      - kind: call
+        has: { field: function, regex: '^(np|numpy)\.(isnan|isfinite|isinf|isin|isclose|logical_and|logical_or|logical_not|logical_xor)$' }
+fix: $X[$M]
+metadata: { fix: unsafe }
+---
+id: int-mask-as-index
+language: python
+severity: error
+message: ~ on 0s and 1s gives -1 and -2, not the opposite mask. Write ~$M, or 1 - $M.astype($T) for numbers.
+rule:
+  pattern: ~$M.astype($T)
+constraints:
+  M: { matches: mask }
+  T: { matches: int-type }
+utils:
+  int-type: { regex: '^(int|["'']int\d*["'']|(np|numpy)\.(int_|intp|int8|int16|int32|int64|uint8|uint\d+))$' }
+  mask:
+    any:
+      - kind: parenthesized_expression
+        has:
+          any:
+            - kind: comparison_operator
+            - kind: binary_operator
+              has: { field: operator, regex: '^[&|^]$' }
+            - kind: unary_operator
+              has: { field: operator, regex: ^~$ }
+      - kind: call
+        has: { field: function, regex: '^(np|numpy)\.(isnan|isfinite|isinf|isin|isclose|logical_and|logical_or|logical_not|logical_xor)$' }

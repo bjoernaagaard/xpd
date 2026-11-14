@@ -1,0 +1,28 @@
+# A default value is built once, when def runs, and every call shares it. A function that writes
+# into an array default changes the default for every later call. Only a default that the body
+# writes to is reported, through +=, an index assignment, or an in place method.
+id: array-default-argument
+language: python
+severity: warning
+message: The default for $P is one array that every call shares, and this function writes into it, so later calls see the change. Default to None and build the array inside the function.
+rule:
+  any:
+    - kind: default_parameter
+    - kind: typed_default_parameter
+  all:
+    - has: { field: name, pattern: $P }
+    - has: { field: value, kind: call, has: { field: function, regex: '^(np|numpy)\.(zeros|ones|empty|full|array|asarray|arange|linspace|eye|identity|zeros_like|ones_like|full_like)$' } }
+    - inside:
+        stopBy: end
+        kind: function_definition
+        has:
+          field: body
+          has:
+            stopBy: { kind: function_definition }
+            any:
+              - kind: augmented_assignment
+                has: { field: left, any: [{ pattern: $P }, { pattern: "$P[$I]" }] }
+              - kind: assignment
+                has: { field: left, pattern: "$P[$I]" }
+              - kind: call
+                has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $P } }, { has: { field: attribute, regex: '^(fill|sort|resize|put|itemset|setfield|partition)$' } }] }

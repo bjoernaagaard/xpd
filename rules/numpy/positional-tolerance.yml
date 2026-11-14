@@ -1,0 +1,28 @@
+# The third positional argument of np.isclose and np.allclose is rtol, a tolerance relative to
+# the second argument, and atol keeps its default of 1e-8. A number written there is often meant
+# as an absolute tolerance, and then values near zero never count as close. A call that also
+# passes atol, by position or by name, or a value named like rtol, sets both on purpose.
+id: positional-tolerance
+language: python
+severity: warning
+message: The third argument of $NP.$F is rtol, a relative tolerance, and atol stays 1e-8. Name it, as in rtol=$T, or write atol=$T for an absolute tolerance.
+rule:
+  any:
+    - pattern: $NP.$F($A, $B, $T)
+    - pattern: $NP.$F($A, $B, $T, $$$REST)
+  not:
+    has:
+      field: arguments
+      any:
+        - has: { nthChild: 4, not: { kind: keyword_argument } }
+        - has: { kind: keyword_argument, has: { field: name, regex: ^atol$ } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(isclose|allclose)$' }
+  T:
+    not:
+      any:
+        - kind: keyword_argument
+        - kind: list_splat
+        - kind: dictionary_splat
+        - regex: '(?i)rtol'

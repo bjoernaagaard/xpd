@@ -1,0 +1,87 @@
+# NumPy does not consume an iterator. np.array wraps a generator, a map, a zip, a filter, a dict
+# view or a set in a zero dimensional array of dtype object. np.max, np.min, np.prod, np.nansum
+# and their kin return the iterator itself, np.argmax returns 0, np.any and np.all return True,
+# and the rest raise TypeError. The fixes give the result the code meant, so they are unsafe on
+# purpose. dict.keys() is left out, because pandas objects have a keys() that returns an Index.
+
+# A generator passed alone, as in np.array(v * 2 for v in y).
+id: iterator-to-array
+language: python
+severity: error
+message: $F does not consume a generator, so this gives a wrong value or raises TypeError. Write $F([...]) with a list comprehension.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $F }
+    - has: { field: arguments, kind: generator_expression, pattern: $G }
+constraints:
+  F: { matches: numpy-function }
+utils:
+  numpy-function: { regex: '^(np|numpy)\.(array|asarray|asanyarray|sum|nansum|prod|nanprod|max|min|amax|amin|nanmax|nanmin|argmax|argmin|ptp|mean|nanmean|median|nanmedian|std|nanstd|var|nanvar|average|any|all|unique|sort|cumsum|concatenate|stack|vstack|hstack|column_stack|dstack|isnan|isfinite|abs)$' }
+transform:
+  BODY: { substring: { source: $G, startChar: 1, endChar: -1 } }
+fix: $F([$BODY])
+metadata: { fix: unsafe }
+---
+# An iterator as the first argument, as in np.array(map(float, y)) or np.array(zip(a, b), dtype=float).
+id: iterator-to-array
+language: python
+severity: error
+message: $F does not consume an iterator such as a generator, a map, a zip or a dict view, so this gives a wrong value or raises TypeError. Write $F(list($I)).
+rule:
+  pattern: $F($I)
+constraints:
+  F: { matches: numpy-function }
+  I: { matches: iterator }
+utils:
+  numpy-function: { regex: '^(np|numpy)\.(array|asarray|asanyarray|sum|nansum|prod|nanprod|max|min|amax|amin|nanmax|nanmin|argmax|argmin|ptp|mean|nanmean|median|nanmedian|std|nanstd|var|nanvar|average|any|all|unique|sort|cumsum|concatenate|stack|vstack|hstack|column_stack|dstack|isnan|isfinite|abs)$' }
+  iterator:
+    any:
+      - kind: call
+        has: { field: function, regex: '^(map|zip|filter|reversed|enumerate|iter)$' }
+      - kind: call
+        has: { field: function, kind: attribute, has: { field: attribute, regex: '^(values|items)$' } }
+        not: { has: { field: arguments, has: { nthChild: 1 } } }
+fix: $F(list($I))
+metadata: { fix: unsafe }
+---
+id: iterator-to-array
+language: python
+severity: error
+message: $F does not consume an iterator such as a generator, a map, a zip or a dict view, so this gives a wrong value or raises TypeError. Write $F(list($I), ...).
+rule:
+  pattern: $F($I, $$$REST)
+constraints:
+  F: { matches: numpy-function }
+  I:
+    any:
+      - matches: iterator
+      - kind: generator_expression
+utils:
+  numpy-function: { regex: '^(np|numpy)\.(array|asarray|asanyarray|sum|nansum|prod|nanprod|max|min|amax|amin|nanmax|nanmin|argmax|argmin|ptp|mean|nanmean|median|nanmedian|std|nanstd|var|nanvar|average|any|all|unique|sort|cumsum|concatenate|stack|vstack|hstack|column_stack|dstack|isnan|isfinite|abs)$' }
+  iterator:
+    any:
+      - kind: call
+        has: { field: function, regex: '^(map|zip|filter|reversed|enumerate|iter)$' }
+      - kind: call
+        has: { field: function, kind: attribute, has: { field: attribute, regex: '^(values|items)$' } }
+        not: { has: { field: arguments, has: { nthChild: 1 } } }
+fix: $F(list($I), $$$REST)
+metadata: { fix: unsafe }
+---
+# A set has no order, so there is no fix.
+id: iterator-to-array
+language: python
+severity: error
+message: $F does not unpack a set. It wraps the set in a zero dimensional object array. Write $F(sorted($I)), or $F(list($I)) when the order does not matter.
+rule:
+  any:
+    - pattern: $F($I)
+    - pattern: $F($I, $$$REST)
+constraints:
+  F: { regex: '^(np|numpy)\.(array|asarray|asanyarray)$' }
+  I:
+    any:
+      - kind: set
+      - kind: set_comprehension
+      - { kind: call, has: { field: function, regex: '^(set|frozenset)$' } }

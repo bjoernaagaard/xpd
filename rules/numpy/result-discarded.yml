@@ -1,0 +1,101 @@
+# These calls return a new array and leave their input as it was, so a call that stands alone as
+# a statement does nothing. Calls in a try block or in a with block that checks for an exception
+# or a warning, and calls in asv benchmark methods, run for their side effect and are left alone. The fixes assign the
+# result back to the input. They are unsafe, because other names bound to the old array keep its
+# old values, and the code may have meant another name.
+
+# A NumPy function on a name, without an out argument.
+id: result-discarded
+language: python
+severity: error
+message: $NP.$F returns a new array and leaves $X as it was, so this line does nothing. Write $X = $NP.$F($X, ...).
+rule:
+  pattern: $NP.$F($$$ARGS)
+  matches: discarded
+  has: { field: arguments, has: { nthChild: 1, pattern: $X, any: [{ kind: identifier }, { kind: attribute }] } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { matches: pure-function }
+utils:
+  pure-function: { regex: '^(sort|argsort|append|insert|delete|reshape|ravel|transpose|swapaxes|moveaxis|squeeze|expand_dims|flip|fliplr|flipud|roll|rot90|unique|pad|tile|repeat|resize|astype|copy|asarray|ascontiguousarray|atleast_1d|atleast_2d|atleast_3d|sort_complex|trim_zeros|nan_to_num|clip|round|around|where|abs|absolute|sqrt|exp|log|log2|log10|log1p|floor|ceil|trunc|rint|sign|negative|square)$' }
+  discarded:
+    all:
+      - inside: { kind: expression_statement }
+      - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(out|copy)$' } } } }
+      - not: { matches: positional-out }
+      - not: { matches: checks-side-effect }
+  # The ufuncs take out as their second positional argument, round as its third, and clip as its
+  # fourth. nan_to_num takes copy as its second.
+  positional-out:
+    any:
+      - all:
+          - has: { field: function, regex: '\.(abs|absolute|sqrt|exp|log|log2|log10|log1p|floor|ceil|trunc|rint|sign|negative|square|nan_to_num)$' }
+          - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } }
+      - all:
+          - has: { field: function, regex: '\.(round|around)$' }
+          - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
+      - all:
+          - has: { field: function, regex: '\.clip$' }
+          - has: { field: arguments, has: { nthChild: 4, not: { kind: keyword_argument } } }
+  checks-side-effect:
+    any:
+      - inside:
+          stopBy: { kind: function_definition }
+          kind: block
+          inside: { kind: try_statement, field: body }
+      - inside:
+          stopBy: { kind: function_definition }
+          kind: with_statement
+          has: { kind: with_clause, regex: '(raises|warns|catch_warnings|deprecated_call|suppress_warnings|assert_)' }
+      - inside:
+          stopBy: end
+          kind: function_definition
+          has: { field: name, regex: '^(time|peakmem|mem|track)_' }
+fix: $X = $NP.$F($$$ARGS)
+metadata: { fix: unsafe }
+---
+# Methods that return a new array on any value that has them, NumPy, pandas or PyTorch. tolist
+# and transpose are left out, because a notebook shows the value of a last line such as
+# names.tolist(), and a test may call m.transpose() only to see that it runs.
+id: result-discarded
+language: python
+severity: error
+message: $M returns a new array and leaves $X as it was, so this line does nothing. Write $X = $X.$M(...).
+rule:
+  pattern: $X.$M($$$ARGS)
+  matches: discarded
+constraints:
+  M: { regex: '^(astype|reshape|ravel|flatten|swapaxes|squeeze|round|clip|cumsum|cumprod)$' }
+  X: { any: [{ kind: identifier }, { kind: attribute }], not: { regex: '^(np|numpy)$' } }
+utils:
+  discarded:
+    all:
+      - inside: { kind: expression_statement }
+      - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(out|copy)$' } } } }
+      - not: { matches: positional-out }
+      - not: { matches: checks-side-effect }
+  # x.clip(lo, hi, out) and x.round(decimals, out) write into out.
+  positional-out:
+    any:
+      - all:
+          - has: { field: function, regex: '\.clip$' }
+          - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
+      - all:
+          - has: { field: function, regex: '\.round$' }
+          - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } }
+  checks-side-effect:
+    any:
+      - inside:
+          stopBy: { kind: function_definition }
+          kind: block
+          inside: { kind: try_statement, field: body }
+      - inside:
+          stopBy: { kind: function_definition }
+          kind: with_statement
+          has: { kind: with_clause, regex: '(raises|warns|catch_warnings|deprecated_call|suppress_warnings|assert_)' }
+      - inside:
+          stopBy: end
+          kind: function_definition
+          has: { field: name, regex: '^(time|peakmem|mem|track)_' }
+fix: $X = $X.$M($$$ARGS)
+metadata: { fix: unsafe }

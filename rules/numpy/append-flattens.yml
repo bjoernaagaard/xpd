@@ -1,0 +1,13 @@
+# Without axis, np.append, np.insert and np.delete flatten the array first. A list of lists
+# appended or inserted is a row or a column, so the flat result is never what was meant.
+id: append-flattens
+language: python
+severity: error
+message: Without axis, $F flattens both arrays, so the row becomes loose values in a one dimensional result. Pass axis=0 to add rows or axis=1 to add columns.
+rule:
+  any:
+    - pattern: $F($A, $V)
+    - pattern: $F($A, $I, $V)
+constraints:
+  F: { regex: '^(np|numpy)\.(append|insert)$' }
+  V: { kind: list, has: { nthChild: 1, kind: list } }

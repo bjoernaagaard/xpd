@@ -1,0 +1,114 @@
+# NaN is not equal to anything, itself included, so == against NaN is False for every value and
+# != is True for every value. The fixes are unsafe on purpose, because they change the result to
+# the one the code meant. A file that imports pandas is left to the pandas rule
+# compare-to-missing, which reports the same line. A comparison passed to an assert function is
+# left alone, because a test may check how a comparison with NaN behaves.
+id: compare-to-nan
+language: python
+severity: error
+message: A comparison with NaN is False for every value, NaN included. Write $NP.isnan($X).
+rule:
+  any:
+    - pattern: $X == $NP.nan
+    - pattern: $NP.nan == $X
+  not: { any: [{ matches: in-pandas-file }, { matches: in-assert-call }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+  pandas-import:
+    any:
+      - kind: import_statement
+        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
+      - kind: import_from_statement
+        has: { field: module_name, regex: '^pandas(\.|$)' }
+  in-assert-call:
+    inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
+fix: $NP.isnan($X)
+metadata: { fix: unsafe }
+---
+id: compare-to-nan
+language: python
+severity: error
+message: A comparison with NaN is True for every value, NaN included. Write ~$NP.isnan($X).
+rule:
+  any:
+    - pattern: $X != $NP.nan
+    - pattern: $NP.nan != $X
+  not: { any: [{ matches: in-pandas-file }, { matches: in-assert-call }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+  pandas-import:
+    any:
+      - kind: import_statement
+        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
+      - kind: import_from_statement
+        has: { field: module_name, regex: '^pandas(\.|$)' }
+  in-assert-call:
+    inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
+fix: ~$NP.isnan($X)
+metadata: { fix: unsafe }
+---
+# float("nan") and math.nan. The fix writes np., so it applies only with import numpy as np.
+id: compare-to-nan
+language: python
+severity: error
+message: A comparison with NaN is False for every value, NaN included. Write np.isnan($X).
+rule:
+  any:
+    - { pattern: $X == $N, has: { nthChild: 2, matches: other-nan } }
+    - { pattern: $N == $X, has: { nthChild: 1, matches: other-nan } }
+  not: { any: [{ matches: in-pandas-file }, { matches: in-assert-call }] }
+utils:
+  other-nan: { regex: '^(math\.nan|float\(\s*["''](nan|NaN|NAN)["'']\s*\))$' }
+  in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+  pandas-import:
+    any:
+      - kind: import_statement
+        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
+      - kind: import_from_statement
+        has: { field: module_name, regex: '^pandas(\.|$)' }
+  in-assert-call:
+    inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
+fix: np.isnan($X)
+metadata: { fix: unsafe }
+---
+id: compare-to-nan
+language: python
+severity: error
+message: A comparison with NaN is True for every value, NaN included. Write ~np.isnan($X).
+rule:
+  any:
+    - { pattern: $X != $N, has: { nthChild: 2, matches: other-nan } }
+    - { pattern: $N != $X, has: { nthChild: 1, matches: other-nan } }
+  not: { any: [{ matches: in-pandas-file }, { matches: in-assert-call }] }
+utils:
+  other-nan: { regex: '^(math\.nan|float\(\s*["''](nan|NaN|NAN)["'']\s*\))$' }
+  in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+  pandas-import:
+    any:
+      - kind: import_statement
+        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
+      - kind: import_from_statement
+        has: { field: module_name, regex: '^pandas(\.|$)' }
+  in-assert-call:
+    inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
+fix: ~np.isnan($X)
+metadata: { fix: unsafe }
+---
+# An array holds new float objects, so `in` compares with ==, and NaN never matches. On a list
+# that holds the np.nan object itself, `in` matches by identity, so only an array made by a
+# NumPy call on the right counts.
+id: compare-to-nan
+language: python
+severity: error
+message: The in operator compares with ==, and NaN equals nothing, so it never finds NaN in an array. Write $NP.isnan($A).any().
+rule:
+  any:
+    - pattern: $NP.nan in $A
+    - pattern: $NP.nan not in $A
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { kind: call, has: { field: function, regex: '^(np|numpy)\.' } }

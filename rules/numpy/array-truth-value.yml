@@ -1,0 +1,27 @@
+# and, or, not and a chained comparison ask Python for the truth of an array, which raises
+# ValueError for an array of more than one value. Inside an index on the same array, as in
+# x[(x > 2) and (x < 8)], the operands are masks of that array, so the mistake is certain. A
+# chained comparison with & or | in the middle is left to mask-operator-precedence.
+id: array-truth-value
+language: python
+severity: error
+message: and, or, not and a chained comparison ask for the truth of a whole array, which raises ValueError. Combine masks with & | and ~, with each comparison in parentheses, as in ($X > a) & ($X < b).
+rule:
+  kind: subscript
+  all:
+    - has: { field: value, pattern: $X }
+    - has:
+        field: subscript
+        any:
+          - kind: boolean_operator
+          - kind: not_operator
+          - kind: comparison_operator
+            has: { nthChild: 3 }
+            not: { has: { kind: binary_operator, has: { field: operator, regex: '^[&|]$' } } }
+    - has:
+        field: subscript
+        any:
+          - { kind: comparison_operator, has: { pattern: $X } }
+          - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }
+constraints:
+  X: { any: [{ kind: identifier }, { kind: attribute }] }

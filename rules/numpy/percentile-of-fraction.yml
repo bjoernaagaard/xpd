@@ -1,0 +1,40 @@
+# np.percentile takes percents from 0 to 100, so 0.95 asks for the 0.95th percentile, near the
+# minimum. A list counts only when every number in it is a fraction, because a list such as
+# [0.5, 99.5] is a real pair of percentiles. The fix keeps the numbers and calls np.quantile,
+# which reads them as fractions. It is unsafe on purpose, because it changes the result to the
+# one the code meant.
+id: percentile-of-fraction
+language: python
+severity: warning
+message: $NP.$F takes percents from 0 to 100, so $Q asks for a percentile near the minimum. For fractions write $NP.$G($A, $Q).
+rule:
+  pattern: $NP.$F($A, $Q)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(nan)?percentile$' }
+  Q: { matches: fractions }
+utils:
+  fraction: { kind: float, regex: '^0*\.\d*[1-9]\d*$' }
+  fractions:
+    any:
+      - matches: fraction
+      - kind: list
+        has: { matches: fraction }
+        not: { has: { matches: not-fraction } }
+      - kind: tuple
+        has: { matches: fraction }
+        not: { has: { matches: not-fraction } }
+  not-fraction:
+    any:
+      - kind: integer
+      - { kind: float, not: { matches: fraction } }
+      - kind: identifier
+      - kind: attribute
+      - kind: call
+      - kind: unary_operator
+      - kind: binary_operator
+      - kind: subscript
+transform:
+  G: { replace: { source: $F, replace: percentile, by: quantile } }
+fix: $NP.$G($A, $Q)
+metadata: { fix: unsafe }
