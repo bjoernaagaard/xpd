@@ -1,5 +1,6 @@
-# A full sort read at one end. The speedups are from research/numpy-rules/math/runs/bench.jsonl
-# and bench3.jsonl, one thread, NumPy 2.5.4.
+# A full sort read at one end. The speedups are the lower of two runs at 1,000,000 values in
+# research/numpy-rules/math/runs/bench.jsonl, bench-repeat.jsonl and bench3.jsonl, one thread,
+# NumPy 2.5.4. At 1,000 values every form here ran 1.6 to 6.3 times faster in alternate.jsonl.
 
 # Unsafe: on a 2-D array np.sort sorts each row, so [0] is the first sorted row and np.min is
 # one value. With NaN, [0] is the smallest number and np.min is NaN. -0.0 and 0.0 can trade
@@ -7,7 +8,7 @@
 id: np-sort-then-select
 language: python
 severity: warning
-message: This sorts every value to read the smallest one, which ran 47 times slower on 1,000,000 values. Write $NP.min($X).
+message: This sorts every value to read the smallest one, which ran 39 times slower on 1,000,000 values. Write $NP.min($X).
 rule: { pattern: "$NP.sort($X)[0]" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
@@ -18,7 +19,7 @@ metadata: { fix: unsafe }
 id: np-sort-then-select
 language: python
 severity: warning
-message: This sorts every value to read the largest one, which ran 47 times slower on 1,000,000 values. Write $NP.max($X).
+message: This sorts every value to read the largest one, which ran 28 times slower on 1,000,000 values. Write $NP.max($X).
 rule: { pattern: "$NP.sort($X)[-1]" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
@@ -31,7 +32,7 @@ metadata: { fix: unsafe }
 id: np-sort-then-select
 language: python
 severity: warning
-message: This sorts every value to read the $K smallest, which ran 5 times slower on 1,000,000 values. Write $NP.sort($NP.partition($X, $K)[:$K]).
+message: This sorts every value to read the $K smallest, which ran 4 times slower on 1,000,000 values. Write $NP.sort($NP.partition($X, $K)[:$K]).
 rule: { pattern: "$NP.sort($X)[:$K]" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
@@ -88,7 +89,7 @@ metadata: { fix: unsafe }
 id: np-sort-then-select
 language: python
 severity: warning
-message: This sorts every value to find the position of the largest, which ran 79 times slower on 1,000,000 values. Write $NP.argmax($X).
+message: This sorts every value to find the position of the largest, which ran 72 times slower on 1,000,000 values. Write $NP.argmax($X).
 rule: { pattern: "$NP.argsort($X)[-1]" }
 constraints:
   NP: { regex: '^(np|numpy)$' }

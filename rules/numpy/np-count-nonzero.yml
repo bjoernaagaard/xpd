@@ -1,5 +1,5 @@
 # Counting the True values of a mask by a sum or by the length of a selection. The speedups are
-# from research/numpy-rules/math/runs/bench.jsonl and bench2.jsonl, one thread, NumPy 2.5.4.
+# from research/numpy-rules/math/runs/bench.jsonl and bench2.jsonl, one thread, NumPy 2.5.4, the lower of two runs.
 
 # Unsafe: np.sum skips the masked values of a masked array and count_nonzero does not, and
 # count_nonzero raises on a pandas column with missing values. The sum compared with 0 has its
@@ -7,7 +7,7 @@
 id: np-count-nonzero
 language: python
 severity: warning
-message: Summing a comparison adds the True values one by one, which ran 2.5 times slower on 1,000,000 values. Write $NP.count_nonzero($C).
+message: Summing a comparison adds the True values one by one, which ran 1.7 times slower on 1,000,000 values. Write $NP.count_nonzero($C).
 rule:
   pattern: $NP.sum($C)
   not: { inside: { kind: comparison_operator, regex: '\s>\s*0$', stopBy: neighbor } }
@@ -48,7 +48,7 @@ constraints:
 id: np-count-nonzero
 language: python
 severity: warning
-message: This counts every True value to learn whether there is one, which ran 3.2 times slower on 1,000,000 values. Write $NP.any($C).
+message: This counts every True value to learn whether there is one, which ran 2.6 times slower on 1,000,000 values. Write $NP.any($C).
 rule: { pattern: $NP.sum($C) > 0 }
 constraints:
   NP: { regex: '^(np|numpy)$' }

@@ -1,6 +1,6 @@
 # A sum of products computed through a temporary array. np.vdot flattens both arrays and adds
 # the products in one BLAS pass. The speedups are from research/numpy-rules/math/runs/bench2.jsonl,
-# one thread, NumPy 2.5.4.
+# one thread, NumPy 2.5.4, the lower of two runs.
 
 # Unsafe: vdot conjugates a complex first array, raises where the old form broadcasts a scalar
 # or a column against a row, returns a bool for two bool arrays and an int8 for two int8 arrays
@@ -25,7 +25,7 @@ metadata: { fix: unsafe }
 id: np-sum-of-products
 language: python
 severity: warning
-message: This builds the array of squares to add it up, which ran 3.9 times slower on 1,000,000 values. Write $NP.vdot($X, $X).
+message: This builds the array of squares to add it up, which ran 3.1 times slower on 1,000,000 values. Write $NP.vdot($X, $X).
 rule:
   any:
     - pattern: $NP.sum($X ** 2)
@@ -40,7 +40,7 @@ metadata: { fix: unsafe }
 id: np-sum-of-products
 language: python
 severity: warning
-message: This builds the array of squared differences to average it, which ran 3.5 times slower on 1,000,000 values. Write d = $A - $B and then $NP.vdot(d, d) / d.size.
+message: This builds the array of squared differences to average it, which ran 3.1 times slower on 1,000,000 values. Write d = $A - $B and then $NP.vdot(d, d) / d.size.
 rule: { pattern: $NP.mean(($A - $B) ** 2) }
 constraints:
   NP: { regex: '^(np|numpy)$' }

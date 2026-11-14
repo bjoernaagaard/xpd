@@ -1,5 +1,5 @@
 # np.where and positions spelled out where one NumPy function does it in one pass. The speedups
-# are from research/numpy-rules/math/runs/bench2.jsonl, one thread, NumPy 2.5.4.
+# are from research/numpy-rules/math/runs/bench2.jsonl, one thread, NumPy 2.5.4, the lower of two runs.
 
 # Unsafe: np.where raises on a pandas column with missing values, and np.asarray returns an
 # object array.
@@ -32,7 +32,7 @@ metadata: { fix: unsafe }
 id: np-where-shortcut
 language: python
 severity: warning
-message: np.where builds a mask and then picks from two arrays, which ran 8 times slower on 1,000,000 values. Write $NP.maximum($X, $W).
+message: np.where builds a mask and then picks from two arrays, which ran 5 times slower on 1,000,000 values. Write $NP.maximum($X, $W).
 rule:
   any:
     - pattern: $NP.where($X > $Z, $X, $W)
