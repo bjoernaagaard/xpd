@@ -10,6 +10,7 @@ import time
 import numpy as np
 import numpy.testing as npt
 from numpy.random import default_rng
+from numpy.random import SeedSequence, rand as legacy_rand  # xpd: legacy-random
 from numpy.testing import assert_, assert_raises
 from numpy.random import randn, seed  # xpd: legacy-random
 

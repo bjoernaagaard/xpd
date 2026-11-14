@@ -50,7 +50,8 @@ rule:
           all:
             - has: { field: module_name, regex: ^numpy\.testing$ }
             - any:
-                - has: { field: name, regex: ^(assert_raises|assert_raises_regex)$ }
+                - has: { kind: dotted_name, regex: ^(assert_raises|assert_raises_regex)$ }
+                - has: { kind: aliased_import, has: { field: name, regex: ^(assert_raises|assert_raises_regex)$ } }
                 - has: { kind: wildcard_import }
 constraints:
   F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?(assert_raises|assert_raises_regex)$' }

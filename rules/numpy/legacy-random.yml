@@ -117,5 +117,6 @@ rule:
   all:
     - has: { field: module_name, regex: '^numpy\.random$' }
     - has:
-        field: name
-        regex: '^(seed|rand|randn|randint|random|random_sample|sample|ranf|choice|shuffle|permutation|normal|uniform|RandomState|beta|binomial|exponential|gamma|poisson|multivariate_normal|standard_normal|get_state|set_state)$'
+        any:
+          - { kind: dotted_name, regex: '^(seed|rand|randn|randint|random|random_sample|sample|ranf|choice|shuffle|permutation|normal|uniform|RandomState|beta|binomial|exponential|gamma|poisson|multivariate_normal|standard_normal|get_state|set_state)$' }
+          - { kind: aliased_import, has: { field: name, regex: '^(seed|rand|randn|randint|random|random_sample|sample|ranf|choice|shuffle|permutation|normal|uniform|RandomState|beta|binomial|exponential|gamma|poisson|multivariate_normal|standard_normal|get_state|set_state)$' } }
