@@ -1,0 +1,18 @@
+# A dict[str, Any] in a signature tells the caller and the type checker nothing about the keys
+# or the values, so every function that takes it has to know the shape by heart. Decode the
+# data once, where it enters the program, into a dataclass or a TypedDict.
+id: dict-str-any
+language: python
+severity: warning
+message: $TYPE in a signature hides which keys and values the function works with. Decode the data once into a dataclass or a TypedDict, and pass that.
+rule:
+  kind: generic_type
+  pattern: $TYPE
+  regex: ^(typing\.|t\.)?(dict|Dict|Mapping|MutableMapping)\[\s*str,\s*(typing\.|t\.)?Any\s*\]$
+  inside:
+    stopBy: end
+    kind: type
+    any:
+      - inside: { kind: typed_parameter }
+      - inside: { kind: typed_default_parameter }
+      - inside: { kind: function_definition, field: return_type }

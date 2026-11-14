@@ -3,6 +3,10 @@
 # underscore, and so may a name inside a function. `_` alone and dunder names such as
 # `__all__` are left alone.
 #
+# `_T = TypeVar("_T")` is left alone, and so are ParamSpec and TypeVarTuple. A type variable is
+# never part of a module's API, and the underscore is how typeshed and the typing documentation
+# write one. On Python 3.12 `def first[T](xs: list[T])` needs no module level name at all.
+#
 # A file that imports hamilton is left alone, because Hamilton turns every module level function
 # into a node unless its name starts with an underscore.
 id: module-private-name
@@ -29,6 +33,11 @@ rule:
       matches: at-module-level
     - kind: assignment
       has: { field: left, kind: identifier, pattern: $NAME, regex: "^_[A-Za-z0-9]" }
+      not:
+        has:
+          field: right
+          kind: call
+          has: { field: function, regex: (^|\.)(TypeVar|ParamSpec|TypeVarTuple)$ }
       inside: { kind: expression_statement, inside: { kind: module } }
 utils:
   at-module-level:

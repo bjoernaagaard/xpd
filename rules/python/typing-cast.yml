@@ -1,0 +1,21 @@
+# cast() tells the type checker to believe a type that nothing checks, so the error it hides
+# comes back at run time, far from the cast. Fix the type where the value is made, or narrow it
+# with isinstance, match or a TypeIs function, which the checker and the program both follow.
+id: typing-cast
+language: python
+severity: warning
+message: cast() overrides the type checker without a check at run time. Fix the type where the value is made, or narrow it with isinstance, match or a TypeIs function.
+rule:
+  kind: call
+  any:
+    - has: { field: function, regex: ^(typing|typing_extensions|t)\.cast$ }
+    - has: { field: function, kind: identifier, regex: ^cast$ }
+      inside:
+        stopBy: end
+        kind: module
+        has:
+          stopBy: end
+          kind: import_from_statement
+          all:
+            - has: { field: module_name, regex: ^(typing|typing_extensions)$ }
+            - has: { stopBy: end, kind: dotted_name, regex: ^cast$ }

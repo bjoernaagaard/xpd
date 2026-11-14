@@ -902,6 +902,7 @@ dependencies = [
  "ast-grep-core",
  "ast-grep-language",
  "clap",
+ "globset",
  "ignore",
  "rayon",
  "serde",

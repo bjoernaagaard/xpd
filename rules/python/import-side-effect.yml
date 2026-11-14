@@ -1,0 +1,66 @@
+# Importing a module should do nothing but define names. A call that stands alone at module
+# level runs on the first import, in an order nobody chose, and again in every process that
+# imports the module. `dspy.configure(...)`, `logging.basicConfig()` and `load_dotenv()` belong
+# in a function that main() or the caller runs.
+#
+# Three kinds of call are left alone, because they only fill in what the module defines: a
+# method that edits a collection, such as `NAMES.append(x)`, a call whose name starts with
+# `register`, and the calls that add a router or a sub-app to a web or command line app.
+# `pytest.importorskip` is how a test module skips itself. A `__main__.py` is run and never
+# imported.
+#
+# A file with no function and no class is a script, which runs top to bottom, so it is left
+# alone too.
+id: import-side-effect
+language: python
+severity: warning
+message: $CALL runs when the module is imported. Move it into a function that main() or the caller runs.
+ignores:
+  - "**/__main__.py"
+rule:
+  kind: call
+  inside: { kind: expression_statement, inside: { matches: importable-module } }
+  has:
+    field: function
+    pattern: $CALL
+    not:
+      any:
+        - regex: \.(append|extend|update|add|remove|discard|insert|setdefault|pop|clear|sort)$
+        - regex: (^|\.)_?register
+        - regex: \.(include_router|add_typer|add_middleware|mount)$
+        - regex: ^pytest\.importorskip$
+utils:
+  importable-module:
+    kind: module
+    has:
+      any:
+        - kind: function_definition
+        - kind: class_definition
+        - kind: decorated_definition
+---
+# The environment is read once, in main(), and the values are passed down. A module level
+# read fixes the value at the first import, before the program has parsed its own arguments.
+id: import-side-effect
+language: python
+severity: warning
+message: This reads or sets the environment when the module is imported. Read it once in main() and pass the value down.
+ignores:
+  - "**/__main__.py"
+rule:
+  any:
+    - pattern: os.environ
+    - pattern: os.getenv
+  inside:
+    stopBy: end
+    kind: expression_statement
+    inside: { matches: importable-module }
+  not:
+    inside: { stopBy: end, kind: lambda }
+utils:
+  importable-module:
+    kind: module
+    has:
+      any:
+        - kind: function_definition
+        - kind: class_definition
+        - kind: decorated_definition

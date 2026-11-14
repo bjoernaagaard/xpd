@@ -33,15 +33,20 @@ def run(path: str) -> object:
     return ns["result"]
 
 
-old, new = run(sys.argv[1]), run(sys.argv[2])
-try:
-    if isinstance(old, pd.DataFrame):
-        pdt.assert_frame_equal(old, new)
-    elif isinstance(old, pd.Series):
-        pdt.assert_series_equal(old, new)
-    else:
-        npt.assert_equal(new, old)
-except AssertionError as e:
-    print(json.dumps({"equivalent": False, "detail": str(e)}))
-    sys.exit(1)
-print(json.dumps({"equivalent": True}))
+def main() -> None:
+    old, new = run(sys.argv[1]), run(sys.argv[2])
+    try:
+        if isinstance(old, pd.DataFrame):
+            pdt.assert_frame_equal(old, new)
+        elif isinstance(old, pd.Series):
+            pdt.assert_series_equal(old, new)
+        else:
+            npt.assert_equal(new, old)
+    except AssertionError as e:
+        print(json.dumps({"equivalent": False, "detail": str(e)}))
+        sys.exit(1)
+    print(json.dumps({"equivalent": True}))
+
+
+if __name__ == "__main__":
+    main()

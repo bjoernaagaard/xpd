@@ -1,0 +1,16 @@
+# A test that replaces a function with a mock passes when the mock is called as the test
+# expects, whatever the real function does. Run the real code on real input.
+id: mock-import
+language: python
+severity: warning
+message: This imports a mock library. A test with a mock checks the mock, so run the real code on real input.
+rule:
+  any:
+    - kind: import_statement
+      has: { stopBy: end, kind: dotted_name, regex: ^(unittest\.mock|mock|pytest_mock)(\.|$) }
+    - kind: import_from_statement
+      has: { field: module_name, regex: ^(unittest\.mock|mock|pytest_mock)(\.|$) }
+    - kind: import_from_statement
+      all:
+        - has: { field: module_name, regex: ^unittest$ }
+        - has: { stopBy: end, kind: dotted_name, regex: ^mock$ }

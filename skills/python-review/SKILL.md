@@ -76,7 +76,8 @@ The first two groups are where real bugs live.
 - A public function without annotations, or one that takes or returns `Any`.
 - `typing.cast` or `# type: ignore` in place of fixing the type where the value is made.
 - A `dict[str, Any]` passed between functions where a dataclass or `TypedDict` would name
-  the fields, or data from a file or request used before it is decoded into a model.
+  the fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), or data from
+  a file or request used before it is decoded into a model.
 - A `Protocol` or `ABC` with one implementation, or an interface added only for a test.
 - Bare strings compared in several places where a `StrEnum` or `Literal` would do.
 
@@ -84,16 +85,19 @@ The first two groups are where real bugs live.
 
 - Module level names that start with an underscore, and a module without `__all__`
   whose callers have to guess what is public (`python/module-private-name`).
-- Mutable module level state, a `utils` or `helpers` module, or a wildcard import.
+- Mutable module level state, a `utils` or `helpers` module (`python/vague-module-name`),
+  or a wildcard import.
+- A module that configures a library, sets up logging or reads the environment when it is
+  imported (`python/import-side-effect`).
 - An import inside a function without a stated reason.
 - A class with `__init__` and one method, or a class that only groups functions.
 - A dependency used for something the standard library or an existing dependency does.
 
 **Readability**
 
-- A comprehension with two `for` clauses, with several conditions, or that merges dicts
-  with `**` for every item (`python/comprehension-merges-dicts`,
-  `python/unpacked-comprehension`). Show the loop.
+- A comprehension with two `for` clauses (`python/comprehension-two-fors`), with several
+  conditions, or that merges dicts with `**` for every item
+  (`python/comprehension-merges-dicts`, `python/unpacked-comprehension`). Show the loop.
 - A function that works at several levels at once, or needs comments to separate its
   parts.
 - A Boolean positional parameter, deep nesting where an early return would do, or a

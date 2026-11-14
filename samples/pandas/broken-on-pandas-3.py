@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-pd.set_option("mode.copy_on_write", True)  # xpd: deprecated-in-pandas-3
+pd.set_option("mode.copy_on_write", True)  # xpd: deprecated-in-pandas-3, import-side-effect
 
 CASES = {}
 
