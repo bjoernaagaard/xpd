@@ -2415,7 +2415,7 @@ warning = np.exceptions.ComplexWarning
 
 #### deprecated-in-numpy-2
 
-**Severity:** warning. **Fix:** safe: `np.trunc` for `np.fix`, `np.ma.round` for `np.ma.round_`, `out=` for an output passed by position to `np.maximum` and `np.minimum`, a datetime64 string without its `Z`, and `np.rec` and `np.char` for `np.core.records` and `np.core.defchararray`. unsafe: `np.<name>` for `np.core.<name>`, `randint(low, high + 1)` for `random_integers(low, high)`, with or without a size, `x = x.reshape(shape)` for `x.shape = shape`, and `x = x.view(dtype)` for `x.dtype = dtype`. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: `np.trunc` for `np.fix`, `np.ma.round` for `np.ma.round_`, `out=` for an output passed by position to `np.maximum` and `np.minimum`, and a datetime64 string without its `Z`. unsafe: `np.rec` and `np.char` for `np.core.records` and `np.core.defchararray`, which export fewer names, `np.<name>` for `np.core.<name>`, `randint(low, high + 1)` for `random_integers(low, high)`, with or without a size, `x = x.reshape(shape)` for `x.shape = shape`, and `x = x.view(dtype)` for `x.dtype = dtype`. The other forms have no fix.
 
 Reports `numpy.core`, `np.typename`, `np.char.array`, `np.char.asarray` and `np.char.chararray`, `np.testing.assert_warns` and `suppress_warnings`, a timedelta64 without a unit, a time zone in a datetime64 string, `fftn` and its kin with `s=` and no `axes=`, and setting `shape`, `dtype` or `strides` on a name bound from an `np.` call in the same function. Each warns on NumPy 2.5.
 
@@ -2545,7 +2545,7 @@ def clipped(x):
 
 #### array-construction
 
-**Severity:** warning. **Fix:** safe: `np.full(n, 3, dtype=np.float64)`, `np.zeros(n, dtype=np.float32)`. unsafe: `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
+**Severity:** warning. **Fix:** safe: `np.zeros(n, dtype=np.float32)`. unsafe: `np.full(n, 3, dtype=np.float64)`, which gives a zero dimensional array where the product of an empty shape gave a scalar, `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
 
 Reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`.
 

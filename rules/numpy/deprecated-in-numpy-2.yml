@@ -101,6 +101,8 @@ fix: $NP.$N
 metadata: { fix: unsafe, since: "2.0" }
 ---
 # np.core.records is np.rec and np.core.defchararray is np.char.
+# Unsafe: np.rec and np.char export fewer names than the old modules did, so an attribute such
+# as np.core.records.ndarray is missing after the fix.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -132,7 +134,7 @@ transform:
   T1: { replace: { source: $N, replace: '^records$', by: rec } }
   NEW: { replace: { source: $T1, replace: '^defchararray$', by: char } }
 fix: $NP.$NEW
-metadata: { fix: safe, since: "2.0" }
+metadata: { fix: unsafe, since: "2.0" }
 ---
 id: deprecated-in-numpy-2
 language: python
@@ -172,7 +174,11 @@ message: $NP.fix is deprecated since NumPy 2.5. Write $NP.trunc, which gives the
 rule:
   all:
     - pattern: $NP.fix
-      not: { inside: { kind: assignment, field: left } }
+      not:
+        any:
+          - inside: { kind: assignment, field: left }
+          # trunc takes its input by position only, so fix(x=...) is left alone.
+          - inside: { kind: call, field: function, has: { field: arguments, has: { kind: keyword_argument } } }
     - not: { matches: compat-code }
 utils:
   compat-code:

@@ -36,6 +36,8 @@ metadata: { fix: unsafe }
 ---
 # np.ones(n) * c writes the array twice. A number written in the code gives the same float64
 # values from np.full in every case the probe tried, -0.0 and overflow included.
+# Unsafe: with the empty shape () the product is a NumPy scalar, where np.full gives a zero
+# dimensional array.
 id: array-construction
 language: python
 severity: warning
@@ -47,8 +49,9 @@ rule:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   C: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator, regex: '^-\s*[\d.]' }] }
+  N: { not: { kind: keyword_argument } }
 fix: $NP.full($N, $C, dtype=$NP.float64)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # np.zeros(n).astype(T) writes a float64 array and then converts every value. For a numeric
 # dtype the probe found the same values in every case.

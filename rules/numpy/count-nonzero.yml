@@ -49,7 +49,10 @@ id: count-nonzero
 language: python
 severity: warning
 message: This counts every True value to learn whether there is one, which ran 2.6 times slower on 1,000,000 values. Write $NP.any($C).
-rule: { pattern: $NP.sum($C) > 0 }
+# A chained comparison such as np.sum(c) > 0 == flag is left alone.
+rule:
+  pattern: $NP.sum($C) > 0
+  not: { has: { nthChild: 3 } }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
