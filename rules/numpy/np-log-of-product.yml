@@ -1,0 +1,13 @@
+# A product of many values overflows to inf or underflows to 0 before the log. 400 tens gave inf
+# in research/numpy-rules/math/runs/probe.jsonl where the sum of the logs was off by 2 units in
+# the last place. Unsafe: the last bits change, and an even count of negative values gave a
+# number where the logs give nan.
+id: np-log-of-product
+language: python
+severity: warning
+message: The product overflows to inf or underflows to 0 before the log is taken. Write $NP.sum($NP.log($X)).
+rule: { pattern: $NP.log($NP.prod($X)) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.sum($NP.log($X))
+metadata: { fix: unsafe }

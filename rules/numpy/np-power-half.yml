@@ -1,0 +1,15 @@
+# The speedup is from research/numpy-rules/math/runs/bench.jsonl, one thread, NumPy 2.5.4.
+# x ** 0.5 already runs as fast as np.sqrt, but np.power does not take that path. Unsafe: on an
+# integer array of 8 or 16 bits np.sqrt returns float16 or float32 and np.power float64.
+id: np-power-half
+language: python
+severity: warning
+message: np.power with 0.5 runs the general power function, which ran 2 times slower on 1,000,000 values. Write $NP.sqrt($X).
+rule:
+  any:
+    - pattern: $NP.power($X, 0.5)
+    - pattern: $NP.power($X, .5)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.sqrt($X)
+metadata: { fix: unsafe }

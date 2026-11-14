@@ -1,0 +1,69 @@
+# exp(x) - 1 and log(1 + x) lose the digits of a small x to rounding. At x = 1e-10 both forms
+# were off by 6.4e8 units in the last place and expm1 and log1p by 0, in
+# research/numpy-rules/math/runs/probe.jsonl. They are not faster, so the messages claim only
+# accuracy. Unsafe: the last bits of every value change.
+id: np-expm1-log1p
+language: python
+severity: warning
+message: exp($X) - 1 loses digits to rounding when $X is near 0. Write $NP.expm1($X).
+rule:
+  any:
+    - pattern: $NP.exp($X) - 1
+    - pattern: $NP.exp($X) - 1.0
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  X: { not: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator, has: { any: [{ kind: integer }, { kind: float }] } }] } }
+fix: $NP.expm1($X)
+metadata: { fix: unsafe }
+---
+id: np-expm1-log1p
+language: python
+severity: warning
+message: 1 - exp($X) loses digits to rounding when $X is near 0. Write -$NP.expm1($X).
+rule:
+  any:
+    - pattern: 1 - $NP.exp($X)
+    - pattern: 1.0 - $NP.exp($X)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  X: { not: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator, has: { any: [{ kind: integer }, { kind: float }] } }] } }
+fix: -$NP.expm1($X)
+metadata: { fix: unsafe }
+---
+# log(1 + exp(x)) has its own document in np-logaddexp.
+id: np-expm1-log1p
+language: python
+severity: warning
+message: 1 + $X rounds away digits before the log when $X is near 0. Write $NP.log1p($X).
+rule:
+  any:
+    - pattern: $NP.log(1 + $X)
+    - pattern: $NP.log(1.0 + $X)
+    - pattern: $NP.log($X + 1)
+    - pattern: $NP.log($X + 1.0)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  X:
+    not:
+      any:
+        - pattern: $E.exp($$$A)
+        - kind: integer
+        - kind: float
+        - { kind: unary_operator, has: { any: [{ kind: integer }, { kind: float }] } }
+fix: $NP.log1p($X)
+metadata: { fix: unsafe }
+---
+# Only a name, attribute, call, subscript or parentheses, so that -$X keeps its meaning.
+id: np-expm1-log1p
+language: python
+severity: warning
+message: 1 - $X rounds away digits before the log when $X is near 0. Write $NP.log1p(-$X).
+rule:
+  any:
+    - pattern: $NP.log(1 - $X)
+    - pattern: $NP.log(1.0 - $X)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  X: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }, { kind: parenthesized_expression }] }
+fix: $NP.log1p(-$X)
+metadata: { fix: unsafe }

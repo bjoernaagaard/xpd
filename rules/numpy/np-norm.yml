@@ -1,0 +1,20 @@
+# The square root of a sum of squares. The speedup is from
+# research/numpy-rules/math/runs/bench.jsonl, one thread, NumPy 2.5.4. np.linalg.norm squares as
+# well, so it overflows at the same values and the message claims only speed.
+
+# Unsafe: norm takes the absolute value of complex numbers, and the last bits change.
+id: np-norm
+language: python
+severity: warning
+message: This builds the array of squares to add it up, which ran 4 times slower on 1,000,000 values. Write $NP.linalg.norm($X).
+rule:
+  any:
+    - pattern: $NP.sqrt($NP.sum($X ** 2))
+    - pattern: $NP.sqrt($NP.sum($X * $X))
+    - pattern: $NP.sqrt($NP.sum($NP.square($X)))
+    - pattern: $NP.sqrt(($X ** 2).sum())
+    - pattern: $NP.sqrt(($X * $X).sum())
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.linalg.norm($X)
+metadata: { fix: unsafe }
