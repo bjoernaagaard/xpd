@@ -7,3 +7,14 @@ message: $F still calls the Python function once per value. Compute on whole col
 rule: { pattern: $F($$$ARGS) }
 constraints:
   F: { regex: '^(np|numpy)\.(vectorize|frompyfunc|apply_along_axis)$' }
+---
+# The same helper used as a bare decorator, as in `@np.vectorize` above a def.
+id: np-vectorize
+language: python
+severity: warning
+message: $F still calls the Python function once per value. Compute on whole columns, for example with np.where or np.select.
+rule:
+  kind: decorator
+  has: { pattern: $F }
+constraints:
+  F: { regex: '^(np|numpy)\.(vectorize|frompyfunc)$' }

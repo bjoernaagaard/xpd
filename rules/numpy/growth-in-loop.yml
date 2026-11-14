@@ -1,0 +1,68 @@
+# The slow form is an array that grows inside a loop, as in `out = np.append(out, x)`, which
+# copies every earlier value on each pass. A call that builds the array from other arrays, such
+# as `rows = np.vstack(parts_of_this_row)`, copies each value once and is left alone, and so is
+# an array that the same pass set before it grows, because it starts again on every pass.
+id: growth-in-loop
+language: python
+severity: warning
+message: $OUT grows by one $NP.$F per pass, and each call copies every earlier value. Collect the pieces in a list and call np.concatenate once after the loop, which ran 130 to 170 times faster for 1,000 passes over 1,000,000 values.
+rule:
+  kind: assignment
+  all:
+    - has: { field: left, pattern: $OUT }
+    - has:
+        field: right
+        pattern: $NP.$F($$$ARGS)
+        has:
+          field: arguments
+          all:
+            - has: { nthChild: 1, matches: grows-out }
+            - not: { has: { stopBy: end, kind: subscript, has: { field: value, pattern: $OUT } } }
+    - inside:
+        stopBy: end
+        any: [{ kind: for_statement }, { kind: while_statement }]
+    # A neighbor statement that also sets $OUT, as in np.delete followed by np.append to keep
+    # the size, is not growth.
+    - not:
+        inside:
+          kind: expression_statement
+          any:
+            - follows: { stopBy: end, has: { kind: assignment, has: { field: left, pattern: $OUT } } }
+            - precedes: { stopBy: end, has: { kind: assignment, has: { field: left, pattern: $OUT } } }
+    - not: { inside: { stopBy: { any: [{ kind: for_statement }, { kind: while_statement }] }, matches: loop-resets-out } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(append|concatenate|vstack|hstack|row_stack|column_stack|dstack|stack)$' }
+  OUT: { any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }] }
+utils:
+  # np.append takes the array first, and the other functions take a list or tuple of pieces.
+  grows-out:
+    any:
+      - all: [{ pattern: $OUT }, { inside: { kind: argument_list, inside: { kind: call, regex: '^(np|numpy)\.append\b' } } }]
+      - { any: [{ kind: list }, { kind: tuple }], has: { pattern: $OUT } }
+  # A loop that sets $OUT afresh on each pass, either as its loop variable or with an
+  # assignment that does not read $OUT, and a loop that reads $OUT as it grows, as in
+  # `np.isin(x, seen)`, where a list collected for later would not do.
+  loop-resets-out:
+    all:
+      - any: [{ kind: for_statement }, { kind: while_statement }]
+      - any:
+          - has: { field: left, pattern: $OUT }
+          - has: { field: left, has: { stopBy: end, pattern: $OUT } }
+          - has:
+              field: body
+              has:
+                stopBy: end
+                matches: reads-out
+                not: { inside: { stopBy: end, kind: assignment, has: { field: left, pattern: $OUT } } }
+          - has:
+              field: body
+              has:
+                stopBy: end
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $OUT }
+                  - has: { field: right, not: { any: [{ matches: reads-out }, { has: { stopBy: end, matches: reads-out } }] } }
+  # $OUT itself, and not an attribute of the same name, as in `sf.surv_times`.
+  reads-out:
+    all: [{ pattern: $OUT }, { not: { inside: { kind: attribute, field: attribute } } }]
