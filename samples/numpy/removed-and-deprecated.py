@@ -25,6 +25,7 @@ def case(fn):
 def imports():
     from numpy import float_, isin  # xpd: removed-in-numpy-2
     from numpy import AxisError as AxisProblem  # xpd: removed-in-numpy-2
+    from numpy import trapz  # xpd: removed-in-numpy-2
     from numpy.lib import pad, median  # xpd: removed-in-numpy-2
     from numpy.lib import pad, NumpyVersion  # xpd: removed-in-numpy-2
     from numpy.linalg.linalg import norm  # xpd: removed-in-numpy-2
@@ -152,7 +153,7 @@ def keywords(values, grid):
     view = np.array([1, 2], copy=False)  # xpd: removed-in-numpy-2
     view32 = np.array(values, dtype=np.float32, copy=False)  # xpd: removed-in-numpy-2
     view2d = np.array(values, copy=False, ndmin=2)  # xpd: removed-in-numpy-2
-    kept_view = (np.asarray([1, 2]), np.array(values, copy=True), values.astype(np.float64, copy=False))
+    kept_view = (np.asarray([1, 2]), np.array(values, copy=None), values.astype(np.float64, copy=False))
     names = np.zeros(3, dtype="a5")  # xpd: removed-in-numpy-2
     codes = np.dtype([("a", "f8"), ("label", "a10")])  # xpd: removed-in-numpy-2
     as_bytes = values.astype("a")  # xpd: removed-in-numpy-2
@@ -160,3 +161,155 @@ def keywords(values, grid):
     raw = np.fromstring(values.tobytes(), dtype=np.float64)  # xpd: removed-in-numpy-2
     parsed = np.fromstring("1 2", sep=" ")
     return flat, flat_f, shaped, kept_shape, near, low, kept_quantile, corr, text, kept_save, density, counts, kept_counts, view, view32, view2d, kept_view, names, codes, as_bytes, kept_dtype, raw, parsed
+
+
+def deprecated_imports():
+    from numpy.core.numeric import normalize_axis_tuple  # xpd: deprecated-in-numpy-2
+    from numpy.core import records  # xpd: deprecated-in-numpy-2
+    import numpy.core.multiarray as multiarray  # xpd: deprecated-in-numpy-2
+    from numpy import core  # xpd: deprecated-in-numpy-2
+    from numpy.core.multiarray import _reconstruct
+    from numpy.lib.array_utils import normalize_axis_index
+    from numpy.char import chararray  # xpd: deprecated-in-numpy-2
+    from numpy.char import upper
+    from numpy.testing import assert_warns  # xpd: deprecated-in-numpy-2
+    from numpy.testing import assert_allclose
+    return normalize_axis_tuple, records, multiarray, core, _reconstruct, normalize_axis_index, chararray, upper, assert_warns, assert_allclose
+
+
+def deprecated_names(values, frame):
+    table = np.core.records.fromarrays([values])  # xpd: deprecated-in-numpy-2
+    is_rec = isinstance(frame, np.core.recarray)  # xpd: deprecated-in-numpy-2
+    close = np.core.numeric.isclose(values, values)  # xpd: deprecated-in-numpy-2
+    name = np.typename("d")  # xpd: deprecated-in-numpy-2
+    labels = np.char.array(["a", "b"])  # xpd: deprecated-in-numpy-2
+    with np.testing.suppress_warnings() as sup:  # xpd: deprecated-in-numpy-2
+        pass
+    kept = (np.rec.fromarrays([values]), np.dtype("d").name, np.array(["a", "b"]), np.char.upper(["a"]), np.strings.upper(np.array(["a"])))
+    return table, is_rec, close, name, labels, sup, kept
+
+
+@case
+def fix_to_trunc():
+    values = np.array([-2.5, -0.5, 0.5, 2.5, np.nan])
+    return np.fix(values), np.trunc(values)  # xpd: deprecated-in-numpy-2
+
+
+@case
+def fix_on_ints():
+    return np.fix(np.arange(-3, 4))  # xpd: deprecated-in-numpy-2
+
+
+@case
+def masked_round():
+    return np.ma.round_(np.ma.array([1.25, 2.5], mask=[0, 1]), 1)  # xpd: deprecated-in-numpy-2
+
+
+@case
+def maximum_into_out():
+    values, out = np.array([1.0, 5.0, -2.0]), np.empty(3)
+    np.maximum(values, 0.0, out)  # xpd: deprecated-in-numpy-2
+    low = np.minimum(values, 1, np.empty(3))  # xpd: deprecated-in-numpy-2
+    kept = (np.maximum(values, 0.0, out=np.empty(3)), np.add(values, 1.0, np.empty(3)), np.maximum(values, 0.0))
+    return out, low, kept
+
+
+@case
+def random_integers_with_size():
+    state = np.random.RandomState(7)
+    draws = state.random_integers(1, 6, 20)  # xpd: deprecated-in-numpy-2
+    more = state.random_integers(1, 6, size=(2, 3))  # xpd: deprecated-in-numpy-2
+    kept = state.randint(1, 7, 5)
+    return draws, more, kept, state.rand()
+
+
+def random_integers_without_size(state, low, high):
+    one = state.random_integers(1, 6)  # xpd: deprecated-in-numpy-2
+    upto = np.random.random_integers(6)  # xpd: deprecated-in-numpy-2
+    spread = state.random_integers(low, high - 1, 3)  # xpd: deprecated-in-numpy-2
+    return one, upto, spread
+
+
+@case
+def timedelta_units():
+    step = np.timedelta64(5, "s")
+    missing = np.timedelta64("NaT", "ns")
+    times = np.zeros(2, dtype="m8[s]")
+    return step, missing, times
+
+
+def timedelta_generic():
+    step = np.timedelta64(5)  # xpd: deprecated-in-numpy-2
+    missing = np.timedelta64("NaT")  # xpd: deprecated-in-numpy-2
+    times = np.zeros(2, dtype="m8")  # xpd: deprecated-in-numpy-2
+    return step, missing, times
+
+
+@case
+def utc_strings():
+    start = np.datetime64("2024-03-01T12:00Z")  # xpd: deprecated-in-numpy-2
+    stamps = np.datetime64("2024-03-01T12:00:00.250Z", "ms")  # xpd: deprecated-in-numpy-2
+    plain = np.datetime64("2024-03-01T12:00")
+    return start, stamps, plain
+
+
+def offset_strings():
+    return np.datetime64("2024-03-01T12:00+01:00")  # xpd: deprecated-in-numpy-2
+
+
+def fft_shapes(grid):
+    padded = np.fft.fftn(grid, s=(4, 4))  # xpd: deprecated-in-numpy-2
+    real = np.fft.rfftn(grid, (4, 4))  # xpd: deprecated-in-numpy-2
+    kept = (np.fft.fftn(grid, s=(4, 4), axes=(0, 1)), np.fft.fft2(grid, s=(4, 4)), np.fft.fftn(grid))
+    return padded, real, kept
+
+
+def set_attributes(shape):
+    grid = np.arange(6.0)
+    grid.shape = (2, 3)  # xpd: deprecated-in-numpy-2
+    codes = np.zeros(4, dtype=np.int32)
+    codes.dtype = np.float32  # xpd: deprecated-in-numpy-2
+    window = np.arange(5)
+    window.strides = (8,)  # xpd: deprecated-in-numpy-2
+    shape.shape = (1,)
+    return grid, codes, window
+
+
+class Holder:
+    def __init__(self, shape):
+        self.shape = shape
+        self.dtype = np.float64
+
+
+def compatible(values):
+    if np.__version__ < "2":
+        kind = np.float_
+    else:
+        kind = np.float64
+    if hasattr(np, "bool8"):
+        flag = np.bool8
+    warning = np.ComplexWarning if NP_LT_2 else np.exceptions.ComplexWarning
+    try:
+        from numpy import AxisError
+    except ImportError:
+        from numpy.exceptions import AxisError
+    try:
+        from numpy.lib.array_utils import normalize_axis_tuple
+    except ModuleNotFoundError:
+        from numpy.core.numeric import normalize_axis_tuple
+    return kind, flag, warning, AxisError, normalize_axis_tuple
+
+
+NP_LT_2 = False
+
+
+def copy_keyword(values):
+    copied = np.array(values, copy=True)
+    same = np.array(values, copy=False)
+    try:
+        import pytest
+    except ModuleNotFoundError:
+        return copied, same
+    with pytest.raises(ValueError):
+        np.array([1, 2], copy=False)
+    return copied, same

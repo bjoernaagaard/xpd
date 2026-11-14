@@ -9,8 +9,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.$N was an alias of the builtin $NEW and is gone since NumPy 1.24. Write $NEW.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -30,8 +47,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.$N was removed in NumPy 2. Write $NP.$NEW, which is the same type.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -64,8 +98,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.$N was removed in NumPy 2. Write $NP.$NEW.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -85,8 +136,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.PZERO was removed in NumPy 2. Write 0.0.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -106,9 +174,25 @@ language: python
 severity: error
 message: $NP.NINF was removed in NumPy 2. Write -$NP.inf.
 rule:
-  matches: numpy-name
-  not: { matches: tight-operand }
+  all:
+    - matches: numpy-name
+      not: { matches: tight-operand }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -132,9 +216,25 @@ language: python
 severity: error
 message: $NP.NZERO was removed in NumPy 2. Write -0.0.
 rule:
-  matches: numpy-name
-  not: { matches: tight-operand }
+  all:
+    - matches: numpy-name
+      not: { matches: tight-operand }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -158,8 +258,24 @@ language: python
 severity: error
 message: $NP.NINF was removed in NumPy 2. Write (-$NP.inf).
 rule:
-  all: [{ matches: numpy-name }, { matches: tight-operand }]
+  all:
+    - all: [{ matches: numpy-name }, { matches: tight-operand }]
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -181,8 +297,24 @@ language: python
 severity: error
 message: $NP.NZERO was removed in NumPy 2. Write (-0.0).
 rule:
-  all: [{ matches: numpy-name }, { matches: tight-operand }]
+  all:
+    - all: [{ matches: numpy-name }, { matches: tight-operand }]
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -204,8 +336,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.$N was removed in NumPy 2. Write $NP.$NEW, which takes the same arguments.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -236,8 +385,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.$N was removed in NumPy 2. Write $NP.exceptions.$N, which is the same class.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -258,11 +424,28 @@ language: python
 severity: error
 message: $X.RankWarning was removed in NumPy 2. Write $NP.exceptions.RankWarning, which is the same class.
 rule:
-  pattern: $X.RankWarning
-  not: { inside: { kind: assignment, field: left } }
-  any:
-    - { pattern: $NP.RankWarning }
-    - { pattern: $NP.lib.RankWarning }
+  all:
+    - pattern: $X.RankWarning
+      not: { inside: { kind: assignment, field: left } }
+      any:
+        - { pattern: $NP.RankWarning }
+        - { pattern: $NP.lib.RankWarning }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.exceptions.RankWarning
@@ -274,8 +457,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.$N was removed in NumPy 2. Write $NP.$NEW, which takes the same arguments.
-rule: { matches: numpy-name }
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-name:
     kind: attribute
     all:
@@ -296,7 +496,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.msort was removed in NumPy 2. Write $NP.sort($A, axis=0).
-rule: { pattern: $NP.msort($A) }
+rule:
+  all:
+    - { pattern: $NP.msort($A) }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.sort($A, axis=0)
@@ -308,7 +526,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.asscalar was removed. Write $A.item().
-rule: { pattern: $NP.asscalar($A) }
+rule:
+  all:
+    - { pattern: $NP.asscalar($A) }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   A: { kind: identifier }
@@ -319,7 +555,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.asscalar was removed. Write $A.item().
-rule: { pattern: $NP.asscalar($A) }
+rule:
+  all:
+    - { pattern: $NP.asscalar($A) }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   A: { any: [{ kind: attribute }, { kind: call }, { kind: subscript }] }
@@ -330,7 +584,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.asscalar was removed. Write ($A).item().
-rule: { pattern: $NP.asscalar($A) }
+rule:
+  all:
+    - { pattern: $NP.asscalar($A) }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   A: { not: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
@@ -341,37 +613,73 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: $NP.in1d was removed in NumPy 2.4. Write $NP.isin($$$A), and add .ravel() when the first argument has more than one dimension.
-rule: { pattern: $NP.in1d($$$A) }
+rule:
+  all:
+    - { pattern: $NP.in1d($$$A) }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.isin($$$A)
 metadata: { fix: unsafe }
 ---
 # Names with no one-to-one replacement. HINT gives the advice of NumPy's migration guide for
-# each. A `from numpy import` of any removed name is reported here too, with the same advice.
+# each. A `from numpy import` of a removed name is reported here too, with the same advice,
+# except for names whose replacement needs a newer NumPy, which follow.
 id: removed-in-numpy-2
 language: python
 severity: error
 message: NumPy 2 no longer has numpy.$N. $HINT
 rule:
-  any:
-    - kind: attribute
-      all:
-        - has: { field: object, regex: '^(np|numpy)$' }
-        - has:
-            field: attribute
-            pattern: $N
-            regex: '^(asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|warnings|os|sys|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS|ERR_[A-Z]+|FPE_[A-Z]+|SHIFT_[A-Z]+|FLOATING_POINT_SUPPORT|UFUNC_BUFSIZE_DEFAULT|UFUNC_PYVALS_NAME|MAY_SHARE_BOUNDS|MAY_SHARE_EXACT)$'
-      not: { inside: { kind: assignment, field: left } }
-    - kind: dotted_name
-      pattern: $N
-      regex: '^(int|float|complex|object|str|unicode|float_|complex_|cfloat|unicode_|string_|longfloat|singlecomplex|longcomplex|clongfloat|bool8|int0|uint0|object0|str0|bytes0|void0|typeDict|NaN|NAN|Inf|Infinity|infty|PINF|NINF|PZERO|NZERO|product|cumproduct|sometrue|alltrue|round_|row_stack|mat|compare_chararrays|format_parser|add_newdoc|add_docstring|DataSource|tracemalloc_domain|AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError|RankWarning|trapz|byte_bounds|msort|asscalar|in1d|asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS)$'
-      any:
-        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
-        - inside:
-            kind: aliased_import
-            field: name
-            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+  all:
+    - any:
+        - kind: attribute
+          all:
+            - has: { field: object, regex: '^(np|numpy)$' }
+            - has:
+                field: attribute
+                pattern: $N
+                regex: '^(asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|warnings|os|sys|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS|ERR_[A-Z]+|FPE_[A-Z]+|SHIFT_[A-Z]+|FLOATING_POINT_SUPPORT|UFUNC_BUFSIZE_DEFAULT|UFUNC_PYVALS_NAME|MAY_SHARE_BOUNDS|MAY_SHARE_EXACT)$'
+          not: { inside: { kind: assignment, field: left } }
+        - kind: dotted_name
+          pattern: $N
+          regex: '^(int|float|complex|object|str|unicode|float_|complex_|cfloat|unicode_|string_|longfloat|singlecomplex|longcomplex|clongfloat|bool8|int0|uint0|object0|str0|bytes0|void0|typeDict|NaN|NAN|Inf|Infinity|infty|PINF|NINF|PZERO|NZERO|product|cumproduct|sometrue|alltrue|round_|row_stack|mat|compare_chararrays|format_parser|add_newdoc|add_docstring|DataSource|tracemalloc_domain|msort|asscalar|in1d|asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS)$'
+          any:
+            - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+            - inside:
+                kind: aliased_import
+                field: name
+                inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   H1: { replace: { source: $N, replace: '^(int|float|complex|object|str)$', by: 'Use the builtin $1.' } }
   H2: { replace: { source: $H1, replace: '^unicode$', by: Use the builtin str. } }
@@ -449,6 +757,78 @@ transform:
   H74: { replace: { source: $H73, replace: '^Datetime64$', by: Use np.datetime64. } }
   HINT: { replace: { source: $H74, replace: '^[A-Z_]+$', by: It was an internal constant with no replacement. } }
 ---
+# np.exceptions arrived in NumPy 1.25.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 no longer has numpy.$N. Import it from numpy.exceptions.
+rule:
+  all:
+    - kind: dotted_name
+      pattern: $N
+      regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$'
+      any:
+        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+metadata: { since: "1.25" }
+---
+# trapezoid, np.lib.array_utils and np.exceptions.RankWarning arrived in NumPy 2.0.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 no longer has numpy.$N. $HINT
+rule:
+  all:
+    - kind: dotted_name
+      pattern: $N
+      regex: '^(RankWarning|trapz|byte_bounds)$'
+      any:
+        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+transform:
+  H1: { replace: { source: $N, replace: '^RankWarning$', by: Import it from numpy.exceptions. } }
+  H2: { replace: { source: $H1, replace: '^trapz$', by: Import trapezoid instead. } }
+  HINT: { replace: { source: $H2, replace: '^byte_bounds$', by: Import it from numpy.lib.array_utils. } }
+metadata: { since: "2.0" }
+---
 # np.lib re-exported these functions before NumPy 2. np.lib.<name> was the same object as
 # np.<name>. np.lib.polynomial was a module, not np.polynomial, so it is not in the list.
 id: removed-in-numpy-2
@@ -456,8 +836,25 @@ language: python
 severity: error
 message: NumPy 2 removed the np.lib copy of $N. Write $NP.$N, which is the same function.
 rule:
-  pattern: $NP.lib.$N
-  not: { inside: { kind: assignment, field: left } }
+  all:
+    - pattern: $NP.lib.$N
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N:
@@ -471,10 +868,26 @@ language: python
 severity: error
 message: NumPy 2 removed these names from numpy.lib. Import them from numpy, where they are the same functions.
 rule:
-  pattern: from numpy.lib import $$$NAMES
-  has: { any: [{ matches: moved-name }, { kind: aliased_import, has: { field: name, matches: moved-name } }] }
-  not: { matches: keeps-a-name }
+  all:
+    - pattern: from numpy.lib import $$$NAMES
+      has: { any: [{ matches: moved-name }, { kind: aliased_import, has: { field: name, matches: moved-name } }] }
+      not: { matches: keeps-a-name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   moved-name:
     kind: dotted_name
     regex: '^(angle|append|apply_along_axis|apply_over_axes|array_split|asarray_chkfinite|average|bartlett|bincount|blackman|broadcast_arrays|broadcast_shapes|broadcast_to|c_|column_stack|common_type|copy|corrcoef|cov|delete|diag|diag_indices|diag_indices_from|diagflat|diff|digitize|dsplit|dstack|ediff1d|emath|expand_dims|extract|eye|fill_diagonal|fix|flip|fliplr|flipud|fromregex|genfromtxt|get_include|gradient|hamming|hanning|histogram|histogram2d|histogram_bin_edges|histogramdd|hsplit|i0|imag|index_exp|info|insert|interp|intersect1d|iscomplex|iscomplexobj|isin|isneginf|isposinf|isreal|isrealobj|issubdtype|iterable|ix_|kaiser|kron|load|loadtxt|mask_indices|median|meshgrid|mgrid|mintypecode|nan_to_num|nanargmax|nanargmin|nancumprod|nancumsum|nanmax|nanmean|nanmedian|nanmin|nanpercentile|nanprod|nanquantile|nanstd|nansum|nanvar|ndenumerate|ndindex|ogrid|packbits|pad|percentile|piecewise|place|poly|poly1d|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|put_along_axis|quantile|r_|ravel_multi_index|real|real_if_close|roots|rot90|s_|save|savetxt|savez|savez_compressed|select|setdiff1d|setxor1d|show_runtime|sinc|sort_complex|split|take_along_axis|tile|tri|tril|tril_indices|tril_indices_from|trim_zeros|triu|triu_indices|triu_indices_from|typename|union1d|unique|unpackbits|unravel_index|unwrap|vander|vectorize|vsplit)$'
@@ -494,15 +907,31 @@ language: python
 severity: error
 message: NumPy 2 removed $N from numpy.lib. Import it from numpy, where it is the same function.
 rule:
-  matches: moved-name
-  pattern: $N
-  any:
-    - inside: { kind: import_from_statement, field: name, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
-    - inside:
-        kind: aliased_import
-        field: name
-        inside: { kind: import_from_statement, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
+  all:
+    - matches: moved-name
+      pattern: $N
+      any:
+        - inside: { kind: import_from_statement, field: name, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   lib-import:
     has: { field: module_name, regex: '^numpy\.lib$' }
   moved-name:
@@ -522,15 +951,31 @@ language: python
 severity: error
 message: NumPy 2 has no module $M. $HINT
 rule:
-  kind: dotted_name
-  pattern: $M
-  matches: removed-module
-  not: { matches: fixable-import }
-  any:
-    - inside: { kind: import_statement }
-    - inside: { kind: aliased_import, inside: { kind: import_statement } }
-    - inside: { kind: import_from_statement, field: module_name }
+  all:
+    - kind: dotted_name
+      pattern: $M
+      matches: removed-module
+      not: { matches: fixable-import }
+      any:
+        - inside: { kind: import_statement }
+        - inside: { kind: aliased_import, inside: { kind: import_statement } }
+        - inside: { kind: import_from_statement, field: module_name }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   removed-module:
     regex: '^numpy\.(distutils|dual|compat|math|oldnumeric|numarray|lib\.(financial|arrayterator|math|function_base|type_check|shape_base|index_tricks|arraysetops|utils|nanfunctions|polynomial|twodim_base|ufunclike|histograms|arraypad)|core\.umath_tests|testing\.(decorators|nosetester|utils)|linalg\.linalg|fft\.helper)(\.\w+)*$'
   fixable-import:
@@ -557,10 +1002,27 @@ language: python
 severity: error
 message: NumPy 2 has no module $M. Import from $NEW.
 rule:
-  kind: dotted_name
-  pattern: $M
-  inside: { kind: import_from_statement, field: module_name }
-  regex: '^numpy\.(linalg\.linalg|fft\.helper|testing\.utils|lib\.(function_base|type_check|shape_base|index_tricks|arraysetops|nanfunctions|polynomial|twodim_base|ufunclike|histograms|arraypad))$'
+  all:
+    - kind: dotted_name
+      pattern: $M
+      inside: { kind: import_from_statement, field: module_name }
+      regex: '^numpy\.(linalg\.linalg|fft\.helper|testing\.utils|lib\.(function_base|type_check|shape_base|index_tricks|arraysetops|nanfunctions|polynomial|twodim_base|ufunclike|histograms|arraypad))$'
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   T1: { replace: { source: $M, replace: '^numpy\.(linalg|fft|testing)\.\w+$', by: 'numpy.$1' } }
   NEW: { replace: { source: $T1, replace: '^numpy\.lib\.\w+$', by: numpy } }
@@ -573,10 +1035,27 @@ language: python
 severity: error
 message: NumPy 2 has no $M. $HINT
 rule:
-  kind: attribute
-  pattern: $M
-  regex: '^(np|numpy)\.(linalg\.linalg|fft\.helper|lib\.(math|financial|function_base|type_check|shape_base|index_tricks|arraysetops|utils|nanfunctions|twodim_base|ufunclike|histograms|arraypad|arrayterator)|core\.umath_tests|testing\.(dec|decorators|nosetester|utils|Tester|raises|run_module_suite)|distutils|dual|oldnumeric|numarray)$'
-  not: { inside: { kind: assignment, field: left } }
+  all:
+    - kind: attribute
+      pattern: $M
+      regex: '^(np|numpy)\.(linalg\.linalg|fft\.helper|lib\.(math|financial|function_base|type_check|shape_base|index_tricks|arraysetops|utils|nanfunctions|twodim_base|ufunclike|histograms|arraypad|arrayterator)|core\.umath_tests|testing\.(dec|decorators|nosetester|utils|Tester|raises|run_module_suite)|distutils|dual|oldnumeric|numarray)$'
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   H1: { replace: { source: $M, replace: '^(np|numpy)\.(linalg|fft)\.\w+$', by: 'Use $1.$2.' } }
   H2: { replace: { source: $H1, replace: '^(np|numpy)\.lib\.math$', by: Import the standard math module. } }
@@ -597,15 +1076,32 @@ language: python
 severity: error
 message: numpy.testing no longer has $N. Use pytest.
 rule:
-  kind: dotted_name
-  pattern: $N
-  regex: '^(dec|decorators|nosetester|Tester|raises|run_module_suite)$'
-  any:
-    - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy\.testing$' } }
-    - inside:
-        kind: aliased_import
-        field: name
-        inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.testing$' } }
+  all:
+    - kind: dotted_name
+      pattern: $N
+      regex: '^(dec|decorators|nosetester|Tester|raises|run_module_suite)$'
+      any:
+        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy\.testing$' } }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.testing$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 ---
 # np.ptp(a) calls a.ptp for a masked array and computes the same range for an ndarray. A module
 # such as np or ma has a ptp function, not a method, so it is left alone.
@@ -614,9 +1110,25 @@ language: python
 severity: error
 message: ndarray.ptp was removed in NumPy 2. Write np.ptp($X).
 rule:
-  pattern: $X.ptp()
-  not: { matches: module-function }
+  all:
+    - pattern: $X.ptp()
+      not: { matches: module-function }
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   module-function:
     has: { field: function, has: { field: object, regex: '^(np|numpy|ma|jnp|cp|cupy|xp|torch|da|(np|numpy)\.ma)$' } }
 fix: np.ptp($X)
@@ -627,12 +1139,28 @@ language: python
 severity: error
 message: ndarray.ptp was removed in NumPy 2. Write np.ptp($X, $$$A).
 rule:
-  pattern: $X.ptp($$$A)
-  not:
-    any:
-      - pattern: $X.ptp()
-      - matches: module-function
+  all:
+    - pattern: $X.ptp($$$A)
+      not:
+        any:
+          - pattern: $X.ptp()
+          - matches: module-function
+    - not: { matches: compat-code }
 utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   module-function:
     has: { field: function, has: { field: object, regex: '^(np|numpy|ma|jnp|cp|cupy|xp|torch|da|(np|numpy)\.ma)$' } }
 fix: np.ptp($X, $$$A)
@@ -645,7 +1173,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: tostring was removed in NumPy 2.3. Write $X.tobytes(), which returns the same bytes.
-rule: { pattern: $X.tostring() }
+rule:
+  all:
+    - { pattern: $X.tostring() }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X.tobytes()
 metadata: { fix: safe }
 ---
@@ -653,7 +1199,25 @@ id: removed-in-numpy-2
 language: python
 severity: error
 message: tostring was removed in NumPy 2.3. Write $X.tobytes(order=$O), which returns the same bytes.
-rule: { pattern: $X.tostring(order=$O) }
+rule:
+  all:
+    - { pattern: $X.tostring(order=$O) }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X.tobytes(order=$O)
 metadata: { fix: safe }
 ---
@@ -663,8 +1227,25 @@ language: python
 severity: error
 message: ndarray.itemset was removed in NumPy 2. Write $X[$INDEX] = $V.
 rule:
-  pattern: $X.itemset($T, $V)
-  inside: { kind: expression_statement }
+  all:
+    - pattern: $X.itemset($T, $V)
+      inside: { kind: expression_statement }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   T: { kind: tuple }
 transform:
@@ -677,9 +1258,26 @@ language: python
 severity: error
 message: ndarray.itemset was removed in NumPy 2. Write $X[$I, $J] = $V.
 rule:
-  pattern: $X.itemset($I, $J, $V)
-  inside: { kind: expression_statement }
-  not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+  all:
+    - pattern: $X.itemset($I, $J, $V)
+      inside: { kind: expression_statement }
+      not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X[$I, $J] = $V
 metadata: { fix: safe }
 ---
@@ -688,9 +1286,26 @@ language: python
 severity: error
 message: ndarray.itemset was removed in NumPy 2. Write $X[$I, $J, $K] = $V.
 rule:
-  pattern: $X.itemset($I, $J, $K, $V)
-  inside: { kind: expression_statement }
-  not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+  all:
+    - pattern: $X.itemset($I, $J, $K, $V)
+      inside: { kind: expression_statement }
+      not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X[$I, $J, $K] = $V
 metadata: { fix: safe }
 ---
@@ -701,19 +1316,36 @@ language: python
 severity: error
 message: ndarray.itemset was removed in NumPy 2. Write $X[index] = value, or $X.flat[i] = value for a flat position.
 rule:
-  pattern: $X.itemset($$$A)
-  not:
-    all:
-      - inside: { kind: expression_statement }
-      - any:
-          - all:
-              - pattern: $X.itemset($T, $V)
-              - has: { field: arguments, has: { nthChild: 1, kind: tuple } }
-          - all:
-              - any:
-                  - pattern: $X.itemset($I, $J, $V)
-                  - pattern: $X.itemset($I, $J, $K, $V)
-              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+  all:
+    - pattern: $X.itemset($$$A)
+      not:
+        all:
+          - inside: { kind: expression_statement }
+          - any:
+              - all:
+                  - pattern: $X.itemset($T, $V)
+                  - has: { field: arguments, has: { nthChild: 1, kind: tuple } }
+              - all:
+                  - any:
+                      - pattern: $X.itemset($I, $J, $V)
+                      - pattern: $X.itemset($I, $J, $K, $V)
+                  - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 ---
 # reshape lost newshape= in NumPy 2.4. The shape by position works on every version, and shape=
 # only from 2.1.
@@ -722,7 +1354,24 @@ language: python
 severity: error
 message: reshape(newshape=) was removed in NumPy 2.4. Write $NP.reshape($A, $S).
 rule:
-  pattern: $NP.reshape($A, newshape=$S)
+  all:
+    - pattern: $NP.reshape($A, newshape=$S)
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.reshape($A, $S)
@@ -733,7 +1382,24 @@ language: python
 severity: error
 message: reshape(newshape=) was removed in NumPy 2.4. Write $NP.reshape($A, $S, order=$O).
 rule:
-  pattern: $NP.reshape($A, newshape=$S, order=$O)
+  all:
+    - pattern: $NP.reshape($A, newshape=$S, order=$O)
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.reshape($A, $S, order=$O)
@@ -744,12 +1410,29 @@ language: python
 severity: error
 message: reshape(newshape=) was removed in NumPy 2.4. Pass the shape by position after the array.
 rule:
-  pattern: $NP.reshape($$$ARGS)
-  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^newshape$ } } }
-  not:
+  all:
+    - pattern: $NP.reshape($$$ARGS)
+      has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^newshape$ } } }
+      not:
+        any:
+          - pattern: $NP.reshape($A, newshape=$S)
+          - pattern: $NP.reshape($A, newshape=$S, order=$O)
+    - not: { matches: compat-code }
+utils:
+  compat-code:
     any:
-      - pattern: $NP.reshape($A, newshape=$S)
-      - pattern: $NP.reshape($A, newshape=$S, order=$O)
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
@@ -760,14 +1443,31 @@ language: python
 severity: error
 message: interpolation= was removed from $F in NumPy 2.4. Write method=$V, which takes the same values.
 rule:
-  kind: keyword_argument
   all:
-    - has: { field: name, regex: ^interpolation$ }
-    - has: { field: value, pattern: $V }
-  inside:
-    kind: argument_list
-    not: { has: { kind: keyword_argument, has: { field: name, regex: ^method$ } } }
-    inside: { kind: call, has: { field: function, pattern: $F, regex: '^(np|numpy)\.(nan)?(quantile|percentile)$' } }
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: ^interpolation$ }
+        - has: { field: value, pattern: $V }
+      inside:
+        kind: argument_list
+        not: { has: { kind: keyword_argument, has: { field: name, regex: ^method$ } } }
+        inside: { kind: call, has: { field: function, pattern: $F, regex: '^(np|numpy)\.(nan)?(quantile|percentile)$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: method=$V
 metadata: { fix: safe, since: "1.22" }
 ---
@@ -778,10 +1478,27 @@ language: python
 severity: error
 message: $F no longer takes the $K keyword, which had no effect. Delete it.
 rule:
-  pattern: $F($$$ARGS)
-  has:
-    field: arguments
-    has: { kind: keyword_argument, has: { field: name, pattern: $K } }
+  all:
+    - pattern: $F($$$ARGS)
+      has:
+        field: arguments
+        has: { kind: keyword_argument, has: { field: name, pattern: $K } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   F: { regex: '^(np|numpy)\.(save|corrcoef)$' }
   K: { regex: '^(fix_imports|bias|ddof)$' }
@@ -812,10 +1529,27 @@ language: python
 severity: error
 message: array2string no longer takes the style keyword, which NumPy 1.14 stopped using. Delete it.
 rule:
-  pattern: $F($$$ARGS)
-  has:
-    field: arguments
-    has: { kind: keyword_argument, has: { field: name, regex: ^style$ } }
+  all:
+    - pattern: $F($$$ARGS)
+      has:
+        field: arguments
+        has: { kind: keyword_argument, has: { field: name, regex: ^style$ } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   F: { regex: '^(np|numpy)\.array2string$' }
 rewriters:
@@ -845,13 +1579,30 @@ language: python
 severity: error
 message: normed= was removed from $F in NumPy 1.24. Write density=$V.
 rule:
-  kind: keyword_argument
   all:
-    - has: { field: name, regex: ^normed$ }
-    - has: { field: value, pattern: $V }
-  inside:
-    kind: argument_list
-    inside: { kind: call, has: { field: function, pattern: $F, regex: '^(np|numpy)\.histogram(2d|dd)?$' } }
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: ^normed$ }
+        - has: { field: value, pattern: $V }
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, pattern: $F, regex: '^(np|numpy)\.histogram(2d|dd)?$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: density=$V
 metadata: { fix: unsafe }
 ---
@@ -860,25 +1611,77 @@ language: python
 severity: error
 message: bincount raises on minlength=None since NumPy 2.3. Write minlength=0, which meant the same.
 rule:
-  kind: keyword_argument
   all:
-    - has: { field: name, regex: ^minlength$ }
-    - has: { field: value, regex: ^None$ }
-  inside:
-    kind: argument_list
-    inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.bincount$' } }
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: ^minlength$ }
+        - has: { field: value, regex: ^None$ }
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.bincount$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: minlength=0
 metadata: { fix: safe }
 ---
 # On NumPy 2, copy=False means never copy, so np.array([1, 2], copy=False) raises ValueError.
 # Old code meant copy only when needed, which np.asarray does on every version. The fix is
 # unsafe, because code that counted on the error to prove no copy was made loses that check.
+# Code under pytest.raises, or next to copy=True in the same function, tests the keyword
+# itself, so it is left alone.
 id: removed-in-numpy-2
 language: python
 severity: error
 message: np.array(copy=False) raises on NumPy 2 when it must copy, for example from a list. Write $NP.asarray($X), which copies only when needed.
 rule:
-  pattern: $NP.array($X, copy=False)
+  all:
+    - pattern: $NP.array($X, copy=False)
+    - not: { matches: compat-code }
+    - not: { matches: copy-test }
+utils:
+  copy-test:
+    any:
+      - inside:
+          kind: with_statement
+          stopBy: end
+          has: { kind: with_clause, regex: 'raises\(' }
+      - inside:
+          kind: function_definition
+          stopBy: end
+          has:
+            stopBy: end
+            kind: keyword_argument
+            all:
+              - has: { field: name, regex: ^copy$ }
+              - has: { field: value, regex: ^True$ }
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.asarray($X)
@@ -889,7 +1692,40 @@ language: python
 severity: error
 message: np.array(copy=False) raises on NumPy 2 when it must copy, for example to change the dtype. Write $NP.asarray($X, dtype=$D), which copies only when needed.
 rule:
-  pattern: $NP.array($X, dtype=$D, copy=False)
+  all:
+    - pattern: $NP.array($X, dtype=$D, copy=False)
+    - not: { matches: compat-code }
+    - not: { matches: copy-test }
+utils:
+  copy-test:
+    any:
+      - inside:
+          kind: with_statement
+          stopBy: end
+          has: { kind: with_clause, regex: 'raises\(' }
+      - inside:
+          kind: function_definition
+          stopBy: end
+          has:
+            stopBy: end
+            kind: keyword_argument
+            all:
+              - has: { field: name, regex: ^copy$ }
+              - has: { field: value, regex: ^True$ }
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.asarray($X, dtype=$D)
@@ -900,18 +1736,51 @@ language: python
 severity: error
 message: np.array(copy=False) raises on NumPy 2 when it must copy, for example from a list. Write np.asarray, which copies only when needed, or copy=None.
 rule:
-  pattern: $NP.array($$$ARGS)
-  has:
-    field: arguments
-    has:
-      kind: keyword_argument
-      all:
-        - has: { field: name, regex: ^copy$ }
-        - has: { field: value, regex: ^False$ }
-  not:
+  all:
+    - pattern: $NP.array($$$ARGS)
+      has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: ^copy$ }
+            - has: { field: value, regex: ^False$ }
+      not:
+        any:
+          - pattern: $NP.array($X, copy=False)
+          - pattern: $NP.array($X, dtype=$D, copy=False)
+    - not: { matches: compat-code }
+    - not: { matches: copy-test }
+utils:
+  copy-test:
     any:
-      - pattern: $NP.array($X, copy=False)
-      - pattern: $NP.array($X, dtype=$D, copy=False)
+      - inside:
+          kind: with_statement
+          stopBy: end
+          has: { kind: with_clause, regex: 'raises\(' }
+      - inside:
+          kind: function_definition
+          stopBy: end
+          has:
+            stopBy: end
+            kind: keyword_argument
+            all:
+              - has: { field: name, regex: ^copy$ }
+              - has: { field: value, regex: ^True$ }
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
@@ -921,27 +1790,44 @@ language: python
 severity: error
 message: The dtype code "a" was removed in NumPy 2.5. Write $NEW, which is the same dtype.
 rule:
-  kind: string
-  pattern: $S
-  regex: '^[bBrRuU]?["''][<>|=]?a\d*["'']$'
-  any:
-    - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
-    - all:
-        - nthChild: 1
-        - inside:
-            kind: argument_list
-            inside: { kind: call, has: { field: function, regex: '^((np|numpy)\.dtype|.*\.astype)$' } }
-    - all:
-        - nthChild: 2
-        - inside:
-            kind: tuple
-            inside:
-              kind: list
-              any:
-                - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
-                - inside:
-                    kind: argument_list
-                    inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.dtype$' } }
+  all:
+    - kind: string
+      pattern: $S
+      regex: '^[bBrRuU]?["''][<>|=]?a\d*["'']$'
+      any:
+        - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
+        - all:
+            - nthChild: 1
+            - inside:
+                kind: argument_list
+                inside: { kind: call, has: { field: function, regex: '^((np|numpy)\.dtype|.*\.astype)$' } }
+        - all:
+            - nthChild: 2
+            - inside:
+                kind: tuple
+                inside:
+                  kind: list
+                  any:
+                    - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
+                    - inside:
+                        kind: argument_list
+                        inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.dtype$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   NEW: { replace: { source: $S, replace: 'a(\d*)(["''])$', by: 'S$1$2' } }
 fix: $NEW
@@ -955,8 +1841,25 @@ language: python
 severity: error
 message: The binary mode of fromstring was removed in NumPy 2.3. Write $NP.frombuffer($$$A), and add .copy() when the code writes to the array.
 rule:
-  pattern: $NP.fromstring($$$A)
-  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^sep$ } } } }
+  all:
+    - pattern: $NP.fromstring($$$A)
+      not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^sep$ } } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.frombuffer($$$A)
