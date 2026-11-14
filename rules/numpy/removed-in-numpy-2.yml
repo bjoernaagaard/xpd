@@ -1,0 +1,963 @@
+# Each document finds a NumPy name, method, module or keyword that raises on NumPy 2.5. Most
+# went in 2.0 (see the migration guide, numpy.org/doc/stable/numpy_2_0_migration_guide.html),
+# the rest in 1.24, 2.3, 2.4 and 2.5. A safe fix gives what the old form gave on the last NumPy
+# that had it. An assignment such as `np.float_ = float` is a shim for old libraries and is left
+# alone.
+
+# These were the Python builtins under another name, so the builtin is the same object.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was an alias of the builtin $NEW and is gone since NumPy 1.24. Write $NEW.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(int|float|complex|object|str|unicode)$' }
+transform:
+  NEW: { replace: { source: $N, replace: '^unicode$', by: str } }
+fix: $NEW
+metadata: { fix: safe }
+---
+# Each old name was the same type object as the new one.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was removed in NumPy 2. Write $NP.$NEW, which is the same type.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N:
+    regex: '^(float_|complex_|cfloat|unicode_|string_|longfloat|singlecomplex|longcomplex|clongfloat|bool8|int0|uint0|object0|str0|bytes0|void0|typeDict)$'
+transform:
+  T1: { replace: { source: $N, replace: '^float_$', by: float64 } }
+  T2: { replace: { source: $T1, replace: '^(complex_|cfloat)$', by: complex128 } }
+  T3: { replace: { source: $T2, replace: '^(unicode_|str0)$', by: str_ } }
+  T4: { replace: { source: $T3, replace: '^(string_|bytes0)$', by: bytes_ } }
+  T5: { replace: { source: $T4, replace: '^longfloat$', by: longdouble } }
+  T6: { replace: { source: $T5, replace: '^singlecomplex$', by: complex64 } }
+  T7: { replace: { source: $T6, replace: '^(longcomplex|clongfloat)$', by: clongdouble } }
+  T8: { replace: { source: $T7, replace: '^bool8$', by: bool_ } }
+  T9: { replace: { source: $T8, replace: '^int0$', by: intp } }
+  T10: { replace: { source: $T9, replace: '^uint0$', by: uintp } }
+  T11: { replace: { source: $T10, replace: '^object0$', by: object_ } }
+  T12: { replace: { source: $T11, replace: '^void0$', by: void } }
+  NEW: { replace: { source: $T12, replace: '^typeDict$', by: sctypeDict } }
+fix: $NP.$NEW
+metadata: { fix: safe }
+---
+# The old constants held the same Python floats as np.nan, np.inf, 0.0, -np.inf and -0.0.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was removed in NumPy 2. Write $NP.$NEW.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(NaN|NAN|Inf|Infinity|infty|PINF)$' }
+transform:
+  T1: { replace: { source: $N, replace: '^(NaN|NAN)$', by: nan } }
+  NEW: { replace: { source: $T1, replace: '^(Inf|Infinity|infty|PINF)$', by: inf } }
+fix: $NP.$NEW
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.PZERO was removed in NumPy 2. Write 0.0.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(PZERO)$' }
+fix: "0.0"
+metadata: { fix: safe }
+---
+# A leading minus binds less tightly than an attribute, a call, a subscript or a power, so the
+# fix applies only where the name is not the left side of one of those.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.NINF was removed in NumPy 2. Write -$NP.inf.
+rule:
+  matches: numpy-name
+  not: { matches: tight-operand }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+  tight-operand:
+    any:
+      - inside: { kind: attribute, field: object }
+      - inside: { kind: subscript, field: value }
+      - inside: { kind: call, field: function }
+      - inside: { kind: binary_operator, field: left, has: { field: operator, regex: '^\*\*$' } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(NINF)$' }
+fix: -$NP.inf
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.NZERO was removed in NumPy 2. Write -0.0.
+rule:
+  matches: numpy-name
+  not: { matches: tight-operand }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+  tight-operand:
+    any:
+      - inside: { kind: attribute, field: object }
+      - inside: { kind: subscript, field: value }
+      - inside: { kind: call, field: function }
+      - inside: { kind: binary_operator, field: left, has: { field: operator, regex: '^\*\*$' } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(NZERO)$' }
+fix: "-0.0"
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.NINF was removed in NumPy 2. Write (-$NP.inf).
+rule:
+  all: [{ matches: numpy-name }, { matches: tight-operand }]
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+  tight-operand:
+    any:
+      - inside: { kind: attribute, field: object }
+      - inside: { kind: subscript, field: value }
+      - inside: { kind: call, field: function }
+      - inside: { kind: binary_operator, field: left, has: { field: operator, regex: '^\*\*$' } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(NINF)$' }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.NZERO was removed in NumPy 2. Write (-0.0).
+rule:
+  all: [{ matches: numpy-name }, { matches: tight-operand }]
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+  tight-operand:
+    any:
+      - inside: { kind: attribute, field: object }
+      - inside: { kind: subscript, field: value }
+      - inside: { kind: call, field: function }
+      - inside: { kind: binary_operator, field: left, has: { field: operator, regex: '^\*\*$' } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(NZERO)$' }
+---
+# Each old function called the new one with the same arguments, or was the same object.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was removed in NumPy 2. Write $NP.$NEW, which takes the same arguments.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N:
+    regex: '^(product|cumproduct|sometrue|alltrue|round_|row_stack|mat|compare_chararrays|format_parser|add_newdoc|add_docstring|DataSource|tracemalloc_domain)$'
+transform:
+  T1: { replace: { source: $N, replace: '^product$', by: prod } }
+  T2: { replace: { source: $T1, replace: '^cumproduct$', by: cumprod } }
+  T3: { replace: { source: $T2, replace: '^sometrue$', by: any } }
+  T4: { replace: { source: $T3, replace: '^alltrue$', by: all } }
+  T5: { replace: { source: $T4, replace: '^round_$', by: round } }
+  T6: { replace: { source: $T5, replace: '^row_stack$', by: vstack } }
+  T7: { replace: { source: $T6, replace: '^mat$', by: asmatrix } }
+  T8: { replace: { source: $T7, replace: '^compare_chararrays$', by: char.compare_chararrays } }
+  T9: { replace: { source: $T8, replace: '^format_parser$', by: rec.format_parser } }
+  T10: { replace: { source: $T9, replace: '^(add_newdoc|add_docstring|tracemalloc_domain)$', by: 'lib.$1' } }
+  NEW: { replace: { source: $T10, replace: '^DataSource$', by: lib.npyio.DataSource } }
+fix: $NP.$NEW
+metadata: { fix: safe }
+---
+# np.exceptions arrived in NumPy 1.25 and holds the same classes.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was removed in NumPy 2. Write $NP.exceptions.$N, which is the same class.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N:
+    regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$'
+fix: $NP.exceptions.$N
+metadata: { fix: safe, since: "1.25" }
+---
+# RankWarning joined np.exceptions in NumPy 2.0. It used to live at np.RankWarning and in
+# np.lib.polynomial, which np.lib re-exported.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $X.RankWarning was removed in NumPy 2. Write $NP.exceptions.RankWarning, which is the same class.
+rule:
+  pattern: $X.RankWarning
+  not: { inside: { kind: assignment, field: left } }
+  any:
+    - { pattern: $NP.RankWarning }
+    - { pattern: $NP.lib.RankWarning }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.exceptions.RankWarning
+metadata: { fix: safe, since: "2.0" }
+---
+# trapezoid and np.lib.array_utils arrived in NumPy 2.0. trapz called trapezoid with the same
+# arguments.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was removed in NumPy 2. Write $NP.$NEW, which takes the same arguments.
+rule: { matches: numpy-name }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(trapz|byte_bounds)$' }
+transform:
+  T1: { replace: { source: $N, replace: '^trapz$', by: trapezoid } }
+  NEW: { replace: { source: $T1, replace: '^byte_bounds$', by: lib.array_utils.byte_bounds } }
+fix: $NP.$NEW
+metadata: { fix: safe, since: "2.0" }
+---
+# msort(a) was np.sort(a, axis=0).
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.msort was removed in NumPy 2. Write $NP.sort($A, axis=0).
+rule: { pattern: $NP.msort($A) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.sort($A, axis=0)
+metadata: { fix: safe }
+---
+# asscalar(a) was a.item(). The fix applies when a is a name, an attribute, a call or a
+# subscript, so the method call binds to all of it.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.asscalar was removed. Write $A.item().
+rule: { pattern: $NP.asscalar($A) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { kind: identifier }
+fix: $A.item()
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.asscalar was removed. Write $A.item().
+rule: { pattern: $NP.asscalar($A) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { any: [{ kind: attribute }, { kind: call }, { kind: subscript }] }
+fix: $A.item()
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.asscalar was removed. Write ($A).item().
+rule: { pattern: $NP.asscalar($A) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { not: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
+---
+# in1d flattened its result, and isin keeps the shape of its first argument, so the fix is
+# unsafe on an input with more than one dimension. isin(...).ravel() is what in1d gave.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.in1d was removed in NumPy 2.4. Write $NP.isin($$$A), and add .ravel() when the first argument has more than one dimension.
+rule: { pattern: $NP.in1d($$$A) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.isin($$$A)
+metadata: { fix: unsafe }
+---
+# Names with no one-to-one replacement. HINT gives the advice of NumPy's migration guide for
+# each. A `from numpy import` of any removed name is reported here too, with the same advice.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 no longer has numpy.$N. $HINT
+rule:
+  any:
+    - kind: attribute
+      all:
+        - has: { field: object, regex: '^(np|numpy)$' }
+        - has:
+            field: attribute
+            pattern: $N
+            regex: '^(asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|warnings|os|sys|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS|ERR_[A-Z]+|FPE_[A-Z]+|SHIFT_[A-Z]+|FLOATING_POINT_SUPPORT|UFUNC_BUFSIZE_DEFAULT|UFUNC_PYVALS_NAME|MAY_SHARE_BOUNDS|MAY_SHARE_EXACT)$'
+      not: { inside: { kind: assignment, field: left } }
+    - kind: dotted_name
+      pattern: $N
+      regex: '^(int|float|complex|object|str|unicode|float_|complex_|cfloat|unicode_|string_|longfloat|singlecomplex|longcomplex|clongfloat|bool8|int0|uint0|object0|str0|bytes0|void0|typeDict|NaN|NAN|Inf|Infinity|infty|PINF|NINF|PZERO|NZERO|product|cumproduct|sometrue|alltrue|round_|row_stack|mat|compare_chararrays|format_parser|add_newdoc|add_docstring|DataSource|tracemalloc_domain|AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError|RankWarning|trapz|byte_bounds|msort|asscalar|in1d|asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS)$'
+      any:
+        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+transform:
+  H1: { replace: { source: $N, replace: '^(int|float|complex|object|str)$', by: 'Use the builtin $1.' } }
+  H2: { replace: { source: $H1, replace: '^unicode$', by: Use the builtin str. } }
+  H3: { replace: { source: $H2, replace: '^float_$', by: Use np.float64. } }
+  H4: { replace: { source: $H3, replace: '^(complex_|cfloat)$', by: Use np.complex128. } }
+  H5: { replace: { source: $H4, replace: '^(unicode_|str0|Str0)$', by: Use np.str_. } }
+  H6: { replace: { source: $H5, replace: '^(string_|bytes0|Bytes0)$', by: Use np.bytes_. } }
+  H7: { replace: { source: $H6, replace: '^longfloat$', by: Use np.longdouble. } }
+  H8: { replace: { source: $H7, replace: '^singlecomplex$', by: Use np.complex64. } }
+  H9: { replace: { source: $H8, replace: '^(longcomplex|clongfloat)$', by: Use np.clongdouble. } }
+  H10: { replace: { source: $H9, replace: '^bool8$', by: Use np.bool_. } }
+  H11: { replace: { source: $H10, replace: '^int0$', by: Use np.intp. } }
+  H12: { replace: { source: $H11, replace: '^uint0$', by: Use np.uintp. } }
+  H13: { replace: { source: $H12, replace: '^object0$', by: Use np.object_. } }
+  H14: { replace: { source: $H13, replace: '^void0$', by: Use np.void. } }
+  H15: { replace: { source: $H14, replace: '^typeDict$', by: Use np.sctypeDict. } }
+  H16: { replace: { source: $H15, replace: '^(NaN|NAN)$', by: Use np.nan. } }
+  H17: { replace: { source: $H16, replace: '^(Inf|Infinity|infty|PINF)$', by: Use np.inf. } }
+  H18: { replace: { source: $H17, replace: '^NINF$', by: Use -np.inf. } }
+  H19: { replace: { source: $H18, replace: '^PZERO$', by: Use 0.0. } }
+  H20: { replace: { source: $H19, replace: '^NZERO$', by: Use -0.0. } }
+  H21: { replace: { source: $H20, replace: '^product$', by: Use np.prod. } }
+  H22: { replace: { source: $H21, replace: '^cumproduct$', by: Use np.cumprod. } }
+  H23: { replace: { source: $H22, replace: '^sometrue$', by: Use np.any. } }
+  H24: { replace: { source: $H23, replace: '^alltrue$', by: Use np.all. } }
+  H25: { replace: { source: $H24, replace: '^round_$', by: Use np.round. } }
+  H26: { replace: { source: $H25, replace: '^row_stack$', by: Use np.vstack. } }
+  H27: { replace: { source: $H26, replace: '^mat$', by: Use np.asmatrix. } }
+  H28: { replace: { source: $H27, replace: '^compare_chararrays$', by: Use np.char.compare_chararrays. } }
+  H29: { replace: { source: $H28, replace: '^format_parser$', by: Use np.rec.format_parser. } }
+  H30: { replace: { source: $H29, replace: '^(add_newdoc|add_docstring|tracemalloc_domain)$', by: 'Use np.lib.$1.' } }
+  H31: { replace: { source: $H30, replace: '^DataSource$', by: Use np.lib.npyio.DataSource. } }
+  H32: { replace: { source: $H31, replace: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError|RankWarning)$', by: 'Use np.exceptions.$1.' } }
+  H33: { replace: { source: $H32, replace: '^trapz$', by: Use np.trapezoid. } }
+  H34: { replace: { source: $H33, replace: '^byte_bounds$', by: Use np.lib.array_utils.byte_bounds. } }
+  H35: { replace: { source: $H34, replace: '^msort$', by: 'Use np.sort(a, axis=0).' } }
+  H36: { replace: { source: $H35, replace: '^asscalar$', by: Use the item method of the array. } }
+  H37: { replace: { source: $H36, replace: '^in1d$', by: Use np.isin. } }
+  H38: { replace: { source: $H37, replace: '^asfarray$', by: Use np.asarray with a float dtype. } }
+  H39: { replace: { source: $H38, replace: '^find_common_type$', by: Use np.result_type or np.promote_types. } }
+  H40: { replace: { source: $H39, replace: '^cast$', by: 'Use np.asarray(x, dtype=dtype).' } }
+  H41: { replace: { source: $H40, replace: '^source$', by: Use inspect.getsource. } }
+  H42: { replace: { source: $H41, replace: '^who$', by: Use locals() or a debugger. } }
+  H43: { replace: { source: $H42, replace: '^lookfor$', by: Search the NumPy documentation instead. } }
+  H44: { replace: { source: $H43, replace: '^obj2sctype$', by: 'Use np.dtype(obj).type.' } }
+  H45: { replace: { source: $H44, replace: '^sctype2char$', by: 'Use np.dtype(obj).char.' } }
+  H46: { replace: { source: $H45, replace: '^issubclass_$', by: Use the builtin issubclass. } }
+  H47: { replace: { source: $H46, replace: '^issubsctype$', by: Use np.issubdtype. } }
+  H48: { replace: { source: $H47, replace: '^issctype$', by: 'Use issubclass(rep, np.generic).' } }
+  H49: { replace: { source: $H48, replace: '^(maximum_sctype|sctypes)$', by: Name the dtypes you need. } }
+  H50: { replace: { source: $H49, replace: '^set_string_function$', by: Use np.set_printoptions with a formatter. } }
+  H51: { replace: { source: $H50, replace: '^rank$', by: Use np.ndim. } }
+  H52: { replace: { source: $H51, replace: '^safe_eval$', by: Use ast.literal_eval. } }
+  H53: { replace: { source: $H52, replace: '^(deprecate|deprecate_with_doc)$', by: Call warnings.warn with a DeprecationWarning, or use warnings.deprecated. } }
+  H54: { replace: { source: $H53, replace: '^disp$', by: Use print. } }
+  H55: { replace: { source: $H54, replace: '^fastCopyAndTranspose$', by: Use a.T.copy(). } }
+  H56: { replace: { source: $H55, replace: '^recfromcsv$', by: 'Use np.genfromtxt with delimiter=",", names=True and dtype=None.' } }
+  H57: { replace: { source: $H56, replace: '^(recfromtxt|ndfromtxt)$', by: Use np.genfromtxt. } }
+  H58: { replace: { source: $H57, replace: '^mafromtxt$', by: 'Use np.genfromtxt with usemask=True.' } }
+  H59: { replace: { source: $H58, replace: '^compat$', by: Delete it, because it only served Python 2. } }
+  H60: { replace: { source: $H59, replace: '^nbytes$', by: 'Use np.dtype(t).itemsize.' } }
+  H61: { replace: { source: $H60, replace: '^(geterrobj|seterrobj)$', by: Use np.errstate, np.geterr or np.seterr. } }
+  H62: { replace: { source: $H61, replace: '^set_numeric_ops$', by: Define __array_ufunc__ on the subclass instead. } }
+  H63: { replace: { source: $H62, replace: '^add_newdoc_ufunc$', by: Set the __doc__ of the ufunc instead. } }
+  H64: { replace: { source: $H63, replace: '^chararray$', by: Use an array with a str or bytes dtype, because np.char.chararray is deprecated too. } }
+  H65: { replace: { source: $H64, replace: '^alen$', by: Use len. } }
+  H66: { replace: { source: $H65, replace: '^loads$', by: Use pickle.loads. } }
+  H67: { replace: { source: $H66, replace: '^(math|warnings|os|sys)$', by: 'Import the standard $1 module.' } }
+  H68: { replace: { source: $H67, replace: '^MachAr$', by: Use np.finfo. } }
+  H69: { replace: { source: $H68, replace: '^CLIP$', by: Pass the string "clip". } }
+  H70: { replace: { source: $H69, replace: '^WRAP$', by: Pass the string "wrap". } }
+  H71: { replace: { source: $H70, replace: '^RAISE$', by: Pass the string "raise". } }
+  H72: { replace: { source: $H71, replace: '^Tester$', by: Run the tests with pytest. } }
+  H73: { replace: { source: $H72, replace: '^Uint64$', by: Use np.uint64. } }
+  H74: { replace: { source: $H73, replace: '^Datetime64$', by: Use np.datetime64. } }
+  HINT: { replace: { source: $H74, replace: '^[A-Z_]+$', by: It was an internal constant with no replacement. } }
+---
+# np.lib re-exported these functions before NumPy 2. np.lib.<name> was the same object as
+# np.<name>. np.lib.polynomial was a module, not np.polynomial, so it is not in the list.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 removed the np.lib copy of $N. Write $NP.$N, which is the same function.
+rule:
+  pattern: $NP.lib.$N
+  not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N:
+    regex: '^(angle|append|apply_along_axis|apply_over_axes|array_split|asarray_chkfinite|average|bartlett|bincount|blackman|broadcast_arrays|broadcast_shapes|broadcast_to|c_|column_stack|common_type|copy|corrcoef|cov|delete|diag|diag_indices|diag_indices_from|diagflat|diff|digitize|dsplit|dstack|ediff1d|emath|expand_dims|extract|eye|fill_diagonal|fix|flip|fliplr|flipud|fromregex|genfromtxt|get_include|gradient|hamming|hanning|histogram|histogram2d|histogram_bin_edges|histogramdd|hsplit|i0|imag|index_exp|info|insert|interp|intersect1d|iscomplex|iscomplexobj|isin|isneginf|isposinf|isreal|isrealobj|issubdtype|iterable|ix_|kaiser|kron|load|loadtxt|mask_indices|median|meshgrid|mgrid|mintypecode|nan_to_num|nanargmax|nanargmin|nancumprod|nancumsum|nanmax|nanmean|nanmedian|nanmin|nanpercentile|nanprod|nanquantile|nanstd|nansum|nanvar|ndenumerate|ndindex|ogrid|packbits|pad|percentile|piecewise|place|poly|poly1d|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|put_along_axis|quantile|r_|ravel_multi_index|real|real_if_close|roots|rot90|s_|save|savetxt|savez|savez_compressed|select|setdiff1d|setxor1d|show_runtime|sinc|sort_complex|split|take_along_axis|tile|tri|tril|tril_indices|tril_indices_from|trim_zeros|triu|triu_indices|triu_indices_from|typename|union1d|unique|unpackbits|unravel_index|unwrap|vander|vectorize|vsplit)$'
+fix: $NP.$N
+metadata: { fix: safe }
+---
+# The same names imported from numpy.lib. The fix applies when every imported name moved.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 removed these names from numpy.lib. Import them from numpy, where they are the same functions.
+rule:
+  pattern: from numpy.lib import $$$NAMES
+  has: { any: [{ matches: moved-name }, { kind: aliased_import, has: { field: name, matches: moved-name } }] }
+  not: { matches: keeps-a-name }
+utils:
+  moved-name:
+    kind: dotted_name
+    regex: '^(angle|append|apply_along_axis|apply_over_axes|array_split|asarray_chkfinite|average|bartlett|bincount|blackman|broadcast_arrays|broadcast_shapes|broadcast_to|c_|column_stack|common_type|copy|corrcoef|cov|delete|diag|diag_indices|diag_indices_from|diagflat|diff|digitize|dsplit|dstack|ediff1d|emath|expand_dims|extract|eye|fill_diagonal|fix|flip|fliplr|flipud|fromregex|genfromtxt|get_include|gradient|hamming|hanning|histogram|histogram2d|histogram_bin_edges|histogramdd|hsplit|i0|imag|index_exp|info|insert|interp|intersect1d|iscomplex|iscomplexobj|isin|isneginf|isposinf|isreal|isrealobj|issubdtype|iterable|ix_|kaiser|kron|load|loadtxt|mask_indices|median|meshgrid|mgrid|mintypecode|nan_to_num|nanargmax|nanargmin|nancumprod|nancumsum|nanmax|nanmean|nanmedian|nanmin|nanpercentile|nanprod|nanquantile|nanstd|nansum|nanvar|ndenumerate|ndindex|ogrid|packbits|pad|percentile|piecewise|place|poly|poly1d|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|put_along_axis|quantile|r_|ravel_multi_index|real|real_if_close|roots|rot90|s_|save|savetxt|savez|savez_compressed|select|setdiff1d|setxor1d|show_runtime|sinc|sort_complex|split|take_along_axis|tile|tri|tril|tril_indices|tril_indices_from|trim_zeros|triu|triu_indices|triu_indices_from|typename|union1d|unique|unpackbits|unravel_index|unwrap|vander|vectorize|vsplit)$'
+  keeps-a-name:
+    has:
+      any:
+        - kind: dotted_name
+          not: { any: [{ inside: { kind: import_from_statement, field: module_name } }, { matches: moved-name }] }
+        - { kind: aliased_import, not: { has: { field: name, matches: moved-name } } }
+        - kind: wildcard_import
+fix: from numpy import $$$NAMES
+metadata: { fix: safe }
+---
+# A moved name imported together with a name that numpy.lib keeps, such as NumpyVersion.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 removed $N from numpy.lib. Import it from numpy, where it is the same function.
+rule:
+  matches: moved-name
+  pattern: $N
+  any:
+    - inside: { kind: import_from_statement, field: name, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
+    - inside:
+        kind: aliased_import
+        field: name
+        inside: { kind: import_from_statement, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
+utils:
+  lib-import:
+    has: { field: module_name, regex: '^numpy\.lib$' }
+  moved-name:
+    kind: dotted_name
+    regex: '^(angle|append|apply_along_axis|apply_over_axes|array_split|asarray_chkfinite|average|bartlett|bincount|blackman|broadcast_arrays|broadcast_shapes|broadcast_to|c_|column_stack|common_type|copy|corrcoef|cov|delete|diag|diag_indices|diag_indices_from|diagflat|diff|digitize|dsplit|dstack|ediff1d|emath|expand_dims|extract|eye|fill_diagonal|fix|flip|fliplr|flipud|fromregex|genfromtxt|get_include|gradient|hamming|hanning|histogram|histogram2d|histogram_bin_edges|histogramdd|hsplit|i0|imag|index_exp|info|insert|interp|intersect1d|iscomplex|iscomplexobj|isin|isneginf|isposinf|isreal|isrealobj|issubdtype|iterable|ix_|kaiser|kron|load|loadtxt|mask_indices|median|meshgrid|mgrid|mintypecode|nan_to_num|nanargmax|nanargmin|nancumprod|nancumsum|nanmax|nanmean|nanmedian|nanmin|nanpercentile|nanprod|nanquantile|nanstd|nansum|nanvar|ndenumerate|ndindex|ogrid|packbits|pad|percentile|piecewise|place|poly|poly1d|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|put_along_axis|quantile|r_|ravel_multi_index|real|real_if_close|roots|rot90|s_|save|savetxt|savez|savez_compressed|select|setdiff1d|setxor1d|show_runtime|sinc|sort_complex|split|take_along_axis|tile|tri|tril|tril_indices|tril_indices_from|trim_zeros|triu|triu_indices|triu_indices_from|typename|union1d|unique|unpackbits|unravel_index|unwrap|vander|vectorize|vsplit)$'
+  keeps-a-name:
+    has:
+      any:
+        - kind: dotted_name
+          not: { any: [{ inside: { kind: import_from_statement, field: module_name } }, { matches: moved-name }] }
+        - { kind: aliased_import, not: { has: { field: name, matches: moved-name } } }
+        - kind: wildcard_import
+---
+# Modules that NumPy removed or made private. HINT names where their public names live now.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 has no module $M. $HINT
+rule:
+  kind: dotted_name
+  pattern: $M
+  matches: removed-module
+  not: { matches: fixable-import }
+  any:
+    - inside: { kind: import_statement }
+    - inside: { kind: aliased_import, inside: { kind: import_statement } }
+    - inside: { kind: import_from_statement, field: module_name }
+utils:
+  removed-module:
+    regex: '^numpy\.(distutils|dual|compat|math|oldnumeric|numarray|lib\.(financial|arrayterator|math|function_base|type_check|shape_base|index_tricks|arraysetops|utils|nanfunctions|polynomial|twodim_base|ufunclike|histograms|arraypad)|core\.umath_tests|testing\.(decorators|nosetester|utils)|linalg\.linalg|fft\.helper)(\.\w+)*$'
+  fixable-import:
+    inside: { kind: import_from_statement, field: module_name }
+    regex: '^numpy\.(linalg\.linalg|fft\.helper|testing\.utils|lib\.(function_base|type_check|shape_base|index_tricks|arraysetops|nanfunctions|polynomial|twodim_base|ufunclike|histograms|arraypad))$'
+transform:
+  H1: { replace: { source: $M, replace: '^numpy\.(distutils)(\.\w+)*$', by: Build the extension with meson-python or setuptools. } }
+  H2: { replace: { source: $H1, replace: '^numpy\.dual$', by: Import the functions from numpy or scipy. } }
+  H3: { replace: { source: $H2, replace: '^numpy\.compat(\.\w+)*$', by: Delete the import, because it only served Python 2. } }
+  H4: { replace: { source: $H3, replace: '^numpy\.(lib\.)?math$', by: Import the standard math module. } }
+  H5: { replace: { source: $H4, replace: '^numpy\.(oldnumeric|numarray)(\.\w+)*$', by: Port the code to numpy. } }
+  H6: { replace: { source: $H5, replace: '^numpy\.lib\.financial$', by: Install numpy-financial and import numpy_financial. } }
+  H7: { replace: { source: $H6, replace: '^numpy\.lib\.arrayterator$', by: Import Arrayterator from numpy.lib. } }
+  H8: { replace: { source: $H7, replace: '^numpy\.lib\.utils$', by: Import its public names from numpy. } }
+  H9: { replace: { source: $H8, replace: '^numpy\.core\.umath_tests$', by: Use np.matmul or np.einsum for what it computed. } }
+  H10: { replace: { source: $H9, replace: '^numpy\.testing\.(decorators|nosetester)$', by: Use pytest. } }
+  H11: { replace: { source: $H10, replace: '^numpy\.(linalg|fft|testing)\.\w+$', by: 'Import from numpy.$1.' } }
+  HINT: { replace: { source: $H11, replace: '^numpy\.lib\.\w+$', by: Import its public names from numpy. } }
+---
+# from numpy.linalg.linalg import norm becomes from numpy.linalg import norm. The fix is unsafe,
+# because the old module also held private names that the new one does not export.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 has no module $M. Import from $NEW.
+rule:
+  kind: dotted_name
+  pattern: $M
+  inside: { kind: import_from_statement, field: module_name }
+  regex: '^numpy\.(linalg\.linalg|fft\.helper|testing\.utils|lib\.(function_base|type_check|shape_base|index_tricks|arraysetops|nanfunctions|polynomial|twodim_base|ufunclike|histograms|arraypad))$'
+transform:
+  T1: { replace: { source: $M, replace: '^numpy\.(linalg|fft|testing)\.\w+$', by: 'numpy.$1' } }
+  NEW: { replace: { source: $T1, replace: '^numpy\.lib\.\w+$', by: numpy } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+# The same modules reached by attribute, and the nose helpers of numpy.testing.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 has no $M. $HINT
+rule:
+  kind: attribute
+  pattern: $M
+  regex: '^(np|numpy)\.(linalg\.linalg|fft\.helper|lib\.(math|financial|function_base|type_check|shape_base|index_tricks|arraysetops|utils|nanfunctions|twodim_base|ufunclike|histograms|arraypad|arrayterator)|core\.umath_tests|testing\.(dec|decorators|nosetester|utils|Tester|raises|run_module_suite)|distutils|dual|oldnumeric|numarray)$'
+  not: { inside: { kind: assignment, field: left } }
+transform:
+  H1: { replace: { source: $M, replace: '^(np|numpy)\.(linalg|fft)\.\w+$', by: 'Use $1.$2.' } }
+  H2: { replace: { source: $H1, replace: '^(np|numpy)\.lib\.math$', by: Import the standard math module. } }
+  H3: { replace: { source: $H2, replace: '^(np|numpy)\.lib\.financial$', by: Install numpy-financial and import numpy_financial. } }
+  H4: { replace: { source: $H3, replace: '^(np|numpy)\.lib\.arrayterator$', by: 'Use $1.lib.Arrayterator.' } }
+  H5: { replace: { source: $H4, replace: '^(np|numpy)\.lib\.\w+$', by: 'Use the same names on $1.' } }
+  H6: { replace: { source: $H5, replace: '^(np|numpy)\.core\.umath_tests$', by: Use np.matmul or np.einsum for what it computed. } }
+  H7: { replace: { source: $H6, replace: '^(np|numpy)\.testing\.utils$', by: 'Use $1.testing.' } }
+  H8: { replace: { source: $H7, replace: '^(np|numpy)\.testing\.raises$', by: Use pytest.raises. } }
+  H9: { replace: { source: $H8, replace: '^(np|numpy)\.testing\.\w+$', by: Use pytest. } }
+  H10: { replace: { source: $H9, replace: '^(np|numpy)\.distutils$', by: Build the extension with meson-python or setuptools. } }
+  H11: { replace: { source: $H10, replace: '^(np|numpy)\.dual$', by: Use the functions of numpy or scipy. } }
+  HINT: { replace: { source: $H11, replace: '^(np|numpy)\.(oldnumeric|numarray)$', by: Port the code to numpy. } }
+---
+# The nose helpers imported from numpy.testing.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: numpy.testing no longer has $N. Use pytest.
+rule:
+  kind: dotted_name
+  pattern: $N
+  regex: '^(dec|decorators|nosetester|Tester|raises|run_module_suite)$'
+  any:
+    - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy\.testing$' } }
+    - inside:
+        kind: aliased_import
+        field: name
+        inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.testing$' } }
+---
+# np.ptp(a) calls a.ptp for a masked array and computes the same range for an ndarray. A module
+# such as np or ma has a ptp function, not a method, so it is left alone.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.ptp was removed in NumPy 2. Write np.ptp($X).
+rule:
+  pattern: $X.ptp()
+  not: { matches: module-function }
+utils:
+  module-function:
+    has: { field: function, has: { field: object, regex: '^(np|numpy|ma|jnp|cp|cupy|xp|torch|da|(np|numpy)\.ma)$' } }
+fix: np.ptp($X)
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.ptp was removed in NumPy 2. Write np.ptp($X, $$$A).
+rule:
+  pattern: $X.ptp($$$A)
+  not:
+    any:
+      - pattern: $X.ptp()
+      - matches: module-function
+utils:
+  module-function:
+    has: { field: function, has: { field: object, regex: '^(np|numpy|ma|jnp|cp|cupy|xp|torch|da|(np|numpy)\.ma)$' } }
+fix: np.ptp($X, $$$A)
+metadata: { fix: safe }
+---
+# tostring returned what tobytes returns. array.array and PIL images renamed the method to
+# tobytes too. A call with a positional argument, such as ET.tostring(root), is a function of
+# another library.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: tostring was removed in NumPy 2.3. Write $X.tobytes(), which returns the same bytes.
+rule: { pattern: $X.tostring() }
+fix: $X.tobytes()
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: tostring was removed in NumPy 2.3. Write $X.tobytes(order=$O), which returns the same bytes.
+rule: { pattern: $X.tostring(order=$O) }
+fix: $X.tobytes(order=$O)
+metadata: { fix: safe }
+---
+# a.itemset((i, j), v) and a.itemset(i, j, v) set a[i, j]. The fix applies to a statement.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.itemset was removed in NumPy 2. Write $X[$INDEX] = $V.
+rule:
+  pattern: $X.itemset($T, $V)
+  inside: { kind: expression_statement }
+constraints:
+  T: { kind: tuple }
+transform:
+  INDEX: { substring: { source: $T, startChar: 1, endChar: -1 } }
+fix: $X[$INDEX] = $V
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.itemset was removed in NumPy 2. Write $X[$I, $J] = $V.
+rule:
+  pattern: $X.itemset($I, $J, $V)
+  inside: { kind: expression_statement }
+  not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+fix: $X[$I, $J] = $V
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.itemset was removed in NumPy 2. Write $X[$I, $J, $K] = $V.
+rule:
+  pattern: $X.itemset($I, $J, $K, $V)
+  inside: { kind: expression_statement }
+  not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+fix: $X[$I, $J, $K] = $V
+metadata: { fix: safe }
+---
+# A single integer index set the element at that flat position, so a.itemset(4, v) is
+# a.flat[4] = v, which differs from a[4] = v on more than one dimension.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.itemset was removed in NumPy 2. Write $X[index] = value, or $X.flat[i] = value for a flat position.
+rule:
+  pattern: $X.itemset($$$A)
+  not:
+    all:
+      - inside: { kind: expression_statement }
+      - any:
+          - all:
+              - pattern: $X.itemset($T, $V)
+              - has: { field: arguments, has: { nthChild: 1, kind: tuple } }
+          - all:
+              - any:
+                  - pattern: $X.itemset($I, $J, $V)
+                  - pattern: $X.itemset($I, $J, $K, $V)
+              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+---
+# reshape lost newshape= in NumPy 2.4. The shape by position works on every version, and shape=
+# only from 2.1.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: reshape(newshape=) was removed in NumPy 2.4. Write $NP.reshape($A, $S).
+rule:
+  pattern: $NP.reshape($A, newshape=$S)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.reshape($A, $S)
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: reshape(newshape=) was removed in NumPy 2.4. Write $NP.reshape($A, $S, order=$O).
+rule:
+  pattern: $NP.reshape($A, newshape=$S, order=$O)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.reshape($A, $S, order=$O)
+metadata: { fix: safe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: reshape(newshape=) was removed in NumPy 2.4. Pass the shape by position after the array.
+rule:
+  pattern: $NP.reshape($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^newshape$ } } }
+  not:
+    any:
+      - pattern: $NP.reshape($A, newshape=$S)
+      - pattern: $NP.reshape($A, newshape=$S, order=$O)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# method= replaced interpolation= in NumPy 1.22 and takes the same values. NumPy 2.4 removed
+# interpolation=. pandas keeps interpolation= on its own quantile, which is not matched.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: interpolation= was removed from $F in NumPy 2.4. Write method=$V, which takes the same values.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^interpolation$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    not: { has: { kind: keyword_argument, has: { field: name, regex: ^method$ } } }
+    inside: { kind: call, has: { field: function, pattern: $F, regex: '^(np|numpy)\.(nan)?(quantile|percentile)$' } }
+fix: method=$V
+metadata: { fix: safe, since: "1.22" }
+---
+# These keywords did nothing before they were removed. np.save ignored fix_imports since 1.17,
+# and np.corrcoef ignored bias and ddof since 1.10.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $F no longer takes the $K keyword, which had no effect. Delete it.
+rule:
+  pattern: $F($$$ARGS)
+  has:
+    field: arguments
+    has: { kind: keyword_argument, has: { field: name, pattern: $K } }
+constraints:
+  F: { regex: '^(np|numpy)\.(save|corrcoef)$' }
+  K: { regex: '^(fix_imports|bias|ddof)$' }
+rewriters:
+  - id: drop-keyword
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(fix_imports|bias|ddof)$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - { kind: keyword_argument, has: { field: name, regex: ^(fix_imports|bias|ddof)$ } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-keyword, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: safe }
+---
+# style= did nothing since NumPy 1.14, except under np.set_printoptions(legacy="1.13"), which
+# used it for zero-dimensional arrays. So the fix is unsafe.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: array2string no longer takes the style keyword, which NumPy 1.14 stopped using. Delete it.
+rule:
+  pattern: $F($$$ARGS)
+  has:
+    field: arguments
+    has: { kind: keyword_argument, has: { field: name, regex: ^style$ } }
+constraints:
+  F: { regex: '^(np|numpy)\.array2string$' }
+rewriters:
+  - id: drop-keyword
+    rule: { kind: keyword_argument, has: { field: name, regex: ^style$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - { kind: keyword_argument, has: { field: name, regex: ^style$ } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-keyword, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe }
+---
+# normed= gave wrong densities on bins of unequal width, where density= is right, so the fix is
+# unsafe.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: normed= was removed from $F in NumPy 1.24. Write density=$V.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^normed$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    inside: { kind: call, has: { field: function, pattern: $F, regex: '^(np|numpy)\.histogram(2d|dd)?$' } }
+fix: density=$V
+metadata: { fix: unsafe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: bincount raises on minlength=None since NumPy 2.3. Write minlength=0, which meant the same.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^minlength$ }
+    - has: { field: value, regex: ^None$ }
+  inside:
+    kind: argument_list
+    inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.bincount$' } }
+fix: minlength=0
+metadata: { fix: safe }
+---
+# On NumPy 2, copy=False means never copy, so np.array([1, 2], copy=False) raises ValueError.
+# Old code meant copy only when needed, which np.asarray does on every version. The fix is
+# unsafe, because code that counted on the error to prove no copy was made loses that check.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: np.array(copy=False) raises on NumPy 2 when it must copy, for example from a list. Write $NP.asarray($X), which copies only when needed.
+rule:
+  pattern: $NP.array($X, copy=False)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.asarray($X)
+metadata: { fix: unsafe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: np.array(copy=False) raises on NumPy 2 when it must copy, for example to change the dtype. Write $NP.asarray($X, dtype=$D), which copies only when needed.
+rule:
+  pattern: $NP.array($X, dtype=$D, copy=False)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.asarray($X, dtype=$D)
+metadata: { fix: unsafe }
+---
+id: removed-in-numpy-2
+language: python
+severity: error
+message: np.array(copy=False) raises on NumPy 2 when it must copy, for example from a list. Write np.asarray, which copies only when needed, or copy=None.
+rule:
+  pattern: $NP.array($$$ARGS)
+  has:
+    field: arguments
+    has:
+      kind: keyword_argument
+      all:
+        - has: { field: name, regex: ^copy$ }
+        - has: { field: value, regex: ^False$ }
+  not:
+    any:
+      - pattern: $NP.array($X, copy=False)
+      - pattern: $NP.array($X, dtype=$D, copy=False)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# NumPy 2.5 removed the dtype code "a", which was another name for "S".
+id: removed-in-numpy-2
+language: python
+severity: error
+message: The dtype code "a" was removed in NumPy 2.5. Write $NEW, which is the same dtype.
+rule:
+  kind: string
+  pattern: $S
+  regex: '^[bBrRuU]?["''][<>|=]?a\d*["'']$'
+  any:
+    - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
+    - all:
+        - nthChild: 1
+        - inside:
+            kind: argument_list
+            inside: { kind: call, has: { field: function, regex: '^((np|numpy)\.dtype|.*\.astype)$' } }
+    - all:
+        - nthChild: 2
+        - inside:
+            kind: tuple
+            inside:
+              kind: list
+              any:
+                - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
+                - inside:
+                    kind: argument_list
+                    inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.dtype$' } }
+transform:
+  NEW: { replace: { source: $S, replace: 'a(\d*)(["''])$', by: 'S$1$2' } }
+fix: $NEW
+metadata: { fix: safe }
+---
+# fromstring without sep= read raw bytes, which NumPy 2.3 removed. frombuffer reads the same
+# values, but returns a read-only view of the bytes where fromstring returned a writable copy,
+# and it rejects a str. So the fix is unsafe.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: The binary mode of fromstring was removed in NumPy 2.3. Write $NP.frombuffer($$$A), and add .copy() when the code writes to the array.
+rule:
+  pattern: $NP.fromstring($$$A)
+  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^sep$ } } } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.frombuffer($$$A)
+metadata: { fix: unsafe }
