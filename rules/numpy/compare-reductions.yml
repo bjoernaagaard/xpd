@@ -1,0 +1,15 @@
+# a.all() == b.all() compares two single booleans, so it is True for many pairs of different
+# arrays. The fix is unsafe on purpose, because it changes the result to the one the code meant.
+id: compare-reductions
+language: python
+severity: error
+message: This compares two single booleans, not the arrays, so it is True for many arrays that differ. Write np.array_equal($A, $B).
+rule:
+  any:
+    - pattern: $A.$R() == $B.$R()
+    - pattern: $NP.$R($A) == $NP.$R($B)
+constraints:
+  R: { regex: "^(all|any)$" }
+  NP: { regex: "^(np|numpy)$" }
+fix: np.array_equal($A, $B)
+metadata: { fix: unsafe }

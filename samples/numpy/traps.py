@@ -301,3 +301,139 @@ def int_masks():
         y[np.array([0, 2]).astype(int)],
         np.array(["low", "high"])[(y > 15).astype(int)],
     ]
+
+
+def kind(value):
+    return type(value).__name__, np.shape(value), getattr(value, "dtype", None)
+
+
+@case
+def iterators_in_numpy():
+    y = [1, 2, 3]
+    d = {"a": 1, "b": 2}
+    return [
+        kind(np.array(v * 2 for v in y)),  # xpd: iterator-to-array
+        kind(np.array(map(float, y))),  # xpd: iterator-to-array
+        kind(np.asarray(zip(y, y), dtype=object)),  # xpd: iterator-to-array
+        kind(np.array(d.values())),  # xpd: iterator-to-array
+        kind(np.array({1, 2, 3})),  # xpd: iterator-to-array
+        kind(np.max(v for v in y)),  # xpd: iterator-to-array
+        np.argmax(map(abs, y)),  # xpd: iterator-to-array
+        np.any(v > 100 for v in y),  # xpd: iterator-to-array
+        np.array([v * 2 for v in y]),
+        np.array(list(map(float, y))),
+        np.fromiter((v * 2 for v in y), float),
+        np.array(range(3)),
+        np.array(sorted({1, 2, 3})),
+        np.max([v for v in y]),
+        np.array(list(d.values())),
+        max(v for v in y),
+        np.array(np.arange(3)),
+    ]
+
+
+def iterators_that_raise(y):
+    np.sum(v for v in y)  # xpd: iterator-to-array
+    np.mean(map(float, y))  # xpd: iterator-to-array
+    np.concatenate(np.ones(2) for _ in y)  # xpd: iterator-to-array
+
+
+@case
+def nan_cast_to_int():
+    x = np.array([1.5, 2.5, 3.5])
+    return [
+        np.where(x > 2, x, np.nan).astype(int),  # xpd: nan-to-int
+        np.full(2, np.nan).astype(np.int64),  # xpd: nan-to-int
+        np.where(x > 2, x, 0).astype(int),
+        np.where(x > 2, x, np.nan).astype(float),
+        np.nan_to_num(np.where(x > 2, x, np.nan)).astype(int),
+    ]
+
+
+def reads_unset_memory(n):
+    total = np.empty(n).sum()  # xpd: read-uninitialized
+    shifted = np.empty_like(np.arange(n)) + 1  # xpd: read-uninitialized
+    return total, shifted
+
+
+@case
+def reads_set_memory():
+    out = np.empty(3)
+    out[:] = 1
+    return [
+        np.empty(3) * np.nan,
+        np.zeros(3).sum(),
+        out,
+        np.empty(0).sum(),
+    ]
+
+
+def add_one(acc=np.zeros(2)):  # xpd: array-default-argument
+    acc += 1
+    return acc
+
+
+def set_first(values=np.ones(3)):  # xpd: array-default-argument
+    values[0] = 0
+    return values
+
+
+def scaled(values=np.ones(3)):
+    return values * 2
+
+
+def reset(acc=None):
+    acc = np.zeros(2) if acc is None else acc
+    acc += 1
+    return acc
+
+
+@case
+def shared_defaults():
+    add_one()
+    set_first()
+    return [add_one(), set_first(), scaled(), reset()]
+
+
+def row_inserted(m):
+    return np.insert(m, 0, [[5, 5]])  # xpd: append-flattens
+
+
+@case
+def rows_appended():
+    m = np.ones((2, 2))
+    return [
+        np.append(m, [[5, 5]]),  # xpd: append-flattens
+        np.append(m, [[5, 5]], axis=0),
+        np.append(m, [[5], [5]], 1),
+        np.append(np.arange(3), [4, 5]),
+    ]
+
+
+@case
+def compared_reductions():
+    a, b = np.array([1, 2]), np.array([5, 9])
+    return [
+        a.all() == b.all(),  # xpd: compare-reductions
+        np.any(a) == np.any(b),  # xpd: compare-reductions
+        np.array_equal(a, b),
+        a.all() and b.all(),
+        a.sum() == b.sum(),
+    ]
+
+
+@case
+def where_as_a_count():
+    z = np.array([0, 5, 0, 7])
+    found = "yes" if np.where(z > 9) else "no"  # xpd: where-tuple-length
+    if np.nonzero(z > 9):  # xpd: where-tuple-length
+        found += "!"
+    return [
+        len(np.where(z > 0)),  # xpd: where-tuple-length
+        len(np.nonzero(z)),  # xpd: where-tuple-length
+        len(np.where(z > 0)[0]),
+        np.count_nonzero(z > 0),
+        len(np.where(z > 0, z, 0)),
+        found,
+        np.where(z > 9)[0].size > 0,
+    ]

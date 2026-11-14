@@ -1,0 +1,26 @@
+# np.empty and np.empty_like leave the memory as they found it, so an expression that reads the
+# new array at once computes with leftover bytes. np.empty(n) * np.nan is left alone, because
+# every value becomes NaN whatever the bytes held.
+id: read-uninitialized
+language: python
+severity: error
+message: $F leaves the values unset, so this computes with whatever bytes were in memory. Write $Z, or fill the array before reading it.
+rule:
+  pattern: $F($$$ARGS)
+  any:
+    - inside: { kind: binary_operator }
+    - inside: { kind: comparison_operator }
+    - inside: { kind: attribute, field: object, inside: { kind: call, has: { field: function, regex: '\.(sum|mean|max|min|prod|std|var|any|all|cumsum|argmax|argmin|tolist|item)$' } } }
+  not:
+    any:
+      - inside:
+          kind: binary_operator
+          all:
+            - has: { field: operator, regex: '^\*$' }
+            - has: { regex: '^(np|numpy)\.nan$' }
+      # An empty array has no values to read.
+      - has: { field: arguments, has: { nthChild: 1, any: [{ regex: '^0$' }, { kind: tuple, has: { regex: '^0$' } }] } }
+constraints:
+  F: { regex: '^(np|numpy)\.(empty|empty_like)$' }
+transform:
+  Z: { replace: { source: $F, replace: empty, by: zeros } }
