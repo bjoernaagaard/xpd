@@ -2,7 +2,7 @@
 # were off by 6.4e8 units in the last place and expm1 and log1p by 0, in
 # research/numpy-rules/math/runs/probe.jsonl. They are not faster, so the messages claim only
 # accuracy. Unsafe: the last bits of every value change.
-id: np-expm1-log1p
+id: expm1-log1p
 language: python
 severity: warning
 message: exp($X) - 1 loses digits to rounding when $X is near 0. Write $NP.expm1($X).
@@ -16,7 +16,7 @@ constraints:
 fix: $NP.expm1($X)
 metadata: { fix: unsafe }
 ---
-id: np-expm1-log1p
+id: expm1-log1p
 language: python
 severity: warning
 message: 1 - exp($X) loses digits to rounding when $X is near 0. Write -$NP.expm1($X).
@@ -30,8 +30,8 @@ constraints:
 fix: -$NP.expm1($X)
 metadata: { fix: unsafe }
 ---
-# log(1 + exp(x)) has its own document in np-logaddexp.
-id: np-expm1-log1p
+# log(1 + exp(x)) has its own document in logaddexp.
+id: expm1-log1p
 language: python
 severity: warning
 message: 1 + $X rounds away digits before the log when $X is near 0. Write $NP.log1p($X).
@@ -54,7 +54,7 @@ fix: $NP.log1p($X)
 metadata: { fix: unsafe }
 ---
 # Only a name, attribute, call, subscript or parentheses, so that -$X keeps its meaning.
-id: np-expm1-log1p
+id: expm1-log1p
 language: python
 severity: warning
 message: 1 - $X rounds away digits before the log when $X is near 0. Write $NP.log1p(-$X).

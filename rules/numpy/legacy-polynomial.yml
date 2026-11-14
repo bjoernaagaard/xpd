@@ -5,7 +5,7 @@
 # the old functions also take poly1d objects.
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.polyfit is part of NumPy's legacy polynomial API, and its docs recommend Polynomial.fit as more stable numerically. Write $NP.polynomial.Polynomial.fit(x, y, deg), and call .convert().coef for the coefficients from degree zero up.
 rule: { pattern: $NP.polyfit($$$ARGS) }
 constraints:
@@ -13,7 +13,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.poly1d is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]), because the new class takes coefficients from degree zero up.
 rule: { pattern: $NP.poly1d($$$ARGS) }
 constraints:
@@ -21,7 +21,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.polyval is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyval(x, coef[::-1]), which takes x first and coefficients from degree zero up.
 rule: { pattern: $NP.polyval($$$ARGS) }
 constraints:
@@ -29,7 +29,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.roots is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).roots(), because the new class takes coefficients from degree zero up.
 rule: { pattern: $NP.roots($$$ARGS) }
 constraints:
@@ -37,7 +37,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.poly is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial.fromroots(roots), which gives coefficients from degree zero up.
 rule: { pattern: $NP.poly($$$ARGS) }
 constraints:
@@ -45,7 +45,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.polyder is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).deriv(), because the new class takes coefficients from degree zero up.
 rule: { pattern: $NP.polyder($$$ARGS) }
 constraints:
@@ -53,7 +53,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.polyint is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).integ(), because the new class takes coefficients from degree zero up.
 rule: { pattern: $NP.polyint($$$ARGS) }
 constraints:
@@ -61,7 +61,7 @@ constraints:
 ---
 id: legacy-polynomial
 language: python
-severity: warning
+severity: info
 message: $NP.$F is part of NumPy's legacy polynomial API. Make $NP.polynomial.Polynomial objects from coef[::-1] and use the + - * and divmod operators on them.
 rule: { pattern: $NP.$F($$$ARGS) }
 constraints:

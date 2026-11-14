@@ -6,7 +6,7 @@
 # kind differently.
 id: mergesort-kind
 language: python
-severity: warning
+severity: info
 message: kind="mergesort" is kept only for backwards compatibility, and it runs the same stable sort as kind="stable". Write kind="stable".
 rule:
   kind: keyword_argument

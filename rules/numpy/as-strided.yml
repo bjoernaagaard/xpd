@@ -5,7 +5,7 @@
 # No fix, because the shape and strides decide which safe function fits.
 id: as-strided
 language: python
-severity: warning
+severity: info
 message: as_strided reads memory outside the array when a shape or stride is wrong, and NumPy's docs ask for extreme care with it. Use sliding_window_view for windows, broadcast_to for repeated values, or slicing and reshape for a regular step, which all stay inside the array.
 rule: { pattern: $F($$$ARGS) }
 constraints:

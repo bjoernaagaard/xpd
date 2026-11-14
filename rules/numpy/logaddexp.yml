@@ -2,7 +2,7 @@
 # research/numpy-rules/math/runs/probe.jsonl gave inf and -inf where logaddexp gave the value to
 # the last bit. logaddexp ran 1.6 times slower on 1,000,000 float64 values, so the messages
 # claim only accuracy. Unsafe: the last bits change, and inf and 0 become numbers.
-id: np-logaddexp
+id: logaddexp
 language: python
 severity: warning
 message: exp($A) overflows to inf above 709 and underflows to 0 below -745, so this log gives inf or -inf where the answer is finite. Write $NP.logaddexp($A, $B).
@@ -14,7 +14,7 @@ metadata: { fix: unsafe }
 ---
 # The softplus. At x = 1000 the old form gave inf, and at x = -40 it gave 0 where the answer is
 # 4.2e-18.
-id: np-logaddexp
+id: logaddexp
 language: python
 severity: warning
 message: exp($X) overflows to inf above 709, and 1 + exp($X) rounds to 1 below -37, so this softplus gives inf or 0. Write $NP.logaddexp(0, $X).
@@ -31,7 +31,7 @@ metadata: { fix: unsafe }
 ---
 # np.logaddexp.reduce is exact but ran 8 times slower, so the message names the shift by the
 # maximum, which ran 1.7 times slower than the old form, and SciPy.
-id: np-logaddexp
+id: logaddexp
 language: python
 severity: warning
 message: exp($X) overflows to inf above 709, so this log of a sum gives inf where the answer is finite. Write m = $NP.max($X) and then m + $NP.log($NP.sum($NP.exp($X - m))), or call scipy.special.logsumexp($X).
@@ -41,7 +41,7 @@ constraints:
   X: { not: { regex: '\bmax\b' } }
 ---
 # The softmax. At [1000, 1000, 999] the old form gave nan for every value.
-id: np-logaddexp
+id: logaddexp
 language: python
 severity: warning
 message: exp($X) overflows to inf above 709, and inf divided by inf is nan, so this softmax gives nan. Subtract the maximum first, as in $NP.exp($X - $NP.max($X)), or call scipy.special.softmax.

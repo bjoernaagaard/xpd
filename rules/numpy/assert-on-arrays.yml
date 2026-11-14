@@ -8,7 +8,7 @@
 # assert with a message has no fix, because err_msg must be a string.
 id: assert-on-arrays
 language: python
-severity: warning
+severity: info
 message: A failed assert on $NP.allclose reports only False. Write $NP.testing.assert_allclose($A, $B, rtol=1e-05, atol=1e-08, equal_nan=False), which keeps the tolerances and shows the differing elements.
 rule:
   pattern: "assert $NP.allclose($A, $B)"
@@ -22,7 +22,7 @@ metadata: { fix: unsafe }
 ---
 id: assert-on-arrays
 language: python
-severity: warning
+severity: info
 message: A failed assert on $NP.allclose reports only False. Write $NP.testing.assert_allclose with the same rtol and atol, which shows the differing elements. Its defaults are rtol=1e-07 and atol=0.
 rule:
   kind: assert_statement
@@ -38,7 +38,7 @@ constraints:
 # scalar where np.array_equal returns False, and fails on shapes that == broadcasts.
 id: assert-on-arrays
 language: python
-severity: warning
+severity: info
 message: A failed assert on an array comparison reports only False. Write $NP.testing.assert_array_equal($A, $B), which shows the differing elements.
 rule:
   any:
@@ -54,7 +54,7 @@ metadata: { fix: unsafe }
 ---
 id: assert-on-arrays
 language: python
-severity: warning
+severity: info
 message: A failed assert on (a == b).all() reports only False. Write np.testing.assert_array_equal($A, $B), which shows the differing elements.
 rule:
   pattern: assert ($A == $B).all()
@@ -65,7 +65,7 @@ metadata: { fix: unsafe }
 # The same comparisons with a message, or with more arguments, have no fix.
 id: assert-on-arrays
 language: python
-severity: warning
+severity: info
 message: A failed assert on an array comparison reports only False. Write np.testing.assert_array_equal(a, b, err_msg=...), which shows the differing elements.
 rule:
   kind: assert_statement

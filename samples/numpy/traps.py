@@ -54,8 +54,8 @@ def wrong_slots_that_raise(a, b, n):
         np.vstack(a, b),  # xpd: argument-in-wrong-slot
         np.hstack(a, b, a),  # xpd: argument-in-wrong-slot
         np.concatenate(a, [4.0, 5.0]),  # xpd: argument-in-wrong-slot
-        np.random.rand((3, 4)),  # xpd: argument-in-wrong-slot
-        np.random.random(3, 4),  # xpd: argument-in-wrong-slot
+        np.random.rand((3, 4)),  # xpd: argument-in-wrong-slot, legacy-random
+        np.random.random(3, 4),  # xpd: argument-in-wrong-slot, legacy-random
         np.linspace(0, 1, 0.1),  # xpd: argument-in-wrong-slot
         np.linspace(0, 1, 1.0 / n),  # xpd: argument-in-wrong-slot
         np.quantile(a, 95),  # xpd: argument-in-wrong-slot
@@ -139,12 +139,12 @@ def float_steps():
 @case
 def one_value_only():
     rng = np.random.default_rng(0)
-    np.random.seed(0)
+    np.random.seed(0)  # xpd: legacy-random
     return [
-        np.random.randint(0, 1, 5),  # xpd: randint-single-value
-        np.random.randint(1),  # xpd: randint-single-value
+        np.random.randint(0, 1, 5),  # xpd: legacy-random, randint-single-value
+        np.random.randint(1),  # xpd: legacy-random, randint-single-value
         rng.integers(0, 1, size=5),  # xpd: randint-single-value
-        np.random.randint(0, 2, 5),
+        np.random.randint(0, 2, 5),  # xpd: legacy-random
         rng.integers(0, 1, size=5, endpoint=True),
         rng.integers(0, 10),
     ]
@@ -214,7 +214,7 @@ def results_written_in_place():
     np.clip(x, 0, 2, out=x)
     np.round(x, 1, x)
     np.nan_to_num(x, copy=False)
-    np.random.shuffle(x)
+    np.random.shuffle(x)  # xpd: legacy-random
     x = np.sort(x)
     m = m.reshape(3, 2)
     x.sort()
@@ -320,10 +320,10 @@ def iterators_in_numpy():
         kind(np.max(v for v in y)),  # xpd: iterator-to-array
         np.argmax(map(abs, y)),  # xpd: iterator-to-array
         np.any(v > 100 for v in y),  # xpd: iterator-to-array
-        np.array([v * 2 for v in y]),
+        np.array([v * 2 for v in y]),  # xpd: per-value-comprehension
         np.array(list(map(float, y))),
         np.fromiter((v * 2 for v in y), float),
-        np.array(range(3)),
+        np.array(range(3)),  # xpd: array-construction
         np.array(sorted({1, 2, 3})),
         np.max([v for v in y]),
         np.array(list(d.values())),
@@ -431,9 +431,9 @@ def where_as_a_count():
     return [
         len(np.where(z > 0)),  # xpd: where-tuple-length
         len(np.nonzero(z)),  # xpd: where-tuple-length
-        len(np.where(z > 0)[0]),
+        len(np.where(z > 0)[0]),  # xpd: count-nonzero
         np.count_nonzero(z > 0),
-        len(np.where(z > 0, z, 0)),
+        len(np.where(z > 0, z, 0)),  # xpd: where-shortcut
         found,
         np.where(z > 9)[0].size > 0,
     ]

@@ -4,7 +4,7 @@
 # eigenvectors were off from orthogonal by 0.999, where eigh was off by 2e-15. Unsafe: eigh
 # returns real values in ascending order where eig returns complex values in no set order, and
 # the signs of the eigenvectors can differ.
-id: np-eigh
+id: eig-on-symmetric
 language: python
 severity: warning
 message: $M is symmetric, and eig treats it as a general matrix, which ran 3.6 times slower and returns complex values. Write $NP.linalg.eigh($M).
@@ -25,7 +25,7 @@ utils:
 fix: $NP.linalg.eigh($M)
 metadata: { fix: unsafe }
 ---
-id: np-eigh
+id: eig-on-symmetric
 language: python
 severity: warning
 message: $M is symmetric, and eigvals treats it as a general matrix, which ran 5 times slower and returns complex values. Write $NP.linalg.eigvalsh($M).

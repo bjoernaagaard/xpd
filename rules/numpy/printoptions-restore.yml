@@ -4,7 +4,7 @@
 # because the code between the two calls has to move into the with block.
 id: printoptions-restore
 language: python
-severity: warning
+severity: info
 message: This restores print options that were changed for a while, and NumPy's docs say to use the context manager for that. Wrap the code in with $NP.printoptions(...) instead, which also restores the options when an error is raised.
 rule: { pattern: $NP.set_printoptions(**$OLD) }
 constraints:

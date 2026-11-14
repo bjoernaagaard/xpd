@@ -1,41 +1,46 @@
-# np.vecdot, added in NumPy 2.0, multiplies and sums in one pass. np.sum(a * b, axis=-1) first
-# writes the whole product to a temporary array and then reads it back to sum. vecdot ran 2.1 to
-# 3.5 times faster on 1,000,000 values, for summed axes of length 2 to 1,000, on float64 and
-# float32, and 2.5 to 3 times faster on 1,000 values.
-# The operands must be names or subscripts. vecdot raises on a scalar, and an attribute or a
-# call such as `obj.step` or `np.sum(x, axis=-1)` is often one.
-# Unsafe: vecdot adds in a different order, so float results can differ in the last bits. It
-# keeps the input dtype, so int8 products can wrap where np.sum counted in int64, and two bool
-# arrays give bool. It conjugates a complex first argument.
+# A sum of products computed through a temporary array. np.vdot flattens both arrays and adds
+# the products in one BLAS pass. The speedups are from research/numpy-rules/math/runs/bench2.jsonl,
+# one thread, NumPy 2.5.4, the lower of two runs.
+
+# Unsafe: vdot conjugates a complex first array, raises where the old form broadcasts a scalar
+# or a column against a row, returns a bool for two bool arrays and an int8 for two int8 arrays
+# where np.sum returns an int64, and changes the last bits of a float. Operands that are
+# comparisons, conjugates or new axes are left alone, because those break the fix most often.
+# The square root of a sum of squares is norm-by-hand.
 id: sum-of-products
 language: python
 severity: warning
-message: This writes every product to a temporary array before it sums. Write $NP.vecdot($A, $B), which ran 2 to 3.5 times faster on 1,000,000 values.
+message: This builds the array of products to add it up, which ran 2.4 times slower on 1,000,000 values. Write $NP.vdot($A, $B).
 rule:
-  any:
-    - pattern: "$NP.sum($A * $B, axis=-1)"
-    - pattern: "$NP.sum($A * $B, -1)"
+  pattern: $NP.sum($A * $B)
+  not: { inside: { pattern: $S.sqrt($Q.sum($Z * $Z)), stopBy: end } }
 constraints:
   NP: { regex: '^(np|numpy)$' }
-  A: { any: [{ kind: identifier }, { kind: subscript }] }
-  B: { any: [{ kind: identifier }, { kind: subscript }] }
-fix: $NP.vecdot($A, $B)
-metadata: { fix: unsafe, since: "2.0" }
+  A: { not: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator }, { regex: '[<>]|==|!=|\bconj|\bNone\b|newaxis|\bif\b|\.(less|greater|equal|not_equal|logical_\w+|isnan|isfinite|isinf|isclose)\(' }] } }
+  B: { not: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator }, { regex: '[<>]|==|!=|\bconj|\bNone\b|newaxis|\bif\b|\.(less|greater|equal|not_equal|logical_\w+|isnan|isfinite|isinf|isclose)\(' }] } }
+fix: $NP.vdot($A, $B)
+metadata: { fix: unsafe }
 ---
-# The conjugate is what vecdot computes on its own, so the explicit conj() goes away.
+# Unsafe for the same reasons as the document above.
 id: sum-of-products
 language: python
 severity: warning
-message: This writes every product to a temporary array before it sums. Write $NP.vecdot($A, $B), which conjugates $A itself and ran 2 to 3.5 times faster on 1,000,000 values.
+message: This builds the array of squares to add it up, which ran 3.1 times slower on 1,000,000 values. Write $NP.vdot($X, $X).
 rule:
   any:
-    - pattern: "$NP.sum($A.conj() * $B, axis=-1)"
-    - pattern: "$NP.sum($A.conj() * $B, -1)"
-    - pattern: "$NP.sum($NP.conj($A) * $B, axis=-1)"
-    - pattern: "$NP.sum($NP.conj($A) * $B, -1)"
+    - pattern: $NP.sum($X ** 2)
+    - pattern: $NP.sum($NP.square($X))
+  not: { inside: { kind: argument_list, inside: { pattern: $S.sqrt($E) }, stopBy: neighbor } }
 constraints:
   NP: { regex: '^(np|numpy)$' }
-  A: { any: [{ kind: identifier }, { kind: subscript }] }
-  B: { any: [{ kind: identifier }, { kind: subscript }] }
-fix: $NP.vecdot($A, $B)
-metadata: { fix: unsafe, since: "2.0" }
+fix: $NP.vdot($X, $X)
+metadata: { fix: unsafe }
+---
+# The fix needs a second statement, so there is none.
+id: sum-of-products
+language: python
+severity: warning
+message: This builds the array of squared differences to average it, which ran 3.1 times slower on 1,000,000 values. Write d = $A - $B and then $NP.vdot(d, d) / d.size.
+rule: { pattern: $NP.mean(($A - $B) ** 2) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }

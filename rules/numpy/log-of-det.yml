@@ -2,7 +2,7 @@
 # research/numpy-rules/math/runs/probe.jsonl a 200 by 200 matrix gave inf and another -inf, where
 # slogdet was off by 1 unit in the last place. The logabsdet field is new in NumPy 2.0. Unsafe:
 # for a negative determinant the old form gives nan and slogdet the log of its absolute value.
-id: np-slogdet
+id: log-of-det
 language: python
 severity: warning
 message: The determinant overflows to inf or underflows to 0 before the log is taken. Write $NP.linalg.slogdet($A).logabsdet.

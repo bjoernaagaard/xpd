@@ -6,7 +6,7 @@
 # bind tighter than @, so no parentheses are needed.
 id: dot-on-matrices
 language: python
-severity: warning
+severity: info
 message: For 2-D arrays NumPy's docs prefer the @ operator to $NP.dot. Write $A @ $B.
 rule: { pattern: "$NP.dot($A, $B)" }
 constraints:
@@ -18,7 +18,7 @@ metadata: { fix: unsafe }
 ---
 id: dot-on-matrices
 language: python
-severity: warning
+severity: info
 message: For 2-D arrays NumPy's docs prefer the @ operator to $NP.dot. Write ($A) @ ($B), and drop parentheses that are not needed.
 rule:
   pattern: "$NP.dot($A, $B)"

@@ -5,7 +5,7 @@
 # float32 values of 0.1, cumsum was off by 1.4 million units in the last place and np.sum by 2.
 # Unsafe: the last bits of a float change, and on an empty array [-1] raises where np.sum
 # returns 0.
-id: np-reduce-last
+id: reduce-last
 language: python
 severity: warning
 message: This builds every running total to read the last one, which ran 8 times slower on 1,000,000 values and adds up more rounding. Write $NP.sum($X).
@@ -15,7 +15,7 @@ constraints:
 fix: $NP.sum($X)
 metadata: { fix: unsafe }
 ---
-id: np-reduce-last
+id: reduce-last
 language: python
 severity: warning
 message: This builds every running product to read the last one, which ran 2.2 times slower on 1,000,000 values. Write $NP.prod($X).

@@ -4,7 +4,7 @@
 # 100 by 100 matrices, and 63 times faster on four 18 by 18 matrices in bench3.jsonl. Only chains
 # of 2-D operands with a 2-D result. A trace such as "ij,jk,ki->" ran 0.25 times as fast with
 # optimize=True on 18 by 18 matrices. Unsafe: the last bits change.
-id: np-einsum-optimize
+id: einsum-optimize
 language: python
 severity: warning
 message: Without optimize= einsum loops over every index at once, which ran 339 times slower on three 100 by 100 matrices. Add optimize=True.

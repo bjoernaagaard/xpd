@@ -8,7 +8,7 @@
 # name imported from numpy.testing has no fix.
 id: almost-equal-assert
 language: python
-severity: warning
+severity: info
 message: assert_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-7. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-7).
 rule: { pattern: "$M.assert_almost_equal($A, $B)" }
 constraints:
@@ -20,7 +20,7 @@ metadata: { fix: unsafe }
 ---
 id: almost-equal-assert
 language: python
-severity: warning
+severity: info
 message: assert_almost_equal is on NumPy's not recommended list, and decimal=$D is an absolute tolerance of 1.5e-$D. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D).
 rule: { pattern: "$M.assert_almost_equal($A, $B, $DECIMAL)" }
 constraints:
@@ -36,7 +36,7 @@ metadata: { fix: unsafe }
 # assert_array_almost_equal defaults to decimal=6, one less than assert_almost_equal.
 id: almost-equal-assert
 language: python
-severity: warning
+severity: info
 message: assert_array_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-6. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-6).
 rule: { pattern: "$M.assert_array_almost_equal($A, $B)" }
 constraints:
@@ -48,7 +48,7 @@ metadata: { fix: unsafe }
 ---
 id: almost-equal-assert
 language: python
-severity: warning
+severity: info
 message: assert_array_almost_equal is on NumPy's not recommended list, and decimal=$D is an absolute tolerance of 1.5e-$D. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D).
 rule: { pattern: "$M.assert_array_almost_equal($A, $B, $DECIMAL)" }
 constraints:
@@ -64,7 +64,7 @@ metadata: { fix: unsafe }
 # Every other call, such as a bare name, an err_msg argument or a computed decimal.
 id: almost-equal-assert
 language: python
-severity: warning
+severity: info
 message: $F is on NumPy's not recommended list. Write assert_allclose with rtol=0 and atol=1.5 * 10**-decimal, where decimal defaults to 7 for assert_almost_equal and 6 for assert_array_almost_equal.
 rule:
   pattern: $F($$$ARGS)
@@ -90,7 +90,7 @@ utils:
 # exactly, so it has no fix.
 id: almost-equal-assert
 language: python
-severity: warning
+severity: info
 message: assert_approx_equal is on NumPy's not recommended list. Write assert_allclose with rtol set to the relative tolerance the test needs, such as rtol=1e-6 for 7 significant digits.
 rule: { pattern: $F($$$ARGS) }
 constraints:

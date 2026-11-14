@@ -1,0 +1,64 @@
+# Squares summed along the last axis. np.vecdot, new in NumPy 2.0, adds them in one pass. The
+# speedups are from research/numpy-rules/math/runs/bench.jsonl and bench2.jsonl, one thread,
+# NumPy 2.5.4, the lower of two runs. Only axis=-1. axis=1 is the last axis of a 2-D array, but on a 3-D array with 3
+# values on axis 1 vecdot ran only 1.0 to 1.3 times as fast, in bench4.jsonl.
+
+# The product of two different arrays is left out. In the corpus 3 of its 10 hits were wrong
+# advice, a scalar that vecdot cannot take and a .conj() that vecdot conjugates again.
+
+# Unsafe: vecdot conjugates a complex array, so the sum of squares becomes a sum of squared
+# magnitudes, and the last bits change.
+id: vecdot
+language: python
+severity: warning
+message: This builds the array of squares to sum it along the last axis, which ran 2.8 times slower on 1,000,000 values. Write $NP.vecdot($X, $X).
+rule:
+  any:
+    - pattern: $NP.sum($X ** 2, axis=-1)
+    - pattern: $NP.sum($NP.square($X), axis=-1)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.vecdot($X, $X)
+metadata: { fix: unsafe, since: "2.0" }
+---
+# np.vecdot, added in NumPy 2.0, multiplies and sums in one pass. np.sum(a * b, axis=-1) first
+# writes the whole product to a temporary array and then reads it back to sum. vecdot ran 2.1 to
+# 3.5 times faster on 1,000,000 values, for summed axes of length 2 to 1,000, on float64 and
+# float32, and 2.5 to 3 times faster on 1,000 values.
+# The operands must be names or subscripts. vecdot raises on a scalar, and an attribute or a
+# call such as `obj.step` or `np.sum(x, axis=-1)` is often one.
+# Unsafe: vecdot adds in a different order, so float results can differ in the last bits. It
+# keeps the input dtype, so int8 products can wrap where np.sum counted in int64, and two bool
+# arrays give bool. It conjugates a complex first argument.
+id: vecdot
+language: python
+severity: warning
+message: This writes every product to a temporary array before it sums. Write $NP.vecdot($A, $B), which ran 2 to 3.5 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: "$NP.sum($A * $B, axis=-1)"
+    - pattern: "$NP.sum($A * $B, -1)"
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { any: [{ kind: identifier }, { kind: subscript }] }
+  B: { any: [{ kind: identifier }, { kind: subscript }] }
+fix: $NP.vecdot($A, $B)
+metadata: { fix: unsafe, since: "2.0" }
+---
+# The conjugate is what vecdot computes on its own, so the explicit conj() goes away.
+id: vecdot
+language: python
+severity: warning
+message: This writes every product to a temporary array before it sums. Write $NP.vecdot($A, $B), which conjugates $A itself and ran 2 to 3.5 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: "$NP.sum($A.conj() * $B, axis=-1)"
+    - pattern: "$NP.sum($A.conj() * $B, -1)"
+    - pattern: "$NP.sum($NP.conj($A) * $B, axis=-1)"
+    - pattern: "$NP.sum($NP.conj($A) * $B, -1)"
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { any: [{ kind: identifier }, { kind: subscript }] }
+  B: { any: [{ kind: identifier }, { kind: subscript }] }
+fix: $NP.vecdot($A, $B)
+metadata: { fix: unsafe, since: "2.0" }

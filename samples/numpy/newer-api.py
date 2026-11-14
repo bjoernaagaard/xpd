@@ -203,8 +203,8 @@ def sum_of_products():
     a = np.arange(12.0).reshape(4, 3)
     b = np.ones((4, 3))
     z = a + 1j
-    dots = np.sum(a * b, axis=-1)  # xpd: sum-of-products
-    cdots = np.sum(z.conj() * b, axis=-1)  # xpd: sum-of-products
+    dots = np.sum(a * b, axis=-1)  # xpd: vecdot
+    cdots = np.sum(z.conj() * b, axis=-1)  # xpd: vecdot
     columns = np.sum(a * b, axis=0)
     scaled = np.sum(np.sum(a, axis=-1) * 2.0, -1)
     return dots, cdots, columns, scaled, np.vecdot(a, b)

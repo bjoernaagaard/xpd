@@ -3,7 +3,7 @@
 # well, so it overflows at the same values and the message claims only speed.
 
 # Unsafe: norm takes the absolute value of complex numbers, and the last bits change.
-id: np-norm
+id: norm-by-hand
 language: python
 severity: warning
 message: This builds the array of squares to add it up, which ran 3.9 times slower on 1,000,000 values. Write $NP.linalg.norm($X).

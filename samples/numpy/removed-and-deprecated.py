@@ -186,7 +186,7 @@ def deprecated_names(values, frame):
     labels = np.char.array(["a", "b"])  # xpd: deprecated-in-numpy-2
     with np.testing.suppress_warnings() as sup:  # xpd: deprecated-in-numpy-2
         pass
-    kept = (np.rec.fromarrays([values]), np.dtype("d").name, np.array(["a", "b"]), np.char.upper(["a"]), np.strings.upper(np.array(["a"])))
+    kept = (np.rec.fromarrays([values]), np.dtype("d").name, np.array(["a", "b"]), np.char.upper(["a"]), np.strings.upper(np.array(["a"])))  # xpd: char-module
     return table, is_rec, close, name, labels, sup, kept
 
 
@@ -217,7 +217,7 @@ def maximum_into_out():
 
 @case
 def random_integers_with_size():
-    state = np.random.RandomState(7)
+    state = np.random.RandomState(7)  # xpd: legacy-random
     draws = state.random_integers(1, 6, 20)  # xpd: deprecated-in-numpy-2
     more = state.random_integers(1, 6, size=(2, 3))  # xpd: deprecated-in-numpy-2
     kept = state.randint(1, 7, 5)

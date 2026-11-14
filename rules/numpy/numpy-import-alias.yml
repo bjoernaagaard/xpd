@@ -7,7 +7,7 @@
 # any array library, so both are left alone.
 id: numpy-import-alias
 language: python
-severity: warning
+severity: info
 message: NumPy's docs import it as np, and other code and the fixes of this pack expect that name. Write import numpy as np.
 rule:
   kind: aliased_import
@@ -17,7 +17,7 @@ rule:
 ---
 id: numpy-import-alias
 language: python
-severity: warning
+severity: info
 message: from numpy import * replaces Python's sum, min, max, round, abs, all and any with NumPy's versions. Write import numpy as np and use the np. prefix.
 rule:
   kind: import_from_statement

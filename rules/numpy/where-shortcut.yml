@@ -3,7 +3,7 @@
 
 # Unsafe: np.where raises on a pandas column with missing values, and np.asarray returns an
 # object array.
-id: np-where-shortcut
+id: where-shortcut
 language: python
 severity: warning
 message: The comparison is already an array of True and False, and np.where copies it, which ran 17 times slower on 1,000,000 values. Write $NP.asarray($C).
@@ -16,7 +16,7 @@ metadata: { fix: unsafe }
 ---
 # Unsafe: on a pandas column with missing values np.where raises TypeError and np.asarray raises
 # ValueError.
-id: np-where-shortcut
+id: where-shortcut
 language: python
 severity: warning
 message: np.where picks 1 or 0 for each value of the comparison, which ran 6 times slower on 1,000,000 values than a cast. Write $NP.asarray($C, dtype=int).
@@ -29,7 +29,7 @@ metadata: { fix: unsafe }
 ---
 # Unsafe: np.where turns NaN into 0 and np.maximum keeps NaN. On a scalar np.where returns a 0-d
 # array and np.maximum a scalar, and on a masked array np.where drops the mask.
-id: np-where-shortcut
+id: where-shortcut
 language: python
 severity: warning
 message: np.where builds a mask and then picks from two arrays, which ran 5 times slower on 1,000,000 values. Write $NP.maximum($X, $W).
@@ -48,7 +48,7 @@ metadata: { fix: unsafe }
 ---
 # Unsafe: when the mask is 2-D or longer than the array, the old form raises and flatnonzero
 # returns positions.
-id: np-where-shortcut
+id: where-shortcut
 language: python
 severity: warning
 message: This builds every position and then selects from it, which ran 6 times slower on 1,000,000 values. Write $NP.flatnonzero($C).

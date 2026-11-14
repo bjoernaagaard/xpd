@@ -24,19 +24,19 @@ n = 5
 @case
 def sort_then_select():
     return (
-        np.sort(x)[0],  # xpd: np-sort-then-select
-        np.sort(x)[-1],  # xpd: np-sort-then-select
-        np.sort(x)[:5],  # xpd: np-sort-then-select
-        np.sort(x)[-5:],  # xpd: np-sort-then-select
-        np.sort(x)[::-1][:5],  # xpd: np-sort-then-select
-        x[np.argsort(x)],  # xpd: np-sort-then-select
-        np.argsort(x)[0],  # xpd: np-sort-then-select
-        np.argsort(x)[-1],  # xpd: np-sort-then-select
-        np.argsort(x)[:5],  # xpd: np-sort-then-select
-        np.argsort(x)[-5:],  # xpd: np-sort-then-select
-        np.argsort(x)[::-1][:5],  # xpd: np-sort-then-select
-        np.argsort(x)[-5:][::-1],  # xpd: np-sort-then-select
-        np.argsort(np.argsort(x)),  # xpd: np-sort-then-select
+        np.sort(x)[0],  # xpd: sort-then-select
+        np.sort(x)[-1],  # xpd: sort-then-select
+        np.sort(x)[:5],  # xpd: sort-then-select
+        np.sort(x)[-5:],  # xpd: sort-then-select
+        np.sort(x)[::-1][:5],  # xpd: sort-then-select
+        x[np.argsort(x)],  # xpd: sort-then-select
+        np.argsort(x)[0],  # xpd: sort-then-select
+        np.argsort(x)[-1],  # xpd: sort-then-select
+        np.argsort(x)[:5],  # xpd: sort-then-select
+        np.argsort(x)[-5:],  # xpd: sort-then-select
+        np.argsort(x)[::-1][:5],  # xpd: sort-then-select
+        np.argsort(x)[-5:][::-1],  # xpd: sort-then-select
+        np.argsort(np.argsort(x)),  # xpd: sort-then-select
         np.sort(x)[1],
         np.sort(grid, axis=0)[0],
         np.sort(x)[:n],
@@ -54,18 +54,18 @@ def sort_then_select():
 def count_nonzero():
     mask = x > 0
     return (
-        np.sum(x > 0.5),  # xpd: np-count-nonzero
-        len(np.where(x > 0)[0]),  # xpd: np-count-nonzero
-        len(np.nonzero(mask)[0]),  # xpd: np-count-nonzero
-        len(np.flatnonzero(mask)),  # xpd: np-count-nonzero
-        len(x[x > 0]),  # xpd: np-count-nonzero
-        np.sum(x > 2) > 0,  # xpd: np-count-nonzero
-        np.sum(y < -2) > 0,  # xpd: np-count-nonzero
+        np.sum(x > 0.5),  # xpd: count-nonzero
+        len(np.where(x > 0)[0]),  # xpd: count-nonzero
+        len(np.nonzero(mask)[0]),  # xpd: count-nonzero
+        len(np.flatnonzero(mask)),  # xpd: count-nonzero
+        len(x[x > 0]),  # xpd: count-nonzero
+        np.sum(x > 2) > 0,  # xpd: count-nonzero
+        np.sum(y < -2) > 0,  # xpd: count-nonzero
         np.sum(mask),
-        np.sum(x * y),  # xpd: np-sum-of-products
+        np.sum(x * y),  # xpd: sum-of-products
         np.sum(x > 0, axis=0),
-        np.sum(x > 0) > 1,  # xpd: np-count-nonzero
-        len(np.where(x > 0)),
+        np.sum(x > 0) > 1,  # xpd: count-nonzero
+        len(np.where(x > 0)),  # xpd: where-tuple-length
         len(x[mask]),
         np.count_nonzero(x > 0),
         np.any(x > 2),
@@ -75,12 +75,12 @@ def count_nonzero():
 @case
 def where_shortcut():
     return (
-        np.where(x > 0, True, False),  # xpd: np-where-shortcut
-        np.where(x > 0, 1, 0),  # xpd: np-where-shortcut
-        np.where(x > 0, x, 0),  # xpd: np-where-shortcut
-        np.where(x >= 0, x, 0.0),  # xpd: np-where-shortcut
-        np.where(x < 0, 0, x),  # xpd: np-where-shortcut
-        np.arange(len(x))[x > 1],  # xpd: np-where-shortcut
+        np.where(x > 0, True, False),  # xpd: where-shortcut
+        np.where(x > 0, 1, 0),  # xpd: where-shortcut
+        np.where(x > 0, x, 0),  # xpd: where-shortcut
+        np.where(x >= 0, x, 0.0),  # xpd: where-shortcut
+        np.where(x < 0, 0, x),  # xpd: where-shortcut
+        np.arange(len(x))[x > 1],  # xpd: where-shortcut
         np.where(x > 0, False, True),
         np.where(x > 0, 2, 0),
         np.where(x > 0, y, 0),
@@ -98,11 +98,11 @@ prob = np.abs(x) / 10
 @case
 def expm1_log1p():
     return (
-        np.exp(small) - 1,  # xpd: np-expm1-log1p
-        1 - np.exp(-small),  # xpd: np-expm1-log1p
-        np.log(1 + small),  # xpd: np-expm1-log1p
-        np.log(small + 1.0),  # xpd: np-expm1-log1p
-        np.log(1 - prob),  # xpd: np-expm1-log1p
+        np.exp(small) - 1,  # xpd: expm1-log1p
+        1 - np.exp(-small),  # xpd: expm1-log1p
+        np.log(1 + small),  # xpd: expm1-log1p
+        np.log(small + 1.0),  # xpd: expm1-log1p
+        np.log(1 - prob),  # xpd: expm1-log1p
         np.exp(small) - 2,
         np.exp(5) - 1,
         np.log(1 + 1e-3),
@@ -116,13 +116,13 @@ def expm1_log1p():
 
 @case
 def logaddexp():
-    s = np.exp(x) / np.sum(np.exp(x))  # xpd: np-logaddexp
-    t = np.exp(grid) / np.sum(np.exp(grid), axis=1, keepdims=True)  # xpd: np-logaddexp
+    s = np.exp(x) / np.sum(np.exp(x))  # xpd: logaddexp
+    t = np.exp(grid) / np.sum(np.exp(grid), axis=1, keepdims=True)  # xpd: logaddexp
     return (
-        np.log(np.exp(x) + np.exp(y)),  # xpd: np-logaddexp
-        np.log(1 + np.exp(x)),  # xpd: np-logaddexp
-        np.log1p(np.exp(x)),  # xpd: np-logaddexp
-        np.log(np.sum(np.exp(x))),  # xpd: np-logaddexp
+        np.log(np.exp(x) + np.exp(y)),  # xpd: logaddexp
+        np.log(1 + np.exp(x)),  # xpd: logaddexp
+        np.log1p(np.exp(x)),  # xpd: logaddexp
+        np.log(np.sum(np.exp(x))),  # xpd: logaddexp
         s,
         t,
         np.log(np.exp(x) + y),
@@ -135,10 +135,10 @@ def logaddexp():
 @case
 def log_of_product():
     return (
-        np.log(np.prod(np.abs(x) + 1)),  # xpd: np-log-of-product
+        np.log(np.prod(np.abs(x) + 1)),  # xpd: log-of-product
         np.log(np.prod(grid, axis=0)),
         np.log(np.sum(np.abs(x))),
-        np.sum(np.log(np.abs(x) + 1)),  # xpd: np-expm1-log1p
+        np.sum(np.log(np.abs(x) + 1)),  # xpd: expm1-log1p
         np.sum(np.log(np.abs(x) + 2)),
     )
 
@@ -147,8 +147,8 @@ def log_of_product():
 @case
 def reduce_last():
     return (
-        np.cumsum(x)[-1],  # xpd: np-reduce-last
-        np.cumprod(prob)[-1],  # xpd: np-reduce-last
+        np.cumsum(x)[-1],  # xpd: reduce-last
+        np.cumprod(prob)[-1],  # xpd: reduce-last
         np.cumsum(x)[-2],
         np.cumsum(x, axis=0)[-1],
         np.cumsum(x),
@@ -159,7 +159,7 @@ def reduce_last():
 @case
 def power_half():
     return (
-        np.power(np.abs(x), 0.5),  # xpd: np-power-half
+        np.power(np.abs(x), 0.5),  # xpd: power-half
         np.power(np.abs(x), 2),
         np.abs(x) ** 0.5,
     )
@@ -168,11 +168,11 @@ def power_half():
 @case
 def sum_of_products():
     return (
-        np.sum(x * y),  # xpd: np-sum-of-products
-        np.sum(grid * grid),  # xpd: np-sum-of-products
-        np.sum(x**2),  # xpd: np-sum-of-products
-        np.sum(np.square(y)),  # xpd: np-sum-of-products
-        np.mean((x - y) ** 2),  # xpd: np-sum-of-products
+        np.sum(x * y),  # xpd: sum-of-products
+        np.sum(grid * grid),  # xpd: sum-of-products
+        np.sum(x**2),  # xpd: sum-of-products
+        np.sum(np.square(y)),  # xpd: sum-of-products
+        np.mean((x - y) ** 2),  # xpd: sum-of-products
         np.sum(2 * x),
         np.sum((x > 0) * (y > 0)),
         np.sum(x[:, None] * grid[0]),
@@ -188,12 +188,12 @@ def sum_of_products():
 @case
 def norm():
     return (
-        np.sqrt(np.sum(x**2)),  # xpd: np-norm
-        np.sqrt(np.sum(x * x)),  # xpd: np-norm
-        np.sqrt(np.sum(np.square(grid))),  # xpd: np-norm
-        np.sqrt((x**2).sum()),  # xpd: np-norm
-        np.sqrt(np.sum(x**2) / x.size),  # xpd: np-sum-of-products
-        np.sqrt(np.sum(x * y)),  # xpd: np-sum-of-products
+        np.sqrt(np.sum(x**2)),  # xpd: norm-by-hand
+        np.sqrt(np.sum(x * x)),  # xpd: norm-by-hand
+        np.sqrt(np.sum(np.square(grid))),  # xpd: norm-by-hand
+        np.sqrt((x**2).sum()),  # xpd: norm-by-hand
+        np.sqrt(np.sum(x**2) / x.size),  # xpd: sum-of-products
+        np.sqrt(np.sum(x * y)),  # xpd: sum-of-products
         np.sqrt(np.sum(x**2, axis=0)),
         np.linalg.norm(x),
     )
@@ -202,9 +202,9 @@ def norm():
 @case
 def vecdot():
     return (
-        np.sum(grid * grid[::-1], axis=-1),
-        np.sum(grid**2, axis=-1),  # xpd: np-vecdot
-        np.sum(np.square(grid), axis=-1),  # xpd: np-vecdot
+        np.sum(grid * grid[::-1], axis=-1),  # xpd: vecdot
+        np.sum(grid**2, axis=-1),  # xpd: vecdot
+        np.sum(np.square(grid), axis=-1),  # xpd: vecdot
         np.sum(grid * grid, axis=1),
         np.sum(grid * 2, axis=-1),
         np.sum(grid**2, axis=0),
@@ -223,10 +223,10 @@ col = rng.standard_normal(12)
 @case
 def solve():
     return (
-        np.linalg.inv(spd) @ vec,  # xpd: np-solve
-        np.linalg.inv(spd).dot(other),  # xpd: np-solve
-        np.dot(np.linalg.inv(spd), vec),  # xpd: np-solve
-        np.linalg.inv(tall.T @ tall) @ tall.T @ col,  # xpd: np-solve
+        np.linalg.inv(spd) @ vec,  # xpd: inv-then-multiply
+        np.linalg.inv(spd).dot(other),  # xpd: inv-then-multiply
+        np.dot(np.linalg.inv(spd), vec),  # xpd: dot-on-matrices, inv-then-multiply
+        np.linalg.inv(tall.T @ tall) @ tall.T @ col,  # xpd: inv-then-multiply
         np.linalg.inv(spd),
         other @ np.linalg.inv(spd),
         np.linalg.solve(spd, vec),
@@ -237,8 +237,8 @@ def solve():
 @case
 def slogdet():
     return (
-        np.log(np.linalg.det(spd)),  # xpd: np-slogdet
-        np.log(np.abs(np.linalg.det(other))),  # xpd: np-slogdet
+        np.log(np.linalg.det(spd)),  # xpd: log-of-det
+        np.log(np.abs(np.linalg.det(other))),  # xpd: log-of-det
         np.linalg.det(spd),
         np.log(np.linalg.norm(spd)),
     )
@@ -247,10 +247,10 @@ def slogdet():
 @case
 def eigh():
     return (
-        np.linalg.eig(sq @ sq.T),  # xpd: np-eigh
-        np.linalg.eig(np.cov(tall.T)),  # xpd: np-eigh
-        np.linalg.eig(np.dot(tall.T, tall)),  # xpd: np-eigh
-        np.linalg.eigvals(sq + sq.T),  # xpd: np-eigh
+        np.linalg.eig(sq @ sq.T),  # xpd: eig-on-symmetric
+        np.linalg.eig(np.cov(tall.T)),  # xpd: eig-on-symmetric
+        np.linalg.eig(np.dot(tall.T, tall)),  # xpd: dot-on-matrices, eig-on-symmetric
+        np.linalg.eigvals(sq + sq.T),  # xpd: eig-on-symmetric
         np.linalg.eig(sq @ other.T),
         np.linalg.eig(sq),
         np.linalg.eigvals(sq.T @ other),
@@ -261,11 +261,11 @@ def eigh():
 @case
 def matmul_diagonal():
     return (
-        np.diag(sq @ other),  # xpd: np-matmul-diagonal
-        np.diag(np.dot(sq, other)),  # xpd: np-matmul-diagonal
-        np.diag(sq @ other.T),  # xpd: np-matmul-diagonal
-        np.trace(sq @ other),  # xpd: np-matmul-diagonal
-        np.trace(np.dot(sq, other)),  # xpd: np-matmul-diagonal
+        np.diag(sq @ other),  # xpd: matmul-diagonal
+        np.diag(np.dot(sq, other)),  # xpd: dot-on-matrices, matmul-diagonal
+        np.diag(sq @ other.T),  # xpd: matmul-diagonal
+        np.trace(sq @ other),  # xpd: matmul-diagonal
+        np.trace(np.dot(sq, other)),  # xpd: dot-on-matrices, matmul-diagonal
         np.diag(sq),
         np.diag(vec),
         np.trace(sq),
@@ -276,8 +276,8 @@ def matmul_diagonal():
 @case
 def einsum_optimize():
     return (
-        np.einsum("ij,jk,kl->il", sq, other, spd),  # xpd: np-einsum-optimize
-        np.einsum("ij,jk,kl,lm->im", sq, other, spd, sq),  # xpd: np-einsum-optimize
+        np.einsum("ij,jk,kl->il", sq, other, spd),  # xpd: einsum-optimize
+        np.einsum("ij,jk,kl,lm->im", sq, other, spd, sq),  # xpd: einsum-optimize
         np.einsum("ij,jk,kl->il", sq, other, spd, optimize=True),
         np.einsum("ij,jk->ik", sq, other),
         np.einsum("ij,jk,ki->", sq, other, spd),

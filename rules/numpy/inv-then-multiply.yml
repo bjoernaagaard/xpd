@@ -4,7 +4,7 @@
 # with LAPACK on one thread. With five right sides it ran 0.98 times as fast on a 32 by 32
 # matrix, in bench5.jsonl, so the message gives the speed only for a vector. Unsafe: the last bits change, and with a stack of matrices solve
 # reads a 2-D b as one matrix per stack where matmul can broadcast it.
-id: np-solve
+id: inv-then-multiply
 language: python
 severity: warning
 message: Multiplying by the inverse loses more digits than solving, and solve ran 3.8 times faster for a vector on a 1,000 by 1,000 matrix. Write $NP.linalg.solve($A, $B).
@@ -23,7 +23,7 @@ metadata: { fix: unsafe }
 # The normal equations inv(X.T @ X) @ X.T @ y are the common case. On a Vandermonde matrix of 12
 # columns the inverse left a residual of 0.038 and solve 5e-8, and solve ran 2.6 to 2.7 times faster in
 # bench2.jsonl and its repeat.
-id: np-solve
+id: inv-then-multiply
 language: python
 severity: warning
 message: Multiplying by the inverse loses more digits than solving, and on the normal equations solve ran 2.6 times faster. Write $NP.linalg.solve($A, $B @ $C).

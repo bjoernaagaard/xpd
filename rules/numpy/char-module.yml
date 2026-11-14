@@ -4,7 +4,7 @@
 # changes nothing at run time.
 id: char-module
 language: python
-severity: warning
+severity: info
 message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.$F.
 rule: { pattern: $NP.char.$F }
 constraints:
@@ -18,7 +18,7 @@ metadata: { fix: safe, since: "2.0" }
 # and on a scalar, where np.char returns a 0-d array and np.strings a bool.
 id: char-module
 language: python
-severity: warning
+severity: info
 message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.$F, which does not strip trailing whitespace before it compares.
 rule: { pattern: $NP.char.$F }
 constraints:
@@ -31,7 +31,7 @@ metadata: { fix: unsafe, since: "2.0" }
 # raises a TypeError.
 id: char-module
 language: python
-severity: warning
+severity: info
 message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.multiply.
 rule: { pattern: $NP.char.multiply }
 constraints:
@@ -41,7 +41,7 @@ metadata: { fix: unsafe, since: "2.0" }
 ---
 id: char-module
 language: python
-severity: warning
+severity: info
 message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.$F, which returns a tuple of three arrays instead of one array with a last axis of length 3.
 rule: { pattern: $NP.char.$F }
 constraints:

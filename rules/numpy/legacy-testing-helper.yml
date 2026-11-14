@@ -5,7 +5,7 @@
 # the test fails, where assert_ built it on every call.
 id: legacy-testing-helper
 language: python
-severity: warning
+severity: info
 message: assert_ is the legacy form of the assert statement, which pytest rewrites to show the compared values. Write assert $X.
 rule:
   kind: expression_statement
@@ -19,7 +19,7 @@ metadata: { fix: unsafe }
 ---
 id: legacy-testing-helper
 language: python
-severity: warning
+severity: info
 message: assert_ is the legacy form of the assert statement, which pytest rewrites to show the compared values. Write assert $X, $MSG.
 rule:
   kind: expression_statement
@@ -36,7 +36,7 @@ metadata: { fix: unsafe }
 # a file that imports it from numpy.testing at the top level.
 id: legacy-testing-helper
 language: python
-severity: warning
+severity: info
 message: NumPy's testing guidelines prefer pytest.raises to $F. Write with pytest.raises(Error, match=...) around the call, and use match to pin the message.
 rule:
   pattern: $F($$$ARGS)
