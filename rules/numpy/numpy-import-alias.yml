@@ -1,0 +1,26 @@
+# NumPy's docs import it as `import numpy as np`, a convention that gives a short recognizable
+# prefix and keeps NumPy's names apart from others with the same name:
+# https://numpy.org/doc/stable/user/absolute_beginners.html. A star import puts names such as
+# sum, min, max, round, all and any over Python's builtins. No fix, because every use of the
+# old name has to change with the import. `from array_api_compat import numpy as xp` is a
+# different module, and `import numpy as xp` is the array API convention for code that takes
+# any array library, so both are left alone.
+id: numpy-import-alias
+language: python
+severity: warning
+message: NumPy's docs import it as np, and other code and the fixes of this pack expect that name. Write import numpy as np.
+rule:
+  kind: aliased_import
+  inside: { kind: import_statement }
+  has: { field: name, regex: ^numpy$ }
+  not: { has: { field: alias, regex: ^(np|xp)$ } }
+---
+id: numpy-import-alias
+language: python
+severity: warning
+message: from numpy import * replaces Python's sum, min, max, round, abs, all and any with NumPy's versions. Write import numpy as np and use the np. prefix.
+rule:
+  kind: import_from_statement
+  all:
+    - has: { field: module_name, regex: ^numpy$ }
+    - has: { kind: wildcard_import }

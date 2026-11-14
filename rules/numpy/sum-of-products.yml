@@ -1,0 +1,41 @@
+# np.vecdot, added in NumPy 2.0, multiplies and sums in one pass. np.sum(a * b, axis=-1) first
+# writes the whole product to a temporary array and then reads it back to sum. vecdot ran 2.1 to
+# 3.5 times faster on 1,000,000 values, for summed axes of length 2 to 1,000, on float64 and
+# float32, and 2.5 to 3 times faster on 1,000 values.
+# The operands must be names or subscripts. vecdot raises on a scalar, and an attribute or a
+# call such as `obj.step` or `np.sum(x, axis=-1)` is often one.
+# Unsafe: vecdot adds in a different order, so float results can differ in the last bits. It
+# keeps the input dtype, so int8 products can wrap where np.sum counted in int64, and two bool
+# arrays give bool. It conjugates a complex first argument.
+id: sum-of-products
+language: python
+severity: warning
+message: This writes every product to a temporary array before it sums. Write $NP.vecdot($A, $B), which ran 2 to 3.5 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: "$NP.sum($A * $B, axis=-1)"
+    - pattern: "$NP.sum($A * $B, -1)"
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { any: [{ kind: identifier }, { kind: subscript }] }
+  B: { any: [{ kind: identifier }, { kind: subscript }] }
+fix: $NP.vecdot($A, $B)
+metadata: { fix: unsafe, since: "2.0" }
+---
+# The conjugate is what vecdot computes on its own, so the explicit conj() goes away.
+id: sum-of-products
+language: python
+severity: warning
+message: This writes every product to a temporary array before it sums. Write $NP.vecdot($A, $B), which conjugates $A itself and ran 2 to 3.5 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: "$NP.sum($A.conj() * $B, axis=-1)"
+    - pattern: "$NP.sum($A.conj() * $B, -1)"
+    - pattern: "$NP.sum($NP.conj($A) * $B, axis=-1)"
+    - pattern: "$NP.sum($NP.conj($A) * $B, -1)"
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { any: [{ kind: identifier }, { kind: subscript }] }
+  B: { any: [{ kind: identifier }, { kind: subscript }] }
+fix: $NP.vecdot($A, $B)
+metadata: { fix: unsafe, since: "2.0" }

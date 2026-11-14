@@ -1,0 +1,12 @@
+# The as_strided docs warn that it "has to be used with extreme care", because a wrong shape or
+# stride reads memory outside the array, and they point to sliding_window_view as the
+# "userfriendly and safe function" for windows, and to broadcast_to and reshape:
+# https://numpy.org/doc/stable/reference/generated/numpy.lib.stride_tricks.as_strided.html
+# No fix, because the shape and strides decide which safe function fits.
+id: as-strided
+language: python
+severity: warning
+message: as_strided reads memory outside the array when a shape or stride is wrong, and NumPy's docs ask for extreme care with it. Use sliding_window_view for windows, broadcast_to for repeated values, or slicing and reshape for a regular step, which all stay inside the array.
+rule: { pattern: $F($$$ARGS) }
+constraints:
+  F: { regex: '^((np|numpy)\.lib\.stride_tricks\.)?as_strided$' }
