@@ -145,6 +145,7 @@ def keywords(values, grid):
     kept_quantile = np.quantile(values, 0.3, method="nearest")
     np.save("/tmp/values.npy", values, fix_imports=True)  # xpd: removed-in-numpy-2
     corr = np.corrcoef(grid, bias=1)  # xpd: removed-in-numpy-2
+    masked_corr = np.ma.corrcoef(grid, ddof=0)  # xpd: removed-in-numpy-2
     text = np.array2string(values, style=repr)  # xpd: removed-in-numpy-2
     kept_save = (np.load("/tmp/values.npy", fix_imports=True), np.corrcoef(grid, rowvar=False))
     density = np.histogram(values, bins=3, normed=True)  # xpd: removed-in-numpy-2

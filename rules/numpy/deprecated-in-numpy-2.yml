@@ -2,7 +2,8 @@
 # and will raise in a later release. The release notes of 2.0 to 2.5 announce each one.
 
 # numpy.core became the private numpy._core in NumPy 2.0. Its old names still work, with a
-# DeprecationWarning on the first use. _multiarray_umath and multiarray._reconstruct stay silent
+# DeprecationWarning on the first use. On NumPy 1, numpy.core is where these names live, so the
+# documents apply from 2.0. _multiarray_umath and multiarray._reconstruct stay silent
 # because pickles from NumPy 1 name them, so they are left alone.
 id: deprecated-in-numpy-2
 language: python
@@ -33,6 +34,7 @@ utils:
           kind: try_statement
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+metadata: { since: "2.0" }
 ---
 id: deprecated-in-numpy-2
 language: python
@@ -64,6 +66,7 @@ utils:
           kind: try_statement
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+metadata: { since: "2.0" }
 ---
 # np.core.<name> was the same object as np.<name> for the public names. The fix is unsafe,
 # because np.core also held private names that the main namespace does not export.
@@ -95,7 +98,7 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^[a-zA-Z]\w*$', not: { regex: '^(records|defchararray|multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits|overrides|umath_tests)$' } }
 fix: $NP.$N
-metadata: { fix: unsafe }
+metadata: { fix: unsafe, since: "2.0" }
 ---
 # np.core.records is np.rec and np.core.defchararray is np.char.
 id: deprecated-in-numpy-2
@@ -129,7 +132,7 @@ transform:
   T1: { replace: { source: $N, replace: '^records$', by: rec } }
   NEW: { replace: { source: $T1, replace: '^defchararray$', by: char } }
 fix: $NP.$NEW
-metadata: { fix: safe }
+metadata: { fix: safe, since: "2.0" }
 ---
 id: deprecated-in-numpy-2
 language: python
@@ -158,6 +161,7 @@ utils:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits|overrides)$' }
+metadata: { since: "2.0" }
 ---
 # NumPy 2.5 deprecated fix. trunc rounds toward zero too, and returns the same values and dtype
 # on every input that was tried, from bool to object arrays.
@@ -276,6 +280,7 @@ constraints:
   N: { regex: '^(chararray|array|asarray)$' }
 transform:
   NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
+metadata: { since: "2.0" }
 ---
 id: deprecated-in-numpy-2
 language: python
@@ -310,6 +315,7 @@ utils:
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
+metadata: { since: "2.0" }
 ---
 # NumPy 2.4 deprecated the warning helpers of numpy.testing.
 id: deprecated-in-numpy-2

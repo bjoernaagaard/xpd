@@ -1472,7 +1472,7 @@ fix: method=$V
 metadata: { fix: safe, since: "1.22" }
 ---
 # These keywords did nothing before they were removed. np.save ignored fix_imports since 1.17,
-# and np.corrcoef ignored bias and ddof since 1.10.
+# and np.corrcoef and np.ma.corrcoef ignored bias and ddof since 1.10.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1500,7 +1500,7 @@ utils:
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
-  F: { regex: '^(np|numpy)\.(save|corrcoef)$' }
+  F: { regex: '^(np|numpy)\.(save|corrcoef|ma\.corrcoef)$' }
   K: { regex: '^(fix_imports|bias|ddof)$' }
 rewriters:
   - id: drop-keyword
