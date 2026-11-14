@@ -1,0 +1,6 @@
+# The NumPy pack. Every other .yml file in this folder is a rule.
+
+# A fix that writes `np.` applies only in a file with `import numpy as np`. Elsewhere the issue
+# has no fix.
+aliases:
+  np: numpy
