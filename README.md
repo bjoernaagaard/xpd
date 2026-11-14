@@ -1,7 +1,7 @@
 # xpd
 
 xpd is a fast, opinionated linter for Python library habits that make code slow or wrong,
-starting with pandas and scikit-learn. Each library gets one set of rules, written for its current
+starting with pandas, NumPy and scikit-learn. Each library gets one set of rules, written for its current
 version, and a small set of Python style rules runs on every file. It fixes what it can, and it is built to run after every edit a coding agent makes.
 
 ```console

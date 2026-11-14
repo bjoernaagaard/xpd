@@ -1,7 +1,7 @@
 # Rules
 
-xpd has four rule packs: [pandas](#pandas), [scikit-learn](#scikit-learn), [Hamilton](#hamilton) and
-[Python](#python). A library's rules run only on files that import it. The Python rules run on
+xpd has five rule packs: [pandas](#pandas), [NumPy](#numpy), [scikit-learn](#scikit-learn),
+[Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The Python rules run on
 every file.
 
 ## pandas
@@ -1202,31 +1202,6 @@ Use instead:
 parts = pd.DataFrame(df["pair"].tolist(), index=df["pair"].index)
 ```
 
-#### np-vectorize
-
-**Severity:** warning. **Fix:** none.
-
-Reports `np.vectorize(f)`, `np.frompyfunc(f, 2, 1)` and `np.apply_along_axis(f, 1, values)`, which still call Python once per value or per row.
-
-Example:
-
-```python
-def bigger(load, wind):
-    if load > wind:
-        return load * 2
-    return wind
-
-out = np.vectorize(bigger)(df["load"], df["wind"])
-```
-
-Use instead:
-
-```python
-out = np.where(df["load"] > df["wind"], df["load"] * 2, df["wind"])
-```
-
-The replacement is advice. xpd does not apply it automatically.
-
 #### index-loop
 
 **Severity:** warning. **Fix:** none.
@@ -2016,6 +1991,1172 @@ A project uses a type checker when the venv has it or `pyproject.toml` has a `[t
 table for it. numexpr and numba have no check. numexpr changed little in measurements, and numba
 only helps a function passed to `rolling(...).apply`, where the `rolling-apply` message names it.
 
+## NumPy
+
+These rules run on files that import `numpy`. Examples assume `import numpy as np`. The rules
+follow NumPy 2.5. Every claim was run on NumPy 2.5.4: a form that is called removed raises there, a
+form that is called wrong gives the wrong value there, and each speedup is the median of 7 runs on
+one core, at 1,000,000 values unless the entry says otherwise.
+
+A fix that writes `np.` applies only in a file with `import numpy as np`. A safe fix returns a bit
+equal value of the same dtype. An unsafe fix names what can differ. A rule that asks for an API
+added in NumPy 2.0 or later is skipped when the project's venv holds an older NumPy.
+
+### Code that gives a wrong result or raises on NumPy 2.5
+
+Each old form gives a wrong value without an error, or raises on every input in a way the text
+already shows. Examples assume `import numpy as np`. Every fix in this group changes the result to
+the one the code meant, so each one is unsafe. Read the notes before applying it.
+
+#### compare-to-nan
+
+**Severity:** error. **Fix:** unsafe: `np.isnan(x)`. `np.nan in np.unique(x)` has no fix.
+
+Reports `x == np.nan`, `x != np.nan`, `x == float("nan")`, `x == math.nan` and `np.nan in np.unique(x)`, which never find NaN, because NaN equals nothing.
+
+Example:
+
+```python
+missing = x == np.nan
+```
+
+Use instead:
+
+```python
+missing = np.isnan(x)
+```
+
+A file that imports pandas is left to the pandas rule `compare-to-missing`. A comparison passed to an assert function is left alone, because a test may check how a comparison with NaN behaves.
+
+#### argument-in-wrong-slot
+
+**Severity:** error. **Fix:** unsafe: `np.zeros((3, 4))`. The linspace form and a quantile call with more arguments have no fix.
+
+Reports `np.zeros(3, 4)`, `np.full(3, 4, 0)`, `np.reshape(a, 2, 3)`, `np.vstack(a, b)`, `np.concatenate(a, [4, 5])`, `np.random.rand((3, 4))`, `np.random.random(3, 4)`, `np.linspace(0, 1, 0.1)` and `np.quantile(x, 95)`, which raise because an argument sits in the slot of another parameter.
+
+Example:
+
+```python
+grid = np.zeros(3, 4)
+```
+
+Use instead:
+
+```python
+grid = np.zeros((3, 4))
+```
+
+#### percentile-of-fraction
+
+**Severity:** warning. **Fix:** unsafe: `np.quantile(x, 0.95)`.
+
+Reports `np.percentile(x, 0.95)` and `np.percentile(x, [0.25, 0.75])`, which ask for percentiles near the minimum, because np.percentile takes percents from 0 to 100.
+
+Example:
+
+```python
+upper = np.percentile(x, 0.95)
+```
+
+Use instead:
+
+```python
+upper = np.quantile(x, 0.95)
+```
+
+A list such as `[0.5, 99.5]`, where one number is a percent, is left alone.
+
+#### positional-tolerance
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.isclose(a, b, 1e-3)` and `np.allclose(a, b, 1e-3)`, where the third argument is rtol and atol stays 1e-8.
+
+Example:
+
+```python
+same = np.isclose(a, b, 1e-3)
+```
+
+Use instead:
+
+```python
+same = np.isclose(a, b, atol=1e-3)
+```
+
+A call that also passes atol, or a value named like rtol, is left alone. The replacement is advice. xpd does not apply it automatically.
+
+#### arange-float-step
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.arange(0, 1, 0.1)`, whose length depends on rounding, so `np.arange(1, 1.3, 0.1)` ends with 1.3000000000000003. The [NumPy docs for arange](https://numpy.org/doc/stable/reference/generated/numpy.arange.html) recommend np.linspace for a step that is not whole.
+
+Example:
+
+```python
+ticks = np.arange(0, 1, 0.1)
+```
+
+Use instead:
+
+```python
+ticks = np.linspace(0, 0.9, 10)
+```
+
+A step that is a multiple of 1/64, such as 0.5 or 0.25, is exact and left alone. The replacement is advice. xpd does not apply it automatically.
+
+#### randint-single-value
+
+**Severity:** error. **Fix:** none.
+
+Reports `np.random.randint(0, 1, n)`, `np.random.randint(1)` and `rng.integers(0, 1)`, which always return 0, because the high end is exclusive.
+
+Example:
+
+```python
+coin = rng.integers(0, 1, size=10)
+```
+
+Use instead:
+
+```python
+coin = rng.integers(0, 2, size=10)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### result-is-none
+
+**Severity:** error. **Fix:** unsafe: `x.sort()`. A result assigned to another name, or returned, has no fix.
+
+Reports `x = x.sort()`, `m = np.fill_diagonal(m, 0)`, `y = rng.shuffle(y)`, `w = w.fill(0)` and `return v.sort()`, which leave None, because these calls change the array in place.
+
+Example:
+
+```python
+values = values.sort()
+```
+
+Use instead:
+
+```python
+values.sort()
+```
+
+A sort with an argument other than an axis, such as `xp.sort(x)` in the array API, returns a value and is left alone.
+
+#### result-discarded
+
+**Severity:** error. **Fix:** unsafe: `x = np.sort(x)`.
+
+Reports `np.sort(x)`, `np.append(x, 4)`, `np.clip(x, 0, 1)`, `x.astype(float)` and `m.reshape(3, 2)` standing alone as a statement, which do nothing, because they return a new array.
+
+Example:
+
+```python
+np.append(lengths, 1)
+```
+
+Use instead:
+
+```python
+lengths = np.append(lengths, 1)
+```
+
+A call with `out=`, a call in a try block or in a `with pytest.raises` block, and a call in an asv benchmark method are left alone. Other names bound to the old array keep its old values after the fix.
+
+#### write-to-copy
+
+**Severity:** error. **Fix:** none.
+
+Reports `x[x > 2][0] = v`, `x[[0, 1]][0] = v`, `m.flatten()[0] = v` and `x.astype(int)[0] = v`, which write to a copy, so the array keeps its old values.
+
+Example:
+
+```python
+x[x > 2][0] = -1
+```
+
+Use instead:
+
+```python
+x[np.flatnonzero(x > 2)[0]] = -1
+```
+
+A slice or a whole number returns a view, so `x[1:4][0] = v` and `m[0][mask] = v` are left alone. The replacement is advice. xpd does not apply it automatically.
+
+#### array-truth-value
+
+**Severity:** error. **Fix:** none.
+
+Reports `x[(x > 2) and (x < 8)]`, `x[not (x > 2)]` and `x[2 < x < 8]`, which raise ValueError, because and, or, not and a chained comparison ask for the truth of a whole array.
+
+Example:
+
+```python
+inside = x[(x > 2) and (x < 8)]
+```
+
+Use instead:
+
+```python
+inside = x[(x > 2) & (x < 8)]
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### mask-operator-precedence
+
+**Severity:** error. **Fix:** none.
+
+Reports `x > 2 & x < 8`, where & binds first, so Python compares x with `2 & x`.
+
+Example:
+
+```python
+inside = x[x > 2 & x < 8]
+```
+
+Use instead:
+
+```python
+inside = x[(x > 2) & (x < 8)]
+```
+
+A file that imports pandas is left to the pandas rule `mask-precedence`. The replacement is advice. xpd does not apply it automatically.
+
+#### int-mask-as-index
+
+**Severity:** error. **Fix:** unsafe: `y[y > 15]`. The `~` form has no fix.
+
+Reports `y[(y > 15).astype(int)]`, which picks element 0 and element 1 over and over, and `~(y > 15).astype(int)`, which gives -1 and -2.
+
+Example:
+
+```python
+large = y[(y > 15).astype(int)]
+```
+
+Use instead:
+
+```python
+large = y[y > 15]
+```
+
+A lookup such as `labels[(score > t).astype(int)]`, where the mask comes from another array, maps each value to one of two labels and is left alone.
+
+#### iterator-to-array
+
+**Severity:** error. **Fix:** unsafe: `np.array([v * 2 for v in y])`. A set has no fix.
+
+Reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy does not consume an iterator. np.array wraps it in a zero dimensional object array, np.max returns the iterator itself, np.any returns True, and np.sum of a generator raises TypeError.
+
+Example:
+
+```python
+doubled = np.array(v * 2 for v in values)
+```
+
+Use instead:
+
+```python
+doubled = np.array([v * 2 for v in values])
+```
+
+`np.fromiter` consumes an iterator and is left alone.
+
+#### nan-to-int
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.where(m, x, np.nan).astype(int)`, which turns each NaN into -9223372036854775808.
+
+Example:
+
+```python
+counts = np.where(seen, totals, np.nan).astype(int)
+```
+
+Use instead:
+
+```python
+counts = np.where(seen, totals, 0).astype(int)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### read-uninitialized
+
+**Severity:** error. **Fix:** none.
+
+Reports `np.empty(n).sum()` and `np.empty_like(x) + 1`, which compute with whatever bytes were in memory.
+
+Example:
+
+```python
+total = np.empty(n) + offset
+```
+
+Use instead:
+
+```python
+total = np.zeros(n) + offset
+```
+
+`np.empty(n) * np.nan` gives NaN everywhere and is left alone. The replacement is advice. xpd does not apply it automatically.
+
+#### array-default-argument
+
+**Severity:** warning. **Fix:** none.
+
+Reports `def f(acc=np.zeros(2))` when the function writes into `acc`, because every call shares the one default array.
+
+Example:
+
+```python
+def add_one(acc=np.zeros(2)):
+    acc += 1
+    return acc
+```
+
+Use instead:
+
+```python
+def add_one(acc=None):
+    acc = np.zeros(2) if acc is None else acc
+    acc += 1
+    return acc
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### append-flattens
+
+**Severity:** error. **Fix:** none.
+
+Reports `np.append(m, [[5, 5]])` and `np.insert(m, 0, [[5, 5]])` without axis, which flatten the array, so the row becomes loose values.
+
+Example:
+
+```python
+grown = np.append(m, [[5, 5]])
+```
+
+Use instead:
+
+```python
+grown = np.append(m, [[5, 5]], axis=0)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### compare-reductions
+
+**Severity:** error. **Fix:** unsafe: `np.array_equal(a, b)`.
+
+Reports `a.all() == b.all()` and `np.any(a) == np.any(b)`, which compare two single booleans, not the arrays.
+
+Example:
+
+```python
+assert a.all() == b.all()
+```
+
+Use instead:
+
+```python
+assert np.array_equal(a, b)
+```
+
+#### where-tuple-length
+
+**Severity:** error. **Fix:** unsafe: `np.count_nonzero(z > 0)`.
+
+Reports `len(np.where(z > 0))`, `len(np.nonzero(z))` and `if np.where(z > 9):`, because np.where with one argument returns a tuple with one array per dimension. Its length is the number of dimensions, and it is always true.
+
+Example:
+
+```python
+matches = len(np.where(z > 0))
+```
+
+Use instead:
+
+```python
+matches = np.count_nonzero(z > 0)
+```
+
+### Code that raises or warns on NumPy 2.5
+
+#### removed-in-numpy-2
+
+**Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, `np.ptp(a)`, `a.tobytes()`, `a[i, j] = v` for `a.itemset`, a shape by position for `newshape=`, `method=` for `interpolation=`, deleting `fix_imports=`, `bias=` and `ddof=`, `minlength=0`, and `"S"` for the dtype code `"a"`. unsafe: `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`. The other forms have no fix.
+
+Reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, each with what to write instead. Code under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches `ImportError` or `AttributeError` is left alone, because it exists for old NumPy.
+
+Example:
+
+```python
+values = np.array(rows, dtype=np.float_, copy=False)
+low = np.quantile(values, 0.1, interpolation="nearest")
+clean = np.where(values > 0, values, np.NaN)
+warning = np.ComplexWarning
+```
+
+Use instead:
+
+```python
+values = np.asarray(rows, dtype=np.float64)
+low = np.quantile(values, 0.1, method="nearest")
+clean = np.where(values > 0, values, np.nan)
+warning = np.exceptions.ComplexWarning
+```
+
+#### deprecated-in-numpy-2
+
+**Severity:** warning. **Fix:** safe: `np.trunc` for `np.fix`, `np.ma.round` for `np.ma.round_`, `out=` for an output passed by position to `np.maximum` and `np.minimum`, `randint(low, high + 1, size)` for `random_integers(low, high, size)`, a datetime64 string without its `Z`, and `np.rec` and `np.char` for `np.core.records` and `np.core.defchararray`. unsafe: `np.<name>` for `np.core.<name>`, `randint(low, high + 1)` without a size, `x = x.reshape(shape)` for `x.shape = shape`, and `x = x.view(dtype)` for `x.dtype = dtype`. The other forms have no fix.
+
+Reports `numpy.core`, `np.typename`, `np.char.array`, `np.char.asarray` and `np.char.chararray`, `np.testing.assert_warns` and `suppress_warnings`, a timedelta64 without a unit, a time zone in a datetime64 string, `fftn` and its kin with `s=` and no `axes=`, and setting `shape`, `dtype` or `strides` on a name bound from an `np.` call in the same function. Each warns on NumPy 2.5.
+
+Example:
+
+```python
+from numpy.core.numeric import normalize_axis_tuple
+whole = np.fix(values)
+np.maximum(values, 0.0, out_buffer)
+grid = np.arange(6.0)
+grid.shape = (2, 3)
+```
+
+Use instead:
+
+```python
+from numpy.lib.array_utils import normalize_axis_tuple
+whole = np.trunc(values)
+np.maximum(values, 0.0, out=out_buffer)
+grid = np.arange(6.0)
+grid = grid.reshape((2, 3))
+```
+
+### Python work per value on arrays
+
+Each old form calls Python once per value, or copies the whole array once per pass. Speedups are
+medians of 7 runs on one core with NumPy 2.5.4, on float64 and int64.
+
+#### element-loop
+
+**Severity:** warning. **Fix:** none.
+
+Reports a `for` loop over `range`, `np.arange` or `np.ndindex`, and a `while i < n` loop with `i += 1`, whose only statement writes one element of a NumPy array from arithmetic on the loop position, and a loop over `np.nditer` or `np.ndenumerate` without `external_loop`. A body that calls another function, reads the array it writes, or writes a slice is left alone.
+
+Example:
+
+```python
+out = np.empty_like(a)
+for i in range(len(a)):
+    out[i] = a[i] * 2 + np.sqrt(b[i])
+```
+
+Use instead:
+
+```python
+out = a * 2 + np.sqrt(b)
+```
+
+#### growth-in-loop
+
+**Severity:** warning. **Fix:** none.
+
+Reports `out = np.append(out, x)`, `out = np.concatenate((out, x))` and the same with `vstack`, `hstack`, `column_stack`, `dstack` and `stack` inside a loop, when the loop does not reset `out` or read it elsewhere.
+
+Example:
+
+```python
+out = np.array([])
+for part in parts:
+    out = np.append(out, part)
+```
+
+Use instead:
+
+```python
+out = np.concatenate(parts)
+```
+
+#### per-value-comprehension
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.array([x * 2 + 1 for x in a])`, `np.array([math.sqrt(x) for x in a])`, `np.array([i * 0.5 for i in range(n)])` and `map(np.sqrt, a)`, where the element is arithmetic or a NumPy or math function on the loop variable.
+
+Example:
+
+```python
+roots = np.array([math.sqrt(x) for x in values])
+```
+
+Use instead:
+
+```python
+roots = np.sqrt(np.asarray(values))
+```
+
+#### builtin-on-array
+
+**Severity:** warning. **Fix:** unsafe: `np.abs(a).sum(axis=0)`, `np.abs(a).max(axis=0)`. `sorted` and `list` have no fix.
+
+Reports `sum`, `min`, `max`, `sorted` and `list` around a NumPy call, as in `sum(np.abs(a))`, or around a comparison of one, as in `sum(np.abs(a) > 1)`.
+
+Example:
+
+```python
+peak = max(np.abs(signal))
+```
+
+Use instead:
+
+```python
+peak = np.abs(signal).max(axis=0)
+```
+
+#### np-vectorize
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.vectorize`, `np.frompyfunc` and `np.apply_along_axis`, called or used as a decorator.
+
+Example:
+
+```python
+@np.vectorize
+def clipped(x):
+    return min(x, 3.0)
+```
+
+Use instead:
+
+```python
+def clipped(x):
+    return np.minimum(x, 3.0)
+```
+
+### Arrays built, copied and stored the slow way
+
+#### array-construction
+
+**Severity:** warning. **Fix:** safe: `np.full(n, 3, dtype=float)`, `np.zeros(n, dtype=np.float32)`. unsafe: `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
+
+Reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`.
+
+Example:
+
+```python
+weights = np.ones(n) * 0.5
+```
+
+Use instead:
+
+```python
+weights = np.full(n, 0.5, dtype=float)
+```
+
+#### needless-copy
+
+**Severity:** warning. **Fix:** safe: `np.abs(m).ravel()`. unsafe: `x.astype(np.float32)`, `np.array(x)`.
+
+Reports `.flatten()` on the result of a NumPy call that returns a new array, `x.copy().astype(t)` and `np.array(x).copy()`.
+
+Example:
+
+```python
+flat = np.concatenate([a, b]).flatten()
+```
+
+Use instead:
+
+```python
+flat = np.concatenate([a, b]).ravel()
+```
+
+#### file-roundtrip
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.loadtxt(f)` and `np.genfromtxt(f)` in a file that also calls `np.savetxt(f, ...)`, and `np.fromfile(f)` in a file that also calls `x.tofile(f)`, with the same file argument.
+
+Example:
+
+```python
+np.savetxt("cache.txt", data)
+data = np.loadtxt("cache.txt")
+```
+
+Use instead:
+
+```python
+np.save("cache.npy", data)
+data = np.load("cache.npy")
+```
+
+### Whole-array math with a faster or more exact function
+
+These rules are warnings. Each one names the NumPy function that does the same work without a
+full sort, a temporary array or a step that loses digits. The speedups were measured on one core
+with BLAS and LAPACK on one thread, NumPy 2.5.4.
+
+#### sort-then-select
+
+**Severity:** warning. **Fix:** unsafe: `np.min(x)`, `np.max(x)`, `np.sort(np.partition(x, 5)[:5])`, `np.sort(np.partition(x, -5)[-5:])`, `np.sort(x)`, `np.argmin(x)`, `np.argmax(x)`. The positions of the k smallest or largest and the rank by a double argsort have no fix.
+
+Reports `np.sort(x)[0]`, `np.sort(x)[-1]`, `np.sort(x)[:5]`, `np.sort(x)[-5:]`, `np.sort(x)[::-1][:5]`, `x[np.argsort(x)]`, `np.argsort(x)[0]`, `np.argsort(x)[-1]`, `np.argsort(x)[:5]`, `np.argsort(x)[-5:]` and `np.argsort(np.argsort(x))`, with a literal count under 100.
+
+Example:
+
+```python
+top = np.sort(scores)[-5:]
+```
+
+Use instead:
+
+```python
+top = np.sort(np.partition(scores, -5)[-5:])
+```
+
+#### count-nonzero
+
+**Severity:** warning. **Fix:** safe: `np.any(x > 2)`. unsafe: `np.count_nonzero(x > 0)`. `len(x[x > 0])` has no fix.
+
+Reports `np.sum(x > 0)`, `len(np.where(c)[0])`, `len(np.nonzero(c)[0])`, `len(np.flatnonzero(c))`, `len(x[x > 0])` and `np.sum(x > 2) > 0`.
+
+Example:
+
+```python
+changed = np.sum(before != after)
+```
+
+Use instead:
+
+```python
+changed = np.count_nonzero(before != after)
+```
+
+#### where-shortcut
+
+**Severity:** warning. **Fix:** unsafe: `np.asarray(x > 0)`, `np.asarray(x > 0, dtype=int)`, `np.maximum(x, 0)`, `np.flatnonzero(x > 1)`.
+
+Reports `np.where(x > 0, True, False)`, `np.where(x > 0, 1, 0)`, `np.where(x > 0, x, 0)`, `np.where(x < 0, 0, x)` and `np.arange(len(x))[x > 1]`.
+
+Example:
+
+```python
+relu = np.where(z > 0, z, 0)
+```
+
+Use instead:
+
+```python
+relu = np.maximum(z, 0)
+```
+
+#### expm1-log1p
+
+**Severity:** warning. **Fix:** unsafe: `np.expm1(x)`, `-np.expm1(x)`, `np.log1p(x)`, `np.log1p(-p)`.
+
+Reports `np.exp(x) - 1`, `1 - np.exp(x)`, `np.log(1 + x)`, `np.log(x + 1)` and `np.log(1 - p)`, but not on a number literal.
+
+Example:
+
+```python
+log_survival = np.log(1 - p)
+```
+
+Use instead:
+
+```python
+log_survival = np.log1p(-p)
+```
+
+#### logaddexp
+
+**Severity:** warning. **Fix:** unsafe: `np.logaddexp(a, b)`, `np.logaddexp(0, x)`. The log of a sum of exponentials and the softmax have no fix.
+
+Reports `np.log(np.exp(a) + np.exp(b))`, `np.log(1 + np.exp(x))`, `np.log1p(np.exp(x))`, `np.log(np.sum(np.exp(x)))` and `np.exp(x) / np.sum(np.exp(x))`.
+
+Example:
+
+```python
+softplus = np.log(1 + np.exp(z))
+```
+
+Use instead:
+
+```python
+softplus = np.logaddexp(0, z)
+```
+
+#### log-of-product
+
+**Severity:** warning. **Fix:** unsafe: `np.sum(np.log(x))`.
+
+Reports `np.log(np.prod(x))`.
+
+Example:
+
+```python
+log_likelihood = np.log(np.prod(probabilities))
+```
+
+Use instead:
+
+```python
+log_likelihood = np.sum(np.log(probabilities))
+```
+
+#### reduce-last
+
+**Severity:** warning. **Fix:** unsafe: `np.sum(x)`, `np.prod(x)`.
+
+Reports `np.cumsum(x)[-1]` and `np.cumprod(x)[-1]`.
+
+Example:
+
+```python
+total = np.cumsum(amounts)[-1]
+```
+
+Use instead:
+
+```python
+total = np.sum(amounts)
+```
+
+#### power-half
+
+**Severity:** warning. **Fix:** unsafe: `np.sqrt(x)`.
+
+Reports `np.power(x, 0.5)`.
+
+Example:
+
+```python
+root = np.power(area, 0.5)
+```
+
+Use instead:
+
+```python
+root = np.sqrt(area)
+```
+
+#### sum-of-products
+
+**Severity:** warning. **Fix:** unsafe: `np.vdot(a, b)`, `np.vdot(x, x)`. The mean of squared differences has no fix.
+
+Reports `np.sum(a * b)`, `np.sum(x ** 2)`, `np.sum(np.square(x))` and `np.mean((a - b) ** 2)`, but not when an operand is a number, a comparison, a conjugate or a new axis.
+
+Example:
+
+```python
+energy = np.sum(signal ** 2)
+```
+
+Use instead:
+
+```python
+energy = np.vdot(signal, signal)
+```
+
+#### norm-by-hand
+
+**Severity:** warning. **Fix:** unsafe: `np.linalg.norm(x)`.
+
+Reports `np.sqrt(np.sum(x ** 2))`, `np.sqrt(np.sum(x * x))`, `np.sqrt(np.sum(np.square(x)))`, `np.sqrt((x ** 2).sum())` and `np.sqrt((x * x).sum())`.
+
+Example:
+
+```python
+distance = np.sqrt(np.sum((a - b) ** 2))
+```
+
+Use instead:
+
+```python
+distance = np.linalg.norm(a - b)
+```
+
+#### vecdot
+
+**Severity:** warning. **Fix:** unsafe: `np.vecdot(x, x)` and `np.vecdot(a, b)`. Floats can differ in the last bits, int8 products can wrap where `np.sum` counted in int64, two bool arrays give bool, and vecdot conjugates a complex first argument. Needs NumPy 2.0.
+
+Reports `np.sum(x ** 2, axis=-1)` and `np.sum(np.square(x), axis=-1)`. It also reports `np.sum(a * b, axis=-1)` and `np.sum(a.conj() * b, axis=-1)` where `a` and `b` are names or subscripts. `np.vecdot` multiplies and sums in one pass without the temporary array, and ran 2 to 3.5 times faster on 1,000,000 values.
+
+Example:
+
+```python
+squared_length = np.sum(points ** 2, axis=-1)
+```
+
+Use instead:
+
+```python
+squared_length = np.vecdot(points, points)
+```
+
+#### inv-then-multiply
+
+**Severity:** warning. **Fix:** unsafe: `np.linalg.solve(a, b)`, `np.linalg.solve(a, b @ c)`.
+
+Reports `np.linalg.inv(a) @ b`, `np.linalg.inv(a).dot(b)`, `np.dot(np.linalg.inv(a), b)` and `np.linalg.inv(a) @ b @ c`, as in the normal equations.
+
+Example:
+
+```python
+beta = np.linalg.inv(X.T @ X) @ X.T @ y
+```
+
+Use instead:
+
+```python
+beta = np.linalg.solve(X.T @ X, X.T @ y)
+```
+
+#### log-of-det
+
+**Severity:** warning. **Fix:** unsafe: `np.linalg.slogdet(a).logabsdet`. Needs NumPy 2.0.
+
+Reports `np.log(np.linalg.det(a))` and `np.log(np.abs(np.linalg.det(a)))`.
+
+Example:
+
+```python
+log_det = np.log(np.linalg.det(cov))
+```
+
+Use instead:
+
+```python
+log_det = np.linalg.slogdet(cov).logabsdet
+```
+
+#### eig-on-symmetric
+
+**Severity:** warning. **Fix:** unsafe: `np.linalg.eigh(m)`, `np.linalg.eigvalsh(m)`.
+
+Reports `np.linalg.eig` and `np.linalg.eigvals` on a matrix the code made symmetric: `x @ x.T`, `x.T @ x`, `np.dot(x, x.T)`, `np.dot(x.T, x)`, `a + a.T`, `np.cov(...)` and `np.corrcoef(...)`.
+
+Example:
+
+```python
+values, vectors = np.linalg.eig(np.cov(data, rowvar=False))
+```
+
+Use instead:
+
+```python
+values, vectors = np.linalg.eigh(np.cov(data, rowvar=False))
+```
+
+#### matmul-diagonal
+
+**Severity:** warning. **Fix:** unsafe: `np.einsum("ij,ji->i", a, b)`, `np.einsum("ij,ij->i", a, b)`, `np.einsum("ij,ji->", a, b)`.
+
+Reports `np.diag(a @ b)`, `np.diag(np.dot(a, b))`, `np.diagonal(a @ b)`, `np.diag(a @ b.T)`, `np.trace(a @ b)` and `np.trace(np.dot(a, b))`.
+
+Example:
+
+```python
+leverage = np.diag(X @ cov @ X.T)
+```
+
+Use instead:
+
+```python
+leverage = np.einsum("ij,ij->i", X @ cov, X)
+```
+
+#### einsum-optimize
+
+**Severity:** warning. **Fix:** unsafe: add `optimize=True`.
+
+Reports `np.einsum` with three or more 2-D operands and a 2-D result, such as `"ij,jk,kl->il"`, and no `optimize=`.
+
+Example:
+
+```python
+chain = np.einsum("ij,jk,kl->il", a, b, c)
+```
+
+Use instead:
+
+```python
+chain = np.einsum("ij,jk,kl->il", a, b, c, optimize=True)
+```
+
+### The API that NumPy's docs prefer on NumPy 2.5
+
+Each old form still runs without a warning on NumPy 2.5.4. NumPy's docs call it legacy, not recommended or kept for backwards compatibility, or the newer form measured at least 1.5 times faster. The rules that state only a documented preference report as info, below the warnings. The rules that name an API added in NumPy 2.0 are skipped on an older NumPy.
+
+#### legacy-random
+
+**Severity:** warning. **Fix:** none. A Generator draws a different stream from the same seed, and `np.random.seed` elsewhere would no longer reach the rewritten call.
+
+Reports `np.random.seed`, `np.random.rand`, `np.random.randint`, `np.random.randn`, `np.random.choice`, every other distribution function in `np.random`, `np.random.get_state`, `np.random.RandomState(...)` outside files that import scikit-learn, and imports of these names from `numpy.random`. The message gives the Generator method, such as `integers` for `randint`, and its measured speed where it was at least 1.5 times faster: `random` 2 times, `integers` 2.5 times, `exponential` 2.4 times, and `choice(..., replace=False)` 280 times.
+
+Example:
+
+```python
+np.random.seed(0)
+idx = np.random.choice(len(x), 100, replace=False)
+```
+
+Use instead:
+
+```python
+rng = np.random.default_rng(0)
+idx = rng.choice(len(x), 100, replace=False)
+```
+
+#### rng-in-loop
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.random.default_rng()` without a seed inside a `for` or `while` body or a comprehension. Each call gathers entropy from the operating system, about 5 microseconds. A loop that seeds each pass from its loop variable is left alone.
+
+Example:
+
+```python
+noise = [np.random.default_rng().normal() for _ in range(n)]
+```
+
+Use instead:
+
+```python
+rng = np.random.default_rng()
+noise = rng.normal(size=n)
+```
+
+#### clock-seed
+
+**Severity:** warning. **Fix:** unsafe: `np.random.default_rng()`, `np.random.seed()`, `np.random.RandomState()`, `np.random.SeedSequence()`. The numbers change, and a seed recovered from a logged start time no longer repeats the run.
+
+Reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick get the same numbers, and NumPy recommends entropy from the operating system, logged when a run must be repeatable.
+
+Example:
+
+```python
+rng = np.random.default_rng(int(time.time()))
+```
+
+Use instead:
+
+```python
+rng = np.random.default_rng()
+print(rng.bit_generator.seed_seq.entropy)
+```
+
+#### legacy-polynomial
+
+**Severity:** info. **Fix:** none, because `numpy.polynomial` takes coefficients from degree zero up, the reverse of the old order.
+
+Reports `np.polyfit`, `np.poly1d`, `np.polyval`, `np.roots`, `np.poly`, `np.polyder`, `np.polyint`, `np.polyadd`, `np.polysub`, `np.polymul` and `np.polydiv`.
+
+Example:
+
+```python
+slope, intercept = np.polyfit(x, y, 1)
+```
+
+Use instead:
+
+```python
+intercept, slope = np.polynomial.Polynomial.fit(x, y, 1).convert().coef
+```
+
+#### almost-equal-assert
+
+**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)`, with `1.5e-6` for `assert_array_almost_equal` and `1.5e-<decimal>` for a literal decimal. A difference of exactly `atol` failed before and passes after, dicts and ragged lists are no longer compared item by item, and complex values are compared by magnitude. A bare imported name, an `err_msg` argument, a computed decimal and `assert_approx_equal` have no fix.
+
+Reports `assert_almost_equal`, `assert_array_almost_equal` and `assert_approx_equal`, which NumPy lists under "Asserts (not recommended)".
+
+Example:
+
+```python
+np.testing.assert_array_almost_equal(result, expected, decimal=4)
+```
+
+Use instead:
+
+```python
+np.testing.assert_allclose(result, expected, rtol=0, atol=1.5e-4)
+```
+
+#### assert-on-arrays
+
+**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)` and `np.testing.assert_array_equal(a, b)`. assert_allclose fails on shapes that `np.allclose` broadcasts, assert_array_equal treats NaN in the same place as equal, and both still run under `python -O`. An assert with a message, or `np.allclose` with more arguments, has no fix.
+
+Reports `assert np.allclose(a, b)`, `assert np.array_equal(a, b)`, `assert np.all(a == b)` and `assert (a == b).all()`. A failed assert shows only False, and the testing functions show the differing elements.
+
+Example:
+
+```python
+assert np.allclose(weights, expected)
+```
+
+Use instead:
+
+```python
+np.testing.assert_allclose(weights, expected, rtol=1e-05, atol=1e-08)
+```
+
+#### legacy-testing-helper
+
+**Severity:** info. **Fix:** unsafe: `assert x` and `assert x, msg`. The statement is skipped under `python -O`, and its message is built only on failure. `assert_raises` has no fix.
+
+Reports `numpy.testing.assert_`, which NumPy's testing guidelines call the legacy form of the assert statement, and `numpy.testing.assert_raises` and `assert_raises_regex`, where they prefer `pytest.raises`. A bare `assert_raises` counts only in a file that imports it from `numpy.testing`, because SciPy imports `pytest.raises` under that name.
+
+Example:
+
+```python
+assert_(res.success, res.message)
+```
+
+Use instead:
+
+```python
+assert res.success, res.message
+```
+
+#### char-module
+
+**Severity:** info. **Fix:** safe: `np.strings.upper` and every other name that is the same function in both modules. Unsafe: the comparisons, such as `np.strings.equal`, which do not strip trailing whitespace, and `np.strings.multiply`, which raises a different error on bad input. `partition` and `rpartition` have no fix, because `np.strings` returns a tuple of three arrays.
+
+Reports `np.char` functions, which NumPy's docs call legacy, where `np.strings` from NumPy 2.0 has the same name.
+
+Example:
+
+```python
+names = np.char.upper(names)
+```
+
+Use instead:
+
+```python
+names = np.strings.upper(names)
+```
+
+#### dot-on-matrices
+
+**Severity:** info. **Fix:** unsafe: `a @ b` when both operands are names, attributes, subscripts, calls or parenthesized. `@` raises on a scalar and on two Python lists, and on arrays of more than two dimensions it works on stacks of matrices, where `np.dot` does not.
+
+Reports `np.dot(a, b)`. The np.dot docs prefer `matmul` or `a @ b` for two 2-D arrays.
+
+Example:
+
+```python
+cov = np.dot(X.T, X) / n
+```
+
+Use instead:
+
+```python
+cov = X.T @ X / n
+```
+
+#### mergesort-kind
+
+**Severity:** info. **Fix:** safe: `kind="stable"`.
+
+Reports `kind="mergesort"` in `np.sort`, `np.argsort` and the `sort` and `argsort` methods. The docs keep "mergesort" only for backwards compatibility, and both names select the same stable sort.
+
+Example:
+
+```python
+order = np.argsort(scores, kind="mergesort")
+```
+
+Use instead:
+
+```python
+order = np.argsort(scores, kind="stable")
+```
+
+#### printoptions-restore
+
+**Severity:** info. **Fix:** none, because the code between the two calls has to move into the `with` block.
+
+Reports `np.set_printoptions(**saved)`, which restores options changed for a while. The docs say to use `np.printoptions` as a context manager for that, which also restores the options when an error is raised.
+
+Example:
+
+```python
+saved = np.get_printoptions()
+np.set_printoptions(precision=3)
+print(table)
+np.set_printoptions(**saved)
+```
+
+Use instead:
+
+```python
+with np.printoptions(precision=3):
+    print(table)
+```
+
+#### as-strided
+
+**Severity:** info. **Fix:** none, because the shape and strides decide which safe function fits.
+
+Reports `as_strided(...)`. Its docs ask for extreme care, because a wrong shape or stride reads memory outside the array, and point to `sliding_window_view`, `broadcast_to` and `reshape`.
+
+Example:
+
+```python
+windows = as_strided(x, shape=(len(x) - 2, 3), strides=(x.strides[0], x.strides[0]))
+```
+
+Use instead:
+
+```python
+windows = np.lib.stride_tricks.sliding_window_view(x, 3)
+```
+
+#### numpy-import-alias
+
+**Severity:** info. **Fix:** none, because every use of the old name changes with the import.
+
+Reports `import numpy as <name>` with a name other than `np` or `xp`, and `from numpy import *`, which replaces Python's `sum`, `min`, `max`, `round`, `abs`, `all` and `any`.
+
+Example:
+
+```python
+import numpy as N
+```
+
+Use instead:
+
+```python
+import numpy as np
+```
+
+#### unpackbits-popcount
+
+**Severity:** warning. **Fix:** none, because the view, reshape and axis around unpackbits vary.
+
+Reports `np.unpackbits(...).sum()`, `np.sum(np.unpackbits(...))` and `np.count_nonzero(np.unpackbits(...))`. np.bitwise_count, added in NumPy 2.0, counts the set bits of each value, and ran 37 times faster on 1,000,000 uint64 values.
+
+Example:
+
+```python
+ones = np.unpackbits(masks.view(np.uint8)).sum()
+```
+
+Use instead:
+
+```python
+ones = np.bitwise_count(masks).sum()
+```
+
 ## scikit-learn
 
 These rules run on files that import `sklearn`. Each old form gives a wrong or leaked score, or a
@@ -2451,8 +3592,8 @@ target/release/xpd check samples/bad.py
 cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --unsafe-fixes
 ```
 
-The files in `samples/pandas/`, `samples/sklearn/`, `samples/hamilton/` and `samples/python/` mark each line a rule
-reports with a comment that names the rules.
+The files in `samples/pandas/`, `samples/numpy/`, `samples/sklearn/`, `samples/hamilton/` and
+`samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the
