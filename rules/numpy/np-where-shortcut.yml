@@ -1,0 +1,64 @@
+# np.where and positions spelled out where one NumPy function does it in one pass. The speedups
+# are from research/numpy-rules/math/runs/bench2.jsonl, one thread, NumPy 2.5.4.
+
+# Unsafe: np.where raises on a pandas column with missing values, and np.asarray returns an
+# object array.
+id: np-where-shortcut
+language: python
+severity: warning
+message: The comparison is already an array of True and False, and np.where copies it, which ran 17 times slower on 1,000,000 values. Write $NP.asarray($C).
+rule: { pattern: "$NP.where($C, True, False)" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { kind: comparison_operator }
+fix: $NP.asarray($C)
+metadata: { fix: unsafe }
+---
+# Unsafe: on a pandas column with missing values np.where raises TypeError and np.asarray raises
+# ValueError.
+id: np-where-shortcut
+language: python
+severity: warning
+message: np.where picks 1 or 0 for each value of the comparison, which ran 6 times slower on 1,000,000 values than a cast. Write $NP.asarray($C, dtype=int).
+rule: { pattern: "$NP.where($C, 1, 0)" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { kind: comparison_operator }
+fix: $NP.asarray($C, dtype=int)
+metadata: { fix: unsafe }
+---
+# Unsafe: np.where turns NaN into 0 and np.maximum keeps NaN. On a scalar np.where returns a 0-d
+# array and np.maximum a scalar, and on a masked array np.where drops the mask.
+id: np-where-shortcut
+language: python
+severity: warning
+message: np.where builds a mask and then picks from two arrays, which ran 8 times slower on 1,000,000 values. Write $NP.maximum($X, $W).
+rule:
+  any:
+    - pattern: $NP.where($X > $Z, $X, $W)
+    - pattern: $NP.where($X >= $Z, $X, $W)
+    - pattern: $NP.where($X < $Z, $W, $X)
+    - pattern: $NP.where($X <= $Z, $W, $X)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  Z: { regex: '^0(\.0*)?$' }
+  W: { regex: '^0(\.0*)?$' }
+fix: $NP.maximum($X, $W)
+metadata: { fix: unsafe }
+---
+# Unsafe: when the mask is 2-D or longer than the array, the old form raises and flatnonzero
+# returns positions.
+id: np-where-shortcut
+language: python
+severity: warning
+message: This builds every position and then selects from it, which ran 6 times slower on 1,000,000 values. Write $NP.flatnonzero($C).
+rule:
+  any:
+    - pattern: $NP.arange(len($X))[$C]
+    - pattern: $NP.arange($X.size)[$C]
+    - pattern: $NP.arange($X.shape[0])[$C]
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
+fix: $NP.flatnonzero($C)
+metadata: { fix: unsafe }
