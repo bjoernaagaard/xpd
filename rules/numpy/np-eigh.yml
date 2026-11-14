@@ -1,0 +1,47 @@
+# eig on a matrix that the code itself made symmetric. In research/numpy-rules/math/runs/bench.jsonl
+# eigh ran 3.6 times faster and eigvalsh 5.5 times faster on a 1,000 by 1,000 matrix, with LAPACK
+# on one thread. In probe.jsonl eig returned complex128 values, and with repeated eigenvalues its
+# eigenvectors were off from orthogonal by 0.999, where eigh was off by 2e-15. Unsafe: eigh
+# returns real values in ascending order where eig returns complex values in no set order, and
+# the signs of the eigenvectors can differ.
+id: np-eigh
+language: python
+severity: warning
+message: $M is symmetric, and eig treats it as a general matrix, which ran 3.6 times slower and returns complex values. Write $NP.linalg.eigh($M).
+rule: { pattern: $NP.linalg.eig($M) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  M: { matches: symmetric }
+utils:
+  symmetric:
+    any:
+      - pattern: $X @ $X.T
+      - pattern: $X.T @ $X
+      - pattern: $Q.dot($X, $X.T)
+      - pattern: $Q.dot($X.T, $X)
+      - pattern: $X + $X.T
+      - pattern: $Q.cov($$$A)
+      - pattern: $Q.corrcoef($$$A)
+fix: $NP.linalg.eigh($M)
+metadata: { fix: unsafe }
+---
+id: np-eigh
+language: python
+severity: warning
+message: $M is symmetric, and eigvals treats it as a general matrix, which ran 5.5 times slower and returns complex values. Write $NP.linalg.eigvalsh($M).
+rule: { pattern: $NP.linalg.eigvals($M) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  M: { matches: symmetric }
+utils:
+  symmetric:
+    any:
+      - pattern: $X @ $X.T
+      - pattern: $X.T @ $X
+      - pattern: $Q.dot($X, $X.T)
+      - pattern: $Q.dot($X.T, $X)
+      - pattern: $X + $X.T
+      - pattern: $Q.cov($$$A)
+      - pattern: $Q.corrcoef($$$A)
+fix: $NP.linalg.eigvalsh($M)
+metadata: { fix: unsafe }

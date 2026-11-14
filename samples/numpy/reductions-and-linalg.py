@@ -210,3 +210,76 @@ def vecdot():
         np.sum(grid**2, axis=0),
         np.vecdot(grid, grid),
     )
+
+
+sq = rng.standard_normal((6, 6))
+spd = sq @ sq.T + 6 * np.eye(6)
+other = rng.standard_normal((6, 6))
+tall = rng.standard_normal((12, 3))
+vec = rng.standard_normal(6)
+col = rng.standard_normal(12)
+
+
+@case
+def solve():
+    return (
+        np.linalg.inv(spd) @ vec,  # xpd: np-solve
+        np.linalg.inv(spd).dot(other),  # xpd: np-solve
+        np.dot(np.linalg.inv(spd), vec),  # xpd: np-solve
+        np.linalg.inv(tall.T @ tall) @ tall.T @ col,  # xpd: np-solve
+        np.linalg.inv(spd),
+        other @ np.linalg.inv(spd),
+        np.linalg.solve(spd, vec),
+    )
+
+
+
+@case
+def slogdet():
+    return (
+        np.log(np.linalg.det(spd)),  # xpd: np-slogdet
+        np.log(np.abs(np.linalg.det(other))),  # xpd: np-slogdet
+        np.linalg.det(spd),
+        np.log(np.linalg.norm(spd)),
+    )
+
+
+@case
+def eigh():
+    return (
+        np.linalg.eig(sq @ sq.T),  # xpd: np-eigh
+        np.linalg.eig(np.cov(tall.T)),  # xpd: np-eigh
+        np.linalg.eig(np.dot(tall.T, tall)),  # xpd: np-eigh
+        np.linalg.eigvals(sq + sq.T),  # xpd: np-eigh
+        np.linalg.eig(sq @ other.T),
+        np.linalg.eig(sq),
+        np.linalg.eigvals(sq.T @ other),
+        np.linalg.eigh(spd),
+    )
+
+
+@case
+def matmul_diagonal():
+    return (
+        np.diag(sq @ other),  # xpd: np-matmul-diagonal
+        np.diag(np.dot(sq, other)),  # xpd: np-matmul-diagonal
+        np.diag(sq @ other.T),  # xpd: np-matmul-diagonal
+        np.trace(sq @ other),  # xpd: np-matmul-diagonal
+        np.trace(np.dot(sq, other)),  # xpd: np-matmul-diagonal
+        np.diag(sq),
+        np.diag(vec),
+        np.trace(sq),
+        np.diag(sq) @ other,
+    )
+
+
+@case
+def einsum_optimize():
+    return (
+        np.einsum("ij,jk,kl->il", sq, other, spd),  # xpd: np-einsum-optimize
+        np.einsum("ij,jk,kl,lm->im", sq, other, spd, sq),  # xpd: np-einsum-optimize
+        np.einsum("ij,jk,kl->il", sq, other, spd, optimize=True),
+        np.einsum("ij,jk->ik", sq, other),
+        np.einsum("ij,jk,ki->", sq, other, spd),
+        np.einsum("i,ij,j->", vec, sq, vec),
+    )
