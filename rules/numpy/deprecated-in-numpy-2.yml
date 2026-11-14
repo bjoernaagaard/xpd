@@ -395,6 +395,8 @@ metadata: { fix: safe }
 # state. Without a size it returns a NumPy integer where randint returns a Python int, so that
 # fix is unsafe. The fix applies when high is a name, a number, an attribute, a call or a
 # subscript, so that adding 1 needs no brackets.
+# Unsafe: the pattern cannot tell a RandomState from another object with a random_integers
+# method.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -422,7 +424,7 @@ constraints:
   HI: { any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] }
   SIZE: { not: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
 fix: $R.randint($LO, $HI + 1, $SIZE)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 id: deprecated-in-numpy-2
 language: python

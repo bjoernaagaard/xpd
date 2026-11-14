@@ -1480,6 +1480,7 @@ metadata: { fix: safe, since: "1.22" }
 ---
 # These keywords did nothing before they were removed. np.save ignored fix_imports since 1.17,
 # and np.corrcoef and np.ma.corrcoef ignored bias and ddof since 1.10.
+# Unsafe: the deleted keyword's value is no longer evaluated, so a call in it no longer runs.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1527,7 +1528,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $F($REST)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # style= did nothing since NumPy 1.14, except under np.set_printoptions(legacy="1.13"), which
 # used it for zero-dimensional arrays. So the fix is unsafe.
