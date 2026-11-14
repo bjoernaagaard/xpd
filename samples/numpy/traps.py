@@ -259,3 +259,45 @@ def writes_that_reach_the_array():
     x[np.flatnonzero(x > 2)[0]] = -1
     m.ravel()[0] = 4
     return [x, m, grid]
+
+
+def masks_combined_with_and(x):
+    a = x[(x > 2) and (x < 8)]  # xpd: array-truth-value
+    b = x[(x < 2) or (x > 8)]  # xpd: array-truth-value
+    c = x[not (x > 2)]  # xpd: array-truth-value
+    d = x[2 < x < 8]  # xpd: array-truth-value
+    return a, b, c, d
+
+
+def mask_precedence(x):
+    return x[x > 2 & x < 8]  # xpd: mask-operator-precedence
+
+
+@case
+def masks_combined_right():
+    x = np.array([1, 5, 9])
+    flags = 6
+    return [
+        x[(x > 2) & (x < 8)],
+        x[(x < 2) | (x > 8)],
+        x[~(x > 2)],
+        x[(2 < x) & (x < 8)],
+        flags & 4 == 4,
+        flags == 2 | 4,
+        x[x > 2] if x.size and x[0] > 0 else x,
+    ]
+
+
+@case
+def int_masks():
+    y = np.array([10, 20, 30])
+    return [
+        y[(y > 15).astype(int)],  # xpd: int-mask-as-index
+        y[np.isnan(y).astype(np.int64)],  # xpd: int-mask-as-index
+        ~(y > 15).astype(int),  # xpd: int-mask-as-index
+        y[y > 15],
+        ~(y > 15),
+        1 - (y > 15).astype(int),
+        y[np.array([0, 2]).astype(int)],
+        np.array(["low", "high"])[(y > 15).astype(int)],
+    ]

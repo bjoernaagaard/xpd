@@ -1,0 +1,25 @@
+# In x > 1 & x < 3, & binds first, so Python reads x > (1 & x) < 3, a chained comparison that
+# raises ValueError on an array and compares the wrong values on a number. Only a & or | in the
+# middle of a chained comparison counts, because x == A | B with one comparison is ordinary flag
+# arithmetic. A file that imports pandas is left to the pandas rule mask-precedence.
+id: mask-operator-precedence
+language: python
+severity: error
+message: The & and | operators bind tighter than comparisons, so this compares against a combined value. Put each comparison in parentheses, as in (x > 1) & (x < 3).
+rule:
+  kind: comparison_operator
+  # all checks in order, so the costly search for a pandas import runs only on a match.
+  all:
+    - has:
+        kind: binary_operator
+        has: { field: operator, regex: '^[&|]$' }
+        not: { any: [{ nthChild: 1 }, { nthChild: { position: 1, reverse: true } }] }
+    - not: { has: { field: operators, regex: ^(in|not in|is|is not)$ } }
+    - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+utils:
+  pandas-import:
+    any:
+      - kind: import_statement
+        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
+      - kind: import_from_statement
+        has: { field: module_name, regex: '^pandas(\.|$)' }
