@@ -148,3 +148,114 @@ def one_value_only():
         rng.integers(0, 1, size=5, endpoint=True),
         rng.integers(0, 10),
     ]
+
+
+@case
+def results_that_are_none():
+    x = np.array([3, 1, 2])
+    y = np.array([3, 1, 2])
+    m = np.ones((2, 2))
+    rng = np.random.default_rng(0)
+    x = x.sort()  # xpd: result-is-none
+    s = y.sort()  # xpd: result-is-none
+    m = np.fill_diagonal(m, 0)  # xpd: result-is-none
+    z = np.zeros(3, int)
+    copied = np.copyto(z, np.array([1, 2, 3]))  # xpd: result-is-none
+    y = rng.shuffle(y)  # xpd: result-is-none
+    w = np.array([5, 6])
+    w = w.fill(0)  # xpd: result-is-none
+    return [x, s, m, copied, y, w]
+
+
+def sorted_and_returned(v):
+    return v.sort()  # xpd: result-is-none
+
+
+@case
+def results_kept():
+    x = np.array([3, 1, 2])
+    x.sort()
+    y = np.sort(np.array([3, 1, 2]))
+    m = np.ones((2, 2))
+    np.fill_diagonal(m, 0)
+    rng = np.random.default_rng(0)
+    p = rng.permutation(np.arange(3))
+    w = np.array([5, 6])
+    w.fill(0)
+    v, i = np.array([2, 1]), 0
+    return [x, y, m, p, w, v, i]
+
+
+def sorted_by_a_namespace(xp, values, cursor):
+    ordered = xp.sort(values)
+    by_axis = xp.sort(values, axis=-1)
+    rows = cursor.sort("name")
+    return ordered, by_axis, rows
+
+
+@case
+def results_thrown_away():
+    x = np.array([3, 1, 2])
+    m = np.ones((2, 3))
+    np.sort(x)  # xpd: result-discarded
+    np.append(x, 4)  # xpd: result-discarded
+    np.clip(x, 0, 2)  # xpd: result-discarded
+    x.astype(float)  # xpd: result-discarded
+    m.reshape(3, 2)  # xpd: result-discarded
+    m.round(1)  # xpd: result-discarded
+    return [x, m]
+
+
+@case
+def results_written_in_place():
+    x = np.array([3.0, -1.0, 2.0])
+    m = np.ones((2, 3))
+    np.abs(x, x)
+    np.clip(x, 0, 2, out=x)
+    np.round(x, 1, x)
+    np.nan_to_num(x, copy=False)
+    np.random.shuffle(x)
+    x = np.sort(x)
+    m = m.reshape(3, 2)
+    x.sort()
+    x.clip(0, 1, x)
+    try:
+        np.asarray(m)
+    except TypeError:
+        pass
+    m.transpose()
+    return [x, m]
+
+
+def time_sort(x):
+    np.sort(x)
+
+
+@case
+def writes_that_land_in_a_copy():
+    x = np.arange(6.0)
+    m = np.zeros((2, 2))
+    x[x > 2][0] = -1  # xpd: write-to-copy
+    x[[0, 1]][0] = -1  # xpd: write-to-copy
+    x[(x > 1) & (x < 4)][:] = 0  # xpd: write-to-copy
+    x[np.isfinite(x)][0] += 1  # xpd: write-to-copy
+    m.flatten()[0] = 1  # xpd: write-to-copy
+    x.astype(int)[0] = 9  # xpd: write-to-copy
+    x[np.isfinite(x) & (x > 2)][0] = 1  # xpd: write-to-copy
+    return [x, m]
+
+
+@case
+def writes_that_reach_the_array():
+    x = np.arange(6.0)
+    m = np.arange(6.0).reshape(2, 3)
+    grid = [[0, 0], [0, 0]]
+    i = 0
+    grid[i ^ 1][1] += 1
+    x[1:4][0] = 9
+    m[0][m[0] > 1] = 0
+    m[1][2] = -5
+    grid[0][1] = 7
+    x[np.flatnonzero(x > 2)[0]] = -1
+    m.ravel()[0] = 4
+    return [x, m, grid]

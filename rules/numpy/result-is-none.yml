@@ -1,0 +1,92 @@
+# These calls change an array in place and return None. Each fix drops the assignment when the
+# name is the array the call changes. It is unsafe on purpose, because the name then keeps the
+# changed array where it held None.
+
+# x = x.sort() on an array or a list. Their sort takes no positional argument but an axis, so a
+# sort with any other argument, such as xp.sort(x) in the array API or a database cursor's
+# sort("field"), returns a value and is left alone.
+id: result-is-none
+language: python
+severity: error
+message: sort() sorts in place and returns None, so $X is None after this line. Call $X.sort() on its own line.
+rule:
+  pattern: $X = $X.sort($$$ARGS)
+  not: { has: { field: right, matches: sort-with-value } }
+constraints:
+  X: { not: { regex: '^(np|numpy)$' } }
+utils:
+  sort-with-value:
+    has: { field: arguments, has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: integer }, { kind: unary_operator }] } } }
+fix: $X.sort($$$ARGS)
+metadata: { fix: unsafe }
+---
+id: result-is-none
+language: python
+severity: error
+message: sort() sorts in place and returns None, so this gives None. Write np.sort($X), or sorted($X) for a list.
+rule:
+  any:
+    - pattern: $N = $X.sort($$$ARGS)
+    - pattern: return $X.sort($$$ARGS)
+  not:
+    any:
+      - pattern: $X = $X.sort($$$ARGS)
+      - has: { field: right, matches: sort-with-value }
+      - has: { matches: sort-with-value }
+constraints:
+  N: { any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }] }
+  X: { not: { regex: '^(np|numpy)$' } }
+utils:
+  sort-with-value:
+    kind: call
+    has: { field: arguments, has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: integer }, { kind: unary_operator }] } } }
+---
+# NumPy functions that write into their first argument and return None.
+id: result-is-none
+language: python
+severity: error
+message: $F changes $X in place and returns None, so $X is None after this line. Call $F on its own line.
+rule:
+  pattern: $X = $F($$$ARGS)
+  has: { field: right, has: { field: arguments, has: { nthChild: 1, pattern: $X } } }
+constraints:
+  F: { regex: '^(np|numpy)\.(fill_diagonal|copyto|put|place|putmask|put_along_axis|random\.shuffle|\w+\.at)$' }
+fix: $F($$$ARGS)
+metadata: { fix: unsafe }
+---
+id: result-is-none
+language: python
+severity: error
+message: $F changes its first argument in place and returns None, so this gives None. Call $F on its own line and use the array it changed.
+rule:
+  any:
+    - pattern: $N = $F($$$ARGS)
+    - pattern: return $F($$$ARGS)
+  not: { has: { field: right, has: { field: arguments, has: { nthChild: 1, pattern: $N } } } }
+constraints:
+  F: { regex: '^(np|numpy)\.(fill_diagonal|copyto|put|place|putmask|put_along_axis|random\.shuffle|\w+\.at)$' }
+  N: { any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }] }
+---
+# shuffle on a Generator, a RandomState or the random module.
+id: result-is-none
+language: python
+severity: error
+message: $R.shuffle shuffles $X in place and returns None, so $X is None after this line. Call $R.shuffle($X) on its own line, or write $X = $R.permutation($X).
+rule:
+  pattern: $X = $R.shuffle($$$ARGS)
+  has: { field: right, has: { field: arguments, has: { nthChild: 1, pattern: $X } } }
+constraints:
+  R: { regex: '(?i)(^random$|rng|random_state|^rs$|^prng$)' }
+fix: $R.shuffle($$$ARGS)
+metadata: { fix: unsafe }
+---
+id: result-is-none
+language: python
+severity: error
+message: $X.fill fills the array in place and returns None, so $X is None after this line. Call $X.fill($V) on its own line.
+rule:
+  pattern: $X = $X.fill($V)
+constraints:
+  X: { not: { regex: '^(np|numpy)$' } }
+fix: $X.fill($V)
+metadata: { fix: unsafe }

@@ -1,0 +1,48 @@
+# An index with a mask, a list or an array of positions returns a copy, and so does a method such
+# as flatten or astype. A second index on that copy writes to the copy, and the array keeps its
+# old values. A slice or a whole number returns a view, so x[1:4][0] = v and m[0][mask] = v do
+# reach the array and are left alone. A chain with text in it is left to the pandas rule
+# chained-assignment.
+id: write-to-copy
+language: python
+severity: error
+message: $X[$A] is a copy, because the index is a mask or a list of positions, so this write never reaches $X. Index $X once, with the two selections combined.
+rule:
+  pattern: $X[$A][$B]
+  any:
+    - inside: { kind: assignment, field: left }
+    - inside: { kind: augmented_assignment, field: left }
+  not: { has: { stopBy: end, kind: string } }
+constraints:
+  A: { matches: copying-index }
+utils:
+  copying-index:
+    any:
+      - kind: comparison_operator
+      - kind: list
+      - kind: list_comprehension
+      # x[(a > 1) & m], but not grid[i ^ 1], which is whole number arithmetic.
+      - kind: binary_operator
+        all:
+          - has: { field: operator, regex: '^[&|^]$' }
+          - has: { matches: copying-index }
+      - kind: unary_operator
+        has: { field: operator, regex: ^~$ }
+      - kind: parenthesized_expression
+        has: { matches: copying-index }
+      - kind: call
+        has:
+          field: function
+          regex: '^(np|numpy)\.(isnan|isfinite|isinf|isin|isclose|logical_and|logical_or|logical_not|logical_xor|where|nonzero|flatnonzero|argwhere|argsort|unique|arange|array|asarray)$|\.(nonzero|argsort)$'
+---
+id: write-to-copy
+language: python
+severity: error
+message: $X.$M() returns a copy, so this write never reaches $X. Write to $X itself.
+rule:
+  pattern: $X.$M($$$ARGS)[$B]
+  any:
+    - inside: { kind: assignment, field: left }
+    - inside: { kind: augmented_assignment, field: left }
+constraints:
+  M: { regex: '^(flatten|astype|copy)$' }
