@@ -1,8 +1,8 @@
 # Rules
 
 xpd has five rule packs: [pandas](#pandas), [NumPy](#numpy), [scikit-learn](#scikit-learn),
-[Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The Python rules run on
-every file.
+[Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
+Python rules run on every file.
 
 ## pandas
 
