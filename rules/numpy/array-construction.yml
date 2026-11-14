@@ -1,0 +1,91 @@
+# Arrays built from a Python list, or built and then changed by a second full pass, where one
+# NumPy call writes the values once. Probes in research/numpy-rules/loops/probes.
+
+# Unsafe: an empty range gives a float64 array and np.arange an int64 one, and np.arange takes a
+# float where range raises.
+id: array-construction
+language: python
+severity: warning
+message: This builds a Python int for every value before NumPy sees them. Write $NP.arange($$$A), which ran 150 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: $NP.$MAKE(range($$$A))
+    - pattern: $NP.$MAKE(list(range($$$A)))
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  MAKE: { regex: '^(array|asarray)$' }
+fix: $NP.arange($$$A)
+metadata: { fix: unsafe }
+---
+# Unsafe: when the count is 0 or less, the list form gives an empty float64 array, where
+# np.full gives the dtype of the value or raises.
+id: array-construction
+language: python
+severity: warning
+message: This builds a Python list of $N values to fill an array with one. Write $NP.full($N, $C), which ran 84 to 114 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: $NP.$MAKE([$C] * $N)
+    - pattern: $NP.$MAKE($N * [$C])
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  MAKE: { regex: '^(array|asarray)$' }
+  C: { any: [{ kind: integer }, { kind: float }, { kind: "true" }, { kind: "false" }, { kind: unary_operator, regex: '^-\s*[\d.]' }] }
+fix: $NP.full($N, $C)
+metadata: { fix: unsafe }
+---
+# np.ones(n) * c writes the array twice. A number written in the code gives the same float64
+# values from np.full in every case the probe tried, -0.0 and overflow included.
+id: array-construction
+language: python
+severity: warning
+message: This writes an array of ones and then multiplies every value. Write $NP.full($N, $C, dtype=float), which ran 2.5 to 2.9 times faster on 1,000,000 values.
+rule:
+  any:
+    - pattern: $NP.ones($N) * $C
+    - pattern: $C * $NP.ones($N)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator, regex: '^-\s*[\d.]' }] }
+fix: $NP.full($N, $C, dtype=float)
+metadata: { fix: safe }
+---
+# np.zeros(n).astype(T) writes a float64 array and then converts every value. For a numeric
+# dtype the probe found the same values in every case.
+id: array-construction
+language: python
+severity: warning
+message: This writes a float64 array and then converts every value. Write $NP.$F($N, dtype=$T), which ran 1.9 to 2.9 times faster on 1,000,000 values.
+rule: { pattern: $NP.$F($N).astype($T) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(zeros|ones)$' }
+  N: { not: { kind: keyword_argument } }
+  T: { regex: '^(float|int|bool|complex|(np|numpy)\.(float16|float32|float64|int8|int16|int32|int64|uint8|uint16|uint32|uint64|intp|uintp|bool|bool_|complex64|complex128|double|single|longlong)|"(float16|float32|float64|int8|int16|int32|int64|uint8|uint16|uint32|uint64|bool|complex64|complex128|f2|f4|f8|i1|i2|i4|i8|u1|u2|u4|u8)"|''(float16|float32|float64|int8|int16|int32|int64|uint8|uint16|uint32|uint64|bool|complex64|complex128|f2|f4|f8|i1|i2|i4|i8|u1|u2|u4|u8)'')$' }
+fix: $NP.$F($N, dtype=$T)
+metadata: { fix: safe }
+---
+# Unsafe: np.arange computes the values in the new dtype, so a bool dtype raises and an unsigned
+# dtype raises on a negative start. A float step, or a division in the arguments, gives other
+# values in an integer dtype, so those calls are left alone.
+id: array-construction
+language: python
+severity: warning
+message: This writes an int64 array and then converts every value. Write $NP.arange($$$A, dtype=$T), which ran 1.8 to 1.9 times faster on 1,000,000 values.
+rule:
+  pattern: $NP.arange($$$A).astype($T)
+  not:
+    has:
+      field: function
+      has:
+        field: object
+        has:
+          field: arguments
+          has:
+            stopBy: end
+            any: [{ kind: keyword_argument }, { kind: float }, { kind: binary_operator, has: { field: operator, regex: '^/$' } }, { kind: call, not: { regex: '^len\(' } }]
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  T: { regex: '^(float|int|(np|numpy)\.(float32|float64|int16|int32|int64|intp|double|single|longlong)|"(float32|float64|int16|int32|int64|f4|f8|i2|i4|i8)"|''(float32|float64|int16|int32|int64|f4|f8|i2|i4|i8)'')$' }
+fix: $NP.arange($$$A, dtype=$T)
+metadata: { fix: unsafe }
