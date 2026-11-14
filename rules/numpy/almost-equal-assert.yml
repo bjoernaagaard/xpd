@@ -1,0 +1,97 @@
+# assert_almost_equal, assert_array_almost_equal and assert_approx_equal are listed under
+# "Asserts (not recommended)", and their docs recommend assert_allclose:
+# https://numpy.org/doc/stable/reference/routines.testing.html
+# The decimal test is abs(desired - actual) < 1.5 * 10**-decimal, so the fix writes rtol=0 and
+# that atol. Unsafe: a difference of exactly atol fails before and passes after, dicts and
+# ragged nested lists are no longer compared item by item, and complex values are compared by
+# magnitude instead of by each part. The fix keeps the module the call came from, so a bare
+# name imported from numpy.testing has no fix.
+id: almost-equal-assert
+language: python
+severity: warning
+message: assert_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-7. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-7).
+rule: { pattern: "$M.assert_almost_equal($A, $B)" }
+constraints:
+  M: { regex: '^(np\.testing|numpy\.testing|npt|nt|testing)$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+fix: $M.assert_allclose($A, $B, rtol=0, atol=1.5e-7)
+metadata: { fix: unsafe }
+---
+id: almost-equal-assert
+language: python
+severity: warning
+message: assert_almost_equal is on NumPy's not recommended list, and decimal=$D is an absolute tolerance of 1.5e-$D. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D).
+rule: { pattern: "$M.assert_almost_equal($A, $B, $DECIMAL)" }
+constraints:
+  M: { regex: '^(np\.testing|numpy\.testing|npt|nt|testing)$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+  DECIMAL: { regex: '^(decimal\s*=\s*)?\d+$' }
+transform:
+  D: { replace: { source: $DECIMAL, replace: '^decimal\s*=\s*', by: '' } }
+fix: $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D)
+metadata: { fix: unsafe }
+---
+# assert_array_almost_equal defaults to decimal=6, one less than assert_almost_equal.
+id: almost-equal-assert
+language: python
+severity: warning
+message: assert_array_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-6. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-6).
+rule: { pattern: "$M.assert_array_almost_equal($A, $B)" }
+constraints:
+  M: { regex: '^(np\.testing|numpy\.testing|npt|nt|testing)$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+fix: $M.assert_allclose($A, $B, rtol=0, atol=1.5e-6)
+metadata: { fix: unsafe }
+---
+id: almost-equal-assert
+language: python
+severity: warning
+message: assert_array_almost_equal is on NumPy's not recommended list, and decimal=$D is an absolute tolerance of 1.5e-$D. Write $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D).
+rule: { pattern: "$M.assert_array_almost_equal($A, $B, $DECIMAL)" }
+constraints:
+  M: { regex: '^(np\.testing|numpy\.testing|npt|nt|testing)$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+  DECIMAL: { regex: '^(decimal\s*=\s*)?\d+$' }
+transform:
+  D: { replace: { source: $DECIMAL, replace: '^decimal\s*=\s*', by: '' } }
+fix: $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D)
+metadata: { fix: unsafe }
+---
+# Every other call, such as a bare name, an err_msg argument or a computed decimal.
+id: almost-equal-assert
+language: python
+severity: warning
+message: $F is on NumPy's not recommended list. Write assert_allclose with rtol=0 and atol=1.5 * 10**-decimal, where decimal defaults to 7 for assert_almost_equal and 6 for assert_array_almost_equal.
+rule:
+  pattern: $F($$$ARGS)
+  not: { all: [{ matches: qualified }, { matches: fixable-arguments }] }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?(assert_almost_equal|assert_array_almost_equal)$' }
+utils:
+  qualified:
+    has: { field: function, regex: '^(np\.testing|numpy\.testing|npt|nt|testing)\.' }
+  fixable-arguments:
+    has:
+      field: arguments
+      all:
+        - has: { nthChild: 1, not: { kind: keyword_argument } }
+        - has: { nthChild: 2, not: { kind: keyword_argument } }
+        - not: { has: { nthChild: 4 } }
+        - any:
+            - not: { has: { nthChild: 3 } }
+            - has: { nthChild: 3, kind: integer }
+            - has: { nthChild: 3, kind: keyword_argument, regex: '^decimal\s*=\s*\d+$' }
+---
+# assert_approx_equal compares significant digits, which no assert_allclose call reproduces
+# exactly, so it has no fix.
+id: almost-equal-assert
+language: python
+severity: warning
+message: assert_approx_equal is on NumPy's not recommended list. Write assert_allclose with rtol set to the relative tolerance the test needs, such as rtol=1e-6 for 7 significant digits.
+rule: { pattern: $F($$$ARGS) }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_approx_equal$' }

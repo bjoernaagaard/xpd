@@ -1,0 +1,35 @@
+# The np.dot docs prefer matmul or `a @ b` when both arrays are 2-D:
+# https://numpy.org/doc/stable/reference/generated/numpy.dot.html
+# Unsafe: @ raises on a scalar and on two Python lists, and for arrays of more than two
+# dimensions it broadcasts stacks of matrices where np.dot sums over the last axis of the
+# first array and the second to last of the second. The fix applies only when both operands
+# bind tighter than @, so no parentheses are needed.
+id: dot-on-matrices
+language: python
+severity: warning
+message: For 2-D arrays NumPy's docs prefer the @ operator to $NP.dot. Write $A @ $B.
+rule: { pattern: "$NP.dot($A, $B)" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }] }
+  B: { any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }] }
+fix: $A @ $B
+metadata: { fix: unsafe }
+---
+id: dot-on-matrices
+language: python
+severity: warning
+message: For 2-D arrays NumPy's docs prefer the @ operator to $NP.dot. Write ($A) @ ($B), and drop parentheses that are not needed.
+rule:
+  pattern: "$NP.dot($A, $B)"
+  not:
+    all:
+      - has: { field: arguments, has: { nthChild: 1, matches: tight } }
+      - has: { field: arguments, has: { nthChild: 2, matches: tight } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+utils:
+  tight:
+    any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }]

@@ -1,0 +1,11 @@
+# The set_printoptions docs say "Use printoptions as a context manager to set the values
+# temporarily": https://numpy.org/doc/stable/reference/generated/numpy.set_printoptions.html
+# A call that passes back a saved dict restores options that were set for a while. No fix,
+# because the code between the two calls has to move into the with block.
+id: printoptions-restore
+language: python
+severity: warning
+message: This restores print options that were changed for a while, and NumPy's docs say to use the context manager for that. Wrap the code in with $NP.printoptions(...) instead, which also restores the options when an error is raised.
+rule: { pattern: $NP.set_printoptions(**$OLD) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }

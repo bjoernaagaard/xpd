@@ -1,0 +1,23 @@
+# NumPy's docs recommend that a program seed from operating system entropy and log that
+# entropy to repeat a run, and they advise against seeds below 32 bits:
+# https://numpy.org/doc/stable/reference/random/bit_generators/index.html#seeding-and-entropy
+# Unsafe: the numbers change, as they would on the next run anyway, and a seed recovered from a
+# logged start time no longer repeats the run.
+id: clock-seed
+language: python
+severity: warning
+message: A seed from the clock repeats whenever two runs start in the same tick, and NumPy recommends entropy from the operating system. Call $F() and log its entropy when a run must be repeatable.
+rule:
+  pattern: $F($SEED)
+  has:
+    field: arguments
+    has:
+      stopBy: end
+      kind: call
+      has:
+        field: function
+        regex: '^(time\.(time|time_ns|perf_counter|perf_counter_ns|monotonic|monotonic_ns|process_time)|(datetime\.)?datetime\.(now|utcnow|today))$'
+constraints:
+  F: { regex: '^(np|numpy)\.random\.(default_rng|seed|RandomState|SeedSequence)$' }
+fix: $F()
+metadata: { fix: unsafe }

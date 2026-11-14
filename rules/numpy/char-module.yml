@@ -1,0 +1,50 @@
+# NumPy's docs call numpy.char legacy and say to use numpy.strings, added in NumPy 2.0:
+# https://numpy.org/doc/stable/reference/routines.char.html
+# On NumPy 2.5 these names in np.char are the same objects as in np.strings, so the rewrite
+# changes nothing at run time.
+id: char-module
+language: python
+severity: warning
+message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.$F.
+rule: { pattern: $NP.char.$F }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(add|capitalize|center|count|decode|encode|endswith|expandtabs|find|index|isalnum|isalpha|isdecimal|isdigit|islower|isnumeric|isspace|istitle|isupper|ljust|lower|lstrip|mod|replace|rfind|rindex|rjust|rstrip|slice|startswith|str_len|strip|swapcase|title|translate|upper|zfill)$' }
+fix: $NP.strings.$F
+metadata: { fix: safe, since: "2.0" }
+---
+# Unsafe: np.char's comparisons strip trailing whitespace, so np.char.equal("a ", "a") is True
+# and np.strings.equal gives False. They also differ on bytes, StringDType and object input,
+# and on a scalar, where np.char returns a 0-d array and np.strings a bool.
+id: char-module
+language: python
+severity: warning
+message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.$F, which does not strip trailing whitespace before it compares.
+rule: { pattern: $NP.char.$F }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(equal|not_equal|greater|greater_equal|less|less_equal)$' }
+fix: $NP.strings.$F
+metadata: { fix: unsafe, since: "2.0" }
+---
+# Unsafe: on object or number input np.char.multiply raises ValueError and np.strings.multiply
+# raises a TypeError.
+id: char-module
+language: python
+severity: warning
+message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.multiply.
+rule: { pattern: $NP.char.multiply }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.strings.multiply
+metadata: { fix: unsafe, since: "2.0" }
+---
+id: char-module
+language: python
+severity: warning
+message: numpy.char is legacy, and NumPy's docs say to use numpy.strings. Write $NP.strings.$F, which returns a tuple of three arrays instead of one array with a last axis of length 3.
+rule: { pattern: $NP.char.$F }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(partition|rpartition)$' }
+metadata: { since: "2.0" }

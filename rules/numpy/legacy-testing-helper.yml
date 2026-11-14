@@ -1,0 +1,57 @@
+# NumPy's testing guidelines call numpy.testing.assert_ the legacy variant of the assert
+# statement, which pytest rewrites to show the values, and prefer pytest.raises over
+# numpy.testing.assert_raises: https://numpy.org/doc/stable/reference/testing.html
+# Unsafe: the assert statement is skipped under python -O, and its message is built only when
+# the test fails, where assert_ built it on every call.
+id: legacy-testing-helper
+language: python
+severity: warning
+message: assert_ is the legacy form of the assert statement, which pytest rewrites to show the compared values. Write assert $X.
+rule:
+  kind: expression_statement
+  has: { pattern: $F($X) }
+  not: { has: { kind: call, has: { field: arguments, has: { kind: keyword_argument } } } }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: assert $X
+metadata: { fix: unsafe }
+---
+id: legacy-testing-helper
+language: python
+severity: warning
+message: assert_ is the legacy form of the assert statement, which pytest rewrites to show the compared values. Write assert $X, $MSG.
+rule:
+  kind: expression_statement
+  has: { pattern: "$F($X, $MSG)" }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  MSG: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: assert $X, $MSG
+metadata: { fix: unsafe }
+---
+# No fix, because pytest may not be imported and the call form has to become a with block.
+# SciPy's tests import pytest.raises under the name assert_raises, so a bare name counts only in
+# a file that imports it from numpy.testing at the top level.
+id: legacy-testing-helper
+language: python
+severity: warning
+message: NumPy's testing guidelines prefer pytest.raises to $F. Write with pytest.raises(Error, match=...) around the call, and use match to pin the message.
+rule:
+  pattern: $F($$$ARGS)
+  any:
+    - has: { field: function, kind: attribute }
+    - inside:
+        stopBy: end
+        kind: module
+        has:
+          kind: import_from_statement
+          all:
+            - has: { field: module_name, regex: ^numpy\.testing$ }
+            - any:
+                - has: { kind: dotted_name, regex: ^(assert_raises|assert_raises_regex)$ }
+                - has: { kind: aliased_import, has: { field: name, regex: ^(assert_raises|assert_raises_regex)$ } }
+                - has: { kind: wildcard_import }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?(assert_raises|assert_raises_regex)$' }
