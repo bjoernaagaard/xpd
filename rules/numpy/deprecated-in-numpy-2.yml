@@ -1,0 +1,767 @@
+# Each document finds a NumPy form that warns on NumPy 2.5, mostly with a DeprecationWarning,
+# and will raise in a later release. The release notes of 2.0 to 2.5 announce each one.
+
+# numpy.core became the private numpy._core in NumPy 2.0. Its old names still work, with a
+# DeprecationWarning on the first use. On NumPy 1, numpy.core is where these names live, so the
+# documents apply from 2.0. _multiarray_umath and multiarray._reconstruct stay silent
+# because pickles from NumPy 1 name them, so they are left alone.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Import the public names from numpy, and normalize_axis_index or normalize_axis_tuple from numpy.lib.array_utils.
+rule:
+  all:
+    - kind: dotted_name
+      regex: '^numpy\.core(\.\w+)*$'
+      not: { regex: '^numpy\.core\.(_multiarray_umath|umath_tests)(\.\w+)*$' }
+      any:
+        - inside: { kind: import_from_statement, field: module_name, not: { has: { field: name, regex: '^_reconstruct$' } } }
+        - inside: { kind: import_statement }
+        - inside: { kind: aliased_import, inside: { kind: import_statement } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+metadata: { since: "2.0" }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Import the public names from numpy.
+rule:
+  all:
+    - kind: dotted_name
+      regex: ^core$
+      any:
+        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+metadata: { since: "2.0" }
+---
+# np.core.<name> was the same object as np.<name> for the public names. The fix is unsafe,
+# because np.core also held private names that the main namespace does not export.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Write $NP.$N.
+rule:
+  all:
+    - pattern: $NP.core.$N
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^[a-zA-Z]\w*$', not: { regex: '^(records|defchararray|multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits|overrides|umath_tests)$' } }
+fix: $NP.$N
+metadata: { fix: unsafe, since: "2.0" }
+---
+# np.core.records is np.rec and np.core.defchararray is np.char.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Write $NP.$NEW.
+rule:
+  all:
+    - pattern: $NP.core.$N
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(records|defchararray)$' }
+transform:
+  T1: { replace: { source: $N, replace: '^records$', by: rec } }
+  NEW: { replace: { source: $T1, replace: '^defchararray$', by: char } }
+fix: $NP.$NEW
+metadata: { fix: safe, since: "2.0" }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Write the name from $NP instead of $NP.core.$N.
+rule:
+  all:
+    - pattern: $NP.core.$N
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits|overrides)$' }
+metadata: { since: "2.0" }
+---
+# NumPy 2.5 deprecated fix. trunc rounds toward zero too, and returns the same values and dtype
+# on every input that was tried, from bool to object arrays.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: $NP.fix is deprecated since NumPy 2.5. Write $NP.trunc, which gives the same result and is faster.
+rule:
+  all:
+    - pattern: $NP.fix
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.trunc
+metadata: { fix: safe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: $NP.ma.round_ is deprecated since NumPy 2.5. Write $NP.ma.round, which takes the same arguments.
+rule:
+  all:
+    - { pattern: $NP.ma.round_ }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.ma.round
+metadata: { fix: safe }
+---
+# typename returned names such as "double precision", which no dtype attribute gives, so there
+# is no fix.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: $NP.typename is deprecated since NumPy 2.5. Use $NP.dtype(code).name.
+rule:
+  all:
+    - { pattern: $NP.typename }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# NumPy 2.5 deprecated the chararray class and the char functions that build one. An array with
+# a str or bytes dtype and the functions of np.strings replace it.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: $NP.char.$N is deprecated since NumPy 2.5. Use $NP.$NEW with a str or bytes dtype, and the functions of $NP.strings.
+rule:
+  all:
+    - { pattern: $NP.char.$N }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(chararray|array|asarray)$' }
+transform:
+  NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
+metadata: { since: "2.0" }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.char.$N is deprecated since NumPy 2.5. Use numpy.$NEW with a str or bytes dtype, and the functions of numpy.strings.
+rule:
+  all:
+    - kind: dotted_name
+      pattern: $N
+      regex: '^(chararray|array|asarray)$'
+      any:
+        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy\.char$' } }
+        - inside:
+            kind: aliased_import
+            field: name
+            inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.char$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+transform:
+  NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
+metadata: { since: "2.0" }
+---
+# NumPy 2.4 deprecated the warning helpers of numpy.testing.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.testing.$N is deprecated since NumPy 2.4. Use $NEW.
+rule:
+  all:
+    - any:
+        - kind: attribute
+          all:
+            - has: { field: object, regex: '^(np|numpy)\.testing$' }
+            - has: { field: attribute, pattern: $N, regex: '^(assert_warns|suppress_warnings)$' }
+        - kind: dotted_name
+          pattern: $N
+          regex: '^(assert_warns|suppress_warnings)$'
+          any:
+            - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy\.testing$' } }
+            - inside:
+                kind: aliased_import
+                field: name
+                inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.testing$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+transform:
+  T1: { replace: { source: $N, replace: '^assert_warns$', by: pytest.warns or warnings.catch_warnings(record=True) } }
+  NEW: { replace: { source: $T1, replace: '^suppress_warnings$', by: warnings.catch_warnings with warnings.filterwarnings } }
+---
+# A third argument by position is the output array, which out= names. NumPy 2.4 deprecated the
+# positional form for maximum and minimum only.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: Passing the output of $F by position is deprecated since NumPy 2.4. Write $F($A, $B, out=$C).
+rule:
+  all:
+    - { pattern: '$F($A, $B, $C)' }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  F: { regex: '^(np|numpy)\.(maximum|minimum)$' }
+  A: { not: { any: [{ kind: list_splat }, { kind: keyword_argument }] } }
+  B: { not: { any: [{ kind: list_splat }, { kind: keyword_argument }] } }
+  C: { not: { any: [{ kind: list_splat }, { kind: keyword_argument }] } }
+fix: $F($A, $B, out=$C)
+metadata: { fix: safe }
+---
+# random_integers(low, high, size) draws what randint(low, high + 1, size) draws from the same
+# state. Without a size it returns a NumPy integer where randint returns a Python int, so that
+# fix is unsafe. The fix applies when high is a name, a number, an attribute, a call or a
+# subscript, so that adding 1 needs no brackets.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: random_integers is deprecated. Write $R.randint($LO, $HI + 1, $SIZE), which draws the same numbers.
+rule:
+  all:
+    - { pattern: '$R.random_integers($LO, $HI, $SIZE)' }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  HI: { any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] }
+  SIZE: { not: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+fix: $R.randint($LO, $HI + 1, $SIZE)
+metadata: { fix: safe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: random_integers is deprecated. Write $R.randint($LO, $HI + 1), which draws the same number as a Python int.
+rule:
+  all:
+    - { pattern: '$R.random_integers($LO, $HI)' }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  HI: { any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] }
+  LO: { not: { any: [{ kind: list_splat }, { kind: keyword_argument }] } }
+fix: $R.randint($LO, $HI + 1)
+metadata: { fix: unsafe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: random_integers is deprecated. Write randint(low, high + 1), whose upper bound is exclusive.
+rule:
+  all:
+    - pattern: $R.random_integers($$$A)
+      not:
+        any:
+          - all:
+              - pattern: '$R.random_integers($LO, $HI, $SIZE)'
+              - has: { field: arguments, has: { nthChild: 2, any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
+              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } } }
+          - all:
+              - pattern: '$R.random_integers($LO, $HI)'
+              - has: { field: arguments, has: { nthChild: 2, any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
+              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+---
+# NumPy 2.5 deprecated the generic timedelta64 unit, which a bare number or "NaT" gets.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: A timedelta64 without a unit is deprecated since NumPy 2.5. Name the unit, as in $NP.timedelta64(5, "s").
+rule:
+  all:
+    - any:
+        - pattern: $NP.timedelta64()
+        - all:
+            - pattern: $NP.timedelta64($X)
+            - has: { field: arguments, has: { any: [{ kind: integer }, { kind: unary_operator, has: { kind: integer } }, { kind: string, regex: '^[bru]?["'']NaT["'']$' }] } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: A timedelta64 dtype without a unit is deprecated since NumPy 2.5. Name the unit, as in "m8[s]".
+rule:
+  all:
+    - kind: string
+      regex: '^[bru]?["''][<>=]?(m8|timedelta64)["'']$'
+      any:
+        - inside: { kind: keyword_argument, field: value, has: { field: name, regex: ^dtype$ } }
+        - all:
+            - nthChild: 1
+            - inside:
+                kind: argument_list
+                inside: { kind: call, has: { field: function, regex: '^((np|numpy)\.dtype|.*\.astype)$' } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+---
+# NumPy stores no time zone and warns when the string has one. "Z" means UTC, which is what the
+# value already is without it.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: datetime64 warns on a time zone in the string because NumPy stores none. Write $NEW, which gives the same time.
+rule:
+  all:
+    - kind: string
+      pattern: $S
+      regex: '^[ru]?["'']\d{4}-\d\d-\d\dT[\d:.]+Z["'']$'
+      nthChild: 1
+      inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.datetime64$' } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+transform:
+  NEW: { replace: { source: $S, replace: 'Z(["''])$', by: '$1' } }
+fix: $NEW
+metadata: { fix: safe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: datetime64 warns on a time zone in the string because NumPy stores none. Convert the time to UTC and drop the offset.
+rule:
+  all:
+    - kind: string
+      regex: '^[ru]?["'']\d{4}-\d\d-\d\dT[\d:.]+[+-]\d\d:?\d\d["'']$'
+      nthChild: 1
+      inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.datetime64$' } } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+---
+# NumPy 2.0 deprecated s= without axes= on the n-dimensional transforms. Today s applies to the
+# last len(s) axes, and a later release will apply it to the axes given.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: $F with s= and no axes= is deprecated since NumPy 2.0. Pass axes= too, such as axes=range(-len(s), 0) for the last axes.
+rule:
+  all:
+    - pattern: $F($$$ARGS)
+      any:
+        - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^s$ } } }
+        - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } }
+      not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^axes$ } } }
+          - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
+          - has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+constraints:
+  F: { regex: '^(np|numpy)\.fft\.(fftn|ifftn|rfftn|irfftn)$' }
+---
+# Setting shape, dtype or strides on an array warns since NumPy 2.4 and 2.5, because another
+# thread or view can share the array. The rule needs the name to be bound from an np call in the
+# same function, which proves it holds an array. The view fixes are unsafe, because other names
+# that share the old array keep its shape or dtype.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: Setting $X.shape is deprecated since NumPy 2.5. Write $X = $X.reshape($V).
+rule:
+  all:
+    - pattern: $X.shape = $V
+      matches: numpy-array
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+  numpy-array:
+    inside:
+      kind: function_definition
+      stopBy: end
+      has:
+        kind: assignment
+        stopBy: end
+        all:
+          - has: { field: left, pattern: $X }
+          - has: { field: right, regex: '^(np|numpy)\.' }
+constraints:
+  X: { kind: identifier }
+fix: $X = $X.reshape($V)
+metadata: { fix: unsafe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: Setting $X.dtype is deprecated since NumPy 2.5. Write $X = $X.view($V).
+rule:
+  all:
+    - pattern: $X.dtype = $V
+      matches: numpy-array
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+  numpy-array:
+    inside:
+      kind: function_definition
+      stopBy: end
+      has:
+        kind: assignment
+        stopBy: end
+        all:
+          - has: { field: left, pattern: $X }
+          - has: { field: right, regex: '^(np|numpy)\.' }
+constraints:
+  X: { kind: identifier }
+fix: $X = $X.view($V)
+metadata: { fix: unsafe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: Setting $X.strides is deprecated since NumPy 2.4. Make a new view with np.lib.stride_tricks.as_strided or sliding_window_view.
+rule:
+  all:
+    - pattern: $X.strides = $V
+      matches: numpy-array
+    - not: { matches: compat-code }
+utils:
+  compat-code:
+    any:
+      - inside:
+          kind: if_statement
+          stopBy: end
+          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
+      - inside:
+          kind: conditional_expression
+          stopBy: end
+          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
+      - inside:
+          kind: try_statement
+          stopBy: end
+          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
+  numpy-array:
+    inside:
+      kind: function_definition
+      stopBy: end
+      has:
+        kind: assignment
+        stopBy: end
+        all:
+          - has: { field: left, pattern: $X }
+          - has: { field: right, regex: '^(np|numpy)\.' }
+constraints:
+  X: { kind: identifier }
