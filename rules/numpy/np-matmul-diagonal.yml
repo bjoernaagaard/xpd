@@ -1,0 +1,46 @@
+# A whole matrix product read only on its diagonal. einsum computes the n diagonal values without
+# the other n * n. The speedups are from research/numpy-rules/math/runs/bench.jsonl and
+# bench2.jsonl on 1,000 by 1,000 matrices, the lower of two runs. np.vecdot was faster still, but it conjugates a
+# complex first array, so the fixes use einsum. Unsafe: the last bits change, np.diag of a 1-D
+# product builds a matrix where einsum raises, and a product that is not square raises.
+id: np-matmul-diagonal
+language: python
+severity: warning
+message: This computes the whole product to read its diagonal, which ran 34 times slower on 1,000 by 1,000 matrices. Write $NP.einsum("ij,ji->i", $A, $B).
+rule:
+  any:
+    - pattern: $NP.diag($A @ $B)
+    - pattern: $NP.diag($NP.dot($A, $B))
+    - pattern: $NP.diagonal($A @ $B)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  B: { not: { pattern: $Y.T } }
+fix: $NP.einsum("ij,ji->i", $A, $B)
+metadata: { fix: unsafe }
+---
+id: np-matmul-diagonal
+language: python
+severity: warning
+message: This computes the whole product to read its diagonal, which ran 50 times slower on 1,000 by 1,000 matrices. Write $NP.einsum("ij,ij->i", $A, $Y).
+rule:
+  any:
+    - pattern: $NP.diag($A @ $Y.T)
+    - pattern: $NP.diag($NP.dot($A, $Y.T))
+    - pattern: $NP.diagonal($A @ $Y.T)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.einsum("ij,ij->i", $A, $Y)
+metadata: { fix: unsafe }
+---
+id: np-matmul-diagonal
+language: python
+severity: warning
+message: This computes the whole product to add up its diagonal, which ran 29 times slower on 1,000 by 1,000 matrices. Write $NP.einsum("ij,ji->", $A, $B).
+rule:
+  any:
+    - pattern: $NP.trace($A @ $B)
+    - pattern: $NP.trace($NP.dot($A, $B))
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.einsum("ij,ji->", $A, $B)
+metadata: { fix: unsafe }

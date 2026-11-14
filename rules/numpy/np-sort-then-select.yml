@@ -1,0 +1,130 @@
+# A full sort read at one end. The speedups are the lower of two runs at 1,000,000 values in
+# research/numpy-rules/math/runs/bench.jsonl, bench-repeat.jsonl and bench3.jsonl, one thread,
+# NumPy 2.5.4. At 1,000 values every form here ran 1.6 to 6.3 times faster in alternate.jsonl.
+
+# Unsafe: on a 2-D array np.sort sorts each row, so [0] is the first sorted row and np.min is
+# one value. With NaN, [0] is the smallest number and np.min is NaN. -0.0 and 0.0 can trade
+# places.
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to read the smallest one, which ran 39 times slower on 1,000,000 values. Write $NP.min($X).
+rule: { pattern: "$NP.sort($X)[0]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.min($X)
+metadata: { fix: unsafe }
+---
+# Unsafe: on a 2-D array [-1] is the last sorted row, and -0.0 and 0.0 can trade places.
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to read the largest one, which ran 28 times slower on 1,000,000 values. Write $NP.max($X).
+rule: { pattern: "$NP.sort($X)[-1]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.max($X)
+metadata: { fix: unsafe }
+---
+# Only a literal count under 100. With k at half the length the partition ran 0.9 times as fast
+# on 1,000 values. Unsafe: partition raises when k is not smaller than the length, and on a 2-D
+# array the slice takes rows.
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to read the $K smallest, which ran 4 times slower on 1,000,000 values. Write $NP.sort($NP.partition($X, $K)[:$K]).
+rule: { pattern: "$NP.sort($X)[:$K]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  K: { kind: integer, regex: '^[1-9][0-9]?$' }
+fix: $NP.sort($NP.partition($X, $K)[:$K])
+metadata: { fix: unsafe }
+---
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to read the $K largest, which ran 7 times slower on 1,000,000 values. Write $NP.sort($NP.partition($X, -$K)[-$K:]).
+rule: { pattern: "$NP.sort($X)[-$K:]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  K: { kind: integer, regex: '^[1-9][0-9]?$' }
+fix: $NP.sort($NP.partition($X, -$K)[-$K:])
+metadata: { fix: unsafe }
+---
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to read the $K largest, which ran 7 times slower on 1,000,000 values. Write $NP.sort($NP.partition($X, -$K)[-$K:])[::-1].
+rule: { pattern: "$NP.sort($X)[::-1][:$K]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  K: { kind: integer, regex: '^[1-9][0-9]?$' }
+fix: $NP.sort($NP.partition($X, -$K)[-$K:])[::-1]
+metadata: { fix: unsafe }
+---
+# Unsafe: on a 2-D array the old form picks whole rows, and -0.0 and 0.0 can trade places.
+id: np-sort-then-select
+language: python
+severity: warning
+message: Indexing $X by its own argsort builds an index array and then copies by it, which ran 3.7 times slower on 1,000,000 values. Write $NP.sort($X).
+rule: { pattern: "$X[$NP.argsort($X)]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.sort($X)
+metadata: { fix: unsafe }
+---
+# Unsafe: argsort does not keep ties in order, and argmin returns the first of them. With NaN,
+# argsort puts NaN last and argmin returns the position of the first NaN. On a 2-D array argsort
+# sorts each row.
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to find the position of the smallest, which ran 84 times slower on 1,000,000 values. Write $NP.argmin($X).
+rule: { pattern: "$NP.argsort($X)[0]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.argmin($X)
+metadata: { fix: unsafe }
+---
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to find the position of the largest, which ran 72 times slower on 1,000,000 values. Write $NP.argmax($X).
+rule: { pattern: "$NP.argsort($X)[-1]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.argmax($X)
+metadata: { fix: unsafe }
+---
+# The fix needs a second statement, so there is none.
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to find the positions of the $K smallest, which ran 9 times slower on 1,000,000 values. Write idx = $NP.argpartition($X, $K)[:$K] and then idx[$NP.argsort($X[idx])].
+rule: { pattern: "$NP.argsort($X)[:$K]" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  K: { kind: integer, regex: '^[1-9][0-9]?$' }
+---
+id: np-sort-then-select
+language: python
+severity: warning
+message: This sorts every value to find the positions of the $K largest, which ran 16 times slower on 1,000,000 values. Write idx = $NP.argpartition($X, -$K)[-$K:] and then idx[$NP.argsort($X[idx])].
+rule:
+  any:
+    - pattern: "$NP.argsort($X)[-$K:]"
+    - pattern: "$NP.argsort($X)[::-1][:$K]"
+    - pattern: "$NP.argsort($X)[-$K:][::-1]"
+  not: { inside: { kind: subscript, pattern: "$Y[::-1]", stopBy: neighbor } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  K: { kind: integer, regex: '^[1-9][0-9]?$' }
+---
+# The fix needs a second statement, so there is none.
+id: np-sort-then-select
+language: python
+severity: warning
+message: argsort of an argsort sorts twice to rank the values, which ran 1.9 times slower on 1,000,000 values. Write order = $NP.argsort($X), then ranks = $NP.empty_like(order) and ranks[order] = $NP.arange(order.size).
+rule: { pattern: "$NP.argsort($NP.argsort($X))" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }

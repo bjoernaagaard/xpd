@@ -1,0 +1,18 @@
+# einsum without optimize= loops over every index at once, so a chain of three matrices costs
+# n**4 steps where two matrix products cost 2 * n**3. In research/numpy-rules/math/runs/bench.jsonl
+# optimize=True ran 1.5 times faster on three 18 by 18 matrices and 339 times faster on three
+# 100 by 100 matrices, and 63 times faster on four 18 by 18 matrices in bench3.jsonl. Only chains
+# of 2-D operands with a 2-D result. A trace such as "ij,jk,ki->" ran 0.25 times as fast with
+# optimize=True on 18 by 18 matrices. Unsafe: the last bits change.
+id: np-einsum-optimize
+language: python
+severity: warning
+message: Without optimize= einsum loops over every index at once, which ran 339 times slower on three 100 by 100 matrices. Add optimize=True.
+rule:
+  pattern: $NP.einsum($S, $$$OPS)
+  not: { regex: 'optimize\s*=' }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  S: { kind: string, regex: '^[rb]?[''"][a-z]{2}(,[a-z]{2}){2,}->[a-z]{2}[''"]$' }
+fix: $NP.einsum($S, $$$OPS, optimize=True)
+metadata: { fix: unsafe }

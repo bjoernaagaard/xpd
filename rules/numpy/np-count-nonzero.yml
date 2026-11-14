@@ -1,0 +1,57 @@
+# Counting the True values of a mask by a sum or by the length of a selection. The speedups are
+# from research/numpy-rules/math/runs/bench.jsonl and bench2.jsonl, one thread, NumPy 2.5.4, the lower of two runs.
+
+# Unsafe: np.sum skips the masked values of a masked array and count_nonzero does not, and
+# count_nonzero raises on a pandas column with missing values. The sum compared with 0 has its
+# own document below.
+id: np-count-nonzero
+language: python
+severity: warning
+message: Summing a comparison adds the True values one by one, which ran 1.7 times slower on 1,000,000 values. Write $NP.count_nonzero($C).
+rule:
+  pattern: $NP.sum($C)
+  not: { inside: { kind: comparison_operator, regex: '\s>\s*0$', stopBy: neighbor } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
+fix: $NP.count_nonzero($C)
+metadata: { fix: unsafe }
+---
+# Unsafe: len returns a Python int and count_nonzero a NumPy integer. On a 0-d array np.where
+# of one argument raises and count_nonzero does not.
+id: np-count-nonzero
+language: python
+severity: warning
+message: This builds the array of positions to count them, which ran 2 times slower on 1,000,000 values. Write $NP.count_nonzero($C).
+rule:
+  any:
+    - pattern: len($NP.where($C)[0])
+    - pattern: len($NP.nonzero($C)[0])
+    - pattern: len($NP.flatnonzero($C))
+    - pattern: len($NP.argwhere($C))
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.count_nonzero($C)
+metadata: { fix: unsafe }
+---
+# Unsafe: len returns a Python int and count_nonzero a NumPy integer.
+id: np-count-nonzero
+language: python
+severity: warning
+message: This copies the selected values to count them, which ran 14 times slower on 1,000,000 values. Write np.count_nonzero($C).
+rule: { pattern: "len($X[$C])" }
+constraints:
+  C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
+---
+# np.sum returns a NumPy integer, so the comparison gives a NumPy bool, as np.any does. Masked
+# arrays and pandas columns with missing values gave the same result in runs/safety-pandas.txt.
+id: np-count-nonzero
+language: python
+severity: warning
+message: This counts every True value to learn whether there is one, which ran 2.6 times slower on 1,000,000 values. Write $NP.any($C).
+rule: { pattern: $NP.sum($C) > 0 }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
+fix: $NP.any($C)
+metadata: { fix: safe }

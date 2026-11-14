@@ -1,0 +1,34 @@
+# Multiplying by an inverse. In research/numpy-rules/math/runs/probe.jsonl inv(a) @ b left a
+# residual of 0.54 on a 12 by 12 Hilbert matrix where solve left 9e-9. In bench.jsonl solve ran
+# 3.8 times faster for a vector on a 1,000 by 1,000 matrix and 1.6 times faster for a matrix,
+# with LAPACK on one thread. With five right sides it ran 0.98 times as fast on a 32 by 32
+# matrix, in bench5.jsonl, so the message gives the speed only for a vector. Unsafe: the last bits change, and with a stack of matrices solve
+# reads a 2-D b as one matrix per stack where matmul can broadcast it.
+id: np-solve
+language: python
+severity: warning
+message: Multiplying by the inverse loses more digits than solving, and solve ran 3.8 times faster for a vector on a 1,000 by 1,000 matrix. Write $NP.linalg.solve($A, $B).
+rule:
+  any:
+    - pattern: $NP.linalg.inv($A) @ $B
+    - pattern: $NP.linalg.inv($A).dot($B)
+    - pattern: $NP.dot($NP.linalg.inv($A), $B)
+  # A product that continues has its own document below.
+  not: { inside: { kind: binary_operator, pattern: $P @ $Q, stopBy: neighbor } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.linalg.solve($A, $B)
+metadata: { fix: unsafe }
+---
+# The normal equations inv(X.T @ X) @ X.T @ y are the common case. On a Vandermonde matrix of 12
+# columns the inverse left a residual of 0.038 and solve 5e-8, and solve ran 2.6 to 2.7 times faster in
+# bench2.jsonl and its repeat.
+id: np-solve
+language: python
+severity: warning
+message: Multiplying by the inverse loses more digits than solving, and on the normal equations solve ran 2.6 times faster. Write $NP.linalg.solve($A, $B @ $C).
+rule: { pattern: $NP.linalg.inv($A) @ $B @ $C }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.linalg.solve($A, $B @ $C)
+metadata: { fix: unsafe }
