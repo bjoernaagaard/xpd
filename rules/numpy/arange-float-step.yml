@@ -1,0 +1,31 @@
+# np.arange computes its length as ceil((stop - start) / step) in floating point, so with a step
+# such as 0.1 the stop value can appear in the result or the length can be one off. The NumPy
+# docs for arange say "When using a non-integer step, such as 0.1, it is often better to use
+# numpy.linspace" (https://numpy.org/doc/stable/reference/generated/numpy.arange.html). A step
+# that is a multiple of 1/64, such as 0.5, 0.25 or 0.03125, is exact and left alone.
+id: arange-float-step
+language: python
+severity: warning
+message: With a float step such as 0.1, the length of $NP.arange depends on rounding, and the stop value can appear in the result. Write $NP.linspace with the number of values.
+rule:
+  pattern: $NP.arange($A, $B, $STEP)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  STEP:
+    any:
+      - matches: inexact
+      - kind: keyword_argument
+        all:
+          - has: { field: name, regex: ^step$ }
+          - has: { field: value, matches: inexact }
+utils:
+  inexact:
+    any:
+      - kind: float
+        any:
+          - regex: '[eE]-'
+          - all:
+              - regex: '^\d*\.\d+$'
+              - not: { regex: '\.(|5|25|75|125|375|625|875|0625|1875|3125|4375|5625|6875|8125|9375|03125|09375|15625|21875|28125|34375|40625|46875|53125|59375|65625|71875|78125|84375|90625|96875|015625|046875|078125|109375|140625|171875|203125|234375|265625|296875|328125|359375|390625|421875|453125|484375|515625|546875|578125|609375|640625|671875|703125|734375|765625|796875|828125|859375|890625|921875|953125|984375)0*$' }
+      - kind: unary_operator
+        has: { field: argument, matches: inexact }
