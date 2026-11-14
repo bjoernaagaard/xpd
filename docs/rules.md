@@ -2349,8 +2349,214 @@ The rule leaves these alone:
 - A method or attribute of a class, such as `def _load(self)`.
 - A name inside a function.
 - `_` alone, and names with two leading underscores such as `__all__` and `__version__`.
+- `_T = TypeVar("_T")`, and the same for `ParamSpec` and `TypeVarTuple`. A type variable is
+  never part of a module's API, and typeshed and the typing documentation write it with an
+  underscore. On Python 3.12, `def first[T](xs: list[T]) -> T` needs no module level name.
 - A file that imports `hamilton`, where an underscore tells Hamilton that a function is not a
   node.
+
+#### vague-module-name
+
+**Severity:** warning. **Fix:** none.
+
+Reports a module named `util`, `utils`, `helper`, `helpers`, `common` or `misc`, and a package
+with one of those names.
+
+Example:
+
+```text
+orders/
+├── utils.py        # parse_date, round_price, retry
+└── report.py
+```
+
+Use instead:
+
+```text
+orders/
+├── dates.py        # parse_date
+├── prices.py       # round_price
+└── report.py
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The name says nothing about what the module holds, so unrelated code collects in it and every
+other module imports it. xpd reports the file on line 1.
+
+### Modules
+
+#### import-side-effect
+
+**Severity:** warning. **Fix:** none.
+
+Reports a call that stands alone at module level, and a read or write of `os.environ` or
+`os.getenv` at module level.
+
+Example:
+
+```python
+import logging
+import os
+
+import dspy
+
+logging.basicConfig(level=logging.INFO)
+dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+REGION = os.environ.get("REGION", "eu")
+
+
+def answer(question: str) -> str:
+    return dspy.Predict("question -> answer")(question=question).answer
+```
+
+Use instead:
+
+```python
+import logging
+import os
+
+import dspy
+
+
+def answer(question: str) -> str:
+    return dspy.Predict("question -> answer")(question=question).answer
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+    print(answer(os.environ.get("QUESTION", "What is xpd?")))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+A module level call runs on the first import, in an order nobody chose, and again in every
+process that imports the module. A program that imports the module to use one function gets
+its logging and its library settings changed, and the environment is read before the program
+has parsed its own arguments.
+
+The rule leaves these alone:
+
+- A file with no function and no class. It is a script, which runs from top to bottom.
+- A `__main__.py`, which is run and never imported.
+- A method that edits a collection the module defines, such as `NAMES.append("id")`.
+- A call whose name starts with `register`, and `include_router`, `add_typer`,
+  `add_middleware` and `mount` on a web or command line app.
+- `pytest.importorskip`, which is how a test module skips itself.
+- A call inside `if`, `try`, `with` or a class body, and a call whose result is assigned.
+
+### Types
+
+#### typing-cast
+
+**Severity:** warning. **Fix:** none.
+
+Reports a call to `typing.cast`.
+
+Example:
+
+```python
+from typing import cast
+
+
+def port(settings: dict[str, object]) -> int:
+    return cast(int, settings["port"])
+```
+
+Use instead:
+
+```python
+def port(settings: dict[str, object]) -> int:
+    value = settings["port"]
+    if not isinstance(value, int):
+        raise TypeError(f"port must be an int: {value!r}")
+    return value
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+`cast` tells the type checker to believe a type that nothing checks, so a wrong value fails at
+run time, far from the cast. `isinstance`, `match` and a `TypeIs` function narrow the type for
+the checker and check it in the program.
+
+xpd reports `typing.cast(...)`, and `cast(...)` in a file that imports `cast` from `typing` or
+`typing_extensions`. ruff has no rule that reports a cast. Its `TC006` only asks for quotes
+around the type.
+
+#### dict-str-any
+
+**Severity:** warning. **Fix:** none.
+
+Reports `dict[str, Any]` as the type of a parameter or a return value. `Dict`, `Mapping` and
+`MutableMapping` with the same arguments are reported too.
+
+Example:
+
+```python
+from typing import Any
+
+
+def total(order: dict[str, Any]) -> float:
+    return order["price"] * order["quantity"]
+```
+
+Use instead:
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Order:
+    price: float
+    quantity: int
+
+
+def total(order: Order) -> float:
+    return order.price * order.quantity
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The type says nothing about the keys or the values, so every function that takes the dict has
+to know its shape by heart, and the type checker cannot find a misspelled key. Decode the data
+once, where it enters the program, into a dataclass or a `TypedDict`.
+
+ruff's `ANN401` reports a parameter annotated with `Any` alone, and leaves `dict[str, Any]`.
+
+### Tests
+
+#### mock-import
+
+**Severity:** warning. **Fix:** none.
+
+Reports an import of `unittest.mock`, `mock` or `pytest_mock`.
+
+Example:
+
+```python
+from unittest.mock import patch
+
+
+def test_total():
+    with patch("orders.load", return_value=[{"price": 2.0}]):
+        assert total() == 2.0
+```
+
+Use instead:
+
+```python
+def test_total(tmp_path):
+    path = tmp_path / "orders.csv"
+    path.write_text("price\n2.0\n", encoding="utf-8")
+    assert total(path) == 2.0
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+A test that replaces a function with a mock passes when the mock is called the way the test
+expects, whatever the real function does. Run the real code on real input.
 
 ### Comprehensions
 
@@ -2417,6 +2623,34 @@ The replacement is advice. xpd does not apply it automatically.
 The literal builds a dict, unpacks it and merges it in one expression, so a reader has to run
 the comprehension in their head to know which keys the result has.
 
+#### comprehension-two-fors
+
+**Severity:** warning. **Fix:** none.
+
+Reports a comprehension or generator expression with more than one `for`.
+
+Example:
+
+```python
+def checks(cases):
+    return [check for case in cases for check in case.checks]
+```
+
+Use instead:
+
+```python
+def checks(cases):
+    found = []
+    for case in cases:
+        found.extend(case.checks)
+    return found
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The clauses run in the order of a nested loop, and the result stands before both, so a reader
+has to reorder the expression. Python 3.15 flattens with `[*case.checks for case in cases]`.
+
 ## Write a rule
 
 Rules are [ast-grep rules](https://ast-grep.github.io/guide/rule-config.html) in `.yml` files,
@@ -2458,6 +2692,12 @@ reports with a comment that names the rules.
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the
 pack's library and lacks the package. With `onlyWith`, it warns only when the project also uses
 one of the tools.
+
+A rule may limit the files it runs on with ast-grep's
+[`files` and `ignores`](https://ast-grep.github.io/reference/yaml.html#files) globs. xpd matches
+a glob against the path as it was given, so start it with `**/` to match at any depth, as in
+`ignores: ["**/__main__.py"]`. A rule about the file itself, such as `vague-module-name`, matches
+`kind: module` and is reported on line 1.
 
 A new folder under `rules/` is a new pack, with no Rust change. Its rules run only on files that
 import the module. A pack about Python itself, such as `rules/python/`, sets `everyFile: true` in

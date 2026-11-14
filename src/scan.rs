@@ -95,7 +95,7 @@ pub(crate) fn scan(
             let mut fixed = 0;
             if let Some(allowed) = fix {
                 for _ in 0..MAX_FIX_PASSES {
-                    let (next, applied) = fix_pass(&src, packs, allowed);
+                    let (next, applied) = fix_pass(path, &src, packs, allowed);
                     if applied == 0 {
                         break;
                     }
@@ -131,7 +131,7 @@ fn lint(path: &Path, src: &str, packs: &[Pack]) -> Vec<Issue> {
     let mut found = Vec::new();
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
-        for rule in &pack.rules {
+        for rule in pack.rules.iter().filter(|rule| rule.runs_on(path)) {
             for m in root.root().find_all(&rule.config.matcher) {
                 let start = m.start_pos();
                 let fix = rule
@@ -157,7 +157,7 @@ fn lint(path: &Path, src: &str, packs: &[Pack]) -> Vec<Issue> {
 
 /// Applies every fix up to `allowed` that does not overlap an earlier one, and returns the new
 /// source with the number of fixes applied. Overlapping fixes wait for the next pass.
-fn fix_pass(src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize) {
+fn fix_pass(path: &Path, src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize) {
     if !packs.iter().any(|pack| pack.may_apply(src)) {
         return (src.to_owned(), 0);
     }
@@ -167,7 +167,7 @@ fn fix_pass(src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
         for rule in &pack.rules {
-            if rule.fix.is_none_or(|a| a > allowed) {
+            if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(path) {
                 continue;
             }
             for m in root.root().find_all(&rule.config.matcher) {

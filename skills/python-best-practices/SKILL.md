@@ -200,10 +200,13 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 
 | Rule | Tool |
 |---|---|
-| Layout, quotes, import order, unused names, mutable defaults, bare `except` | `ruff format`, `ruff check` |
+| Layout, quotes, import order, unused names, mutable defaults (`B006`), bare `except`, a `lambda` bound to a name (`E731`), an import inside a function (`PLC0415`), access to another object's private member (`SLF001`) | `ruff format`, `ruff check` |
 | Types, `None` handling, missing annotations in strict mode | the project's type checker |
-| Module level names with an underscore | `xpd check`: `python/module-private-name` |
-| `**` merges and unpacked comprehensions | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension` |
+| Module level names with an underscore, a `utils` module | `xpd check`: `python/module-private-name`, `python/vague-module-name` |
+| Calls and environment reads at import | `xpd check`: `python/import-side-effect` |
+| `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
+| `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
+| Mock imports | `xpd check`: `python/mock-import` |
 | Slow or wrong pandas, scikit-learn and Hamilton code | `xpd check`, in files that import them |
 
 The rest of this file needs a reader. The `python-review` skill is that reader.

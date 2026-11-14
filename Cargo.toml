@@ -24,6 +24,8 @@ ast-grep-config = "0.51.1"
 ast-grep-core = "0.51.1"
 ast-grep-language = { version = "0.51.1", default-features = false, features = ["tree-sitter-python"] }
 clap = { version = "4.6.7", features = ["derive"] }
+# ast-grep-config already builds globset, so this adds no package to the build.
+globset = "0.4.21"
 ignore = "0.4.34"
 rayon = "1.12.0"
 # ast-grep-config already builds serde with derive, so this adds no package to the build.

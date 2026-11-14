@@ -3,13 +3,29 @@
 A line that xpd reports ends with a comment that names the rule.
 """
 
+import logging
+import os
+from dataclasses import dataclass
 from functools import cache
+from typing import Any, TypeVar, cast
+from unittest.mock import patch  # xpd: mock-import
 
 __all__ = ["rows", "rows_with_loop"]
 
 _LIMIT = 10  # xpd: module-private-name
 LIMIT = 10
 _ = LIMIT
+_T = TypeVar("_T")
+
+logging.basicConfig(level=logging.INFO)  # xpd: import-side-effect
+REGION = os.environ.get("REGION", "eu")  # xpd: import-side-effect
+NAMES = ["id"]
+NAMES.append("name")
+log = logging.getLogger(__name__)
+
+
+def main() -> None:
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
 
 def _prices(item: dict) -> dict:  # xpd: module-private-name
@@ -72,3 +88,34 @@ def rows_with_loop(items: list[dict]) -> dict:
             row[f"tag_{name}"] = value
         found[item["id"]] = row
     return found
+
+
+def flatten(lists: list[list[int]]) -> list[int]:
+    return [x for xs in lists for x in xs]  # xpd: comprehension-two-fors
+
+
+def flatten_with_loop(lists: list[list[int]]) -> list[int]:
+    found = []
+    for xs in lists:
+        found.extend(xs)
+    return found
+
+
+def price(payload: dict[str, Any]) -> float:  # xpd: dict-str-any
+    return cast(float, payload["price"])  # xpd: typing-cast
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Item:
+    price: float
+
+
+def decode(payload: object) -> Item:
+    if not isinstance(payload, dict) or not isinstance(payload.get("price"), float):
+        raise ValueError(f"not an item: {payload!r}")
+    return Item(price=payload["price"])
+
+
+def first(values: list[_T]) -> _T:
+    with patch("os.getcwd"):
+        return values[0]
