@@ -181,7 +181,7 @@ def apply_condition(df):
 
 @case
 def condition_on_whole_column(df):
-    return pd.Series(np.where(df["a"] > 50, 1, 0)), df["b"].clip(upper=1.0), df["s"].apply(str.title)
+    return pd.Series(np.where(df["a"] > 50, 1, 0)), df["b"].clip(upper=1.0), df["s"].apply(str.title)  # xpd: where-shortcut
 
 
 @case
@@ -234,7 +234,7 @@ def frame_built_once(df):
 
 @case
 def len_of_filter(df):
-    return len(df[df["a"] > 50]), len(df[(df["a"] > 50) & (df["b"] < 0)])  # xpd: len-of-filter
+    return len(df[df["a"] > 50]), len(df[(df["a"] > 50) & (df["b"] < 0)])  # xpd: len-of-filter, count-nonzero
 
 
 @case

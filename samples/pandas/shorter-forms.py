@@ -36,7 +36,7 @@ def assign_with_a_named_list(df):
     return df.assign(
         c=lambda d: d["a"] * d["w"] + 1,
         u=pd.col("s").str.strip().str.upper(),
-        m=lambda d: np.where(d["a"] > 5, 1, 0),
+        m=lambda d: np.where(d["a"] > 5, 1, 0),  # xpd: where-shortcut
     )[output_columns]
 
 

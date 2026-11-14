@@ -109,7 +109,7 @@ constraints:
 id: sort-then-select
 language: python
 severity: warning
-message: This sorts every value to find the positions of the $K largest, which ran 16 times slower on 1,000,000 values. Write idx = $NP.argpartition($X, -$K)[-$K:] and then idx[$NP.argsort($X[idx])].
+message: This sorts every value to find the positions of the $K largest, which ran 16 times slower on 1,000,000 values. Write idx = $NP.argpartition($X, -$K)[-$K:] and then idx[$NP.argsort($X[idx])], reversed with [::-1] where the largest comes first.
 rule:
   any:
     - pattern: "$NP.argsort($X)[-$K:]"

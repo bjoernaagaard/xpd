@@ -6,7 +6,7 @@
 id: arange-float-step
 language: python
 severity: warning
-message: With a float step such as 0.1, the length of $NP.arange depends on rounding, and the stop value can appear in the result. Write $NP.linspace with the number of values.
+message: With a float step such as 0.1, the length of $NP.arange depends on rounding, and the stop value can appear in the result. Write $NP.linspace(start, stop, num, endpoint=False) with the number of values, which gives the same grid and never the stop value.
 rule:
   pattern: $NP.arange($A, $B, $STEP)
 constraints:

@@ -33,6 +33,8 @@ rule:
   not: { inside: { kind: argument_list, inside: { pattern: $S.sqrt($E) }, stopBy: neighbor } }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  # The fix writes $X twice, so a call in it would run twice.
+  X: { not: { any: [{ kind: call }, { has: { stopBy: end, kind: call } }] } }
 fix: $NP.vdot($X, $X)
 metadata: { fix: unsafe }
 ---

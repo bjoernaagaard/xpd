@@ -3,7 +3,7 @@
 id: np-vectorize
 language: python
 severity: warning
-message: $F still calls the Python function once per value. Compute on whole columns, for example with np.where or np.select.
+message: $F still calls the Python function once per value or once per slice, so it runs at the speed of a Python loop. Where the function is arithmetic or a condition, write it on whole arrays, for example with np.where or np.select.
 rule: { pattern: $F($$$ARGS) }
 constraints:
   F: { regex: '^(np|numpy)\.(vectorize|frompyfunc|apply_along_axis)$' }
@@ -12,7 +12,7 @@ constraints:
 id: np-vectorize
 language: python
 severity: warning
-message: $F still calls the Python function once per value. Compute on whole columns, for example with np.where or np.select.
+message: $F still calls the Python function once per value or once per slice, so it runs at the speed of a Python loop. Where the function is arithmetic or a condition, write it on whole arrays, for example with np.where or np.select.
 rule:
   kind: decorator
   has: { pattern: $F }

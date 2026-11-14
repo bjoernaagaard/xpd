@@ -18,6 +18,8 @@ rule:
     - pattern: $NP.sum($NP.square($X), axis=-1)
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  # The fix writes $X twice, so a call in it would run twice.
+  X: { not: { any: [{ kind: call }, { has: { stopBy: end, kind: call } }] } }
 fix: $NP.vecdot($X, $X)
 metadata: { fix: unsafe, since: "2.0" }
 ---

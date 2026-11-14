@@ -5,7 +5,7 @@
 id: log-of-product
 language: python
 severity: warning
-message: The product overflows to inf or underflows to 0 before the log is taken. Write $NP.sum($NP.log($X)).
+message: The product can overflow to inf or underflow to 0 before the log is taken. Write $NP.sum($NP.log($X)).
 rule: { pattern: $NP.log($NP.prod($X)) }
 constraints:
   NP: { regex: '^(np|numpy)$' }
