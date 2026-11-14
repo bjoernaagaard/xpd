@@ -10,6 +10,7 @@ import time
 import numpy as np
 import numpy.testing as npt
 from numpy.random import default_rng
+from numpy.testing import assert_, assert_raises
 from numpy.random import randn, seed  # xpd: legacy-random
 
 CASES = {}
@@ -215,3 +216,15 @@ def bit_counts():
     each = np.sum(np.unpackbits(x.view(np.uint8).reshape(-1, 8), axis=1), axis=1)  # xpd: unpackbits-popcount
     bits = np.unpackbits(x.view(np.uint8))
     return total, each, bits, np.bitwise_count(x)
+
+
+def legacy_testing_helpers():
+    a = np.ones(2)
+    assert_(a.shape == (2,))  # xpd: legacy-testing-helper
+    np.testing.assert_(a.sum() == 2, "sum is off")  # xpd: legacy-testing-helper
+    assert_raises(ValueError, int, "x")  # xpd: legacy-testing-helper
+    with np.testing.assert_raises(ValueError):  # xpd: legacy-testing-helper
+        int("x")
+    assert a.shape == (2,)
+    ok = assert_(True)
+    return ok
