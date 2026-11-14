@@ -1105,6 +1105,7 @@ utils:
 ---
 # np.ptp(a) calls a.ptp for a masked array and computes the same range for an ndarray. A module
 # such as np or ma has a ptp function, not a method, so it is left alone.
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1132,8 +1133,9 @@ utils:
   module-function:
     has: { field: function, has: { field: object, regex: '^(np|numpy|ma|jnp|cp|cupy|xp|torch|da|(np|numpy)\.ma)$' } }
 fix: np.ptp($X)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1164,11 +1166,12 @@ utils:
   module-function:
     has: { field: function, has: { field: object, regex: '^(np|numpy|ma|jnp|cp|cupy|xp|torch|da|(np|numpy)\.ma)$' } }
 fix: np.ptp($X, $$$A)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # tostring returned what tobytes returns. array.array and PIL images renamed the method to
 # tobytes too. A call with a positional argument, such as ET.tostring(root), is a function of
 # another library.
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1193,8 +1196,9 @@ utils:
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X.tobytes()
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1219,9 +1223,10 @@ utils:
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X.tobytes(order=$O)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # a.itemset((i, j), v) and a.itemset(i, j, v) set a[i, j]. The fix applies to a statement.
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1251,8 +1256,9 @@ constraints:
 transform:
   INDEX: { substring: { source: $T, startChar: 1, endChar: -1 } }
 fix: $X[$INDEX] = $V
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1279,8 +1285,9 @@ utils:
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X[$I, $J] = $V
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the pattern cannot tell an array from another object with a method of this name.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1307,7 +1314,7 @@ utils:
           stopBy: end
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 fix: $X[$I, $J, $K] = $V
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # A single integer index set the element at that flat position, so a.itemset(4, v) is
 # a.flat[4] = v, which differs from a[4] = v on more than one dimension.

@@ -2391,7 +2391,7 @@ matches = np.count_nonzero(z > 0)
 
 #### removed-in-numpy-2
 
-**Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, `np.ptp(a)`, `a.tobytes()`, `a[i, j] = v` for `a.itemset`, a shape by position for `newshape=`, `method=` for `interpolation=`, deleting `fix_imports=`, `bias=` and `ddof=`, `minlength=0`, and `"S"` for the dtype code `"a"`. unsafe: `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`. The other forms have no fix.
+**Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, a shape by position for `newshape=`, `method=` for `interpolation=`, deleting `fix_imports=`, `bias=` and `ddof=`, `minlength=0`, and `"S"` for the dtype code `"a"`. unsafe: `np.ptp(a)`, `a.tobytes()` and `a[i, j] = v` for `a.itemset`, because the pattern cannot tell an array from another object with a method of that name, `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`. The other forms have no fix.
 
 Reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, each with what to write instead. Code under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches `ImportError` or `AttributeError` is left alone, because it exists for old NumPy.
 
@@ -2545,7 +2545,7 @@ def clipped(x):
 
 #### array-construction
 
-**Severity:** warning. **Fix:** safe: `np.full(n, 3, dtype=float)`, `np.zeros(n, dtype=np.float32)`. unsafe: `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
+**Severity:** warning. **Fix:** safe: `np.full(n, 3, dtype=np.float64)`, `np.zeros(n, dtype=np.float32)`. unsafe: `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
 
 Reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`.
 
@@ -2558,12 +2558,12 @@ weights = np.ones(n) * 0.5
 Use instead:
 
 ```python
-weights = np.full(n, 0.5, dtype=float)
+weights = np.full(n, 0.5, dtype=np.float64)
 ```
 
 #### needless-copy
 
-**Severity:** warning. **Fix:** safe: `np.abs(m).ravel()`. unsafe: `x.astype(np.float32)`, `np.array(x)`.
+**Severity:** warning. **Fix:** unsafe: `np.abs(m).ravel()`, `x.astype(np.float32)`, `np.array(x)`. ravel can return a view of an output array that was passed by position, and the other two can change the memory order.
 
 Reports `.flatten()` on the result of a NumPy call that returns a new array, `x.copy().astype(t)` and `np.array(x).copy()`.
 
@@ -3065,7 +3065,7 @@ cov = X.T @ X / n
 
 #### mergesort-kind
 
-**Severity:** info. **Fix:** safe: `kind="stable"`.
+**Severity:** info. **Fix:** safe: `kind="stable"` in `np.sort` and `np.argsort`. unsafe: the same in a `sort` or `argsort` method, because the pattern cannot tell an array from another object.
 
 Reports `kind="mergesort"` in `np.sort`, `np.argsort` and the `sort` and `argsort` methods. The docs keep "mergesort" only for backwards compatibility, and both names select the same stable sort.
 

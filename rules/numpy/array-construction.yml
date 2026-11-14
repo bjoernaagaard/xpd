@@ -39,7 +39,7 @@ metadata: { fix: unsafe }
 id: array-construction
 language: python
 severity: warning
-message: This writes an array of ones and then multiplies every value. Write $NP.full($N, $C, dtype=float), which ran 2.5 to 2.9 times faster on 1,000,000 values.
+message: This writes an array of ones and then multiplies every value. Write $NP.full($N, $C, dtype=$NP.float64), which ran 2.5 to 2.9 times faster on 1,000,000 values.
 rule:
   any:
     - pattern: $NP.ones($N) * $C
@@ -47,7 +47,7 @@ rule:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   C: { any: [{ kind: integer }, { kind: float }, { kind: unary_operator, regex: '^-\s*[\d.]' }] }
-fix: $NP.full($N, $C, dtype=float)
+fix: $NP.full($N, $C, dtype=$NP.float64)
 metadata: { fix: safe }
 ---
 # np.zeros(n).astype(T) writes a float64 array and then converts every value. For a numeric

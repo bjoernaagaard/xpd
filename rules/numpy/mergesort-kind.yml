@@ -1,9 +1,6 @@
 # The np.sort docs say "The 'mergesort' option is retained for backwards compatibility", and
 # both names select the same stable sort:
 # https://numpy.org/doc/stable/reference/generated/numpy.sort.html
-# The method form covers arrays and pandas objects, which pass kind on to NumPy. A sort function
-# of another array library, such as jnp.sort or cupy.sort, is left alone, because those treat
-# kind differently.
 id: mergesort-kind
 language: python
 severity: info
@@ -19,10 +16,31 @@ rule:
           kind: call
           has:
             field: function
-            any:
-              - regex: '^(np|numpy)\.(sort|argsort)$'
-              - kind: attribute
-                has: { field: attribute, regex: ^(sort|argsort)$ }
-                not: { has: { field: object, regex: '^(jnp|jax|cp|cupy|torch|tf|da|dask|xp|mx|sparse)(\.numpy)?$' } }
+            regex: '^(np|numpy)\.(sort|argsort)$'
 fix: kind="stable"
 metadata: { fix: safe }
+---
+# The method form covers arrays and pandas objects, which pass kind on to NumPy. A sort function
+# of another array library, such as jnp.sort or cupy.sort, is left alone, because those treat
+# kind differently. Unsafe: the pattern cannot tell an array from another object with a sort
+# method that takes kind.
+id: mergesort-kind
+language: python
+severity: info
+message: kind="mergesort" is kept only for backwards compatibility, and it runs the same stable sort as kind="stable". Write kind="stable".
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^kind$ }
+    - has: { field: value, kind: string, regex: '^["'']mergesort["'']$' }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has:
+            field: function
+            kind: attribute
+            has: { field: attribute, regex: ^(sort|argsort)$ }
+            not: { has: { field: object, regex: '^(np|numpy|jnp|jax|cp|cupy|torch|tf|da|dask|xp|mx|sparse)(\.numpy)?$' } }
+fix: kind="stable"
+metadata: { fix: unsafe }

@@ -4,6 +4,8 @@
 # The call returns a new array that no other name holds, so ravel gives the same values in the
 # same order, and a view of it changes nothing. A call with out= returns that array, and
 # np.array with copy= can return its input, so both are left alone.
+# Unsafe: a second positional argument of a function such as np.sqrt(a, out) is the output
+# array, and ravel then returns a view of it where flatten returned a copy.
 id: needless-copy
 language: python
 severity: warning
@@ -15,7 +17,7 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
   F: { regex: '^(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|clip|isnan|isfinite|isinf|add|subtract|multiply|divide|true_divide|floor_divide|mod|remainder|logical_and|logical_or|logical_not|equal|not_equal|greater|greater_equal|less|less_equal|zeros|ones|empty|full|zeros_like|ones_like|empty_like|full_like|arange|linspace|logspace|array|copy|concatenate|stack|vstack|hstack|dstack|column_stack|dot|matmul|outer|kron|tile|repeat|sort|cumsum|cumprod|diff|eye|identity|random\.\w+)$' }
 fix: $NP.$F($$$ARGS).ravel()
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # Unsafe: copy() makes a C-ordered array, and astype keeps the order of its input, so a
 # Fortran-ordered $X gives the same values in another memory order. A call with copy= is left
