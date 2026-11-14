@@ -1381,6 +1381,7 @@ utils:
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  A: { not: { kind: keyword_argument } }
 fix: $NP.reshape($A, $S)
 metadata: { fix: safe }
 ---
@@ -1409,6 +1410,7 @@ utils:
           has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  A: { not: { kind: keyword_argument } }
 fix: $NP.reshape($A, $S, order=$O)
 metadata: { fix: safe }
 ---
@@ -1793,6 +1795,7 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
 # NumPy 2.5 removed the dtype code "a", which was another name for "S".
+# Unsafe: a dtype= keyword of a function that is not NumPy's can give the text another meaning.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1839,7 +1842,7 @@ utils:
 transform:
   NEW: { replace: { source: $S, replace: 'a(\d*)(["''])$', by: 'S$1$2' } }
 fix: $NEW
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # fromstring without sep= read raw bytes, which NumPy 2.3 removed. frombuffer reads the same
 # values, but returns a read-only view of the bytes where fromstring returned a writable copy,
