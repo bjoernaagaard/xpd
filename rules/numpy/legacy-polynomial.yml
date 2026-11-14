@@ -1,0 +1,69 @@
+# np.poly1d and the poly* functions are NumPy's old polynomial API. The docs say they should
+# not be used in new code and that numpy.polynomial is preferred:
+# https://numpy.org/doc/stable/reference/routines.polynomials.html. No fix, because
+# numpy.polynomial stores coefficients from degree zero up, the reverse of the old order, and
+# the old functions also take poly1d objects.
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.polyfit is part of NumPy's legacy polynomial API, and its docs recommend Polynomial.fit as more stable numerically. Write $NP.polynomial.Polynomial.fit(x, y, deg), and call .convert().coef for the coefficients from degree zero up.
+rule: { pattern: $NP.polyfit($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.poly1d is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]), because the new class takes coefficients from degree zero up.
+rule: { pattern: $NP.poly1d($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.polyval is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyval(x, coef[::-1]), which takes x first and coefficients from degree zero up.
+rule: { pattern: $NP.polyval($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.roots is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).roots(), because the new class takes coefficients from degree zero up.
+rule: { pattern: $NP.roots($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.poly is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial.fromroots(roots), which gives coefficients from degree zero up.
+rule: { pattern: $NP.poly($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.polyder is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).deriv(), because the new class takes coefficients from degree zero up.
+rule: { pattern: $NP.polyder($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.polyint is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).integ(), because the new class takes coefficients from degree zero up.
+rule: { pattern: $NP.polyint($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-polynomial
+language: python
+severity: warning
+message: $NP.$F is part of NumPy's legacy polynomial API. Make $NP.polynomial.Polynomial objects from coef[::-1] and use the + - * and divmod operators on them.
+rule: { pattern: $NP.$F($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(polyadd|polysub|polymul|polydiv)$' }

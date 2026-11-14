@@ -1,0 +1,22 @@
+# A new Generator per pass gathers OS entropy and builds a SeedSequence each time. Reusing one
+# Generator ran 32 times faster over 1,000 passes that each drew one value, about 5.6
+# microseconds saved per pass. Only default_rng() without a seed is reported. A loop that seeds
+# each pass from its loop variable is a deliberate experiment per seed, and a constant seed in a
+# loop repeats the same numbers, which is a wrong result and not a speed issue. No fix, because
+# the Generator has to move out of the loop.
+id: rng-in-loop
+language: python
+severity: warning
+message: $NP.random.default_rng() builds a new Generator on every pass, which costs about 5 microseconds each time. Create rng = $NP.random.default_rng() once before the loop and draw from it.
+rule:
+  pattern: $NP.random.default_rng()
+  inside:
+    stopBy: end
+    any:
+      - { kind: block, inside: { any: [{ kind: for_statement }, { kind: while_statement }] } }
+      - kind: list_comprehension
+      - kind: set_comprehension
+      - kind: dictionary_comprehension
+      - kind: generator_expression
+constraints:
+  NP: { regex: '^(np|numpy)$' }

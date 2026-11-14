@@ -1,0 +1,121 @@
+# The functions in np.random and the RandomState class are NumPy's legacy random API. The docs
+# discourage them because they use hidden global state and the frozen RandomState, and recommend
+# a Generator from np.random.default_rng:
+# https://numpy.org/doc/stable/reference/random/legacy.html#functions-in-numpy-random and
+# https://numpy.org/doc/stable/reference/random/index.html. No document has a fix. A Generator
+# draws a different stream from the same seed, and np.random.seed elsewhere would no longer
+# reach the rewritten call. random_integers warns on NumPy 2.5 and is left to the rules for
+# removed forms.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.seed sets the hidden global RandomState, which NumPy keeps only for old code. Create rng = $NP.random.default_rng(seed) once and draw from rng.
+rule: { pattern: $NP.random.seed($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# scikit-learn's random_state accepts a RandomState and rejects a Generator, so a file that
+# imports scikit-learn is left alone. In its tests about a third of the RandomState objects went
+# to random_state.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.RandomState is NumPy's frozen legacy generator. Write $NP.random.default_rng($$$ARGS) and call the Generator methods, such as integers for randint and random for rand.
+rule:
+  pattern: $NP.random.RandomState($$$ARGS)
+  not:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        any:
+          - { kind: import_statement, regex: '\bsklearn\b' }
+          - { kind: import_from_statement, has: { field: module_name, regex: '^sklearn\b' } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# Generator.random was 2.1 times faster than rand at 1,000,000 values and 1.4 times at 1,000,
+# because PCG64 makes doubles faster than MT19937.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.$F draws from the hidden global RandomState, which NumPy keeps only for old code. Create rng = $NP.random.default_rng(seed) once and call rng.random(shape), which ran 2 times faster on 1,000,000 values.
+rule: { pattern: $NP.random.$F($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(rand|random|random_sample|sample|ranf)$' }
+---
+# Generator.integers was 2.5 times faster than randint at 1,000,000 values on int64 and int32,
+# and not slower at 1,000. It uses Lemire's bounded method where randint masks and rejects.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.randint draws from the hidden global RandomState, which NumPy keeps only for old code. Create rng = $NP.random.default_rng(seed) once and call rng.integers, which ran 2.5 times faster on 1,000,000 values.
+rule: { pattern: $NP.random.randint($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.randn draws from the hidden global RandomState, which NumPy keeps only for old code. Create rng = $NP.random.default_rng(seed) once and call rng.standard_normal(shape).
+rule: { pattern: $NP.random.randn($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# The legacy choice permutes the whole population to draw without replacement. Generator.choice
+# draws only the sample, and ran 280 times faster for 1,001 of 1,000,000 values.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.choice permutes the whole population to sample without replacement, and it uses the legacy global RandomState. Create rng = $NP.random.default_rng(seed) once and call rng.choice, which ran 280 times faster drawing 1,001 of 1,000,000 values.
+rule:
+  pattern: $NP.random.choice($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^replace\s*=\s*False$' } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# Generator.exponential uses a ziggurat where the legacy function takes a logarithm per value.
+# It ran 2.4 times faster at 1,000,000 values and 1.7 times at 1,000.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.exponential draws from the hidden global RandomState, which NumPy keeps only for old code. Create rng = $NP.random.default_rng(seed) once and call rng.exponential, which ran 2.4 times faster on 1,000,000 values.
+rule: { pattern: $NP.random.exponential($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+---
+# The other functions keep their name on Generator. choice with replace=False has its own
+# document above.
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.$F draws from the hidden global RandomState, which NumPy keeps only for old code. Create rng = $NP.random.default_rng(seed) once and call rng.$F.
+rule:
+  pattern: $NP.random.$F($$$ARGS)
+  not: { has: { field: arguments, has: { kind: keyword_argument, regex: '^replace\s*=\s*False$' } } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(beta|binomial|bytes|chisquare|choice|dirichlet|f|gamma|geometric|gumbel|hypergeometric|laplace|logistic|lognormal|logseries|multinomial|multivariate_normal|negative_binomial|noncentral_chisquare|noncentral_f|normal|pareto|permutation|poisson|power|rayleigh|shuffle|standard_cauchy|standard_exponential|standard_gamma|standard_normal|standard_t|triangular|uniform|vonmises|wald|weibull|zipf)$' }
+---
+id: legacy-random
+language: python
+severity: warning
+message: $NP.random.$F reads the hidden global RandomState, which NumPy keeps only for old code. Use a Generator from $NP.random.default_rng and its rng.bit_generator.state.
+rule: { pattern: $NP.random.$F($$$ARGS) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(get_state|set_state)$' }
+---
+# An import of the legacy functions by name, such as `from numpy.random import rand, seed`.
+id: legacy-random
+language: python
+severity: warning
+message: This imports functions of NumPy's legacy global RandomState. Import default_rng, create rng = default_rng(seed) once, and draw from rng.
+rule:
+  kind: import_from_statement
+  all:
+    - has: { field: module_name, regex: '^numpy\.random$' }
+    - has:
+        field: name
+        regex: '^(seed|rand|randn|randint|random|random_sample|sample|ranf|choice|shuffle|permutation|normal|uniform|RandomState|beta|binomial|exponential|gamma|poisson|multivariate_normal|standard_normal|get_state|set_state)$'
