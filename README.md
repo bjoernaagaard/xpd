@@ -127,11 +127,11 @@ Add the hook to `.claude/settings.json` in your project.
 ### MCP server
 
 `xpd mcp` starts an [MCP](https://modelcontextprotocol.io) server, so an agent calls xpd through
-typed tools and needs no shell. The server needs the `mcp` extra, and the command below installs
-it and adds the server to Claude Code.
+typed tools and needs no shell. The server comes with xpd, and the command below adds it to
+Claude Code.
 
 ```sh
-claude mcp add xpd -- uvx --from 'xpd[mcp]' xpd mcp
+claude mcp add xpd -- uvx xpd mcp
 ```
 
 ```text

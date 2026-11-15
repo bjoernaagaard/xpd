@@ -123,7 +123,7 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
-    /// Start the MCP server. Needs the mcp extra: uvx --from 'xpd[mcp]' xpd mcp
+    /// Start the MCP server
     ///
     /// The arguments go to the server, so `xpd mcp -h` lists its flags.
     #[command(disable_help_flag = true)]

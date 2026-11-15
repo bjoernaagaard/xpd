@@ -3,7 +3,7 @@
 `xpd mcp` starts an [MCP](https://modelcontextprotocol.io) server, so an agent can run xpd
 through tools instead of a shell. It gets every rule and every result from the xpd binary, so
 it always matches the installed version. The server is built on
-[FastMCP](https://gofastmcp.com) and needs the `mcp` extra.
+[FastMCP](https://gofastmcp.com), which installs with xpd.
 
 ```text
 xpd mcp
@@ -52,7 +52,7 @@ The result of the check includes the following issue.
 Run the following command to add the server to Claude Code.
 
 ```sh
-claude mcp add xpd -- uvx --from 'xpd[mcp]' xpd mcp
+claude mcp add xpd -- uvx xpd mcp
 ```
 
 For another client, add the server to the `mcpServers` setting of the client.
@@ -62,15 +62,16 @@ For another client, add the server to the `mcpServers` setting of the client.
   "mcpServers": {
     "xpd": {
       "command": "uvx",
-      "args": ["--from", "xpd[mcp]", "xpd", "mcp"]
+      "args": ["xpd", "mcp"]
     }
   }
 }
 ```
 
 The server uses its working directory as the project root, unless `--root` or `XPD_MCP_ROOT`
-names another folder. Set the root when your client starts servers in another folder. With xpd
-installed without the extra, `xpd mcp` prints the `uvx` command above and exits 2.
+names another folder. Set the root when your client starts servers in another folder. An xpd
+binary built with `cargo` has no Python package, so its `xpd mcp` prints `uvx xpd mcp` and
+exits 2.
 
 ## Tools
 
@@ -157,7 +158,7 @@ Each flag has an environment setting, for clients that start the server without 
 | Flag | Environment | Default | Effect |
 | --- | --- | --- | --- |
 | `--root PATH` | `XPD_MCP_ROOT` | The working directory | The project root. Every path must be inside it |
-| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute` |
+| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute`. It does not run on Windows on Arm, where its sandbox has no wheel |
 | `--transport stdio\|http` | `FASTMCP_TRANSPORT` | `stdio` | How clients connect |
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to bind for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
@@ -170,7 +171,7 @@ setting of the client, because a client may not pass on the variables of your sh
 To serve several clients, or a client on another machine, start the server over HTTP:
 
 ```sh
-uvx --from 'xpd[mcp]' xpd mcp --transport http --port 8000
+uvx xpd mcp --transport http --port 8000
 ```
 
 Clients connect to `http://127.0.0.1:8000/mcp`. The server binds `127.0.0.1` unless `--host`

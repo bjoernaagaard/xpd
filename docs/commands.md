@@ -230,6 +230,5 @@ and `files`, each file with its `path` in the skill folder and its `text`.
 xpd mcp [ARGS]...
 ```
 
-Starts the [MCP server](mcp.md). It needs the `mcp` extra, so run it as
-`uvx --from 'xpd[mcp]' xpd mcp`. The arguments go to the server, so `xpd mcp -h` lists its
-flags.
+Starts the [MCP server](mcp.md), which installs with xpd. The arguments go to the server, so
+`xpd mcp -h` lists its flags.

@@ -12,11 +12,12 @@ const PYTHON: &str = if cfg!(windows) {
 } else {
     "python"
 };
-/// Exits 0 when the server's one dependency is installed, without the cost of importing it.
+/// Exits 0 when `FastMCP` is installed, without the cost of importing it. The wheel installs it,
+/// and a binary built with cargo has no Python beside it.
 const HAS_FASTMCP: &str =
     "import importlib.util, sys; sys.exit(importlib.util.find_spec('fastmcp') is None)";
 /// The command that installs and starts the server in one step.
-const INSTALL: &str = "xpd mcp needs the mcp extra. Run it as: uvx --from 'xpd[mcp]' xpd mcp";
+const INSTALL: &str = "xpd mcp needs xpd installed as a Python package. Run it as: uvx xpd mcp";
 /// Exit code when the server cannot start.
 const NOT_STARTED: u8 = 2;
 

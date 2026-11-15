@@ -62,13 +62,13 @@ jobs:
         if: matrix.platform.target == 'x86_64'
         shell: bash
         run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel with the mcp extra and calls a tool.
+      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
       - name: Smoke test the MCP server
         if: matrix.platform.target == 'x86_64'
         shell: bash
         run: |
           wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "xpd[mcp] @ ./$wheel" -- \
+          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
             fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -113,8 +113,11 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
+            python: '3.11'
+          # PyPI has no Windows on Arm wheel of PyYAML, which FastMCP needs, for Python 3.11.
           - runner: windows-11-arm
             target: aarch64
+            python: '3.12'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -131,15 +134,13 @@ jobs:
           enable-cache: false
       - name: Smoke test the wheel
         shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel with the mcp extra and calls a tool.
-      # PyPI has no Windows on Arm wheel of PyYAML for Python 3.11, which the mcp extra needs.
+        run: uv run --isolated --no-project --python ${{ matrix.platform.python }} --with dist/*.whl -- xpd check samples/good.py --format text
+      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
       - name: Smoke test the MCP server
-        if: matrix.platform.target == 'x64'
         shell: bash
         run: |
           wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "xpd[mcp] @ ./$wheel" -- \
+          uv run --isolated --no-project --python ${{ matrix.platform.python }} --with "./$wheel" -- \
             fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -175,12 +176,12 @@ jobs:
       - name: Smoke test the wheel
         shell: bash
         run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel with the mcp extra and calls a tool.
+      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
       - name: Smoke test the MCP server
         shell: bash
         run: |
           wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "xpd[mcp] @ ./$wheel" -- \
+          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
             fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -254,9 +255,9 @@ jobs:
             sleep 20
           done
           exit 1
-      # The same version with the mcp extra, started and called through FastMCP's own client.
+      # The MCP server of the same version, started and called through FastMCP's own client.
       - run: |
-          uv run --isolated --no-project --python 3.11 --with "xpd[mcp]==${GITHUB_REF_NAME#v}" -- \
+          uv run --isolated --no-project --python 3.11 --with "xpd==${GITHUB_REF_NAME#v}" -- \
             fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
 
   github-release:

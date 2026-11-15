@@ -15,11 +15,14 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
 ]
 dynamic = ["version", "description", "readme", "keywords"]
-
-# The MCP server, `xpd mcp`. FastMCP stays within one minor release, and prefab-ui, which draws
-# the app views, is pinned because its releases break often.
-[project.optional-dependencies]
-mcp = ["fastmcp[apps,code-mode,tasks]~=4.2.0", "prefab-ui==0.21.1"]
+# The MCP server, `xpd mcp`, with every FastMCP extra. FastMCP stays within one minor release,
+# and prefab-ui, which draws the app views, is pinned because its releases break often.
+# Code mode runs on pydantic-monty, which has no wheel for Windows on Arm.
+dependencies = [
+  "fastmcp[anthropic,apps,azure,gemini,jev,openai,tasks]~=4.2.0",
+  "fastmcp[code-mode]~=4.2.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "prefab-ui==0.21.1",
+]
 
 [project.urls]
 Documentation = "https://bjoernaagaard.github.io/xpd/"

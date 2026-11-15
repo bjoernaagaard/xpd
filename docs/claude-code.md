@@ -41,5 +41,5 @@ The hook shows the agent the issues of each edit. The [MCP server](mcp.md) adds 
 calls itself, such as `fix`, `rule` and `equiv`. The command below adds the server.
 
 ```sh
-claude mcp add xpd -- uvx --from 'xpd[mcp]' xpd mcp
+claude mcp add xpd -- uvx xpd mcp
 ```
