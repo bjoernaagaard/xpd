@@ -261,12 +261,16 @@ def renamed_keywords():
 @case
 def dropped_keywords():
     from sklearn.cluster import KMeans
-    from sklearn.ensemble import AdaBoostClassifier, IsolationForest
+    from sklearn.ensemble import AdaBoostClassifier, IsolationForest, RandomForestClassifier
+    from sklearn.linear_model import Ridge
     from sklearn.model_selection import GridSearchCV
     X, y = data()
     return (
         attempt(lambda: KMeans(n_clusters=2, n_jobs=-1, random_state=0).fit(X).labels_),  # xpd: removed-in-sklearn
         KMeans(n_clusters=2, random_state=0).fit(X).labels_,
+        attempt(lambda: RandomForestClassifier(n_estimators=5, min_impurity_split=None, random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        attempt(lambda: Ridge(normalize=False).fit(X, y).coef_),  # xpd: removed-in-sklearn
+        attempt(lambda: GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, fit_params=None).fit(X, y).best_params_),  # xpd: removed-in-sklearn
         attempt(lambda: IsolationForest(behaviour="new", random_state=0).fit(X).predict(X)),  # xpd: removed-in-sklearn
         attempt(lambda: AdaBoostClassifier(algorithm="SAMME", random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
         attempt(lambda: GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, iid=False).fit(X, y).best_params_),  # xpd: removed-in-sklearn
@@ -302,6 +306,7 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     from sklearn.datasets import load_boston  # xpd: removed-in-sklearn
     from sklearn.datasets import load_diabetes
     from sklearn.datasets.base import Bunch  # xpd: removed-in-sklearn
+    from sklearn.ensemble.forest import BaseForest  # xpd: removed-in-sklearn
     from sklearn.dummy import DummyClassifier
     from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
     from sklearn.externals.six import StringIO  # xpd: removed-in-sklearn
@@ -311,7 +316,7 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     from sklearn.metrics import get_scorer_names, jaccard_score, mean_squared_error
     from sklearn.metrics import jaccard_similarity_score  # xpd: removed-in-sklearn
     from sklearn.metrics import plot_confusion_matrix, plot_roc_curve  # xpd: removed-in-sklearn, removed-in-sklearn
-    from sklearn.model_selection import GridSearchCV, cross_val_score
+    from sklearn.model_selection import GridSearchCV, ShuffleSplit, StratifiedKFold, cross_val_score
     from sklearn.preprocessing import Imputer  # xpd: removed-in-sklearn
     from sklearn.impute import SimpleImputer
     import sklearn.externals.joblib  # xpd: removed-in-sklearn
@@ -341,9 +346,13 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     GridSearchCV(model, grid, "accuracy")  # xpd: removed-in-sklearn
     cross_val_score(model, X, y, 5)  # xpd: removed-in-sklearn
     cross_val_score(model, X, y, cv=5)
+    StratifiedKFold(y, n_folds=3)  # xpd: removed-in-sklearn
+    ShuffleSplit(len(X), 10, test_size=0.4, random_state=0)  # xpd: removed-in-sklearn
+    StratifiedKFold(3)
+    StratifiedKFold(n_splits=3).split(X, y)
     jaccard_score(y, y)
     SimpleImputer(strategy="mean")
-    return Bunch, StringIO, SCORERS, jaccard_similarity_score, plot_confusion_matrix, plot_roc_curve, LabelKFold, grid_search, load_boston, Imputer
+    return Bunch, BaseForest, StringIO, SCORERS, jaccard_similarity_score, plot_confusion_matrix, plot_roc_curve, LabelKFold, grid_search, load_boston, Imputer
 
 
 def plot_confusion_matrix_of(model, X, y):

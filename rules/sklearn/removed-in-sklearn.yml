@@ -179,9 +179,30 @@ rule:
     - inside:
         kind: import_from_statement
         field: module_name
-        not: { any: [{ any: [{ regex: '^from\s+sklearn\.base\.\w+\s+import\s+\(?[\s,]*((AttrsDict|BaseEstimator|BiclusterMixin|ClassNamePrefixFeaturesOutMixin|ClassifierMixin|ClassifierTags|ClusterMixin|DensityMixin|InconsistentVersionWarning|MetaEstimatorMixin|MultiOutputMixin|OneToOneFeatureMixin|OutlierMixin|ParamsDict|RegressorMixin|RegressorTags|ReprHTMLMixin|Tags|TargetTags|TransformerMixin|TransformerTags|check_array|check_is_fitted|clone|config_context|copy|defaultdict|estimator_html_repr|functools|get_config|get_tags|inspect|is_classifier|is_clusterer|is_outlier_detector|is_pandas_na|is_regressor|is_scalar_nan|np|numbers|platform|re|validate_parameter_constraints|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.calibration\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|CalibratedClassifierCV|CalibrationDisplay|ClassifierMixin|FrozenEstimator|HalfBinomialLoss|HalfMultinomialLoss|HalfMultinomialLossArrayAPI|HasMethods|Integral|Interval|IsotonicRegression|LabelEncoder|LeaveOneOut|LinearSVC|MetaEstimatorMixin|MetadataRouter|MethodMapping|Parallel|Real|RegressorMixin|StrOptions|calibration_curve|check_array|check_classification_targets|check_consistent_length|check_cv|check_is_fitted|clone|column_or_1d|cross_val_predict|delayed|expit|get_namespace|get_namespace_and_device|get_tags|indexable|label_binarize|log|minimize|minimize_scalar|move_to|np|process_routing|signature|softmax|validate_params|warnings|xpx)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.callback\.\w+\s+import\s+\(?[\s,]*((AutoPropagatedCallback|CallbackContext|CallbackSupportMixin|FitCallback|ProgressBar|ScoringMonitor|ScoringMonitorLog|with_callbacks)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.cluster\.\w+\s+import\s+\(?[\s,]*((AffinityPropagation|AgglomerativeClustering|Birch|BisectingKMeans|DBSCAN|FeatureAgglomeration|HDBSCAN|KMeans|MeanShift|MiniBatchKMeans|OPTICS|SpectralBiclustering|SpectralClustering|SpectralCoclustering|affinity_propagation|cluster_optics_dbscan|cluster_optics_xi|compute_optics_graph|dbscan|estimate_bandwidth|get_bin_seeds|k_means|kmeans_plusplus|linkage_tree|mean_shift|spectral_clustering|ward_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.compose\.\w+\s+import\s+\(?[\s,]*((ColumnTransformer|TransformedTargetRegressor|make_column_selector|make_column_transformer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.covariance\.\w+\s+import\s+\(?[\s,]*((EllipticEnvelope|EmpiricalCovariance|GraphicalLasso|GraphicalLassoCV|LedoitWolf|MinCovDet|OAS|ShrunkCovariance|empirical_covariance|fast_mcd|graphical_lasso|ledoit_wolf|ledoit_wolf_shrinkage|log_likelihood|oas|shrunk_covariance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.cross_decomposition\.\w+\s+import\s+\(?[\s,]*((CCA|PLSCanonical|PLSRegression|PLSSVD)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.datasets\.\w+\s+import\s+\(?[\s,]*((clear_data_home|dump_svmlight_file|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_file|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_openml|fetch_rcv1|fetch_species_distributions|get_data_home|load_breast_cancer|load_diabetes|load_digits|load_files|load_iris|load_linnerud|load_sample_image|load_sample_images|load_svmlight_file|load_svmlight_files|load_wine|make_biclusters|make_blobs|make_checkerboard|make_circles|make_classification|make_friedman1|make_friedman2|make_friedman3|make_gaussian_quantiles|make_hastie_10_2|make_low_rank_matrix|make_moons|make_multilabel_classification|make_regression|make_s_curve|make_sparse_coded_signal|make_sparse_spd_matrix|make_sparse_uncorrelated|make_spd_matrix|make_swiss_roll)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.decomposition\.\w+\s+import\s+\(?[\s,]*((DictionaryLearning|FactorAnalysis|FastICA|IncrementalPCA|KernelPCA|LatentDirichletAllocation|MiniBatchDictionaryLearning|MiniBatchNMF|MiniBatchSparsePCA|NMF|PCA|SparseCoder|SparsePCA|TruncatedSVD|dict_learning|dict_learning_online|fastica|non_negative_factorization|randomized_svd|sparse_encode)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.discriminant_analysis\.\w+\s+import\s+\(?[\s,]*((LinearDiscriminantAnalysis|QuadraticDiscriminantAnalysis)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.dummy\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|ClassifierMixin|DummyClassifier|DummyRegressor|Integral|Interval|MultiOutputMixin|Real|RegressorMixin|StrOptions|check_array|check_consistent_length|check_is_fitted|check_random_state|class_distribution|np|sp|validate_data|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.ensemble\.\w+\s+import\s+\(?[\s,]*((AdaBoostClassifier|AdaBoostRegressor|BaggingClassifier|BaggingRegressor|BaseEnsemble|ExtraTreesClassifier|ExtraTreesRegressor|GradientBoostingClassifier|GradientBoostingRegressor|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IsolationForest|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|StackingClassifier|StackingRegressor|VotingClassifier|VotingRegressor)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.exceptions\.\w+\s+import\s+\(?[\s,]*((ConvergenceWarning|DataConversionWarning|DataDimensionalityWarning|EfficiencyWarning|EstimatorCheckFailedWarning|FitFailedWarning|NotFittedError|PositiveSpectrumWarning|SkipTestWarning|UndefinedMetricWarning|UnsetMetadataPassedError)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.experimental\.\w+\s+import\s+\(?[\s,]*((enable_halving_search_cv|enable_iterative_imputer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.externals\.\w+\s+import\s+\(?[\s,]*((array_api_compat|array_api_extra)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.feature_extraction\.\w+\s+import\s+\(?[\s,]*((DictVectorizer|FeatureHasher|grid_to_graph|image|img_to_graph|text)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.feature_selection\.\w+\s+import\s+\(?[\s,]*((GenericUnivariateSelect|RFE|RFECV|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SelectorMixin|SequentialFeatureSelector|VarianceThreshold|chi2|f_classif|f_oneway|f_regression|mutual_info_classif|mutual_info_regression|r_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.frozen\.\w+\s+import\s+\(?[\s,]*((FrozenEstimator)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.gaussian_process\.\w+\s+import\s+\(?[\s,]*((GaussianProcessClassifier|GaussianProcessRegressor|kernels)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.impute\.\w+\s+import\s+\(?[\s,]*((IterativeImputer|KNNImputer|MissingIndicator|SimpleImputer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.inspection\.\w+\s+import\s+\(?[\s,]*((DecisionBoundaryDisplay|PartialDependenceDisplay|partial_dependence|permutation_importance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.isotonic\.\w+\s+import\s+\(?[\s,]*((IsotonicRegression|check_increasing|isotonic_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.kernel_approximation\.\w+\s+import\s+\(?[\s,]*((AdditiveChi2Sampler|BaseEstimator|ClassNamePrefixFeaturesOutMixin|Integral|Interval|KERNEL_PARAMS|Nystroem|PAIRWISE_KERNEL_FUNCTIONS|PolynomialCountSketch|RBFSampler|Real|SkewedChi2Sampler|StrOptions|TransformerMixin|check_is_fitted|check_random_state|fft|get_namespace_and_device|ifft|np|pairwise_kernels|safe_sparse_dot|sp|validate_data|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.kernel_ridge\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|Interval|KernelRidge|MultiOutputMixin|PAIRWISE_KERNEL_FUNCTIONS|Real|RegressorMixin|StrOptions|check_is_fitted|np|pairwise_kernels|validate_data)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.linear_model\.\w+\s+import\s+\(?[\s,]*((ARDRegression|BayesianRidge|ElasticNet|ElasticNetCV|GammaRegressor|HuberRegressor|Lars|LarsCV|Lasso|LassoCV|LassoLars|LassoLarsCV|LassoLarsIC|LinearRegression|LogisticRegression|LogisticRegressionCV|MultiTaskElasticNet|MultiTaskElasticNetCV|MultiTaskLasso|MultiTaskLassoCV|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|QuantileRegressor|RANSACRegressor|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDOneClassSVM|SGDRegressor|TheilSenRegressor|TweedieRegressor|enet_path|lars_path|lars_path_gram|lasso_path|orthogonal_mp|orthogonal_mp_gram|ridge_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.manifold\.\w+\s+import\s+\(?[\s,]*((ClassicalMDS|Isomap|LocallyLinearEmbedding|MDS|SpectralEmbedding|TSNE|locally_linear_embedding|smacof|spectral_embedding|trustworthiness)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.metrics\.\w+\s+import\s+\(?[\s,]*((ConfusionMatrixDisplay|DetCurveDisplay|DistanceMetric|PrecisionRecallDisplay|PredictionErrorDisplay|RocCurveDisplay|accuracy_score|adjusted_mutual_info_score|adjusted_rand_score|auc|average_precision_score|balanced_accuracy_score|brier_score_loss|calinski_harabasz_score|check_scoring|class_likelihood_ratios|classification_report|cluster|cohen_kappa_score|completeness_score|confusion_matrix|confusion_matrix_at_thresholds|consensus_score|coverage_error|d2_absolute_error_score|d2_brier_score|d2_log_loss_score|d2_pinball_score|d2_tweedie_score|davies_bouldin_score|dcg_score|det_curve|euclidean_distances|explained_variance_score|f1_score|fbeta_score|fowlkes_mallows_score|get_scorer|get_scorer_names|hamming_loss|hinge_loss|homogeneity_completeness_v_measure|homogeneity_score|jaccard_score|label_ranking_average_precision_score|label_ranking_loss|log_loss|make_scorer|matthews_corrcoef|max_error|mean_absolute_error|mean_absolute_percentage_error|mean_gamma_deviance|mean_pinball_loss|mean_poisson_deviance|mean_squared_error|mean_squared_log_error|mean_tweedie_deviance|median_absolute_error|metric_at_thresholds|multilabel_confusion_matrix|mutual_info_score|nan_euclidean_distances|ndcg_score|normalized_mutual_info_score|pair_confusion_matrix|pairwise_distances|pairwise_distances_argmin|pairwise_distances_argmin_min|pairwise_distances_chunked|pairwise_kernels|precision_recall_curve|precision_recall_fscore_support|precision_score|r2_score|rand_score|recall_score|roc_auc_score|roc_curve|root_mean_squared_error|root_mean_squared_log_error|silhouette_samples|silhouette_score|top_k_accuracy_score|v_measure_score|zero_one_loss)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.mixture\.\w+\s+import\s+\(?[\s,]*((BayesianGaussianMixture|GaussianMixture)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.model_selection\.\w+\s+import\s+\(?[\s,]*((BaseCrossValidator|BaseShuffleSplit|FixedThresholdClassifier|GridSearchCV|GroupKFold|GroupShuffleSplit|HalvingGridSearchCV|HalvingRandomSearchCV|KFold|LearningCurveDisplay|LeaveOneGroupOut|LeaveOneOut|LeavePGroupsOut|LeavePOut|ParameterGrid|ParameterSampler|PredefinedSplit|RandomizedSearchCV|RepeatedKFold|RepeatedStratifiedKFold|ShuffleSplit|StratifiedGroupKFold|StratifiedKFold|StratifiedShuffleSplit|TimeSeriesSplit|TunedThresholdClassifierCV|ValidationCurveDisplay|check_cv|cross_val_predict|cross_val_score|cross_validate|learning_curve|permutation_test_score|train_test_split|validation_curve)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.multiclass\.\w+\s+import\s+\(?[\s,]*((OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.multioutput\.\w+\s+import\s+\(?[\s,]*((ClassifierChain|MultiOutputClassifier|MultiOutputRegressor|RegressorChain)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.naive_bayes\.\w+\s+import\s+\(?[\s,]*((BernoulliNB|CategoricalNB|ComplementNB|GaussianNB|MultinomialNB)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.neighbors\.\w+\s+import\s+\(?[\s,]*((BallTree|KDTree|KNeighborsClassifier|KNeighborsRegressor|KNeighborsTransformer|KernelDensity|LocalOutlierFactor|NearestCentroid|NearestNeighbors|NeighborhoodComponentsAnalysis|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RadiusNeighborsTransformer|VALID_METRICS|VALID_METRICS_SPARSE|kneighbors_graph|radius_neighbors_graph|sort_graph_by_row_values)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.neural_network\.\w+\s+import\s+\(?[\s,]*((BernoulliRBM|MLPClassifier|MLPRegressor)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.pipeline\.\w+\s+import\s+\(?[\s,]*((FeatureUnion|Pipeline|make_pipeline|make_union)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.preprocessing\.\w+\s+import\s+\(?[\s,]*((Binarizer|FunctionTransformer|KBinsDiscretizer|KernelCenterer|LabelBinarizer|LabelEncoder|MaxAbsScaler|MinMaxScaler|MultiLabelBinarizer|Normalizer|OneHotEncoder|OrdinalEncoder|PolynomialFeatures|PowerTransformer|QuantileTransformer|RobustScaler|SplineTransformer|StandardScaler|TargetEncoder|add_dummy_feature|binarize|label_binarize|maxabs_scale|minmax_scale|normalize|power_transform|quantile_transform|robust_scale|scale)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.random_projection\.\w+\s+import\s+\(?[\s,]*((GaussianRandomProjection|SparseRandomProjection|johnson_lindenstrauss_min_dim)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.semi_supervised\.\w+\s+import\s+\(?[\s,]*((LabelPropagation|LabelSpreading|SelfTrainingClassifier)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.svm\.\w+\s+import\s+\(?[\s,]*((LinearSVC|LinearSVR|NuSVC|NuSVR|OneClassSVM|SVC|SVR|l1_min_c)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.tree\.\w+\s+import\s+\(?[\s,]*((BaseDecisionTree|DecisionTreeClassifier|DecisionTreeRegressor|ExtraTreeClassifier|ExtraTreeRegressor|export_graphviz|export_text|plot_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.utils\.\w+\s+import\s+\(?[\s,]*((Bunch|ClassifierTags|DataConversionWarning|InputTags|RegressorTags|Tags|TargetTags|TransformerTags|_align_api_if_sparse|_safe_indexing|all_estimators|as_float_array|assert_all_finite|check_X_y|check_array|check_consistent_length|check_random_state|check_scalar|check_symmetric|column_or_1d|compute_class_weight|compute_sample_weight|deprecated|estimator_html_repr|gen_batches|gen_even_slices|get_tags|indexable|metadata_routing|murmurhash3_32|resample|safe_mask|safe_sqr|shuffle)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }] }, { regex: '\bimport\b[^#]*\bSCORERS\b' }] }
+        not: { any: [{ any: [{ regex: '^from\s+sklearn\.base\.\w+\s+import\s+\(?[\s,]*((AttrsDict|BaseEstimator|BiclusterMixin|ClassNamePrefixFeaturesOutMixin|ClassifierMixin|ClassifierTags|ClusterMixin|DensityMixin|InconsistentVersionWarning|MetaEstimatorMixin|MultiOutputMixin|OneToOneFeatureMixin|OutlierMixin|ParamsDict|RegressorMixin|RegressorTags|ReprHTMLMixin|Tags|TargetTags|TransformerMixin|TransformerTags|check_array|check_is_fitted|clone|config_context|copy|defaultdict|estimator_html_repr|functools|get_config|get_tags|inspect|is_classifier|is_clusterer|is_outlier_detector|is_pandas_na|is_regressor|is_scalar_nan|np|numbers|platform|re|validate_parameter_constraints|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.calibration\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|CalibratedClassifierCV|CalibrationDisplay|ClassifierMixin|FrozenEstimator|HalfBinomialLoss|HalfMultinomialLoss|HalfMultinomialLossArrayAPI|HasMethods|Integral|Interval|IsotonicRegression|LabelEncoder|LeaveOneOut|LinearSVC|MetaEstimatorMixin|MetadataRouter|MethodMapping|Parallel|Real|RegressorMixin|StrOptions|calibration_curve|check_array|check_classification_targets|check_consistent_length|check_cv|check_is_fitted|clone|column_or_1d|cross_val_predict|delayed|expit|get_namespace|get_namespace_and_device|get_tags|indexable|label_binarize|log|minimize|minimize_scalar|move_to|np|process_routing|signature|softmax|validate_params|warnings|xpx)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.callback\.\w+\s+import\s+\(?[\s,]*((AutoPropagatedCallback|CallbackContext|CallbackSupportMixin|FitCallback|ProgressBar|ScoringMonitor|ScoringMonitorLog|with_callbacks)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.cluster\.\w+\s+import\s+\(?[\s,]*((AffinityPropagation|AgglomerativeClustering|Birch|BisectingKMeans|DBSCAN|FeatureAgglomeration|HDBSCAN|KMeans|MeanShift|MiniBatchKMeans|OPTICS|SpectralBiclustering|SpectralClustering|SpectralCoclustering|affinity_propagation|cluster_optics_dbscan|cluster_optics_xi|compute_optics_graph|dbscan|estimate_bandwidth|get_bin_seeds|k_means|kmeans_plusplus|linkage_tree|mean_shift|spectral_clustering|ward_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.compose\.\w+\s+import\s+\(?[\s,]*((ColumnTransformer|TransformedTargetRegressor|make_column_selector|make_column_transformer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.covariance\.\w+\s+import\s+\(?[\s,]*((EllipticEnvelope|EmpiricalCovariance|GraphicalLasso|GraphicalLassoCV|LedoitWolf|MinCovDet|OAS|ShrunkCovariance|empirical_covariance|fast_mcd|graphical_lasso|ledoit_wolf|ledoit_wolf_shrinkage|log_likelihood|oas|shrunk_covariance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.cross_decomposition\.\w+\s+import\s+\(?[\s,]*((CCA|PLSCanonical|PLSRegression|PLSSVD)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.datasets\.\w+\s+import\s+\(?[\s,]*((clear_data_home|dump_svmlight_file|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_file|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_openml|fetch_rcv1|fetch_species_distributions|get_data_home|load_breast_cancer|load_diabetes|load_digits|load_files|load_iris|load_linnerud|load_sample_image|load_sample_images|load_svmlight_file|load_svmlight_files|load_wine|make_biclusters|make_blobs|make_checkerboard|make_circles|make_classification|make_friedman1|make_friedman2|make_friedman3|make_gaussian_quantiles|make_hastie_10_2|make_low_rank_matrix|make_moons|make_multilabel_classification|make_regression|make_s_curve|make_sparse_coded_signal|make_sparse_spd_matrix|make_sparse_uncorrelated|make_spd_matrix|make_swiss_roll)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.decomposition\.\w+\s+import\s+\(?[\s,]*((DictionaryLearning|FactorAnalysis|FastICA|IncrementalPCA|KernelPCA|LatentDirichletAllocation|MiniBatchDictionaryLearning|MiniBatchNMF|MiniBatchSparsePCA|NMF|PCA|SparseCoder|SparsePCA|TruncatedSVD|dict_learning|dict_learning_online|fastica|non_negative_factorization|randomized_svd|sparse_encode)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.discriminant_analysis\.\w+\s+import\s+\(?[\s,]*((LinearDiscriminantAnalysis|QuadraticDiscriminantAnalysis)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.dummy\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|ClassifierMixin|DummyClassifier|DummyRegressor|Integral|Interval|MultiOutputMixin|Real|RegressorMixin|StrOptions|check_array|check_consistent_length|check_is_fitted|check_random_state|class_distribution|np|sp|validate_data|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.ensemble\.\w+\s+import\s+\(?[\s,]*((AdaBoostClassifier|AdaBoostRegressor|BaggingClassifier|BaggingRegressor|BaseEnsemble|ExtraTreesClassifier|ExtraTreesRegressor|GradientBoostingClassifier|GradientBoostingRegressor|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IsolationForest|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|StackingClassifier|StackingRegressor|VotingClassifier|VotingRegressor)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.exceptions\.\w+\s+import\s+\(?[\s,]*((ConvergenceWarning|DataConversionWarning|DataDimensionalityWarning|EfficiencyWarning|EstimatorCheckFailedWarning|FitFailedWarning|NotFittedError|PositiveSpectrumWarning|SkipTestWarning|UndefinedMetricWarning|UnsetMetadataPassedError)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.experimental\.\w+\s+import\s+\(?[\s,]*((enable_halving_search_cv|enable_iterative_imputer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.externals\.\w+\s+import\s+\(?[\s,]*((array_api_compat|array_api_extra)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.feature_extraction\.\w+\s+import\s+\(?[\s,]*((DictVectorizer|FeatureHasher|grid_to_graph|image|img_to_graph|text)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.feature_selection\.\w+\s+import\s+\(?[\s,]*((GenericUnivariateSelect|RFE|RFECV|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SelectorMixin|SequentialFeatureSelector|VarianceThreshold|chi2|f_classif|f_oneway|f_regression|mutual_info_classif|mutual_info_regression|r_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.frozen\.\w+\s+import\s+\(?[\s,]*((FrozenEstimator)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.gaussian_process\.\w+\s+import\s+\(?[\s,]*((GaussianProcessClassifier|GaussianProcessRegressor|kernels)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.impute\.\w+\s+import\s+\(?[\s,]*((IterativeImputer|KNNImputer|MissingIndicator|SimpleImputer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.inspection\.\w+\s+import\s+\(?[\s,]*((DecisionBoundaryDisplay|PartialDependenceDisplay|partial_dependence|permutation_importance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.isotonic\.\w+\s+import\s+\(?[\s,]*((IsotonicRegression|check_increasing|isotonic_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.kernel_approximation\.\w+\s+import\s+\(?[\s,]*((AdditiveChi2Sampler|BaseEstimator|ClassNamePrefixFeaturesOutMixin|Integral|Interval|KERNEL_PARAMS|Nystroem|PAIRWISE_KERNEL_FUNCTIONS|PolynomialCountSketch|RBFSampler|Real|SkewedChi2Sampler|StrOptions|TransformerMixin|check_is_fitted|check_random_state|fft|get_namespace_and_device|ifft|np|pairwise_kernels|safe_sparse_dot|sp|validate_data|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.kernel_ridge\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|Interval|KernelRidge|MultiOutputMixin|PAIRWISE_KERNEL_FUNCTIONS|Real|RegressorMixin|StrOptions|check_is_fitted|np|pairwise_kernels|validate_data)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.linear_model\.\w+\s+import\s+\(?[\s,]*((ARDRegression|BayesianRidge|ElasticNet|ElasticNetCV|GammaRegressor|HuberRegressor|Lars|LarsCV|Lasso|LassoCV|LassoLars|LassoLarsCV|LassoLarsIC|LinearRegression|LogisticRegression|LogisticRegressionCV|MultiTaskElasticNet|MultiTaskElasticNetCV|MultiTaskLasso|MultiTaskLassoCV|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|QuantileRegressor|RANSACRegressor|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDOneClassSVM|SGDRegressor|TheilSenRegressor|TweedieRegressor|enet_path|lars_path|lars_path_gram|lasso_path|orthogonal_mp|orthogonal_mp_gram|ridge_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.manifold\.\w+\s+import\s+\(?[\s,]*((ClassicalMDS|Isomap|LocallyLinearEmbedding|MDS|SpectralEmbedding|TSNE|locally_linear_embedding|smacof|spectral_embedding|trustworthiness)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.metrics\.\w+\s+import\s+\(?[\s,]*((ConfusionMatrixDisplay|DetCurveDisplay|DistanceMetric|PrecisionRecallDisplay|PredictionErrorDisplay|RocCurveDisplay|accuracy_score|adjusted_mutual_info_score|adjusted_rand_score|auc|average_precision_score|balanced_accuracy_score|brier_score_loss|calinski_harabasz_score|check_scoring|class_likelihood_ratios|classification_report|cluster|cohen_kappa_score|completeness_score|confusion_matrix|confusion_matrix_at_thresholds|consensus_score|coverage_error|d2_absolute_error_score|d2_brier_score|d2_log_loss_score|d2_pinball_score|d2_tweedie_score|davies_bouldin_score|dcg_score|det_curve|euclidean_distances|explained_variance_score|f1_score|fbeta_score|fowlkes_mallows_score|get_scorer|get_scorer_names|hamming_loss|hinge_loss|homogeneity_completeness_v_measure|homogeneity_score|jaccard_score|label_ranking_average_precision_score|label_ranking_loss|log_loss|make_scorer|matthews_corrcoef|max_error|mean_absolute_error|mean_absolute_percentage_error|mean_gamma_deviance|mean_pinball_loss|mean_poisson_deviance|mean_squared_error|mean_squared_log_error|mean_tweedie_deviance|median_absolute_error|metric_at_thresholds|multilabel_confusion_matrix|mutual_info_score|nan_euclidean_distances|ndcg_score|normalized_mutual_info_score|pair_confusion_matrix|pairwise_distances|pairwise_distances_argmin|pairwise_distances_argmin_min|pairwise_distances_chunked|pairwise_kernels|precision_recall_curve|precision_recall_fscore_support|precision_score|r2_score|rand_score|recall_score|roc_auc_score|roc_curve|root_mean_squared_error|root_mean_squared_log_error|silhouette_samples|silhouette_score|top_k_accuracy_score|v_measure_score|zero_one_loss)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.mixture\.\w+\s+import\s+\(?[\s,]*((BayesianGaussianMixture|GaussianMixture)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.model_selection\.\w+\s+import\s+\(?[\s,]*((BaseCrossValidator|BaseShuffleSplit|FixedThresholdClassifier|GridSearchCV|GroupKFold|GroupShuffleSplit|HalvingGridSearchCV|HalvingRandomSearchCV|KFold|LearningCurveDisplay|LeaveOneGroupOut|LeaveOneOut|LeavePGroupsOut|LeavePOut|ParameterGrid|ParameterSampler|PredefinedSplit|RandomizedSearchCV|RepeatedKFold|RepeatedStratifiedKFold|ShuffleSplit|StratifiedGroupKFold|StratifiedKFold|StratifiedShuffleSplit|TimeSeriesSplit|TunedThresholdClassifierCV|ValidationCurveDisplay|check_cv|cross_val_predict|cross_val_score|cross_validate|learning_curve|permutation_test_score|train_test_split|validation_curve)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.multiclass\.\w+\s+import\s+\(?[\s,]*((OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.multioutput\.\w+\s+import\s+\(?[\s,]*((ClassifierChain|MultiOutputClassifier|MultiOutputRegressor|RegressorChain)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.naive_bayes\.\w+\s+import\s+\(?[\s,]*((BernoulliNB|CategoricalNB|ComplementNB|GaussianNB|MultinomialNB)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.neighbors\.\w+\s+import\s+\(?[\s,]*((BallTree|KDTree|KNeighborsClassifier|KNeighborsRegressor|KNeighborsTransformer|KernelDensity|LocalOutlierFactor|NearestCentroid|NearestNeighbors|NeighborhoodComponentsAnalysis|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RadiusNeighborsTransformer|VALID_METRICS|VALID_METRICS_SPARSE|kneighbors_graph|radius_neighbors_graph|sort_graph_by_row_values)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.neural_network\.\w+\s+import\s+\(?[\s,]*((BernoulliRBM|MLPClassifier|MLPRegressor)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.pipeline\.\w+\s+import\s+\(?[\s,]*((FeatureUnion|Pipeline|make_pipeline|make_union)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.preprocessing\.\w+\s+import\s+\(?[\s,]*((Binarizer|FunctionTransformer|KBinsDiscretizer|KernelCenterer|LabelBinarizer|LabelEncoder|MaxAbsScaler|MinMaxScaler|MultiLabelBinarizer|Normalizer|OneHotEncoder|OrdinalEncoder|PolynomialFeatures|PowerTransformer|QuantileTransformer|RobustScaler|SplineTransformer|StandardScaler|TargetEncoder|add_dummy_feature|binarize|label_binarize|maxabs_scale|minmax_scale|normalize|power_transform|quantile_transform|robust_scale|scale)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.random_projection\.\w+\s+import\s+\(?[\s,]*((GaussianRandomProjection|SparseRandomProjection|johnson_lindenstrauss_min_dim)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.semi_supervised\.\w+\s+import\s+\(?[\s,]*((LabelPropagation|LabelSpreading|SelfTrainingClassifier)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.svm\.\w+\s+import\s+\(?[\s,]*((LinearSVC|LinearSVR|NuSVC|NuSVR|OneClassSVM|SVC|SVR|l1_min_c)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.tree\.\w+\s+import\s+\(?[\s,]*((BaseDecisionTree|DecisionTreeClassifier|DecisionTreeRegressor|ExtraTreeClassifier|ExtraTreeRegressor|export_graphviz|export_text|plot_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.utils\.\w+\s+import\s+\(?[\s,]*((Bunch|ClassifierTags|DataConversionWarning|InputTags|RegressorTags|Tags|TargetTags|TransformerTags|_align_api_if_sparse|_safe_indexing|all_estimators|as_float_array|assert_all_finite|check_X_y|check_array|check_consistent_length|check_random_state|check_scalar|check_symmetric|column_or_1d|compute_class_weight|compute_sample_weight|deprecated|estimator_html_repr|gen_batches|gen_even_slices|get_tags|indexable|metadata_routing|murmurhash3_32|resample|safe_mask|safe_sqr|shuffle)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }] }, { regex: '\bimport\b[^#]*\bSCORERS\b' }, { regex: '\bimport\b[^#]*\b(_\w+|Base[A-Z]\w*)' }] }
     - inside: { kind: import_statement }
     - inside: { kind: aliased_import, inside: { kind: import_statement } }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+---
+# Private names, such as BaseForest or _tree, have no public home to point to.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $M is not a module in scikit-learn 1.9.1, so the import raises. The names it imports are private in 1.9.1, so no public module offers them.
+rule:
+  kind: dotted_name
+  pattern: $M
+  regex: '^sklearn\.\w+\.[a-z]\w*$'
+  not:
+    any:
+      - regex: '^(sklearn\.base|sklearn\.calibration|sklearn\.callback|sklearn\.cluster|sklearn\.compose|sklearn\.covariance|sklearn\.cross_decomposition|sklearn\.datasets|sklearn\.datasets\.data|sklearn\.datasets\.descr|sklearn\.datasets\.images|sklearn\.decomposition|sklearn\.discriminant_analysis|sklearn\.dummy|sklearn\.ensemble|sklearn\.exceptions|sklearn\.experimental|sklearn\.experimental\.enable_halving_search_cv|sklearn\.experimental\.enable_hist_gradient_boosting|sklearn\.experimental\.enable_iterative_imputer|sklearn\.externals|sklearn\.externals\.array_api_compat|sklearn\.externals\.array_api_extra|sklearn\.externals\.conftest|sklearn\.feature_extraction|sklearn\.feature_extraction\.image|sklearn\.feature_extraction\.text|sklearn\.feature_selection|sklearn\.frozen|sklearn\.gaussian_process|sklearn\.gaussian_process\.kernels|sklearn\.impute|sklearn\.inspection|sklearn\.isotonic|sklearn\.kernel_approximation|sklearn\.kernel_ridge|sklearn\.linear_model|sklearn\.manifold|sklearn\.metrics|sklearn\.metrics\.cluster|sklearn\.metrics\.pairwise|sklearn\.mixture|sklearn\.model_selection|sklearn\.multiclass|sklearn\.multioutput|sklearn\.naive_bayes|sklearn\.neighbors|sklearn\.neural_network|sklearn\.pipeline|sklearn\.preprocessing|sklearn\.random_projection|sklearn\.semi_supervised|sklearn\.svm|sklearn\.tests|sklearn\.tests\.metadata_routing_common|sklearn\.tests\.test_base|sklearn\.tests\.test_build|sklearn\.tests\.test_calibration|sklearn\.tests\.test_check_build|sklearn\.tests\.test_common|sklearn\.tests\.test_config|sklearn\.tests\.test_discriminant_analysis|sklearn\.tests\.test_docstring_parameters|sklearn\.tests\.test_docstring_parameters_consistency|sklearn\.tests\.test_docstrings|sklearn\.tests\.test_dummy|sklearn\.tests\.test_init|sklearn\.tests\.test_isotonic|sklearn\.tests\.test_kernel_approximation|sklearn\.tests\.test_kernel_ridge|sklearn\.tests\.test_metadata_routing|sklearn\.tests\.test_metaestimators|sklearn\.tests\.test_metaestimators_metadata_routing|sklearn\.tests\.test_min_dependencies_consistency|sklearn\.tests\.test_multiclass|sklearn\.tests\.test_multioutput|sklearn\.tests\.test_naive_bayes|sklearn\.tests\.test_pipeline|sklearn\.tests\.test_public_functions|sklearn\.tests\.test_random_projection|sklearn\.tree|sklearn\.utils|sklearn\.utils\.arrayfuncs|sklearn\.utils\.class_weight|sklearn\.utils\.deprecation|sklearn\.utils\.discovery|sklearn\.utils\.estimator_checks|sklearn\.utils\.extmath|sklearn\.utils\.fixes|sklearn\.utils\.graph|sklearn\.utils\.metadata_routing|sklearn\.utils\.metaestimators|sklearn\.utils\.multiclass|sklearn\.utils\.murmurhash|sklearn\.utils\.optimize|sklearn\.utils\.parallel|sklearn\.utils\.random|sklearn\.utils\.sparsefuncs|sklearn\.utils\.sparsefuncs_fast|sklearn\.utils\.stats|sklearn\.utils\.validation)$'
+      - regex: '^sklearn\.externals\b'
+      - matches: compat-code
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '\bimport\b[^#]*\b(_\w+|Base[A-Z]\w*)'
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
@@ -286,7 +307,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^sparse_output$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^sparse_output$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(OneHotEncoder)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -307,7 +330,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^estimator$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^estimator$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(BaggingClassifier|BaggingRegressor|AdaBoostClassifier|AdaBoostRegressor)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -328,7 +353,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^estimator$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^estimator$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(CalibratedClassifierCV)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -349,7 +376,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^max_iter$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^max_iter$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(TSNE)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -370,7 +399,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^store_cv_results$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^store_cv_results$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(RidgeCV|RidgeClassifierCV)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -391,7 +422,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^ensure_all_finite$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^ensure_all_finite$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(check_array|check_X_y)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -412,7 +445,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^metric$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^metric$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(AgglomerativeClustering|FeatureAgglomeration)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -433,7 +468,9 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^alphas$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^alphas$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(LassoCV|ElasticNetCV|MultiTaskLassoCV|MultiTaskElasticNetCV)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -453,7 +490,10 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^n_splits$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^n_splits$ } }
+          - has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }] } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(KFold|StratifiedKFold|GroupKFold)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -473,7 +513,10 @@ rule:
     field: name
     inside:
       kind: argument_list
-      not: { has: { kind: keyword_argument, has: { field: name, regex: ^n_splits$ } } }
+      not:
+        any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^n_splits$ } }
+          - has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }] } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(ShuffleSplit|StratifiedShuffleSplit|GroupShuffleSplit)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
@@ -612,6 +655,105 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes min_impurity_split=. Drop min_impurity_split=None, which was its default.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^min_impurity_split\s*=\s*None$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(DecisionTreeClassifier|DecisionTreeRegressor|ExtraTreeClassifier|ExtraTreeRegressor|RandomForestClassifier|RandomForestRegressor|ExtraTreesClassifier|ExtraTreesRegressor|GradientBoostingClassifier|GradientBoostingRegressor)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^min_impurity_split$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^min_impurity_split$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: unsafe }
+---
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes normalize=. Drop normalize=False, which was its default.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^normalize\s*=\s*False$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(LinearRegression|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|Lars|LarsCV|LassoLars|LassoLarsCV|LassoLarsIC|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|BayesianRidge|ARDRegression|MultiTaskLasso|MultiTaskElasticNet|MultiTaskLassoCV|MultiTaskElasticNetCV)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^normalize$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^normalize$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: unsafe }
+---
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes fit_params=. Drop fit_params=None, which was its default.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^fit_params\s*=\s*None$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^fit_params$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: unsafe }
+---
 # multi_class="multinomial" is what 1.9.1 always fits for three or more classes, and "auto" chose
 # it too, except for binary targets and liblinear, where 1.9.1 fits the binary model itself.
 id: removed-in-sklearn
@@ -671,7 +813,10 @@ message: $C no longer takes min_impurity_split=. Use min_impurity_decrease, whic
 rule:
   kind: keyword_argument
   has: { field: name, regex: ^min_impurity_split$ }
-  not: { matches: compat-code }
+  not:
+    any:
+      - regex: '^min_impurity_split\s*=\s*None$'
+      - matches: compat-code
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(DecisionTreeClassifier|DecisionTreeRegressor|ExtraTreeClassifier|ExtraTreeRegressor|RandomForestClassifier|RandomForestRegressor|ExtraTreesClassifier|ExtraTreesRegressor|GradientBoostingClassifier|GradientBoostingRegressor)$' } }
@@ -685,7 +830,10 @@ message: $C no longer takes normalize=. Scale the features before the model inst
 rule:
   kind: keyword_argument
   has: { field: name, regex: ^normalize$ }
-  not: { matches: compat-code }
+  not:
+    any:
+      - regex: '^normalize\s*=\s*False$'
+      - matches: compat-code
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(LinearRegression|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|Lars|LarsCV|LassoLars|LassoLarsCV|LassoLarsIC|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|BayesianRidge|ARDRegression|MultiTaskLasso|MultiTaskElasticNet|MultiTaskLassoCV|MultiTaskElasticNetCV)$' } }
@@ -699,7 +847,10 @@ message: $C no longer takes fit_params=. Pass them to fit, as in search.fit(X, y
 rule:
   kind: keyword_argument
   has: { field: name, regex: ^fit_params$ }
-  not: { matches: compat-code }
+  not:
+    any:
+      - regex: '^fit_params\s*=\s*None$'
+      - matches: compat-code
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(GridSearchCV|RandomizedSearchCV)$' } }
@@ -938,6 +1089,25 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# A splitter called the way the removed sklearn.cross_validation module took it, with the data or
+# its length first. model_selection splitters take n_splits first and get the data in split.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C gets the data in split(X, y), and its arguments are settings such as n_splits. This call passes the data the way the removed sklearn.cross_validation did, so pass only settings and loop over split(X, y).
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] } } }
+  any:
+    - regex: '(^|\.)LeaveOneOut\('
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(n_folds|n_iter|n|indices)$ } } }
+    - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] } } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|LeaveOneOut|LeavePOut)$' }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+---
 id: removed-in-sklearn
 language: python
 severity: error
@@ -947,7 +1117,7 @@ rule:
   has:
     field: arguments
     has:
-      nthChild: 1
+      nthChild: { position: 1, ofRule: { not: { kind: comment } } }
       not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
   not:
     any:
@@ -960,7 +1130,7 @@ rule:
         stopBy: end
         has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 constraints:
-  C: { regex: '(^|\.)(ARDRegression|AdditiveChi2Sampler|AffinityPropagation|BayesianGaussianMixture|BayesianRidge|BernoulliNB|Binarizer|Birch|CategoricalNB|ComplementNB|DecisionBoundaryDisplay|DecisionTreeClassifier|DecisionTreeRegressor|DetCurveDisplay|DictVectorizer|DummyClassifier|DummyRegressor|ElasticNetCV|EllipticEnvelope|EmpiricalCovariance|EstimatorCheckFailedWarning|ExtraTreeClassifier|ExtraTreeRegressor|GammaRegressor|GaussianNB|GradientBoostingClassifier|GradientBoostingRegressor|GraphicalLassoCV|HuberRegressor|InconsistentVersionWarning|IsolationForest|Isomap|IsotonicRegression|KNNImputer|KNeighborsTransformer|KernelDensity|LabelBinarizer|Lars|LarsCV|LassoCV|LassoLarsCV|LearningCurveDisplay|LedoitWolf|LinearRegression|LinearSVR|LocallyLinearEmbedding|LogisticRegressionCV|MaxAbsScaler|MeanShift|MinCovDet|MissingIndicator|MultiLabelBinarizer|MultiTaskElasticNetCV|MultiTaskLassoCV|MultinomialNB|NearestNeighbors|NuSVC|NuSVR|OAS|OPTICS|OneClassSVM|OneHotEncoder|OrdinalEncoder|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|ParamsDict|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|PolynomialCountSketch|PredictionErrorDisplay|QuadraticDiscriminantAnalysis|QuantileRegressor|QuantileTransformer|RBFSampler|RadiusNeighborsTransformer|RepeatedKFold|RepeatedStratifiedKFold|RobustScaler|RocCurveDisplay|SVC|SVR|ScoringMonitor|ShrunkCovariance|SimpleImputer|SkewedChi2Sampler|StandardScaler|TheilSenRegressor|TweedieRegressor|UnsetMetadataPassedError|ValidationCurveDisplay|cluster_optics_dbscan|cluster_optics_xi|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_rcv1|fetch_species_distributions|load_breast_cancer|load_diabetes|load_digits|load_iris|load_linnerud|load_wine|make_gaussian_quantiles)$' }
+  C: { regex: '(^|\.)(ARDRegression|AdditiveChi2Sampler|AffinityPropagation|BayesianGaussianMixture|BayesianRidge|BernoulliNB|Binarizer|Birch|CategoricalNB|ComplementNB|DecisionBoundaryDisplay|DecisionTreeClassifier|DecisionTreeRegressor|DetCurveDisplay|DictVectorizer|DummyClassifier|DummyRegressor|ElasticNetCV|EllipticEnvelope|EmpiricalCovariance|EstimatorCheckFailedWarning|ExtraTreeClassifier|ExtraTreeRegressor|GammaRegressor|GaussianNB|GradientBoostingClassifier|GradientBoostingRegressor|GraphicalLassoCV|HuberRegressor|InconsistentVersionWarning|IsolationForest|Isomap|IsotonicRegression|KNNImputer|KNeighborsTransformer|KernelDensity|LabelBinarizer|Lars|LarsCV|LassoCV|LassoLarsCV|LearningCurveDisplay|LedoitWolf|LinearRegression|LinearSVR|LocallyLinearEmbedding|LogisticRegressionCV|MaxAbsScaler|MeanShift|MinCovDet|MissingIndicator|MultiLabelBinarizer|MultiTaskElasticNetCV|MultiTaskLassoCV|MultinomialNB|NearestNeighbors|NuSVC|NuSVR|OAS|OPTICS|OneClassSVM|OneHotEncoder|OrdinalEncoder|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|ParamsDict|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|PolynomialCountSketch|PredictionErrorDisplay|QuadraticDiscriminantAnalysis|QuantileRegressor|QuantileTransformer|RBFSampler|RadiusNeighborsTransformer|RobustScaler|RocCurveDisplay|SVC|SVR|ScoringMonitor|ShrunkCovariance|SimpleImputer|SkewedChi2Sampler|StandardScaler|TheilSenRegressor|TweedieRegressor|UnsetMetadataPassedError|ValidationCurveDisplay|cluster_optics_dbscan|cluster_optics_xi|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_rcv1|fetch_species_distributions|load_breast_cancer|load_diabetes|load_digits|load_iris|load_linnerud|load_wine|make_gaussian_quantiles)$' }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
@@ -973,7 +1143,7 @@ rule:
   has:
     field: arguments
     has:
-      nthChild: 2
+      nthChild: { position: 2, ofRule: { not: { kind: comment } } }
       not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
   not:
     any:
@@ -986,7 +1156,7 @@ rule:
         stopBy: end
         has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 constraints:
-  C: { regex: '(^|\.)(AdaBoostClassifier|AdaBoostRegressor|AgglomerativeClustering|BernoulliRBM|BisectingKMeans|CCA|CalibratedClassifierCV|ClassicalMDS|ClassifierChain|ColumnTransformer|ConfusionMatrixDisplay|DBSCAN|DictionaryLearning|ElasticNet|ExtraTreesClassifier|ExtraTreesRegressor|FactorAnalysis|FastICA|FeatureAgglomeration|FeatureHasher|FeatureUnion|FixedThresholdClassifier|GaussianMixture|GaussianProcessClassifier|GaussianProcessRegressor|GaussianRandomProjection|GenericUnivariateSelect|GraphicalLasso|GroupKFold|GroupShuffleSplit|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IncrementalPCA|IterativeImputer|KBinsDiscretizer|KFold|KMeans|KNeighborsClassifier|KNeighborsRegressor|KernelPCA|KernelRidge|LabelPropagation|LabelSpreading|Lasso|LassoLars|LassoLarsIC|LatentDirichletAllocation|LocalOutlierFactor|LogisticRegression|MDS|MinMaxScaler|MiniBatchDictionaryLearning|MiniBatchKMeans|MiniBatchNMF|MiniBatchSparsePCA|MultiOutputClassifier|MultiOutputRegressor|MultiTaskElasticNet|MultiTaskLasso|NMF|NearestCentroid|NeighborhoodComponentsAnalysis|Normalizer|Nystroem|OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier|PCA|PLSCanonical|PLSRegression|PLSSVD|PartialDependenceDisplay|Pipeline|PolynomialFeatures|PowerTransformer|RANSACRegressor|RFE|RFECV|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|RegressorChain|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDRegressor|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SequentialFeatureSelector|ShuffleSplit|SparseCoder|SparsePCA|SparseRandomProjection|SpectralBiclustering|SpectralClustering|SpectralCoclustering|SpectralEmbedding|StrOptions|StratifiedKFold|StratifiedShuffleSplit|TSNE|TimeSeriesSplit|TransformedTargetRegressor|TruncatedSVD|TunedThresholdClassifierCV|VotingClassifier|VotingRegressor|affinity_propagation|binarize|compute_class_weight|compute_optics_graph|empirical_covariance|estimate_bandwidth|export_text|fetch_openml|img_to_graph|isotonic_regression|johnson_lindenstrauss_min_dim|label_binarize|ledoit_wolf|load_files|load_svmlight_file|load_svmlight_files|locally_linear_embedding|make_circles|make_column_selector|make_friedman2|make_friedman3|make_hastie_10_2|make_moons|make_s_curve|make_scorer|make_sparse_coded_signal|make_sparse_spd_matrix|make_spd_matrix|make_swiss_roll|maxabs_scale|mean_shift|plot_tree|quantile_transform|robust_scale|spectral_clustering|spectral_embedding|ward_tree)$' }
+  C: { regex: '(^|\.)(AdaBoostClassifier|AdaBoostRegressor|AgglomerativeClustering|BernoulliRBM|BisectingKMeans|CCA|CalibratedClassifierCV|ClassicalMDS|ClassifierChain|ColumnTransformer|ConfusionMatrixDisplay|DBSCAN|DictionaryLearning|ElasticNet|ExtraTreesClassifier|ExtraTreesRegressor|FactorAnalysis|FastICA|FeatureAgglomeration|FeatureHasher|FeatureUnion|FixedThresholdClassifier|GaussianMixture|GaussianProcessClassifier|GaussianProcessRegressor|GaussianRandomProjection|GenericUnivariateSelect|GraphicalLasso|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IncrementalPCA|IterativeImputer|KBinsDiscretizer|KMeans|KNeighborsClassifier|KNeighborsRegressor|KernelPCA|KernelRidge|LabelPropagation|LabelSpreading|Lasso|LassoLars|LassoLarsIC|LatentDirichletAllocation|LocalOutlierFactor|LogisticRegression|MDS|MinMaxScaler|MiniBatchDictionaryLearning|MiniBatchKMeans|MiniBatchNMF|MiniBatchSparsePCA|MultiOutputClassifier|MultiOutputRegressor|MultiTaskElasticNet|MultiTaskLasso|NMF|NearestCentroid|NeighborhoodComponentsAnalysis|Normalizer|Nystroem|OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier|PCA|PLSCanonical|PLSRegression|PLSSVD|PartialDependenceDisplay|Pipeline|PolynomialFeatures|PowerTransformer|RANSACRegressor|RFE|RFECV|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|RegressorChain|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDRegressor|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SequentialFeatureSelector|SparseCoder|SparsePCA|SparseRandomProjection|SpectralBiclustering|SpectralClustering|SpectralCoclustering|SpectralEmbedding|StrOptions|TSNE|TimeSeriesSplit|TransformedTargetRegressor|TruncatedSVD|TunedThresholdClassifierCV|VotingClassifier|VotingRegressor|affinity_propagation|binarize|compute_class_weight|compute_optics_graph|empirical_covariance|estimate_bandwidth|export_text|fetch_openml|img_to_graph|isotonic_regression|johnson_lindenstrauss_min_dim|label_binarize|ledoit_wolf|load_files|load_svmlight_file|load_svmlight_files|locally_linear_embedding|make_circles|make_column_selector|make_friedman2|make_friedman3|make_hastie_10_2|make_moons|make_s_curve|make_scorer|make_sparse_coded_signal|make_sparse_spd_matrix|make_spd_matrix|make_swiss_roll|maxabs_scale|mean_shift|plot_tree|quantile_transform|robust_scale|spectral_clustering|spectral_embedding|ward_tree)$' }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
@@ -999,7 +1169,7 @@ rule:
   has:
     field: arguments
     has:
-      nthChild: 3
+      nthChild: { position: 3, ofRule: { not: { kind: comment } } }
       not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
   not:
     any:
@@ -1025,7 +1195,7 @@ rule:
   has:
     field: arguments
     has:
-      nthChild: 4
+      nthChild: { position: 4, ofRule: { not: { kind: comment } } }
       not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
   not:
     any:

@@ -242,7 +242,7 @@ metadata: { since: "1.8" }
 id: deprecated-in-sklearn
 language: python
 severity: warning
-message: LogisticRegressionCV warns on fit until l1_ratios, scoring and use_legacy_attributes are all set, because their defaults change in 1.10 and 1.11. Pass l1_ratios=(0,), scoring="accuracy" and use_legacy_attributes=False.
+message: LogisticRegressionCV warns on fit until l1_ratios, scoring and use_legacy_attributes are all set, because their defaults change in 1.10 and 1.11. Pass l1_ratios=(0,) and scoring="accuracy" to keep the current fit, and use_legacy_attributes=True to keep the current attributes.
 rule:
   pattern: $C($$$ARGS)
   not:
