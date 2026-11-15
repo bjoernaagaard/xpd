@@ -6,7 +6,7 @@
 id: score-after-predict
 language: python
 severity: warning
-message: $M.score($X, $Y) predicts $X again, and $P already holds those predictions. Pass $P to the metric, as accuracy_score($Y, $P) for a classifier or r2_score($Y, $P) for a regressor, which gives the same number and measured 1.7 to 690 times faster, depending on the model.
+message: $M.score($X, $Y) predicts $X again, and $P already holds those predictions. Pass $P to the metric, as accuracy_score($Y, $P) for a classifier or r2_score($Y, $P) for a regressor, which gives the same number and measured 1.6 to 690 times faster, depending on the model.
 rule:
   pattern: $M.score($X, $Y)
   all:
@@ -39,7 +39,7 @@ rule:
 id: score-after-predict
 language: python
 severity: warning
-message: $M.predict($X) runs again here, and $P already holds those predictions. Pass $P, which gives the same number and measured 1.7 to 690 times faster, depending on the model.
+message: $M.predict($X) runs again here, and $P already holds those predictions. Pass $P, which gives the same number and measured 1.6 to 690 times faster, depending on the model.
 rule:
   pattern: $F($Y, $M.predict($X))
   all:

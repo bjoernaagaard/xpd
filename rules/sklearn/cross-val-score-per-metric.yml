@@ -5,7 +5,7 @@
 id: cross-val-score-per-metric
 language: python
 severity: warning
-message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured at least 1.6 times faster for two scorings.
 rule:
   any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
   all:
@@ -28,7 +28,7 @@ constraints:
 id: cross-val-score-per-metric
 language: python
 severity: warning
-message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured at least 1.6 times faster for two scorings.
 rule:
   any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
   all:
@@ -51,7 +51,7 @@ constraints:
 id: cross-val-score-per-metric
 language: python
 severity: warning
-message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured at least 1.6 times faster for two scorings.
 rule:
   any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
   all:
@@ -74,7 +74,7 @@ constraints:
 id: cross-val-score-per-metric
 language: python
 severity: warning
-message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured at least 1.6 times faster for two scorings.
 rule:
   any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
   all:

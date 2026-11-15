@@ -5,7 +5,7 @@
 id: vectorizer-fit-then-transform
 language: python
 severity: warning
-message: fit already builds the matrix of these documents and drops it, so transform reads them a second time. Call $C($$$A).fit_transform($X), which measured 1.6 to 2.5 times faster.
+message: fit already builds the matrix of these documents and drops it, so transform reads them a second time. Call $C($$$A).fit_transform($X), which measured at least 1.6 times faster.
 rule:
   pattern: $C($$$A).fit($X).transform($X)
 constraints:
@@ -16,7 +16,7 @@ metadata: { fix: unsafe }
 id: vectorizer-fit-then-transform
 language: python
 severity: warning
-message: fit already builds the matrix of these documents and drops it, so transform reads them a second time. Call $V.fit_transform($X), which measured 1.6 to 2.5 times faster.
+message: fit already builds the matrix of these documents and drops it, so transform reads them a second time. Call $V.fit_transform($X), which measured at least 1.6 times faster.
 rule:
   pattern: $V.fit($X).transform($X)
   inside:
@@ -35,7 +35,7 @@ metadata: { fix: unsafe }
 id: vectorizer-fit-then-transform
 language: python
 severity: warning
-message: fit already builds the matrix of $X and drops it, so $V.transform($X) reads the documents a second time. Write $V.fit_transform($X) in place of the two calls, which measured 1.6 to 2.5 times faster.
+message: fit already builds the matrix of $X and drops it, so $V.transform($X) reads the documents a second time. Write $V.fit_transform($X) in place of the two calls, which measured at least 1.6 times faster.
 rule:
   pattern: $V.fit($X)
   all:

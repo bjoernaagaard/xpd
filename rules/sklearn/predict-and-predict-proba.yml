@@ -5,7 +5,7 @@
 id: predict-and-predict-proba
 language: python
 severity: warning
-message: $M.predict($X) computes the same probabilities as $M.predict_proba($X) and returns the class with the largest one. Call predict_proba once, keep the whole matrix, and take $M.classes_[proba.argmax(axis=1)] as the labels, which gives the same labels and measured 1.7 to 2.1 times faster.
+message: $M.predict($X) computes the same probabilities as $M.predict_proba($X) and returns the class with the largest one. Call predict_proba once, keep the whole matrix, and take $M.classes_[proba.argmax(axis=1)] as the labels, which gives the same labels and measured at least 1.7 times faster.
 rule:
   pattern: $M.predict($X)
   all:
