@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import make_pipeline as make_imb_pipeline
+from imblearn.under_sampling import NearMiss, RandomUnderSampler
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score, cross_validate, train_test_split
@@ -173,7 +174,10 @@ def correlation_before_split():
 def resample_before_split():
     df = frame()
     X_more, y_more = SMOTE(random_state=0).fit_resample(df[["x1", "x2"]], df["y"])  # xpd: fit-before-split
-    return train_test_split(X_more, y_more, random_state=0)
+    X_near, y_near = NearMiss().fit_resample(df[["x1", "x2"]], df["y"])  # xpd: fit-before-split
+    undersample = RandomUnderSampler(random_state=0)
+    X_fewer, y_fewer = undersample.fit_resample(df[["x1", "x2"]], df["y"])
+    return train_test_split(X_more, y_more, random_state=0), train_test_split(X_near, y_near, random_state=0), train_test_split(X_fewer, y_fewer, random_state=0)
 
 
 @case
@@ -216,7 +220,9 @@ def cross_val_on_fitted_data():
 def cross_val_on_resampled_data():
     df = frame()
     X_more, y_more = SMOTE(random_state=0).fit_resample(df[["x1", "x2"]], df["y"])  # xpd: cross-val-on-fitted-data
-    return cross_val_score(KNeighborsClassifier(), X_more, y_more, cv=3)
+    rus = RandomUnderSampler(random_state=0)
+    X_fewer, y_fewer = rus.fit_resample(df[["x1", "x2"]], df["y"])
+    return cross_val_score(KNeighborsClassifier(), X_more, y_more, cv=3), cross_val_score(KNeighborsClassifier(), X_fewer, y_fewer, cv=3)
 
 
 @case
@@ -230,6 +236,8 @@ def search_on_fitted_data():
     search = GridSearchCV(KNeighborsClassifier(), {"n_neighbors": [3, 5]}, cv=3)
     X_more, y_more = SMOTE(random_state=0).fit_resample(X, y)  # xpd: cross-val-on-fitted-data
     search.fit(X_more, y_more)
+    X_fewer, y_fewer = RandomUnderSampler(random_state=0).fit_resample(X, y)
+    search.fit(X_fewer, y_fewer)
     return grid.best_score_, search.best_score_
 
 
