@@ -281,14 +281,18 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
 # get_feature_names returned a list. get_feature_names_out returns an array, and on a frame it
-# names the input columns where get_feature_names named them x0, x1 and so on.
+# names the input columns where get_feature_names named them x0, x1 and so on. A file that
+# defines its own get_feature_names is left alone, because the call may reach that method.
 id: removed-in-sklearn
 language: python
 severity: error
 message: get_feature_names was removed in favor of get_feature_names_out, added in 1.0. Call $X.get_feature_names_out(), which returns an array.
 rule:
   pattern: $X.get_feature_names($$$A)
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - inside: { kind: module, stopBy: end, has: { kind: function_definition, stopBy: end, has: { field: name, regex: ^get_feature_names$ } } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: $X.get_feature_names_out($$$A)
