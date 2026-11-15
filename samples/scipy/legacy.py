@@ -49,6 +49,12 @@ def removed_keywords(a, b, y, x, points):
     stats.iqr(y, scale="raw")  # xpd: removed-keyword
     scipy.optimize.fmin_l_bfgs_b(np.sum, x, approx_grad=True, iprint=-1)  # xpd: removed-keyword, legacy-optimize
     cdist(points, points, "wminkowski", p=2, w=np.ones(2))  # xpd: removed-keyword
+    opts = {}
+    spla.cg(a, b, tol=1e-8, **opts)  # xpd: removed-keyword
+    gmres(a, b, restrt=5, restart=5)  # xpd: removed-keyword
+    linalg.solve(a, b, sym_pos=True, assume_a="gen")  # xpd: removed-keyword
+    linalg.eigh(a, eigvals=(0, 1), **opts)  # xpd: removed-keyword
+    tree.query_pairs(0.5, n_jobs=2)  # xpd: removed-keyword
 
 
 @case
@@ -138,6 +144,30 @@ def defaults_chosen():
         ndimage.zoom(np.ones((4, 4)), 2, grid_mode=True, mode="grid-constant"),
         ndimage.zoom(np.ones((4, 4)), 2, mode="nearest", grid_mode=True),
     )
+
+
+@case
+def defaults_passed_through_a_mapping():
+    a = np.array([[4.0, 1.0], [1.0, 3.0]])
+    b = np.array([1.0, 2.0])
+    opts = {"callback_type": "legacy"}
+    seen = []
+    x = gmres(a, b, callback=seen.append, **opts)[0]
+    buffer = io.BytesIO()
+    mmwrite(buffer, sparse.coo_array(np.eye(3)))
+    buffer.seek(0)
+    m = mmread(buffer, **{"spmatrix": True})
+    return x, len(seen), m.toarray(), type(m).__name__
+
+
+@case
+def sum_on_a_rebound_name():
+    import scipy.ndimage as ndi
+
+    def total(ndi, image):
+        return ndi.sum(image)
+
+    return total(ndi, np.arange(4.0))
 
 
 def read_harwell_boeing(path):
@@ -264,6 +294,7 @@ def look_alikes(tol, model):
     np.linalg.pinv(np.eye(2), rcond=1e-10)
     model.minimize(method="BFGS", options={"maxfun": 5})
     model.mode(tol)[0][0]
+    stats.mode(tol, 0, "propagate", False)[0][0]
     model.sum(tol)
     np.random.default_rng(0).random(3)
     np.interp(0.5, [0.0, 1.0], [0.0, 1.0])
