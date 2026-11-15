@@ -1,0 +1,88 @@
+# A csr or csc built from a shape alone stores nothing, so every write into it adds a stored
+# value. In speed/runs/probe_setitem.jsonl an element write, a += write, a row slice write and a
+# fancy write into each of csr_matrix, csc_matrix, csr_array and csc_array raised
+# SparseEfficiencyWarning under -W error, and the same write into a lil_array ran clean. Each
+# write copies the stored arrays, and 1,000 writes ran 30 times slower than into a lil_matrix in
+# speed/runs/bench.jsonl. The rule reports the construction, which is the line to change. A
+# function that assigns the name again is left alone, because it may convert it to lil first.
+# No fix, because the rest of the code may need the csr or csc.
+id: empty-csr-write
+language: python
+severity: warning
+message: $A starts as an empty $N, and a later write into it adds a stored value, which emits SparseEfficiencyWarning, raises under python -W error, and copies the whole matrix each time. Build it as lil_array or dok_array, or collect the coordinates and pass them to coo_array, and call tocsr or tocsc once at the end.
+rule:
+  # all keeps the order, so $A is bound before the not looks for another assignment to it.
+  all:
+    - matches: empty-call
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, pattern: $A }
+        inside:
+          kind: expression_statement
+          any:
+            - precedes: { stopBy: end, has: { stopBy: end, matches: write-into-a } }
+            - precedes: { stopBy: end, matches: write-into-a }
+    - not:
+        inside:
+          stopBy: { kind: function_definition }
+          kind: function_definition
+          has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $A } }, { not: { has: { field: right, matches: empty-call } } }] }
+constraints:
+  A: { any: [{ kind: identifier }, { kind: attribute }] }
+  N: { regex: '^cs[rc]_(matrix|array)$' }
+utils:
+  # $A[...] = v or $A[...] += v.
+  write-into-a:
+    any: [{ kind: assignment }, { kind: augmented_assignment }]
+    has: { field: left, kind: subscript, has: { field: value, pattern: $A } }
+  # csr_matrix((n, m)), csr_matrix(X.shape) and the same with dtype=. A first tuple of three, a
+  # tuple that holds a tuple, as in (data, (row, col)), and (data, ij) are stored values.
+  empty-call:
+    kind: call
+    all:
+      - has:
+          field: function
+          any:
+            - { pattern: $M.$N, matches: sparse-module }
+            - { kind: identifier, pattern: $N, matches: from-sparse }
+      - has:
+          field: arguments
+          has:
+            nthChild: 1
+            any:
+              - kind: tuple
+                all:
+                  - has: { nthChild: 2 }
+                  - not: { has: { nthChild: 3 } }
+                  - not: { has: { any: [{ kind: tuple }, { kind: list }, { kind: call, not: { regex: '^len\(' } }, { kind: identifier, regex: '(?i)data|val|ij|coord' }] } }
+              - { kind: attribute, regex: '\.shape$' }
+      - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+  sparse-module:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - inside:
+          stopBy: end
+          kind: module
+          has:
+            any:
+              - kind: import_statement
+                has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $M } }] }
+              - kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^scipy$' }
+                  - any:
+                      - has: { kind: dotted_name, pattern: $M, regex: '^sparse$' }
+                      - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $M } }] }
+  from-sparse:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all:
+          - has: { field: module_name, regex: '^scipy\.sparse$' }
+          - has: { kind: dotted_name, pattern: $N }

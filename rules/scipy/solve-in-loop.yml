@@ -1,0 +1,147 @@
+# spsolve factors its matrix on every call. With the matrix fixed across the loop, splu once
+# and its solve per pass ran 17 to 20 times faster for 100 right sides of the 2-D Poisson matrix
+# of 10,000 rows, which give 1,000,000 solution values, and 3.3 to 3.6 times for 10 sides of 100
+# rows, on float64 and float32, in speed/runs/bench_b.jsonl and bench_b2.jsonl. splu needs csc,
+# so the message converts. A matrix that the loop assigns, or an expression such as A + s * I,
+# is left alone. No fix, because the loop body must change.
+id: solve-in-loop
+language: python
+severity: warning
+message: spsolve factors $A again on every pass of this loop. Factor it once before the loop with lu = splu($A.tocsc()) from scipy.sparse.linalg, then call lu.solve(b) in the loop, which ran 17 to 20 times faster for 100 right sides.
+rule:
+  kind: call
+  all:
+    - has: { field: function, any: [{ pattern: $L.$F, matches: sparse-linalg }, { kind: identifier, pattern: $F, matches: from-sparse-linalg }] }
+    - has: { field: arguments, has: { nthChild: 1, pattern: $A } }
+    - matches: in-loop
+constraints:
+  F: { regex: '^spsolve$' }
+  A: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # The call sits in a comprehension or a loop body, and no enclosing loop assigns $A or takes
+  # it as its loop name.
+  in-loop:
+    all:
+      - inside:
+          stopBy: { kind: function_definition }
+          any: [{ kind: list_comprehension }, { kind: generator_expression }, { kind: for_statement }, { kind: while_statement }]
+      - not:
+          inside:
+            stopBy: { kind: function_definition }
+            all:
+              - any: [{ kind: list_comprehension }, { kind: generator_expression }, { kind: for_statement }, { kind: while_statement }]
+              - any:
+                  - has: { stopBy: end, any: [{ kind: assignment }, { kind: augmented_assignment }], has: { field: left, matches: names-a } }
+                  - has: { field: left, matches: names-a }
+                  - has: { kind: for_in_clause, has: { field: left, matches: names-a } }
+  names-a:
+    any: [{ pattern: $A }, { has: { stopBy: end, pattern: $A } }]
+  sparse-linalg:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse\.linalg$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse.linalg }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $P.linalg }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $P } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $P, regex: '^sparse$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $P } }] }
+      - all:
+          - has: { field: object, pattern: $L }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse\.linalg$' } }, { has: { field: alias, pattern: $L } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy\.sparse$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $L, regex: '^linalg$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^linalg$' } }, { has: { field: alias, pattern: $L } }] }
+  from-sparse-linalg:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.sparse\.linalg$' } }, { has: { kind: dotted_name, pattern: $F } }]
+---
+# scipy.linalg.solve factors its matrix on every call. With the matrix fixed across the loop,
+# lu_factor once and lu_solve per pass ran 18 to 23 times faster for 20 right sides of a 1,000 by
+# 1,000 matrix, and 2.3 to 2.6 times for 100 sides of a 10 by 10 matrix, on float64 and float32,
+# with bit equal results, in speed/runs/bench_b.jsonl and bench_b2.jsonl. No fix, because the
+# loop body must change.
+id: solve-in-loop
+language: python
+severity: warning
+message: $L.solve factors $A again on every pass of this loop. Factor it once before the loop with lu = $L.lu_factor($A), then call $L.lu_solve(lu, b) in the loop, which ran 18 to 23 times faster for 20 right sides of a 1,000 by 1,000 matrix.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $L.$F, matches: dense-linalg }
+    - has: { field: arguments, has: { nthChild: 1, pattern: $A } }
+    - matches: in-loop
+constraints:
+  F: { regex: '^solve$' }
+  A: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # The call sits in a comprehension or a loop body, and no enclosing loop assigns $A or takes
+  # it as its loop name.
+  in-loop:
+    all:
+      - inside:
+          stopBy: { kind: function_definition }
+          any: [{ kind: list_comprehension }, { kind: generator_expression }, { kind: for_statement }, { kind: while_statement }]
+      - not:
+          inside:
+            stopBy: { kind: function_definition }
+            all:
+              - any: [{ kind: list_comprehension }, { kind: generator_expression }, { kind: for_statement }, { kind: while_statement }]
+              - any:
+                  - has: { stopBy: end, any: [{ kind: assignment }, { kind: augmented_assignment }], has: { field: left, matches: names-a } }
+                  - has: { field: left, matches: names-a }
+                  - has: { kind: for_in_clause, has: { field: left, matches: names-a } }
+  names-a:
+    any: [{ pattern: $A }, { has: { stopBy: end, pattern: $A } }]
+  dense-linalg:
+    any:
+      - has: { field: object, regex: '^scipy\.linalg$' }
+      - all:
+          - has: { field: object, pattern: $S.linalg }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $L }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.linalg$' } }, { has: { field: alias, pattern: $L } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $L, regex: '^linalg$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^linalg$' } }, { has: { field: alias, pattern: $L } }] }
+  from-dense-linalg:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.linalg$' } }, { has: { kind: dotted_name, pattern: $F } }]
