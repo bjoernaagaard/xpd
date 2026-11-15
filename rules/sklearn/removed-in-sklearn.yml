@@ -997,29 +997,32 @@ constraints:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# The test for an import from sklearn reads the whole file, so the four documents below test the
+# name of the call first in all, which keeps its order. ast-grep checks constraints only after the
+# whole rule has matched.
 id: removed-in-sklearn
 language: python
 severity: error
 message: $C takes no positional arguments in scikit-learn 1.9.1, so this call raises TypeError. Pass each argument by keyword.
 rule:
   pattern: $C($$$ARGS)
-  has:
-    field: arguments
-    has:
-      nthChild: { position: 1, ofRule: { not: { kind: comment } } }
-      not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
-  not:
-    any:
-      - has: { field: arguments, has: { kind: list_splat } }
-      - matches: compat-code
-  any:
-    - regex: '^sklearn\.'
-    - inside:
-        kind: module
-        stopBy: end
-        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
-constraints:
-  C: { regex: '(^|\.)(ARDRegression|AdditiveChi2Sampler|AffinityPropagation|BayesianGaussianMixture|BayesianRidge|BernoulliNB|Binarizer|Birch|CategoricalNB|ComplementNB|DecisionBoundaryDisplay|DecisionTreeClassifier|DecisionTreeRegressor|DetCurveDisplay|DictVectorizer|DummyClassifier|DummyRegressor|ElasticNetCV|EllipticEnvelope|EmpiricalCovariance|EstimatorCheckFailedWarning|ExtraTreeClassifier|ExtraTreeRegressor|GammaRegressor|GaussianNB|GradientBoostingClassifier|GradientBoostingRegressor|GraphicalLassoCV|HuberRegressor|InconsistentVersionWarning|IsolationForest|Isomap|IsotonicRegression|KNNImputer|KNeighborsTransformer|KernelDensity|LabelBinarizer|Lars|LarsCV|LassoCV|LassoLarsCV|LearningCurveDisplay|LedoitWolf|LinearRegression|LinearSVR|LocallyLinearEmbedding|LogisticRegressionCV|MaxAbsScaler|MeanShift|MinCovDet|MissingIndicator|MultiLabelBinarizer|MultiTaskElasticNetCV|MultiTaskLassoCV|MultinomialNB|NearestNeighbors|NuSVC|NuSVR|OAS|OPTICS|OneClassSVM|OneHotEncoder|OrdinalEncoder|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|ParamsDict|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|PolynomialCountSketch|PredictionErrorDisplay|QuadraticDiscriminantAnalysis|QuantileRegressor|QuantileTransformer|RBFSampler|RadiusNeighborsTransformer|RobustScaler|RocCurveDisplay|SVC|SVR|ScoringMonitor|ShrunkCovariance|SimpleImputer|SkewedChi2Sampler|StandardScaler|TheilSenRegressor|TweedieRegressor|UnsetMetadataPassedError|ValidationCurveDisplay|cluster_optics_dbscan|cluster_optics_xi|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_rcv1|fetch_species_distributions|load_breast_cancer|load_diabetes|load_digits|load_iris|load_linnerud|load_wine|make_gaussian_quantiles)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(ARDRegression|AdditiveChi2Sampler|AffinityPropagation|BayesianGaussianMixture|BayesianRidge|BernoulliNB|Binarizer|Birch|CategoricalNB|ComplementNB|DecisionBoundaryDisplay|DecisionTreeClassifier|DecisionTreeRegressor|DetCurveDisplay|DictVectorizer|DummyClassifier|DummyRegressor|ElasticNetCV|EllipticEnvelope|EmpiricalCovariance|EstimatorCheckFailedWarning|ExtraTreeClassifier|ExtraTreeRegressor|GammaRegressor|GaussianNB|GradientBoostingClassifier|GradientBoostingRegressor|GraphicalLassoCV|HuberRegressor|InconsistentVersionWarning|IsolationForest|Isomap|IsotonicRegression|KNNImputer|KNeighborsTransformer|KernelDensity|LabelBinarizer|Lars|LarsCV|LassoCV|LassoLarsCV|LearningCurveDisplay|LedoitWolf|LinearRegression|LinearSVR|LocallyLinearEmbedding|LogisticRegressionCV|MaxAbsScaler|MeanShift|MinCovDet|MissingIndicator|MultiLabelBinarizer|MultiTaskElasticNetCV|MultiTaskLassoCV|MultinomialNB|NearestNeighbors|NuSVC|NuSVR|OAS|OPTICS|OneClassSVM|OneHotEncoder|OrdinalEncoder|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|ParamsDict|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|PolynomialCountSketch|PredictionErrorDisplay|QuadraticDiscriminantAnalysis|QuantileRegressor|QuantileTransformer|RBFSampler|RadiusNeighborsTransformer|RobustScaler|RocCurveDisplay|SVC|SVR|ScoringMonitor|ShrunkCovariance|SimpleImputer|SkewedChi2Sampler|StandardScaler|TheilSenRegressor|TweedieRegressor|UnsetMetadataPassedError|ValidationCurveDisplay|cluster_optics_dbscan|cluster_optics_xi|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_rcv1|fetch_species_distributions|load_breast_cancer|load_diabetes|load_digits|load_iris|load_linnerud|load_wine|make_gaussian_quantiles)$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: list_splat } }
+          - matches: compat-code
+    - any:
+        - regex: '^sklearn\.'
+        - inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
@@ -1029,23 +1032,23 @@ severity: error
 message: $C takes at most 1 positional argument in scikit-learn 1.9.1, so this call raises TypeError. Pass the others by keyword.
 rule:
   pattern: $C($$$ARGS)
-  has:
-    field: arguments
-    has:
-      nthChild: { position: 2, ofRule: { not: { kind: comment } } }
-      not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
-  not:
-    any:
-      - has: { field: arguments, has: { kind: list_splat } }
-      - matches: compat-code
-  any:
-    - regex: '^sklearn\.'
-    - inside:
-        kind: module
-        stopBy: end
-        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
-constraints:
-  C: { regex: '(^|\.)(AdaBoostClassifier|AdaBoostRegressor|AgglomerativeClustering|BernoulliRBM|BisectingKMeans|CCA|CalibratedClassifierCV|ClassicalMDS|ClassifierChain|ColumnTransformer|ConfusionMatrixDisplay|DBSCAN|DictionaryLearning|ElasticNet|ExtraTreesClassifier|ExtraTreesRegressor|FactorAnalysis|FastICA|FeatureAgglomeration|FeatureHasher|FeatureUnion|FixedThresholdClassifier|GaussianMixture|GaussianProcessClassifier|GaussianProcessRegressor|GaussianRandomProjection|GenericUnivariateSelect|GraphicalLasso|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IncrementalPCA|IterativeImputer|KBinsDiscretizer|KMeans|KNeighborsClassifier|KNeighborsRegressor|KernelPCA|KernelRidge|LabelPropagation|LabelSpreading|Lasso|LassoLars|LassoLarsIC|LatentDirichletAllocation|LocalOutlierFactor|LogisticRegression|MDS|MinMaxScaler|MiniBatchDictionaryLearning|MiniBatchKMeans|MiniBatchNMF|MiniBatchSparsePCA|MultiOutputClassifier|MultiOutputRegressor|MultiTaskElasticNet|MultiTaskLasso|NMF|NearestCentroid|NeighborhoodComponentsAnalysis|Normalizer|Nystroem|OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier|PCA|PLSCanonical|PLSRegression|PLSSVD|PartialDependenceDisplay|Pipeline|PolynomialFeatures|PowerTransformer|RANSACRegressor|RFE|RFECV|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|RegressorChain|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDRegressor|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SequentialFeatureSelector|SparseCoder|SparsePCA|SparseRandomProjection|SpectralBiclustering|SpectralClustering|SpectralCoclustering|SpectralEmbedding|StrOptions|TSNE|TimeSeriesSplit|TransformedTargetRegressor|TruncatedSVD|TunedThresholdClassifierCV|VotingClassifier|VotingRegressor|affinity_propagation|binarize|compute_class_weight|compute_optics_graph|empirical_covariance|estimate_bandwidth|export_text|fetch_openml|img_to_graph|isotonic_regression|johnson_lindenstrauss_min_dim|label_binarize|ledoit_wolf|load_files|load_svmlight_file|load_svmlight_files|locally_linear_embedding|make_circles|make_column_selector|make_friedman2|make_friedman3|make_hastie_10_2|make_moons|make_s_curve|make_scorer|make_sparse_coded_signal|make_sparse_spd_matrix|make_spd_matrix|make_swiss_roll|maxabs_scale|mean_shift|plot_tree|quantile_transform|robust_scale|spectral_clustering|spectral_embedding|ward_tree)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(AdaBoostClassifier|AdaBoostRegressor|AgglomerativeClustering|BernoulliRBM|BisectingKMeans|CCA|CalibratedClassifierCV|ClassicalMDS|ClassifierChain|ColumnTransformer|ConfusionMatrixDisplay|DBSCAN|DictionaryLearning|ElasticNet|ExtraTreesClassifier|ExtraTreesRegressor|FactorAnalysis|FastICA|FeatureAgglomeration|FeatureHasher|FeatureUnion|FixedThresholdClassifier|GaussianMixture|GaussianProcessClassifier|GaussianProcessRegressor|GaussianRandomProjection|GenericUnivariateSelect|GraphicalLasso|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IncrementalPCA|IterativeImputer|KBinsDiscretizer|KMeans|KNeighborsClassifier|KNeighborsRegressor|KernelPCA|KernelRidge|LabelPropagation|LabelSpreading|Lasso|LassoLars|LassoLarsIC|LatentDirichletAllocation|LocalOutlierFactor|LogisticRegression|MDS|MinMaxScaler|MiniBatchDictionaryLearning|MiniBatchKMeans|MiniBatchNMF|MiniBatchSparsePCA|MultiOutputClassifier|MultiOutputRegressor|MultiTaskElasticNet|MultiTaskLasso|NMF|NearestCentroid|NeighborhoodComponentsAnalysis|Normalizer|Nystroem|OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier|PCA|PLSCanonical|PLSRegression|PLSSVD|PartialDependenceDisplay|Pipeline|PolynomialFeatures|PowerTransformer|RANSACRegressor|RFE|RFECV|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|RegressorChain|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDRegressor|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SequentialFeatureSelector|SparseCoder|SparsePCA|SparseRandomProjection|SpectralBiclustering|SpectralClustering|SpectralCoclustering|SpectralEmbedding|StrOptions|TSNE|TimeSeriesSplit|TransformedTargetRegressor|TruncatedSVD|TunedThresholdClassifierCV|VotingClassifier|VotingRegressor|affinity_propagation|binarize|compute_class_weight|compute_optics_graph|empirical_covariance|estimate_bandwidth|export_text|fetch_openml|img_to_graph|isotonic_regression|johnson_lindenstrauss_min_dim|label_binarize|ledoit_wolf|load_files|load_svmlight_file|load_svmlight_files|locally_linear_embedding|make_circles|make_column_selector|make_friedman2|make_friedman3|make_hastie_10_2|make_moons|make_s_curve|make_scorer|make_sparse_coded_signal|make_sparse_spd_matrix|make_spd_matrix|make_swiss_roll|maxabs_scale|mean_shift|plot_tree|quantile_transform|robust_scale|spectral_clustering|spectral_embedding|ward_tree)$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: { position: 2, ofRule: { not: { kind: comment } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: list_splat } }
+          - matches: compat-code
+    - any:
+        - regex: '^sklearn\.'
+        - inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
@@ -1055,23 +1058,23 @@ severity: error
 message: $C takes at most 2 positional arguments in scikit-learn 1.9.1, so this call raises TypeError. Pass the others by keyword.
 rule:
   pattern: $C($$$ARGS)
-  has:
-    field: arguments
-    has:
-      nthChild: { position: 3, ofRule: { not: { kind: comment } } }
-      not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
-  not:
-    any:
-      - has: { field: arguments, has: { kind: list_splat } }
-      - matches: compat-code
-  any:
-    - regex: '^sklearn\.'
-    - inside:
-        kind: module
-        stopBy: end
-        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
-constraints:
-  C: { regex: '(^|\.)(BaggingClassifier|BaggingRegressor|FunctionTransformer|GridSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|LinearSVC|MLPClassifier|ParameterSampler|PrecisionRecallDisplay|RandomizedSearchCV|SplineTransformer|StackingClassifier|StackingRegressor|accuracy_score|adjusted_mutual_info_score|average_precision_score|balanced_accuracy_score|brier_score_loss|calibration_curve|check_array|check_cv|check_is_fitted|check_scoring|class_likelihood_ratios|classification_report|cohen_kappa_score|compute_sample_weight|confusion_matrix|confusion_matrix_at_thresholds|consensus_score|coverage_error|d2_absolute_error_score|d2_brier_score|d2_log_loss_score|d2_pinball_score|d2_tweedie_score|dbscan|dcg_score|dict_learning|dict_learning_online|enet_path|euclidean_distances|explained_variance_score|export_graphviz|f1_score|f_regression|fastica|fbeta_score|gen_batches|gen_even_slices|graphical_lasso|hamming_loss|hinge_loss|homogeneity_completeness_v_measure|jaccard_score|k_means|kmeans_plusplus|kneighbors_graph|l1_min_c|label_ranking_average_precision_score|label_ranking_loss|lars_path_gram|lasso_path|log_loss|make_biclusters|make_blobs|make_checkerboard|make_classification|make_friedman1|make_low_rank_matrix|make_multilabel_classification|make_regression|make_sparse_uncorrelated|matthews_corrcoef|mean_absolute_error|mean_absolute_percentage_error|mean_gamma_deviance|mean_pinball_loss|mean_poisson_deviance|mean_squared_error|mean_squared_log_error|mean_tweedie_deviance|median_absolute_error|minmax_scale|multilabel_confusion_matrix|mutual_info_classif|mutual_info_regression|mutual_info_score|nan_euclidean_distances|ndcg_score|normalized_mutual_info_score|orthogonal_mp|orthogonal_mp_gram|pairwise_distances_argmin|pairwise_distances_argmin_min|pairwise_distances_chunked|power_transform|precision_recall_curve|precision_recall_fscore_support|precision_score|r2_score|r_regression|radius_neighbors_graph|randomized_svd|recall_score|roc_auc_score|roc_curve|root_mean_squared_error|root_mean_squared_log_error|safe_sparse_dot|silhouette_samples|silhouette_score|sparse_encode|top_k_accuracy_score|trustworthiness|v_measure_score|zero_one_loss)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(BaggingClassifier|BaggingRegressor|FunctionTransformer|GridSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|LinearSVC|MLPClassifier|ParameterSampler|PrecisionRecallDisplay|RandomizedSearchCV|SplineTransformer|StackingClassifier|StackingRegressor|accuracy_score|adjusted_mutual_info_score|average_precision_score|balanced_accuracy_score|brier_score_loss|calibration_curve|check_array|check_cv|check_is_fitted|check_scoring|class_likelihood_ratios|classification_report|cohen_kappa_score|compute_sample_weight|confusion_matrix|confusion_matrix_at_thresholds|consensus_score|coverage_error|d2_absolute_error_score|d2_brier_score|d2_log_loss_score|d2_pinball_score|d2_tweedie_score|dbscan|dcg_score|dict_learning|dict_learning_online|enet_path|euclidean_distances|explained_variance_score|export_graphviz|f1_score|f_regression|fastica|fbeta_score|gen_batches|gen_even_slices|graphical_lasso|hamming_loss|hinge_loss|homogeneity_completeness_v_measure|jaccard_score|k_means|kmeans_plusplus|kneighbors_graph|l1_min_c|label_ranking_average_precision_score|label_ranking_loss|lars_path_gram|lasso_path|log_loss|make_biclusters|make_blobs|make_checkerboard|make_classification|make_friedman1|make_low_rank_matrix|make_multilabel_classification|make_regression|make_sparse_uncorrelated|matthews_corrcoef|mean_absolute_error|mean_absolute_percentage_error|mean_gamma_deviance|mean_pinball_loss|mean_poisson_deviance|mean_squared_error|mean_squared_log_error|mean_tweedie_deviance|median_absolute_error|minmax_scale|multilabel_confusion_matrix|mutual_info_classif|mutual_info_regression|mutual_info_score|nan_euclidean_distances|ndcg_score|normalized_mutual_info_score|orthogonal_mp|orthogonal_mp_gram|pairwise_distances_argmin|pairwise_distances_argmin_min|pairwise_distances_chunked|power_transform|precision_recall_curve|precision_recall_fscore_support|precision_score|r2_score|r_regression|radius_neighbors_graph|randomized_svd|recall_score|roc_auc_score|roc_curve|root_mean_squared_error|root_mean_squared_log_error|safe_sparse_dot|silhouette_samples|silhouette_score|sparse_encode|top_k_accuracy_score|trustworthiness|v_measure_score|zero_one_loss)$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: { position: 3, ofRule: { not: { kind: comment } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: list_splat } }
+          - matches: compat-code
+    - any:
+        - regex: '^sklearn\.'
+        - inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
@@ -1081,22 +1084,22 @@ severity: error
 message: $C takes at most 3 positional arguments in scikit-learn 1.9.1, so this call raises TypeError. Pass the others by keyword.
 rule:
   pattern: $C($$$ARGS)
-  has:
-    field: arguments
-    has:
-      nthChild: { position: 4, ofRule: { not: { kind: comment } } }
-      not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
-  not:
-    any:
-      - has: { field: arguments, has: { kind: list_splat } }
-      - matches: compat-code
-  any:
-    - regex: '^sklearn\.'
-    - inside:
-        kind: module
-        stopBy: end
-        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
-constraints:
-  C: { regex: '(^|\.)(CalibrationDisplay|MLPRegressor|check_X_y|cross_val_predict|cross_val_score|cross_validate|dump_svmlight_file|grid_to_graph|lars_path|learning_curve|metric_at_thresholds|pairwise_distances|pairwise_kernels|partial_dependence|permutation_importance|permutation_test_score|ridge_regression|validation_curve)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(CalibrationDisplay|MLPRegressor|check_X_y|cross_val_predict|cross_val_score|cross_validate|dump_svmlight_file|grid_to_graph|lars_path|learning_curve|metric_at_thresholds|pairwise_distances|pairwise_kernels|partial_dependence|permutation_importance|permutation_test_score|ridge_regression|validation_curve)$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: { position: 4, ofRule: { not: { kind: comment } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: list_splat } }
+          - matches: compat-code
+    - any:
+        - regex: '^sklearn\.'
+        - inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
