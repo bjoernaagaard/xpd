@@ -197,6 +197,7 @@ def minimize_options(f, g, x0):
     minimize(f, x0, method="L-BFGS-B", options={"disp": True, "maxiter": 50})  # xpd: minimize-unknown-option
     optimize.minimize(f, x0, method="TNC", options=dict(maxiter=50))  # xpd: minimize-unknown-option
     minimize(f, x0, method="BFGS", options={"maxfun": 50})  # xpd: minimize-unknown-option
+    minimize(f, x0, method="dogleg", options={"eta": 0.1})
     minimize(f, x0, method="trust-constr", options={"ftol": 1e-9})  # xpd: minimize-unknown-option
     minimize(f, x0, method="Nelder-Mead", jac=g)  # xpd: minimize-unused-argument
     minimize(f, x0, method="BFGS", jac=g, hess=g)  # xpd: minimize-unused-argument
