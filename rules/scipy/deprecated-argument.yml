@@ -1,0 +1,629 @@
+# lombscargle warns DeprecationWarning for any precenter=, scipy/signal/_spectral_py.py line 260.
+id: deprecated-argument
+language: python
+severity: warning
+message: lombscargle deprecated precenter= in SciPy 1.17 and warns DeprecationWarning for any value. Delete it,
+  and pass y - y.mean() as y where it was True.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^precenter$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.signal\.(lombscargle)$, pattern: scipy.signal.$F}
+          - all:
+            - {regex: \.signal\.(lombscargle)$, pattern: $R.signal.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(lombscargle)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.signal$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^signal$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(lombscargle)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.signal$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.signal$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(lombscargle)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^lombscargle$}
+---
+# @_deprecate_positional_args(version='1.19.0') on lombscargle, scipy/signal/_spectral_py.py line 19.
+id: deprecated-argument
+language: python
+severity: warning
+message: lombscargle warns DeprecationWarning when precenter or normalize is passed by position, and SciPy 1.19
+  makes them keyword only. Pass normalize= by keyword.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.signal\.(lombscargle)$, pattern: scipy.signal.$F}
+      - all:
+        - {regex: \.signal\.(lombscargle)$, pattern: $R.signal.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(lombscargle)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.signal$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^signal$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(lombscargle)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.signal$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.signal$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(lombscargle)$}
+                    - has: {field: alias, pattern: $F_AS}
+  - all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 4
+          not:
+            any:
+            - {kind: keyword_argument}
+            - {kind: list_splat}
+            - {kind: dictionary_splat}
+    - not:
+        has:
+          field: arguments
+          has: {kind: list_splat}
+constraints:
+  F: {regex: ^lombscargle$}
+---
+# qr warns DeprecationWarning for lwork=None, -1 or above M and raises ValueError below, scipy/linalg/_decomp_qr.py line 175.
+id: deprecated-argument
+language: python
+severity: warning
+message: qr no longer uses lwork= and warns DeprecationWarning, and SciPy 1.20 removes it. Delete it.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^lwork$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.(qr)$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.(qr)$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(qr)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(qr)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(qr)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^qr$}
+---
+id: deprecated-argument
+language: python
+severity: warning
+message: The third positional argument of qr is lwork, which SciPy no longer uses and which warns DeprecationWarning.
+  Delete it and pass mode= and the rest by keyword.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.linalg\.(qr)$, pattern: scipy.linalg.$F}
+      - all:
+        - {regex: \.linalg\.(qr)$, pattern: $R.linalg.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(qr)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.linalg$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^linalg$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(qr)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.linalg$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.linalg$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(qr)$}
+                    - has: {field: alias, pattern: $F_AS}
+  - all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 3
+          not:
+            any:
+            - {kind: keyword_argument}
+            - {kind: list_splat}
+            - {kind: dictionary_splat}
+    - not:
+        has:
+          field: arguments
+          has: {kind: list_splat}
+constraints:
+  F: {regex: ^qr$}
+---
+# anderson_ksamp warns UserWarning for midrank=, scipy/stats/_morestats.py line 2901. variant= returns an object that does not unpack as a tuple, so there is no fix.
+id: deprecated-argument
+language: python
+severity: warning
+message: anderson_ksamp replaced midrank= with variant= and warns UserWarning, and SciPy 1.19 removes midrank. Write
+  variant='midrank' for True or variant='right' for False, and read the result by attribute.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^midrank$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.stats\.(anderson_ksamp)$, pattern: scipy.stats.$F}
+          - all:
+            - {regex: \.stats\.(anderson_ksamp)$, pattern: $R.stats.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(anderson_ksamp)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^stats$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(anderson_ksamp)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(anderson_ksamp)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^anderson_ksamp$}
+metadata: {since: '1.17'}
+---
+id: deprecated-argument
+language: python
+severity: warning
+message: The second positional argument of anderson_ksamp is midrank, which warns UserWarning, and SciPy 1.19 removes
+  it. Write variant='midrank' or variant='right' by keyword.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.stats\.(anderson_ksamp)$, pattern: scipy.stats.$F}
+      - all:
+        - {regex: \.stats\.(anderson_ksamp)$, pattern: $R.stats.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(anderson_ksamp)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.stats$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^stats$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(anderson_ksamp)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.stats$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.stats$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(anderson_ksamp)$}
+                    - has: {field: alias, pattern: $F_AS}
+  - all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 2
+          not:
+            any:
+            - {kind: keyword_argument}
+            - {kind: list_splat}
+            - {kind: dictionary_splat}
+    - not:
+        has:
+          field: arguments
+          has: {kind: list_splat}
+constraints:
+  F: {regex: ^anderson_ksamp$}
+metadata: {since: '1.17'}
+---
+# linprog warns DeprecationWarning for the three legacy methods, scipy/optimize/_linprog.py line 669. Their options differ from HiGHS, so there is no fix.
+id: deprecated-argument
+language: python
+severity: warning
+message: linprog warns DeprecationWarning for this legacy method, which SciPy announced for removal. Write method='highs'
+  and move its options to the HiGHS names.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^method$}
+  - has: {field: value, kind: string, regex: '^[''\"](simplex|interior-point|revised simplex)[''\"]$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(linprog)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(linprog)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(linprog)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(linprog)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(linprog)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^linprog$}
