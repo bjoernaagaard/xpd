@@ -13,7 +13,7 @@ rule:
     - inside:
         stopBy: end
         kind: expression_statement
-        follows: { stopBy: end, has: { stopBy: end, pattern: $P = $M.predict($X) } }
+        follows: { stopBy: end, has: { stopBy: end, any: [{ pattern: $P = $M.predict($X) }, { pattern: $P = $M.fit($$$).predict($X) }] } }
     - inside:
         kind: module
         stopBy: end
@@ -46,7 +46,7 @@ rule:
     - inside:
         stopBy: end
         kind: expression_statement
-        follows: { stopBy: end, has: { stopBy: end, pattern: $P = $M.predict($X) } }
+        follows: { stopBy: end, has: { stopBy: end, any: [{ pattern: $P = $M.predict($X) }, { pattern: $P = $M.fit($$$).predict($X) }] } }
     - inside:
         kind: module
         stopBy: end

@@ -135,8 +135,8 @@ def score_after_predict():
     y_pred = forest.predict(X_test)
     accuracy = forest.score(X_test, y_test)  # xpd: score-after-predict
     f1 = f1_score(y_test, forest.predict(X_test))  # xpd: score-after-predict
-    knn = KNeighborsRegressor().fit(X[:150], X[:150, 0])
-    fitted = knn.predict(X_test)
+    knn = KNeighborsRegressor()
+    fitted = knn.fit(X[:150], X[:150, 0]).predict(X_test)
     r2 = knn.score(X_test, X_test[:, 0])  # xpd: score-after-predict
     return forest, y_pred, accuracy, f1, fitted, r2
 
