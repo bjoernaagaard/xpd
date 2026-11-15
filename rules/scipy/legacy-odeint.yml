@@ -1,0 +1,84 @@
+# scipy/integrate/_odepack_py.py line 39 says new code should use solve_ivp. solve_ivp calls
+# fun(t, y) where odeint calls func(y, t) unless tfirst=True, and returns an object, so there is
+# no fix. Neither solver was faster on every problem in runs/bench.jsonl, so the message makes no
+# speed claim. solve_ivp with method='LSODA' raised MemoryError at 1,000,000 equations there.
+id: legacy-odeint
+language: python
+severity: info
+message: SciPy's docs say new code should use solve_ivp instead of odeint. Write solve_ivp(fun, (t0, t1), y0, t_eval=t)
+  with fun taking t before y, and keep its default method for a large system, because method='LSODA' stores a full
+  Jacobian and ran out of memory at 1,000,000 equations.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.integrate\.(odeint)$, pattern: scipy.integrate.$F}
+      - all:
+        - {regex: \.integrate\.(odeint)$, pattern: $R.integrate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(odeint)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.integrate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^integrate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^integrate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(odeint)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.integrate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.integrate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(odeint)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^odeint$}

@@ -1,0 +1,222 @@
+# scipy/ndimage/_measurements.py line 708 says ndimage.sum is kept for backwards
+# compatibility and new code should prefer sum_labels, and its body is return
+# sum_labels(input, labels, index), so the fix gives the same value.
+id: legacy-api
+language: python
+severity: info
+message: SciPy keeps ndimage.sum only for backwards compatibility and asks new code to use sum_labels. Write ndimage.sum_labels.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.ndimage\.(sum)$, pattern: scipy.ndimage.$F}
+      - all:
+        - {regex: \.ndimage\.(sum)$, pattern: $R.ndimage.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(sum)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.ndimage$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^ndimage$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^ndimage$}
+                      - has: {field: alias, pattern: $R}
+  - {pattern: $FN($$$A)}
+constraints:
+  F: {regex: ^sum$}
+transform:
+  G:
+    replace: {source: $FN, replace: sum$, by: sum_labels}
+fix: $G($$$A)
+metadata: {fix: safe}
+---
+# scipy/stats/_stats_py.py line 8473 marks ranksums as legacy and says to prefer mannwhitneyu. mannwhitneyu reports U where ranksums reports z, so there is no fix.
+id: legacy-api
+language: python
+severity: info
+message: SciPy marks stats.ranksums as legacy and asks new code to use mannwhitneyu. Write mannwhitneyu(x, y, use_continuity=False,
+  method='asymptotic'), which gives the same p-value and reports the U statistic instead of a z score.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.stats\.(ranksums)$, pattern: scipy.stats.$F}
+      - all:
+        - {regex: \.stats\.(ranksums)$, pattern: $R.stats.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(ranksums)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.stats$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^stats$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(ranksums)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.stats$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.stats$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(ranksums)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^ranksums$}
+---
+# scipy/sparse/_construct.py line 1207 says block_array is preferred over bmat. bmat returns a sparse matrix when no input is a sparse array, so there is no fix.
+id: legacy-api
+language: python
+severity: info
+message: SciPy prefers sparse.block_array over bmat, which returns a sparse matrix when no block is a sparse array.
+  Write block_array, and use sparse arrays for the blocks.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.sparse\.(bmat)$, pattern: scipy.sparse.$F}
+      - all:
+        - {regex: \.sparse\.(bmat)$, pattern: $R.sparse.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(bmat)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.sparse$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^sparse$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(bmat)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(bmat)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^bmat$}

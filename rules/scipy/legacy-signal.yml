@@ -1,0 +1,141 @@
+# scipy/signal/_spectral_py.py lines 983, 1162, 1439 and 1627 mark these as legacy functions and
+# point to ShortTimeFFT. Its methods take other arguments, so there is no fix.
+id: legacy-signal
+language: python
+severity: info
+message: SciPy marks signal.$F as a legacy function. Write a ShortTimeFFT object and call its method of the same
+  purpose, such as stft or spectrogram.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.signal\.((stft|istft|spectrogram|check_COLA))$, pattern: scipy.signal.$F}
+      - all:
+        - {regex: \.signal\.((stft|istft|spectrogram|check_COLA))$, pattern: $R.signal.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.((stft|istft|spectrogram|check_COLA))$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.signal$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^signal$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^((stft|istft|spectrogram|check_COLA))$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.signal$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.signal$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^((stft|istft|spectrogram|check_COLA))$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(stft|istft|spectrogram|check_COLA)$}
+---
+# scipy/signal/_filter_design.py line 974 marks sosfreqz as a legacy alias, and its body is
+# return freqz_sos(*args, **kwargs), so the fix gives the same value. freqz_sos is new in 1.15.
+id: legacy-signal
+language: python
+severity: info
+message: SciPy marks signal.sosfreqz as a legacy alias of freqz_sos. Write freqz_sos.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.signal\.(sosfreqz)$, pattern: scipy.signal.$F}
+      - all:
+        - {regex: \.signal\.(sosfreqz)$, pattern: $R.signal.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(sosfreqz)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.signal$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^signal$}
+                      - has: {field: alias, pattern: $R}
+  - {pattern: $FN($$$A)}
+constraints:
+  F: {regex: ^sosfreqz$}
+transform:
+  G:
+    replace: {source: $FN, replace: sosfreqz$, by: freqz_sos}
+fix: $G($$$A)
+metadata: {fix: safe, since: '1.15'}

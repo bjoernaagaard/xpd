@@ -1,0 +1,129 @@
+# scipy/optimize/__init__.py lines 338 to 341 list these as legacy functions that are not
+# recommended for new scripts. The newer interfaces take other argument names and return an
+# OptimizeResult, so there is no fix.
+id: legacy-optimize
+language: python
+severity: info
+message: SciPy lists optimize.$F among the legacy functions that are not recommended for new scripts. Write optimize.$NEW,
+  which returns an OptimizeResult.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.optimize\.((fmin|fmin_powell|fmin_cg|fmin_bfgs|fmin_ncg|fmin_l_bfgs_b|fmin_tnc|fmin_cobyla|fmin_slsqp|fminbound|brent|golden|leastsq|fsolve|broyden1|broyden2|newton_krylov|anderson|excitingmixing|linearmixing|diagbroyden))$,
+        pattern: scipy.optimize.$F}
+      - all:
+        - {regex: \.optimize\.((fmin|fmin_powell|fmin_cg|fmin_bfgs|fmin_ncg|fmin_l_bfgs_b|fmin_tnc|fmin_cobyla|fmin_slsqp|fminbound|brent|golden|leastsq|fsolve|broyden1|broyden2|newton_krylov|anderson|excitingmixing|linearmixing|diagbroyden))$,
+          pattern: $R.optimize.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.((fmin|fmin_powell|fmin_cg|fmin_bfgs|fmin_ncg|fmin_l_bfgs_b|fmin_tnc|fmin_cobyla|fmin_slsqp|fminbound|brent|golden|leastsq|fsolve|broyden1|broyden2|newton_krylov|anderson|excitingmixing|linearmixing|diagbroyden))$,
+          pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.optimize$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^optimize$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^((fmin|fmin_powell|fmin_cg|fmin_bfgs|fmin_ncg|fmin_l_bfgs_b|fmin_tnc|fmin_cobyla|fmin_slsqp|fminbound|brent|golden|leastsq|fsolve|broyden1|broyden2|newton_krylov|anderson|excitingmixing|linearmixing|diagbroyden))$,
+          pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.optimize$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.optimize$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^((fmin|fmin_powell|fmin_cg|fmin_bfgs|fmin_ncg|fmin_l_bfgs_b|fmin_tnc|fmin_cobyla|fmin_slsqp|fminbound|brent|golden|leastsq|fsolve|broyden1|broyden2|newton_krylov|anderson|excitingmixing|linearmixing|diagbroyden))$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(fmin|fmin_powell|fmin_cg|fmin_bfgs|fmin_ncg|fmin_l_bfgs_b|fmin_tnc|fmin_cobyla|fmin_slsqp|fminbound|brent|golden|leastsq|fsolve|broyden1|broyden2|newton_krylov|anderson|excitingmixing|linearmixing|diagbroyden)$}
+transform:
+  T0:
+    replace: {source: $F, replace: ^fmin$, by: 'minimize(fun, x0, method=''Nelder-Mead'')'}
+  T1:
+    replace: {source: $T0, replace: ^fmin_powell$, by: 'minimize(fun, x0, method=''Powell'')'}
+  T2:
+    replace: {source: $T1, replace: ^fmin_cg$, by: 'minimize(fun, x0, method=''CG'')'}
+  T3:
+    replace: {source: $T2, replace: ^fmin_bfgs$, by: 'minimize(fun, x0, method=''BFGS'')'}
+  T4:
+    replace: {source: $T3, replace: ^fmin_ncg$, by: 'minimize(fun, x0, method=''Newton-CG'')'}
+  T5:
+    replace: {source: $T4, replace: ^fmin_l_bfgs_b$, by: 'minimize(fun, x0, method=''L-BFGS-B'')'}
+  T6:
+    replace: {source: $T5, replace: ^fmin_tnc$, by: 'minimize(fun, x0, method=''TNC'')'}
+  T7:
+    replace: {source: $T6, replace: ^fmin_cobyla$, by: 'minimize(fun, x0, method=''COBYLA'')'}
+  T8:
+    replace: {source: $T7, replace: ^fmin_slsqp$, by: 'minimize(fun, x0, method=''SLSQP'')'}
+  T9:
+    replace: {source: $T8, replace: ^fminbound$, by: 'minimize_scalar(fun, bounds=(a, b), method=''bounded'')'}
+  T10:
+    replace: {source: $T9, replace: ^brent$, by: 'minimize_scalar(fun, method=''brent'')'}
+  T11:
+    replace: {source: $T10, replace: ^golden$, by: 'minimize_scalar(fun, method=''golden'')'}
+  T12:
+    replace: {source: $T11, replace: ^leastsq$, by: 'least_squares(fun, x0)'}
+  T13:
+    replace: {source: $T12, replace: ^fsolve$, by: 'root(fun, x0)'}
+  T14:
+    replace: {source: $T13, replace: ^broyden1$, by: 'root(fun, x0, method=''broyden1'')'}
+  T15:
+    replace: {source: $T14, replace: ^broyden2$, by: 'root(fun, x0, method=''broyden2'')'}
+  T16:
+    replace: {source: $T15, replace: ^newton_krylov$, by: 'root(fun, x0, method=''krylov'')'}
+  T17:
+    replace: {source: $T16, replace: ^anderson$, by: 'root(fun, x0, method=''anderson'')'}
+  T18:
+    replace: {source: $T17, replace: ^excitingmixing$, by: 'root(fun, x0, method=''excitingmixing'')'}
+  T19:
+    replace: {source: $T18, replace: ^linearmixing$, by: 'root(fun, x0, method=''linearmixing'')'}
+  NEW:
+    replace: {source: $T19, replace: ^diagbroyden$, by: 'root(fun, x0, method=''diagbroyden'')'}

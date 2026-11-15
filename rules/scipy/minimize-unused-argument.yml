@@ -1,0 +1,497 @@
+# minimize warns RuntimeWarning when the method does not use gradient information, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+id: minimize-unused-argument
+language: python
+severity: warning
+message: minimize with method=$METH does not use gradient information, so it ignores jac= and warns RuntimeWarning.
+  Delete jac=, or choose a method that uses it.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^jac$}
+  - has:
+      field: value
+      not: {regex: '^(None|False|\(\)|\[\]|\{\})$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(minimize)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(minimize)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(minimize)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(minimize)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(minimize)$}
+                        - has: {field: alias, pattern: $F_AS}
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has: {field: name, regex: ^method$}
+            - has: {field: value, pattern: $METH}
+constraints:
+  F: {regex: ^minimize$}
+  METH: {regex: '(?i)^[''\"](nelder\-mead|powell|cobyla|cobyqa)[''\"]$'}
+---
+# minimize warns RuntimeWarning when the method does not use Hessian information, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+id: minimize-unused-argument
+language: python
+severity: warning
+message: minimize with method=$METH does not use Hessian information, so it ignores hess= and warns RuntimeWarning.
+  Delete hess=, or choose a method that uses it.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^hess$}
+  - has:
+      field: value
+      not: {regex: '^(None|False|\(\)|\[\]|\{\})$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(minimize)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(minimize)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(minimize)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(minimize)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(minimize)$}
+                        - has: {field: alias, pattern: $F_AS}
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has: {field: name, regex: ^method$}
+            - has: {field: value, pattern: $METH}
+constraints:
+  F: {regex: ^minimize$}
+  METH:
+    regex: ^['\"]
+    not: {regex: '(?i)^[''\"](newton\-cg|dogleg|trust\-ncg|trust\-constr|trust\-krylov|trust\-exact)[''\"]$'}
+---
+# minimize warns RuntimeWarning when the method does not use a Hessian-vector product, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+id: minimize-unused-argument
+language: python
+severity: warning
+message: minimize with method=$METH does not use a Hessian-vector product, so it ignores hessp= and warns RuntimeWarning.
+  Delete hessp=, or choose a method that uses it.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^hessp$}
+  - has:
+      field: value
+      not: {regex: '^(None|False|\(\)|\[\]|\{\})$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(minimize)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(minimize)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(minimize)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(minimize)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(minimize)$}
+                        - has: {field: alias, pattern: $F_AS}
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has: {field: name, regex: ^method$}
+            - has: {field: value, pattern: $METH}
+constraints:
+  F: {regex: ^minimize$}
+  METH:
+    regex: ^['\"]
+    not: {regex: '(?i)^[''\"](newton\-cg|trust\-ncg|trust\-constr|trust\-krylov)[''\"]$'}
+---
+# minimize warns RuntimeWarning when the method cannot handle constraints, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+id: minimize-unused-argument
+language: python
+severity: warning
+message: minimize with method=$METH cannot handle constraints, so it ignores constraints= and warns RuntimeWarning.
+  Delete constraints=, or choose a method that uses it.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^constraints$}
+  - has:
+      field: value
+      not: {regex: '^(None|False|\(\)|\[\]|\{\})$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(minimize)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(minimize)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(minimize)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(minimize)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(minimize)$}
+                        - has: {field: alias, pattern: $F_AS}
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has: {field: name, regex: ^method$}
+            - has: {field: value, pattern: $METH}
+constraints:
+  F: {regex: ^minimize$}
+  METH:
+    regex: ^['\"]
+    not: {regex: '(?i)^[''\"](cobyla|cobyqa|slsqp|trust\-constr)[''\"]$'}
+---
+# minimize warns RuntimeWarning when the method cannot handle bounds, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+id: minimize-unused-argument
+language: python
+severity: warning
+message: minimize with method=$METH cannot handle bounds, so it ignores bounds= and warns RuntimeWarning. Delete
+  bounds=, or choose a method that uses it.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^bounds$}
+  - has:
+      field: value
+      not: {regex: '^(None|False|\(\)|\[\]|\{\})$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(minimize)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(minimize)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(minimize)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(minimize)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(minimize)$}
+                        - has: {field: alias, pattern: $F_AS}
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has: {field: name, regex: ^method$}
+            - has: {field: value, pattern: $METH}
+constraints:
+  F: {regex: ^minimize$}
+  METH:
+    regex: ^['\"]
+    not: {regex: '(?i)^[''\"](nelder\-mead|powell|l\-bfgs\-b|cobyla|cobyqa|slsqp|tnc|trust\-constr)[''\"]$'}

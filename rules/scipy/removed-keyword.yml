@@ -1,0 +1,1564 @@
+# The solvers raise TypeError for tol=, in runs/probe2.jsonl. The fix is unsafe because
+# the old tol came with an atol default of 'legacy', which 1.18.1 rejects, so the stopping point
+# can differ.
+id: removed-keyword
+language: python
+severity: error
+message: $F no longer takes tol= and raises TypeError. Write rtol=, the relative tolerance, and set atol= if the
+  old code relied on an absolute one.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^tol$}
+  - has: {field: value, pattern: $V}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.sparse\.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: scipy.sparse.linalg.$F}
+          - all:
+            - {regex: \.sparse\.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.sparse.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^sparse$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
+fix: rtol=$V
+metadata: {fix: unsafe}
+---
+# atol='legacy' raises ValueError in _get_atol_rtol, scipy/sparse/linalg/_isolve/iterative.py line 15.
+id: removed-keyword
+language: python
+severity: error
+message: $F rejects atol='legacy' and raises ValueError. Write a number for atol, such as 0.0, the default.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^atol$}
+  - has: {field: value, kind: string, regex: '^[''\"]legacy[''\"]$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.sparse\.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: scipy.sparse.linalg.$F}
+          - all:
+            - {regex: \.sparse\.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.sparse.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^sparse$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
+---
+# Every solver takes its tolerances only by keyword after x0, in runs/probe2.jsonl.
+id: removed-keyword
+language: python
+severity: error
+message: $F takes only A, b and x0 by position, and a fourth positional argument raises TypeError. Pass rtol= and
+  the other options by keyword.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.sparse\.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: scipy.sparse.linalg.$F}
+      - all:
+        - {regex: \.sparse\.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.sparse.linalg.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.linalg\.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.linalg.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.sparse$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^sparse$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.sparse\.linalg$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^linalg$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^((bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr))$}
+                    - has: {field: alias, pattern: $F_AS}
+  - all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 4
+          not:
+            any:
+            - {kind: keyword_argument}
+            - {kind: list_splat}
+            - {kind: dictionary_splat}
+    - not:
+        has:
+          field: arguments
+          has: {kind: list_splat}
+constraints:
+  F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
+---
+# gmres raises TypeError for restrt=, in runs/probe2.jsonl. The source no longer says what restrt meant, so the fix is unsafe.
+id: removed-keyword
+language: python
+severity: error
+message: gmres no longer takes restrt= and raises TypeError. Write restart=.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^restrt$}
+  - has: {field: value, pattern: $V}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.sparse\.linalg\.(gmres)$, pattern: scipy.sparse.linalg.$F}
+          - all:
+            - {regex: \.sparse\.linalg\.(gmres)$, pattern: $R.sparse.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.linalg\.(gmres)$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^sparse$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(gmres)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(gmres)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(gmres)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^gmres$}
+fix: restart=$V
+metadata: {fix: unsafe}
+---
+# solve raises TypeError for sym_pos=, in runs/probe2.jsonl. assume_a='pos' asks for the same Cholesky path, but the source no longer shows the old code, so the fix is unsafe.
+id: removed-keyword
+language: python
+severity: error
+message: solve no longer takes sym_pos= and raises TypeError. Write assume_a='pos' for a symmetric positive definite
+  matrix.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^sym_pos$}
+  - has: {field: value, kind: 'true'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.(solve)$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.(solve)$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(solve)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(solve)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(solve)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^solve$}
+fix: assume_a='pos'
+metadata: {fix: unsafe}
+---
+id: removed-keyword
+language: python
+severity: error
+message: solve no longer takes sym_pos= and raises TypeError. Delete it, or write assume_a='pos' where the matrix
+  is positive definite.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^sym_pos$}
+  - has:
+      field: value
+      not: {kind: 'true'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.(solve)$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.(solve)$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(solve)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(solve)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(solve)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^solve$}
+---
+# eigh raises TypeError for eigvals=, in runs/probe2.jsonl. subset_by_index takes the same pair of indices, but the source no longer shows the old code, so the fix is unsafe.
+id: removed-keyword
+language: python
+severity: error
+message: $F no longer takes eigvals= and raises TypeError. Write subset_by_index= with the same pair of indices.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^eigvals$}
+  - has: {field: value, pattern: $V}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.((eigh|eigvalsh))$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.((eigh|eigvalsh))$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((eigh|eigvalsh))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((eigh|eigvalsh))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((eigh|eigvalsh))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(eigh|eigvalsh)$}
+fix: subset_by_index=$V
+metadata: {fix: unsafe}
+---
+id: removed-keyword
+language: python
+severity: error
+message: $F no longer takes turbo= and raises TypeError. Delete it, or choose a LAPACK routine with driver=, such
+  as driver='gvd' for a generalized problem.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^turbo$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.((eigh|eigvalsh))$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.((eigh|eigvalsh))$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((eigh|eigvalsh))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((eigh|eigvalsh))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((eigh|eigvalsh))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(eigh|eigvalsh)$}
+---
+id: removed-keyword
+language: python
+severity: error
+message: $F no longer takes cond= or rcond= and raises TypeError. Write atol= for an absolute cutoff or rtol= for
+  one relative to the largest singular value.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^(cond|rcond)$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.((pinv|pinvh))$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.((pinv|pinvh))$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((pinv|pinvh))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((pinv|pinvh))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((pinv|pinvh))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(pinv|pinvh)$}
+---
+id: removed-keyword
+language: python
+severity: error
+message: simpson no longer takes even= and raises TypeError. Delete it.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^even$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.integrate\.(simpson)$, pattern: scipy.integrate.$F}
+          - all:
+            - {regex: \.integrate\.(simpson)$, pattern: $R.integrate.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(simpson)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.integrate$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^integrate$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^integrate$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(simpson)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.integrate$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.integrate$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(simpson)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^simpson$}
+---
+# cumulative_trapezoid raises ValueError for an initial other than 0 or None, scipy/integrate/_quadrature.py line 346.
+id: removed-keyword
+language: python
+severity: error
+message: cumulative_trapezoid raises ValueError for an initial other than 0 or None. Write initial=0, and add the
+  start value to the result if it is an offset.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^initial$}
+  - has:
+      field: value
+      any:
+      - kind: integer
+        not: {regex: ^0+$}
+      - kind: float
+        not: {regex: '^0*\.0*$|^0+\.?0*([eE][-+]?\d+)?$'}
+      - {kind: unary_operator}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.integrate\.(cumulative_trapezoid)$, pattern: scipy.integrate.$F}
+          - all:
+            - {regex: \.integrate\.(cumulative_trapezoid)$, pattern: $R.integrate.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(cumulative_trapezoid)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.integrate$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^integrate$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^integrate$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(cumulative_trapezoid)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.integrate$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.integrate$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(cumulative_trapezoid)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^cumulative_trapezoid$}
+---
+# The tree methods raise TypeError for n_jobs=, in runs/probe2.jsonl, and
+# scipy/spatial/_ckdtree.pyx line 733 says n_jobs was renamed workers. The fix is unsafe because no
+# older source here shows the wrapper.
+id: removed-keyword
+language: python
+severity: error
+message: $M no longer takes n_jobs= and raises TypeError. SciPy renamed it workers=.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^n_jobs$}
+  - has: {field: value, pattern: $V}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          kind: attribute
+          all:
+          - has: {field: attribute, pattern: $M, regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
+          - any:
+            - has:
+                field: object
+                kind: call
+                has: &id001
+                  field: function
+                  any:
+                  - {regex: ^scipy\.spatial\.((KDTree|cKDTree))$, pattern: scipy.spatial.$F}
+                  - all:
+                    - {regex: \.spatial\.((KDTree|cKDTree))$, pattern: $Q.spatial.$F}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          any:
+                          - kind: import_statement
+                            has:
+                              kind: aliased_import
+                              all:
+                              - has: {field: name, regex: ^scipy$}
+                              - has: {field: alias, pattern: $Q}
+                  - all:
+                    - {regex: \.((KDTree|cKDTree))$, pattern: $Q.$F}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          any:
+                          - kind: import_statement
+                            has:
+                              kind: aliased_import
+                              all:
+                              - has: {field: name, regex: ^scipy\.spatial$}
+                              - has: {field: alias, pattern: $Q}
+                          - kind: import_from_statement
+                            all:
+                            - has: {field: module_name, regex: ^scipy$}
+                            - any:
+                              - has: {kind: dotted_name, pattern: $Q, regex: ^spatial$}
+                              - has:
+                                  kind: aliased_import
+                                  all:
+                                  - has: {field: name, regex: ^spatial$}
+                                  - has: {field: alias, pattern: $Q}
+                  - all:
+                    - {kind: identifier, regex: ^((KDTree|cKDTree))$, pattern: $F}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          any:
+                          - kind: import_from_statement
+                            all:
+                            - has: {field: module_name, regex: ^scipy\.spatial$}
+                            - has: {kind: dotted_name, pattern: $F}
+                  - all:
+                    - {kind: identifier, pattern: $F_AS}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          any:
+                          - kind: import_from_statement
+                            all:
+                            - has: {field: module_name, regex: ^scipy\.spatial$}
+                            - has:
+                                kind: aliased_import
+                                all:
+                                - has: {field: name, pattern: $F, regex: ^((KDTree|cKDTree))$}
+                                - has: {field: alias, pattern: $F_AS}
+            - all:
+              - has: {field: object, kind: identifier, pattern: $T}
+              - inside:
+                  stopBy: end
+                  any:
+                  - {kind: function_definition}
+                  - {kind: module}
+                  has:
+                    stopBy: end
+                    kind: assignment
+                    all:
+                    - has: {field: left, pattern: $T}
+                    - has:
+                        field: right
+                        kind: call
+                        has: *id001
+constraints:
+  F: {regex: ^(KDTree|cKDTree)$}
+  M: {regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
+fix: workers=$V
+metadata: {fix: unsafe}
+---
+id: removed-keyword
+language: python
+severity: error
+message: kendalltau no longer takes initial_lexsort= and raises TypeError. Delete it.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^initial_lexsort$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.stats\.(kendalltau)$, pattern: scipy.stats.$F}
+          - all:
+            - {regex: \.stats\.(kendalltau)$, pattern: $R.stats.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(kendalltau)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^stats$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(kendalltau)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(kendalltau)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^kendalltau$}
+---
+# scale='raw' raises ValueError, in runs/probe2.jsonl. The docstring says the default 1.0 divides nothing out, which is what raw meant, but no older source here shows it, so the fix is unsafe.
+id: removed-keyword
+language: python
+severity: error
+message: $F rejects scale='raw' and raises ValueError. Write scale=1.0, the default, which leaves the result unscaled.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^scale$}
+  - has: {field: value, kind: string, regex: '^[''\"]raw[''\"]$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.stats\.((iqr|median_abs_deviation))$, pattern: scipy.stats.$F}
+          - all:
+            - {regex: \.stats\.((iqr|median_abs_deviation))$, pattern: $R.stats.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((iqr|median_abs_deviation))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^stats$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((iqr|median_abs_deviation))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((iqr|median_abs_deviation))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(iqr|median_abs_deviation)$}
+fix: scale=1.0
+metadata: {fix: unsafe}
+---
+id: removed-keyword
+language: python
+severity: error
+message: fmin_l_bfgs_b no longer takes iprint= or disp= and raises TypeError. Delete it, and read the result's message
+  instead of printed output.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^(iprint|disp)$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.(fmin_l_bfgs_b)$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.(fmin_l_bfgs_b)$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(fmin_l_bfgs_b)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(fmin_l_bfgs_b)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(fmin_l_bfgs_b)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^fmin_l_bfgs_b$}
+---
+id: removed-keyword
+language: python
+severity: error
+message: $F no longer knows the metric 'wminkowski' and raises ValueError. Write 'minkowski' with w=, which weights
+  each term as the sum of w times |u - v| to the power p, so check that the weights still mean what the old code
+  meant.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.spatial\.distance\.((cdist|pdist))$, pattern: scipy.spatial.distance.$F}
+      - all:
+        - {regex: \.spatial\.distance\.((cdist|pdist))$, pattern: $R.spatial.distance.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.distance\.((cdist|pdist))$, pattern: $R.distance.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.spatial$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^spatial$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^spatial$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.((cdist|pdist))$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.spatial\.distance$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.spatial$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^distance$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^distance$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^((cdist|pdist))$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.spatial\.distance$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.spatial\.distance$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^((cdist|pdist))$}
+                    - has: {field: alias, pattern: $F_AS}
+  - has:
+      field: arguments
+      any:
+      - has: {kind: string, regex: '^[''\"]wminkowski[''\"]$'}
+      - has:
+          kind: keyword_argument
+          all:
+          - has: {field: name, regex: ^metric$}
+          - has: {field: value, kind: string, regex: '^[''\"]wminkowski[''\"]$'}
+constraints:
+  F: {regex: ^(cdist|pdist)$}
