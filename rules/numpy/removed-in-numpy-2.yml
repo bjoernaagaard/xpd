@@ -659,7 +659,7 @@ rule:
           pattern: $N
           regex: '^(int|float|complex|object|str|unicode|float_|complex_|cfloat|unicode_|string_|longfloat|singlecomplex|longcomplex|clongfloat|bool8|int0|uint0|object0|str0|bytes0|void0|typeDict|NaN|NAN|Inf|Infinity|infty|PINF|NINF|PZERO|NZERO|product|cumproduct|sometrue|alltrue|round_|row_stack|mat|compare_chararrays|format_parser|add_newdoc|add_docstring|DataSource|tracemalloc_domain|msort|asscalar|in1d|asfarray|find_common_type|cast|source|who|lookfor|obj2sctype|sctype2char|issubclass_|issubsctype|issctype|maximum_sctype|sctypes|set_string_function|rank|safe_eval|deprecate|deprecate_with_doc|disp|fastCopyAndTranspose|recfromcsv|recfromtxt|compat|nbytes|geterrobj|seterrobj|set_numeric_ops|get_array_wrap|add_newdoc_ufunc|chararray|alen|loads|mafromtxt|ndfromtxt|math|MachAr|CLIP|WRAP|RAISE|Tester|Uint64|Datetime64|Str0|Bytes0|MAXDIMS|BUFSIZE|ALLOW_THREADS)$'
           any:
-            - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+            - inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
             - inside:
                 kind: aliased_import
                 field: name
@@ -768,7 +768,7 @@ rule:
       pattern: $N
       regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$'
       any:
-        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+        - inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
         - inside:
             kind: aliased_import
             field: name
@@ -802,7 +802,7 @@ rule:
       pattern: $N
       regex: '^(RankWarning|trapz|byte_bounds)$'
       any:
-        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy$' } }
+        - inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
         - inside:
             kind: aliased_import
             field: name
@@ -911,7 +911,7 @@ rule:
     - matches: moved-name
       pattern: $N
       any:
-        - inside: { kind: import_from_statement, field: name, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
+        - inside: { kind: import_from_statement, all: [{ matches: lib-import }, { matches: keeps-a-name }] }
         - inside:
             kind: aliased_import
             field: name
@@ -1081,7 +1081,7 @@ rule:
       pattern: $N
       regex: '^(dec|decorators|nosetester|Tester|raises|run_module_suite)$'
       any:
-        - inside: { kind: import_from_statement, field: name, has: { field: module_name, regex: '^numpy\.testing$' } }
+        - inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.testing$' } }
         - inside:
             kind: aliased_import
             field: name

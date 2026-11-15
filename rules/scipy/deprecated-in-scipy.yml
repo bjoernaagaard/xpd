@@ -590,8 +590,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.constants.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.constants.
 rule:
   all:
   - kind: dotted_name
@@ -630,8 +630,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.constants.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.constants.
+message: scipy.constants.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.constants.
 rule:
   all:
   - kind: dotted_name
@@ -1336,8 +1336,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.fftpack.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.fftpack.
 rule:
   all:
   - kind: dotted_name
@@ -1376,8 +1376,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.fftpack.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.fftpack.
+message: scipy.fftpack.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.fftpack.
 rule:
   all:
   - kind: dotted_name
@@ -2082,8 +2082,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.integrate.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.integrate.
 rule:
   all:
   - kind: dotted_name
@@ -2122,8 +2122,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.integrate.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.integrate.
+message: scipy.integrate.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.integrate.
 rule:
   all:
   - kind: dotted_name
@@ -2828,8 +2828,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.interpolate.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.interpolate.
 rule:
   all:
   - kind: dotted_name
@@ -2868,8 +2868,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.interpolate.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.interpolate.
+message: scipy.interpolate.$M is a private module that SciPy deprecated, and every name read from it warns with
+  DeprecationWarning or raises AttributeError on SciPy 1.18.1. The public names are in scipy.interpolate.
 rule:
   all:
   - kind: dotted_name
@@ -3574,8 +3574,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.io.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.io.
 rule:
   all:
   - kind: dotted_name
@@ -3614,8 +3614,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.io.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.io.
+message: scipy.io.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.io.
 rule:
   all:
   - kind: dotted_name
@@ -4482,8 +4482,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.io.arff.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.io.arff.
 rule:
   all:
   - kind: dotted_name
@@ -4522,8 +4522,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.io.arff.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.io.arff.
+message: scipy.io.arff.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.io.arff.
 rule:
   all:
   - kind: dotted_name
@@ -5390,8 +5390,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.io.matlab.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.io.matlab.
 rule:
   all:
   - kind: dotted_name
@@ -5430,8 +5430,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.io.matlab.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.io.matlab.
+message: scipy.io.matlab.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.io.matlab.
 rule:
   all:
   - kind: dotted_name
@@ -6136,8 +6136,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.linalg.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.linalg.
 rule:
   all:
   - kind: dotted_name
@@ -6176,8 +6176,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.linalg.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.linalg.
+message: scipy.linalg.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.linalg.
 rule:
   all:
   - kind: dotted_name
@@ -6882,8 +6882,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.ndimage.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.ndimage.
 rule:
   all:
   - kind: dotted_name
@@ -6922,8 +6922,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.ndimage.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.ndimage.
+message: scipy.ndimage.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.ndimage.
 rule:
   all:
   - kind: dotted_name
@@ -7628,8 +7628,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.optimize.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.optimize.
 rule:
   all:
   - kind: dotted_name
@@ -7668,8 +7668,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.optimize.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.optimize.
+message: scipy.optimize.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.optimize.
 rule:
   all:
   - kind: dotted_name
@@ -8374,8 +8374,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.signal.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.signal.
 rule:
   all:
   - kind: dotted_name
@@ -8414,8 +8414,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.signal.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.signal.
+message: scipy.signal.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.signal.
 rule:
   all:
   - kind: dotted_name
@@ -9282,8 +9282,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.signal.windows.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.signal.windows.
 rule:
   all:
   - kind: dotted_name
@@ -9322,8 +9322,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.signal.windows.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.signal.windows.
+message: scipy.signal.windows.$M is a private module that SciPy deprecated, and every name read from it warns with
+  DeprecationWarning or raises AttributeError on SciPy 1.18.1. The public names are in scipy.signal.windows.
 rule:
   all:
   - kind: dotted_name
@@ -10028,8 +10028,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.sparse.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.sparse.
 rule:
   all:
   - kind: dotted_name
@@ -10068,8 +10068,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.sparse.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.sparse.
+message: scipy.sparse.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.sparse.
 rule:
   all:
   - kind: dotted_name
@@ -10936,8 +10936,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.sparse.linalg.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.sparse.linalg.
 rule:
   all:
   - kind: dotted_name
@@ -10976,8 +10976,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.sparse.linalg.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.sparse.linalg.
+message: scipy.sparse.linalg.$M is a private module that SciPy deprecated, and every name read from it warns with
+  DeprecationWarning or raises AttributeError on SciPy 1.18.1. The public names are in scipy.sparse.linalg.
 rule:
   all:
   - kind: dotted_name
@@ -11682,8 +11682,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.spatial.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.spatial.
 rule:
   all:
   - kind: dotted_name
@@ -11722,8 +11722,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.spatial.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.spatial.
+message: scipy.spatial.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.spatial.
 rule:
   all:
   - kind: dotted_name
@@ -12590,8 +12590,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.spatial.transform.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.spatial.transform.
 rule:
   all:
   - kind: dotted_name
@@ -12630,8 +12630,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.spatial.transform.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.spatial.transform.
+message: scipy.spatial.transform.$M is a private module that SciPy deprecated, and every name read from it warns
+  with DeprecationWarning or raises AttributeError on SciPy 1.18.1. The public names are in scipy.spatial.transform.
 rule:
   all:
   - kind: dotted_name
@@ -13336,8 +13336,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.special.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.special.
 rule:
   all:
   - kind: dotted_name
@@ -13376,8 +13376,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.special.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.special.
+message: scipy.special.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.special.
 rule:
   all:
   - kind: dotted_name
@@ -14082,8 +14082,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.stats.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.stats.
 rule:
   all:
   - kind: dotted_name
@@ -14122,8 +14122,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.stats.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.stats.
+message: scipy.stats.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.stats.
 rule:
   all:
   - kind: dotted_name
@@ -14828,8 +14828,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning on SciPy
-  1.18.1. Import the names from scipy.stats.mstats.
+message: $M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.stats.mstats.
 rule:
   all:
   - kind: dotted_name
@@ -14868,8 +14868,8 @@ utils:
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: scipy.stats.$M is a private module that SciPy deprecated, and every name in it warns with DeprecationWarning
-  on SciPy 1.18.1. Import the names from scipy.stats.mstats.
+message: scipy.stats.$M is a private module that SciPy deprecated, and every name read from it warns with DeprecationWarning
+  or raises AttributeError on SciPy 1.18.1. The public names are in scipy.stats.mstats.
 rule:
   all:
   - kind: dotted_name
