@@ -1,3 +1,5 @@
+# A lambda whose condition reduces its argument, as in x.isnull().all(), receives a whole Series,
+# one per group, and np.where cannot write that.
 id: apply-condition
 language: python
 severity: warning
@@ -9,6 +11,7 @@ rule:
     - pattern: "$S.apply(lambda $X: $F($$$ARGS))"
   all:
     - not: { has: { field: arguments, has: { kind: keyword_argument } } }
+    - not: { has: { field: arguments, has: { stopBy: end, kind: call, has: { field: function, regex: '\.(all|any|sum|mean|fillna|nunique)$' } } } }
     - any:
         - has: { field: arguments, has: { kind: lambda, has: { field: body, kind: conditional_expression } } }
         - has:

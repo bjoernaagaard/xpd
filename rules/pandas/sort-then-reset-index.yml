@@ -1,9 +1,11 @@
 # These methods take ignore_index=True on DataFrame and Series, so a following
 # reset_index(drop=True) is not needed. groupby(...).sample has no ignore_index, so a receiver
 # that is a groupby call is left alone, and with axis= ignore_index resets the columns instead.
+# Unsafe: reset_index always gives a RangeIndex, and ignore_index=True keeps the old index when
+# the method has nothing to do, as on an empty frame.
 id: sort-then-reset-index
 language: python
-severity: warning
+severity: info
 message: Pass ignore_index=True to $M instead of calling reset_index(drop=True) afterwards.
 rule:
   pattern: $X.$M($$$A).reset_index(drop=True)
@@ -21,17 +23,19 @@ rule:
           has: { kind: keyword_argument, has: { field: name, regex: ^(ignore_index|inplace|axis)$ } }
 constraints:
   M: { regex: ^(sort_values|sort_index|drop_duplicates|dropna|explode|sample)$ }
-  X: { not: { kind: call, has: { field: function, regex: '\.groupby$' } } }
+  X: { not: { regex: '\.groupby\(' } }
 fix: $X.$M($$$A, ignore_index=True)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: reset_index always gives a RangeIndex, and ignore_index=True keeps the old index when
+# the method has nothing to do, as on an empty frame.
 id: sort-then-reset-index
 language: python
-severity: warning
+severity: info
 message: Pass ignore_index=True to $M instead of calling reset_index(drop=True) afterwards.
 rule: { pattern: $X.$M().reset_index(drop=True) }
 constraints:
   M: { regex: ^(sort_values|sort_index|drop_duplicates|dropna|explode|sample)$ }
-  X: { not: { kind: call, has: { field: function, regex: '\.groupby$' } } }
+  X: { not: { regex: '\.groupby\(' } }
 fix: $X.$M(ignore_index=True)
-metadata: { fix: safe }
+metadata: { fix: unsafe }

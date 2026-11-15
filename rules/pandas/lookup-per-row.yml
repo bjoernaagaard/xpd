@@ -31,3 +31,21 @@ constraints:
         - all: [{ has: { nthChild: 1, kind: subscript } }, { has: { nthChild: { position: 1, reverse: true }, pattern: $X } }]
         - all: [{ has: { nthChild: 1, pattern: $X } }, { has: { nthChild: { position: 1, reverse: true }, kind: subscript } }]
       inside: { kind: subscript, field: subscript, stopBy: end }
+---
+# A dict read once per value. map takes the dict itself, and gives NaN for a key that is absent,
+# so a get with a missing value as its default is the same lookup. A get with another default
+# is left alone. Unsafe: get with no default gave None, where map gives NaN.
+id: lookup-per-row
+language: python
+severity: warning
+message: This reads $D once per value, in Python. Pass the dict to map, as in $S.map($D).
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: $D.get($X))"
+    - pattern: "$S.map(lambda $X: $D.get($X))"
+    - pattern: "$S.apply(lambda $X: $D.get($X, $MISSING))"
+    - pattern: "$S.map(lambda $X: $D.get($X, $MISSING))"
+constraints:
+  MISSING: { regex: '^(np\.nan|numpy\.nan|None|float\(["'']nan["'']\))$' }
+fix: $S.map($D)
+metadata: { fix: unsafe }

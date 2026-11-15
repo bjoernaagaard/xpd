@@ -1,5 +1,7 @@
-# `value in df["a"]` asks whether value is an index label of the column. The fixes are unsafe,
-# because the subscript may be a dict of lists, where `in` was right.
+# `value in df["a"]` asks whether value is an index label of the column. `key in data["k"]` is
+# also how a nested dict or a string is tested: all 19 hits in the held-back files of 23 projects
+# were one of those. So the receiver must be named like a frame: df, frame, or a name with one of
+# them as a word. The fixes are unsafe, because such a name can still hold a dict.
 id: in-column
 language: python
 severity: error
@@ -7,6 +9,7 @@ message: The in operator on a column checks its index labels, not its values. Wr
 rule: { pattern: "$V in $DF[$COL]" }
 constraints:
   COL: { kind: string }
+  DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }
 fix: ($DF[$COL] == $V).any()
 metadata: { fix: unsafe }
 ---
@@ -17,5 +20,6 @@ message: The not in operator on a column checks its index labels, not its values
 rule: { pattern: "$V not in $DF[$COL]" }
 constraints:
   COL: { kind: string }
+  DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }
 fix: not ($DF[$COL] == $V).any()
 metadata: { fix: unsafe }

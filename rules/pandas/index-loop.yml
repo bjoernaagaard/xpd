@@ -1,8 +1,11 @@
+# Not run on test files: a test's fixture frame has a handful of rows, and a loop that builds
+# the expected value row by row is the point of the test.
 # row-loop reports a loop over row numbers. This is the same loop over the index labels: the
 # body reads the frame by the loop's label.
 id: index-loop
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: A loop over index labels runs Python once per row. Compute on whole columns instead, such as df["a"] * df["w"].
 rule:
   any:

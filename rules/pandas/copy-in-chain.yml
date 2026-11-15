@@ -2,6 +2,8 @@
 # so a copy before or after one only does the work twice. Methods that take most of the time
 # themselves, such as sort_values and merge, are left out, and so is copy().pipe(f), where f
 # may write to its argument.
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-in-chain
 language: python
 severity: warning
@@ -11,8 +13,10 @@ rule:
 constraints:
   M: { regex: '^(rename|assign|reset_index|set_index|astype|fillna)$' }
 fix: $X.$M($$$A)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-in-chain
 language: python
 severity: warning
@@ -22,28 +26,34 @@ rule:
 constraints:
   M: { regex: '^(rename|assign|reset_index|set_index|astype|fillna)$' }
 fix: $X.$M($$$A)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-in-chain
 language: python
 severity: warning
 message: drop returns a new frame, so the copy before it is thrown away. Drop .copy().
 rule:
   pattern: $X.copy().drop($$$A)
-  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^columns$' } } }
+  has: { field: arguments, has: { kind: keyword_argument, any: [{ has: { field: name, regex: '^columns$' } }, { all: [{ has: { field: name, regex: '^axis$' } }, { has: { field: value, regex: '^(1|["'']columns["''])$' } }] }] } }
 fix: $X.drop($$$A)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-in-chain
 language: python
 severity: warning
 message: drop returns a new frame, so the copy after it does the work twice. Drop .copy().
 rule:
   pattern: $X.drop($$$A).copy()
-  has: { field: function, has: { field: object, has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^columns$' } } } } }
+  has: { field: function, has: { field: object, has: { field: arguments, has: { kind: keyword_argument, any: [{ has: { field: name, regex: '^columns$' } }, { all: [{ has: { field: name, regex: '^axis$' } }, { has: { field: value, regex: '^(1|["'']columns["''])$' } }] }] } } } }
 fix: $X.drop($$$A)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-in-chain
 language: python
 severity: warning
@@ -53,4 +63,4 @@ rule:
 constraints:
   PD: { regex: '^(pd|pandas)$' }
 fix: $PD.concat($$$A)
-metadata: { fix: safe }
+metadata: { fix: unsafe }

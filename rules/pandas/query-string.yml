@@ -1,7 +1,7 @@
 # A query string that reads like SQL belongs to a database client, so it is left alone.
 id: query-string
 language: python
-severity: warning
+severity: info
 message: A query string hides column names from editors, type checkers and xpd. Write the condition as an expression, such as df.loc[(pd.col("a") > 50) & (pd.col("b") < 0)].
 rule: { pattern: $X.query($S) }
 constraints:

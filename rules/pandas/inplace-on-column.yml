@@ -1,4 +1,4 @@
-# An inplace call on a selection such as df["b"] or df.loc[:, "b"] changes a copy under
+# An inplace call on a selection such as df["b"], df[column] or df.loc[:, "b"] changes a copy under
 # copy-on-write, so the frame keeps its old values. pandas 3 only warns.
 # Unsafe: the subscript may be a dict of frames, where the inplace call did work.
 id: inplace-on-column
@@ -15,7 +15,7 @@ utils:
   selection:
     kind: subscript
     any:
-      - has: { field: subscript, any: [{ kind: string }, { kind: list }] }
+      - has: { field: subscript, any: [{ kind: string }, { kind: list }, { kind: identifier }] }
       - has: { field: value, kind: attribute, has: { field: attribute, regex: ^(loc|iloc)$ } }
   inplace-true:
     kind: keyword_argument

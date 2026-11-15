@@ -1,8 +1,11 @@
+# Not run on test files: a test's fixture frame has a handful of rows, and a loop that builds
+# the expected value row by row is the point of the test.
 # A for loop or comprehension over zip(...) whose arguments are all columns taken by a text
 # label, or the .values, .to_numpy() or .tolist() of something. dict(zip(...)) is not a loop.
 id: zip-over-columns
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: A loop over zipped columns runs Python once per row. Compute on whole columns instead, such as df["a"] * df["w"].
 rule:
   pattern: zip($$$ARGS)

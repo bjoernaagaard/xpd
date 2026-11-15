@@ -1,6 +1,7 @@
 # Unsafe: nsmallest and nlargest raise on a text column, and they order ties differently. The
 # row form uses argmin, a position, so a repeated index label still gives one row, and it raises
-# when every value in the column is missing, where the sort returned the first row.
+# when every value in the column is missing, where the sort returned the first row. head(-n)
+# keeps all but the last n rows and nsmallest(-n) returns none, so a negative count is left alone.
 id: sort-then-head
 language: python
 severity: warning
@@ -8,6 +9,7 @@ message: nsmallest finds the rows without sorting the whole frame. Write $X.nsma
 rule: { pattern: "$X.sort_values($C).head($N)" }
 constraints:
   C: { kind: string }
+  N: { not: { kind: unary_operator } }
 fix: $X.nsmallest($N, $C)
 metadata: { fix: unsafe }
 ---
@@ -18,6 +20,7 @@ message: nlargest finds the rows without sorting the whole frame. Write $X.nlarg
 rule: { pattern: "$X.sort_values($C, ascending=False).head($N)" }
 constraints:
   C: { kind: string }
+  N: { not: { kind: unary_operator } }
 fix: $X.nlargest($N, $C)
 metadata: { fix: unsafe }
 ---
@@ -26,6 +29,8 @@ language: python
 severity: warning
 message: nsmallest finds the values without sorting the whole column. Write $X.nsmallest($N).
 rule: { pattern: "$X.sort_values().head($N)" }
+constraints:
+  N: { not: { kind: unary_operator } }
 fix: $X.nsmallest($N)
 metadata: { fix: unsafe }
 ---

@@ -8,7 +8,7 @@ message: An integer key on a Series is a label on pandas 3, and value_counts lab
 rule:
   pattern: $X.value_counts($$$A)[$N]
 constraints:
-  N: { kind: integer }
+  N: { regex: '^-?\d+$' }
 fix: $X.value_counts($$$A).iloc[$N]
 metadata: { fix: unsafe }
 ---
@@ -19,7 +19,7 @@ message: A row is a Series labelled by the column names, and an integer key is a
 rule:
   pattern: $DF.iloc[$I][$N]
 constraints:
-  N: { kind: integer }
+  N: { regex: '^-?\d+$' }
   I: { any: [{ kind: integer }, { kind: identifier }, { kind: unary_operator }] }
 fix: $DF.iloc[$I, $N]
 metadata: { fix: unsafe }
@@ -35,5 +35,5 @@ rule:
     - pattern: $DF.isna().$R()[$N]
     - pattern: $DF.isnull().$R()[$N]
 constraints:
-  N: { kind: integer }
+  N: { regex: '^-?\d+$' }
   R: { regex: '^(sum|mean|median|min|max|std|var|count|nunique|idxmax|idxmin|any|all)$' }

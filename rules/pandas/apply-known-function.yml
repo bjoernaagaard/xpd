@@ -37,6 +37,8 @@ transform:
 fix: $S.$M()
 metadata: { fix: unsafe }
 ---
+# Unsafe: .str.len() raises AttributeError on a column that is not text, where apply(len) counted
+# lists and tuples, and the result dtype differs on a column with missing values.
 id: apply-known-function
 language: python
 severity: warning
@@ -50,7 +52,7 @@ constraints:
 utils:
   column: { kind: subscript, has: { field: subscript, kind: string } }
 fix: $S.str.len()
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # Unsafe: Python's round and numpy's round differ on some halfway values.
 id: apply-known-function

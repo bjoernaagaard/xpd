@@ -4,6 +4,8 @@
 # rewritten, because in a list the name of the result column would change. np.median, np.std and
 # np.var are left alone: they treat missing values and ddof differently from the named methods.
 # min, max, median, count and nunique give the same result, so their fix is safe.
+# Unsafe: the named method keeps a datetime unit and an integer dtype where the lambda's result
+# was inferred again, and it raises TypeError on a column the lambda could reduce.
 id: groupby-lambda
 language: python
 severity: warning
@@ -40,7 +42,7 @@ utils:
           kind: tuple
           inside: { kind: keyword_argument, inside: { kind: argument_list, inside: { matches: reducer-call } } }
 fix: '"$R"'
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # sum, mean, std, var and prod: unsafe, because pandas adds up each group with compensated
 # summation, and the lambda did not. On values such as 1e16, 1, 1, -1e16 the sum changes from 0
@@ -83,6 +85,8 @@ utils:
 fix: '"$R"'
 metadata: { fix: unsafe }
 ---
+# Unsafe: the named method keeps a datetime unit and an integer dtype where the NumPy function's
+# result was inferred again, and it raises TypeError on a column the function could reduce.
 id: groupby-lambda
 language: python
 severity: warning
@@ -119,7 +123,7 @@ utils:
           kind: tuple
           inside: { kind: keyword_argument, inside: { kind: argument_list, inside: { matches: reducer-call } } }
 fix: '"$R"'
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 
 ---
 # np.sum, np.mean and np.prod: unsafe for the same reason as the lambda that sums.
