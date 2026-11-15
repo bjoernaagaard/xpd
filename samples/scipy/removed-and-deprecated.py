@@ -199,7 +199,19 @@ def tsearch_on_a_triangulation():
     a = spatial.tsearch(tri, pts)  # xpd: deprecated-in-scipy
     b = scipy.spatial.tsearch(holder["t"], pts[:2])  # xpd: deprecated-in-scipy
     c = tri.find_simplex(pts)
-    return a, b, c
+    args = (pts,)
+    d = spatial.tsearch(tri, *args)  # xpd: deprecated-in-scipy
+    return a, b, c, d
+
+
+@case
+def deprecated_name_on_a_rebound_alias():
+    import scipy.signal as sgl
+
+    def spline_of(sgl):
+        return sgl.bsplines.cspline1d(np.array([1.0, 2.0, 3.0]))
+
+    return spline_of(sgl)
 
 
 @case

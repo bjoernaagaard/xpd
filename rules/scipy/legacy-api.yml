@@ -6,57 +6,169 @@ language: python
 severity: info
 message: SciPy keeps ndimage.sum only for backwards compatibility and asks new code to use sum_labels. Write ndimage.sum_labels.
 rule:
-  kind: call
-  all:
-  - has:
-      field: function
-      any:
-      - {regex: ^scipy\.ndimage\.(sum)$, pattern: scipy.ndimage.$F}
-      - all:
-        - {regex: \.ndimage\.(sum)$, pattern: $R.ndimage.$F}
-        - inside:
-            stopBy: end
-            kind: module
-            has:
+  kind: attribute
+  pattern: $FN
+  inside:
+    field: function
+    kind: call
+    all:
+    - has:
+        field: function
+        any:
+        - {regex: ^scipy\.ndimage\.(sum)$, pattern: scipy.ndimage.$F}
+        - all:
+          - {regex: \.ndimage\.(sum)$, pattern: $R.ndimage.$F}
+          - inside:
               stopBy: end
-              any:
-              - kind: import_statement
-                has:
-                  kind: aliased_import
-                  all:
-                  - has: {field: name, regex: ^scipy$}
-                  - has: {field: alias, pattern: $R}
-      - all:
-        - {regex: \.(sum)$, pattern: $R.$F}
-        - inside:
-            stopBy: end
-            kind: module
-            has:
+              kind: module
+              has:
+                stopBy: end
+                any:
+                - kind: import_statement
+                  has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, regex: ^scipy$}
+                    - has: {field: alias, pattern: $R}
+        - all:
+          - {regex: \.(sum)$, pattern: $R.$F}
+          - inside:
               stopBy: end
-              any:
-              - kind: import_statement
-                has:
-                  kind: aliased_import
+              kind: module
+              has:
+                stopBy: end
+                any:
+                - kind: import_statement
+                  has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, regex: ^scipy\.ndimage$}
+                    - has: {field: alias, pattern: $R}
+                - kind: import_from_statement
                   all:
-                  - has: {field: name, regex: ^scipy\.ndimage$}
-                  - has: {field: alias, pattern: $R}
-              - kind: import_from_statement
-                all:
-                - has: {field: module_name, regex: ^scipy$}
-                - any:
-                  - has: {kind: dotted_name, pattern: $R, regex: ^ndimage$}
-                  - has:
-                      kind: aliased_import
-                      all:
-                      - has: {field: name, regex: ^ndimage$}
-                      - has: {field: alias, pattern: $R}
-  - {pattern: $FN($$$A)}
+                  - has: {field: module_name, regex: ^scipy$}
+                  - any:
+                    - has: {kind: dotted_name, pattern: $R, regex: ^ndimage$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, regex: ^ndimage$}
+                        - has: {field: alias, pattern: $R}
+    - has:
+        field: function
+        any:
+        - {kind: identifier, pattern: $ROOT}
+        - has:
+            stopBy: end
+            kind: identifier
+            pattern: $ROOT
+            inside: {kind: attribute, field: object}
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: identifier
+            pattern: $ROOT
+            any:
+            - inside:
+                stopBy:
+                  not: &id001
+                    any:
+                    - {kind: pattern_list}
+                    - {kind: tuple_pattern}
+                    - {kind: list_pattern}
+                    - {kind: list_splat_pattern}
+                    - {kind: tuple}
+                    - {kind: list}
+                    - {kind: parenthesized_expression}
+                    - {kind: expression_list}
+                    - {kind: list_splat}
+                kind: assignment
+                field: left
+            - inside:
+                stopBy:
+                  not: *id001
+                kind: augmented_assignment
+                field: left
+            - inside:
+                stopBy:
+                  not: *id001
+                kind: for_statement
+                field: left
+            - inside:
+                stopBy:
+                  not: *id001
+                kind: for_in_clause
+                field: left
+            - inside:
+                stopBy:
+                  not: *id001
+                kind: as_pattern_target
+            - inside:
+                stopBy:
+                  not: *id001
+                kind: delete_statement
+            - inside: {kind: named_expression, field: name}
+            - inside: {kind: parameters}
+            - inside: {kind: lambda_parameters}
+            - inside: {kind: typed_parameter}
+            - inside: {kind: list_splat_pattern}
+            - inside: {kind: dictionary_splat_pattern}
+            - inside: {kind: global_statement}
+            - inside: {kind: nonlocal_statement}
+            - inside: {kind: splat_pattern}
+            - inside: {kind: default_parameter, field: name}
+            - inside: {kind: typed_default_parameter, field: name}
+            - inside: {kind: function_definition, field: name}
+            - inside: {kind: class_definition, field: name}
+            - inside:
+                kind: as_pattern
+                inside: {kind: case_pattern}
+            - inside:
+                kind: dotted_name
+                regex: ^\w+$
+                inside:
+                  any:
+                  - {kind: case_pattern}
+                  - {kind: keyword_pattern}
+            - inside:
+                kind: type
+                any:
+                - inside: {kind: type_alias_statement, field: left}
+                - inside: {kind: type_parameter}
+            - nthChild: 1
+              inside:
+                kind: dotted_name
+                not: {regex: ^scipy(\.|$)}
+                inside: {kind: import_statement, field: name}
+            - inside:
+                kind: aliased_import
+                field: alias
+                inside: {kind: import_statement}
+                not:
+                  has: {field: name, regex: ^scipy(\.|$)}
+            - inside:
+                kind: aliased_import
+                field: alias
+                inside:
+                  kind: import_from_statement
+                  not: &id002
+                    has: {field: module_name, regex: ^scipy(\.|$)}
+            - inside:
+                kind: dotted_name
+                regex: ^\w+$
+                inside:
+                  kind: import_from_statement
+                  field: name
+                  not: *id002
 constraints:
   F: {regex: ^sum$}
 transform:
   G:
     replace: {source: $FN, replace: sum$, by: sum_labels}
-fix: $G($$$A)
+fix: $G
 metadata: {fix: safe}
 ---
 # scipy/stats/_stats_py.py line 8473 marks ranksums as legacy and says to prefer mannwhitneyu. mannwhitneyu reports U where ranksums reports z, so there is no fix.
