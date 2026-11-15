@@ -3159,32 +3159,118 @@ ones = np.bitwise_count(masks).sum()
 
 ## scikit-learn
 
-These rules run on files that import `sklearn`. Each old form gives a wrong or leaked score, or a
-score that changes from run to run. Speed plays no part. The numbers are means of 30 seeds on
-scikit-learn 1.9.1. On data with no signal, an honest accuracy is 0.5.
+These rules run on files that import `sklearn`. They report code that gives a leaked or wrong
+score, code that raises or warns on scikit-learn 1.9.1, and code that does the same work twice.
+Every number in this section was measured on scikit-learn 1.9.1. Examples assume that the
+scikit-learn names they use are imported. Names such as `X_train`, `y_test` and `model` represent
+values supplied by your program.
 
-Several of these rules read the names of variables, such as `X_test` and `y_pred`, because that
-is all a pattern can see. A name that misleads gives a wrong report.
+Several rules read the names of variables, such as `X_test` and `y_pred`, because a pattern sees
+nothing else, so a name that misleads gives a wrong report. A rule document whose advice needs a
+newer release of scikit-learn carries `since`. xpd reads the installed version from the project's
+venv, as it does for pandas, and skips that document on an older release. When the venv has no
+scikit-learn, or there is no venv, every document runs.
+
+### How a rule earns its place
+
+Every rule document ships on a saved proof that its old form is wrong, and a proof is one of
+three kinds:
+
+- A score proof runs the old and the new form over 30 seeds on data with no signal, where the
+  honest score is 0.5. It passes when the old form's mean is more than three standard errors
+  above the honest score and the new form's mean is within 0.02 of it.
+- An interpreter proof runs the old form under `python -W error`. It passes when the old form
+  raises an exception or a warning and the new form runs clean.
+- A speed proof times both forms on one thread, as the median of 7 runs, at two data sizes. It
+  passes when the new form is at least 1.5 times faster at both sizes.
+
+A document is `info` when no proof of the three kinds passed for it. Either it changes a score in
+a way the three proofs cannot show, such as a ranking metric given class labels, which scores
+0.5 on data with no signal in both forms, or it changes nothing that can be measured, such as a
+missing seed.
+
+The rules were then judged on 1,414 held-back files from 268 public repositories, which were set
+aside before any rule was written. Two readers who did not write the rules labelled 478 reports
+of the rules as they stood then, each apart from the other, and marked every report whose advice
+was wrong. Recall was measured by planting 2,749 old forms in copies of the held-back files and
+counting the plants that a rule reported. Every fix was run before and after, on its held-back
+sites and on cases built for each form, and the fitted model and its predictions were compared
+bit for bit.
+
+| Rule | Severity | Proof | Held-back reports | Wrong advice | Recall | Fix |
+| --- | --- | --- | --- | --- | --- | --- |
+| [`fit-on-test`](#fit-on-test) | error, info | score: 0.997 against 0.525 AUC | 20 | 0 and 0 of 20 | 103 of 130 | unsafe |
+| [`fit-before-split`](#fit-before-split) | error | score: 0.771 against 0.497 AUC | 24 | 0 and 0 of 24 | 91 of 162 | none |
+| [`cross-val-on-fitted-data`](#cross-val-on-fitted-data) | error | score: 0.764 against 0.518 AUC | 10 | 0 and 0 of 10 | 72 of 78 | none |
+| [`tune-on-test`](#tune-on-test) | error | score: 0.597 against 0.507 accuracy | 1 | 0 and 0 of 1 | 15 of 50 | none |
+| [`stateful-function-transformer`](#stateful-function-transformer) | info | none of the three | 0 | no reports | 24 of 30 | none |
+| [`groups-ignored`](#groups-ignored) | error | score: 0.849 against 0.480 accuracy | 0 | no reports | 56 of 57 | none |
+| [`missing-groups`](#missing-groups) | error | interpreter: ValueError | 0 | no reports | 48 of 50 | none |
+| [`leave-one-out-score`](#leave-one-out-score) | error | interpreter: UndefinedMetricWarning | 0 | no reports | 14 of 33 | none |
+| [`auc-from-labels`](#auc-from-labels) | error, info | score: log loss 18.00 against 0.70 | 20 | 2 and 2 of 20 | 55 of 72 | unsafe |
+| [`metric-arguments-swapped`](#metric-arguments-swapped) | error, info | score: precision 0.471 against 0.294 | 43 | 0 and 0 of 30 | 66 of 100 | unsafe |
+| [`score-on-training-rows`](#score-on-training-rows) | error | score: 1.000 against 0.510 accuracy | 0 | no reports | 10 of 27 | none |
+| [`unknown-scoring-name`](#unknown-scoring-name) | error | interpreter: InvalidParameterError, ValueError | 4 | 0 and 0 of 4 | 16 of 32 | none |
+| [`removed-in-sklearn`](#removed-in-sklearn) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, InvalidParameterError | 321 | 1 and 0 of 58 | 517 of 600 | unsafe |
+| [`deprecated-in-sklearn`](#deprecated-in-sklearn) | warning | interpreter: FutureWarning | 101 | 3 and 0 of 57 | 274 of 308 | safe, unsafe |
+| [`removed-metric-api`](#removed-metric-api) | error | interpreter: ImportError, TypeError | 13 | 0 and 0 of 13 | 74 of 74 | none |
+| [`deprecated-metric-api`](#deprecated-metric-api) | warning | interpreter: FutureWarning | 0 | no reports | 48 of 48 | safe |
+| [`fit-params-keyword`](#fit-params-keyword) | error | interpreter: TypeError | 4 | 0 and 0 of 4 | 32 of 32 | none |
+| [`column-transformer-removed`](#column-transformer-removed) | error | interpreter: TypeError | 3 | 0 and 0 of 3 | 30 of 30 | none |
+| [`metadata-routing`](#metadata-routing) | error | interpreter: RuntimeError, ValueError, TypeError, UnsetMetadataPassedError | 0 | no reports | 34 of 34 | none |
+| [`pipeline-fit-params`](#pipeline-fit-params) | error | interpreter: ValueError | 0 | no reports | 23 of 30 | none |
+| [`pipeline-step-form`](#pipeline-step-form) | error | interpreter: ValueError, TypeError | 0 | no reports | 29 of 35 | none |
+| [`transformed-target-pair`](#transformed-target-pair) | error | interpreter: ValueError | 0 | no reports | 31 of 36 | none |
+| [`pandas-output-sparse`](#pandas-output-sparse) | error | interpreter: ValueError | 0 | no reports | 29 of 31 | none |
+| [`predict-per-row`](#predict-per-row) | warning | speed: 2.77 times | 2 | 0 and 2 of 2 | 28 of 32 | none |
+| [`score-after-predict`](#score-after-predict) | warning | speed: 1.62 times | 17 | 0 and 0 of 17 | 31 of 32 | unsafe |
+| [`predict-and-predict-proba`](#predict-and-predict-proba) | warning | speed: 1.83 times | 22 | 0 and 0 of 22 | 30 of 30 | none |
+| [`cross-val-score-per-metric`](#cross-val-score-per-metric) | warning | speed: 1.60 times | 14 | 0 and 0 of 14 | 30 of 30 | none |
+| [`vectorizer-fit-then-transform`](#vectorizer-fit-then-transform) | warning | speed: 1.63 times | 12 | 0 and 4 of 12 | 19 of 25 | unsafe |
+| [`refit-per-n-estimators`](#refit-per-n-estimators) | warning | speed: 1.64 times | 0 | no reports | 30 of 30 | none |
+| [`tsne-exact`](#tsne-exact) | info | none of the three | 0 | no reports | 21 of 30 | none |
+| [`random-state-without-shuffle`](#random-state-without-shuffle) | error | interpreter: ValueError | 9 | 0 and 0 of 9 | 54 of 54 | none |
+| [`missing-random-state`](#missing-random-state) | info | none of the three | 527 | 1 and 1 of 52 | 79 of 80 | none |
+
+A score proof gives the old form's mean against the new form's mean. A speed proof gives the
+lowest ratio over the classes the rule reports and both sizes. Wrong advice gives the reports
+that reader A and reader B called wrong, out of the reports they labelled. A rule with more
+reports than labels was sampled.
+
+The rules were narrowed after the readers' labels came in, so the wrong advice of a narrowed rule
+counts how many of its labelled reports are still made and still wrong, and it is not a clean
+measurement. Recall was measured on the rules before that narrowing. Most plants were inserted
+into a file in shapes the judges chose, which sit closer to the documented examples than real
+code does, so recall on real code is likely lower. For the metric and pipeline rules, recall was
+190 of 280 on plants turned from a right form already in the file, against 311 of 357 on inserted
+plants. A rule with no report on the held-back files has no wrong-advice number.
 
 ### Leakage
 
+Each old form below lets the test rows, or every row, shape what the model learns, so a score on
+the test rows is too high. The score proofs in this group use data whose target is drawn apart
+from every feature, where an honest AUC is 0.5, and give the mean over 30 seeds. A step that does
+not read the target, such as a scaler, an imputer, PCA, a binner, a one-hot encoder or a text
+vectorizer, moved the test AUC by at most 0.006 when it was fitted before the split, so these
+rules leave it alone.
+
 #### fit-on-test
 
-**Severity:** error. **Fix:** unsafe: `scaler.transform(X_test)`. `fit` on test data has no fix.
+**Severity:** error for `fit` with a target and for `partial_fit`, and info for `fit_transform` and for `fit` without a target. **Fix:** unsafe: `scaler.transform(X_test)`. The other forms have no fix.
 
-Reports `scaler.fit_transform(X_test)` and `model.fit(X_test, y_test)`, which learn from the test rows.
+Reports `model.fit(X_test, y_test)` and `model.partial_fit(X_test, y_test)`, which train on the test rows, and `scaler.fit_transform(X_test)` and `scaler.fit(X_test)`, which refit a step on them.
 
 Example:
 
 ```python
-X_train = scaler.fit_transform(X_train)
+model = LogisticRegression().fit(X_test, y_test)
 X_test = scaler.fit_transform(X_test)
 ```
 
 Use instead:
 
 ```python
-X_train = scaler.fit_transform(X_train)
+model = LogisticRegression().fit(X_train, y_train)
 X_test = scaler.transform(X_test)
 ```
 
@@ -3192,7 +3278,7 @@ X_test = scaler.transform(X_test)
 
 **Severity:** error. **Fix:** none.
 
-Reports `X = selector.fit_transform(X, y)` followed by `train_test_split(X, y)`, and `fit_resample` before the split.
+Reports a step that learns from the target and is fitted on every row before `train_test_split`, such as `selector.fit_transform(X, y)`, `encoder.fit(X, y).transform(X)`, `fit_resample`, `resample(..., replace=True)`, a target mean per group from `groupby(...)[target].transform("mean")`, and columns picked by `df.corr()[target]`.
 
 Example:
 
@@ -3215,7 +3301,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports `cross_val_score(model, scaler.fit_transform(X), y)`, and a fitted result passed to it from an earlier line.
+Reports a step that learns from the target, or `fit_resample`, on every row before `cross_val_score`, another cross-validation function, or a search fitted on the result.
 
 Example:
 
@@ -3233,81 +3319,261 @@ scores = cross_val_score(pipeline, X, y, cv=5)
 
 The replacement is advice. xpd does not apply it automatically.
 
-#### get-dummies-on-test
+#### tune-on-test
 
 **Severity:** error. **Fix:** none.
 
-Reports `pd.get_dummies(X_test)`, which makes one column per value in the test rows.
+Reports a loop that builds one model per setting, scores each model on the test rows and keeps the best score.
 
 Example:
 
 ```python
-X_train = pd.get_dummies(X_train)
-X_test = pd.get_dummies(X_test)
+for k in range(1, 30):
+    model = KNeighborsClassifier(n_neighbors=k).fit(X_train, y_train)
+    scores.append(model.score(X_test, y_test))
+best = max(scores)
 ```
 
 Use instead:
 
 ```python
-encoder = OneHotEncoder(handle_unknown="ignore")
-X_train = encoder.fit_transform(X_train)
-X_test = encoder.transform(X_test)
+search = GridSearchCV(KNeighborsClassifier(), {"n_neighbors": range(1, 30)}, cv=5)
+search.fit(X_train, y_train)
+test_score = search.score(X_test, y_test)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### stateful-function-transformer
+
+**Severity:** info. **Fix:** none.
+
+Reports `FunctionTransformer(lambda X: (X - X.mean(axis=0)) / X.std(axis=0))`, a function that takes statistics of the rows it gets, so at predict time it scales by the test rows.
+
+Example:
+
+```python
+pipe = make_pipeline(FunctionTransformer(lambda X: (X - X.mean(axis=0)) / X.std(axis=0)), model)
+```
+
+Use instead:
+
+```python
+pipe = make_pipeline(StandardScaler(), model)
 ```
 
 The replacement is advice. xpd does not apply it automatically.
 
 
-`fit-on-test` reads the first argument's name: `test`, `val`, `valid`, `validation` or `holdout`
-for `fit_transform`, and `test` only for `fit`, because a fit on a validation set can be meant, as
-in probability calibration. A scaler refitted on test rows that arrive 5 at a time scored 0.865
-where `transform` scored 0.976. An encoder refitted on the test rows scored 0.795 against 0.905.
-A model fitted on its test rows scored 1.000 on noise. The fix is unsafe, because a name can
-mislead. `StandardScaler().fit_transform(X_test)` has no fix, because that scaler was never fitted
-on the training data.
+`fit-on-test` reads the name of the first argument. For `fit` the name must hold `test`. For
+`partial_fit` and `fit_transform` it may also hold `holdout`, or be a validation name such as
+`X_val`. A `LogisticRegression` fitted on 60 test rows and scored
+on them gave 0.997 AUC, where the fit on the training rows gave 0.525. Five `partial_fit` calls on
+the test rows gave 0.924 against 0.518. A refitted scaler cannot move a score on data with no
+signal, so the forms without a target are info. On data with signal, a `StandardScaler` refitted
+on batches of 5 test rows lost 0.048 AUC, and an `OrdinalEncoder` refitted on 30 test rows lost
+0.058. With the target, a category_encoders `TargetEncoder` refitted on the test rows scored 0.992
+on noise, but `SelectKBest` scored 0.438 and the scikit-learn `TargetEncoder` 0.499, so that form
+is info as well. The `fit_transform` forms read the step's name too, such as `scaler`, `imputer`,
+`encoder`, `ohe` or `tfidf`, because `PolynomialFeatures` and plots refit on purpose. The rule
+leaves alone `PermutationImportance` and `permutation_importance`, a fit on train and test rows
+joined, a `LabelBinarizer` or `MultiLabelBinarizer`, and a `LabelEncoder` whose result goes
+straight into another call, such as a plot. The fix scales or codes the test rows with the
+statistics of the training rows, so it changes the test matrix by up to 0.43 and the predicted
+probabilities by up to 0.18, and a test level the step has not seen now raises. At 4 of 17
+held-back sites the fixed code raised, because the scaler was built again on the line before, or
+one `LabelEncoder` was last fitted on another column. The frozen rule gave wrong advice in 3 and
+3 of 23 labelled reports, and the narrowed rule no longer makes those reports. Recall was 41 of
+45 for the error forms and 62 of 85 for the info forms. The rule misses a step whose name it does
+not read, such as `rs = RobustScaler()` or `imp`, a test name with no separator such as `Xtest`,
+and held-out rows named `X_dev`, `X_te` or `X_cv`.
 
 `fit-before-split` reports the fit when a later statement of the same block passes its result to
-`train_test_split`. Feature selection before the split scored 0.781 on noise, where the honest
-value was 0.503. SMOTE before the split gave an F1 of 0.842 on noise, where the honest value was
-0.164. For `StandardScaler` the leak is real and small: 0.9673 against 0.9667. xpd cannot tell a
-scaler from a selector, so it reports both. It leaves a label encoder on the target alone, when the
-result is named `y`, `target` or `labels`, or the encoder's name holds `label`.
+`train_test_split`. Before the split, `SelectKBest` scored 0.771 against 0.497, `SelectFromModel`
+0.684 against 0.519, `RFE` 0.750 against 0.495, `RFECV` 0.739 against 0.506,
+`SequentialFeatureSelector` 0.551 against 0.477, and a category_encoders `TargetEncoder` 0.880
+against 0.495. `SMOTE` scored 0.815, `RandomOverSampler` 0.737, `ADASYN` 0.819,
+`EditedNearestNeighbours` 0.678 and `resample(replace=True)` 0.970, against 0.478 to 0.493 after
+the split. `TargetEncoder().fit(X, y).transform(X)` scored 0.889 against 0.509, a target mean per
+group 0.887 against 0.497, and 10 columns picked by `df.corr()` 0.771 against 0.497. `NearMiss`
+scored 0.448 and `TomekLinks` 0.516, which did not pass the proof, and the rule reports them
+because they pick rows by their neighbours. The rule leaves `RandomUnderSampler` alone, which drops
+rows at random and scored 0.512 against 0.491. It leaves the scikit-learn
+`TargetEncoder.fit_transform` alone too, which cross-fits and scored 0.522 against 0.504. A label
+encoder on the target is left alone, when the result is named `y`, `target` or `labels`, or the
+encoder's name holds `label`. The target mean and the `df.corr()` forms need the same column to
+become the target later in the block, as in `y = df["target"]`. The frozen rule gave wrong advice
+in 2 and 0 of 26 labelled reports. Recall was 91 of 162. The rule found none of 24 columns picked
+by correlation in other shapes, such as `corr.index[1:11]` read back as `df[top_features]`. It
+also misses a target mean written with `.map` or `.mean()`, `resample` imported under another
+name, and `SelectFromModel` fitted in one statement and applied in the next.
 
 `cross-val-on-fitted-data` covers `cross_val_score`, `cross_validate`, `cross_val_predict`,
-`learning_curve` and `validation_curve`. Cross-validated accuracy on noise was 0.781 where the
-Pipeline gave 0.510. `GridSearchCV(...).fit(X_fitted, y)` leaks in the same way and is not
-reported, because xpd cannot tell a search from any other object with `fit`.
+`learning_curve`, `validation_curve` and `permutation_test_score` when the fitted result is the
+second argument, and a `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` or
+`HalvingRandomSearchCV` that is assigned in the same file and fitted on the result.
+Cross-validated AUC after `SelectKBest` on every row was 0.764 against 0.518 for a Pipeline.
+`SMOTE` before `cross_val_score` gave 0.838 against 0.510. `best_score_` after `SelectKBest` was
+0.770 against 0.522, and after `SMOTE` 0.854 against 0.521. `RandomUnderSampler` before the folds
+scored 0.519 against 0.511, so the rule leaves it alone. The frozen rule gave wrong advice in 1
+and 0 of 11 labelled reports.
 
-`get-dummies-on-test` reads the first argument's name, as `fit-on-test` does. In 15 of 30 splits
-`predict` raised on the columns. Passed on as arrays, 102 of 200 splits raised and 17 ran on the
-wrong columns. A call followed by `reindex` or `align` is left alone.
+`tune-on-test` needs the loop variable as a keyword of the call that built the scored model, a
+`score`, `predict` or `predict_proba` on a name with `test` in it, and a pick. A pick is a `>`
+comparison that reads or sets a name with `best` or `max` in it, or whose branch reads the
+setting, or a later `max`, `argmax` or `idxmax` of the list the loop appends to. A keyword named
+like `random_state`, `seed`, `method` or `model` is left alone, because such a loop compares or
+averages. The best of 30 test accuracies for `n_neighbors` from 1 to 30 was 0.597, where a
+`GridSearchCV` on the training rows gave 0.507. The frozen rule gave wrong advice in 2 and 2 of 3
+labelled reports, on loops that printed whether the training score was far above the test score,
+and the narrowed rule no longer makes those reports. Recall was 15 of 50. The rule found none of
+20 thresholds picked by the test score. It also misses scores kept in a dict and picked with
+`max(results, key=results.get)`, a loop over `ParameterGrid` that builds the model with
+`**params`, and a list comprehension picked with `np.argmax`.
 
-### Metrics
+`stateful-function-transformer` is info, because on data with no signal it does not move a
+score. Predicted in batches of 5 rows it scored 0.484 against 0.494 for `StandardScaler`. On data
+with signal, `LogisticRegression` scored 0.773 against 0.847 with batches of 5 test rows, and
+0.824 against 0.847 with batches of 20, over 30 seeds. A reduction along axis 1 works per row
+and is left alone. Recall was 24 of 30. The rule found none of 6 functions defined with `def` and
+passed by name.
+
+### Splits and groups
+
+Each old form below splits the rows in a way that leaks or gives no score.
+
+#### groups-ignored
+
+**Severity:** error. **Fix:** none.
+
+Reports `groups=` given to a cross-validation function or a search whose `cv` ignores it, and the groups given to `split` on a splitter that ignores them, such as `KFold(5).split(X, y, g)`.
+
+Example:
+
+```python
+scores = cross_val_score(model, X, y, groups=patient_id, cv=5)
+```
+
+Use instead:
+
+```python
+scores = cross_val_score(model, X, y, groups=patient_id, cv=GroupKFold(n_splits=5))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### missing-groups
+
+**Severity:** error. **Fix:** none.
+
+Reports a group splitter that gets no groups, such as `cross_val_score(model, X, y, cv=GroupKFold(5))` or `GroupKFold(5).split(X, y)`, which raises ValueError.
+
+Example:
+
+```python
+search = GridSearchCV(model, grid, cv=GroupKFold(n_splits=5))
+search.fit(X, y)
+```
+
+Use instead:
+
+```python
+search = GridSearchCV(model, grid, cv=GroupKFold(n_splits=5))
+search.fit(X, y, groups=patient_id)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### leave-one-out-score
+
+**Severity:** error. **Fix:** none.
+
+Reports `cv=LeaveOneOut()` with a score that needs more than one row, which is R2 or ROC AUC given as `scoring`, or the R2 that a regressor scores by default.
+
+Example:
+
+```python
+scores = cross_val_score(Ridge(), X, y, cv=LeaveOneOut())
+```
+
+Use instead:
+
+```python
+r2 = r2_score(y, cross_val_predict(Ridge(), X, y, cv=LeaveOneOut()))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`groups-ignored` covers `cross_val_score`, `cross_validate`, `cross_val_predict`,
+`learning_curve`, `validation_curve` and `permutation_test_score` with `groups=` and a `cv` that
+is missing, a whole number, or one of `KFold`, `StratifiedKFold`, `ShuffleSplit`,
+`StratifiedShuffleSplit`, `RepeatedKFold`, `RepeatedStratifiedKFold`, `TimeSeriesSplit`,
+`LeaveOneOut`, `LeavePOut` and `PredefinedSplit`, given in the call or assigned to a name earlier.
+It covers `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` and `HalvingRandomSearchCV`
+built in the same block as a `fit` that gets `groups=`, and such a splitter's
+`split(X, y, groups)`, called directly or through a name. scikit-learn warns "The groups parameter
+is ignored by KFold" and splits the rows as if no groups were given. On 60 groups of 8 rows, with
+one label per group drawn apart from the features and the rows in random order, a
+`RandomForestClassifier` scored 0.849 accuracy with `cv=5` and `groups=`, where `GroupKFold(5)`
+scored 0.480. When the rows of each group sit next to each other, folds that are not shuffled keep
+most groups whole and the score was 0.497, so the leak depends on the row order. On 40 groups of 5
+near copies, a 1-nearest-neighbour model scored 0.998 with `cv=5` and 0.487 with `GroupKFold(5)`.
+A `cv` held in a name that xpd cannot trace to one of these splitters is left alone. Recall was
+56 of 57.
+
+`missing-groups` covers `GroupKFold`, `StratifiedGroupKFold`, `GroupShuffleSplit`,
+`LeaveOneGroupOut` and `LeavePGroupsOut` given as `cv` to the six cross-validation functions
+above, their own `split(X, y)` called directly or through a name, and `GridSearchCV`,
+`RandomizedSearchCV`, `HalvingGridSearchCV`, `HalvingRandomSearchCV` and `RFECV` whose `fit` gets
+no `groups=`. Each raises "The 'groups' parameter should not be None" on scikit-learn 1.9.1, and
+`StratifiedGroupKFold` raises that it found 1 group. A call with `params=` or `**` is left alone,
+because it can carry the groups. `SequentialFeatureSelector` and `LogisticRegressionCV` take
+groups only through metadata routing, so they are not listed. Recall was 48 of 50.
+
+`leave-one-out-score` covers `cross_val_score`, `cross_validate`, `GridSearchCV`,
+`RandomizedSearchCV`, `validation_curve`, `learning_curve`, `permutation_test_score` and `RFECV`.
+With one row per fold, R2 warns "R^2 score is not well-defined with less than two samples" and
+ROC AUC warns "Only one class is present in y_true", every fold scores nan, and a search over nan
+scores picks its first candidate. Under `python -W error` each warning is an
+`UndefinedMetricWarning` that raises. The rule knows a regressor only by its class name in the
+same call. `explained_variance` and `average_precision` score 1 or 0 on a fold of one row and give
+no nan, so they are left alone. Recall was 14 of 33, and the plants included those two scorings,
+which the rule left out after the recall run. The rule misses a splitter kept in a name, as in
+`loo = LeaveOneOut()` and `cv=loo`, `LeaveOneOut` imported under another name, and a regressor
+passed by a variable with no `scoring`. `cv=len(X)`, which is leave one out under another name,
+is left alone by design.
+
+### Metrics and scoring
+
+Each old form below passes a metric the wrong thing, scores the wrong rows, or names a scorer that
+does not exist.
 
 #### auc-from-labels
 
-**Severity:** error. **Fix:** none.
+**Severity:** error for `log_loss` and `brier_score_loss` given labels, for the whole `predict_proba` matrix where one score per row is needed, for `decision_function` given to a loss, and for `roc_auc_score` with `multi_class` given labels, and info for ranking metrics given labels, column 0 of `predict_proba`, and `make_scorer(roc_auc_score)` without `response_method`. **Fix:** unsafe: `log_loss(y_test, model.predict_proba(X_test))`. The other forms have no fix.
 
-Reports `roc_auc_score(y_test, model.predict(X_test))`, which ranks class labels where the metric needs a score per row.
+Reports `log_loss(y_test, model.predict(X_test))`, `roc_auc_score(y_test, model.predict_proba(X_test))` and `roc_auc_score(y_test, model.predict(X_test))`, where a metric that needs one probability or score per row gets class labels or a whole matrix.
 
 Example:
 
 ```python
-auc = roc_auc_score(y_test, model.predict(X_test))
+loss = log_loss(y_test, model.predict(X_test))
+auc = roc_auc_score(y_test, model.predict_proba(X_test))
 ```
 
 Use instead:
 
 ```python
+loss = log_loss(y_test, model.predict_proba(X_test))
 auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
 ```
 
-The replacement is advice. xpd does not apply it automatically.
-
 #### metric-arguments-swapped
 
-**Severity:** error. **Fix:** unsafe: `precision_score(y_test, y_pred)`.
+**Severity:** error for `precision_score`, `classification_report` and `precision_recall_fscore_support`, and for scores passed first to a ranking metric or a loss, and info for the other metrics that change with the order. **Fix:** unsafe: `precision_score(y_test, y_pred)`. The scores-first form has no fix.
 
-Reports `precision_score(y_pred, y_test)`, with the predictions first.
+Reports `precision_score(y_pred, y_test)` and `roc_auc_score(y_score, y_test)`, where the predictions come first.
 
 Example:
 
@@ -3321,25 +3587,736 @@ Use instead:
 precision = precision_score(y_test, y_pred)
 ```
 
+#### score-on-training-rows
 
-`auc-from-labels` covers `roc_auc_score`, `average_precision_score`, `roc_curve`,
-`precision_recall_curve`, `log_loss` and `brier_score_loss`. The AUC was 0.755 from labels and
-0.875 from probabilities. It also reports `predict_proba(X)[:, 0]`, which scored 0.126, and a
-variable that holds the result of `predict` and reaches the metric on a later line. Files that
-import keras, tensorflow or torch are left alone, because `predict` returns probabilities there.
+**Severity:** error. **Fix:** none.
 
-`metric-arguments-swapped` covers `precision_score`, `recall_score`, `confusion_matrix`,
-`classification_report`, `r2_score`, `explained_variance_score`, `mean_absolute_percentage_error`,
-`balanced_accuracy_score` and `fbeta_score`. The swapped precision is the recall: 0.817 against
-0.967. R2 went from 0.48 to -3.19. `accuracy_score` and `f1_score` return the same number either
-way and are left alone. The rule reports when the first name holds `pred` or `hat` and the second
-holds `true`, `test`, `val`, `actual`, `target` or `label`, or is `y`.
+Reports `model.score(X_train, y_train)` and `accuracy_score(y_train, model.predict(X_train))` when nothing around them scores held-out rows.
+
+Example:
+
+```python
+model.fit(X_train, y_train)
+print(model.score(X_train, y_train))
+```
+
+Use instead:
+
+```python
+model.fit(X_train, y_train)
+print(model.score(X_test, y_test))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### unknown-scoring-name
+
+**Severity:** error. **Fix:** none.
+
+Reports `scoring="mean_squared_error"` and any other string that `get_scorer` refuses, in a search, `cross_val_score`, `cross_validate`, the other scikit-learn functions that take `scoring`, and `get_scorer` itself.
+
+Example:
+
+```python
+scores = cross_val_score(model, X, y, scoring="mean_squared_error")
+```
+
+Use instead:
+
+```python
+scores = cross_val_score(model, X, y, scoring="neg_mean_squared_error")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`auc-from-labels` was measured with `LogisticRegression` over 30 seeds. On data with no signal,
+`log_loss` given the labels came out at 17.998, where the probabilities gave 0.699 and the honest
+loss is ln 2, 0.693. `brier_score_loss` given the labels came out at 0.499 against 0.253, where
+the honest loss is 0.25. Passing the whole `predict_proba` matrix to `roc_auc_score` without
+`multi_class`, or to `roc_curve`, `precision_recall_curve` or `det_curve`, raises ValueError. So
+does `roc_auc_score(multi_class="ovr")` given labels on three classes, and `decision_function`
+given to `log_loss` or `brier_score_loss`. Ranking metrics given labels are info, because on
+noise the labels scored 0.495 and the probabilities 0.498. On data with signal the labels gave an
+AUC of 0.735 against 0.822 and an average precision of 0.677 against 0.827, and column 0 of
+`predict_proba` gave an AUC of 0.178. `make_scorer(roc_auc_score)` without `response_method`
+scored 0.739 in `cross_val_score` against 0.824. The variable form reports
+`y_pred = model.predict(X_test)` when a later line passes `y_pred` to the metric. The rule leaves
+alone a `predict` on a Booster that `xgb.train` or `lgb.train` returned, a `predict` whose
+argument is named like predictions or probabilities, as on a calibrator, and files that import
+keras, tensorflow or torch, because `predict` returns probabilities there. The fix changes the
+loss on purpose, from 12.0 to 0.63 on the case built for it. On three classes the old form raised
+and the fixed form runs, and on an `SVC` without probabilities the fixed form raises
+AttributeError. The readers called 2 and 2 of the 20 held-back reports wrong advice. Recall was
+55 of 72. The rule found none of 13 plants that keep column 0 or the whole `predict_proba` matrix
+in a variable before the metric. It also misses a `predict` variable whose argument is wrapped, as
+in `model.predict(np.array(X_test.values))`.
+
+`metric-arguments-swapped` reports when the first name holds `pred` or `hat` and the second holds
+`true`, `test`, `val`, `actual`, `target` or `label`, or is `y`. With the arguments swapped, the
+precision a metric reports is the recall. On noise where 30 percent of the rows are positive, a
+`LogisticRegression(class_weight="balanced")` gave a swapped precision of 0.471, where the honest
+precision was 0.294, and `classification_report` gave the same numbers for class 1. The other
+documents are info, because their swapped numbers on noise are not above the honest value. The
+swapped recall was 0.294 against 0.471, the balanced accuracy 0.496 against 0.495, and R2 -186.06
+against -0.022. On data
+with signal a swapped R2 was -0.069 against 0.486. `accuracy_score`, `f1_score`, `jaccard_score`,
+`matthews_corrcoef`, `cohen_kappa_score` and the error metrics such as `mean_squared_error` return
+the same number in either order, so they are left alone. Scores passed first to `roc_auc_score`,
+`average_precision_score`, `roc_curve`, `precision_recall_curve`, `log_loss` or
+`brier_score_loss` raise ValueError, because the true values then look continuous. The fix
+changes the number on purpose. Precision becomes the old recall, and a confusion matrix is
+transposed. Of 43 held-back reports, 30 were labelled, and neither reader called one wrong.
+Recall was 66 of 100. The rule found none of 9 swapped keyword values such as
+`confusion_matrix(y_true=y_pred, y_pred=y_true)`, and 2 of 7 `log_loss` calls with the scores
+first. It also misses a column slice first, such as `roc_auc_score(y_prob[:, 1], y_test)`, and
+true values named with `train` or `Y_`.
+
+`score-on-training-rows` reads the names of the rows. On noise, a `DecisionTreeClassifier` with
+default settings scored 1.000 accuracy on its training rows, where the test rows gave 0.510, and a
+1-nearest-neighbour model scored 1.000 against 0.495. A `LogisticRegression` scored 0.545 on its
+training rows against 0.501. The rule stays silent when the function around the score, the
+functions next to it, or the file for code outside functions, scores a name with `test`, `val` or
+`holdout` in it, or calls cross-validation or a search. Recall was 10 of 27. The rule found none of
+9 metrics given a `predict` variable of the training rows, as in `y_pred = knn.predict(X_train)`
+and `accuracy_score(y_train, y_pred)`. It also misses rows whose names do not say train, as in
+`model.score(X, y)` after `model.fit(X, y)`.
+
+`unknown-scoring-name` checks each string against `sklearn.metrics.get_scorer_names()` on
+scikit-learn 1.9.1. `scoring="mean_squared_error"`, `scoring="log_loss"` and `scoring="auc"`
+raise InvalidParameterError, and `"roc_auc_score"` in a list given to `cross_validate` raises
+ValueError. A string with `{` or `%` in it, or an f-string, is left alone, because code fills it
+in later. Recall was 16 of 32. The rule found none of 16 scoring strings or dicts of scorer names
+kept in a variable.
+
+### Removed and deprecated forms
+
+Each form below raises or warns on scikit-learn 1.9.1. Each was run under `python -W error`, where
+the old form raised and the new form ran clean. The messages take each replacement from the 1.9.1
+source, such as the docstring that says `sparse` was renamed `sparse_output` in 1.2, or from the
+error text. Every fix of a removed form turns code that raises into code that runs, so none of
+those fixes can be bit equal and none is safe. A fix that drops a keyword deletes the comments
+inside the argument list and joins a call written over several lines onto one line.
+
+#### removed-in-sklearn
+
+**Severity:** error. **Fix:** unsafe: `sklearn.model_selection` for `sklearn.cross_validation`, `sklearn.grid_search` and `sklearn.learning_curve`, `import joblib`, the public module for a private module path such as `sklearn.linear_model.logistic`, `get_feature_names_out()`, renamed keywords such as `sparse_output=`, `estimator=`, `max_iter=`, `store_cv_results=`, `ensure_all_finite=`, `metric=`, `alphas=` and `n_splits=`, dropped keywords such as `n_jobs`, `behaviour`, `algorithm`, `iid`, `multi_class`, `min_impurity_split=None` and `normalize=False`, and new values for refused ones, such as `max_features="sqrt"` or `1.0` for `"auto"`, `loss="log_loss"`, `criterion="squared_error"` and `"absolute_error"`, and `loss="squared_error"`. The other forms have no fix.
+
+Reports imports of removed modules and names, such as `sklearn.cross_validation`, `sklearn.externals.joblib` and `six`, `load_boston`, `preprocessing.Imputer`, private module paths and `sklearn.feature_extraction.stop_words`, and reports `get_feature_names()`, keywords the signature no longer has, values that parameter validation refuses, positional arguments past the keyword-only marker, and splitters given the data the way `sklearn.cross_validation` took it.
+
+Example:
+
+```python
+from sklearn.cross_validation import train_test_split
+
+encoder = OneHotEncoder(sparse=False)
+names = vectorizer.get_feature_names()
+forest = RandomForestClassifier(max_features="auto", random_state=0)
+folds = StratifiedKFold(y, n_folds=5)
+```
+
+Use instead:
+
+```python
+from sklearn.model_selection import train_test_split
+
+encoder = OneHotEncoder(sparse_output=False)
+names = vectorizer.get_feature_names_out()
+forest = RandomForestClassifier(max_features="sqrt", random_state=0)
+folds = StratifiedKFold(n_splits=5).split(X, y)
+```
+
+#### deprecated-in-sklearn
+
+**Severity:** warning. **Fix:** safe: drop `probability=False` from `SVC` and `NuSVC`, drop `penalty="elasticnet"` beside an `l1_ratio`, drop `n_jobs=` from `LogisticRegression`, `criterion="squared_error"` for `"friedman_mse"` on regression trees and forests, drop `criterion=` from GradientBoosting, `metric=` for MDS `dissimilarity=`, `metric_mds=` for MDS `metric=True` or `False`, `alphas=` for `n_alphas=`, and `alphas=100` for `alphas=None`. Unsafe: drop `penalty="l2"`, `l1_ratio=1` for `penalty="l1"`, and `l1_ratio=0` for `l1_ratio=None` on `LogisticRegression`. The other forms have no fix.
+
+Reports `SVC(probability=)` and `NuSVC(probability=)`, `probA_` and `probB_`, `penalty=`, `l1_ratio=None` and `n_jobs=` on `LogisticRegression`, `penalty=` and the three defaults that warn on `LogisticRegressionCV`, `criterion="friedman_mse"`, GradientBoosting `criterion=`, the PassiveAggressive classes, `TargetEncoder(shuffle=, random_state=)`, MDS `dissimilarity=`, `metric=True` and a missing `init`, `HDBSCAN` without `copy`, `n_alphas=` and `alphas=None` on the path functions, a negative `power_t`, and `stable_cumsum`.
+
+Example:
+
+```python
+model = LogisticRegression(penalty="l1", solver="liblinear", n_jobs=-1)
+svm = SVC(probability=True, random_state=0).fit(X_train, y_train)
+tree = DecisionTreeRegressor(criterion="friedman_mse", random_state=0)
+```
+
+Use instead:
+
+```python
+model = LogisticRegression(l1_ratio=1, solver="liblinear")
+svm = CalibratedClassifierCV(SVC(), ensemble=False).fit(X_train, y_train)
+tree = DecisionTreeRegressor(criterion="squared_error", random_state=0)
+```
+
+#### removed-metric-api
+
+**Severity:** error. **Fix:** none.
+
+Reports metric APIs that scikit-learn removed: `SCORERS`, `plot_confusion_matrix` and the other `plot_*` functions, `jaccard_similarity_score`, `squared=` on `mean_squared_error` and `mean_squared_log_error`, `eps=` on `log_loss`, `squared=`, `needs_proba=` and `needs_threshold=` passed to `make_scorer`, and the `RocCurveDisplay` keywords that 1.7 replaced.
+
+Example:
+
+```python
+rmse = mean_squared_error(y_test, y_pred, squared=False)
+scorer = make_scorer(roc_auc_score, needs_proba=True)
+```
+
+Use instead:
+
+```python
+rmse = root_mean_squared_error(y_test, y_pred)
+scorer = make_scorer(roc_auc_score, response_method="predict_proba")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### deprecated-metric-api
+
+**Severity:** warning. **Fix:** safe: `log_loss(y_test, y_proba=proba)` and `PrecisionRecallDisplay(precision=precision, recall=recall, name="model")`. The other forms have no fix.
+
+Reports metric APIs that warn on scikit-learn 1.9.1: `y_pred=` on `log_loss` and `d2_log_loss_score`, `estimator_name=` on `PrecisionRecallDisplay`, `y_pred=` on `PrecisionRecallDisplay.from_predictions` and `DetCurveDisplay.from_predictions`, matplotlib keywords passed straight to `PrecisionRecallDisplay`, and `sklearn.metrics.cluster.entropy`.
+
+Example:
+
+```python
+loss = log_loss(y_test, y_pred=proba)
+```
+
+Use instead:
+
+```python
+loss = log_loss(y_test, y_proba=proba)
+```
+
+#### fit-params-keyword
+
+**Severity:** error. **Fix:** none.
+
+Reports `fit_params=` on `cross_val_score`, `cross_validate`, `cross_val_predict`, `learning_curve`, `validation_curve`, `permutation_test_score` and the four search classes.
+
+Example:
+
+```python
+scores = cross_val_score(model, X, y, fit_params={"sample_weight": w})
+```
+
+Use instead:
+
+```python
+scores = cross_val_score(model, X, y, params={"sample_weight": w})
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### column-transformer-removed
+
+**Severity:** error. **Fix:** none.
+
+Reports `force_int_remainder_cols=` on `ColumnTransformer` and `make_column_transformer`.
+
+Example:
+
+```python
+ColumnTransformer(transformers, remainder="passthrough", force_int_remainder_cols=False)
+```
+
+Use instead:
+
+```python
+ColumnTransformer(transformers, remainder="passthrough")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`removed-in-sklearn` ran 49 forms on scikit-learn 1.9.1. Each old form raised
+ModuleNotFoundError, ImportError, AttributeError, TypeError for an unexpected keyword or too many
+positional arguments, or InvalidParameterError, and its new form ran clean. A grid with
+`max_features: ["auto", "sqrt"]` raised through the FitFailedWarning that `GridSearchCV` gives.
+`SCORERS`, the `plot_*` functions, `jaccard_similarity_score`, `squared=` and `fit_params=` are
+left to `removed-metric-api` and `fit-params-keyword`. A backslash line break inside a call is
+not counted as a positional argument. Every fixed form ran on the case built for it, and each
+renamed keyword and refused value gave the same model as a reference written from the 1.9.1
+docstrings. Some fixes change what the code means. `get_feature_names_out()` returns an array
+where `get_feature_names()` returned a list, so `print` shows `array([...])`, and at 1 held-back
+site the fix broke a project class that defined its own `get_feature_names`. Dropping
+`multi_class` makes every multiclass fit use the multinomial loss, and with liblinear on three or
+more classes the fixed call raises ValueError. Dropping `algorithm="SAMME.R"` turns a SAMME.R
+model into a SAMME model. At 2 held-back sites the fixed `OneHotEncoder(sparse_output=False,
+dtype=np.int)` still raised, because `np.int` is gone from NumPy. Of 321 held-back reports, 58
+were labelled, and reader A called 1 wrong. Recall was 517 of 600. Of the misses, 36 were
+`SCORERS`, the `plot_*` functions and `jaccard_similarity_score`, which `removed-metric-api`
+reports. The rule found none of 18 refused values in a parameter grid for keywords other than
+`max_features`, and none of 16 refused values held in a variable. It also misses
+`sklearn.feature_extraction.stop_words` imported as a module.
+
+`deprecated-in-sklearn` ran 30 forms on scikit-learn 1.9.1, and each old form raised its
+FutureWarning under `-W error` while its new form ran clean. The warning gives the release that
+removes each form, 1.10 or 1.11. `LogisticRegression(n_jobs=None)` gives no warning and is left
+alone. Every safe fix gave a bit equal fitted model and bit equal predictions in every run. The
+runs were 16 for dropping `probability=False`, 16 for dropping `penalty="elasticnet"`, 38 for
+dropping `n_jobs`, 16 for `friedman_mse`, 6 for the GradientBoosting `criterion`, 4 and 6 for the
+two MDS renames, 8 for `n_alphas`, and 6 for `alphas=None`. The stored constructor parameter
+changes in a fix that drops a keyword, which is not counted as a change of the model. The three
+unsafe fixes were bit equal in 48 runs, 32 runs and 8 runs, and they differ only with `C=np.inf`,
+which 1.9.1 turns into no penalty only when `penalty` is left at its default. With liblinear and
+`C=np.inf`, the fixed `l1_ratio=1` raises where the old form ran, and the fixed form of
+`penalty="l2"` raises ValueError where the old form did not finish in 60 s. With saga and
+`C=np.inf`, the fixed `l1_ratio=0` runs where the old form raised TypeError. Of 101 held-back
+reports, 57 were
+labelled, and reader A called 3 wrong. Recall was 274 of 308. Of the misses, 12 were
+`sklearn.metrics.cluster.entropy`, which `deprecated-metric-api` reports. The rule also misses
+`HDBSCAN`, `stable_cumsum` and the PassiveAggressive classes reached through a module or another
+name, and a deprecated value in a parameter grid or a variable.
+
+`removed-metric-api` raises on scikit-learn 1.9.1 for every form, ImportError for `SCORERS`, the
+`plot_*` functions and `jaccard_similarity_score`, and TypeError for the keywords. `make_scorer`
+passes `squared=`, `needs_proba=` and `needs_threshold=` on to the metric, so the error comes when
+the scorer runs, and a search with the default `error_score` then scores every fold as nan. The
+rule reports `squared=` and `eps=` only on the scikit-learn functions, imported from
+`sklearn.metrics` or called as `metrics.<name>`, because torchmetrics has a `mean_squared_error`
+with `squared=`. Old module paths such as `sklearn.metrics.ranking` are left to
+`removed-in-sklearn`. The four `RocCurveDisplay` forms raised TypeError in the first run, with
+matplotlib 3.11.2 added to scikit-learn 1.9.1, and the saved rerun had no matplotlib, so the
+saved results hold no passing proof for them. The forms raise, so a fix could not be compared bit
+for bit, and they have none. Neither reader called one of the 13 held-back reports wrong. Recall
+was 74 of 74.
+
+`deprecated-metric-api` gives the release that removes each form, from the warning text.
+`y_pred=` on `log_loss` goes in 1.11, `estimator_name=` and the display `y_pred=` go in 1.10, the
+display matplotlib keywords go in 1.11, and `entropy` goes in 1.10. The four display forms passed
+in the first run with matplotlib 3.11.2, and the saved rerun had no matplotlib. The two fixes
+rename a keyword and gave bit equal results, the `log_loss` rename in 12 of 12 runs and the
+`PrecisionRecallDisplay` rename in 2 of 2 with the same plot label. `scipy.stats.entropy` of the
+class counts differs from `entropy` in the last bits, so that form has no fix. Recall was 48 of
+48.
+
+`fit-params-keyword` reports a keyword that raises TypeError on scikit-learn 1.9.1. The documents
+for `cross_val_score`, `cross_validate` and `cross_val_predict` carry `since: "1.4"`, the release
+that added `params`, and the documents for the other three functions carry `since: "1.6"`. On
+`GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` and `HalvingRandomSearchCV` the
+message says to drop the keyword and pass the values to `fit`. A rename has no fix, because the
+old form raises and leaves nothing to compare. Neither reader called one of the 4 held-back
+reports wrong. Recall was 32 of 32.
+
+`column-transformer-removed` reports a keyword that raises TypeError on scikit-learn 1.9.1, with
+either value. The remainder columns now come back in the form the other columns were given in.
+Neither reader called one of the 3 held-back reports wrong. Recall was 30 of 30.
+
+### Pipeline and metadata routing
+
+Each form below raises at construction or at fit on scikit-learn 1.9.1.
+
+#### metadata-routing
+
+**Severity:** error. **Fix:** none.
+
+Reports forms that raise because metadata routing is off, such as `set_fit_request` and `Pipeline(transform_input=...)`, and forms that raise because it is on, such as `groups=`, `step__sample_weight=` and `params=` with no request in the file.
+
+Example:
+
+```python
+model = LogisticRegression().set_fit_request(sample_weight=True)
+cross_validate(model, X, y, params={"sample_weight": w})
+```
+
+Use instead:
+
+```python
+sklearn.set_config(enable_metadata_routing=True)
+model = LogisticRegression().set_fit_request(sample_weight=True).set_score_request(sample_weight=True)
+cross_validate(model, X, y, params={"sample_weight": w})
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### pipeline-fit-params
+
+**Severity:** error. **Fix:** none.
+
+Reports `pipe.fit(X, y, sample_weight=w)` on a Pipeline built in the same block, with metadata routing off.
+
+Example:
+
+```python
+pipe = make_pipeline(StandardScaler(), LogisticRegression())
+pipe.fit(X, y, sample_weight=w)
+```
+
+Use instead:
+
+```python
+pipe = make_pipeline(StandardScaler(), LogisticRegression())
+pipe.fit(X, y, logisticregression__sample_weight=w)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### pipeline-step-form
+
+**Severity:** error. **Fix:** none.
+
+Reports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare estimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.
+
+Example:
+
+```python
+from sklearn.pipeline import Pipeline
+
+pipe = Pipeline([("smote", SMOTE()), ("model", LogisticRegression())])
+```
+
+Use instead:
+
+```python
+from imblearn.pipeline import Pipeline
+
+pipe = Pipeline([("smote", SMOTE()), ("model", LogisticRegression())])
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### transformed-target-pair
+
+**Severity:** error. **Fix:** none.
+
+Reports `TransformedTargetRegressor` with `func` and no `inverse_func`, the other way round, or with both a `transformer` and functions.
+
+Example:
+
+```python
+model = TransformedTargetRegressor(regressor=Ridge(), func=np.log1p)
+```
+
+Use instead:
+
+```python
+model = TransformedTargetRegressor(regressor=Ridge(), func=np.log1p, inverse_func=np.expm1)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### pandas-output-sparse
+
+**Severity:** error. **Fix:** none.
+
+Reports pandas output on a OneHotEncoder that keeps its default `sparse_output=True`, set with `set_output` or with `set_config(transform_output="pandas")`.
+
+Example:
+
+```python
+encoder = OneHotEncoder(handle_unknown="ignore")
+encoder.set_output(transform="pandas")
+```
+
+Use instead:
+
+```python
+encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+encoder.set_output(transform="pandas")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+No held-back file uses metadata routing, a misnamed step, `TransformedTargetRegressor` in a wrong
+mix, or pandas output on a sparse encoder, so the rules in this group made no report there and
+have no wrong-advice number.
+
+`metadata-routing` counts a file as routed when any call in it passes `enable_metadata_routing`
+with a value other than `False`. With routing off, `set_fit_request` and the other request
+setters raise RuntimeError, and `Pipeline(transform_input=...)` raises ValueError at fit. With
+routing on, `groups=` on a cross-validation function raises ValueError, a `step__sample_weight`
+keyword on `fit` raises TypeError, and `params=` raises UnsetMetadataPassedError when no
+estimator asked for the metadata. A function or a script that never calls a `set_*_request`
+method has asked for nothing. On scikit-learn 1.9.1 a weighted `cross_validate` with routing on
+also needs `set_score_request`, or it raises for the scorer. Recall was 34 of 34.
+
+`pipeline-fit-params` reads the Pipeline from an assignment earlier in the same block, or from
+the call itself. With routing off, `Pipeline.fit` raises "ValueError: Pipeline.fit does not
+accept the sample_weight parameter". A file that turns routing on is left alone, because there a
+plain name is the right form. Recall was 23 of 30. The rule found none of 6 `sample_weight=`
+keywords given to the `fit` of a search over a Pipeline, which raises the same ValueError. It also
+misses a Pipeline built outside a loop and fitted inside it.
+
+`pipeline-step-form` reports a step name with two underscores in a row in the list given to
+`Pipeline`, `ColumnTransformer` or `FeatureUnion`, which raises ValueError at fit.
+`make_pipeline([a, b])` raises TypeError at fit, and `Pipeline([a, b])` raises "TypeError: cannot
+unpack non-iterable". A sampler such as `SMOTE` before another step raises "TypeError: All
+intermediate steps should be transformers" in the Pipeline of scikit-learn. The first three forms
+are reported only when the name comes from scikit-learn, imported from `sklearn.pipeline` or
+`sklearn.compose` or called through those modules, because other libraries such as xfeat have a
+Pipeline that takes a plain list. The frozen rule made 4 reports on the held-back files, on such
+Pipelines, and both readers called all 4 wrong. Files that import from `imblearn.pipeline` are
+left alone, and so is a sampler as the last step, which fits. Recall was 29 of 35, measured
+before the rule was narrowed to the Pipeline of scikit-learn. The rule found 4 of 10 plants of
+`Pipeline` given bare estimators, and it misses them given by `steps=`, by names that hold the
+estimators, or as a single step.
+
+`transformed-target-pair` reports the three mixes that raise ValueError at fit. Recall was 31 of
+36. The rule found none of 5 plants that import the class under another name, as in
+`TransformedTargetRegressor as TTR`.
+
+`pandas-output-sparse` reports `set_output(transform="pandas")` on a OneHotEncoder, or on a
+Pipeline, ColumnTransformer or FeatureUnion that holds one, either in the same expression or
+assigned in an earlier statement of the block. With `set_config` or `config_context` it reports
+every OneHotEncoder in the file. A OneHotEncoder with `sparse_output=False` is left alone. Each
+form raises "ValueError: Pandas output does not support sparse data" on scikit-learn 1.9.1.
+Recall was 29 of 31.
+
+### Work done twice
+
+Each old form below repeats work that scikit-learn already did, and the new form does it once.
+The numbers are speed proofs on scikit-learn 1.9.1, on one thread, as the median of 7 runs of
+each form at two data sizes. A rule reports only the classes where both sizes passed 1.5 times.
+
+#### predict-per-row
+
+**Severity:** warning. **Fix:** none.
+
+Reports `model.predict([row])`, `model.predict_proba(X[i].reshape(1, -1))`, `model.predict(df.iloc[[i]])` and the same calls of `decision_function` and `predict_log_proba` in a loop, a comprehension or a lambda over the rows.
+
+Example:
+
+```python
+labels = [model.predict([row])[0] for row in X_test]
+```
+
+Use instead:
+
+```python
+labels = model.predict(X_test)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### score-after-predict
+
+**Severity:** warning. **Fix:** unsafe: `f1_score(y_test, y_pred)`. `model.score(X_test, y_test)` has no fix.
+
+Reports `model.score(X_test, y_test)` and `f1_score(y_test, model.predict(X_test))` after `y_pred = model.predict(X_test)`, when the file builds `model` as a forest, a boosting or bagging model, k-nearest neighbours, an SVM, an MLP or `GaussianNB`.
+
+Example:
+
+```python
+forest = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+y_pred = forest.predict(X_test)
+accuracy = forest.score(X_test, y_test)
+```
+
+Use instead:
+
+```python
+forest = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+y_pred = forest.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+```
+
+#### predict-and-predict-proba
+
+**Severity:** warning. **Fix:** none.
+
+Reports `model.predict(X_test)` next to `model.predict_proba(X_test)` when the file builds `model` as a `RandomForestClassifier`, `ExtraTreesClassifier` or `BaggingClassifier`.
+
+Example:
+
+```python
+forest = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+y_pred = forest.predict(X_test)
+y_score = forest.predict_proba(X_test)[:, 1]
+```
+
+Use instead:
+
+```python
+forest = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+proba = forest.predict_proba(X_test)
+y_pred = forest.classes_[proba.argmax(axis=1)]
+y_score = proba[:, 1]
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### cross-val-score-per-metric
+
+**Severity:** warning. **Fix:** none.
+
+Reports `cross_val_score(model, X, y, scoring="accuracy")` followed by `cross_val_score(model, X, y, scoring="precision")` on the same model, data and `cv`.
+
+Example:
+
+```python
+accuracy = cross_val_score(model, X, y, cv=5, scoring="accuracy")
+precision = cross_val_score(model, X, y, cv=5, scoring="precision")
+```
+
+Use instead:
+
+```python
+scores = cross_validate(model, X, y, cv=5, scoring=["accuracy", "precision"])
+accuracy, precision = scores["test_accuracy"], scores["test_precision"]
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### vectorizer-fit-then-transform
+
+**Severity:** warning. **Fix:** unsafe: `vectorizer.fit_transform(docs)`. The form in two statements has no fix.
+
+Reports `vectorizer.fit(docs).transform(docs)`, and `vectorizer.fit(docs)` followed by `vectorizer.transform(docs)`, on a `CountVectorizer` or `TfidfVectorizer`.
+
+Example:
+
+```python
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit(docs).transform(docs)
+```
+
+Use instead:
+
+```python
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(docs)
+```
+
+#### refit-per-n-estimators
+
+**Severity:** warning. **Fix:** none.
+
+Reports a `RandomForest`, `ExtraTrees`, `GradientBoosting` or `Bagging` model or an `IsolationForest` built with `n_estimators=n` in a loop over `n` and fitted there.
+
+Example:
+
+```python
+for n in [10, 50, 100]:
+    forest = RandomForestClassifier(n_estimators=n, random_state=0)
+    forest.fit(X_train, y_train)
+    scores.append(forest.score(X_test, y_test))
+```
+
+Use instead:
+
+```python
+forest = RandomForestClassifier(warm_start=True, random_state=0)
+for n in [10, 50, 100]:
+    forest.set_params(n_estimators=n)
+    forest.fit(X_train, y_train)
+    scores.append(forest.score(X_test, y_test))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### tsne-exact
+
+**Severity:** info. **Fix:** none.
+
+Reports `TSNE(method="exact")`.
+
+Example:
+
+```python
+embedding = TSNE(method="exact", random_state=0).fit_transform(X)
+```
+
+Use instead:
+
+```python
+embedding = TSNE(random_state=0).fit_transform(X)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`predict-per-row` reports a call whose rows come from the loop variable, either the row itself or
+the data indexed by it. Each call checks the input and sets up the model again. One call on all
+rows measured 2.77 and 2.79 times faster for `SVC` at 500 and 5,000 rows, 216 and 356 times for
+`RandomForestClassifier`, and 104 and 816 times for `LogisticRegression.predict_proba`. The
+labels were bit equal, and the probabilities of `LogisticRegression` differed by up to 3.3e-16,
+so the rule has no fix. A loop that writes into the data it predicts from, as recursive
+forecasting does, is left alone. Reader B called both held-back reports wrong advice, and reader
+A called neither wrong. Recall was 28 of 32. The 4 misses were `DataFrame.apply` with the row's
+values in a list, as in `X_test.apply(lambda row: model.predict([row.values])[0], axis=1)`.
+
+`score-after-predict` reads the class from the line that builds the model, because `score` costs
+the most where `predict` does. The score call measured 1.62 to 879 times the metric alone over
+the 13 reported classes that were timed, at 1,000 and 10,000 test rows, and gave the same number.
+`GaussianNB` was the slowest gain, 1.62 times at 1,000 rows. `DecisionTreeClassifier` measured
+1.45 times at 1,000 rows in the first run and 1.54 times in the saved rerun, and
+`DecisionTreeRegressor` 1.52 and 1.66 times. The rule leaves both decision trees alone, as it does
+`LogisticRegression` and `LinearRegression`. A name the file also binds to another class is left
+alone. The fix on the metric form is unsafe, because code between the two lines can change the
+saved predictions. It gave the same score in 12 of 12 runs on both held-back shapes, and the
+score changed only when the model was fitted again between the two lines. Neither reader called
+one of the 17 held-back reports wrong. Recall was 31 of 32.
+
+`predict-and-predict-proba` covers the classes whose `predict` takes the argmax of
+`predict_proba`. Deriving the labels from one `predict_proba` measured 1.83 to 2.00 times faster
+for `RandomForestClassifier`, `ExtraTreesClassifier` and `BaggingClassifier` at 1,000 and 10,000
+rows, with bit equal labels and probabilities. Other classes decide the label from a raw score,
+and a tie at 0.5 can give another label, so they are left alone. Neither reader called one of the
+22 held-back reports wrong. Recall was 30 of 30.
+
+`cross-val-score-per-metric` reports the first call when a later call in the same block passes the
+same model, data and `cv` with another `scoring`. Two scorings in one `cross_validate` measured
+1.60 and 1.84 times faster at 2,000 and 20,000 rows with `LogisticRegression`, and the scores were
+bit equal. Neither reader called one of the 14 held-back reports wrong. Recall was 30 of 30.
+
+`vectorizer-fit-then-transform` covers `CountVectorizer` and `TfidfVectorizer`, whose `fit` runs
+`fit_transform` and drops the matrix. `fit_transform` measured 1.63 and 2.06 times faster for
+`CountVectorizer` and 1.82 and 2.03 times faster for `TfidfVectorizer`, at 2,000 and 20,000
+documents. The fitted vectorizer is bit equal. The fix is unsafe, because `fit_transform` leaves
+the column indices of each row unsorted, and `TfidfVectorizer` values differ by up to 1.1e-16. A
+`MultinomialNB` fitted on the matrix gave probabilities that differ by up to 3e-15, and a
+`LogisticRegression` coefficients that differ by up to 1.3e-15. Reader B called 4 of the 12
+held-back reports wrong advice, and reader A called none wrong. Recall was 19 of 25. The 6 misses
+were a fitted vectorizer assigned back to its own name, as in `cv = cv.fit(corpus)` followed by
+`cv.transform(corpus)`.
+
+`refit-per-n-estimators` relies on `warm_start=True`, which keeps the trees already grown and
+draws every seed from `random_state` in the same order, so the grown models were bit equal to
+models fitted from scratch. For `n_estimators` 10, 20, 50 and 100, warm start measured 1.64 to
+2.75 times faster at 1,000 and 5,000 rows for `RandomForestClassifier`, `RandomForestRegressor`,
+`ExtraTreesClassifier`, `GradientBoostingClassifier`, `BaggingClassifier` and `IsolationForest`.
+For 10 to 100 trees in steps of 10, it measured 6.82 and 3.59 times faster for
+`RandomForestClassifier`. A model passed to a cross-validation function or to `clone` is cloned,
+so warm start cannot help it, and that loop is left alone. So is a loop with another loop inside
+it, where another setting changes between fits, and a loop that reads a clock, because it times
+each fit. The frozen rule made 1 report on the held-back files, on a loop that timed each fit,
+and both readers called it wrong. Recall was 30 of 30.
+
+`tsne-exact` is info, because the default Barnes-Hut method approximates the forces between
+distant points, so its embedding is another one and no speed proof applies. Over 20 seeds on
+`make_classification` data, Barnes-Hut gave a trustworthiness with 5 neighbours within 0.001 of
+the exact method and fitted a median 2.2 times faster at 300 rows and 4.0 times faster at 1,000
+rows. At 300 rows the slowest seed took 0.39 times as long with the exact method, so the gain is
+not certain on small data. Recall was 21 of 30. The rule misses `TSNE` imported under another
+name and a method held in a variable.
 
 ### Reproducible results
 
+#### random-state-without-shuffle
+
+**Severity:** error. **Fix:** none.
+
+Reports `KFold(n_splits=5, random_state=42)` without `shuffle=True`, which raises ValueError.
+
+Example:
+
+```python
+folds = KFold(n_splits=5, random_state=42)
+```
+
+Use instead:
+
+```python
+folds = KFold(n_splits=5, shuffle=True, random_state=42)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
 #### missing-random-state
 
-**Severity:** warning. **Fix:** none.
+**Severity:** info. **Fix:** none.
 
 Reports `train_test_split(X, y)`, `RandomForestClassifier()` and `KFold(shuffle=True)` without `random_state`.
 
@@ -3362,14 +4339,36 @@ The value 0 is only the example. Any fixed number makes the run repeatable.
 The replacement is advice. xpd does not apply it automatically.
 
 
-The same script, run 30 times, scored between 0.930 and 1.000. The rule names the classes whose
-output changed between two runs: the random forests, extra trees, bagging and gradient boosting
-models, `IsolationForest`, the decision trees, `KMeans`, `MiniBatchKMeans`, `GaussianMixture`, the
-MLP and SGD models, `TruncatedSVD`, `NMF`, `TSNE`, `ShuffleSplit`, `StratifiedShuffleSplit` and
-`RepeatedKFold`, and `KFold`, `StratifiedKFold`, `GroupKFold` and `StratifiedGroupKFold` with
-`shuffle=True`. `LogisticRegression`, `SVC`, `LinearSVC` and `PCA` gave the same output twice and
-are left alone. A call with `shuffle=False` or `**params` is left alone, and so is a file that
-calls `np.random.seed`, because scikit-learn then draws from that seed.
+`random-state-without-shuffle` covers `KFold`, `StratifiedKFold` and `StratifiedGroupKFold`, and
+`GroupKFold` from scikit-learn 1.6, which added its `shuffle`. Each raises "Setting a random_state
+has no effect since shuffle is False" on scikit-learn 1.9.1. A file that imports the removed
+`sklearn.cross_validation` is left alone unless the call passes `n_splits`, because the old
+classes took other arguments and `removed-in-sklearn` reports the import. The frozen rule gave
+wrong advice in 2 and 2 of 11 labelled reports, on such files, and the narrowed rule no longer
+makes those reports. Recall was 54 of 54.
+
+`missing-random-state` is info, because a seed does not move the expected score. What changes is
+which model wins a comparison. With two models whose true accuracy differs a little, the worse
+model won 25.0 percent of 300 trials when each was scored on its own split without a seed, and
+14.3 percent when both were scored on one shared split. The classes the rule names gave another
+output in five fresh runs on scikit-learn 1.9.1. They are the forests, extra trees, bagging,
+gradient boosting, `AdaBoostRegressor`, `IsolationForest`, `RandomTreesEmbedding`, the decision
+trees, `KMeans`, `MiniBatchKMeans`, `SpectralClustering`, `AffinityPropagation`, the MLPs, the SGD
+models, `TruncatedSVD`, `NMF`, `LatentDirichletAllocation`, `FastICA`,
+`MiniBatchDictionaryLearning`, `MDS`, `SpectralEmbedding`, `Nystroem`, `RBFSampler`, the random
+projections, `ShuffleSplit`, `StratifiedShuffleSplit`, `RepeatedKFold` and
+`RepeatedStratifiedKFold`, and `KFold`, `StratifiedKFold`, `GroupKFold` and
+`StratifiedGroupKFold` with `shuffle=True`. `TSNE` with `init="random"`, `SVC(probability=True)`,
+a HistGradientBoosting model with `early_stopping=True`, and a Gaussian mixture with more than one
+component are reported too. A HistGradientBoosting model without `random_state` is reported with
+a message that names 10,000 rows, because above that size it stops early on a validation part
+drawn at random. `LogisticRegression`, `PCA`, `Perceptron`, `AdaBoostClassifier` and `TSNE` with
+its default `init` gave the same output and are not listed. The rule leaves alone a file that
+calls `np.random.seed`, or a seed helper such as `set_seed` or `seed_everything` that the file
+does not define and does not import from TensorFlow, PyTorch or `random`. It also leaves alone a
+call with `shuffle=False` or `**`, a `train_test_split` whose result is thrown away, and a
+constructor that only `isinstance` reads. Of 527 held-back reports, 52 were labelled, and each
+reader called 1 wrong. Recall was 79 of 80.
 
 ## Hamilton
 
