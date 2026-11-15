@@ -1,0 +1,23 @@
+# tz_convert(None) converts to UTC and drops the zone. On a column, an index and a frame it gave
+# a result equal to the two calls, with the same dtype, on pandas 2.3.3 and 3.1.1.
+id: convert-then-drop-zone
+language: python
+severity: warning
+message: tz_convert(None) converts to UTC and drops the time zone in one call. Write $X.dt.tz_convert(None).
+rule:
+  pattern: $X.dt.tz_convert($U).dt.tz_localize(None)
+constraints:
+  U: { regex: '^["''](UTC|utc)["'']$' }
+fix: $X.dt.tz_convert(None)
+metadata: { fix: safe }
+---
+id: convert-then-drop-zone
+language: python
+severity: warning
+message: tz_convert(None) converts to UTC and drops the time zone in one call. Write $X.tz_convert(None).
+rule:
+  pattern: $X.tz_convert($U).tz_localize(None)
+constraints:
+  U: { regex: '^["''](UTC|utc)["'']$' }
+fix: $X.tz_convert(None)
+metadata: { fix: safe }

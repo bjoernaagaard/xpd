@@ -1,0 +1,20 @@
+# inclusive="left" leaves out the end point. Unsafe: when the end is not a step of the range,
+# as in an end of 00:07 with 15 minutes, the slice drops the last real step and inclusive="left"
+# keeps it. A range with periods has no end point to leave out.
+id: date-range-slice
+language: python
+severity: warning
+message: date_range takes inclusive="left", which leaves out the end point. Write $PD.date_range($$$A, inclusive="left").
+rule:
+  pattern: $PD.date_range($$$A)[:-1]
+  all:
+    - not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^(periods|inclusive)$ } } }
+    # The fix adds an argument after the last one, so a trailing comma or a comment would break it.
+    - not: { has: { stopBy: end, kind: argument_list, regex: ',\s*\)$' } }
+    - not: { has: { stopBy: end, kind: comment } }
+    # The third argument by position is periods.
+    - not: { has: { stopBy: end, kind: argument_list, has: { nthChild: 3, not: { kind: keyword_argument } }, inside: { kind: call, has: { field: function, regex: 'date_range$' } } } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+fix: $PD.date_range($$$A, inclusive="left")
+metadata: { fix: unsafe }

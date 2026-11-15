@@ -1,0 +1,30 @@
+# A zone with daylight saving has a stretch each year that happens twice and one that never
+# happens, an hour in most zones.
+# tz_localize raises on a time in either hour unless the call says what to do. On half-hourly
+# data for 2024, "Europe/Copenhagen" raised on pandas 2.3.3 and 3.1.1, and "UTC", "GMT", "Etc/UTC",
+# "Etc/GMT-1" and "+01:00" did not, so those are left alone. A date_range receiver belongs to
+# date-range-then-localize, and a single pd.Timestamp is left alone. No fix: the choice between
+# "infer", "NaT", a mask and a shift depends on the data.
+id: tz-localize-without-dst
+language: python
+severity: warning
+message: tz_localize raises for a time that repeats when the clocks go back unless ambiguous= is set, and for a time that is skipped when they go forward unless nonexistent= is set. Pass both to say what those times become.
+rule:
+  pattern: $X.tz_localize($$$A)
+  has:
+    field: arguments
+    all:
+      - any:
+          - has: { nthChild: 1, matches: named-zone }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^tz$ } }, { has: { field: value, matches: named-zone } }] }
+      # ambiguous and nonexistent can follow the zone by position.
+      - not: { has: { nthChild: 3, not: { kind: keyword_argument } } }
+      - any:
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: ^ambiguous$ } } }
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: ^nonexistent$ } } }
+constraints:
+  X: { not: { regex: '(^|\.)(date_range|bdate_range|Timestamp)\([^()]*(\([^()]*\)[^()]*)*\)$' } }
+utils:
+  named-zone:
+    kind: string
+    not: { regex: '^["'']((?i)utc|gmt|z|etc/[^"'']*|[+-]\d\d:?\d\d)["'']$' }

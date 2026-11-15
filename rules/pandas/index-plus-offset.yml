@@ -1,0 +1,17 @@
+# shift(freq=) adds the offset to the index, so the values and the new index were equal for a
+# Timedelta, a timedelta, a DateOffset and pd.offsets.Hour on pandas 2.3.3 and 3.1.1.
+# Unsafe: the assignment changes the object in place, so every other name for it sees the new
+# index, and shift returns a new object.
+id: index-plus-offset
+language: python
+severity: warning
+message: shift(freq=) moves the index by an offset and leaves the values alone. Write $X = $X.shift(freq=$D).
+rule:
+  any:
+    - pattern: $X.index = $X.index + $D
+    - pattern: $X.index += $D
+constraints:
+  X: { kind: identifier }
+  D: { regex: '^((pd|pandas)\.(Timedelta|DateOffset|offsets\.[A-Za-z]+)|timedelta|datetime\.timedelta|dt\.timedelta)\(' }
+fix: $X = $X.shift(freq=$D)
+metadata: { fix: unsafe }

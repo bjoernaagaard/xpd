@@ -1636,7 +1636,7 @@ Use instead:
 monthly = df.groupby(df["time"].dt.to_period("M"))["load"].sum()
 ```
 
-The result has a PeriodIndex instead of text labels. Converting time zones to periods also removes the time zone.
+The result has a PeriodIndex instead of text labels. On a column with a time zone, `to_period` drops the zone and gives a UserWarning, so group on `pd.Grouper(key="time", freq="MS")` there.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1762,9 +1762,9 @@ The replacement is advice. xpd does not apply it automatically.
 
 #### apply-date-method
 
-**Severity:** warning. **Fix:** unsafe: `df["d"].dt.floor("h")`, `df["d"].dt.weekday`, `df["d"].dt.date`, `df["d"].dt.isocalendar().week`. `timestamp` and `toordinal` have no fix.
+**Severity:** warning. **Fix:** unsafe: `df["d"].dt.floor("h")`, `df["d"].dt.weekday`, `df["d"].dt.date`, `df["d"].dt.isocalendar().week`, `df["d"].dt.tz_localize(None)` for `replace(tzinfo=None)` and `df["d"].dt.tz_convert(zone)` for `astimezone(zone)`. `timestamp` and `toordinal` have no fix.
 
-Reports `df["d"].apply(lambda t: t.floor("h"))`, and the same with `ceil`, `normalize`, `tz_localize`, `tz_convert`, `day_name`, `month_name`, `to_period`, `total_seconds`, `weekday`, `date`, `isocalendar`, `timestamp` and `toordinal`.
+Reports `df["d"].apply(lambda t: t.floor("h"))`, and the same with `ceil`, `normalize`, `tz_localize`, `tz_convert`, `day_name`, `month_name`, `to_period`, `total_seconds`, `weekday`, `date`, `isocalendar`, `timestamp`, `toordinal`, `replace(tzinfo=None)` and `astimezone`.
 
 Example:
 
@@ -1816,6 +1816,196 @@ shift = pd.to_timedelta(df["days"], unit="D")
 
 The units are "W", "D", "h", "min", "s", "ms" and "us". On fractional values the two forms can differ in the last digits.
 
+#### tz-localize-without-dst
+
+**Severity:** warning. **Fix:** none.
+
+Reports `df["d"].dt.tz_localize("Europe/Copenhagen")` without `ambiguous=` or without `nonexistent=`. A zone with daylight saving has a stretch each year that happens twice and one that never happens, an hour in most zones. `tz_localize` raises on a time in either stretch unless the call says what to do.
+
+Example:
+
+```python
+local = df["time"].dt.tz_localize("Europe/Copenhagen")
+```
+
+Use instead:
+
+```python
+local = df["time"].dt.tz_localize("Europe/Copenhagen", ambiguous="infer", nonexistent="shift_forward")
+```
+
+`ambiguous="infer"` reads the order of the rows and needs both copies of the repeated hour. `"NaT"` makes the time missing, and a boolean array says which rows are summer time. `nonexistent=` takes `"shift_forward"`, `"shift_backward"`, `"NaT"` or a Timedelta.
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### date-range-then-localize
+
+**Severity:** warning. **Fix:** unsafe: `pd.date_range(start, end, freq="h", tz=zone)`.
+
+Reports `pd.date_range(start, end, freq="h").tz_localize(zone)`.
+
+Example:
+
+```python
+hours = pd.date_range("2024-10-26", "2024-10-28", freq="h").tz_localize("Europe/Copenhagen")
+```
+
+Use instead:
+
+```python
+hours = pd.date_range("2024-10-26", "2024-10-28", freq="h", tz="Europe/Copenhagen")
+```
+
+#### to-datetime-then-localize
+
+**Severity:** warning. **Fix:** unsafe: `pd.to_datetime(df["raw"], utc=True)`.
+
+Reports `pd.to_datetime(df["raw"]).dt.tz_localize("UTC")`.
+
+Example:
+
+```python
+when = pd.to_datetime(df["raw"]).dt.tz_localize("UTC")
+```
+
+Use instead:
+
+```python
+when = pd.to_datetime(df["raw"], utc=True)
+```
+
+#### convert-then-drop-zone
+
+**Severity:** warning. **Fix:** safe: `df["d"].dt.tz_convert(None)`.
+
+Reports `df["d"].dt.tz_convert("UTC").dt.tz_localize(None)`, and the same on an index or a frame.
+
+Example:
+
+```python
+plain = df["time"].dt.tz_convert("UTC").dt.tz_localize(None)
+```
+
+Use instead:
+
+```python
+plain = df["time"].dt.tz_convert(None)
+```
+
+#### index-plus-offset
+
+**Severity:** warning. **Fix:** unsafe: `ts = ts.shift(freq=pd.Timedelta(hours=6))`.
+
+Reports `ts.index = ts.index + pd.Timedelta(hours=6)` and `ts.index += timedelta(days=1)`.
+
+Example:
+
+```python
+ts.index = ts.index + pd.Timedelta(hours=6)
+```
+
+Use instead:
+
+```python
+ts = ts.shift(freq=pd.Timedelta(hours=6))
+```
+
+#### date-range-slice
+
+**Severity:** warning. **Fix:** unsafe: `pd.date_range(start, end, freq="15min", inclusive="left")`.
+
+Reports `pd.date_range(start, end, freq="15min")[:-1]`.
+
+Example:
+
+```python
+steps = pd.date_range("2024-03-30", "2024-04-01", freq="15min")[:-1]
+```
+
+Use instead:
+
+```python
+steps = pd.date_range("2024-03-30", "2024-04-01", freq="15min", inclusive="left")
+```
+
+#### index-time-mask
+
+**Severity:** warning. **Fix:** safe: `ts.at_time(time(12))`. unsafe: `ts.between_time("8:00", "16:00", inclusive="left")`.
+
+Reports `ts[ts.index.time == time(12)]` and `ts[(ts.index.hour >= 8) & (ts.index.hour < 16)]`.
+
+Example:
+
+```python
+noon = ts[ts.index.time == time(12)]
+working = ts[(ts.index.hour >= 8) & (ts.index.hour < 16)]
+```
+
+Use instead:
+
+```python
+noon = ts.at_time(time(12))
+working = ts.between_time("8:00", "16:00", inclusive="left")
+```
+
+#### reindex-to-date-range
+
+**Severity:** warning. **Fix:** unsafe: `ts.asfreq("15min")`.
+
+Reports `ts.reindex(pd.date_range(ts.index.min(), ts.index.max(), freq="15min"))`.
+
+Example:
+
+```python
+full = ts.reindex(pd.date_range(ts.index.min(), ts.index.max(), freq="15min"))
+```
+
+Use instead:
+
+```python
+full = ts.asfreq("15min")
+```
+
+#### divide-by-shift
+
+**Severity:** warning. **Fix:** unsafe: `df["load"].pct_change(96)`.
+
+Reports `df["load"] / df["load"].shift(96) - 1` and `(df["load"] - df["load"].shift(96)) / df["load"].shift(96)`.
+
+Example:
+
+```python
+change = df["load"] / df["load"].shift(96) - 1
+```
+
+Use instead:
+
+```python
+change = df["load"].pct_change(96)
+```
+
+#### date-part-key
+
+**Severity:** warning. **Fix:** none.
+
+Reports `df.groupby([df["d"].dt.year, df["d"].dt.month])`, and the same with `index.year` and `index.month`.
+
+Example:
+
+```python
+monthly = df.groupby([df["time"].dt.year, df["time"].dt.month])["load"].sum()
+```
+
+Use instead:
+
+```python
+monthly = df.groupby(pd.Grouper(key="time", freq="MS"))["load"].sum()
+```
+
+The result has one timestamp per month in place of a year and a month, and it also holds the months without rows.
+
+The replacement is advice. xpd does not apply it automatically.
+
 The `rolling-apply` fixes for sum, mean, std and var are unsafe, because the window methods keep
 running totals, so values far apart in size can give another result. For a function with no
 window method the message names `raw=True` and `engine="numba"`. `apply-on-dates` writes
@@ -1841,6 +2031,35 @@ has no fix for a keyword such as `days=v`, because the keyword must become a uni
 `pd.DateOffset(months=v)` alone, because a month has no fixed length. On 1,000,000 rows `dt.floor`
 ran 1,354 times faster than the lambda, `pd.to_datetime` with a format 24 times faster than
 `strptime`, and `pd.to_timedelta` 1,549 times faster.
+
+The time zone rules were run on pandas 2.3.3 and 3.1.1 with quarter-hourly data in
+`Europe/Copenhagen`. `tz-localize-without-dst` raised on half-hourly data for 2024 in that zone.
+It leaves `"UTC"`, `"GMT"`, a zone under `Etc/` and an offset such as `"+01:00"` alone, which did
+not raise. It also leaves a zone held in a name alone, and it reports a zone without daylight
+saving, such as `"Asia/Tokyo"`, by mistake. `date-range-then-localize` is unsafe, because hourly
+steps from 26 to 28 October 2024 raised when localized and gave 50 hours with `tz=`. Without a
+daylight saving change in the range the two forms gave an equal index.
+`to-datetime-then-localize` is unsafe, because on text that carries an offset `utc=True` converts
+to UTC where `tz_localize` raised TypeError. `index-plus-offset` is unsafe, because the
+assignment changes the object in place and `shift` returns a new one. `date-range-slice` is
+unsafe: when the end is not a step of the range, the slice drops the last real step and
+`inclusive="left"` keeps it. It leaves a range with periods alone. These three rules also leave
+a call alone that ends in a trailing comma or holds a comment, because the fix adds an argument
+after the last one.
+
+`index-time-mask` took 241 ms as a mask on `index.time` and 25 ms as `at_time` on 2,000,000 rows.
+The two hour masks took 51 ms and `between_time` took 28 ms. The `between_time` fix applies to
+whole hours written as numbers, and it is unsafe: when the first hour is later than the second,
+the masks select nothing and `between_time` selects the hours across midnight. The `at_time` fix
+applies to a time object, such as `time(12)`, and a comparison with text is left alone, because
+text never equals a time.
+`reindex-to-date-range` is unsafe, because `asfreq` keeps the name of the index and the reindex
+dropped it. `divide-by-shift` is unsafe: `(s - s.shift(n)) / s.shift(n)` rounds differently, so
+the result is close and not bit equal, with or without a number of rows, and on pandas 2 `pct_change` filled missing values forward
+first. `date-part-key` took 25 ms with two keys and 6 ms with one monthly key on 2,000,000 rows.
+For `replace(tzinfo=None)` in a lambda, `dt.tz_localize(None)` took 2.3 ms where the lambda took
+746 ms on 200,000 rows. `apply-date-method` leaves `replace(tzinfo=zone)` alone, because `replace`
+skips the daylight saving check that `tz_localize` makes.
 
 ### Stated intent
 

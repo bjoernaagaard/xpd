@@ -1,0 +1,30 @@
+# pct_change(n) is s / s.shift(n) - 1, and that form gave a bit equal result on pandas 3.1.1.
+# Unsafe: on pandas 2 pct_change filled missing values forward first, so a column with missing
+# values gave another result there. The form (s - s.shift()) / s.shift() rounds differently, so
+# its result is close to pct_change() and not bit equal: 0.1 then 0.3 gave 1.9999999999999998
+# and pct_change gave 1.9999999999999996.
+id: divide-by-shift
+language: python
+severity: warning
+message: pct_change() is the change from the earlier row as a share of it. Write $S.pct_change().
+rule:
+  any:
+    - pattern: $S / $S.shift() - 1
+    - pattern: ($S - $S.shift()) / $S.shift()
+fix: $S.pct_change()
+metadata: { fix: unsafe }
+---
+# With a number of rows. The form (s - s.shift(n)) / s.shift(n) rounds differently, so its result
+# is close to pct_change(n) and not bit equal.
+id: divide-by-shift
+language: python
+severity: warning
+message: pct_change($N) is the change from the earlier row as a share of it. Write $S.pct_change($N).
+rule:
+  any:
+    - pattern: $S / $S.shift($N) - 1
+    - pattern: ($S - $S.shift($N)) / $S.shift($N)
+constraints:
+  N: { any: [{ kind: integer }, { kind: identifier }] }
+fix: $S.pct_change($N)
+metadata: { fix: unsafe }

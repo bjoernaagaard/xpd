@@ -1,0 +1,20 @@
+# date_range with tz= steps over a daylight saving change. The same range made without a zone
+# and then localized raises there: hourly from 26 to 28 October 2024 in Europe/Copenhagen raised
+# on pandas 2.3.3 and 3.1.1, and tz= returned 50 hours. Unsafe for that reason. Without a change
+# in the range the two forms gave an equal index.
+id: date-range-then-localize
+language: python
+severity: warning
+message: date_range takes tz=, which steps over a daylight saving change where tz_localize raises. Write $PD.date_range($$$A, tz=$TZ).
+rule:
+  pattern: $PD.date_range($$$A).tz_localize($TZ)
+  all:
+    - not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^tz$ } } }
+    # The fix adds an argument after the last one, so a trailing comma or a comment would break it.
+    - not: { has: { stopBy: end, kind: argument_list, regex: ',\s*\)$' } }
+    - not: { has: { stopBy: end, kind: comment } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+  TZ: { not: { any: [{ kind: keyword_argument }, { regex: ^None$ }] } }
+fix: $PD.date_range($$$A, tz=$TZ)
+metadata: { fix: unsafe }

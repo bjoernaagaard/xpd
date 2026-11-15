@@ -1,0 +1,13 @@
+# asfreq reindexes to every step between the first and the last time. The result was equal on
+# sorted and unsorted data and across a daylight saving change, on pandas 2.3.3 and 3.1.1.
+# Unsafe: asfreq keeps the name of the index, and the reindex dropped it.
+id: reindex-to-date-range
+language: python
+severity: warning
+message: asfreq fills in the missing steps between the first and the last time. Write $X.asfreq($F).
+rule:
+  pattern: $X.reindex($PD.date_range($X.index.min(), $X.index.max(), freq=$F))
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+fix: $X.asfreq($F)
+metadata: { fix: unsafe }

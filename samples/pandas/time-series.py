@@ -405,11 +405,11 @@ def pytz_error_handler(df):
     from pytz.exceptions import AmbiguousTimeError
 
     try:
-        first = df["d"].dt.tz_localize("Europe/Copenhagen")
+        first = df["d"].dt.tz_localize("Europe/Copenhagen")  # xpd: tz-localize-without-dst
     except pytz.exceptions.NonExistentTimeError:  # xpd: removed-in-pandas-3
         first = None
     try:
-        second = df["d"].dt.tz_localize("Europe/Copenhagen")
+        second = df["d"].dt.tz_localize("Europe/Copenhagen")  # xpd: tz-localize-without-dst
     except (pytz.AmbiguousTimeError, KeyError):  # xpd: removed-in-pandas-3
         second = None
     try:
@@ -425,7 +425,7 @@ def error_handler_that_stays(df):
 
     zone = pytz.timezone("Europe/Copenhagen")
     try:
-        first = df["d"].dt.tz_localize("Europe/Copenhagen")
+        first = df["d"].dt.tz_localize("Europe/Copenhagen")  # xpd: tz-localize-without-dst
     except (pytz.exceptions.NonExistentTimeError, ValueError):
         first = None
     try:
@@ -433,7 +433,174 @@ def error_handler_that_stays(df):
     except pytz.exceptions.AmbiguousTimeError:
         second = None
     try:
-        third = df["d"].dt.tz_localize("Europe/Copenhagen")
+        third = df["d"].dt.tz_localize("Europe/Copenhagen")  # xpd: tz-localize-without-dst
     except ValueError as error:
         raise pytz.exceptions.InvalidTimeError(str(error)) from error
     return first, second, third
+
+
+@case
+def tz_localize_without_dst(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        df["d"].dt.tz_localize("Europe/Copenhagen"),  # xpd: tz-localize-without-dst
+        ts.tz_localize("Europe/Copenhagen", ambiguous="infer"),  # xpd: tz-localize-without-dst
+        ts.tz_localize(tz="US/Eastern", nonexistent="shift_forward"),  # xpd: tz-localize-without-dst
+    )
+
+
+@case
+def tz_localize_that_stays(df):
+    zone = "Europe/Copenhagen"
+    return (
+        df["d"].dt.tz_localize("UTC"),
+        df["d"].dt.tz_localize("Etc/GMT-1"),
+        df["d"].dt.tz_localize("+01:00"),
+        df["d"].dt.tz_localize("Europe/Copenhagen", ambiguous="NaT", nonexistent="shift_forward"),
+        df["d"].dt.tz_localize(zone, ambiguous="NaT", nonexistent="NaT").dt.tz_localize(None),
+        pd.Timestamp("2024-01-01").tz_localize("Europe/Copenhagen"),
+    )
+
+
+@case
+def date_range_then_localize(df):
+    zone = "Europe/Copenhagen"
+    return (
+        pd.date_range("2024-05-01", "2024-05-03", freq="15min").tz_localize("Europe/Copenhagen"),  # xpd: date-range-then-localize
+        pd.date_range("2024-05-01", periods=96, freq="15min").tz_localize(zone),  # xpd: date-range-then-localize
+    )
+
+
+@case
+def date_range_with_zone(df):
+    return pd.date_range("2024-05-01", "2024-05-03", freq="15min", tz="Europe/Copenhagen"), pd.date_range("2024-05-01", periods=4).tz_localize(None)
+
+
+@case
+def apply_time_zone_method(df):
+    utc = df["d"].dt.tz_localize("UTC")
+    return (
+        utc.apply(lambda t: t.replace(tzinfo=None)),  # xpd: apply-date-method
+        utc.map(lambda t: t.astimezone("Europe/Copenhagen")),  # xpd: apply-date-method
+    )
+
+
+@case
+def time_zone_method_that_stays(df):
+    utc = df["d"].dt.tz_localize("UTC")
+    zones = {2022: "Europe/Copenhagen", 2023: "Europe/London"}
+    return utc.dt.tz_localize(None), utc.head(5).apply(lambda t: t.astimezone(zones[t.year])), utc.dt.tz_convert("Europe/Copenhagen")
+
+
+@case
+def to_datetime_then_localize(df):
+    return (
+        pd.to_datetime(df["raw"]).dt.tz_localize("UTC"),  # xpd: to-datetime-then-localize
+        pd.to_datetime(df["raw"].tolist(), format="%Y-%m-%d").tz_localize("utc"),  # xpd: to-datetime-then-localize
+    )
+
+
+@case
+def to_datetime_with_utc(df):
+    return pd.to_datetime(df["raw"], utc=True), pd.to_datetime(df["raw"]).dt.tz_localize("Europe/Copenhagen", ambiguous="NaT", nonexistent="NaT")
+
+
+@case
+def convert_then_drop_zone(df):
+    local = df["d"].dt.tz_localize("UTC").dt.tz_convert("Europe/Copenhagen")
+    ts = df.set_index(local).sort_index()[["b"]]
+    return (
+        local.dt.tz_convert("UTC").dt.tz_localize(None),  # xpd: convert-then-drop-zone
+        ts.tz_convert("UTC").tz_localize(None),  # xpd: convert-then-drop-zone
+        ts.index.tz_convert("utc").tz_localize(None),  # xpd: convert-then-drop-zone
+    )
+
+
+@case
+def zone_dropped_another_way(df):
+    local = df["d"].dt.tz_localize("UTC").dt.tz_convert("Europe/Copenhagen")
+    return local.dt.tz_convert(None), local.dt.tz_localize(None), local.dt.tz_convert("Europe/London").dt.tz_localize(None)
+
+
+@case
+def index_plus_offset(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    ts.index = ts.index + pd.Timedelta(hours=6)  # xpd: index-plus-offset
+    ts.index += timedelta(days=1)  # xpd: index-plus-offset
+    return ts
+
+
+@case
+def index_moved_by_shift(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    other = ts.copy()
+    other.index = ts.index + pd.Timedelta(hours=6)
+    return ts.shift(freq=pd.Timedelta(hours=6)), other
+
+
+@case
+def date_range_slice(df):
+    return pd.date_range("2024-03-30", "2024-04-01", freq="15min")[:-1]  # xpd: date-range-slice
+
+
+@case
+def date_range_without_end_point(df):
+    return pd.date_range("2024-03-30", "2024-04-01", freq="15min", inclusive="left"), pd.date_range("2024-03-30", periods=10, freq="15min")[:-1]
+
+
+@case
+def index_time_mask(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        ts[ts.index.time == datetime(2024, 1, 1, 12).time()],  # xpd: index-time-mask
+        ts.loc[ts.index.time == datetime(2024, 1, 1, 12, 30).time()],  # xpd: index-time-mask
+        ts[(ts.index.hour >= 8) & (ts.index.hour < 16)],  # xpd: index-time-mask
+    )
+
+
+@case
+def time_of_day_that_stays(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    start, end = 8, 16
+    return ts.at_time("12:00"), ts.between_time("08:00", "16:00", inclusive="left"), ts[(ts.index.hour >= start) & (ts.index.hour < end)], ts[(ts.index.hour >= 8) & (ts.index.hour < 24)]
+
+
+@case
+def reindex_to_date_range(df):
+    ts = df.set_index("d").sort_index()[["b"]].resample("h").mean().dropna()
+    return ts.reindex(pd.date_range(ts.index.min(), ts.index.max(), freq="h"))  # xpd: reindex-to-date-range
+
+
+@case
+def reindex_that_stays(df):
+    ts = df.set_index("d").sort_index()[["b"]].resample("h").mean().dropna()
+    return ts.asfreq("h"), ts.reindex(pd.date_range("2022-01-01", "2022-02-01", freq="h"))
+
+
+@case
+def divide_by_shift(df):
+    n = 4
+    return (
+        df["w"] / df["w"].shift() - 1,  # xpd: divide-by-shift
+        (df["w"] - df["w"].shift(96)) / df["w"].shift(96),  # xpd: divide-by-shift
+        df["w"] / df["w"].shift(n) - 1,  # xpd: divide-by-shift
+    )
+
+
+@case
+def ratio_that_stays(df):
+    return df["w"].pct_change(96), df["w"] / df["a"].shift() - 1, df["w"] / df["w"].shift(fill_value=1) - 1
+
+
+@case
+def date_part_key(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        df.groupby([df["d"].dt.year, df["d"].dt.month])["b"].sum(),  # xpd: date-part-key
+        ts.groupby([ts.index.year, ts.index.month], sort=False).sum(),  # xpd: date-part-key
+    )
+
+
+@case
+def month_key_that_stays(df):
+    return df.groupby(pd.Grouper(key="d", freq="MS"))["b"].sum(), df.groupby([df["d"].dt.year, df["k"]])["b"].sum()

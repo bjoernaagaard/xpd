@@ -1,0 +1,21 @@
+# Unsafe: on text that carries an offset, such as "2024-07-01 12:00+02:00", utc=True converts to
+# UTC where tz_localize raised TypeError. On text without an offset, on a format and on a unit the
+# two forms gave an equal result of the same dtype on pandas 2.3.3 and 3.1.1.
+id: to-datetime-then-localize
+language: python
+severity: warning
+message: to_datetime takes utc=True, which also reads text that carries an offset, where tz_localize raises. Write $PD.to_datetime($$$A, utc=True).
+rule:
+  any:
+    - pattern: $PD.to_datetime($$$A).dt.tz_localize($U)
+    - pattern: $PD.to_datetime($$$A).tz_localize($U)
+  all:
+    - not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^utc$ } } }
+    # The fix adds an argument after the last one, so a trailing comma or a comment would break it.
+    - not: { has: { stopBy: end, kind: argument_list, regex: ',\s*\)$' } }
+    - not: { has: { stopBy: end, kind: comment } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+  U: { regex: '^["''](UTC|utc)["'']$' }
+fix: $PD.to_datetime($$$A, utc=True)
+metadata: { fix: unsafe }

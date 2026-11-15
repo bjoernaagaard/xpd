@@ -1,7 +1,7 @@
 id: text-time-key
 language: python
 severity: warning
-message: Grouping on formatted text is slow. Group on dt.to_period("M") or dt.floor("h") instead.
+message: Grouping on formatted text is slow. Group on dt.to_period("M") or dt.floor("h") instead. On a column with a time zone to_period drops the zone and warns, so group on pd.Grouper(key=..., freq="MS") there.
 rule:
   pattern: $X.dt.strftime($F)
   inside:
