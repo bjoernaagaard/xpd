@@ -8,7 +8,7 @@ id: cdf-complement
 language: python
 severity: warning
 message: Subtracting $R.cdf from 1 drops the digits of a small right tail and gives 0 once the cdf rounds to 1. In the runs that lost up to all 16 digits, and $R.sf was never a digit worse. Write $R.sf($$$A).
-rule: { any: [{ pattern: 1 - $R.cdf($$$A) }, { pattern: 1.0 - $R.cdf($$$A) }, { pattern: '1. - $R.cdf($$$A)' }] }
+rule: { all: [{ any: [{ pattern: 1 - $R.cdf($$$A) }, { pattern: 1.0 - $R.cdf($$$A) }, { pattern: '1. - $R.cdf($$$A)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   R:
     any:
@@ -52,7 +52,7 @@ id: cdf-complement
 language: python
 severity: warning
 message: Subtracting $R.sf from 1 drops the digits of a small left tail and gives 0 once the sf rounds to 1. In the runs that lost up to all 16 digits, and $R.cdf was never a digit worse. Write $R.cdf($$$A).
-rule: { any: [{ pattern: 1 - $R.sf($$$A) }, { pattern: 1.0 - $R.sf($$$A) }, { pattern: '1. - $R.sf($$$A)' }] }
+rule: { all: [{ any: [{ pattern: 1 - $R.sf($$$A) }, { pattern: 1.0 - $R.sf($$$A) }, { pattern: '1. - $R.sf($$$A)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   R:
     any:

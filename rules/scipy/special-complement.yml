@@ -5,7 +5,7 @@ id: special-complement
 language: python
 severity: warning
 message: Subtracting $SP.$F from 1 drops the digits of a small result and gives 0 once $F rounds to 1. In the runs that lost up to all 16 digits, and $SP.$NEW was never a digit worse. Write $SP.$NEW($$$A).
-rule: { any: [{ pattern: 1 - $SP.$F($$$A) }, { pattern: 1.0 - $SP.$F($$$A) }, { pattern: '1. - $SP.$F($$$A)' }] }
+rule: { all: [{ any: [{ pattern: 1 - $SP.$F($$$A) }, { pattern: 1.0 - $SP.$F($$$A) }, { pattern: '1. - $SP.$F($$$A)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   SP: { matches: special-module }
   F: { regex: '^(erf|erfc|gammainc|gammaincc)$' }
@@ -47,7 +47,7 @@ id: special-complement
 language: python
 severity: warning
 message: Subtracting $SP.betainc from 1 drops the digits of a small upper tail and gives 0 once betainc rounds to 1. That lost up to all 16 digits where $SP.betaincc lost less than 1. Write $SP.betaincc($$$A).
-rule: { any: [{ pattern: 1 - $SP.betainc($$$A) }, { pattern: 1.0 - $SP.betainc($$$A) }, { pattern: '1. - $SP.betainc($$$A)' }] }
+rule: { all: [{ any: [{ pattern: 1 - $SP.betainc($$$A) }, { pattern: 1.0 - $SP.betainc($$$A) }, { pattern: '1. - $SP.betainc($$$A)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   SP: { matches: special-module }
 fix: $SP.betaincc($$$A)
@@ -81,7 +81,7 @@ id: special-complement
 language: python
 severity: warning
 message: Adding $F($X) to 1 drops the digits of a small result when $X is negative and gives 0 below -5.9. That lost up to all 16 digits where erfc lost at most 0.7. Write $NEW(-$X).
-rule: { any: [{ pattern: 1 + $F($X) }, { pattern: 1.0 + $F($X) }, { pattern: $F($X) + 1 }, { pattern: $F($X) + 1.0 }] }
+rule: { all: [{ any: [{ pattern: 1 + $F($X) }, { pattern: 1.0 + $F($X) }, { pattern: $F($X) + 1 }, { pattern: $F($X) + 1.0 }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   F: { kind: attribute, regex: '\.erf$', has: { field: object, matches: special-module } }
   X: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }, { kind: parenthesized_expression }, { kind: integer }, { kind: float }, { kind: binary_operator, has: { field: operator, regex: '^(\*|/|\*\*)$' } }] }
@@ -119,7 +119,7 @@ id: special-complement
 language: python
 severity: warning
 message: Subtracting $F($X) from 1 drops the digits of a small result and gives 0 once it rounds to 1. In the runs that lost up to all 16 digits, and $F(-$X) was never a digit worse. Write $F(-$X).
-rule: { any: [{ pattern: 1 - $F($X) }, { pattern: 1.0 - $F($X) }, { pattern: '1. - $F($X)' }] }
+rule: { all: [{ any: [{ pattern: 1 - $F($X) }, { pattern: 1.0 - $F($X) }, { pattern: '1. - $F($X)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   F: { any: [{ kind: attribute, regex: '\.(ndtr|expit)$', has: { field: object, matches: special-module } }, { all: [{ matches: special-name }, { regex: '^(ndtr|expit)$' }] }] }
   X: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }, { kind: parenthesized_expression }, { kind: integer }, { kind: float }, { kind: binary_operator, has: { field: operator, regex: '^(\*|/|\*\*)$' } }] }

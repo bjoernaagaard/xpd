@@ -7,7 +7,7 @@ id: log-of-special
 language: python
 severity: warning
 message: $SP.ndtr($X) underflows to 0 below about -37.5, so its log is -inf there. At -40 that lost all 16 digits where $SP.log_ndtr lost 0.15. Write $SP.log_ndtr($X).
-rule: { pattern: $NP.log($SP.ndtr($X)) }
+rule: { all: [{ pattern: $NP.log($SP.ndtr($X)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   SP: { matches: special-module }
@@ -46,7 +46,7 @@ id: log-of-special
 language: python
 severity: warning
 message: $SP.gamma($X) overflows to inf above 171.6, so its log is inf there. At 200 that lost all 16 digits where $SP.gammaln lost none. Write $SP.gammaln($X).
-rule: { pattern: $NP.log($SP.gamma($X)) }
+rule: { all: [{ pattern: $NP.log($SP.gamma($X)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   SP: { matches: special-module }
@@ -84,7 +84,7 @@ id: log-of-special
 language: python
 severity: warning
 message: $SP.factorial($N) overflows to inf above 170, so its log is inf there. At 200 that lost all 16 digits where $SP.gammaln($N + 1) lost none. Write $SP.gammaln($N + 1).
-rule: { pattern: $NP.log($SP.factorial($N)) }
+rule: { all: [{ pattern: $NP.log($SP.factorial($N)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   SP: { matches: special-module }
@@ -123,7 +123,7 @@ id: log-of-special
 language: python
 severity: warning
 message: $SP.beta($A, $B) underflows to 0 once both arguments pass about 550, so its log is -inf there. At 1e6 and 1e6 that lost all 16 digits where $SP.betaln lost 0.8. Write $SP.betaln($A, $B).
-rule: { pattern: '$NP.log($SP.beta($A, $B))' }
+rule: { all: [{ pattern: '$NP.log($SP.beta($A, $B))' }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   SP: { matches: special-module }
@@ -159,7 +159,7 @@ id: log-of-special
 language: python
 severity: warning
 message: $SP.expit($X) rounds toward 1 above 8 and to 0 below -745, so its log loses 3 to 16 digits there. At 40 that lost all 16 digits where $SP.log_expit lost none. Write $SP.log_expit($X).
-rule: { pattern: $NP.log($SP.expit($X)) }
+rule: { all: [{ pattern: $NP.log($SP.expit($X)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   SP: { matches: special-module }
@@ -195,7 +195,7 @@ id: log-of-special
 language: python
 severity: warning
 message: $SP.softmax gives 0 for an entry more than 745 below the largest, so its log is -inf there. With logits 0, -50 and -800 that lost all 16 digits in the last entry where $SP.log_softmax lost none. Write $SP.log_softmax($$$A).
-rule: { pattern: $NP.log($SP.softmax($$$A)) }
+rule: { all: [{ pattern: $NP.log($SP.softmax($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   SP: { matches: special-module }

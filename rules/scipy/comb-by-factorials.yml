@@ -5,7 +5,7 @@ id: comb-by-factorials
 language: python
 severity: warning
 message: $F overflows to inf above 170, so this ratio is inf or nan once $N passes 170. At 200 and 3 that lost all 16 digits where comb lost none. Write $COMB($N, $K).
-rule: { any: [{ pattern: $F($N) / ($F($K) * $F($N - $K)) }, { pattern: $F($N) / ($F($N - $K) * $F($K)) }, { pattern: $F($N) / $F($K) / $F($N - $K) }, { pattern: $F($N) / $F($N - $K) / $F($K) }] }
+rule: { all: [{ any: [{ pattern: $F($N) / ($F($K) * $F($N - $K)) }, { pattern: $F($N) / ($F($N - $K) * $F($K)) }, { pattern: $F($N) / $F($K) / $F($N - $K) }, { pattern: $F($N) / $F($N - $K) / $F($K) }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   F: { kind: attribute, regex: '\.factorial$', has: { field: object, matches: special-module } }
 transform:

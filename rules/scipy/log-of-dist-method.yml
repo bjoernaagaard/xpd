@@ -7,7 +7,7 @@ id: log-of-dist-method
 language: python
 severity: warning
 message: $R.$M underflows to 0 far in a tail, so np.log of it gives -inf there. In the runs that lost up to all 16 digits, and $R.log$M was never a digit worse. Write $R.log$M($$$A).
-rule: { pattern: $NP.log($R.$M($$$A)) }
+rule: { all: [{ pattern: $NP.log($R.$M($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   M: { regex: '^(pdf|pmf)$' }
@@ -53,7 +53,7 @@ id: log-of-dist-method
 language: python
 severity: warning
 message: $R.cdf underflows to 0 far in the left tail and rounds to 1 in the right, so np.log of it gives -inf or 0 there. In the runs that lost up to all 16 digits, and $R.logcdf was never a digit worse. Write $R.logcdf($$$A).
-rule: { pattern: $NP.log($R.cdf($$$A)) }
+rule: { all: [{ pattern: $NP.log($R.cdf($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   R:
@@ -98,7 +98,7 @@ id: log-of-dist-method
 language: python
 severity: warning
 message: $R.sf underflows to 0 far in the right tail and rounds to 1 in the left, so np.log of it gives -inf or 0 there. In the runs that lost up to all 16 digits, and $R.logsf was never a digit worse. Write $R.logsf($$$A).
-rule: { pattern: $NP.log($R.sf($$$A)) }
+rule: { all: [{ pattern: $NP.log($R.sf($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   R:

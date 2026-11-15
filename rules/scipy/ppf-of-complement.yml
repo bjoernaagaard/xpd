@@ -10,6 +10,7 @@ message: 1 - $P rounds away the digits of a small $P, so this lost at least 3 di
 rule:
   pattern: $R.ppf($$$ARGS)
   has: { field: arguments, has: { nthChild: 1, any: [{ pattern: 1 - $P }, { pattern: 1.0 - $P }, { pattern: '1. - $P' }] } }
+  not: { has: { stopBy: end, kind: comment } }
 constraints:
   # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
   P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
@@ -60,6 +61,7 @@ message: 1 - $P rounds away the digits of a small $P, so this lost at least 3 di
 rule:
   pattern: $R.isf($$$ARGS)
   has: { field: arguments, has: { nthChild: 1, any: [{ pattern: 1 - $P }, { pattern: 1.0 - $P }, { pattern: '1. - $P' }] } }
+  not: { has: { stopBy: end, kind: comment } }
 constraints:
   # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
   P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
@@ -109,7 +111,7 @@ id: ppf-of-complement
 language: python
 severity: warning
 message: 1 - $P rounds away the digits of a small $P, so $F(1 - $P) lost at least 3 digits for $P below 5e-7 and gives inf below 1.1e-16, where -$F($P) lost none. Write -$F($P).
-rule: { any: [{ pattern: $F(1 - $P) }, { pattern: $F(1.0 - $P) }, { pattern: '$F(1. - $P)' }] }
+rule: { all: [{ any: [{ pattern: $F(1 - $P) }, { pattern: $F(1.0 - $P) }, { pattern: '$F(1. - $P)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
 constraints:
   # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
   P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }

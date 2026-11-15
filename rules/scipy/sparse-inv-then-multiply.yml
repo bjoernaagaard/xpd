@@ -12,6 +12,7 @@ rule:
     - pattern: $L.inv($A) @ $B
     - pattern: $L.inv($A).dot($B)
   has: { stopBy: end, kind: attribute, pattern: $L.inv, matches: sparse-linalg }
+  not: { has: { stopBy: end, kind: comment } }
 fix: $L.spsolve($A, $B)
 metadata: { fix: unsafe }
 utils:
