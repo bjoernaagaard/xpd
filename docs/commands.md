@@ -24,7 +24,8 @@ fix may change it, for example because another name still points at the old obje
 | `--fix --unsafe-fixes` | Write every fix, then lint what is left |
 
 Output is text on a terminal and JSON otherwise. The JSON has `fixed`, the number of fixes
-written, and `issues`, each with `package`, `rule`, `file`, `line`, `column`, `severity`,
+written, `fixable`, the number of issues that `--fix` fixes with the same `--unsafe-fixes`
+setting, and `issues`, each with `package`, `rule`, `file`, `line`, `column`, `severity`,
 `message` and `fix`: `safe`, `unsafe` or `null`. A package warning is about the project and not
 about a place in a file, so its `line` and `column` are `null`.
 

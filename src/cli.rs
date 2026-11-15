@@ -229,7 +229,7 @@ fn check(
         }
     };
     match format {
-        Format::Json => println!("{}", report.to_json()),
+        Format::Json => println!("{}", report.to_json(allowed)),
         Format::Text => {
             for i in &report.issues {
                 println!("{}", i.line(allowed));

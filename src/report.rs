@@ -88,9 +88,11 @@ impl Report {
         self.issues.iter().any(|i| i.severity == Severity::Error)
     }
 
-    pub(crate) fn to_json(&self) -> Value {
+    /// `fixable` counts the issues that `--fix` fixes at the `allowed` level.
+    pub(crate) fn to_json(&self, allowed: Applicability) -> Value {
         let issues: Vec<Value> = self.issues.iter().map(Issue::to_json).collect();
-        json!({"fixed": self.fixed, "issues": issues})
+        let fixable = self.issues.iter().filter(|i| i.fixable(allowed)).count();
+        json!({"fixed": self.fixed, "fixable": fixable, "issues": issues})
     }
 
     /// For example `fixed 2, 3 issues, 1 fixable with --fix, 1 more with --fix --unsafe-fixes`.
