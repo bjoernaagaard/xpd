@@ -16,12 +16,19 @@ classifiers = [
 ]
 dynamic = ["version", "description", "readme", "keywords"]
 
+# The MCP server, `xpd mcp`. FastMCP stays within one minor release, and prefab-ui, which draws
+# the app views, is pinned because its releases break often.
+[project.optional-dependencies]
+mcp = ["fastmcp[apps,code-mode,tasks]~=4.2.0", "prefab-ui==0.21.1"]
+
 [project.urls]
 Documentation = "https://bjoernaagaard.github.io/xpd/"
 Repository = "https://github.com/bjoernaagaard/xpd"
 
 [tool.maturin]
 bindings = "bin"
+# The wheel also installs the `xpd` Python package, which holds the MCP server.
+python-source = "python"
 
 [tool.ruff]
 line-length = 100

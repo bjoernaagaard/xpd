@@ -13,11 +13,11 @@ pre-commit:
       glob: ["rules/**/*.yml", "*.rs"]
       run: cargo run --quiet -- check samples/good.py --format text
     - name: ruff format
-      glob: "py/*.py"
+      glob: ["py/*.py", "python/**/*.py"]
       run: ruff format {staged_files}
       stage_fixed: true
     - name: ruff check
-      glob: "py/*.py"
+      glob: ["py/*.py", "python/**/*.py"]
       run: ruff check --fix {staged_files}
       stage_fixed: true
     - name: jactionlint

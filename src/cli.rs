@@ -1,5 +1,6 @@
 //! The command line: its arguments, and what each command prints and exits with.
 
+use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -10,6 +11,7 @@ use serde_json::Value;
 
 use crate::catalog;
 use crate::graph::Graph;
+use crate::mcp;
 use crate::pack;
 use crate::package_check;
 use crate::report::Report;
@@ -121,6 +123,15 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Start the MCP server. Needs the mcp extra: uvx --from 'xpd[mcp]' xpd mcp
+    ///
+    /// The arguments go to the server, so `xpd mcp -h` lists its flags.
+    #[command(disable_help_flag = true)]
+    Mcp {
+        /// Arguments for the server, such as --transport http.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
+    },
 }
 
 /// Runs the command the arguments name.
@@ -160,6 +171,7 @@ pub(crate) fn run() -> ExitCode {
             println!("{}", skills::to_json());
             ExitCode::SUCCESS
         }
+        Cmd::Mcp { args } => mcp::run(&args),
     }
 }
 

@@ -4,6 +4,7 @@
 mod catalog;
 mod cli;
 mod graph;
+mod mcp;
 mod nodes;
 mod pack;
 mod package_check;
