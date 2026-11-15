@@ -162,3 +162,203 @@ def removed_helpers():
     from sklearn.metrics.cluster import entropy  # xpd: deprecated-in-sklearn
     from sklearn.metrics.cluster import mutual_info_score
     return stable_cumsum, entropy, mutual_info_score
+
+
+def attempt(build):
+    """What build returns, or None when it raises, as a removed form does on 1.9.1."""
+    try:
+        return build()
+    except (ImportError, TypeError, ValueError, AttributeError):
+        return None
+
+
+@case
+def model_selection_module():
+    def old():
+        from sklearn.cross_validation import cross_val_score, train_test_split  # xpd: removed-in-sklearn
+        return train_test_split(np.arange(10), random_state=0), cross_val_score
+
+    from sklearn.model_selection import train_test_split
+    return attempt(old), train_test_split(np.arange(10), random_state=0)
+
+
+@case
+def externals_joblib():
+    def whole():
+        from sklearn.externals import joblib  # xpd: removed-in-sklearn
+        return joblib.hash([1, 2])
+
+    def names():
+        from sklearn.externals.joblib import hash  # xpd: removed-in-sklearn
+        return hash([1, 2])
+
+    def aliased():
+        import sklearn.externals.joblib as jl  # xpd: removed-in-sklearn
+        return jl.hash([1, 2])
+
+    import joblib
+    return attempt(whole), attempt(names), attempt(aliased), joblib.hash([1, 2])
+
+
+@case
+def private_modules():
+    def logistic():
+        from sklearn.linear_model.logistic import LogisticRegression  # xpd: removed-in-sklearn
+        return LogisticRegression().fit(*data()).coef_
+
+    def blobs():
+        from sklearn.datasets.samples_generator import make_blobs  # xpd: removed-in-sklearn
+        return make_blobs(n_samples=10, random_state=0)
+
+    def stop_words():
+        from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS  # xpd: removed-in-sklearn
+        return sorted(ENGLISH_STOP_WORDS)[:5]
+
+    from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+    return attempt(logistic), attempt(blobs), attempt(stop_words), sorted(ENGLISH_STOP_WORDS)[:5]
+
+
+@case
+def feature_names():
+    from sklearn.feature_extraction.text import CountVectorizer
+    vec = CountVectorizer().fit(["red apple", "green apple"])
+    old = attempt(lambda: vec.get_feature_names())  # xpd: removed-in-sklearn
+    return old, vec.get_feature_names_out()
+
+
+@case
+def renamed_keywords():
+    from sklearn.calibration import CalibratedClassifierCV
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.ensemble import BaggingClassifier
+    from sklearn.linear_model import LassoCV, RidgeCV
+    from sklearn.manifold import TSNE
+    from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
+    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.svm import LinearSVC
+    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.utils import check_array
+    X, y = data()
+    Xr, yr = reg_data()
+    cats = [["a"], ["b"], ["a"]]
+    return (
+        attempt(lambda: OneHotEncoder(sparse=False).fit_transform(cats)),  # xpd: removed-in-sklearn
+        OneHotEncoder(sparse_output=False).fit_transform(cats),
+        attempt(lambda: BaggingClassifier(base_estimator=DecisionTreeClassifier(random_state=0), random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        BaggingClassifier(estimator=DecisionTreeClassifier(random_state=0), random_state=0).fit(X, y).predict(X),
+        attempt(lambda: CalibratedClassifierCV(base_estimator=LinearSVC(random_state=0)).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        attempt(lambda: TSNE(n_iter=250, random_state=0).fit_transform(X[:40])),  # xpd: removed-in-sklearn
+        attempt(lambda: RidgeCV(store_cv_values=True).fit(Xr, yr).alpha_),  # xpd: removed-in-sklearn
+        attempt(lambda: check_array([[1.0, np.nan]], force_all_finite=False)),  # xpd: removed-in-sklearn
+        attempt(lambda: AgglomerativeClustering(affinity="manhattan", linkage="average").fit(X).labels_),  # xpd: removed-in-sklearn
+        attempt(lambda: LassoCV(n_alphas=10).fit(Xr, yr).alpha_),  # xpd: removed-in-sklearn
+        attempt(lambda: StratifiedKFold(n_folds=3).get_n_splits()),  # xpd: removed-in-sklearn
+        attempt(lambda: StratifiedShuffleSplit(n_iter=3, random_state=0).get_n_splits()),  # xpd: removed-in-sklearn
+        StratifiedKFold(n_splits=3).get_n_splits(),
+    )
+
+
+@case
+def dropped_keywords():
+    from sklearn.cluster import KMeans
+    from sklearn.ensemble import AdaBoostClassifier, IsolationForest
+    from sklearn.model_selection import GridSearchCV
+    X, y = data()
+    return (
+        attempt(lambda: KMeans(n_clusters=2, n_jobs=-1, random_state=0).fit(X).labels_),  # xpd: removed-in-sklearn
+        KMeans(n_clusters=2, random_state=0).fit(X).labels_,
+        attempt(lambda: IsolationForest(behaviour="new", random_state=0).fit(X).predict(X)),  # xpd: removed-in-sklearn
+        attempt(lambda: AdaBoostClassifier(algorithm="SAMME", random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        attempt(lambda: GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, iid=False).fit(X, y).best_params_),  # xpd: removed-in-sklearn
+        attempt(lambda: LogisticRegression(multi_class="multinomial").fit(X, y).coef_),  # xpd: removed-in-sklearn
+        LogisticRegression().fit(X, y).coef_,
+    )
+
+
+@case
+def refused_values():
+    from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+    X, y = data()
+    Xr, yr = reg_data()
+    return (
+        attempt(lambda: RandomForestClassifier(n_estimators=5, max_features="auto", random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        RandomForestClassifier(n_estimators=5, max_features="sqrt", random_state=0).fit(X, y).predict(X),
+        attempt(lambda: RandomForestRegressor(n_estimators=5, max_features="auto", random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
+        attempt(lambda: SGDClassifier(loss="log", random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        SGDClassifier(loss="log_loss", random_state=0).fit(X, y).predict(X),
+        attempt(lambda: DecisionTreeRegressor(criterion="mse", random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
+        attempt(lambda: DecisionTreeRegressor(criterion="mae", random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
+        attempt(lambda: GradientBoostingRegressor(loss="ls", n_estimators=5, random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
+        attempt(lambda: GradientBoostingClassifier(loss="deviance", n_estimators=5, random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
+        ExtraTreesClassifier(n_estimators=5, max_features="log2", random_state=0).fit(X, y).predict(X),
+    )
+
+
+def removed_forms(model, X, y, X_test, y_test, grid):
+    from sklearn import grid_search  # xpd: removed-in-sklearn
+    from sklearn import datasets, metrics
+    from sklearn.calibration import CalibratedClassifierCV
+    from sklearn.cross_validation import LabelKFold  # xpd: removed-in-sklearn
+    from sklearn.datasets import load_boston  # xpd: removed-in-sklearn
+    from sklearn.datasets import load_diabetes
+    from sklearn.datasets.base import Bunch  # xpd: removed-in-sklearn
+    from sklearn.dummy import DummyClassifier
+    from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+    from sklearn.externals.six import StringIO  # xpd: removed-in-sklearn
+    from sklearn.feature_selection import RFE
+    from sklearn.linear_model import LassoCV, Ridge
+    from sklearn.metrics import SCORERS  # xpd: removed-in-sklearn
+    from sklearn.metrics import get_scorer_names, jaccard_score, mean_squared_error
+    from sklearn.metrics import jaccard_similarity_score  # xpd: removed-in-sklearn
+    from sklearn.metrics import plot_confusion_matrix, plot_roc_curve  # xpd: removed-in-sklearn, removed-in-sklearn
+    from sklearn.model_selection import GridSearchCV, cross_val_score
+    from sklearn.preprocessing import Imputer  # xpd: removed-in-sklearn
+    from sklearn.impute import SimpleImputer
+    import sklearn.externals.joblib  # xpd: removed-in-sklearn
+    datasets.load_boston()  # xpd: removed-in-sklearn
+    load_diabetes()
+    metrics.SCORERS.keys()  # xpd: removed-in-sklearn
+    metrics.plot_precision_recall_curve(model, X_test, y_test)  # xpd: removed-in-sklearn
+    get_scorer_names()
+    LogisticRegression(multi_class="ovr")  # xpd: removed-in-sklearn
+    RandomForestClassifier(min_impurity_split=0.1, random_state=0)  # xpd: removed-in-sklearn
+    RandomForestClassifier(min_impurity_decrease=0.1, random_state=0)
+    Ridge(normalize=True)  # xpd: removed-in-sklearn
+    GridSearchCV(model, grid, fit_params={"sample_weight": y})  # xpd: removed-in-sklearn
+    SGDClassifier(n_iter=5, random_state=0)  # xpd: removed-in-sklearn
+    LassoCV(n_alphas=100, alphas=None)  # xpd: removed-in-sklearn
+    mean_squared_error(y, y, squared=False)  # xpd: removed-in-sklearn
+    GradientBoostingClassifier(max_features="auto", random_state=0)  # xpd: removed-in-sklearn
+    grid = {"max_features": ["auto", "sqrt"], "n_estimators": [10, 50]}  # xpd: removed-in-sklearn
+    grid = {"rf__max_features": ["sqrt", "log2"], "solver": ["auto"]}
+    CalibratedClassifierCV(model, cv="prefit")  # xpd: removed-in-sklearn
+    LogisticRegression(penalty="none")  # xpd: removed-in-sklearn
+    RandomForestClassifier(min_samples_split=1, random_state=0)  # xpd: removed-in-sklearn
+    DummyClassifier("most_frequent")  # xpd: removed-in-sklearn
+    DummyClassifier(strategy="most_frequent")
+    RFE(model, 5)  # xpd: removed-in-sklearn
+    RFE(model, n_features_to_select=5)
+    GridSearchCV(model, grid, "accuracy")  # xpd: removed-in-sklearn
+    cross_val_score(model, X, y, 5)  # xpd: removed-in-sklearn
+    cross_val_score(model, X, y, cv=5)
+    jaccard_score(y, y)
+    SimpleImputer(strategy="mean")
+    return Bunch, StringIO, SCORERS, jaccard_similarity_score, plot_confusion_matrix, plot_roc_curve, LabelKFold, grid_search, load_boston, Imputer
+
+
+def plot_confusion_matrix_of(model, X, y):
+    def plot_confusion_matrix(m, a, b):
+        return m.score(a, b)
+    return plot_confusion_matrix(model, X, y)
+
+
+def compat_paths():
+    try:
+        from sklearn.model_selection import train_test_split
+    except ImportError:
+        from sklearn.cross_validation import train_test_split
+    try:
+        enc = OneHotEncoder(sparse_output=False)
+    except TypeError:
+        enc = OneHotEncoder(sparse=False)
+    return train_test_split, enc

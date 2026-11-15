@@ -167,6 +167,7 @@ rule:
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
   not:
     any:
+      - regex: '^penalty\s*=\s*["'']none["'']$'
       - all:
           - regex: '^penalty\s*=\s*["'']l2["'']$'
           - inside: { kind: argument_list, not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^l1_ratio$ } }] } } }
@@ -337,7 +338,7 @@ rule:
     - inside:
         kind: module
         stopBy: end
-        has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { field: name, pattern: $C } }] }
+        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 constraints:
   C: { regex: '(^|\.)TargetEncoder$' }
 metadata: { since: "1.9" }
@@ -408,7 +409,7 @@ rule:
     - inside:
         kind: module
         stopBy: end
-        has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { field: name, pattern: $C } }] }
+        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 constraints:
   C: { regex: '(^|\.)HDBSCAN$' }
 ---
