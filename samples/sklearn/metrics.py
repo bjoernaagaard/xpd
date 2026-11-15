@@ -1,14 +1,23 @@
 """Metrics given the wrong input, and the same metrics given the right one.
 
 A line that xpd reports ends with a comment that names the rule. Each case returns what the
-code computes, so a copy fixed with `xpd check --fix` can be compared with this file.
+code computes, so a copy fixed with `xpd check --fix` can be compared with this file. A form
+that raises on scikit-learn 1.9.1 sits in a function that is not a case.
 """
 
 import numpy as np
-import pandas as pd
 from sklearn import metrics
+from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, average_precision_score, confusion_matrix, precision_score, r2_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    brier_score_loss,
+    log_loss,
+    precision_recall_curve,
+    roc_auc_score,
+    roc_curve,
+)
 from sklearn.model_selection import train_test_split
 
 CASES = {}
@@ -19,67 +28,113 @@ def case(fn):
     return fn
 
 
-def frame(n=300, seed=0):
+def data(n=300, classes=2, seed=0):
     r = np.random.default_rng(seed)
-    city = r.choice(["berlin", "paris", "rome", "oslo"], n, p=[0.4, 0.3, 0.25, 0.05])
-    x1 = r.normal(size=n)
-    x2 = r.normal(size=n)
-    y = ((city == "berlin") * 1.5 + x1 + r.normal(scale=0.5, size=n) > 0.8).astype(int)
-    return pd.DataFrame({"city": city, "x1": x1, "x2": x2, "y": y})
+    X = r.normal(size=(n, 3))
+    y = np.digitize(X[:, 0] + r.normal(scale=0.7, size=n), np.linspace(-0.6, 0.6, classes - 1)) if classes > 2 else (X[:, 0] + r.normal(scale=0.7, size=n) > 0.3).astype(int)
+    return train_test_split(X, y, test_size=0.3, random_state=0)
 
 
-def fitted(df):
-    X_train, X_test, y_train, y_test = train_test_split(df[["x1", "x2"]], df["y"], test_size=0.3, random_state=0)
+def fitted(classes=2):
+    X_train, X_test, y_train, y_test = data(classes=classes)
     return LogisticRegression().fit(X_train, y_train), X_test, y_test
 
 
 @case
-def auc_from_labels(df):
-    model, X_test, y_test = fitted(df)
+def auc_from_labels():
+    model, X_test, y_test = fitted()
     return (
+        model,
         roc_auc_score(y_test, model.predict(X_test)),  # xpd: auc-from-labels
         average_precision_score(y_test, model.predict(X_test), pos_label=1),  # xpd: auc-from-labels
+        metrics.roc_curve(y_test, model.predict(X_test)),  # xpd: auc-from-labels
         roc_auc_score(y_test, model.predict_proba(X_test)[:, 0]),  # xpd: auc-from-labels
-    )
-
-
-@case
-def auc_from_a_label_variable(df):
-    model, X_test, y_test = fitted(df)
-    y_pred = model.predict(X_test)  # xpd: auc-from-labels
-    accuracy = accuracy_score(y_test, y_pred)
-    return accuracy, roc_auc_score(y_test, y_pred)
-
-
-@case
-def auc_from_scores(df):
-    model, X_test, y_test = fitted(df)
-    y_pred = model.predict(X_test)
-    return (
         roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]),
         roc_auc_score(y_test, model.decision_function(X_test)),
         accuracy_score(y_test, model.predict(X_test)),
-        accuracy_score(y_test, y_pred),
     )
 
 
 @case
-def metric_arguments_swapped(df):
-    model, X_test, y_test = fitted(df)
+def auc_from_a_label_variable():
+    model, X_test, y_test = fitted()
+    y_pred = model.predict(X_test)  # xpd: auc-from-labels
+    accuracy = accuracy_score(y_test, y_pred)
+    precision, recall, _ = precision_recall_curve(y_test, y_pred)
+    return model, accuracy, precision, recall
+
+
+@case
+def auc_from_a_name_assigned_again():
+    model, X_test, y_test = fitted()
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    y_pred = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_pred)
+    return model, accuracy, fpr, tpr
+
+
+@case
+def auc_from_a_calibrator():
+    model, X_test, y_test = fitted()
+    y_score = model.decision_function(X_test)
+    calibrator = IsotonicRegression(out_of_bounds="clip").fit(y_score, y_test)
+    return model, roc_auc_score(y_test, calibrator.predict(y_score))
+
+
+@case
+def loss_from_labels():
+    model, X_test, y_test = fitted()
+    return (
+        model,
+        log_loss(y_test, model.predict(X_test)),  # xpd: auc-from-labels
+        brier_score_loss(y_test, model.predict(X_test)),  # xpd: auc-from-labels
+        log_loss(y_test, model.predict_proba(X_test)),
+        brier_score_loss(y_test, model.predict_proba(X_test)[:, 1]),
+    )
+
+
+@case
+def loss_from_a_label_variable():
+    model, X_test, y_test = fitted()
+    labels = model.predict(X_test)  # xpd: auc-from-labels
+    probabilities = model.predict_proba(X_test)
+    return model, log_loss(y_test, labels), log_loss(y_test, probabilities)
+
+
+def auc_input_that_raises():
+    model, X_test, y_test = fitted()
+    roc_auc_score(y_test, model.predict_proba(X_test))  # xpd: auc-from-labels
+    roc_curve(y_test, model.predict_proba(X_test))  # xpd: auc-from-labels
+    log_loss(y_test, model.decision_function(X_test))  # xpd: auc-from-labels
+    many, X_many, y_many = fitted(classes=3)
+    roc_auc_score(y_many, many.predict(X_many), multi_class="ovr")  # xpd: auc-from-labels
+
+
+@case
+def auc_on_more_classes():
+    model, X_test, y_test = fitted(classes=3)
+    return model, roc_auc_score(y_test, model.predict_proba(X_test), multi_class="ovr")
+
+
+@case
+def metric_arguments_swapped():
+    model, X_test, y_test = fitted()
     y_true = y_test
     y_pred = model.predict(X_test)
     predictions = model.predict_proba(X_test)[:, 1]
     return (
-        precision_score(y_pred, y_test),  # xpd: metric-arguments-swapped
-        recall_score(y_pred, y_true, average="macro"),  # xpd: metric-arguments-swapped
+        model,
+        metrics.precision_score(y_pred, y_test),  # xpd: metric-arguments-swapped
+        metrics.recall_score(y_pred, y_true, average="macro"),  # xpd: metric-arguments-swapped
         metrics.r2_score(predictions, y_test),  # xpd: metric-arguments-swapped
-        confusion_matrix(y_pred, y_test),  # xpd: metric-arguments-swapped
+        metrics.confusion_matrix(y_pred, y_test),  # xpd: metric-arguments-swapped
     )
 
 
 @case
-def metric_arguments_in_order(df):
-    model, X_test, y_test = fitted(df)
+def metric_arguments_in_order():
+    model, X_test, y_test = fitted()
     y_pred = model.predict(X_test)
     y_test_pred = y_pred
-    return precision_score(y_test, y_pred), r2_score(y_test, y_test_pred), accuracy_score(y_pred, y_test)
+    return model, metrics.precision_score(y_test, y_pred), metrics.r2_score(y_test, y_test_pred), accuracy_score(y_pred, y_test)

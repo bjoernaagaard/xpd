@@ -1,43 +1,202 @@
 # Ranking metrics need a score per row. predict returns class labels on a scikit-learn
-# classifier, so the metric ranks two values. Files that import keras, tensorflow or torch are
-# left alone, because predict returns probabilities there.
+# classifier, so the metric ranks two values. On data with no signal the labels and the
+# probabilities both give 0.5, so no proof can show the loss, and these two documents are info.
+# Files that import keras, tensorflow or torch are left
+# alone, and so is a Booster that xgboost or lightgbm trained, because predict returns
+# probabilities there.
 id: auc-from-labels
 language: python
-severity: error
+severity: info
 message: $F ranks the rows by score, and predict returns the class labels, which leaves two values to rank. Pass predict_proba(X)[:, 1] or decision_function(X).
 rule:
   pattern: $F($$$ARGS)
-  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict($$$X)' } }
-  not: { inside: { kind: module, stopBy: end, has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' } } }
+  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict($$$X)', not: { any: [{ matches: predict-of-predictions }, { matches: predict-returns-scores }] } } }
+  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } } } }
 constraints:
-  F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|log_loss|brier_score_loss)$' }
+  F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve)$' }
+utils:
+  predict-returns-scores:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
+        - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+  # A calibrator's predict takes predictions and returns probabilities.
+  predict-of-predictions:
+    has: { field: arguments, has: { nthChild: 1, regex: '(?i)pred|prob|score' } }
 ---
 id: auc-from-labels
 language: python
-severity: error
+severity: info
 message: $V holds the class labels that predict returned, and this metric ranks the rows by score. Pass predict_proba(X)[:, 1] or decision_function(X).
 rule:
   pattern: $V = $M.predict($$$X)
+  not:
+    any:
+      # A calibrator's predict takes predictions and returns probabilities.
+      - has: { stopBy: end, kind: argument_list, has: { nthChild: 1, regex: '(?i)pred|prob|score' } }
+      - matches: predict-returns-scores
   inside:
     kind: expression_statement
-    precedes:
-      stopBy: end
-      has:
+    precedes: { stopBy: end, has: { stopBy: end, matches: metric-of-v } }
+    # A name assigned again and then scored is reported at the later assignment.
+    not:
+      precedes:
         stopBy: end
-        kind: call
-        all:
-          - has: { field: function, regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|log_loss|brier_score_loss)$' }
-          - has: { field: arguments, has: { nthChild: 2, pattern: $V } }
-  not: { inside: { kind: module, stopBy: end, has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' } } }
+        has: { pattern: '$V = $OTHER' }
+        precedes: { stopBy: end, has: { stopBy: end, matches: metric-of-v } }
 constraints:
   V: { kind: identifier }
+utils:
+  metric-of-v:
+    kind: call
+    all:
+      - has: { field: function, regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve)$' }
+      - has: { field: arguments, has: { nthChild: 2, pattern: $V } }
+  predict-returns-scores:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
+        - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+
+---
+# Unsafe: the fix changes the loss on purpose, and predict_proba raises on a model that has none.
+id: auc-from-labels
+language: python
+severity: error
+message: log_loss scores probabilities, and predict returns the class labels, so every wrong label costs the largest loss there is. It scored 18.0 on data with no signal, where the honest loss is 0.69. Pass predict_proba.
+rule:
+  pattern: $M.predict($$$X)
+  nthChild: 2
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)log_loss$' } } }
+  not:
+    any:
+      - has: { field: arguments, has: { nthChild: 1, regex: '(?i)pred|prob|score' } }
+      - matches: predict-returns-scores
+utils:
+  predict-returns-scores:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
+        - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+fix: $M.predict_proba($$$X)
+metadata: { fix: unsafe }
 ---
 id: auc-from-labels
 language: python
 severity: error
+message: brier_score_loss scores probabilities, and predict returns the class labels, so it counts the wrong labels. It scored 0.50 on data with no signal, where the honest loss is 0.25. Pass predict_proba(X)[:, 1].
+rule:
+  pattern: $F($$$ARGS)
+  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict($$$X)', not: { any: [{ matches: predict-of-predictions }, { matches: predict-returns-scores }] } } }
+constraints:
+  F: { regex: '(^|\.)brier_score_loss$' }
+utils:
+  predict-returns-scores:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
+        - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+  predict-of-predictions:
+    has: { field: arguments, has: { nthChild: 1, regex: '(?i)pred|prob|score' } }
+---
+id: auc-from-labels
+language: python
+severity: error
+message: $V holds the class labels that predict returned, and log_loss and brier_score_loss score probabilities, so every wrong label costs the largest loss. Pass predict_proba(X).
+rule:
+  pattern: $V = $M.predict($$$X)
+  not:
+    any:
+      # A calibrator's predict takes predictions and returns probabilities.
+      - has: { stopBy: end, kind: argument_list, has: { nthChild: 1, regex: '(?i)pred|prob|score' } }
+      - matches: predict-returns-scores
+  inside:
+    kind: expression_statement
+    precedes: { stopBy: end, has: { stopBy: end, matches: metric-of-v } }
+    # A name assigned again and then scored is reported at the later assignment.
+    not:
+      precedes:
+        stopBy: end
+        has: { pattern: '$V = $OTHER' }
+        precedes: { stopBy: end, has: { stopBy: end, matches: metric-of-v } }
+constraints:
+  V: { kind: identifier }
+utils:
+  metric-of-v:
+    kind: call
+    all:
+      - has: { field: function, regex: '(^|\.)(log_loss|brier_score_loss)$' }
+      - has: { field: arguments, has: { nthChild: 2, pattern: $V } }
+  predict-returns-scores:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
+        - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+
+---
+# multi_class says the target has more than two classes, and there roc_auc_score raises on one
+# label per row.
+id: auc-from-labels
+language: python
+severity: error
+message: roc_auc_score with multi_class needs one probability per class, and predict returns one label per row, which raises on more than two classes. Pass predict_proba(X).
+rule:
+  pattern: $F($$$ARGS)
+  all:
+    - has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict($$$X)', not: { matches: predict-returns-scores } } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } } }
+constraints:
+  F: { regex: '(^|\.)roc_auc_score$' }
+utils:
+  predict-returns-scores:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
+        - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+---
+# predict_proba returns one column per class. These functions take one score per row, and
+# roc_auc_score takes the whole matrix only with multi_class.
+id: auc-from-labels
+language: python
+severity: error
+message: $F takes one score per row, and predict_proba returns one column per class, so this raises. Pass predict_proba(X)[:, 1], or multi_class="ovr" to roc_auc_score on more than two classes.
+rule:
+  pattern: $F($$$ARGS)
+  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)' } }
+  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } } } }
+constraints:
+  F: { regex: '(^|\.)(roc_auc_score|roc_curve|precision_recall_curve|det_curve)$' }
+---
+id: auc-from-labels
+language: python
+severity: error
+message: $F takes probabilities, and decision_function returns scores outside 0 to 1, so this raises. Pass predict_proba(X).
+rule:
+  pattern: $F($$$ARGS)
+  has: { field: arguments, has: { nthChild: 2, pattern: '$M.decision_function($$$X)' } }
+constraints:
+  F: { regex: '(^|\.)(log_loss|brier_score_loss)$' }
+---
+# Column 0 of predict_proba is the probability of the first class. On data with no signal both
+# columns give 0.5, so no proof can show the loss, and the document is info.
+id: auc-from-labels
+language: python
+severity: info
 message: Column 0 of predict_proba is the probability of the first class, so this scores the model upside down. Take column 1.
 rule:
   pattern: $F($$$ARGS)
   has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)[:, 0]' } }
 constraints:
-  F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve)$' }
+  F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve)$' }
