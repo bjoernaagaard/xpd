@@ -316,7 +316,7 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     from sklearn.metrics import get_scorer_names, jaccard_score, mean_squared_error
     from sklearn.metrics import jaccard_similarity_score  # xpd: removed-in-sklearn
     from sklearn.metrics import plot_confusion_matrix, plot_roc_curve  # xpd: removed-in-sklearn, removed-in-sklearn
-    from sklearn.model_selection import GridSearchCV, ShuffleSplit, StratifiedKFold, cross_val_score
+    from sklearn.model_selection import GridSearchCV, KFold, ShuffleSplit, StratifiedKFold, cross_val_score
     from sklearn.preprocessing import Imputer  # xpd: removed-in-sklearn
     from sklearn.impute import SimpleImputer
     import sklearn.externals.joblib  # xpd: removed-in-sklearn
@@ -348,6 +348,7 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     cross_val_score(model, X, y, cv=5)
     StratifiedKFold(y, n_folds=3)  # xpd: removed-in-sklearn
     ShuffleSplit(len(X), 10, test_size=0.4, random_state=0)  # xpd: removed-in-sklearn
+    KFold(n=len(y), n_folds=3)  # xpd: removed-in-sklearn
     StratifiedKFold(3)
     StratifiedKFold(n_splits=3).split(X, y)
     jaccard_score(y, y)
