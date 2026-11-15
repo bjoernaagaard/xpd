@@ -1,0 +1,438 @@
+# scipy/ndimage/_measurements.py line 708 says ndimage.sum is kept for backwards
+# compatibility and new code should prefer sum_labels, and its body is return
+# sum_labels(input, labels, index), so the fix gives the same value.
+id: legacy-api
+language: python
+severity: info
+message: SciPy keeps ndimage.sum only for backwards compatibility and asks new code to use sum_labels. Write ndimage.sum_labels.
+rule:
+  kind: attribute
+  pattern: $FN
+  inside:
+    field: function
+    kind: call
+    all:
+    - has:
+        field: function
+        any:
+        - all:
+          - {regex: ^scipy\.ndimage\.(sum)$, pattern: scipy.ndimage.$F}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: scipy
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                        not: {regex: ^(scipy)(\.|$)}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^(scipy)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(scipy)$}
+                          - &id001
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(scipy)$}
+                          - *id001
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^$}
+        - all:
+          - {regex: \.ndimage\.(sum)$, pattern: $R.ndimage.$F}
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                stopBy: end
+                any:
+                - kind: import_statement
+                  has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, regex: ^scipy$}
+                    - has: {field: alias, pattern: $R}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: $R
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                        not: {regex: ^(scipy)(\.|$)}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^(scipy)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(scipy)$}
+                          - &id002
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(scipy)$}
+                          - *id002
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^$}
+        - all:
+          - {regex: \.(sum)$, pattern: $R.$F}
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                stopBy: end
+                any:
+                - kind: import_statement
+                  has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, regex: ^scipy\.ndimage$}
+                    - has: {field: alias, pattern: $R}
+                - kind: import_from_statement
+                  all:
+                  - has: {field: module_name, regex: ^scipy$}
+                  - any:
+                    - has: {kind: dotted_name, pattern: $R, regex: ^ndimage$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, regex: ^ndimage$}
+                        - has: {field: alias, pattern: $R}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: $R
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^scipy\.(ndimage)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(ndimage)$}
+                          - &id003
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^scipy$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(ndimage)$}
+                          - *id003
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^scipy$}
+    - has:
+        field: function
+        any:
+        - {kind: identifier, pattern: $ROOT}
+        - has:
+            stopBy: end
+            kind: identifier
+            pattern: $ROOT
+            inside: {kind: attribute, field: object}
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: identifier
+            pattern: $ROOT
+            any:
+            - inside:
+                stopBy:
+                  not: &id004
+                    any:
+                    - {kind: pattern_list}
+                    - {kind: tuple_pattern}
+                    - {kind: list_pattern}
+                    - {kind: list_splat_pattern}
+                    - {kind: tuple}
+                    - {kind: list}
+                    - {kind: parenthesized_expression}
+                    - {kind: expression_list}
+                    - {kind: list_splat}
+                kind: assignment
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: augmented_assignment
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: for_statement
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: for_in_clause
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: as_pattern_target
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: delete_statement
+            - inside: {kind: named_expression, field: name}
+            - inside: {kind: parameters}
+            - inside: {kind: lambda_parameters}
+            - inside: {kind: typed_parameter}
+            - inside: {kind: list_splat_pattern}
+            - inside: {kind: dictionary_splat_pattern}
+            - inside: {kind: global_statement}
+            - inside: {kind: nonlocal_statement}
+            - inside: {kind: splat_pattern}
+            - inside: {kind: default_parameter, field: name}
+            - inside: {kind: typed_default_parameter, field: name}
+            - inside: {kind: function_definition, field: name}
+            - inside: {kind: class_definition, field: name}
+            - inside:
+                kind: as_pattern
+                inside: {kind: case_pattern}
+            - inside:
+                kind: dotted_name
+                regex: ^\w+$
+                inside:
+                  any:
+                  - {kind: case_pattern}
+                  - {kind: keyword_pattern}
+            - inside:
+                kind: type
+                any:
+                - inside: {kind: type_alias_statement, field: left}
+                - inside: {kind: type_parameter}
+constraints:
+  F: {regex: ^sum$}
+transform:
+  G:
+    replace: {source: $FN, replace: sum$, by: sum_labels}
+fix: $G
+metadata: {fix: safe}
+---
+# scipy/stats/_stats_py.py line 8473 marks ranksums as legacy and says to prefer mannwhitneyu. mannwhitneyu reports U where ranksums reports z, so there is no fix.
+id: legacy-api
+language: python
+severity: info
+message: SciPy marks stats.ranksums as legacy and asks new code to use mannwhitneyu. Write mannwhitneyu(x, y, use_continuity=False,
+  method='asymptotic'), which gives the same p-value and reports the U statistic instead of a z score.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.stats\.(ranksums)$, pattern: scipy.stats.$F}
+      - all:
+        - {regex: \.stats\.(ranksums)$, pattern: $R.stats.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(ranksums)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.stats$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^stats$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(ranksums)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.stats$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.stats$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(ranksums)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^ranksums$}
+---
+# scipy/sparse/_construct.py line 1207 says block_array is preferred over bmat. bmat returns a sparse matrix when no input is a sparse array, so there is no fix.
+id: legacy-api
+language: python
+severity: info
+message: SciPy prefers sparse.block_array over bmat, which returns a sparse matrix when no block is a sparse array.
+  Write block_array, and use sparse arrays for the blocks.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.sparse\.(bmat)$, pattern: scipy.sparse.$F}
+      - all:
+        - {regex: \.sparse\.(bmat)$, pattern: $R.sparse.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(bmat)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.sparse$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^sparse$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(bmat)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.sparse$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(bmat)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^bmat$}

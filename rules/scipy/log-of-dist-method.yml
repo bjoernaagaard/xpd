@@ -1,0 +1,139 @@
+# Measured at one shape per distribution in research/scipy-rules/digits/runs/dists.jsonl. A
+# distribution is listed only where the bar held in a tail and the log method was never 1 digit or
+# more worse than the log of the value. binom.logpmf lost up to 3.6 digits more near the mode, so
+# binom is not listed. Unsafe. The last bits change, and a subclass can define the two methods
+# apart.
+id: log-of-dist-method
+language: python
+severity: warning
+message: $R.$M underflows to 0 far in a tail, so np.log of it gives -inf there. In the runs that lost up to all 16 digits, and $R.log$M was never a digit worse. Write $R.log$M($$$A).
+rule: { all: [{ pattern: $NP.log($R.$M($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  M: { regex: '^(pdf|pmf)$' }
+  R:
+    any:
+      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|chi2|gamma|expon|logistic|beta|lognorm|cauchy|poisson|geom)$' }]
+      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|chi2|gamma|expon|logistic|beta|lognorm|cauchy|poisson|geom)$' }] } }
+fix: $R.log$M($$$A)
+metadata: { fix: unsafe }
+utils:
+  scipy-dist:
+    any:
+      - { kind: attribute, has: { field: object, matches: stats-module } }
+      - matches: stats-name
+  stats-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.stats$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  stats-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
+---
+# The lists differ per method, from the same runs.
+id: log-of-dist-method
+language: python
+severity: warning
+message: $R.cdf underflows to 0 far in the left tail and rounds to 1 in the right, so np.log of it gives -inf or 0 there. In the runs that lost up to all 16 digits, and $R.logcdf was never a digit worse. Write $R.logcdf($$$A).
+rule: { all: [{ pattern: $NP.log($R.cdf($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  R:
+    any:
+      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|cauchy|pareto|laplace)$' }]
+      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|cauchy|pareto|laplace)$' }] } }
+fix: $R.logcdf($$$A)
+metadata: { fix: unsafe }
+utils:
+  scipy-dist:
+    any:
+      - { kind: attribute, has: { field: object, matches: stats-module } }
+      - matches: stats-name
+  stats-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.stats$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  stats-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
+---
+# The lists differ per method, from the same runs.
+id: log-of-dist-method
+language: python
+severity: warning
+message: $R.sf underflows to 0 far in the right tail and rounds to 1 in the left, so np.log of it gives -inf or 0 there. In the runs that lost up to all 16 digits, and $R.logsf was never a digit worse. Write $R.logsf($$$A).
+rule: { all: [{ pattern: $NP.log($R.sf($$$A)) }, { not: { has: { stopBy: end, kind: comment } } }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  R:
+    any:
+      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|lognorm|f|cauchy|geom|laplace)$' }]
+      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|lognorm|f|cauchy|geom|laplace)$' }] } }
+fix: $R.logsf($$$A)
+metadata: { fix: unsafe }
+utils:
+  scipy-dist:
+    any:
+      - { kind: attribute, has: { field: object, matches: stats-module } }
+      - matches: stats-name
+  stats-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.stats$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  stats-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }

@@ -1,0 +1,357 @@
+# scipy/signal/_spectral_py.py lines 983, 1162, 1439 and 1627 mark these as legacy functions and
+# point to ShortTimeFFT. Its methods take other arguments, so there is no fix.
+id: legacy-signal
+language: python
+severity: info
+message: SciPy marks signal.$F as a legacy function. Write a ShortTimeFFT object and call its method of the same
+  purpose, such as stft or spectrogram.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.signal\.((stft|istft|spectrogram|check_COLA))$, pattern: scipy.signal.$F}
+      - all:
+        - {regex: \.signal\.((stft|istft|spectrogram|check_COLA))$, pattern: $R.signal.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.((stft|istft|spectrogram|check_COLA))$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.signal$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^signal$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^((stft|istft|spectrogram|check_COLA))$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.signal$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.signal$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^((stft|istft|spectrogram|check_COLA))$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(stft|istft|spectrogram|check_COLA)$}
+---
+# scipy/signal/_filter_design.py line 974 marks sosfreqz as a legacy alias, and its body is
+# return freqz_sos(*args, **kwargs), so the fix gives the same value. freqz_sos is new in 1.15.
+id: legacy-signal
+language: python
+severity: info
+message: SciPy marks signal.sosfreqz as a legacy alias of freqz_sos. Write freqz_sos.
+rule:
+  kind: attribute
+  pattern: $FN
+  inside:
+    field: function
+    kind: call
+    all:
+    - has:
+        field: function
+        any:
+        - all:
+          - {regex: ^scipy\.signal\.(sosfreqz)$, pattern: scipy.signal.$F}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: scipy
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                        not: {regex: ^(scipy)(\.|$)}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^(scipy)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(scipy)$}
+                          - &id001
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(scipy)$}
+                          - *id001
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^$}
+        - all:
+          - {regex: \.signal\.(sosfreqz)$, pattern: $R.signal.$F}
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                stopBy: end
+                any:
+                - kind: import_statement
+                  has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, regex: ^scipy$}
+                    - has: {field: alias, pattern: $R}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: $R
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                        not: {regex: ^(scipy)(\.|$)}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^(scipy)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(scipy)$}
+                          - &id002
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(scipy)$}
+                          - *id002
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^$}
+        - all:
+          - {regex: \.(sosfreqz)$, pattern: $R.$F}
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                stopBy: end
+                any:
+                - kind: import_statement
+                  has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, regex: ^scipy\.signal$}
+                    - has: {field: alias, pattern: $R}
+                - kind: import_from_statement
+                  all:
+                  - has: {field: module_name, regex: ^scipy$}
+                  - any:
+                    - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, regex: ^signal$}
+                        - has: {field: alias, pattern: $R}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: $R
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^scipy\.(signal)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(signal)$}
+                          - &id003
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^scipy$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(signal)$}
+                          - *id003
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^scipy$}
+    - has:
+        field: function
+        any:
+        - {kind: identifier, pattern: $ROOT}
+        - has:
+            stopBy: end
+            kind: identifier
+            pattern: $ROOT
+            inside: {kind: attribute, field: object}
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: identifier
+            pattern: $ROOT
+            any:
+            - inside:
+                stopBy:
+                  not: &id004
+                    any:
+                    - {kind: pattern_list}
+                    - {kind: tuple_pattern}
+                    - {kind: list_pattern}
+                    - {kind: list_splat_pattern}
+                    - {kind: tuple}
+                    - {kind: list}
+                    - {kind: parenthesized_expression}
+                    - {kind: expression_list}
+                    - {kind: list_splat}
+                kind: assignment
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: augmented_assignment
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: for_statement
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: for_in_clause
+                field: left
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: as_pattern_target
+            - inside:
+                stopBy:
+                  not: *id004
+                kind: delete_statement
+            - inside: {kind: named_expression, field: name}
+            - inside: {kind: parameters}
+            - inside: {kind: lambda_parameters}
+            - inside: {kind: typed_parameter}
+            - inside: {kind: list_splat_pattern}
+            - inside: {kind: dictionary_splat_pattern}
+            - inside: {kind: global_statement}
+            - inside: {kind: nonlocal_statement}
+            - inside: {kind: splat_pattern}
+            - inside: {kind: default_parameter, field: name}
+            - inside: {kind: typed_default_parameter, field: name}
+            - inside: {kind: function_definition, field: name}
+            - inside: {kind: class_definition, field: name}
+            - inside:
+                kind: as_pattern
+                inside: {kind: case_pattern}
+            - inside:
+                kind: dotted_name
+                regex: ^\w+$
+                inside:
+                  any:
+                  - {kind: case_pattern}
+                  - {kind: keyword_pattern}
+            - inside:
+                kind: type
+                any:
+                - inside: {kind: type_alias_statement, field: left}
+                - inside: {kind: type_parameter}
+constraints:
+  F: {regex: ^sosfreqz$}
+transform:
+  G:
+    replace: {source: $FN, replace: sosfreqz$, by: freqz_sos}
+fix: $G
+metadata: {fix: safe, since: '1.15'}

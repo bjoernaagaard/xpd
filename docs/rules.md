@@ -1,7 +1,7 @@
 # Rules
 
-xpd has five rule packs: [pandas](#pandas), [NumPy](#numpy), [scikit-learn](#scikit-learn),
-[Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
+xpd has six rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+[scikit-learn](#scikit-learn), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
 Python rules run on every file.
 
 ## pandas
@@ -3157,6 +3157,623 @@ Use instead:
 ones = np.bitwise_count(masks).sum()
 ```
 
+## SciPy
+
+These rules run on files that import `scipy`. Examples assume `import numpy as np`. The rules
+follow SciPy 1.18. Every claim was run on SciPy 1.18.1 with NumPy 2.5.4. A form that is called
+removed or deprecated raises there under `python -W error`. A form that is called inexact lost at
+least 3 decimal digits against mpmath at 50 digits, where the form to write lost fewer than 1. Each
+speedup is the range over repeated runs on one core, at 1,000,000 values unless the entry says
+otherwise, and the faster form was not slower at 1,000. A rule with severity info states only
+what SciPy's own source calls legacy or prefers, and claims nothing about speed or accuracy.
+
+A rule reports a name only when it is rooted at `scipy` or the file's own imports bind it from
+`scipy`. A form made only of NumPy names, such as `np.linalg.inv(a) @ b`, belongs to the
+[NumPy](#numpy) rules. A safe fix gives the same object or a bit equal value of the same type, and
+is not offered where the file binds the name again or the call spreads `*args` or `**kwargs`. An
+unsafe fix names what can differ. A rule that asks for an API newer than the project's SciPy is
+skipped.
+
+### Names that are gone or that warn
+
+#### removed-in-scipy
+
+**Severity:** error. **Fix:** unsafe: `trapezoid`, `cumulative_trapezoid` and `simpson` for `trapz`, `cumtrapz` and `simps`, `pinv` for `pinv2`, `eye` for `speye`, `median_abs_deviation` and `gibrat` for `median_absolute_deviation` and `gilbrat`, each in the module the code already names, `from scipy.integrate import trapezoid as trapz` for an import of the old name, `scipy.signal.windows.<name>` for a window on the `scipy.signal` namespace, `stats.mstats.find_repeats` and `kendalltau_seasonal`, and `np.<name>` for a NumPy name on the `scipy` namespace. Each is unsafe because the old body is not in SciPy 1.18.1, so the fix cannot be shown to give the same result. The other forms have no fix.
+
+Reports the SciPy names that raise on SciPy 1.18.1, each with what to write instead: the integration, window, wavelet, Legendre, spherical Bessel, statistics and linear algebra functions that SciPy removed, `interp2d`, which raises `NotImplementedError` when called, everything in `scipy.misc`, which is empty and warns when imported, and the NumPy functions and constants that the `scipy` namespace no longer re-exports. A name without a public replacement says so. Code under a SciPy version check, a `hasattr` check, or a `try` that catches `ImportError` or `AttributeError` is left alone, because it exists for old SciPy.
+
+Example:
+
+```python
+from scipy import integrate, signal, stats
+from scipy.misc import comb
+area = integrate.trapz(y, x)
+window = signal.hann(64)
+p = stats.binom_test(k, n)
+angle = scipy.pi * frac
+```
+
+Use instead:
+
+```python
+from scipy import integrate, signal, stats
+from scipy.special import comb
+area = integrate.trapezoid(y, x)
+window = signal.windows.hann(64)
+p = stats.binomtest(k, n).pvalue
+angle = np.pi * frac
+```
+
+#### deprecated-in-scipy
+
+**Severity:** warning. **Fix:** safe: the public namespace for a name taken from one of the 107 private modules that SciPy deprecated, such as `scipy.sparse.csr_matrix` for `scipy.sparse.csr.csr_matrix` and `from scipy.ndimage import gaussian_filter` for `from scipy.ndimage.filters import gaussian_filter`, which give the same object, and `tri.find_simplex(xi)` for `scipy.spatial.tsearch(tri, xi)`, which is what `tsearch` returns. The other forms have no fix.
+
+Reports the names that warn with `DeprecationWarning` on SciPy 1.18.1: every name taken from a private module such as `scipy.stats.stats`, `scipy.linalg.basic`, `scipy.ndimage.filters` or `scipy.sparse.linalg.isolve`, an import of such a module, `scipy.odr`, which goes away in SciPy 1.19, and calls of `minkowski_distance`, `minkowski_distance_p`, `distance_matrix`, `tsearch`, `lagrange`, `pade`, `approximate_taylor_polynomial` and `py_vq`, each with the replacement that SciPy's warning names.
+
+Example:
+
+```python
+from scipy.ndimage.filters import gaussian_filter
+from scipy.stats.stats import pearsonr
+smooth = scipy.sparse.linalg.isolve.cg(A, b)
+cell = scipy.spatial.tsearch(tri, points)
+D = scipy.spatial.distance_matrix(X, Y)
+```
+
+Use instead:
+
+```python
+from scipy.ndimage import gaussian_filter
+from scipy.stats import pearsonr
+smooth = scipy.sparse.linalg.cg(A, b)
+cell = tri.find_simplex(points)
+D = scipy.spatial.distance.cdist(X, Y)
+```
+
+### Arguments, defaults and legacy entry points
+
+#### removed-keyword
+
+**Severity:** error. **Fix:** unsafe: `rtol=` for `tol=` on the sparse.linalg solvers, because the old tol came with an atol default that SciPy 1.18 rejects, `restart=` for gmres `restrt=`, `assume_a='pos'` for linalg.solve `sym_pos=True`, `subset_by_index=` for eigh and eigvalsh `eigvals=`, `workers=` for `n_jobs=` on the KDTree and cKDTree query methods, and `scale=1.0` for iqr and median_abs_deviation `scale='raw'`, because no source on SciPy 1.18 shows the old code. The other forms have no fix.
+
+Reports keywords and argument values that SciPy removed and that raise on SciPy 1.18.1: `tol=`, `atol='legacy'` and a fourth positional argument on cg, gmres and the other iterative solvers, gmres `restrt=`, linalg.solve `sym_pos=`, eigh and eigvalsh `eigvals=` and `turbo=`, pinv and pinvh `cond=` and `rcond=`, integrate.simpson `even=`, cumulative_trapezoid with an `initial` other than 0, `n_jobs=` on the methods of a KDTree or cKDTree, kendalltau `initial_lexsort=`, iqr and median_abs_deviation `scale='raw'`, fmin_l_bfgs_b `iprint=` and `disp=`, and the metric `'wminkowski'` of cdist and pdist.
+
+Example:
+
+```python
+x, info = cg(A, b, tol=1e-8)
+w = linalg.eigh(a, eigvals=(0, 2), eigvals_only=True)
+dist, idx = tree.query(points, k=3, n_jobs=-1)
+```
+
+Use instead:
+
+```python
+x, info = cg(A, b, rtol=1e-8)
+w = linalg.eigh(a, subset_by_index=(0, 2), eigvals_only=True)
+dist, idx = tree.query(points, k=3, workers=-1)
+```
+
+#### deprecated-argument
+
+**Severity:** warning. **Fix:** none.
+
+Reports arguments that warn on SciPy 1.18.1 and that SciPy will remove: lombscargle `precenter=` and a fourth or fifth positional argument, linalg.qr `lwork=` by keyword or by position, anderson_ksamp `midrank=` by keyword or by position, and linprog with `method='simplex'`, `'interior-point'` or `'revised simplex'`. The rules that name `variant=` are skipped on SciPy older than 1.17.
+
+Example:
+
+```python
+power = signal.lombscargle(t, y, freqs, precenter=True)
+res = optimize.linprog(c, A_ub=A, b_ub=b, method="interior-point")
+```
+
+Use instead:
+
+```python
+power = signal.lombscargle(t, y - y.mean(), freqs)
+res = optimize.linprog(c, A_ub=A, b_ub=b, method="highs")
+```
+
+#### default-that-warns
+
+**Severity:** warning. **Fix:** safe: `callback_type='legacy'` for gmres with a callback, and `spmatrix=True` for hb_read and mmread. Each is what SciPy 1.18.1 does after it warns. The other forms have no fix.
+
+Reports calls that rely on a default that warns on SciPy 1.18.1: gmres with `callback=` and no `callback_type=`, stats.anderson without `method=`, anderson_ksamp without `variant=`, io.hb_read and io.mmread without `spmatrix=`, and ndimage.zoom with `grid_mode=True` and mode `'constant'`, the default, or `'wrap'`. The rules that name an argument added in SciPy 1.17 or 1.18 are skipped on an older SciPy.
+
+Example:
+
+```python
+x, info = gmres(A, b, callback=log)
+A = mmread("matrix.mtx")
+result = stats.anderson(sample)
+```
+
+Use instead:
+
+```python
+x, info = gmres(A, b, callback=log, callback_type="legacy")
+A = mmread("matrix.mtx", spmatrix=True)
+result = stats.anderson(sample, method="interpolate")
+```
+
+#### minimize-unknown-option
+
+**Severity:** warning. **Fix:** none.
+
+Reports a key in the `options=` dict of `optimize.minimize` that the chosen `method=` does not take, when another method takes it. Each such pair warns OptimizeWarning and is ignored on SciPy 1.18.1, or raises TypeError for `'trust-constr'`. Examples are `disp` and `iprint` for L-BFGS-B, `maxiter` for TNC and `maxfun` for BFGS. The keys of every method were measured by running each pair.
+
+Example:
+
+```python
+res = minimize(f, x0, method="L-BFGS-B", options={"disp": True, "maxiter": 200})
+```
+
+Use instead:
+
+```python
+res = minimize(f, x0, method="L-BFGS-B", options={"maxiter": 200})
+```
+
+#### minimize-unused-argument
+
+**Severity:** warning. **Fix:** none.
+
+Reports `jac=` with Nelder-Mead, Powell, COBYLA or COBYQA, `hess=` and `hessp=` with a method that uses no Hessian, `constraints=` with a method that cannot handle them, and `bounds=` with CG, BFGS, Newton-CG or a trust-region method other than trust-constr. minimize ignores the argument and warns RuntimeWarning on SciPy 1.18.1.
+
+Example:
+
+```python
+res = minimize(f, x0, method="BFGS", jac=grad, bounds=[(0, 1)] * n)
+```
+
+Use instead:
+
+```python
+res = minimize(f, x0, method="L-BFGS-B", jac=grad, bounds=[(0, 1)] * n)
+```
+
+#### rng-keyword
+
+**Severity:** info. **Fix:** none. The same integer gives a different stream under `rng=` than under `random_state=` or `seed=`.
+
+Reports `random_state=` and `seed=` passed by keyword to the functions and classes that SciPy 1.15 moved to `rng=`, such as sparse.random, svds, bootstrap, permutation_test, kmeans2, differential_evolution, basinhopping, dual_annealing, directed_hausdorff, Rotation.random and the qmc engines. SciPy's docs say new code should pass `rng`. The old keywords run without a warning on SciPy 1.18.1. Skipped on SciPy older than 1.15.
+
+Example:
+
+```python
+engine = qmc.Sobol(d=2, seed=0)
+X = sparse.random(1000, 100, density=0.01, random_state=0)
+```
+
+Use instead:
+
+```python
+engine = qmc.Sobol(d=2, rng=0)
+X = sparse.random(1000, 100, density=0.01, rng=0)
+```
+
+#### legacy-optimize
+
+**Severity:** info. **Fix:** none, because the newer functions take other argument names and return an OptimizeResult.
+
+Reports the functions that scipy.optimize lists as legacy and not recommended for new scripts: fmin, fmin_powell, fmin_cg, fmin_bfgs, fmin_ncg, fmin_l_bfgs_b, fmin_tnc, fmin_cobyla, fmin_slsqp, fminbound, brent, golden, leastsq, fsolve, broyden1, broyden2, newton_krylov, anderson, excitingmixing, linearmixing and diagbroyden. The message names the `minimize`, `minimize_scalar`, `least_squares` or `root` call that replaces each.
+
+Example:
+
+```python
+xopt = optimize.fmin_bfgs(f, x0, fprime=grad, disp=False)
+```
+
+Use instead:
+
+```python
+xopt = optimize.minimize(f, x0, jac=grad, method="BFGS").x
+```
+
+#### legacy-odeint
+
+**Severity:** info. **Fix:** none, because solve_ivp calls `fun(t, y)` where odeint calls `func(y, t)`, and returns an object.
+
+Reports `integrate.odeint`, which SciPy's docs ask new code to replace with `solve_ivp`. Neither solver was faster on every problem measured, so the message makes no speed claim. It says to keep solve_ivp's default method for a large system, because `method='LSODA'` stores a full Jacobian and raised MemoryError at 1,000,000 equations.
+
+Example:
+
+```python
+ys = odeint(lambda y, t: -k * y, y0, t)
+```
+
+Use instead:
+
+```python
+ys = solve_ivp(lambda t, y: -k * y, (t[0], t[-1]), y0, t_eval=t).y.T
+```
+
+#### legacy-interpolate
+
+**Severity:** info. **Fix:** none, because each replacement takes other arguments and returns a BSpline or another object.
+
+Reports the interpolation classes and functions that SciPy marks as legacy: interp1d, Rbf, UnivariateSpline, InterpolatedUnivariateSpline, LSQUnivariateSpline, splrep, splprep, splev, splint, sproot, spalde, splder and splantider. The message names the replacement SciPy recommends, such as make_splrep for splrep and RBFInterpolator for Rbf. Documents that name an API added in SciPy 1.7 or 1.15 are skipped on an older SciPy.
+
+Example:
+
+```python
+tck = interpolate.splrep(x, y, s=0.1)
+smooth = interpolate.splev(grid, tck)
+```
+
+Use instead:
+
+```python
+spline = interpolate.make_splrep(x, y, s=0.1)
+smooth = spline(grid)
+```
+
+#### legacy-signal
+
+**Severity:** info. **Fix:** safe: `freqz_sos` for `sosfreqz`, whose body only calls freqz_sos. The other forms have no fix.
+
+Reports signal.stft, istft, spectrogram and check_COLA, which SciPy marks as legacy in favor of the ShortTimeFFT class, and signal.sosfreqz, a legacy alias of freqz_sos. The sosfreqz document is skipped on SciPy older than 1.15.
+
+Example:
+
+```python
+w, h = signal.sosfreqz(sos, worN=512)
+```
+
+Use instead:
+
+```python
+w, h = signal.freqz_sos(sos, worN=512)
+```
+
+#### legacy-api
+
+**Severity:** info. **Fix:** safe: `ndimage.sum_labels` for `ndimage.sum`, whose body only calls sum_labels. The other forms have no fix.
+
+Reports ndimage.sum, which SciPy keeps for backwards compatibility, stats.ranksums, which SciPy marks as legacy in favor of mannwhitneyu with the same p-value and the U statistic in place of z, and sparse.bmat, which returns a sparse matrix where block_array returns a sparse array.
+
+Example:
+
+```python
+totals = ndimage.sum(image, labels, index)
+stat, p = stats.ranksums(x, y)
+```
+
+Use instead:
+
+```python
+totals = ndimage.sum_labels(image, labels, index)
+u, p = stats.mannwhitneyu(x, y, use_continuity=False, method="asymptotic")
+```
+
+### Forms that keep digits
+
+#### log-of-special
+
+**Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5.
+
+Reports `np.log` of `special.ndtr`, `special.gamma`, `special.factorial`, `special.beta`, `special.expit` and `special.softmax`, through any import of `scipy.special`, and without a fix when the function was imported by name.
+
+Example:
+
+```python
+loglike = np.log(special.ndtr(q * xb)).sum()
+```
+
+Use instead:
+
+```python
+loglike = special.log_ndtr(q * xb).sum()
+```
+
+#### log-of-dist-method
+
+**Severity:** warning. **Fix:** unsafe: `dist.logpdf(...)`, `dist.logpmf(...)`, `dist.logcdf(...)`, `dist.logsf(...)`.
+
+Reports `np.log` of the `pdf`, `pmf`, `cdf` or `sf` of a `scipy.stats` distribution, written as `stats.norm`, imported by name as `norm`, or frozen in the same expression as `stats.norm(0, 2)`. Each method has its own list of distributions, measured one by one, so `np.log(stats.binom.pmf(k, n, p))` is not reported.
+
+Example:
+
+```python
+ll = np.log(stats.norm.pdf(resid, scale=sigma)).sum()
+```
+
+Use instead:
+
+```python
+ll = stats.norm.logpdf(resid, scale=sigma).sum()
+```
+
+#### cdf-complement
+
+**Severity:** warning. **Fix:** unsafe: `dist.sf(...)`, `dist.cdf(...)`.
+
+Reports `1 - dist.cdf(...)` and `1 - dist.sf(...)` for a `scipy.stats` distribution from a measured list.
+
+Example:
+
+```python
+pvalue = 2 * (1 - stats.norm.cdf(np.abs(z)))
+```
+
+Use instead:
+
+```python
+pvalue = 2 * stats.norm.sf(np.abs(z))
+```
+
+#### special-complement
+
+**Severity:** warning. **Fix:** unsafe: `special.erfc(x)`, `special.erf(x)`, `special.gammaincc(a, x)`, `special.gammainc(a, x)`, `special.betaincc(a, b, x)`, `special.erfc(-x)`, `special.ndtr(-x)`, `special.expit(-x)`. `betaincc` needs SciPy 1.11.
+
+Reports `1 - special.erf(x)`, `1 - special.erfc(x)`, `1 - special.gammainc(a, x)`, `1 - special.gammaincc(a, x)`, `1 - special.betainc(a, b, x)`, `1 + special.erf(x)`, `1 - special.ndtr(x)` and `1 - special.expit(x)`.
+
+Example:
+
+```python
+cdf = 0.5 * (1 + special.erf(x / np.sqrt(2)))
+```
+
+Use instead:
+
+```python
+cdf = 0.5 * special.erfc(-x / np.sqrt(2))
+```
+
+#### ppf-of-complement
+
+**Severity:** warning. **Fix:** unsafe: `dist.isf(p, ...)`, `dist.ppf(p, ...)`, `-special.ndtri(p)`.
+
+Reports `dist.ppf(1 - p, ...)` and `dist.isf(1 - p, ...)` for a continuous `scipy.stats` distribution from a measured list, and `special.ndtri(1 - p)`. A probability written as a number, such as `1 - 0.05`, is left alone unless it is below 5e-7.
+
+Example:
+
+```python
+crit = stats.norm.ppf(1 - alpha / 2)
+```
+
+Use instead:
+
+```python
+crit = stats.norm.isf(alpha / 2)
+```
+
+#### comb-by-factorials
+
+**Severity:** warning. **Fix:** unsafe: `special.comb(n, k)`.
+
+Reports `special.factorial(n) / (special.factorial(k) * special.factorial(n - k))` and the same with the factors in another order or divided one at a time.
+
+Example:
+
+```python
+ways = special.factorial(n) / (special.factorial(k) * special.factorial(n - k))
+```
+
+Use instead:
+
+```python
+ways = special.comb(n, k)
+```
+
+#### log-of-scipy-det
+
+**Severity:** warning. **Fix:** unsafe: `np.linalg.slogdet(a)[1]`.
+
+Reports `np.log(linalg.det(a))`, `np.log(np.abs(linalg.det(a)))` and `np.log(abs(linalg.det(a)))` where `linalg` is `scipy.linalg`, or `det` was imported from it. `np.log(np.linalg.det(a))` belongs to the NumPy rule `log-of-det`.
+
+Example:
+
+```python
+logdet = np.log(linalg.det(cov))
+```
+
+Use instead:
+
+```python
+logdet = np.linalg.slogdet(cov)[1]
+```
+
+### SciPy calls made once per value or once per pair
+
+Each old form calls SciPy from Python once per value, once per pair of points or once per pass of a loop, where one call on whole arrays does the same work in compiled code. Speedups are medians of 7 runs on one core with SciPy 1.18.1, on float64 and float32, at 1,000,000 values unless the entry says what the 1,000,000 counts.
+
+#### distance-per-pair
+
+**Severity:** warning. **Fix:** none.
+
+Reports a metric function of `scipy.spatial.distance`, such as `euclidean`, `cityblock` or `cosine`, called inside a comprehension, a generator or a loop body. `cdist` ran 960 to 9,600 times faster on 1,000 by 1,000 points.
+
+Example:
+
+```python
+D = np.array([[distance.euclidean(a, b) for b in Y] for a in X])
+```
+
+Use instead:
+
+```python
+D = distance.cdist(X, Y, "euclidean")
+```
+
+#### callable-metric
+
+**Severity:** warning. **Fix:** unsafe: the metric's name as a string. `cosine` and `correlation` differ in the last bits, and complex input is cast to float.
+
+Reports a metric function of `scipy.spatial.distance` passed to `cdist` or `pdist` as the metric, by position or as `metric=`. The name runs the same metric in C, 720 to 7,600 times faster on 1,000 by 1,000 points.
+
+Example:
+
+```python
+D = cdist(X, Y, distance.euclidean)
+```
+
+Use instead:
+
+```python
+D = cdist(X, Y, "euclidean")
+```
+
+#### per-value-scipy-call
+
+**Severity:** warning. **Fix:** none.
+
+Reports a comprehension or generator whose element is a call to a `scipy.special` ufunc, a `scipy.stats` distribution method such as `norm.cdf`, a distribution frozen from the loop name such as `norm(m, 2.0).pdf(x)`, or `stats.scoreatpercentile(x, p)` over the percentiles, with the loop name as an argument. One call on the array ran 7 to 23 times faster for `special`, 34 to 1,045 times faster for `stats` methods, 4.9 to 23 times faster for frozen distributions, and 2.1 to 3.2 times faster for 1,000 percentiles, because `scoreatpercentile` sorts the data on every call. A filter with `if`, a second `for` and an element that does more than the call are left alone.
+
+Example:
+
+```python
+p = np.array([stats.norm.cdf(v) for v in x])
+```
+
+Use instead:
+
+```python
+p = stats.norm.cdf(x)
+```
+
+#### query-per-point
+
+**Severity:** warning. **Fix:** none.
+
+Reports `tree.query(q)` inside a comprehension or a `for` loop, where `q` is the loop name or a row indexed by it and `tree` comes from a `KDTree` or `cKDTree` call in the same function. One query of all points ran 17 to 36 times faster for 1,000,000 points on a tree of 10,000.
+
+Example:
+
+```python
+tree = KDTree(points)
+nearest = [tree.query(q)[1] for q in queries]
+```
+
+Use instead:
+
+```python
+tree = KDTree(points)
+nearest = tree.query(queries)[1]
+```
+
+#### solve-in-loop
+
+**Severity:** warning. **Fix:** none.
+
+Reports `scipy.sparse.linalg.spsolve(A, b)` and `scipy.linalg.solve(A, b)` inside a comprehension or a loop that does not assign `A` or take it as its loop name. Each call factors `A` again. Factoring once ran 17 to 20 times faster for 100 right sides of a sparse matrix of 10,000 rows, and 18 to 23 times faster for 20 right sides of a dense 1,000 by 1,000 matrix.
+
+Example:
+
+```python
+xs = [spsolve(A, b) for b in sides]
+```
+
+Use instead:
+
+```python
+lu = splu(A.tocsc())
+xs = [lu.solve(b) for b in sides]
+```
+
+#### sparse-inv-then-multiply
+
+**Severity:** warning. **Fix:** unsafe: `spla.spsolve(A, b)` when `inv` is reached through its module. The last bits change, and a `b` of shape `(n, 1)` gives a 1-D result. `inv` imported by name has no fix.
+
+Reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`. The inverse of most sparse matrices is dense. `spsolve` ran 260 to 620 times faster on a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000 values.
+
+Example:
+
+```python
+x = spla.inv(A) @ b
+```
+
+Use instead:
+
+```python
+x = spla.spsolve(A, b)
+```
+
+### Sparse matrices
+
+#### empty-csr-write
+
+**Severity:** warning. **Fix:** none.
+
+Reports a write into a `csr_matrix`, `csc_matrix`, `csr_array` or `csc_array` built from a shape alone, as in `A = csr_matrix((n, m))` followed by `A[i, j] = v`, `A[i, j] += v` or a slice write, in a function that does not assign `A` again. Each write adds a stored value, which emits `SparseEfficiencyWarning` and raises under `python -W error` on SciPy 1.18.1, and copies the whole matrix. 1,000 writes ran 30 times slower than into a `lil_matrix`.
+
+Example:
+
+```python
+A = sparse.csr_matrix((n, n))
+for i, j, v in triples:
+    A[i, j] = v
+```
+
+Use instead:
+
+```python
+A = sparse.lil_array((n, n))
+for i, j, v in triples:
+    A[i, j] = v
+A = A.tocsr()
+```
+
+#### sparse-matrix-api
+
+**Severity:** info. **Fix:** none, because `*` and `**` work elementwise on a sparse array, a row slice of one is 1-D and `todense` gives an ndarray. Skipped on SciPy older than 1.8 for the classes and 1.12 for the builder functions.
+
+Reports a call to `csr_matrix`, `csc_matrix`, `coo_matrix`, `lil_matrix`, `dok_matrix`, `bsr_matrix` or `dia_matrix`, whose SciPy docstrings say the sparse matrix interface is expected to be deprecated, and to `eye`, `identity`, `diags`, `spdiags`, `rand`, `random` and `bmat`, whose docstrings encourage `eye_array`, `diags_array`, `dia_array`, `random_array` and `block_array`. A function that also names a sparse array class, and a branch taken on a condition that mentions a matrix, are left alone, because such code builds the matrix on purpose.
+
+Example:
+
+```python
+X = sparse.csr_matrix(X)
+I = sparse.eye(n)
+```
+
+Use instead:
+
+```python
+X = sparse.csr_array(X)
+I = sparse.eye_array(n)
+```
+
+### The API that SciPy's docs prefer on SciPy 1.18
+
+#### ckdtree
+
+**Severity:** info. **Fix:** none, because the default `leafsize` differs, 16 against 10. Skipped on SciPy older than 1.6.
+
+Reports a call to `cKDTree`. Its docstring says it is functionally identical to `KDTree` and kept only for backward compatibility.
+
+Example:
+
+```python
+tree = cKDTree(points)
+```
+
+Use instead:
+
+```python
+tree = KDTree(points)
+```
+
+#### legacy-fftpack
+
+**Severity:** info. **Fix:** none, because `rfft` packs its output differently and the pseudo differential operators have no `scipy.fft` form.
+
+Reports an import of `scipy.fftpack`, whose module docstring is a legacy directive that says new code should use `scipy.fft`. `scipy.fft` was no faster in the measurements, so the rule claims only the preference.
+
+Example:
+
+```python
+from scipy import fftpack
+y = fftpack.dct(x)
+```
+
+Use instead:
+
+```python
+from scipy import fft
+y = fft.dct(x)
+```
+
 ## scikit-learn
 
 These rules run on files that import `sklearn`. Each old form gives a wrong or leaked score, or a
@@ -3826,7 +4443,7 @@ target/release/xpd check samples/bad.py
 cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --unsafe-fixes
 ```
 
-The files in `samples/pandas/`, `samples/numpy/`, `samples/sklearn/`, `samples/hamilton/` and
+The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/hamilton/` and
 `samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to

@@ -1,0 +1,146 @@
+# 1 - p keeps only the digits of p above 1e-16. The old form lost 3 or more digits for every p
+# below 5e-7, and isf lost less than 1, for each listed distribution in
+# research/scipy-rules/digits/runs/ppf.jsonl and research/scipy-rules/digits/runs/grid.jsonl. f is
+# not listed because f.isf itself lost 1 or more digits for p from 4e-16 to 1e-3. Discrete
+# distributions are not listed, because ppf and isf break ties apart. Unsafe. The last bits change.
+id: ppf-of-complement
+language: python
+severity: warning
+message: 1 - $P rounds away the digits of a small $P, so this lost at least 3 digits for $P below 5e-7 and gives the end of the support below 1.1e-16, where $R.isf lost less than 1. Write $R.isf($REST).
+rule:
+  pattern: $R.ppf($$$ARGS)
+  has: { field: arguments, has: { nthChild: 1, any: [{ pattern: 1 - $P }, { pattern: 1.0 - $P }, { pattern: '1. - $P' }] } }
+  not: { has: { stopBy: end, kind: comment } }
+constraints:
+  # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
+  P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
+  R:
+    any:
+      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|cauchy|pareto|laplace)$' }]
+      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|cauchy|pareto|laplace)$' }] } }
+transform:
+  REST: { replace: { source: $$$ARGS, replace: '^1(\.0?)?\s*-\s*', by: '' } }
+fix: $R.isf($REST)
+metadata: { fix: unsafe }
+utils:
+  scipy-dist:
+    any:
+      - { kind: attribute, has: { field: object, matches: stats-module } }
+      - matches: stats-name
+  stats-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.stats$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  stats-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
+---
+# The mirror case. pareto is not listed because its ppf did not meet the bar, in the same runs.
+id: ppf-of-complement
+language: python
+severity: warning
+message: 1 - $P rounds away the digits of a small $P, so this lost at least 3 digits for $P below 5e-7 and gives the start of the support below 1.1e-16, where $R.ppf lost less than 1. Write $R.ppf($REST).
+rule:
+  pattern: $R.isf($$$ARGS)
+  has: { field: arguments, has: { nthChild: 1, any: [{ pattern: 1 - $P }, { pattern: 1.0 - $P }, { pattern: '1. - $P' }] } }
+  not: { has: { stopBy: end, kind: comment } }
+constraints:
+  # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
+  P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
+  R:
+    any:
+      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|f|cauchy|laplace)$' }]
+      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|f|cauchy|laplace)$' }] } }
+transform:
+  REST: { replace: { source: $$$ARGS, replace: '^1(\.0?)?\s*-\s*', by: '' } }
+fix: $R.ppf($REST)
+metadata: { fix: unsafe }
+utils:
+  scipy-dist:
+    any:
+      - { kind: attribute, has: { field: object, matches: stats-module } }
+      - matches: stats-name
+  stats-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.stats$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  stats-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
+---
+# ndtri is odd, so -ndtri(p) is ndtri(1 - p). The old form lost 3 or more digits for p below 5e-7
+# in research/scipy-rules/digits/runs/grid.jsonl. The parentheses keep the sign right under ** and
+# an attribute. Unsafe. The last bits change.
+id: ppf-of-complement
+language: python
+severity: warning
+message: 1 - $P rounds away the digits of a small $P, so $F(1 - $P) lost at least 3 digits for $P below 5e-7 and gives inf below 1.1e-16, where -$F($P) lost none. Write -$F($P).
+rule: { all: [{ any: [{ pattern: $F(1 - $P) }, { pattern: $F(1.0 - $P) }, { pattern: '$F(1. - $P)' }] }, { not: { has: { stopBy: end, kind: comment } } }] }
+constraints:
+  # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
+  P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
+  F: { any: [{ kind: attribute, regex: '\.ndtri$', has: { field: object, matches: special-module } }, { all: [{ matches: special-name }, { regex: '^ndtri$' }] }] }
+fix: (-$F($P))
+metadata: { fix: unsafe }
+utils:
+  special-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.special$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  special-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }

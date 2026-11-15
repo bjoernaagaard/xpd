@@ -1,0 +1,137 @@
+# The docstring of every sparse matrix class says that SciPy expects to deprecate the sparse
+# matrix interface, in research/scipy-rules/src/scipy/scipy/sparse/_csr.py:472 and the same
+# warning at _csc.py:299, _coo.py:1820, _lil.py:610, _dok.py:743, _bsr.py:785, _dia.py:628 and
+# __init__.py:21. Nothing warns under -W error on 1.18.1, in speed/runs/probe_warn.jsonl. No
+# fix, because on a sparse array * and ** work elementwise, a row slice is 1-D, sum(axis=0) is
+# 1-D and todense gives an ndarray, in speed/runs/probe_matrix_vs_array.jsonl. The array classes
+# carry no versionadded. SciPy 1.7.3 has no csr_array and 1.8.1 has it, in
+# research/scipy-rules/runs/since-sparse-arrays.txt.
+id: sparse-matrix-api
+language: python
+severity: info
+message: $N builds a sparse matrix, and SciPy's docstring for it says the sparse matrix interface is expected to be deprecated. Write $ARR in new code, and check the code that uses it, because * and ** work elementwise on a sparse array and a row slice of one is 1-D.
+rule:
+  kind: call
+  has:
+    field: function
+    any:
+      - { pattern: $M.$N, matches: sparse-module }
+      - { kind: identifier, pattern: $N, matches: from-sparse }
+  not: { matches: chose-matrix }
+constraints:
+  N: { regex: '^(csr|csc|coo|lil|dok|bsr|dia)_matrix$' }
+transform:
+  ARR: { replace: { source: $N, replace: '_matrix$', by: _array } }
+metadata: { since: "1.8" }
+utils:
+  # A function or a literal list, tuple or dict that also names a sparse array class, or a branch
+  # taken on a condition that names a matrix, builds the matrix on purpose, as code that supports
+  # both kinds does.
+  chose-matrix:
+    any:
+      - inside:
+          stopBy: end
+          any: [{ kind: function_definition }, { kind: list }, { kind: tuple }, { kind: dictionary }]
+          has: { stopBy: end, kind: identifier, regex: '^((csr|csc|coo|lil|dok|bsr|dia)_array|sparray|eye_array|diags_array|random_array|block_array)$' }
+      - inside:
+          stopBy: end
+          any: [{ kind: if_statement }, { kind: elif_clause }]
+          has: { field: condition, regex: 'matrix' }
+  sparse-module:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - inside:
+          stopBy: end
+          kind: module
+          has:
+            any:
+              - kind: import_statement
+                has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $M } }] }
+              - kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^scipy$' }
+                  - any:
+                      - has: { kind: dotted_name, pattern: $M, regex: '^sparse$' }
+                      - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $M } }] }
+  from-sparse:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all:
+          - has: { field: module_name, regex: '^scipy\.sparse$' }
+          - has: { kind: dotted_name, pattern: $N }
+---
+# The builder functions that return a sparse matrix. Their docstrings encourage the array form,
+# in research/scipy-rules/src/scipy/scipy/sparse/_construct.py:262 for spdiags, :486 for diags,
+# :592 for identity, :720 for eye, :1207 and :1214 for bmat, :1686 for random and :1792 for rand.
+# SciPy 1.11.4 has none of eye_array, diags_array, random_array and block_array and 1.12.0 has
+# all four, in research/scipy-rules/runs/since-sparse-arrays.txt. No fix, because the arguments differ:
+# random_array takes a shape tuple, and eye_array and diags_array take k and offsets by keyword.
+id: sparse-matrix-api
+language: python
+severity: info
+message: $N returns a sparse matrix, and its SciPy docstring encourages $NEW, which returns a sparse array. Write $NEW, whose arguments differ, and check the code that uses the result.
+rule:
+  kind: call
+  has:
+    field: function
+    any:
+      - { pattern: $M.$N, matches: sparse-module }
+      - { kind: identifier, pattern: $N, matches: from-sparse }
+  not: { matches: chose-matrix }
+constraints:
+  N: { regex: '^(eye|identity|diags|spdiags|rand|random|bmat)$' }
+transform:
+  T1: { replace: { source: $N, replace: '^(eye|identity)$', by: eye_array } }
+  T2: { replace: { source: $T1, replace: '^diags$', by: diags_array } }
+  T3: { replace: { source: $T2, replace: '^spdiags$', by: dia_array } }
+  T4: { replace: { source: $T3, replace: '^(rand|random)$', by: random_array } }
+  NEW: { replace: { source: $T4, replace: '^bmat$', by: block_array } }
+metadata: { since: "1.12" }
+utils:
+  # A function or a literal list, tuple or dict that also names a sparse array class, or a branch
+  # taken on a condition that names a matrix, builds the matrix on purpose, as code that supports
+  # both kinds does.
+  chose-matrix:
+    any:
+      - inside:
+          stopBy: end
+          any: [{ kind: function_definition }, { kind: list }, { kind: tuple }, { kind: dictionary }]
+          has: { stopBy: end, kind: identifier, regex: '^((csr|csc|coo|lil|dok|bsr|dia)_array|sparray|eye_array|diags_array|random_array|block_array)$' }
+      - inside:
+          stopBy: end
+          any: [{ kind: if_statement }, { kind: elif_clause }]
+          has: { field: condition, regex: 'matrix' }
+  sparse-module:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - inside:
+          stopBy: end
+          kind: module
+          has:
+            any:
+              - kind: import_statement
+                has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $M } }] }
+              - kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^scipy$' }
+                  - any:
+                      - has: { kind: dotted_name, pattern: $M, regex: '^sparse$' }
+                      - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $M } }] }
+  from-sparse:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all:
+          - has: { field: module_name, regex: '^scipy\.sparse$' }
+          - has: { kind: dotted_name, pattern: $N }

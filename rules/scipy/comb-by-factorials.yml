@@ -1,0 +1,50 @@
+# At n = 200 and k = 3 the ratio gave nan where comb lost no digits, and the bar held for every n
+# from 175 to 995 in research/scipy-rules/digits/runs/grid.jsonl. Unsafe. For k above n the ratio
+# gives inf and for n = -1 nan, where comb gives 0, in research/scipy-rules/digits/runs/claims.txt.
+id: comb-by-factorials
+language: python
+severity: warning
+message: $F overflows to inf above 170, so this ratio is inf or nan once $N passes 170. At 200 and 3 that lost all 16 digits where comb lost none. Write $COMB($N, $K).
+rule: { all: [{ any: [{ pattern: $F($N) / ($F($K) * $F($N - $K)) }, { pattern: $F($N) / ($F($N - $K) * $F($K)) }, { pattern: $F($N) / $F($K) / $F($N - $K) }, { pattern: $F($N) / $F($N - $K) / $F($K) }] }, { not: { has: { stopBy: end, kind: comment } } }] }
+constraints:
+  F: { kind: attribute, regex: '\.factorial$', has: { field: object, matches: special-module } }
+transform:
+  COMB: { replace: { source: $F, replace: 'factorial$', by: comb } }
+fix: $COMB($N, $K)
+metadata: { fix: unsafe }
+utils:
+  special-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.special$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+---
+# The same with factorial imported by name. No fix, because comb is not imported.
+id: comb-by-factorials
+language: python
+severity: warning
+message: factorial overflows to inf above 170, so this ratio is inf or nan once $N passes 170. At 200 and 3 that lost all 16 digits where comb lost none. Import scipy.special.comb and write comb($N, $K).
+rule: { any: [{ pattern: $F($N) / ($F($K) * $F($N - $K)) }, { pattern: $F($N) / ($F($N - $K) * $F($K)) }, { pattern: $F($N) / $F($K) / $F($N - $K) }, { pattern: $F($N) / $F($N - $K) / $F($K) }] }
+constraints:
+  F: { all: [{ matches: special-name }, { regex: '^factorial$' }] }
+utils:
+  special-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }

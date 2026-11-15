@@ -1,0 +1,1051 @@
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of random_state=.
+  The same integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^random_state$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.sparse\.((random|rand|random_array))$, pattern: scipy.sparse.$F}
+          - all:
+            - {regex: \.sparse\.((random|rand|random_array))$, pattern: $R.sparse.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((random|rand|random_array))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^sparse$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((random|rand|random_array))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((random|rand|random_array))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(random|rand|random_array)$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of random_state=.
+  The same integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^random_state$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.sparse\.linalg\.(svds)$, pattern: scipy.sparse.linalg.$F}
+          - all:
+            - {regex: \.sparse\.linalg\.(svds)$, pattern: $R.sparse.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.linalg\.(svds)$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^sparse$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^sparse$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(svds)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.sparse\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(svds)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(svds)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^svds$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of random_state=.
+  The same integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^random_state$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.stats\.((goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod))$,
+            pattern: scipy.stats.$F}
+          - all:
+            - {regex: \.stats\.((goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod))$,
+              pattern: $R.stats.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod))$,
+              pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^stats$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod))$,
+              pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod)$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of random_state=.
+  The same integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^random_state$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.interpolate\.(BarycentricInterpolator)$, pattern: scipy.interpolate.$F}
+          - all:
+            - {regex: \.interpolate\.(BarycentricInterpolator)$, pattern: $R.interpolate.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(BarycentricInterpolator)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.interpolate$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^interpolate$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(BarycentricInterpolator)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.interpolate$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.interpolate$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(BarycentricInterpolator)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^BarycentricInterpolator$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of random_state=.
+  The same integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^random_state$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.spatial\.transform\.Rotation\.(random)$, pattern: scipy.spatial.transform.Rotation.$F}
+          - all:
+            - {regex: \.spatial\.transform\.Rotation\.(random)$, pattern: $R.spatial.transform.Rotation.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.transform\.Rotation\.(random)$, pattern: $R.transform.Rotation.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.spatial$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^spatial$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^spatial$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.Rotation\.(random)$, pattern: $R.Rotation.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.spatial\.transform$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^transform$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^transform$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(random)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.spatial\.transform\.Rotation$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial\.transform$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^Rotation$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^Rotation$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(random)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial\.transform\.Rotation$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial\.transform\.Rotation$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(random)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^random$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of seed=. The same
+  integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^seed$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.cluster\.vq\.((kmeans|kmeans2))$, pattern: scipy.cluster.vq.$F}
+          - all:
+            - {regex: \.cluster\.vq\.((kmeans|kmeans2))$, pattern: $R.cluster.vq.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.vq\.((kmeans|kmeans2))$, pattern: $R.vq.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.cluster$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^cluster$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^cluster$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((kmeans|kmeans2))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.cluster\.vq$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.cluster$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^vq$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^vq$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((kmeans|kmeans2))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.cluster\.vq$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.cluster\.vq$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((kmeans|kmeans2))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(kmeans|kmeans2)$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of seed=. The same
+  integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^seed$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.linalg\.(clarkson_woodruff_transform)$, pattern: scipy.linalg.$F}
+          - all:
+            - {regex: \.linalg\.(clarkson_woodruff_transform)$, pattern: $R.linalg.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(clarkson_woodruff_transform)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.linalg$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^linalg$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^linalg$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(clarkson_woodruff_transform)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.linalg$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(clarkson_woodruff_transform)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^clarkson_woodruff_transform$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of seed=. The same
+  integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^seed$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.optimize\.((basinhopping|dual_annealing|check_grad|differential_evolution))$, pattern: scipy.optimize.$F}
+          - all:
+            - {regex: \.optimize\.((basinhopping|dual_annealing|check_grad|differential_evolution))$, pattern: $R.optimize.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((basinhopping|dual_annealing|check_grad|differential_evolution))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.optimize$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^optimize$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^optimize$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((basinhopping|dual_annealing|check_grad|differential_evolution))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.optimize$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((basinhopping|dual_annealing|check_grad|differential_evolution))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(basinhopping|dual_annealing|check_grad|differential_evolution)$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of seed=. The same
+  integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^seed$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.spatial\.distance\.(directed_hausdorff)$, pattern: scipy.spatial.distance.$F}
+          - all:
+            - {regex: \.spatial\.distance\.(directed_hausdorff)$, pattern: $R.spatial.distance.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.distance\.(directed_hausdorff)$, pattern: $R.distance.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.spatial$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^spatial$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^spatial$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(directed_hausdorff)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.spatial\.distance$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^distance$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^distance$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(directed_hausdorff)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial\.distance$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.spatial\.distance$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(directed_hausdorff)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^directed_hausdorff$}
+metadata: {since: '1.15'}
+---
+# SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
+# scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
+# say in a versionchanged note that the keyword changed to rng. An integer gives a different
+# stream under rng, in runs/rng_stream.txt, so there is no fix.
+id: rng-keyword
+language: python
+severity: info
+message: $F takes rng= since SciPy 1.15, and SciPy's docs say new code should pass rng instead of seed=. The same
+  integer gives different numbers under rng, so expect results to change.
+rule:
+  kind: keyword_argument
+  has: {field: name, regex: ^seed$}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.stats\.qmc\.((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$,
+            pattern: scipy.stats.qmc.$F}
+          - all:
+            - {regex: \.stats\.qmc\.((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$,
+              pattern: $R.stats.qmc.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.qmc\.((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$,
+              pattern: $R.qmc.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^stats$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats\.qmc$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^qmc$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^qmc$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$,
+              pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats\.qmc$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats\.qmc$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC)$}
+metadata: {since: '1.15'}

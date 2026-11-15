@@ -1,0 +1,20 @@
+# The scipy.fftpack module docstring is a legacy directive that says new code should use
+# scipy.fft, in research/scipy-rules/src/scipy/scipy/fftpack/__init__.py:6 to 8. It runs clean
+# under -W error in speed/runs/probe_warn.jsonl, and scipy.fft was no faster for fft and dct on
+# 1,000 values in speed/runs/bench.jsonl, so the rule claims only the preference. No fix,
+# because rfft packs its output differently and diff, tilbert and the other pseudo
+# differential operators have no scipy.fft form.
+id: legacy-fftpack
+language: python
+severity: info
+message: scipy.fftpack is legacy, and its SciPy docstring says new code should use scipy.fft. Import from scipy.fft instead, and check rfft, whose output layout differs.
+rule:
+  any:
+    - kind: import_statement
+      has: { any: [{ kind: dotted_name }, { kind: aliased_import }], regex: '^scipy\.fftpack\b' }
+    - kind: import_from_statement
+      any:
+        - has: { field: module_name, regex: '^scipy\.fftpack\b' }
+        - all:
+            - has: { field: module_name, regex: '^scipy$' }
+            - has: { any: [{ kind: dotted_name }, { kind: aliased_import }], regex: '^fftpack\b' }

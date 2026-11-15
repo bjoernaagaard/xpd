@@ -1,0 +1,68 @@
+# A KDTree or cKDTree query for one point per pass of a loop. On a tree of 10,000 points one
+# query of all points ran 17 to 36 times faster than one query per point for 1,000,000
+# points, and 14 to 19 times for 1,000, on float64 and float32, in speed/runs/bench.jsonl,
+# bench2.jsonl and eval/runs/speed-rerun-bench.jsonl, with equal results. The cost is 32 Python calls of argument checks per query,
+# in speed/runs/profile_loops.txt. The tree must be built from a visible KDTree or cKDTree call in the same function,
+# and the point must be the loop name or a row indexed by it. No fix, because the loop decides the result's shape.
+id: query-per-point
+language: python
+severity: warning
+message: This queries $T once per point. Pass all the points to $T.query in one call, as an array of shape (n, k), which ran 17 to 36 times faster on 1,000,000 points.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $T.query }
+    # The point is a name or one row of an array, $P[$X], and the loop takes $X as its name.
+    - has: { field: arguments, has: { nthChild: 1, any: [{ kind: identifier, pattern: $X }, { kind: subscript, pattern: '$P[$X]' }] } }
+    - any:
+        - inside: { stopBy: { kind: function_definition }, matches: per-point-comprehension }
+        - inside: { stopBy: { kind: function_definition }, kind: block, inside: { kind: for_statement, matches: per-point-loop } }
+    - inside:
+        stopBy: end
+        kind: function_definition
+        has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $T } }, { has: { field: right, matches: tree-call } }] }
+constraints:
+  T: { kind: identifier }
+  X: { kind: identifier }
+utils:
+  per-point-comprehension:
+    any: [{ kind: list_comprehension }, { kind: generator_expression }]
+    has: { kind: for_in_clause, has: { field: left, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] } }
+  per-point-loop:
+    has: { field: left, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] }
+  tree-call:
+    kind: call
+    has:
+      field: function
+      any:
+        - { pattern: $M.$K, matches: spatial-module }
+        - { kind: identifier, pattern: $K, matches: from-spatial }
+      regex: '(^|\.)c?KDTree$'
+  spatial-module:
+    any:
+      - has: { field: object, regex: '^scipy\.spatial$' }
+      - all:
+          - has: { field: object, pattern: $S.spatial }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $M }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.spatial$' } }, { has: { field: alias, pattern: $M } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $M, regex: '^spatial$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^spatial$' } }, { has: { field: alias, pattern: $M } }] }
+  from-spatial:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.spatial$' } }, { has: { kind: dotted_name, pattern: $K } }]

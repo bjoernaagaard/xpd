@@ -1,0 +1,1045 @@
+# scipy/interpolate/_interpolate.py line 193 marks interp1d as legacy. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.interp1d as legacy. Write numpy.interp for linear interpolation of 1-D data or
+  make_interp_spline for a spline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(interp1d)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(interp1d)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(interp1d)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(interp1d)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(interp1d)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^interp1d$}
+---
+# scipy/interpolate/_rbf.py line 64 marks Rbf as legacy. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.Rbf as legacy. Write RBFInterpolator, which takes the points as one (n, d) array.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(Rbf)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(Rbf)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(Rbf)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(Rbf)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(Rbf)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^Rbf$}
+metadata: {since: '1.7'}
+---
+# scipy/interpolate/_fitpack2.py line 402 recommends make_splrep. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.UnivariateSpline as legacy. Write make_splrep, which returns a BSpline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(UnivariateSpline)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(UnivariateSpline)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(UnivariateSpline)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(UnivariateSpline)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(UnivariateSpline)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^UnivariateSpline$}
+metadata: {since: '1.15'}
+---
+# scipy/interpolate/_fitpack2.py line 1010 recommends make_interp_spline. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.InterpolatedUnivariateSpline as legacy. Write make_interp_spline, which returns
+  a BSpline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(InterpolatedUnivariateSpline)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(InterpolatedUnivariateSpline)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(InterpolatedUnivariateSpline)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(InterpolatedUnivariateSpline)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(InterpolatedUnivariateSpline)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^InterpolatedUnivariateSpline$}
+---
+# scipy/interpolate/_fitpack2.py line 1132 recommends make_lsq_spline. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.LSQUnivariateSpline as legacy. Write make_lsq_spline, which returns a BSpline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(LSQUnivariateSpline)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(LSQUnivariateSpline)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(LSQUnivariateSpline)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(LSQUnivariateSpline)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(LSQUnivariateSpline)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^LSQUnivariateSpline$}
+---
+# scipy/interpolate/_fitpack_py.py line 170 recommends make_splrep. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.splrep as legacy. Write make_splrep, which returns a BSpline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(splrep)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(splrep)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(splrep)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(splrep)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(splrep)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^splrep$}
+metadata: {since: '1.15'}
+---
+# scipy/interpolate/_fitpack_py.py line 20 recommends make_splprep. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.splprep as legacy. Write make_splprep, which returns a BSpline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(splprep)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(splprep)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(splprep)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(splprep)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(splprep)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^splprep$}
+metadata: {since: '1.15'}
+---
+# scipy/interpolate/_fitpack_py.py line 314 recommends BSpline.__call__. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.splev as legacy. Build a BSpline and call it.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(splev)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(splev)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(splev)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(splev)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(splev)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^splev$}
+---
+# scipy/interpolate/_fitpack_py.py line 405 recommends BSpline.integrate. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.splint as legacy. Build a BSpline and call its integrate method.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(splint)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(splint)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(splint)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(splint)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(splint)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^splint$}
+---
+# scipy/interpolate/_fitpack_py.py line 476 recommends PPoly.from_spline(spl).roots(). The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.sproot as legacy. Write PPoly.from_spline(spl).roots() on a BSpline.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(sproot)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(sproot)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(sproot)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(sproot)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(sproot)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^sproot$}
+---
+# scipy/interpolate/_fitpack_py.py line 573 recommends BSpline derivatives. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.spalde as legacy. Build a BSpline and evaluate its derivative.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(spalde)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(spalde)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(spalde)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(spalde)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(spalde)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^spalde$}
+---
+# scipy/interpolate/_fitpack_py.py line 773 recommends BSpline.derivative. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.splder as legacy. Build a BSpline and call its derivative method.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(splder)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(splder)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(splder)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(splder)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(splder)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^splder$}
+---
+# scipy/interpolate/_fitpack_py.py line 841 recommends BSpline.antiderivative. The replacement takes other arguments and returns another object, so there is no fix.
+id: legacy-interpolate
+language: python
+severity: info
+message: SciPy marks interpolate.splantider as legacy. Build a BSpline and call its antiderivative method.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      any:
+      - {regex: ^scipy\.interpolate\.(splantider)$, pattern: scipy.interpolate.$F}
+      - all:
+        - {regex: \.interpolate\.(splantider)$, pattern: $R.interpolate.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy$}
+                  - has: {field: alias, pattern: $R}
+      - all:
+        - {regex: \.(splantider)$, pattern: $R.$F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                  - has: {field: name, regex: ^scipy\.interpolate$}
+                  - has: {field: alias, pattern: $R}
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy$}
+                - any:
+                  - has: {kind: dotted_name, pattern: $R, regex: ^interpolate$}
+                  - has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^interpolate$}
+                      - has: {field: alias, pattern: $R}
+      - all:
+        - {kind: identifier, regex: ^(splantider)$, pattern: $F}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has: {kind: dotted_name, pattern: $F}
+      - all:
+        - {kind: identifier, pattern: $F_AS}
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_from_statement
+                all:
+                - has: {field: module_name, regex: ^scipy\.interpolate$}
+                - has:
+                    kind: aliased_import
+                    all:
+                    - has: {field: name, pattern: $F, regex: ^(splantider)$}
+                    - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^splantider$}

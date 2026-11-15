@@ -1,0 +1,44 @@
+# On covariance matrices of 120 features at scale 1e-3 and 80 features at scale 1e4 the old form
+# gave -inf and inf, where slogdet lost 0.54 and 0.27 digits, in
+# research/scipy-rules/digits/runs/probe_linalg.jsonl. SciPy has no slogdet, so the fix calls
+# NumPy's through the np of the match. Unsafe. For a negative determinant np.log gives nan where
+# slogdet gives the log of its absolute value, for complex input slogdet gives the log of the
+# modulus, and slogdet does not raise on nan or inf input where scipy.linalg.det does, in
+# research/scipy-rules/digits/runs/claims.txt. The abs forms come first because a constraint that
+# fails on the first pattern that fits does not try the next.
+id: log-of-scipy-det
+language: python
+severity: warning
+message: $D($A) overflows to inf or underflows to 0 for a large matrix, so its log is inf or -inf. On covariance matrices of 80 and 120 features that lost all 16 digits where slogdet lost less than 1. Write $NP.linalg.slogdet($A)[1].
+rule: { all: [{ any: [{ pattern: $NP.log($NP.abs($D($A))) }, { pattern: $NP.log(abs($D($A))) }, { pattern: $NP.log($D($A)) }] }, { not: { has: { stopBy: end, kind: comment } } }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  D: { any: [{ kind: attribute, regex: '\.det$', has: { field: object, matches: linalg-module } }, { all: [{ matches: linalg-name }, { regex: '^det$' }] }] }
+fix: $NP.linalg.slogdet($A)[1]
+metadata: { fix: unsafe }
+utils:
+  linalg-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.linalg$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.linalg }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.linalg$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^linalg$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^linalg$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  linalg-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.linalg$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
