@@ -1,0 +1,40 @@
+# scipy.integrate.trapz, cumtrapz and simps raise AttributeError on SciPy 1.18.1, in
+# research/scipy-rules/removed/runs/probe_scaffold.jsonl. A name counts as SciPy's only when it
+# is rooted at scipy or the file's own imports bind it from scipy.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.integrate.$N was removed from SciPy and raises AttributeError. Write $NEW.
+rule:
+  kind: attribute
+  pattern: $M.$N
+  not: { inside: { kind: assignment, field: left } }
+  any:
+    - has: { field: object, regex: '^scipy\.integrate$' }
+    - all:
+        - has: { field: object, pattern: $S.integrate }
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              kind: import_statement
+              has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] }
+    - inside:
+        stopBy: end
+        kind: module
+        has:
+          any:
+            - kind: import_statement
+              has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.integrate$' } }, { has: { field: alias, pattern: $M } }] }
+            - kind: import_from_statement
+              all:
+                - has: { field: module_name, regex: '^scipy$' }
+                - any:
+                    - has: { field: name, kind: dotted_name, pattern: $M, regex: '^integrate$' }
+                    - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^integrate$' } }, { has: { field: alias, pattern: $M } }] }
+constraints:
+  N: { regex: '^(trapz|cumtrapz|simps)$' }
+transform:
+  T1: { replace: { source: $N, replace: '^trapz$', by: trapezoid } }
+  T2: { replace: { source: $T1, replace: '^cumtrapz$', by: cumulative_trapezoid } }
+  NEW: { replace: { source: $T2, replace: '^simps$', by: simpson } }
