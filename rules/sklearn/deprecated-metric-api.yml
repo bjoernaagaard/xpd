@@ -1,0 +1,96 @@
+# Each document finds one metric API that scikit-learn 1.9.1 warns about with a FutureWarning.
+# The old form still runs and gives the same result as the new one.
+id: deprecated-metric-api
+language: python
+severity: warning
+message: $F renamed y_pred= to y_proba= in scikit-learn 1.9, and y_pred= goes away in 1.11. Pass y_proba= instead.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^y_pred$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+constraints:
+  F: { regex: '^(log_loss|d2_log_loss_score)$' }
+utils:
+  from-sklearn-metrics:
+    any:
+      - kind: attribute
+        has: { field: object, regex: '^(sklearn\.)?metrics$' }
+      - kind: identifier
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            has: { field: module_name, regex: '^sklearn\.metrics$' }
+            any:
+              - has: { stopBy: end, kind: identifier, pattern: $F }
+              - has: { kind: wildcard_import }
+fix: y_proba=$V
+metadata: { fix: safe, since: "1.9" }
+---
+id: deprecated-metric-api
+language: python
+severity: warning
+message: PrecisionRecallDisplay renamed estimator_name= to name= in scikit-learn 1.8, and estimator_name= goes away in 1.10. Pass name= instead.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^estimator_name$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    not: { has: { kind: keyword_argument, has: { field: name, regex: ^name$ } } }
+    inside:
+      kind: call
+      has: { field: function, regex: '(^|\.)PrecisionRecallDisplay$' }
+fix: name=$V
+metadata: { fix: safe, since: "1.8" }
+---
+# from_predictions needs matplotlib to run, so the form has no fix: a fix needs a case that runs.
+id: deprecated-metric-api
+language: python
+severity: warning
+message: $F renamed y_pred= to y_score= in scikit-learn 1.8, and y_pred= goes away in 1.10. Pass y_score= instead.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '(^|\.)(PrecisionRecallDisplay|DetCurveDisplay)\.from_predictions$', pattern: $F }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^y_pred$ } } }
+metadata: { since: "1.8" }
+---
+# The keywords below are the ones these methods take on 1.9.1. Any other keyword is a
+# matplotlib argument, which they pass on with a FutureWarning.
+id: deprecated-metric-api
+language: python
+severity: warning
+message: $F passes $KW= on to matplotlib with a FutureWarning, and scikit-learn 1.11 stops taking it. Pass the matplotlib arguments as curve_kwargs={...}.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '(^|\.)PrecisionRecallDisplay\.(from_estimator|from_predictions)$|^PrecisionRecallDisplay\(.*\)\.plot$', pattern: $F }
+  has:
+    field: arguments
+    has:
+      kind: keyword_argument
+      has:
+        field: name
+        pattern: $KW
+        not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|despine)$' }
+metadata: { since: "1.9" }
+---
+id: deprecated-metric-api
+language: python
+severity: warning
+message: sklearn.metrics.cluster.entropy is deprecated in scikit-learn 1.8 and goes away in 1.10. Call scipy.stats.entropy on the class counts, np.unique(labels, return_counts=True)[1].
+rule:
+  kind: import_from_statement
+  all:
+    - has: { field: module_name, regex: '^sklearn\.metrics\.cluster$' }
+    - has: { stopBy: end, kind: identifier, regex: ^entropy$, not: { inside: { kind: aliased_import, field: alias } } }
