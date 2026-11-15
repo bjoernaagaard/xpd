@@ -26,6 +26,7 @@ rule:
     any:
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
       - has: { field: arguments, has: { kind: dictionary_splat } }
+      - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
       - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
 constraints:
   C: { regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees?(Classifier|Regressor)|Bagging(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|AdaBoostRegressor|IsolationForest|RandomTreesEmbedding|DecisionTree(Classifier|Regressor)|KMeans|MiniBatchKMeans|SpectralClustering|AffinityPropagation|MLP(Classifier|Regressor)|SGD(Classifier|Regressor|OneClassSVM)|TruncatedSVD|NMF|LatentDirichletAllocation|FastICA|MiniBatchDictionaryLearning|MDS|SpectralEmbedding|Nystroem|RBFSampler|(Sparse|Gaussian)RandomProjection|ShuffleSplit|StratifiedShuffleSplit|Repeated(Stratified)?KFold)$' }
@@ -65,7 +66,8 @@ rule:
       - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
 ---
 # With more than 10000 rows HistGradientBoosting stops early on a validation part it draws at
-# random, so from that size the result changes. A pattern cannot see the number of rows.
+# random, so from that size the result changes. A pattern cannot see the number of rows. A call
+# that only reads get_params fits nothing and is left alone.
 id: missing-random-state
 language: python
 severity: info
@@ -76,6 +78,7 @@ rule:
     any:
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|early_stopping)$' } } }
       - has: { field: arguments, has: { kind: dictionary_splat } }
+      - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
       - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
 constraints:
   C: { regex: '(^|\.)HistGradientBoosting(Classifier|Regressor)$' }
