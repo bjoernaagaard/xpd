@@ -1,0 +1,494 @@
+# Each document finds a scikit-learn form that raises FutureWarning on 1.9.1 and will raise an
+# error in a later release. The warning text names the release, and the message repeats it.
+# Code inside a try block that catches TypeError or a version check is a compatibility path and
+# stays silent.
+
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: $C(probability=) is deprecated since 1.9 and will be removed in 1.11. Wrap the model as CalibratedClassifierCV($C(), ensemble=False) to get predict_proba.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^probability$ } } }
+  not:
+    any:
+      - has: { field: arguments, has: { kind: keyword_argument, regex: '^probability\s*=\s*False$' } }
+      - matches: compat-code
+constraints:
+  C: { regex: '(^|\.)(SVC|NuSVC)$' }
+utils:
+  compat-code:
+    any:
+      - inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(TypeError|ValueError)' } }
+      - inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } }
+metadata: { since: "1.9" }
+---
+# probability=False is what the default does, so the keyword can go. The parameter that the
+# estimator stores changes from False to "deprecated", and the fitted model stays the same.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: $C(probability=) is deprecated since 1.9 and will be removed in 1.11. Drop probability=False, which is what the default does.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^probability\s*=\s*False$' } }
+  not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+constraints:
+  C: { regex: '(^|\.)(SVC|NuSVC)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^probability$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^probability$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: safe, since: "1.9" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: $X.$A is deprecated since 1.9 and will be removed in 1.11, with SVC(probability=True). Wrap the model in CalibratedClassifierCV(ensemble=False) and read its calibrators instead.
+rule:
+  pattern: $X.$A
+  regex: '\.prob[AB]_$'
+metadata: { since: "1.9" }
+---
+# penalty= on LogisticRegression. Since 1.8 l1_ratio picks the penalty, and its default 0.0
+# gives the L2 penalty. The fixes below hold only when l1_ratio is not passed, because a passed
+# l1_ratio would then pick the penalty instead.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegression(penalty=) is deprecated since 1.8 and will be removed in 1.10. Drop penalty="l2", because the default l1_ratio=0 gives the L2 penalty.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^penalty\s*=\s*["'']l2["'']$' } }
+  not:
+    any:
+      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^l1_ratio$ } } }
+      - has: { field: arguments, has: { kind: dictionary_splat } }
+constraints:
+  C: { regex: '(^|\.)LogisticRegression$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^penalty$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^penalty$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: safe, since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegression(penalty=) is deprecated since 1.8 and will be removed in 1.10. Write l1_ratio=1 for the L1 penalty.
+rule:
+  kind: keyword_argument
+  regex: '^penalty\s*=\s*["'']l1["'']$'
+  inside:
+    kind: argument_list
+    not:
+      any:
+        - has: { kind: keyword_argument, has: { field: name, regex: ^l1_ratio$ } }
+        - has: { kind: dictionary_splat }
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
+fix: l1_ratio=1
+metadata: { fix: safe, since: "1.8" }
+---
+# The fix holds only for an l1_ratio written as a number strictly between 0 and 1. At 0 or 1 the
+# deprecated default would pick the L2 or L1 penalty instead of elasticnet.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegression(penalty=) is deprecated since 1.8 and will be removed in 1.10. Drop penalty="elasticnet", because an l1_ratio between 0 and 1 already gives that penalty.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^penalty\s*=\s*["'']elasticnet["'']$' } }
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^l1_ratio\s*=\s*0?\.0*[1-9]\d*$' } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+constraints:
+  C: { regex: '(^|\.)LogisticRegression$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^penalty$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^penalty$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: safe, since: "1.8" }
+---
+# Any other penalty=, such as None, a value held in a name, or l2 next to an l1_ratio.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegression(penalty=) is deprecated since 1.8 and will be removed in 1.10. Set l1_ratio instead, 0 for L2, 1 for L1 and a value between for elasticnet, and C=np.inf for no penalty.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: ^penalty$ }
+  inside:
+    kind: argument_list
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
+  not:
+    any:
+      - all:
+          - regex: '^penalty\s*=\s*["'']l2["'']$'
+          - inside: { kind: argument_list, not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^l1_ratio$ } }] } } }
+      - all:
+          - regex: '^penalty\s*=\s*["'']l1["'']$'
+          - inside: { kind: argument_list, not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^l1_ratio$ } }] } } }
+      - all:
+          - regex: '^penalty\s*=\s*["'']elasticnet["'']$'
+          - inside: { kind: argument_list, has: { kind: keyword_argument, regex: '^l1_ratio\s*=\s*0?\.0*[1-9]\d*$' }, not: { has: { kind: dictionary_splat } } }
+metadata: { since: "1.8" }
+---
+# l1_ratio=None with the default penalty gives the L2 penalty, the same as l1_ratio=0.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegression(l1_ratio=None) is deprecated since 1.8 and will raise in 1.10. Write l1_ratio=0, which gives the same L2 penalty.
+rule:
+  kind: keyword_argument
+  regex: '^l1_ratio\s*=\s*None$'
+  inside:
+    kind: argument_list
+    not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^penalty$ } }] } }
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
+fix: l1_ratio=0
+metadata: { fix: safe, since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegression(n_jobs=) has had no effect since 1.8 and will be removed in 1.10. Drop it.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^n_jobs$ } } }
+constraints:
+  C: { regex: '(^|\.)LogisticRegression$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^n_jobs$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^n_jobs$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: safe, since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegressionCV(penalty=) is deprecated since 1.8 and will be removed in 1.10. Pass l1_ratios instead, (0,) for L2, (1,) for L1 and values between for elasticnet.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: ^penalty$ }
+  inside:
+    kind: argument_list
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegressionCV$' } }
+metadata: { since: "1.8" }
+---
+# Three defaults of LogisticRegressionCV each give a FutureWarning on fit: l1_ratios, scoring and
+# use_legacy_attributes. The source names no release for use_legacy_attributes, so the document
+# applies from 1.9, the release measured.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: LogisticRegressionCV warns on fit until l1_ratios, scoring and use_legacy_attributes are all set, because their defaults change in 1.10 and 1.11. Pass l1_ratios=(0,), scoring="accuracy" and use_legacy_attributes=False.
+rule:
+  pattern: $C($$$ARGS)
+  not:
+    any:
+      - all:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^l1_ratios$ } } }
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^scoring$ } } }
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^use_legacy_attributes$ } } }
+      - has: { field: arguments, has: { kind: dictionary_splat } }
+constraints:
+  C: { regex: '(^|\.)LogisticRegressionCV$' }
+metadata: { since: "1.9" }
+---
+# The regressors map "friedman_mse" to "squared_error" in __init__, so the stored parameter and
+# the fitted trees are the same.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: criterion="friedman_mse" is deprecated since 1.9 and will be removed in 1.11. Write criterion="squared_error", which 1.9 maps it to.
+rule:
+  kind: string
+  regex: '^["'']friedman_mse["'']$'
+  inside:
+    kind: keyword_argument
+    has: { field: name, regex: ^criterion$ }
+    inside:
+      kind: argument_list
+      inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)(RandomForestRegressor|ExtraTreesRegressor|DecisionTreeRegressor|ExtraTreeRegressor)$' } }
+fix: '"squared_error"'
+metadata: { fix: safe, since: "1.9" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: GradientBoosting criterion= has no effect, is deprecated since 1.9 and will be removed in 1.11. Drop it.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^criterion$ } } }
+constraints:
+  C: { regex: '(^|\.)GradientBoosting(Classifier|Regressor)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^criterion$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^criterion$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: safe, since: "1.9" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: PassiveAggressiveClassifier is deprecated since 1.8 and will be removed in 1.10. Use SGDClassifier(loss="hinge", penalty=None, learning_rate="pa1", eta0=1.0).
+rule:
+  pattern: $C($$$ARGS)
+constraints:
+  C: { regex: '(^|\.)PassiveAggressiveClassifier$' }
+metadata: { since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: PassiveAggressiveRegressor is deprecated since 1.8 and will be removed in 1.10. Use SGDRegressor(loss="epsilon_insensitive", penalty=None, learning_rate="pa1", eta0=1.0).
+rule:
+  pattern: $C($$$ARGS)
+constraints:
+  C: { regex: '(^|\.)PassiveAggressiveRegressor$' }
+metadata: { since: "1.8" }
+---
+# category_encoders has a TargetEncoder too, so the document needs the class imported from
+# sklearn in the same file.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: TargetEncoder(shuffle=, random_state=) is deprecated since 1.9 and will be removed in 1.11. Pass a splitter as cv, such as cv=KFold(5, shuffle=True, random_state=0).
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(shuffle|random_state)$ } } }
+  any:
+    - regex: '^sklearn\.'
+    - inside:
+        kind: module
+        stopBy: end
+        has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { field: name, pattern: $C } }] }
+constraints:
+  C: { regex: '(^|\.)TargetEncoder$' }
+metadata: { since: "1.9" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: MDS(dissimilarity=) was renamed metric in 1.8, and the old name will be removed in 1.10. Write metric=.
+rule:
+  kind: identifier
+  regex: ^dissimilarity$
+  inside:
+    kind: keyword_argument
+    field: name
+    inside:
+      kind: argument_list
+      not: { has: { kind: keyword_argument, has: { field: name, regex: ^metric$ } } }
+      inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)MDS$' } }
+fix: metric
+metadata: { fix: safe, since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: MDS(metric=True or False) was renamed metric_mds in 1.8, and the old form will be removed in 1.10. Write metric_mds=.
+rule:
+  kind: identifier
+  regex: ^metric$
+  inside:
+    kind: keyword_argument
+    field: name
+    regex: '^metric\s*=\s*(True|False)$'
+    inside:
+      kind: argument_list
+      not: { has: { kind: keyword_argument, has: { field: name, regex: ^metric_mds$ } } }
+      inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)MDS$' } }
+fix: metric_mds
+metadata: { fix: safe, since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: MDS without init warns, because the default changes from "random" to "classical_mds" in 1.10. Pass init="random" to keep the current result.
+rule:
+  pattern: $C($$$ARGS)
+  not:
+    has:
+      field: arguments
+      has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^init$ } }] }
+constraints:
+  C: { regex: '(^|\.)MDS$' }
+metadata: { since: "1.8" }
+---
+# The hdbscan package has an HDBSCAN class too, so the document needs the class imported from
+# sklearn in the same file.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: HDBSCAN without copy warns, because the default changes from False to True in 1.10. Pass copy=False to keep the current behavior, or copy=True to keep X unchanged.
+rule:
+  pattern: $C($$$ARGS)
+  not:
+    has:
+      field: arguments
+      has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^copy$ } }] }
+  any:
+    - regex: '^sklearn\.'
+    - inside:
+        kind: module
+        stopBy: end
+        has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { field: name, pattern: $C } }] }
+constraints:
+  C: { regex: '(^|\.)HDBSCAN$' }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: n_alphas= is deprecated since 1.9 and will be removed in 1.11, because alphas takes the number of alphas since 1.7. Write alphas=.
+rule:
+  kind: identifier
+  regex: ^n_alphas$
+  inside:
+    kind: keyword_argument
+    field: name
+    inside:
+      kind: argument_list
+      not: { has: { kind: keyword_argument, has: { field: name, regex: ^alphas$ } } }
+      inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)(lasso_path|enet_path)$' } }
+fix: alphas
+metadata: { fix: safe, since: "1.9" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: n_alphas= is deprecated since 1.9 and will be removed in 1.11. Pass only alphas, as a number of alphas or a list of them.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: ^n_alphas$ }
+  inside:
+    kind: argument_list
+    has: { kind: keyword_argument, has: { field: name, regex: ^alphas$ } }
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)(lasso_path|enet_path)$' } }
+metadata: { since: "1.9" }
+---
+# With n_alphas left out, alphas=None computes 100 alphas, the same as alphas=100.
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: alphas=None is deprecated since 1.9 and will be removed in 1.11. Write alphas=100, which computes the same 100 alphas.
+rule:
+  kind: keyword_argument
+  regex: '^alphas\s*=\s*None$'
+  inside:
+    kind: argument_list
+    not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^n_alphas$ } }] } }
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)(lasso_path|enet_path)$' } }
+fix: alphas=100
+metadata: { fix: safe, since: "1.9" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: A negative power_t is deprecated since 1.8 and will raise in 1.10. Use a value of 0 or more.
+rule:
+  kind: keyword_argument
+  regex: '^power_t\s*=\s*-'
+  inside:
+    kind: argument_list
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)(SGDClassifier|SGDRegressor|SGDOneClassSVM)$' } }
+metadata: { since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: sklearn.utils.extmath.stable_cumsum is deprecated since 1.8 and will be removed in 1.10. Call np.cumulative_sum with the dtype you need.
+rule:
+  any:
+    - kind: import_from_statement
+      regex: '^from\s+sklearn\.utils\.extmath\s+import\b[^#]*\bstable_cumsum\b'
+    - pattern: $X.stable_cumsum($$$A)
+      regex: '^sklearn\.utils\.extmath\.'
+metadata: { since: "1.8" }
+---
+id: deprecated-in-sklearn
+language: python
+severity: warning
+message: sklearn.metrics.cluster.entropy is deprecated since 1.8 and will be removed in 1.10, and scikit-learn has no replacement. Compute the entropy of the label counts yourself.
+rule:
+  any:
+    - kind: import_from_statement
+      regex: '^from\s+sklearn\.metrics\.cluster\s+import\b[^#]*\bentropy\b'
+    - pattern: $X.entropy($$$A)
+      regex: '^sklearn\.metrics\.cluster\.'
+metadata: { since: "1.8" }
