@@ -217,3 +217,87 @@ def current_metric_api():
         make_scorer(roc_auc_score, response_method="predict_proba")(model, X_test, y_test),
         RocCurveDisplay(fpr=fpr, tpr=tpr, name="model").name,
     )
+
+
+@case
+def deprecated_metric_api():
+    from sklearn.metrics import PrecisionRecallDisplay, d2_log_loss_score
+    from sklearn.metrics.cluster import entropy  # xpd: deprecated-metric-api
+
+    model, X_test, y_test = fitted()
+    proba = model.predict_proba(X_test)
+    precision, recall, _ = precision_recall_curve(y_test, proba[:, 1])
+    display = PrecisionRecallDisplay(precision, recall, estimator_name="model")  # xpd: deprecated-metric-api
+    return (
+        model,
+        log_loss(y_test, y_pred=proba),  # xpd: deprecated-metric-api
+        metrics.log_loss(y_true=y_test, y_pred=proba, labels=[0, 1]),  # xpd: deprecated-metric-api
+        d2_log_loss_score(y_test, y_pred=proba),  # xpd: deprecated-metric-api
+        log_loss(y_test, y_proba=proba),
+        display.name,
+        PrecisionRecallDisplay(precision, recall, name="model").name,
+        entropy(y_test),
+    )
+
+
+def deprecated_display_keywords():
+    from sklearn.metrics import DetCurveDisplay, PrecisionRecallDisplay
+
+    model, X_test, y_test = fitted()
+    y_score = model.predict_proba(X_test)[:, 1]
+    PrecisionRecallDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: deprecated-metric-api
+    DetCurveDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: deprecated-metric-api
+    PrecisionRecallDisplay.from_estimator(model, X_test, y_test, color="red")  # xpd: deprecated-metric-api
+    PrecisionRecallDisplay.from_predictions(y_test, y_score=y_score, curve_kwargs={"color": "red"})
+
+
+def unknown_scoring_names():
+    from sklearn.metrics import get_scorer
+    from sklearn.model_selection import GridSearchCV, cross_val_score, cross_validate
+
+    X_train, X_test, y_train, y_test = data()
+    cross_val_score(LinearRegression(), X_train, y_train, scoring="mean_squared_error", cv=5)  # xpd: unknown-scoring-name
+    GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, scoring="auc").fit(X_train, y_train)  # xpd: unknown-scoring-name
+    cross_validate(LogisticRegression(), X_train, y_train, scoring=["accuracy", "roc_auc_score"])  # xpd: unknown-scoring-name
+    get_scorer("log_loss")  # xpd: unknown-scoring-name
+
+
+@case
+def known_scoring_names():
+    from sklearn.metrics import get_scorer
+    from sklearn.model_selection import cross_val_score, cross_validate
+
+    X_train, X_test, y_train, y_test = data()
+    name = "neg_log_loss"
+    return (
+        cross_val_score(LinearRegression(), X_train, y_train, scoring="neg_mean_squared_error", cv=5),
+        cross_validate(LogisticRegression(), X_train, y_train, scoring=["accuracy", "roc_auc"])["test_roc_auc"],
+        get_scorer("neg_log_loss")(LogisticRegression().fit(X_train, y_train), X_test, y_test),
+        cross_val_score(LogisticRegression(), X_train, y_train, scoring=f"{name}", cv=5),
+    )
+
+
+@case
+def score_on_training_rows():
+    from sklearn.tree import DecisionTreeClassifier
+
+    def report():
+        X_train, _, y_train, _ = data()
+        model = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)
+        fit_score = model.score(X_train, y_train)  # xpd: score-on-training-rows
+        fit_accuracy = accuracy_score(y_train, model.predict(X_train))  # xpd: score-on-training-rows
+        return model, fit_score, fit_accuracy
+
+    return report()
+
+
+@case
+def score_on_training_and_test_rows():
+    from sklearn.tree import DecisionTreeClassifier
+
+    def report():
+        X_train, X_test, y_train, y_test = data()
+        model = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)
+        return model, model.score(X_train, y_train), model.score(X_test, y_test)
+
+    return report()

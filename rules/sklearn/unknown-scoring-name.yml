@@ -1,0 +1,35 @@
+# get_scorer raises on any name outside sklearn.metrics.get_scorer_names(). The list below is
+# that function's output on scikit-learn 1.9.1. A string with { or % in it is left alone,
+# because it is a template that code fills in later.
+id: unknown-scoring-name
+language: python
+severity: error
+message: $S is not a scorer name, so this raises. Pick a name from sklearn.metrics.get_scorer_names(). Losses carry the neg_ prefix, as in "neg_mean_squared_error".
+rule:
+  kind: string
+  pattern: $S
+  not: { regex: '[{%]|^[fFrRbB]+["'']' }
+  any:
+    - inside:
+        kind: keyword_argument
+        all:
+          - has: { field: name, regex: ^scoring$ }
+          - inside: { kind: argument_list, inside: { kind: call, matches: takes-scoring } }
+    - inside:
+        any: [{ kind: list }, { kind: tuple }]
+        inside:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: ^scoring$ }
+            - inside: { kind: argument_list, inside: { kind: call, matches: takes-scoring } }
+    - nthChild: 1
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '(^|\.)get_scorer$' } }
+constraints:
+  S: { not: { regex: '^["''](accuracy|adjusted_mutual_info_score|adjusted_rand_score|average_precision|balanced_accuracy|completeness_score|d2_absolute_error_score|d2_brier_score|d2_log_loss_score|explained_variance|f1|f1_macro|f1_micro|f1_samples|f1_weighted|fowlkes_mallows_score|homogeneity_score|jaccard|jaccard_macro|jaccard_micro|jaccard_samples|jaccard_weighted|matthews_corrcoef|mutual_info_score|neg_brier_score|neg_log_loss|neg_max_error|neg_mean_absolute_error|neg_mean_absolute_percentage_error|neg_mean_gamma_deviance|neg_mean_poisson_deviance|neg_mean_squared_error|neg_mean_squared_log_error|neg_median_absolute_error|neg_negative_likelihood_ratio|neg_root_mean_squared_error|neg_root_mean_squared_log_error|normalized_mutual_info_score|positive_likelihood_ratio|precision|precision_macro|precision_micro|precision_samples|precision_weighted|r2|rand_score|recall|recall_macro|recall_micro|recall_samples|recall_weighted|roc_auc|roc_auc_ovo|roc_auc_ovo_weighted|roc_auc_ovr|roc_auc_ovr_weighted|top_k_accuracy|v_measure_score)["'']$' } }
+utils:
+  takes-scoring:
+    has:
+      field: function
+      regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|cross_val_score|cross_validate|learning_curve|validation_curve|permutation_importance|RFECV|SequentialFeatureSelector|check_scoring|LogisticRegressionCV|TunedThresholdClassifierCV|BayesSearchCV)$'
