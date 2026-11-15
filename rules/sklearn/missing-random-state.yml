@@ -4,6 +4,10 @@
 # default init, GaussianMixture with one component, Perceptron and AdaBoostClassifier gave the same
 # output and are not listed. A file that calls np.random.seed is left alone, because scikit-learn
 # then draws from that seed.
+#
+# The np.random.seed test reads the whole file, so a rule that starts from every call tests the
+# class name first in all, which keeps its order. ast-grep checks constraints only after the
+# whole rule has matched, so a name test there would come after the file test.
 id: missing-random-state
 language: python
 severity: info
@@ -22,14 +26,14 @@ severity: info
 message: $C draws random numbers with a new seed on every run, so the result changes from run to run. Pass random_state.
 rule:
   pattern: $C($$$ARGS)
-  not:
-    any:
-      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
-      - has: { field: arguments, has: { kind: dictionary_splat } }
-      - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
-      - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
-constraints:
-  C: { regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees?(Classifier|Regressor)|Bagging(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|AdaBoostRegressor|IsolationForest|RandomTreesEmbedding|DecisionTree(Classifier|Regressor)|KMeans|MiniBatchKMeans|SpectralClustering|AffinityPropagation|MLP(Classifier|Regressor)|SGD(Classifier|Regressor|OneClassSVM)|TruncatedSVD|NMF|LatentDirichletAllocation|FastICA|MiniBatchDictionaryLearning|MDS|SpectralEmbedding|Nystroem|RBFSampler|(Sparse|Gaussian)RandomProjection|ShuffleSplit|StratifiedShuffleSplit|Repeated(Stratified)?KFold)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees?(Classifier|Regressor)|Bagging(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|AdaBoostRegressor|IsolationForest|RandomTreesEmbedding|DecisionTree(Classifier|Regressor)|KMeans|MiniBatchKMeans|SpectralClustering|AffinityPropagation|MLP(Classifier|Regressor)|SGD(Classifier|Regressor|OneClassSVM)|TruncatedSVD|NMF|LatentDirichletAllocation|FastICA|MiniBatchDictionaryLearning|MDS|SpectralEmbedding|Nystroem|RBFSampler|(Sparse|Gaussian)RandomProjection|ShuffleSplit|StratifiedShuffleSplit|Repeated(Stratified)?KFold)$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
 ---
 id: missing-random-state
 language: python
@@ -37,13 +41,13 @@ severity: info
 message: $C with shuffle=True shuffles with a new seed on every run, so the folds change from run to run. Pass random_state.
 rule:
   pattern: $C($$$ARGS)
-  has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' } }
-  not:
-    any:
-      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
-      - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
-constraints:
-  C: { regex: '(^|\.)(KFold|StratifiedKFold|GroupKFold|StratifiedGroupKFold)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(KFold|StratifiedKFold|GroupKFold|StratifiedGroupKFold)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' } }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
 ---
 # These draw random numbers only with the argument shown: TSNE(init="random"),
 # SVC(probability=True), HistGradientBoosting with early_stopping=True, and a mixture with more
@@ -74,11 +78,11 @@ severity: info
 message: $C holds out a random validation part when it gets more than 10000 rows, so from that size the result changes from run to run. Pass random_state.
 rule:
   pattern: $C($$$ARGS)
-  not:
-    any:
-      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|early_stopping)$' } } }
-      - has: { field: arguments, has: { kind: dictionary_splat } }
-      - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
-      - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
-constraints:
-  C: { regex: '(^|\.)HistGradientBoosting(Classifier|Regressor)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)HistGradientBoosting(Classifier|Regressor)$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|early_stopping)$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
