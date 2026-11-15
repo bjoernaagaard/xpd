@@ -7,12 +7,14 @@ code computes, so a copy fixed with `xpd check --fix` can be compared with this 
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.manifold import TSNE
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC, LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 
 CASES = {}
@@ -182,3 +184,23 @@ def labels_from_one_predict_proba():
     linear_labels = linear.predict(X_test)
     linear_scores = linear.predict_proba(X_test)[:, 1]
     return proba, labels, train_labels, linear_labels, linear_scores
+
+
+@case
+def models_with_a_faster_relative():
+    X, y = table()
+    boosted = GradientBoostingClassifier(n_estimators=20, random_state=0).fit(X, y)  # xpd: slow-gradient-boosting
+    linear_kernel = SVC(kernel="linear").fit(X, y)  # xpd: svc-linear-kernel
+    embedding = TSNE(method="exact", perplexity=10, random_state=0).fit_transform(X[:60])  # xpd: tsne-exact
+    return boosted, linear_kernel, embedding
+
+
+@case
+def the_faster_relatives():
+    X, y = table()
+    boosted = HistGradientBoostingClassifier(max_iter=20, random_state=0).fit(X, y)
+    linear = LinearSVC().fit(X, y)
+    kernel = SVC(kernel="rbf").fit(X, y)
+    calibrated = SVC(kernel="linear", probability=True, random_state=0).fit(X, y)
+    embedding = TSNE(perplexity=10, random_state=0).fit_transform(X[:60])
+    return boosted, linear, kernel, calibrated, embedding
