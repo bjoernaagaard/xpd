@@ -42,9 +42,9 @@ def removed_keywords(a, b, y, x, points):
     linalg.pinv(a, rcond=1e-10)  # xpd: removed-keyword
     integrate.simpson(y, x=x, even="avg")  # xpd: removed-keyword
     integrate.cumulative_trapezoid(y, x, initial=1.0)  # xpd: removed-keyword
-    tree = cKDTree(points)
+    tree = cKDTree(points)  # xpd: ckdtree
     tree.query(points[:2], n_jobs=2)  # xpd: removed-keyword
-    cKDTree(points).query_ball_point(points[0], 0.5, n_jobs=-1)  # xpd: removed-keyword
+    cKDTree(points).query_ball_point(points[0], 0.5, n_jobs=-1)  # xpd: ckdtree, removed-keyword
     stats.kendalltau(x, y, initial_lexsort=True)  # xpd: removed-keyword
     stats.iqr(y, scale="raw")  # xpd: removed-keyword
     scipy.optimize.fmin_l_bfgs_b(np.sum, x, approx_grad=True, iprint=-1)  # xpd: removed-keyword, legacy-optimize
@@ -58,7 +58,7 @@ def current_keywords():
     x = np.linspace(0.0, 1.0, 11)
     y = np.sin(3 * x)
     points = np.c_[x, y]
-    tree = cKDTree(points)
+    tree = cKDTree(points)  # xpd: ckdtree
     return (
         spla.cg(a, b, rtol=1e-8)[0],
         gmres(a, b, atol=0.0, restart=5)[0],
@@ -117,7 +117,7 @@ def defaults_kept():
     seen = []
     x = gmres(a, b, callback=seen.append)[0]  # xpd: default-that-warns
     buffer = io.BytesIO()
-    mmwrite(buffer, sparse.coo_matrix(np.eye(3)))
+    mmwrite(buffer, sparse.coo_matrix(np.eye(3)))  # xpd: sparse-matrix-api
     buffer.seek(0)
     m = mmread(buffer)  # xpd: default-that-warns
     return x, len(seen), m.toarray(), type(m).__name__
@@ -129,7 +129,7 @@ def defaults_chosen():
     b = np.array([1.0, 2.0])
     x = np.random.default_rng(0).standard_normal(50)
     buffer = io.BytesIO()
-    mmwrite(buffer, sparse.coo_matrix(np.eye(3)))
+    mmwrite(buffer, sparse.coo_matrix(np.eye(3)))  # xpd: sparse-matrix-api
     buffer.seek(0)
     return (
         gmres(a, b, callback=len, callback_type="x")[0],
@@ -194,7 +194,7 @@ def minimize_known_options():
 
 
 def rng_keywords(x, f, bounds):
-    sparse.random(5, 5, density=0.5, random_state=0)  # xpd: rng-keyword
+    sparse.random(5, 5, density=0.5, random_state=0)  # xpd: rng-keyword, sparse-matrix-api
     sparse_random(5, 5, 0.5, random_state=0)  # xpd: rng-keyword
     kmeans2(x, 3, seed=1)  # xpd: rng-keyword
     optimize.differential_evolution(f, bounds, seed=2)  # xpd: rng-keyword
@@ -206,7 +206,7 @@ def rng_keywords(x, f, bounds):
 def rng_by_keyword():
     x = np.random.default_rng(0).standard_normal((40, 2))
     return (
-        sparse.random(5, 5, density=0.5, rng=0).toarray(),
+        sparse.random(5, 5, density=0.5, rng=0).toarray(),  # xpd: sparse-matrix-api
         kmeans2(x, 3, rng=1)[1],
         qmc.Sobol(2, rng=3).random(4),
         stats.norm.rvs(size=3, random_state=np.random.default_rng(4)),
@@ -224,7 +224,7 @@ def legacy_entry_points(f, x0, x, y, t, y0, sos, image, labels):
     interpolate.Rbf(x, y)  # xpd: legacy-interpolate
     signal.stft(y, nperseg=16)  # xpd: legacy-signal
     stats.ranksums(x, y)  # xpd: legacy-api
-    sparse.bmat([[None]])  # xpd: legacy-api
+    sparse.bmat([[None]])  # xpd: legacy-api, sparse-matrix-api
 
 
 @case

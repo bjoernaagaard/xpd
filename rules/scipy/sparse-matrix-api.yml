@@ -4,7 +4,8 @@
 # __init__.py:21. Nothing warns under -W error on 1.18.1, in speed/runs/probe_warn.jsonl. No
 # fix, because on a sparse array * and ** work elementwise, a row slice is 1-D, sum(axis=0) is
 # 1-D and todense gives an ndarray, in speed/runs/probe_matrix_vs_array.jsonl. The array classes
-# carry no versionadded. scikit-learn's tests skipped them below SciPy 1.8.
+# carry no versionadded. SciPy 1.7.3 has no csr_array and 1.8.1 has it, in
+# research/scipy-rules/runs/since-sparse-arrays.txt.
 id: sparse-matrix-api
 language: python
 severity: info
@@ -68,8 +69,8 @@ utils:
 # The builder functions that return a sparse matrix. Their docstrings encourage the array form,
 # in research/scipy-rules/src/scipy/scipy/sparse/_construct.py:262 for spdiags, :486 for diags,
 # :592 for identity, :720 for eye, :1207 and :1214 for bmat, :1686 for random and :1792 for rand.
-# diags_array has versionadded 1.11 at _construct.py:378. eye_array, random_array and
-# block_array carry none, so 1.11 is a guess for them. No fix, because the arguments differ:
+# SciPy 1.11.4 has none of eye_array, diags_array, random_array and block_array and 1.12.0 has
+# all four, in research/scipy-rules/runs/since-sparse-arrays.txt. No fix, because the arguments differ:
 # random_array takes a shape tuple, and eye_array and diags_array take k and offsets by keyword.
 id: sparse-matrix-api
 language: python
@@ -91,7 +92,7 @@ transform:
   T3: { replace: { source: $T2, replace: '^spdiags$', by: dia_array } }
   T4: { replace: { source: $T3, replace: '^(rand|random)$', by: random_array } }
   NEW: { replace: { source: $T4, replace: '^bmat$', by: block_array } }
-metadata: { since: "1.11" }
+metadata: { since: "1.12" }
 utils:
   # A function or a literal list, tuple or dict that also names a sparse array class, or a branch
   # taken on a condition that names a matrix, builds the matrix on purpose, as code that supports

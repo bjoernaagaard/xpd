@@ -23,9 +23,9 @@ from scipy.spatial import Delaunay
 import scipy.constants.codata  # xpd: deprecated-in-scipy
 from scipy.constants.codata import physical_constants as physical_constants_constants_codata  # xpd: deprecated-in-scipy
 from scipy.constants import physical_constants as physical_constants_constants_codata_now
-import scipy.fftpack.basic  # xpd: deprecated-in-scipy
-from scipy.fftpack.basic import fft as fft_fftpack_basic  # xpd: deprecated-in-scipy
-from scipy.fftpack import fft as fft_fftpack_basic_now
+import scipy.fftpack.basic  # xpd: deprecated-in-scipy, legacy-fftpack
+from scipy.fftpack.basic import fft as fft_fftpack_basic  # xpd: deprecated-in-scipy, legacy-fftpack
+from scipy.fftpack import fft as fft_fftpack_basic_now  # xpd: legacy-fftpack
 import scipy.integrate.odepack  # xpd: deprecated-in-scipy
 from scipy.integrate.odepack import odeint as odeint_integrate_odepack  # xpd: deprecated-in-scipy
 from scipy.integrate import odeint as odeint_integrate_odepack_now
@@ -120,7 +120,7 @@ def removed_and_moved_names(x):
 def current_moved_names():
     x = np.array([1.0, 2.0, 2.0, 5.0])
     return (signal.windows.hann(8), scipy.signal.windows.kaiser(8, 5.0), signal.get_window("hann", 8),
-            stats.mstats.find_repeats(x)[0], linalg.pinv(np.eye(2)), sparse.eye(3).toarray(),
+            stats.mstats.find_repeats(x)[0], linalg.pinv(np.eye(2)), sparse.eye(3).toarray(),  # xpd: sparse-matrix-api
             stats.median_abs_deviation(x))
 
 
@@ -228,8 +228,8 @@ def private_fftpack_basic():
 
 
 def private_fftpack_basic_other_forms():
-    from scipy.fftpack import basic  # xpd: deprecated-in-scipy
-    from scipy.fftpack.basic import no_such_name  # xpd: deprecated-in-scipy
+    from scipy.fftpack import basic  # xpd: deprecated-in-scipy, legacy-fftpack
+    from scipy.fftpack.basic import no_such_name  # xpd: deprecated-in-scipy, legacy-fftpack
     gone = scipy.fftpack.basic.no_such_name  # xpd: deprecated-in-scipy
     return basic, no_such_name, gone
 
