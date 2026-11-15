@@ -2,8 +2,9 @@
 # the seeds of all trees from random_state in the same order, so a model grown from 10 to 100 trees
 # is bit equal to one fitted with 100. A model passed to a cross-validation function is cloned
 # there, so warm_start cannot help it, and that loop is left alone. So is a loop over n_estimators
-# with another loop inside it, where another setting changes between fits. AdaBoost has no
-# warm_start.
+# with another loop inside it, where another setting changes between fits, and a loop that reads
+# a clock, because it times each fit and warm_start would change what it measures. AdaBoost has
+# no warm_start.
 id: refit-per-n-estimators
 language: python
 severity: warning
@@ -19,6 +20,7 @@ rule:
           - has: { field: left, pattern: $N }
           - has: { field: body, has: { stopBy: end, pattern: $V.fit($$$F) } }
           - not: { has: { field: body, has: { stopBy: end, kind: call, regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|GridSearchCV|RandomizedSearchCV|learning_curve|validation_curve|clone)\(\s*', has: { field: arguments, has: { nthChild: 1, pattern: $V } } } } }
+          - not: { has: { field: body, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)(time|time_ns|perf_counter|perf_counter_ns|process_time|monotonic|default_timer|timeit|now)$' } } } }
 constraints:
   C: { regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|Bagging(Classifier|Regressor)|IsolationForest)$' }
 ---
@@ -36,5 +38,6 @@ rule:
         all:
           - has: { field: left, pattern: $N }
           - not: { has: { field: body, has: { stopBy: end, kind: call, regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|GridSearchCV|RandomizedSearchCV|learning_curve|validation_curve|clone)\(\s*', has: { field: arguments, has: { nthChild: 1, pattern: $V } } } } }
+          - not: { has: { field: body, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)(time|time_ns|perf_counter|perf_counter_ns|process_time|monotonic|default_timer|timeit|now)$' } } } }
 constraints:
   C: { regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|Bagging(Classifier|Regressor)|IsolationForest)$' }

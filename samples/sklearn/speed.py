@@ -4,6 +4,8 @@ A line that xpd reports ends with a comment that names the rule. Each case retur
 code computes, so a copy fixed with `xpd check --fix` can be compared with this file.
 """
 
+import time
+
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -218,7 +220,13 @@ def refit_per_n_estimators():
     for n in [5, 10, 20]:
         model = GradientBoostingClassifier(n_estimators=n, random_state=0).fit(X, y)  # xpd: refit-per-n-estimators, slow-gradient-boosting
         boosted.append(model.predict_proba(X[:10]))
-    return scores, boosted
+    timed = []
+    for n in [5, 10, 20]:
+        start = time.perf_counter()
+        forest = RandomForestClassifier(n_estimators=n, random_state=0).fit(X[:150], y[:150])
+        print(n, time.perf_counter() - start)
+        timed.append(forest.score(X[150:], y[150:]))
+    return scores, boosted, timed
 
 
 @case
