@@ -1,7 +1,12 @@
-# Unsafe: the methods skip missing values, and the builtins did not.
+# Not run on test files: a test's fixture frame has a handful of rows, and a loop that builds
+# the expected value row by row is the point of the test.
+# Unsafe: the methods skip missing values, and the builtins did not. set() and list() over
+# x["key"] are also how a dict's value is copied, so for those two the receiver must be named
+# like a frame: df, frame, or a name with one of them as a word.
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: A Python builtin walks the column one value at a time. Write $DF[$C].$F().
 rule: { pattern: "$F($DF[$C])" }
 constraints:
@@ -13,8 +18,12 @@ metadata: { fix: unsafe }
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: len(set(...)) walks the column one value at a time. Write $DF[$C].nunique().
-rule: { pattern: "len(set($DF[$C]))" }
+rule:
+  any:
+    - pattern: len(set($DF[$C]))
+    - pattern: len(set($DF[$C].values))
 constraints:
   C: { kind: string }
 fix: $DF[$C].nunique()
@@ -24,6 +33,7 @@ metadata: { fix: unsafe }
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: sum walks the mask one value at a time in Python. Call .sum() on the mask.
 rule:
   pattern: sum($MASK)
@@ -37,19 +47,24 @@ metadata: { fix: unsafe }
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: set hashes one Python value per row. Write set($DF[$C].unique()).
 rule:
-  pattern: set($DF[$C])
+  any:
+    - pattern: set($DF[$C])
+    - pattern: set($DF[$C].values)
   # len(set(...)) has its own document above.
   not: { inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: ^len$ } } } }
 constraints:
   C: { kind: string }
+  DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }
 fix: set($DF[$C].unique())
 metadata: { fix: unsafe }
 ---
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: Counter hashes one Python value per row. Write $DF[$C].value_counts().
 rule:
   any:
@@ -61,20 +76,34 @@ constraints:
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: list walks the column one value at a time. Write $DF[$C].tolist().
 rule: { pattern: "list($DF[$C])" }
 constraints:
   C: { kind: string }
+  DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }
 fix: $DF[$C].tolist()
 metadata: { fix: unsafe }
 ---
 id: builtin-on-column
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: This builds a Python list of every value to make an array of them. Call $S.to_numpy().
 rule:
   pattern: $NP.array($S.tolist())
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $S.to_numpy()
+metadata: { fix: unsafe }
+---
+# unique() builds the array of distinct values only to count it. dropna=False keeps the count
+# of a column with missing values. Unsafe: the receiver is not known to be a column.
+id: builtin-on-column
+language: python
+severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+message: unique() builds every distinct value to count them. Write $S.nunique(dropna=False), or $S.nunique() to leave missing values out.
+rule: { pattern: len($S.unique()) }
+fix: $S.nunique(dropna=False)
 metadata: { fix: unsafe }

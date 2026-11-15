@@ -8,7 +8,7 @@ rule:
   kind: binary_operator
   all:
     - has: { field: operator, regex: ^//?$ }
-    - has: { field: left, pattern: $X.astype($T) }
+    - has: { field: left, any: [{ pattern: $X.astype($T) }, { pattern: $X.view($T) }] }
     - has: { field: right, regex: '^(10 ?\*\* ?[69]|1e[69]|1_?000_?000(_?000)?)$' }
 constraints:
   T: { regex: '^(["'']int64["'']|["'']int["'']|int|np\.int64|["'']i8["''])$' }

@@ -4,7 +4,7 @@
 # alone too, because columns= there defines the frame.
 id: inline-column-list
 language: python
-severity: warning
+severity: info
 message: This list of names is written inside the expression. Give the list a name first, such as output_columns, and pass the name.
 rule:
   kind: list

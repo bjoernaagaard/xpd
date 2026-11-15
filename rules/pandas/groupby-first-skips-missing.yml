@@ -1,3 +1,5 @@
+# One column cannot mix rows, so a group of one selected column, df.groupby(k)["a"], and a
+# grouped Series built in place are left alone.
 id: groupby-first-skips-missing
 language: python
 severity: warning
@@ -7,3 +9,8 @@ rule:
   has: { field: function, regex: '\.groupby\(' }
 constraints:
   M: { regex: ^(first|last)$ }
+  G:
+    not:
+      any:
+        - { kind: subscript, has: { field: subscript, kind: string } }
+        - regex: '(^|\.)Series\('

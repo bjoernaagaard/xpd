@@ -1,6 +1,7 @@
 # The slow form is a frame that grows inside a loop: `out = pd.concat([out, part])` copies every
 # earlier row on each pass. A concat inside a loop that builds a frame from other objects, such
-# as `panel = pd.concat(parts_of_this_month)`, copies each row once and is left alone.
+# as `panel = pd.concat(parts_of_this_month)`, copies each row once and is left alone. So is a
+# concat with axis=1: on pandas 3 it shares the columns it already has and copies no row.
 id: concat-in-loop
 language: python
 severity: warning
@@ -20,6 +21,14 @@ rule:
           stopBy: end
           field: arguments
           has: { stopBy: end, pattern: $OUT }
+    - not:
+        has:
+          field: right
+          stopBy: end
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: ^axis$ }
+            - has: { field: value, regex: '^(1|["'']columns["''])$' }
     - inside:
         stopBy: end
         any: [{ kind: for_statement }, { kind: while_statement }]

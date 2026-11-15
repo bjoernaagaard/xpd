@@ -2,6 +2,9 @@
 # applies when a named aggregation follows, directly or after selecting columns. Upsampling with
 # asfreq, ffill or interpolate raises with on=, and a function passed to agg or apply sees other
 # data, so those calls are left alone.
+# Unsafe: on an empty frame resample(on=) raises AttributeError where the indexed form returned,
+# selecting the key column afterwards works only with on=, and the result index differs in name
+# and dtype in some cases.
 id: set-index-then-resample
 language: python
 severity: warning
@@ -24,4 +27,4 @@ utils:
       field: object
       has: { field: attribute, regex: ^(sum|mean|min|max|median|std|var|sem|count|size|first|last|ohlc|nunique|prod)$ }
 fix: $X.resample($$$A, on=$COL)
-metadata: { fix: safe }
+metadata: { fix: unsafe }

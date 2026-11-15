@@ -1,7 +1,11 @@
+# dt.normalize() keeps datetime64, and datetime64 compared with a Python date raises TypeError,
+# so a dt.date that is one side of a comparison is left alone.
 id: object-dates
 language: python
 severity: warning
-message: dt.$P makes a column of Python objects. Use dt.normalize() or dt.floor("D") to keep datetime64.
-rule: { pattern: $X.dt.$P }
+message: dt.$P makes a column of Python objects. Use dt.normalize() or dt.floor("D") to keep datetime64, and compare the result with a pd.Timestamp, not a date.
+rule:
+  pattern: $X.dt.$P
+  not: { inside: { kind: comparison_operator } }
 constraints:
   P: { regex: ^(date|time)$ }

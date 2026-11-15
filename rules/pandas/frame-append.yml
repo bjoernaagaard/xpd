@@ -2,7 +2,7 @@
 # pandas 3.0 and 3.1. list.append returns None and takes no ignore_index, so a call whose result
 # is assigned, returned, passed on or read, or that passes one of the frame's keywords, is a
 # frame's. Index.append still exists, so a receiver that ends in .index or .columns is left
-# alone. The right rewrite moves pd.concat out of the loop, so there is no fix.
+# alone, and so is a module named like numpy, such as _np or anp. The right rewrite moves pd.concat out of the loop, so there is no fix.
 id: frame-append
 language: python
 severity: error
@@ -19,4 +19,4 @@ rule:
     - inside: { kind: subscript, field: value }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(ignore_index|verify_integrity|sort)$ } } }
 constraints:
-  OBJ: { not: { regex: '(^(np|numpy)$|\.(index|columns)$)' } }
+  OBJ: { not: { regex: '(^\w*(np|numpy)$|\.(index|columns)$)' } }

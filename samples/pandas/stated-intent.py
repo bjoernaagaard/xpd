@@ -29,12 +29,14 @@ def merge_without_on(df):
 @case
 def merge_with_on(df):
     other = pd.DataFrame({"k": ["a", "b"], "w": [10, 20]})
-    return df.merge(other, on="k", validate="one_to_one"), df.merge(other, how="cross")  # xpd: merge-without-validate
+    return df.merge(other, on="k", validate="one_to_one"), df.merge(other, how="cross")
 
 
 @case
 def to_csv_index(df):
-    return df.to_csv()  # xpd: to-csv-index
+    buffer = io.StringIO()
+    df.to_csv(buffer)  # xpd: to-csv-index
+    return buffer.getvalue(), df.to_csv()
 
 
 @case

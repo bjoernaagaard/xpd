@@ -2,6 +2,8 @@
 # original. The fix applies to a selection that copies in numpy too: a list of labels, a boolean
 # mask, or .loc and .iloc. A single text label or a slice is left alone, because on a dict or a
 # numpy array the copy keeps a later write away from the original.
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-after-indexing
 language: python
 severity: warning
@@ -26,20 +28,24 @@ utils:
           field: function
           regex: \.(isin|isna|isnull|notna|notnull|between|duplicated|contains|startswith|endswith|match|fullmatch)$
 fix: $DF[$I]
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-after-indexing
 language: python
 severity: warning
 message: Copy-on-write already keeps later writes away from the original, so this copy only costs memory and time. Drop .copy().
 rule: { pattern: "$DF.loc[$$$I].copy()" }
 fix: $DF.loc[$$$I]
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: the copy owned its data. Without it, .values and .to_numpy() of the result give an array
+# that is read-only or shares memory with the source, so a write through the array differs.
 id: copy-after-indexing
 language: python
 severity: warning
 message: Copy-on-write already keeps later writes away from the original, so this copy only costs memory and time. Drop .copy().
 rule: { pattern: "$DF.iloc[$$$I].copy()" }
 fix: $DF.iloc[$$$I]
-metadata: { fix: safe }
+metadata: { fix: unsafe }

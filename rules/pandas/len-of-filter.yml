@@ -1,11 +1,17 @@
+# Not run on test files: a test's fixture frame has a handful of rows, and a loop that builds
+# the expected value row by row is the point of the test.
 # Unsafe: the result is a numpy integer from the sum, converted back with int, and a mask with
-# missing values counts differently.
+# missing values counts differently. The frame must be a plain name: in
+# len(s.loc[s != 0].loc[s < n]) the second mask filters the first result, and its sum alone
+# counts other rows.
 id: len-of-filter
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: Sum the mask instead of building the filtered frame to count it. Write int(($MASK).sum()).
 rule: { pattern: "len($DF[$MASK])" }
 constraints:
+  DF: { regex: '^[A-Za-z_][\w.]*$' }
   MASK:
     any:
       - kind: comparison_operator

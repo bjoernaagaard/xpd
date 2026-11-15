@@ -1,6 +1,8 @@
 # A pattern made only of letters, digits, spaces and punctuation that has no meaning in a regular
 # expression matches the same text with regex=False. flags= needs the regex engine, so a call
 # with flags or regex is left alone.
+# Unsafe: on a column of Python objects, a value that is not text gives NaN with a pattern and
+# False with regex=False, and the result dtype follows.
 id: literal-contains
 language: python
 severity: warning
@@ -12,8 +14,10 @@ constraints:
 utils:
   literal: { kind: string, regex: '^["''][A-Za-z0-9 _,:;@#%&=/<>!~-]*["'']$' }
 fix: $X.str.contains($P, regex=False)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: on a column of Python objects, a value that is not text gives NaN with a pattern and
+# False with regex=False, and the result dtype follows.
 id: literal-contains
 language: python
 severity: warning
@@ -38,4 +42,4 @@ constraints:
 utils:
   literal: { kind: string, regex: '^["''][A-Za-z0-9 _,:;@#%&=/<>!~-]*["'']$' }
 fix: $X.str.contains($P, $$$REST, regex=False)
-metadata: { fix: safe }
+metadata: { fix: unsafe }

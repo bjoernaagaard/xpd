@@ -3,13 +3,17 @@
 id: deprecated-in-pandas-3
 language: python
 severity: warning
-message: Timestamp.utcnow is deprecated. Write pd.Timestamp.now("UTC"), which returns the same time.
-rule: { pattern: pd.Timestamp.utcnow() }
-fix: pd.Timestamp.now("UTC")
+message: Timestamp.utcnow is deprecated. Write $PD.Timestamp.now("UTC"), which returns the same time.
+rule: { pattern: $PD.Timestamp.utcnow() }
+constraints:
+  PD: { regex: '^_?(pd|pandas)$' }
+fix: $PD.Timestamp.now("UTC")
 metadata: { fix: safe }
 ---
 # The fix deletes the statement, so it applies only at the top level of the file, where an
 # empty file is still valid. Inside a block it is reported without a fix.
+# Unsafe: pd.get_option reads the value back, so code that reads the option sees the default
+# once the line is gone.
 id: deprecated-in-pandas-3
 language: python
 severity: warning
@@ -26,7 +30,7 @@ utils:
         - pattern: pd.set_option('mode.copy_on_write', $V)
         - pattern: pd.options.mode.copy_on_write = $V
 fix: ""
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 id: deprecated-in-pandas-3
 language: python
@@ -78,19 +82,24 @@ transform:
 fix: $F($REST)
 metadata: { fix: safe }
 ---
-# copy= on astype. Unsafe: on a numpy array or an Index, astype(copy=False) is not deprecated,
-# and on a numpy array it can return the same array, so a later write reaches both names.
+# copy= on astype. NumPy's astype has the same keyword and it is not deprecated: 6 of 7 hits in
+# the held-back files were arrays. So the receiver must be a column taken by a label or a name
+# like a frame's. Unsafe: such a receiver can still be an array, where astype(copy=False) can
+# return the same array, so a later write reaches both names.
 id: deprecated-in-pandas-3
 language: python
 severity: warning
 message: The copy keyword is deprecated, because copy-on-write decides when pandas copies data. Drop copy=.
 rule:
-  pattern: $F($$$ARGS)
+  pattern: $O.astype($$$ARGS)
   has:
     field: arguments
     has: { kind: keyword_argument, has: { field: name, regex: ^copy$ } }
 constraints:
-  F: { regex: '\.astype$' }
+  O:
+    any:
+      - { kind: subscript, has: { field: subscript, any: [{ kind: string }, { kind: identifier }] }, not: { has: { field: value, kind: attribute } } }
+      - regex: '(?i)(^|_)(df|frame)(_|\d|$)'
 rewriters:
   - id: drop-copy
     rule: { kind: keyword_argument, has: { field: name, regex: ^copy$ } }
@@ -109,5 +118,5 @@ transform:
     rewrite: { source: $$$ARGS, rewriters: [drop-copy, keep-argument], joinBy: "" }
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
-fix: $F($REST)
+fix: $O.astype($REST)
 metadata: { fix: unsafe }

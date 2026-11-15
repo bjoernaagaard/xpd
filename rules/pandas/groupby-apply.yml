@@ -1,3 +1,5 @@
+# A lambda that sorts each group, or builds a dict, a list or a joined text per group, has no
+# agg or transform form, and is left alone.
 id: groupby-apply
 language: python
 severity: warning
@@ -7,3 +9,4 @@ rule:
   all:
     - has: { field: arguments, has: { kind: lambda } }
     - has: { field: function, regex: '\.groupby\(' }
+    - not: { has: { field: arguments, has: { kind: lambda, has: { stopBy: end, kind: call, has: { field: function, regex: '\.(sort_values|to_dict|tolist|to_list|join)$' } } } } }

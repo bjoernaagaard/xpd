@@ -1,6 +1,7 @@
 # Text columns have dtype str in pandas 3, so a check against object is False for them. The fixes
-# are unsafe: is_string_dtype is False for an object column of mixed values, and "str" in
-# select_dtypes leaves out object columns that hold other Python objects.
+# are unsafe: is_string_dtype is False for an object column of mixed values. select_dtypes has no
+# fix: "str" alone leaves out object columns that hold other Python objects, which the old call
+# selected, so the message names both spellings.
 
 id: object-dtype-check
 language: python
@@ -43,7 +44,7 @@ utils:
 id: object-dtype-check
 language: python
 severity: error
-message: Text columns have dtype str in pandas 3. select_dtypes still matches them with object, but it warns that this will stop. Write "str".
+message: Text columns have dtype str in pandas 3. select_dtypes still matches them with object, but it warns that this will stop. Write ["object", "str"] to keep selecting both, or "str" for text columns only.
 rule:
   all:
     - any: [{ kind: string }, { kind: identifier }, { kind: attribute }]
@@ -51,6 +52,8 @@ rule:
     - any:
         - matches: select-argument
         - inside: { any: [{ kind: list }, { kind: tuple }], matches: select-argument }
+    # With "str" beside it the call names both and does not warn.
+    - not: { inside: { any: [{ kind: list }, { kind: tuple }], has: { regex: '^["'']str(ing)?["'']$' } } }
 utils:
   select-argument:
     inside:
@@ -59,8 +62,6 @@ utils:
       inside:
         kind: argument_list
         inside: { kind: call, has: { field: function, regex: \.select_dtypes$ } }
-fix: '"str"'
-metadata: { fix: unsafe }
 ---
 # is_object_dtype, a dtype tested with in, dtype.name, and select_dtypes with object by position.
 id: object-dtype-check
@@ -90,17 +91,17 @@ constraints:
 id: object-dtype-check
 language: python
 severity: error
-message: Text columns have dtype str in pandas 3. select_dtypes still matches them with object, but it warns that this will stop. Write "str".
+message: Text columns have dtype str in pandas 3. select_dtypes still matches them with object, but it warns that this will stop. Write ["object", "str"] to keep selecting both, or "str" for text columns only.
 rule:
   pattern: $DF.select_dtypes($FIRST, $$$REST)
 constraints:
-  FIRST: { regex: '\bobject\b|["'']O["'']', not: { kind: keyword_argument } }
+  FIRST: { regex: '\bobject\b|["'']O["'']', not: { any: [{ kind: keyword_argument }, { regex: '["'']str(ing)?["'']' }] } }
 ---
 id: object-dtype-check
 language: python
 severity: error
-message: Text columns have dtype str in pandas 3. select_dtypes still matches them with object, but it warns that this will stop. Write "str".
+message: Text columns have dtype str in pandas 3. select_dtypes still matches them with object, but it warns that this will stop. Write ["object", "str"] to keep selecting both, or "str" for text columns only.
 rule:
   pattern: $DF.select_dtypes($FIRST)
 constraints:
-  FIRST: { regex: '\bobject\b|["'']O["'']', not: { kind: keyword_argument } }
+  FIRST: { regex: '\bobject\b|["'']O["'']', not: { any: [{ kind: keyword_argument }, { regex: '["'']str(ing)?["'']' }] } }

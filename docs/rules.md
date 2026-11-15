@@ -29,7 +29,7 @@ Each old form gives a wrong result, raises, or warns on pandas 3.0 and 3.1.
 
 **Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`. A write through `.iloc` or `.iat` on a column, and `update` on a column, have no fix.
 
-Reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy.
+Reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy. Also reports `df[col][mask] = v` with the column named by a variable. A dict, list or set assigned to `x["a"][key]` is a nested dict being filled and is left alone.
 
 Example:
 
@@ -47,7 +47,7 @@ df.loc[row, "load"] = value
 
 **Severity:** error. **Fix:** unsafe: `df["b"] = df["b"].fillna(0)`.
 
-Reports `df["b"].fillna(0, inplace=True)`, which changes a copy.
+Reports `df["b"].fillna(0, inplace=True)`, which changes a copy. Also reports a column named by a variable, `df[column].fillna(0, inplace=True)`.
 
 Example:
 
@@ -81,7 +81,7 @@ df = df.dropna()
 
 #### no-inplace
 
-**Severity:** warning. **Fix:** unsafe: `df = df.dropna()`.
+**Severity:** info. **Fix:** unsafe: `df = df.dropna()`.
 
 Reports any other `inplace=True`, which gives no speedup and blocks chaining.
 
@@ -101,7 +101,7 @@ df = df.dropna()
 
 **Severity:** error. **Fix:** none.
 
-Reports `df["d"].astype("int64") // 10**9`, `index.asi8 // 10**9` and `df["d"].values.astype("float64") / 1e9`, which are off by 1,000 now that datetimes default to microseconds.
+Reports `df["d"].astype("int64") // 10**9`, `index.asi8 // 10**9` and `df["d"].values.astype("float64") / 1e9`, which are off by 1,000 now that datetimes default to microseconds. Also reports `.view(np.int64)` divided the same way.
 
 Example:
 
@@ -141,7 +141,7 @@ missing = df["load"].isna()
 
 **Severity:** error. **Fix:** unsafe: `(df["a"] == 2).any()`.
 
-Reports `2 in df["a"]`, which checks the index labels.
+Reports `2 in df["a"]`, which checks the index labels. The receiver must be named like a frame: `df`, `frame`, or a name with one of them as a word. In real code `key in data["k"]` is far more often a test on a nested dict or a string.
 
 Example:
 
@@ -197,7 +197,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 #### object-dtype-check
 
-**Severity:** error. **Fix:** unsafe: `pd.api.types.is_string_dtype(df["k"])`. `is_object_dtype`, a test with `in`, `dtype.name` and `select_dtypes("object")` by position have no fix.
+**Severity:** error. **Fix:** unsafe: `pd.api.types.is_string_dtype(df["k"])`. `is_object_dtype`, a test with `in`, `dtype.name` and `select_dtypes` have no fix: `"str"` alone leaves out object columns that hold other Python objects, so write `["object", "str"]` to keep both.
 
 Reports `df["k"].dtype == object`, `select_dtypes(include="object")`, `is_object_dtype(df["k"])`, `df["k"].dtype in ("object", "category")` and `df["k"].dtype.name == "object"`, which miss the new str dtype.
 
@@ -237,7 +237,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 #### removed-in-pandas-3
 
-**Severity:** error. **Fix:** safe: `map`, `ffill()`, `"ME"`, `"h"`, `"min"`, `sep=r"\s+"`, `lineterminator=`, `sep=` for a separator passed by position, `is_monotonic_increasing`, `np.` for `pd.np.` and `pd.json_normalize`. unsafe: `"M"` in `resample`, `dt.isocalendar().week`, `writer.close()` and `pd.Series(x).value_counts()`. The other forms have no fix.
+**Severity:** error. **Fix:** safe: `map`, `"ME"`, `"h"`, `"min"`, `sep=r"\s+"`, `lineterminator=`, `sep=` for a separator passed by position, `is_monotonic_increasing`, `np.` for `pd.np.` and `pd.json_normalize`. unsafe: `ffill()` and `bfill()`, which label and order the rows of a group-by differently, `"M"` in `resample`, `dt.isocalendar().week`, `writer.close()` and `pd.Series(x).value_counts()`. The other forms have no fix.
 
 Reports `applymap`, `fillna(method=)`, frequencies such as `"M"`, `"H"` and `"T"`, `delim_whitespace=True`, `dt.week`, and the removed arguments and names listed below.
 
@@ -299,7 +299,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports `df = df.append(row)` and `df.append(row, ignore_index=True)`, which raise AttributeError.
+Reports `df = df.append(row)` and `df.append(row, ignore_index=True)`, which raise AttributeError. A module named like NumPy, such as `np`, `_np` or `anp`, is left alone.
 
 Example:
 
@@ -341,7 +341,7 @@ digits = df["phone"].str.replace(r"\D", "", regex=True)
 
 **Severity:** error. **Fix:** unsafe: `.iloc[0]`.
 
-Reports `df["k"].value_counts()[0]` and `df.iloc[0][0]`, which raise KeyError, because an integer key on a Series is a label on pandas 3.
+Reports `df["k"].value_counts()[0]` and `df.iloc[0][0]`, which raise KeyError, because an integer key on a Series is a label on pandas 3. A negative key, as in `mean()[-1]`, is reported too.
 
 Example:
 
@@ -359,9 +359,9 @@ first = df.iloc[0, 0]
 
 #### deprecated-in-pandas-3
 
-**Severity:** warning. **Fix:** safe: delete the line, drop `copy=`, `pd.Timestamp.now("UTC")`. unsafe: drop `copy=` from `astype`.
+**Severity:** warning. **Fix:** safe: `pd.Timestamp.now("UTC")`, drop `copy=`. unsafe: delete the copy-on-write option line, because `pd.get_option` reads the value back, and drop `copy=` from `astype`.
 
-Reports `pd.set_option("mode.copy_on_write", True)`, `copy=False` and `pd.Timestamp.utcnow()`.
+Reports `pd.set_option("mode.copy_on_write", True)`, `copy=False` and `pd.Timestamp.utcnow()`. `astype(copy=)` is reported on a column taken by a label or a receiver named like a frame, because NumPy's `astype` has the same keyword.
 
 Example:
 
@@ -439,11 +439,11 @@ or subscript. The inplace fixes drop comments between the call's arguments.
 
 ### Shorter forms, including the pandas 3.0 and 3.1 API
 
-These rules are warnings. Most of them make code shorter and do not change its speed.
+These rules are warnings, apart from those marked info. Most of them make code shorter and do not change its speed.
 
 #### sort-then-reset-index
 
-**Severity:** warning. **Fix:** safe: `df.sort_values("b", ignore_index=True)`.
+**Severity:** info. **Fix:** unsafe: `df.sort_values("b", ignore_index=True)`. `reset_index` always gives a RangeIndex, and `ignore_index=True` keeps the old index when the method has nothing to do, as on an empty frame.
 
 Reports `df.sort_values("b").reset_index(drop=True)`, also after `sort_index`, `dropna`, `drop_duplicates`, `explode` and `sample`.
 
@@ -461,7 +461,7 @@ ordered = df.sort_values("load", ignore_index=True)
 
 #### set-index-then-resample
 
-**Severity:** warning. **Fix:** safe: `df.resample("D", on="d").sum()`.
+**Severity:** warning. **Fix:** unsafe: `df.resample("D", on="d").sum()`, which raises on an empty frame where the indexed form returned.
 
 Reports `df.set_index("d").resample("D").sum()`.
 
@@ -623,7 +623,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 #### query-string
 
-**Severity:** warning. **Fix:** none.
+**Severity:** info. **Fix:** none.
 
 Reports `df.query("a > 50 and b < 0")`.
 
@@ -663,7 +663,7 @@ The replacement raises when a requested column is absent. filter silently skips 
 
 #### inline-column-list
 
-**Severity:** warning. **Fix:** none.
+**Severity:** info. **Fix:** none.
 
 Reports `df[["k", "a", "b"]]` and `df.groupby(["k", "s", "raw"])`, three or more names written inside the expression.
 
@@ -725,7 +725,7 @@ fix is unsafe, because the category order differs, and parts that are not catego
 
 #### apply-known-function
 
-**Severity:** warning. **Fix:** safe: `df["s"].str.len()`. unsafe: `df["b"].isna()`, `pd.to_datetime(df["raw"])`, `df["b"].round(2)`.
+**Severity:** warning. **Fix:** unsafe: `df["s"].str.len()`, which raises on a column that is not text, `df["b"].isna()`, `pd.to_datetime(df["raw"])`, `df["b"].round(2)`.
 
 Reports `df["s"].apply(len)`, `df["b"].apply(pd.isna)`, `df["raw"].apply(pd.to_datetime)` and `df["b"].apply(lambda v: round(v, 2))`.
 
@@ -743,7 +743,7 @@ lengths = df["name"].str.len()
 
 #### literal-contains
 
-**Severity:** warning. **Fix:** safe: `str.contains("ta_", regex=False)`.
+**Severity:** warning. **Fix:** unsafe: `str.contains("ta_", regex=False)`. On a column of Python objects, a value that is not text gives NaN with a pattern and False with `regex=False`.
 
 Reports `df["s"].str.contains("ta_")`, a pattern with no regex character.
 
@@ -761,7 +761,7 @@ matches = df["name"].str.contains("load_", regex=False)
 
 #### copy-after-indexing
 
-**Severity:** warning. **Fix:** safe: drop `.copy()`.
+**Severity:** warning. **Fix:** unsafe: drop `.copy()`. Without the copy, `.values` and `.to_numpy()` of the result give an array that is read-only or shares memory with the source.
 
 Reports `df[["a", "b"]].copy()`, `df[mask].copy()` and `df.loc[...].copy()`.
 
@@ -779,7 +779,7 @@ part = df[["load", "wind"]]
 
 #### lookup-per-row
 
-**Severity:** warning. **Fix:** unsafe: `df["k"].map(table["v"])`. A lookup through a mask has no fix.
+**Severity:** warning. **Fix:** unsafe: `df["k"].map(table["v"])`, and `df["k"].map(codes)` for `codes.get(key)` per value. A lookup through a mask has no fix.
 
 Reports `df["k"].apply(lambda key: table.loc[key, "v"])` and `lambda key: table[table["k"] == key]["v"].iloc[0]`, which read another frame once per row.
 
@@ -839,9 +839,9 @@ The replacement is advice. xpd does not apply it automatically.
 
 #### copy-in-chain
 
-**Severity:** warning. **Fix:** safe: drop `.copy()`.
+**Severity:** warning. **Fix:** unsafe: drop `.copy()`. Without the copy, `.values` and `.to_numpy()` of the result give an array that is read-only or shares memory with the source.
 
-Reports `df.copy().rename(...)` and `df.rename(...).copy()`, also with `assign`, `reset_index`, `set_index`, `astype`, `fillna`, `drop(columns=)` and `pd.concat`.
+Reports `df.copy().rename(...)` and `df.rename(...).copy()`, also with `assign`, `reset_index`, `set_index`, `astype`, `fillna`, `drop(columns=)` and `pd.concat`. Also reports `drop(name, axis=1).copy()`.
 
 Example:
 
@@ -861,7 +861,7 @@ tidy = df.reset_index(drop=True)
 
 **Severity:** warning. **Fix:** none.
 
-Reports a loop over `iterrows()`, a loop over `itertuples()` or `to_dict("records")` that only computes from the row values, and `for i in range(len(df))` with `df.iloc[i]`.
+Reports a loop over `iterrows()`, a loop over `itertuples()` or `to_dict("records")` that only computes from the row values, and `for i in range(len(df))` with `df.iloc[i]`. It does not run on test files.
 
 Example:
 
@@ -946,7 +946,7 @@ years = df["time"].dt.year
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["a"].apply(lambda v: 1 if v > 50 else 0)` and `lambda v: min(v, 1.0)`.
+Reports `df["a"].apply(lambda v: 1 if v > 50 else 0)` and `lambda v: min(v, 1.0)`. A lambda that reduces its argument, as in `x.isnull().all()`, receives a whole Series per group and is left alone.
 
 Example:
 
@@ -984,9 +984,9 @@ scaled = df["load"] * 2 + 1
 
 #### builtin-on-column
 
-**Severity:** warning. **Fix:** unsafe: `df["a"].sum()`, `df["k"].nunique()`, `(df["a"] > 50).sum()`, `set(df["k"].unique())`, `df["a"].tolist()`, `df["a"].to_numpy()`. `Counter` has no fix.
+**Severity:** warning. **Fix:** unsafe: `df["a"].sum()`, `df["k"].nunique()`, `df["k"].nunique(dropna=False)` for `len(df["k"].unique())`, `(df["a"] > 50).sum()`, `set(df["k"].unique())`, `df["a"].tolist()`, `df["a"].to_numpy()`. `Counter` has no fix.
 
-Reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])` and `np.array(df["a"].tolist())`.
+Reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])` and `np.array(df["a"].tolist())`. Also reports `len(df["k"].unique())` and `set(df["k"].values)`. For `set` and `list` the receiver must be named like a frame, because both are also how a dict's value is copied. It does not run on test files.
 
 Example:
 
@@ -1004,7 +1004,7 @@ total = df["load"].sum()
 
 **Severity:** warning. **Fix:** none.
 
-Reports `[v.upper() for v in df["s"]]`, and a `for` loop over a column that appends to a list.
+Reports `[v.upper() for v in df["s"]]`, and a `for` loop over a column that appends to a list. The receiver must be named like a frame: `df`, `frame`, or a name with one of them as a word. `x["key"]` in a for clause is more often a list inside a dict. It does not run on test files.
 
 Example:
 
@@ -1048,7 +1048,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `int((df["a"] > 50).sum())`.
 
-Reports `len(df[df["a"] > 50])`.
+Reports `len(df[df["a"] > 50])`. The frame must be a plain name. It does not run on test files.
 
 Example:
 
@@ -1066,7 +1066,7 @@ count = int((df["load"] > 50).sum())
 
 **Severity:** warning. **Fix:** unsafe: `df.nsmallest(10, "b")`, `df.iloc[df["b"].argmin()]`, `df["b"].min()`, `df["b"].max()`, `df["b"].idxmin()`. The last rows of a frame, `iloc[-1]` on a sorted column and `sorted(df["b"])[0]` have no fix.
 
-Reports `df.sort_values("b").head(10)`, `df.sort_values("b").iloc[0]`, `df["b"].sort_values().iloc[0]`, `df.sort_values("b").tail(10)` and `sorted(df["b"])[0]`.
+Reports `df.sort_values("b").head(10)`, `df.sort_values("b").iloc[0]`, `df["b"].sort_values().iloc[0]`, `df.sort_values("b").tail(10)` and `sorted(df["b"])[0]`. A negative count, `head(-3)`, is left alone: it keeps all but the last rows, and `nsmallest(-3)` returns none.
 
 Example:
 
@@ -1106,7 +1106,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports a frame that grows inside a loop, as in `out = pd.concat([out, part])`. Each pass copies every earlier row.
+Reports a frame that grows inside a loop, as in `out = pd.concat([out, part])`. Each pass copies every earlier row. A concat with `axis=1` is left alone: on pandas 3 it shares the columns it already has.
 
 Example:
 
@@ -1206,7 +1206,7 @@ parts = pd.DataFrame(df["pair"].tolist(), index=df["pair"].index)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `for label in df.index` with `df.loc[label, "a"]` or `df.at[label, "a"]` in the body, also as a comprehension.
+Reports `for label in df.index` with `df.loc[label, "a"]` or `df.at[label, "a"]` in the body, also as a comprehension. It does not run on test files.
 
 Example:
 
@@ -1228,7 +1228,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports a loop or comprehension over `zip(df["a"], df["w"])`.
+Reports a loop or comprehension over `zip(df["a"], df["w"])`. It does not run on test files.
 
 Example:
 
@@ -1301,7 +1301,7 @@ value is missing. `replace-with-mapping` asks for
 
 #### groupby-lambda
 
-**Severity:** warning. **Fix:** safe: `"max"` for min, max, median, count and nunique. unsafe: `"sum"`, `"mean"`. A reduction with arguments, a count of a condition and `resample` have no fix.
+**Severity:** warning. **Fix:** unsafe: `"max"` for min, max, median, count and nunique, `"sum"`, `"mean"`. The named method can give another dtype, and it raises on a column the lambda could reduce. A reduction with arguments, a count of a condition and `resample` have no fix.
 
 Reports `g["b"].agg(lambda v: v.max())`, `g.agg(np.sum)`, `pivot_table(aggfunc=np.mean)`, `g.agg(lambda v: v.quantile(0.9))`, `g.agg(lambda v: (v > 0).sum())` and a lambda or NumPy function on `resample`.
 
@@ -1319,7 +1319,7 @@ maximum = df.groupby("region")["load"].agg("max")
 
 #### groupby-lambda-window
 
-**Severity:** warning. **Fix:** safe: `g["b"].shift(1)`. unsafe: `g["b"].cumsum()`.
+**Severity:** warning. **Fix:** unsafe: `g["b"].shift(1)`, `g["b"].cumsum()`. The method can give another dtype or index type on an empty or all-missing group.
 
 Reports `g["b"].transform(lambda v: v.shift(1))`.
 
@@ -1390,7 +1390,7 @@ The example assumes the group keys are not missing. Check dropna and missing-key
 
 **Severity:** warning. **Fix:** none.
 
-Reports any `groupby(...).apply` with a lambda.
+Reports any `groupby(...).apply` with a lambda. A lambda that sorts each group, or builds a dict, a list or a joined text per group, is left alone.
 
 Example:
 
@@ -1439,7 +1439,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.groupby("k").first()` and `last()`.
+Reports `df.groupby("k").first()` and `last()`. A group of one selected column, `df.groupby("k")["b"].last()`, is left alone, because one column cannot mix rows.
 
 Example:
 
@@ -1482,7 +1482,7 @@ index = pd.MultiIndex.from_arrays([df["region"], df["year"]], names=["region", "
 
 **Severity:** warning. **Fix:** unsafe: `df.index.unique("k")`, `df.index.unique("k").nunique()`.
 
-Reports `df.index.get_level_values("k").unique()` and `.nunique()`, which build one value per row first.
+Reports `df.index.get_level_values("k").unique()` and `.nunique()`, which build one value per row first. It does not run on test files.
 
 Example:
 
@@ -1508,7 +1508,7 @@ Index. On 1,000,000 rows `from_arrays` ran 27 times faster than `from_tuples` ov
 
 #### rolling-apply
 
-**Severity:** warning. **Fix:** safe: `rolling(20).max()` for min, max and median. unsafe: sum, mean, std and var. The `raw=True` case and a NumPy function have no fix.
+**Severity:** warning. **Fix:** safe: `rolling(20).max()` for min, max and median. unsafe: sum, mean, std and var. The `raw=True` case, which reports as info, and a NumPy function have no fix.
 
 Reports `rolling(20).apply(lambda w: w.max())`, `rolling(20).apply(f)` without `raw=True`, `rolling(20).agg(np.max)` and `rolling(20).apply(np.mean, raw=True)`.
 
@@ -1550,7 +1550,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["d"].dt.date` and `dt.time`.
+Reports `df["d"].dt.date` and `dt.time`. A `dt.date` that is one side of a comparison is left alone: `dt.normalize()` keeps datetime64, and datetime64 compared with a Python `date` raises TypeError.
 
 Example:
 
@@ -1754,7 +1754,7 @@ ran 1,354 times faster than the lambda, `pd.to_datetime` with a format 24 times 
 
 **Severity:** warning. **Fix:** none.
 
-Reports `merge` without `validate=`, which can duplicate rows.
+Reports `merge` without `validate=`, which can duplicate rows. A merge with `how="cross"` is left alone, because it pairs every row on purpose.
 
 Example:
 
@@ -1798,7 +1798,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.to_csv(path)` without `index=`.
+Reports `df.to_csv(path)` without `index=`. A call with no argument and a call that forwards `**options` are left alone. A named index is written under its name, so the message applies to an index with no name.
 
 Example:
 

@@ -9,6 +9,8 @@ fix: $X.map($$$A)
 metadata: { fix: safe }
 ---
 # fillna(method="ffill") whose other arguments are limit, axis or inplace, which ffill takes too.
+# Unsafe: on a group-by, ffill() labels and orders the rows differently from what
+# fillna(method="ffill") gave on pandas 2.3.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -50,8 +52,10 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $X.ffill($REST)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
+# Unsafe: on a group-by, bfill() labels and orders the rows differently from what
+# fillna(method="bfill") gave on pandas 2.3.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -93,7 +97,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $X.bfill($REST)
-metadata: { fix: safe }
+metadata: { fix: unsafe }
 ---
 # Any other fillna(method=), such as one with a value or with a method held in a name, has no fix.
 id: removed-in-pandas-3

@@ -1,9 +1,12 @@
+# Not run on test files: a test's fixture frame has a handful of rows, and a loop that builds
+# the expected value row by row is the point of the test.
 # A for loop or comprehension over the rows of a frame runs Python once per row.
 
 # iterrows builds a Series for every row, so it is the slowest way to loop for any purpose.
 id: row-loop
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
 rule:
   pattern: $DF.iterrows()
@@ -17,6 +20,7 @@ rule:
 id: row-loop
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: A loop over rows runs Python once per row. Compute on whole columns instead, such as df["a"] * df["w"].
 rule:
   all:
@@ -56,6 +60,7 @@ utils:
 id: row-loop
 language: python
 severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: A loop over row numbers runs Python once per row. Compute on whole columns instead, such as df["a"] * df["w"].
 rule:
   kind: for_statement
