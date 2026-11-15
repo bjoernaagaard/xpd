@@ -3336,7 +3336,7 @@ res = minimize(f, x0, method="L-BFGS-B", jac=grad, bounds=[(0, 1)] * n)
 
 **Severity:** info. **Fix:** none. The same integer gives a different stream under `rng=` than under `random_state=` or `seed=`.
 
-Reports `random_state=` and `seed=` passed by keyword to the functions and classes that SciPy 1.15 moved to `rng=`, such as sparse.random, svds, bootstrap, permutation_test, kmeans2, differential_evolution, basinhopping, dual_annealing, directed_hausdorff, Rotation.random and the qmc engines. SciPy's docs say new code should pass `rng`. The old keywords run without a warning on SciPy 1.18.1. A call under a SciPy version check is left alone, because it is kept for an older SciPy, where `rng=` raises. Skipped on SciPy older than 1.15.
+Reports `random_state=` and `seed=` passed by keyword to the functions and classes that SciPy 1.15 moved to `rng=`, such as sparse.random, svds, bootstrap, permutation_test, kmeans2, differential_evolution, basinhopping, dual_annealing, directed_hausdorff, Rotation.random and the qmc engines. SciPy's docs say new code should pass `rng`. The old keywords run without a warning on SciPy 1.18.1. A call under a SciPy version check is left alone, because it is kept for an older SciPy, where `rng=` raises. The message says to keep the old keyword when the code must also run on a SciPy older than 1.15, because xpd reads only the installed SciPy and cannot see which versions a library supports. Skipped on SciPy older than 1.15.
 
 Example:
 
