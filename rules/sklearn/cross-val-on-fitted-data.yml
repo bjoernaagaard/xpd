@@ -40,8 +40,9 @@ constraints:
 # cross-validation, it scored 0.519 AUC on data with no signal against
 # 0.511 when it ran inside each training part, over 30 seeds, so it is left
 # alone when it is built in the same expression, assigned in the same block or named rus.
-# NearMiss, TomekLinks and EditedNearestNeighbours pick rows by their neighbours and moved the
-# score, so they stay reported.
+# NearMiss and TomekLinks also only drop rows. They scored 0.448 and 0.516 before the split,
+# which did not pass the proof, so they are left alone too. EditedNearestNeighbours scored
+# 0.678 and stays reported.
 id: cross-val-on-fitted-data
 language: python
 severity: error
@@ -64,12 +65,12 @@ constraints:
 utils:
   random-under-sampler:
     any:
-      - has: { field: right, has: { field: function, has: { field: object, any: [{ kind: call, regex: '^[\w.]*RandomUnderSampler\(' }, { regex: '^rus$' }] } } }
+      - has: { field: right, has: { field: function, has: { field: object, any: [{ kind: call, regex: '^[\w.]*(RandomUnderSampler|NearMiss|TomekLinks)\(' }, { regex: '^rus$' }] } } }
       - inside:
           kind: expression_statement
           inside:
             any: [{ kind: block }, { kind: module }]
-            has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*RandomUnderSampler\(' } }] } }
+            has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*(RandomUnderSampler|NearMiss|TomekLinks)\(' } }] } }
 ---
 # A search scores each setting by cross-validation, so it leaks in the same way. The search is
 # named in the same file, as in grid = GridSearchCV(...) and grid.fit(X_picked, y).
@@ -122,9 +123,9 @@ constraints:
 utils:
   random-under-sampler:
     any:
-      - has: { field: right, has: { field: function, has: { field: object, any: [{ kind: call, regex: '^[\w.]*RandomUnderSampler\(' }, { regex: '^rus$' }] } } }
+      - has: { field: right, has: { field: function, has: { field: object, any: [{ kind: call, regex: '^[\w.]*(RandomUnderSampler|NearMiss|TomekLinks)\(' }, { regex: '^rus$' }] } } }
       - inside:
           kind: expression_statement
           inside:
             any: [{ kind: block }, { kind: module }]
-            has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*RandomUnderSampler\(' } }] } }
+            has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*(RandomUnderSampler|NearMiss|TomekLinks)\(' } }] } }
