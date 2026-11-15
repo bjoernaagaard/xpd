@@ -1,0 +1,20 @@
+# scikit-learn's TargetEncoder.fit_transform encodes each row with the target means of the other
+# folds. fit and then transform on the same rows encodes each row with its own label, so the
+# model learns to trust the code. It lost 0.040 test AUC on data with signal. On noise it cannot
+# move the test score, so this is info. category_encoders has no cross-fitting, so a file that
+# imports from it is left alone.
+id: target-encoder-fit-transform
+language: python
+severity: info
+message: TargetEncoder.fit_transform cross-fits, and fit($X, $Y).transform($X) on the same rows gives each row its own label in its code. Call fit_transform($X, $Y).
+rule:
+  any:
+    - pattern: TargetEncoder($$$A).fit($X, $Y).transform($X)
+    - all:
+        - pattern: $E.fit($X, $Y).transform($X)
+        - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$E = TargetEncoder($$$A)' } }
+    - all:
+        - pattern: $E.transform($X)
+        - inside: { kind: expression_statement, stopBy: end, follows: { stopBy: end, has: { stopBy: end, pattern: '$E.fit($X, $Y)' } } }
+        - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$E = TargetEncoder($$$A)' } }
+  not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'category_encoders' } } }

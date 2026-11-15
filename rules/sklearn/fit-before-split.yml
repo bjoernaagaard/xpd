@@ -1,28 +1,34 @@
-# A step fitted on every row and split afterwards has seen the test rows. The rule reports the
-# fit when a later statement of the same block passes its result to train_test_split. It leaves
-# a label encoder on the target alone, which only renames the classes.
+# A step that learns from the target, fitted on every row and split afterwards, has seen the
+# labels of the test rows. The rule reports the fit when a later statement of the same block
+# passes its result to train_test_split. A step fitted on the rows alone, such as a scaler, is
+# left alone, because it moved the test AUC by less than 0.001.
 id: fit-before-split
 language: python
 severity: error
-message: $V was fitted on every row and is split afterwards, so the test rows shaped the training data. Split first, fit on the training part, and transform both parts.
+message: $S learned from the target on every row, and $V is split afterwards, so the test rows chose what the model sees. Split first, fit $S on the training part, and transform both parts.
 rule:
-  pattern: $V = $S.fit_transform($$$A)
+  # The subscript form comes first, because ast-grep keeps the first branch that matches.
+  any:
+    - pattern: $V[$COLS] = $S.fit_transform($X, $Y)
+    - pattern: $V = $S.fit_transform($X, $Y)
   inside:
     kind: expression_statement
     precedes:
       stopBy: end
       has: { stopBy: end, any: [{ pattern: 'train_test_split($$$B, $V, $$$C)' }, { pattern: 'train_test_split($$$B, $V)' }] }
 constraints:
-  # A label encoder on the target only renames the classes.
   V: { kind: identifier, not: { regex: '^(y|Y|target|targets|label|labels)(_|$)' } }
-  S: { not: { regex: '(?i)label|^le$' } }
+  # A step whose name says it scales, imputes or reduces ignores the target it is given. The
+  # scikit-learn TargetEncoder cross-fits in fit_transform, which kept the gap at 0.016.
+  S: { not: { regex: '(?i)label|^le$|scal|standard|minmax|norm|imput|pca|svd|poly|vectori|tfidf|preprocess|pipe|column|^TargetEncoder\(' } }
+  Y: { not: { any: [{ kind: none }, { kind: keyword_argument }] } }
 ---
 id: fit-before-split
 language: python
 severity: error
-message: The columns of $V were fitted on every row and $V is split afterwards, so the test rows shaped the training data. Split first, fit on the training part, and transform both parts.
+message: $S was fitted on the target of every row, and $V is split afterwards, so each test row carries its own label in its code. Split first, then call fit_transform on the training part and transform on the test part.
 rule:
-  pattern: $V[$COLS] = $S.fit_transform($$$A)
+  pattern: $V = $S.fit($X, $Y).transform($X)
   inside:
     kind: expression_statement
     precedes:
@@ -30,7 +36,7 @@ rule:
       has: { stopBy: end, any: [{ pattern: 'train_test_split($$$B, $V, $$$C)' }, { pattern: 'train_test_split($$$B, $V)' }] }
 constraints:
   V: { kind: identifier }
-  S: { not: { regex: '(?i)label|^le$' } }
+  S: { not: { regex: '(?i)label|^le$|scal|standard|minmax|norm|imput|pca|svd|poly|vectori|tfidf|preprocess|pipe|column' } }
 ---
 id: fit-before-split
 language: python
@@ -45,3 +51,63 @@ rule:
       has: { stopBy: end, any: [{ pattern: 'train_test_split($$$B, $V, $$$C)' }, { pattern: 'train_test_split($$$B, $V)' }] }
 constraints:
   V: { kind: identifier }
+---
+# resample(..., replace=True) draws copies of rows. When a split follows in the same block, a
+# copy can land in the test part while its twin trains the model.
+id: fit-before-split
+language: python
+severity: error
+message: resample draws copies of rows before the split, so a test row can have its twin in the training part. Split first and resample the training part only.
+rule:
+  # The cheap checks come first, because the split is searched for from every match.
+  all:
+    - kind: call
+    - has: { field: function, regex: '^(resample|(sklearn\.)?utils\.resample)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^replace\s*=\s*True$' } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        precedes: { stopBy: end, has: { stopBy: end, pattern: train_test_split($$$B) } }
+---
+# A mean of the target per group, computed on every row, holds each test row's own label. The
+# rule needs the same column to become the target later in the block, as in y = df["target"].
+id: fit-before-split
+language: python
+severity: error
+message: This takes the mean of the target $T per group on every row before the split, so each test row's code holds its own label. Split first and compute the means on the training part.
+rule:
+  pattern: $DF.groupby($$$G)[$T].transform($M)
+  inside:
+    stopBy: end
+    kind: expression_statement
+    all:
+      - precedes: { stopBy: end, has: { stopBy: end, any: [{ pattern: '$Y = $DF[$T]' }, { pattern: '$Y = $DF[$T].values' }, { pattern: 'train_test_split($$$B, $DF[$T], $$$C)' }] } }
+      - precedes: { stopBy: end, has: { stopBy: end, pattern: 'train_test_split($$$S)' } }
+constraints:
+  T: { kind: string }
+  M: { regex: '^.mean.$' }
+---
+# Columns kept by their correlation with the target on every row were chosen by the labels of
+# the test rows. The rule needs the result kept in a name, a pick such as nlargest, tail, head or
+# a threshold, a later read of columns by a list, and the same column becoming the target before
+# a later split.
+id: fit-before-split
+language: python
+severity: error
+message: These columns are picked by their correlation with $T on every row before the split, so the test rows helped choose them. Split first and compute the correlations on the training part, or use SelectKBest inside a Pipeline.
+rule:
+  all:
+    - kind: assignment
+    - has: { field: right, regex: 'nlargest|nsmallest|tail|head|index|>|<' , not: { regex: '\.plot\(' } }
+    - has: { field: right, stopBy: end, pattern: '$DF.corr()[$T]' }
+    - inside:
+        kind: expression_statement
+        all:
+          - precedes: { stopBy: end, has: { stopBy: end, any: [{ pattern: '$Y = $DF[$T]' }, { pattern: '$Y = $DF[$T].values' }, { pattern: 'train_test_split($$$B, $DF[$T], $$$C)' }] } }
+          - precedes: { stopBy: end, has: { stopBy: end, pattern: 'train_test_split($$$S)' } }
+          # A later df[names] reads columns by a list, as the picked columns are read.
+          - precedes:
+              stopBy: end
+              has: { stopBy: end, kind: subscript, all: [{ has: { field: value, pattern: $DF } }, { has: { field: subscript, kind: identifier } }] }
+constraints:
+  T: { kind: string }
