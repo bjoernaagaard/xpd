@@ -1,15 +1,32 @@
 # A k-fold splitter uses random_state only to shuffle, and without shuffle=True it raises "Setting
 # a random_state has no effect since shuffle is False". GroupKFold takes shuffle from 1.6 on.
+# The classes of the removed sklearn.cross_validation took other arguments, and removed-in-sklearn
+# reports that import, so a file that imports it is left alone unless the call passes n_splits,
+# which only the classes of sklearn.model_selection take. The import test reads the whole file, so
+# it comes last.
 id: random-state-without-shuffle
 language: python
 severity: error
 message: $K uses random_state only when it shuffles, so without shuffle=True it raises a ValueError. Pass shuffle=True, or drop random_state.
 rule:
   pattern: $K($$$A)
-  has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
-  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { has: { field: value, kind: 'false' } } }] }, { kind: dictionary_splat }, { kind: list_splat }] } } }
-constraints:
-  K: { regex: '(^|\.)(KFold|StratifiedKFold|StratifiedGroupKFold)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)(KFold|StratifiedKFold|StratifiedGroupKFold)$' }
+    - matches: random-state-alone
+    - not: { all: [{ not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_splits$' } } } } }, { matches: old-cross-validation }] }
+utils:
+  random-state-alone:
+    all:
+      - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
+      - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { has: { field: value, kind: 'false' } } }] }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+  old-cross-validation:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        any: [{ kind: import_from_statement }, { kind: import_statement }]
+        regex: '^(from\s+sklearn\.cross_validation\s+import|from\s+sklearn\s+import\b[^#]*\bcross_validation\b|import\s+sklearn\.cross_validation\b)'
 ---
 id: random-state-without-shuffle
 language: python
@@ -17,8 +34,21 @@ severity: error
 message: GroupKFold uses random_state only when it shuffles, so without shuffle=True it raises a ValueError. Pass shuffle=True, or drop random_state.
 rule:
   pattern: $K($$$A)
-  has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
-  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { has: { field: value, kind: 'false' } } }] }, { kind: dictionary_splat }, { kind: list_splat }] } } }
-constraints:
-  K: { regex: '(^|\.)GroupKFold$' }
+  all:
+    - has: { field: function, regex: '(^|\.)GroupKFold$' }
+    - matches: random-state-alone
+    - not: { all: [{ not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_splits$' } } } } }, { matches: old-cross-validation }] }
+utils:
+  random-state-alone:
+    all:
+      - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
+      - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { has: { field: value, kind: 'false' } } }] }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+  old-cross-validation:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        any: [{ kind: import_from_statement }, { kind: import_statement }]
+        regex: '^(from\s+sklearn\.cross_validation\s+import|from\s+sklearn\s+import\b[^#]*\bcross_validation\b|import\s+sklearn\.cross_validation\b)'
 metadata: { since: "1.6" }

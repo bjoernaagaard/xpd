@@ -361,6 +361,8 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     StratifiedKFold(y, n_folds=3)  # xpd: removed-in-sklearn
     ShuffleSplit(len(X), 10, test_size=0.4, random_state=0)  # xpd: removed-in-sklearn
     KFold(n=len(y), n_folds=3)  # xpd: removed-in-sklearn
+    KFold(len(y), n_folds=3, random_state=0)  # xpd: removed-in-sklearn
+    KFold(n_splits=3, random_state=0)  # xpd: random-state-without-shuffle
     StratifiedKFold(3)
     StratifiedKFold(n_splits=3).split(X, y)
     jaccard_score(y, y)
