@@ -7,9 +7,13 @@ code computes, so a copy fixed with `xpd check --fix` can be compared with this 
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import cross_val_score, cross_validate
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
 
 CASES = {}
 
@@ -119,3 +123,34 @@ def predict_once_or_recursively():
     for i in range(len(rows) - 1):
         rows[i + 1, 0] = model.predict_proba([rows[i]])[0, 1]
     return labels, forecast, rows
+
+
+@case
+def score_after_predict():
+    X, y = table()
+    forest = RandomForestClassifier(n_estimators=20, random_state=0).fit(X[:150], y[:150])
+    X_test, y_test = X[150:], y[150:]
+    y_pred = forest.predict(X_test)
+    accuracy = forest.score(X_test, y_test)  # xpd: score-after-predict
+    f1 = f1_score(y_test, forest.predict(X_test))  # xpd: score-after-predict
+    knn = KNeighborsRegressor().fit(X[:150], X[:150, 0])
+    fitted = knn.predict(X_test)
+    r2 = knn.score(X_test, X_test[:, 0])  # xpd: score-after-predict
+    return forest, y_pred, accuracy, f1, fitted, r2
+
+
+@case
+def score_without_a_second_predict():
+    X, y = table()
+    X_test, y_test = X[150:], y[150:]
+    forest = RandomForestClassifier(n_estimators=20, random_state=0).fit(X[:150], y[:150])
+    y_pred = forest.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    train_accuracy = forest.score(X[:150], y[:150])
+    linear = LogisticRegression().fit(X[:150], y[:150])
+    linear_pred = linear.predict(X_test)
+    linear_accuracy = linear.score(X_test, y_test)
+    tree = DecisionTreeClassifier(random_state=0).fit(X[:150], y[:150])
+    tree_pred = tree.predict(X_test)
+    tree_accuracy = tree.score(X_test, y_test)
+    return accuracy, train_accuracy, linear_accuracy, linear_pred, tree_accuracy, tree_pred
