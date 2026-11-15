@@ -12,6 +12,8 @@ Use `xpd` whenever you write or change Python code.
   unless you can state why the pattern is right here. Don't silence rules.
   A `missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
+- `xpd rules --format json`: every rule with its documentation. Read a rule's
+  `doc` before you change code it reports.
 - `xpd check <paths…> --fix`: apply safe fixes. Add `--unsafe-fixes` for fixes
   that may change behavior, then read the diff.
 - `xpd profile <data file>`: dtypes, nulls, cardinality, memory. Run it before
@@ -29,3 +31,7 @@ Use `xpd` whenever you write or change Python code.
     `frame["x"] = ...` on the frame a step was given.
   - Apache Hamilton modules: a `warning` names an input one edit from a node
     name, so check it for a typing error. `inputs` are what the caller passes.
+
+When the xpd MCP server is connected, call its tools (`check`, `fix`, `graph`,
+`profile`, `equiv`, `rules`, `rule`) instead of the shell commands. They take
+the same paths and return the same JSON.

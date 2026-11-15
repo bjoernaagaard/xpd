@@ -10,6 +10,7 @@ nav = [
   { "Get started" = "index.md" },
   { "Commands" = "commands.md" },
   { "Claude Code" = "claude-code.md" },
+  { "MCP server" = "mcp.md" },
   { "Rules" = "rules.md" },
 ]
 

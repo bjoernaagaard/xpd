@@ -32,9 +32,23 @@ Before version 0.7.0 the package was `pdx-lint` and the command was `pdx`.
 | `xpd equiv old.py new.py` | Check that two scripts leave an equal `result`. Needs pandas. |
 | `xpd graph features.py` | Print the dataflow of step code or Apache Hamilton modules: what reads what, and what does not connect. |
 | `xpd hook` | Lint the file a Claude Code edit touched. |
-| `xpd skill` | Print the agent skill for this version. |
+| `xpd rules` | List every rule with its severity, fix and documentation. |
+| `xpd skill` | Print the agent skill for this version. Add `--json` for all three skills. |
+| `xpd mcp` | Start the MCP server. Needs the `mcp` extra. |
 
 Run `xpd -h` for every flag.
+
+## MCP server
+
+`xpd mcp` gives an agent xpd's commands as MCP tools with typed results, the rules and skills as
+resources, and prompts for the skill's workflows. Add it to Claude Code with:
+
+```sh
+claude mcp add xpd -- uvx --from 'xpd[mcp]' xpd mcp
+```
+
+See [MCP server](https://bjoernaagaard.github.io/xpd/mcp/) for other clients, the settings and
+HTTP.
 
 ## Skills
 

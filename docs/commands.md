@@ -197,6 +197,39 @@ Reads a Claude Code hook event on stdin and lints the `.py` file the edit touche
 holds a pipeline of steps, the hook also prints the errors and warnings of `xpd graph` for it. See
 [Claude Code](claude-code.md).
 
+## rules
+
+```sh
+xpd rules [--format text|json]
+```
+
+Lists every rule and package check of every pack, whatever the project's venv holds. Text has
+one line per rule: its severity, `[package/rule]`, its fix and the first library version it
+applies to when there is one, and its message.
+
+The JSON is a list with one object per rule, each with `package`, `rule`, `severity`,
+`message`, `fix` (`safe`, `unsafe` or `null`), `since` (a version or `null`), `url`, the
+rule's link on [Rules](rules.md), and `doc`, that section as Markdown. A rule file may hold
+several rule documents, one for each form the rule matches, and `rules` lists them as one rule
+with the highest severity of its documents, the message of the first, the least safe fix, and
+the lowest `since`, which is `null` when one document applies to every version.
+
 ## skill
 
-Prints the agent skill that ships with this version of xpd.
+```sh
+xpd skill [--json]
+```
+
+Prints the agent skill that ships with this version of xpd. With `--json`, it prints all three
+skills, `python-best-practices`, `python-review` and `xpd`, as a list of objects with `name`
+and `files`, each file with its `path` in the skill folder and its `text`.
+
+## mcp
+
+```sh
+xpd mcp [ARGS]...
+```
+
+Starts the [MCP server](mcp.md). It needs the `mcp` extra, so run it as
+`uvx --from 'xpd[mcp]' xpd mcp`. The arguments go to the server, so `xpd mcp -h` lists its
+flags.
