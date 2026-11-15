@@ -7,7 +7,7 @@ code computes, so a copy fixed with `xpd check --fix` can be compared with this 
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import cross_val_score, cross_validate
@@ -154,3 +154,31 @@ def score_without_a_second_predict():
     tree_pred = tree.predict(X_test)
     tree_accuracy = tree.score(X_test, y_test)
     return accuracy, train_accuracy, linear_accuracy, linear_pred, tree_accuracy, tree_pred
+
+
+@case
+def predict_and_predict_proba():
+    X, y = table()
+    forest = RandomForestClassifier(n_estimators=20, random_state=0).fit(X[:150], y[:150])
+    X_test = X[150:]
+    labels = forest.predict(X_test)  # xpd: predict-and-predict-proba
+    scores = forest.predict_proba(X_test)[:, 1]
+    trees = ExtraTreesClassifier(n_estimators=20, random_state=0)
+    trees.fit(X[:150], y[:150])
+    proba = trees.predict_proba(X_test)
+    extra_labels = trees.predict(X_test)  # xpd: predict-and-predict-proba
+    return forest, labels, scores, proba, extra_labels
+
+
+@case
+def labels_from_one_predict_proba():
+    X, y = table()
+    X_test = X[150:]
+    forest = RandomForestClassifier(n_estimators=20, random_state=0).fit(X[:150], y[:150])
+    proba = forest.predict_proba(X_test)
+    labels = forest.classes_[proba.argmax(axis=1)]
+    train_labels = forest.predict(X[:150])
+    linear = LogisticRegression().fit(X[:150], y[:150])
+    linear_labels = linear.predict(X_test)
+    linear_scores = linear.predict_proba(X_test)[:, 1]
+    return proba, labels, train_labels, linear_labels, linear_scores
