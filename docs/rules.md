@@ -3395,11 +3395,11 @@ and held-out rows named `X_dev`, `X_te` or `X_cv`.
 against 0.495. `SMOTE` scored 0.815, `RandomOverSampler` 0.737, `ADASYN` 0.819,
 `EditedNearestNeighbours` 0.678 and `resample(replace=True)` 0.970, against 0.478 to 0.493 after
 the split. `TargetEncoder().fit(X, y).transform(X)` scored 0.889 against 0.509, a target mean per
-group 0.887 against 0.497, and 10 columns picked by `df.corr()` 0.771 against 0.497. `NearMiss`
-scored 0.448 and `TomekLinks` 0.516, which did not pass the proof, and the rule reports them
-because they pick rows by their neighbours. The rule leaves `RandomUnderSampler` alone, which drops
-rows at random and scored 0.512 against 0.491. It leaves the scikit-learn
-`TargetEncoder.fit_transform` alone too, which cross-fits and scored 0.522 against 0.504. A label
+group 0.887 against 0.497, and 10 columns picked by `df.corr()` 0.771 against 0.497. The rule
+leaves three under-samplers alone, because they only drop rows and did not pass the proof:
+`RandomUnderSampler` scored 0.512 against 0.491, `NearMiss` 0.448 and `TomekLinks` 0.516. It
+leaves the scikit-learn `TargetEncoder.fit_transform` alone too, which cross-fits and scored 0.522
+against 0.504. A label
 encoder on the target is left alone, when the result is named `y`, `target` or `labels`, or the
 encoder's name holds `label`. The target mean and the `df.corr()` forms need the same column to
 become the target later in the block, as in `y = df["target"]`. The frozen rule gave wrong advice
@@ -3415,8 +3415,9 @@ second argument, and a `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchC
 Cross-validated AUC after `SelectKBest` on every row was 0.764 against 0.518 for a Pipeline.
 `SMOTE` before `cross_val_score` gave 0.838 against 0.510. `best_score_` after `SelectKBest` was
 0.770 against 0.522, and after `SMOTE` 0.854 against 0.521. `RandomUnderSampler` before the folds
-scored 0.519 against 0.511, so the rule leaves it alone. The frozen rule gave wrong advice in 1
-and 0 of 11 labelled reports.
+scored 0.519 against 0.511, `NearMiss` 0.458 and `TomekLinks` 0.530 against 0.508, which did not
+pass the proof, so the rule leaves the three alone. The frozen rule gave wrong advice in 1 and 0 of
+11 labelled reports.
 
 `tune-on-test` needs the loop variable as a keyword of the call that built the scored model, a
 `score`, `predict` or `predict_proba` on a name with `test` in it, and a pick. A pick is a `>`

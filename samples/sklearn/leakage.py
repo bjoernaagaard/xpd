@@ -173,7 +173,7 @@ def correlation_before_split():
 def resample_before_split():
     df = frame()
     X_more, y_more = SMOTE(random_state=0).fit_resample(df[["x1", "x2"]], df["y"])  # xpd: fit-before-split
-    X_near, y_near = NearMiss().fit_resample(df[["x1", "x2"]], df["y"])  # xpd: fit-before-split
+    X_near, y_near = NearMiss().fit_resample(df[["x1", "x2"]], df["y"])
     undersample = RandomUnderSampler(random_state=0)
     X_fewer, y_fewer = undersample.fit_resample(df[["x1", "x2"]], df["y"])
     return train_test_split(X_more, y_more, random_state=0), train_test_split(X_near, y_near, random_state=0), train_test_split(X_fewer, y_fewer, random_state=0)

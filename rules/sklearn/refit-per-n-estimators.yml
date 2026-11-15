@@ -8,7 +8,7 @@
 id: refit-per-n-estimators
 language: python
 severity: warning
-message: Each pass of this loop fits $C again from scratch. Create it once before the loop with warm_start=True and call set_params(n_estimators=$N) before fit, which keeps the trees already grown, gives the same model while $N grows, and measured 1.8 times faster for 10, 20, 50 and 100 trees and 4.6 to 5.3 times faster for 10 to 100 trees in steps of 10.
+message: Each pass of this loop fits $C again from scratch. Create it once before the loop with warm_start=True and call set_params(n_estimators=$N) before fit, which keeps the trees already grown, gives the same model while $N grows, and measured at least 1.6 times faster for 10, 20, 50 and 100 trees and at least 3.5 times faster for 10 to 100 trees in steps of 10.
 rule:
   pattern: $V = $C($$$A)
   all:
@@ -27,7 +27,7 @@ constraints:
 id: refit-per-n-estimators
 language: python
 severity: warning
-message: Each pass of this loop fits $C again from scratch. Create it once before the loop with warm_start=True and call set_params(n_estimators=$N) before fit, which keeps the trees already grown, gives the same model while $N grows, and measured 1.8 times faster for 10, 20, 50 and 100 trees and 4.6 to 5.3 times faster for 10 to 100 trees in steps of 10.
+message: Each pass of this loop fits $C again from scratch. Create it once before the loop with warm_start=True and call set_params(n_estimators=$N) before fit, which keeps the trees already grown, gives the same model while $N grows, and measured at least 1.6 times faster for 10, 20, 50 and 100 trees and at least 3.5 times faster for 10 to 100 trees in steps of 10.
 rule:
   pattern: $V = $C($$$A).fit($$$F)
   all:

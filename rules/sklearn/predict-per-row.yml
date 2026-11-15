@@ -5,7 +5,7 @@
 id: predict-per-row
 language: python
 severity: warning
-message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured 2.7 to 860 times faster on 500 and 5,000 rows.
+message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured at least 2.7 times faster on 500 and 5,000 rows.
 rule:
   kind: call
   pattern: $M.$P($$$A)
@@ -44,7 +44,7 @@ constraints:
 id: predict-per-row
 language: python
 severity: warning
-message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured 2.7 to 860 times faster on 500 and 5,000 rows.
+message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured at least 2.7 times faster on 500 and 5,000 rows.
 rule:
   kind: call
   pattern: $M.$P($$$A)
