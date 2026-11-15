@@ -1,0 +1,174 @@
+# The ranges are in research/scipy-rules/digits/runs/grid.jsonl. 1 - erf lost 3 or more digits from
+# 2.75 to 26.5, 1 - erfc below 6e-5, and 1 - gammainc and 1 - gammaincc in the tails where the
+# result falls below about 1e-4. Unsafe. The last bits change.
+id: special-complement
+language: python
+severity: warning
+message: Subtracting $SP.$F from 1 drops the digits of a small result and gives 0 once $F rounds to 1. In the runs that lost up to all 16 digits, and $SP.$NEW was never a digit worse. Write $SP.$NEW($$$A).
+rule: { any: [{ pattern: 1 - $SP.$F($$$A) }, { pattern: 1.0 - $SP.$F($$$A) }, { pattern: '1. - $SP.$F($$$A)' }] }
+constraints:
+  SP: { matches: special-module }
+  F: { regex: '^(erf|erfc|gammainc|gammaincc)$' }
+transform:
+  T1: { replace: { source: $F, replace: '^erf$', by: erfc_ } }
+  T2: { replace: { source: $T1, replace: '^erfc$', by: erf } }
+  T3: { replace: { source: $T2, replace: '^gammaincc$', by: gammainc_ } }
+  T4: { replace: { source: $T3, replace: '^gammainc$', by: gammaincc } }
+  NEW: { replace: { source: $T4, replace: '_$', by: '' } }
+fix: $SP.$NEW($$$A)
+metadata: { fix: unsafe }
+utils:
+  special-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.special$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+---
+# 1 - betainc lost 3 or more digits for x from 0.32 to 0.95 with a = 2 and b = 30, where betaincc
+# lost less than 1, in research/scipy-rules/digits/runs/grid.jsonl. betaincc is new in SciPy
+# 1.11.0. Unsafe. The last bits change.
+id: special-complement
+language: python
+severity: warning
+message: Subtracting $SP.betainc from 1 drops the digits of a small upper tail and gives 0 once betainc rounds to 1. That lost up to all 16 digits where $SP.betaincc lost less than 1. Write $SP.betaincc($$$A).
+rule: { any: [{ pattern: 1 - $SP.betainc($$$A) }, { pattern: 1.0 - $SP.betainc($$$A) }, { pattern: '1. - $SP.betainc($$$A)' }] }
+constraints:
+  SP: { matches: special-module }
+fix: $SP.betaincc($$$A)
+metadata: { fix: unsafe, since: "1.11" }
+utils:
+  special-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.special$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+---
+# erfc(-x) is 1 + erf(x). The old form lost 3 or more digits below -2.75 in
+# research/scipy-rules/digits/runs/grid.jsonl. Unsafe. The last bits change.
+id: special-complement
+language: python
+severity: warning
+message: Adding $F($X) to 1 drops the digits of a small result when $X is negative and gives 0 below -5.9. That lost up to all 16 digits where erfc lost at most 0.7. Write $NEW(-$X).
+rule: { any: [{ pattern: 1 + $F($X) }, { pattern: 1.0 + $F($X) }, { pattern: $F($X) + 1 }, { pattern: $F($X) + 1.0 }] }
+constraints:
+  F: { kind: attribute, regex: '\.erf$', has: { field: object, matches: special-module } }
+  X: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }, { kind: parenthesized_expression }, { kind: integer }, { kind: float }, { kind: binary_operator, has: { field: operator, regex: '^(\*|/|\*\*)$' } }] }
+transform:
+  NEW: { replace: { source: $F, replace: 'erf$', by: erfc } }
+fix: $NEW(-$X)
+metadata: { fix: unsafe }
+utils:
+  special-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.special$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+---
+# ndtr(-x) is 1 - ndtr(x) and expit(-x) is 1 - expit(x), so the fix keeps the name and works when
+# it was imported by name. 1 - ndtr lost 3 or more digits above 4.25 and 1 - expit above 8, in
+# research/scipy-rules/digits/runs/grid.jsonl. Unsafe. The last bits change.
+id: special-complement
+language: python
+severity: warning
+message: Subtracting $F($X) from 1 drops the digits of a small result and gives 0 once it rounds to 1. In the runs that lost up to all 16 digits, and $F(-$X) was never a digit worse. Write $F(-$X).
+rule: { any: [{ pattern: 1 - $F($X) }, { pattern: 1.0 - $F($X) }, { pattern: '1. - $F($X)' }] }
+constraints:
+  F: { any: [{ kind: attribute, regex: '\.(ndtr|expit)$', has: { field: object, matches: special-module } }, { all: [{ matches: special-name }, { regex: '^(ndtr|expit)$' }] }] }
+  X: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }, { kind: parenthesized_expression }, { kind: integer }, { kind: float }, { kind: binary_operator, has: { field: operator, regex: '^(\*|/|\*\*)$' } }] }
+fix: $F(-$X)
+metadata: { fix: unsafe }
+utils:
+  special-module:
+    any:
+      - { kind: attribute, regex: '^scipy\.special$' }
+      - all:
+          - { kind: attribute, pattern: $SCIPY_.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $SCIPY_ } }] } } }
+      - all:
+          - { kind: identifier, pattern: $MOD_ }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
+  special-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
+---
+# The renamed forms with the function imported by name. No fix, because the new name is not
+# imported.
+id: special-complement
+language: python
+severity: warning
+message: Subtracting scipy.special.$F from 1 drops the digits of a small result and gives 0 once $F rounds to 1. Import $NEW and call it instead.
+rule: { any: [{ pattern: 1 - $F($$$A) }, { pattern: 1.0 - $F($$$A) }, { pattern: '1. - $F($$$A)' }] }
+constraints:
+  F: { all: [{ matches: special-name }, { regex: '^(erf|erfc|gammainc|gammaincc|betainc)$' }] }
+transform:
+  T1: { replace: { source: $F, replace: '^erf$', by: erfc_ } }
+  T2: { replace: { source: $T1, replace: '^erfc$', by: erf } }
+  T3: { replace: { source: $T2, replace: '^gammaincc$', by: gammainc_ } }
+  T4: { replace: { source: $T3, replace: '^(gammainc|betainc)$', by: '${1}c' } }
+  NEW: { replace: { source: $T4, replace: '_$', by: '' } }
+utils:
+  special-name:
+    all:
+      - { kind: identifier, pattern: $NAME_ }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
