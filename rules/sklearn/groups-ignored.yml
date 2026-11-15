@@ -1,0 +1,55 @@
+# groups= reaches the splitter, and these splitters ignore it with a UserWarning. When cv is
+# missing or an integer, cross_val_score splits with KFold or StratifiedKFold, which ignore it too.
+# A cv given as a name is left alone, because the name can hold a group splitter.
+id: groups-ignored
+language: python
+severity: error
+message: cv=$K($$$KA) ignores groups=, so rows of one group are in the training and the test folds, and on data with no signal this scored 0.85 where GroupKFold scored 0.48. Pass cv=GroupKFold().
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^groups$' } } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: '$K($$$KA)' } }] } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+  K: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut|PredefinedSplit)$' }
+---
+id: groups-ignored
+language: python
+severity: error
+message: With cv missing or an integer, $F splits with KFold or StratifiedKFold, which ignore groups=, so rows of one group are in the training and the test folds. On data with no signal this scored 0.85 where GroupKFold scored 0.48. Pass cv=GroupKFold().
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^groups$' } } }
+  not:
+    any:
+      - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { not: { has: { field: value, kind: integer } } }] } }
+      - has: { field: arguments, has: { kind: dictionary_splat } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+---
+id: groups-ignored
+language: python
+severity: error
+message: $K ignores the groups passed to split, so rows of one group are in the training and the test part, and on data with no signal this scored 0.85 where GroupKFold scored 0.48. Use GroupKFold or GroupShuffleSplit.
+rule:
+  any:
+    - pattern: $K($$$KA).split($X, $Y, $G)
+    - pattern: $K($$$KA).split($$$S, groups=$G)
+constraints:
+  K: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut)$' }
+---
+id: groups-ignored
+language: python
+severity: error
+message: $V is a $K, which ignores the groups passed to split, so rows of one group are in the training and the test part, and on data with no signal this scored 0.85 where GroupKFold scored 0.48. Use GroupKFold or GroupShuffleSplit.
+rule:
+  any:
+    - pattern: $V.split($X, $Y, $G)
+    - pattern: $V.split($$$S, groups=$G)
+  inside:
+    stopBy: end
+    follows: { stopBy: end, has: { pattern: '$V = $K($$$KA)' } }
+constraints:
+  V: { kind: identifier }
+  K: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut)$' }

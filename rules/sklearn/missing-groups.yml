@@ -1,0 +1,64 @@
+# The group splitters need the group of each row. Without groups= they raise "The 'groups'
+# parameter should not be None", and StratifiedGroupKFold raises that it found 1 group. A call with
+# params= or ** can carry the groups, so it is left alone. A search such as SequentialFeatureSelector
+# or LogisticRegressionCV takes groups only through metadata routing, so it is not listed.
+id: missing-groups
+language: python
+severity: error
+message: $K splits by group, and $F gets no groups=, so it raises a ValueError. Pass groups= with the group of each row.
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: '$K($$$KA)' } }] } }
+  not:
+    has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(groups|params)$' } }, { kind: dictionary_splat }] } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+  K: { regex: '(^|\.)(GroupKFold|StratifiedGroupKFold|GroupShuffleSplit|LeaveOneGroupOut|LeavePGroupsOut)$' }
+---
+id: missing-groups
+language: python
+severity: error
+message: $K splits by group, and split gets no groups, so it raises a ValueError. Pass the group of each row as the third argument.
+rule:
+  any:
+    - pattern: $K($$$KA).split($X)
+    - pattern: $K($$$KA).split($X, $Y)
+  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^groups$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+constraints:
+  K: { regex: '(^|\.)(GroupKFold|StratifiedGroupKFold|GroupShuffleSplit|LeaveOneGroupOut|LeavePGroupsOut)$' }
+---
+id: missing-groups
+language: python
+severity: error
+message: $V is a $K, which splits by group, and split gets no groups, so it raises a ValueError. Pass the group of each row as the third argument.
+rule:
+  any:
+    - pattern: $V.split($X)
+    - pattern: $V.split($X, $Y)
+  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^groups$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+  inside:
+    stopBy: end
+    follows: { stopBy: end, has: { pattern: '$V = $K($$$KA)' } }
+constraints:
+  V: { kind: identifier }
+  K: { regex: '(^|\.)(GroupKFold|StratifiedGroupKFold|GroupShuffleSplit|LeaveOneGroupOut|LeavePGroupsOut)$' }
+---
+id: missing-groups
+language: python
+severity: error
+message: $S searches with cv=$K($$$KA), which splits by group, and fit gets no groups=, so it raises a ValueError. Pass groups= to fit.
+rule:
+  any:
+    - pattern: $S.fit($X, $Y)
+    - pattern: $S.fit($X)
+  inside:
+    stopBy: end
+    follows:
+      stopBy: end
+      has:
+        pattern: $S = $G($$$GA)
+        has: { field: right, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: '$K($$$KA)' } }] } } }
+constraints:
+  S: { kind: identifier }
+  G: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|RFECV)$' }
+  K: { regex: '(^|\.)(GroupKFold|StratifiedGroupKFold|GroupShuffleSplit|LeaveOneGroupOut|LeavePGroupsOut)$' }
