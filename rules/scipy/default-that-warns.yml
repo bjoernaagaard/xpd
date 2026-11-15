@@ -19,7 +19,51 @@ rule:
       - has:
           field: function
           any:
-          - {regex: ^scipy\.sparse\.linalg\.(gmres)$, pattern: scipy.sparse.linalg.$F}
+          - all:
+            - {regex: ^scipy\.sparse\.linalg\.(gmres)$, pattern: scipy.sparse.linalg.$F}
+            - not:
+                inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    any:
+                    - kind: identifier
+                      pattern: scipy
+                      any:
+                      - nthChild: 1
+                        inside:
+                          kind: dotted_name
+                          inside: {kind: import_statement, field: name}
+                          not: {regex: ^(scipy)(\.|$)}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_statement}
+                          not:
+                            has: {field: name, regex: ^(scipy)$}
+                      - inside:
+                          kind: dotted_name
+                          inside: {kind: import_from_statement, field: name}
+                          not:
+                            all:
+                            - {regex: ^(scipy)$}
+                            - &id001
+                              inside:
+                                kind: import_from_statement
+                                has: {field: module_name, regex: ^$}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_from_statement}
+                          not:
+                            all:
+                            - has: {field: name, regex: ^(scipy)$}
+                            - *id001
+                    - kind: import_from_statement
+                      has: {kind: wildcard_import}
+                      not:
+                        has: {field: module_name, regex: ^$}
           - all:
             - {regex: \.sparse\.linalg\.(gmres)$, pattern: $R.sparse.linalg.$F}
             - inside:
@@ -34,6 +78,49 @@ rule:
                       all:
                       - has: {field: name, regex: ^scipy$}
                       - has: {field: alias, pattern: $R}
+            - not:
+                inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    any:
+                    - kind: identifier
+                      pattern: $R
+                      any:
+                      - nthChild: 1
+                        inside:
+                          kind: dotted_name
+                          inside: {kind: import_statement, field: name}
+                          not: {regex: ^(scipy)(\.|$)}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_statement}
+                          not:
+                            has: {field: name, regex: ^(scipy)$}
+                      - inside:
+                          kind: dotted_name
+                          inside: {kind: import_from_statement, field: name}
+                          not:
+                            all:
+                            - {regex: ^(scipy)$}
+                            - &id002
+                              inside:
+                                kind: import_from_statement
+                                has: {field: module_name, regex: ^$}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_from_statement}
+                          not:
+                            all:
+                            - has: {field: name, regex: ^(scipy)$}
+                            - *id002
+                    - kind: import_from_statement
+                      has: {kind: wildcard_import}
+                      not:
+                        has: {field: module_name, regex: ^$}
           - all:
             - {regex: \.linalg\.(gmres)$, pattern: $R.linalg.$F}
             - inside:
@@ -58,6 +145,48 @@ rule:
                           all:
                           - has: {field: name, regex: ^sparse$}
                           - has: {field: alias, pattern: $R}
+            - not:
+                inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    any:
+                    - kind: identifier
+                      pattern: $R
+                      any:
+                      - nthChild: 1
+                        inside:
+                          kind: dotted_name
+                          inside: {kind: import_statement, field: name}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_statement}
+                          not:
+                            has: {field: name, regex: ^scipy\.(sparse)$}
+                      - inside:
+                          kind: dotted_name
+                          inside: {kind: import_from_statement, field: name}
+                          not:
+                            all:
+                            - {regex: ^(sparse)$}
+                            - &id003
+                              inside:
+                                kind: import_from_statement
+                                has: {field: module_name, regex: ^scipy$}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_from_statement}
+                          not:
+                            all:
+                            - has: {field: name, regex: ^(sparse)$}
+                            - *id003
+                    - kind: import_from_statement
+                      has: {kind: wildcard_import}
+                      not:
+                        has: {field: module_name, regex: ^scipy$}
           - all:
             - {regex: \.(gmres)$, pattern: $R.$F}
             - inside:
@@ -82,6 +211,48 @@ rule:
                           all:
                           - has: {field: name, regex: ^linalg$}
                           - has: {field: alias, pattern: $R}
+            - not:
+                inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    any:
+                    - kind: identifier
+                      pattern: $R
+                      any:
+                      - nthChild: 1
+                        inside:
+                          kind: dotted_name
+                          inside: {kind: import_statement, field: name}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_statement}
+                          not:
+                            has: {field: name, regex: ^scipy\.sparse\.(linalg)$}
+                      - inside:
+                          kind: dotted_name
+                          inside: {kind: import_from_statement, field: name}
+                          not:
+                            all:
+                            - {regex: ^(linalg)$}
+                            - &id004
+                              inside:
+                                kind: import_from_statement
+                                has: {field: module_name, regex: ^scipy\.sparse$}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_from_statement}
+                          not:
+                            all:
+                            - has: {field: name, regex: ^(linalg)$}
+                            - *id004
+                    - kind: import_from_statement
+                      has: {kind: wildcard_import}
+                      not:
+                        has: {field: module_name, regex: ^scipy\.sparse$}
           - all:
             - {kind: identifier, regex: ^(gmres)$, pattern: $F}
             - inside:
@@ -94,6 +265,48 @@ rule:
                     all:
                     - has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
                     - has: {kind: dotted_name, pattern: $F}
+            - not:
+                inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    any:
+                    - kind: identifier
+                      pattern: $F
+                      any:
+                      - nthChild: 1
+                        inside:
+                          kind: dotted_name
+                          inside: {kind: import_statement, field: name}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_statement}
+                          not:
+                            has: {field: name, regex: ^scipy\.sparse\.linalg\.((gmres))$}
+                      - inside:
+                          kind: dotted_name
+                          inside: {kind: import_from_statement, field: name}
+                          not:
+                            all:
+                            - {regex: ^((gmres))$}
+                            - &id005
+                              inside:
+                                kind: import_from_statement
+                                has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_from_statement}
+                          not:
+                            all:
+                            - has: {field: name, regex: ^((gmres))$}
+                            - *id005
+                    - kind: import_from_statement
+                      has: {kind: wildcard_import}
+                      not:
+                        has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
           - all:
             - {kind: identifier, pattern: $F_AS}
             - inside:
@@ -109,6 +322,48 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^(gmres)$}
                         - has: {field: alias, pattern: $F_AS}
+            - not:
+                inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    any:
+                    - kind: identifier
+                      pattern: $F_AS
+                      any:
+                      - nthChild: 1
+                        inside:
+                          kind: dotted_name
+                          inside: {kind: import_statement, field: name}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_statement}
+                          not:
+                            has: {field: name, regex: ^scipy\.sparse\.linalg\.((gmres))$}
+                      - inside:
+                          kind: dotted_name
+                          inside: {kind: import_from_statement, field: name}
+                          not:
+                            all:
+                            - {regex: ^((gmres))$}
+                            - &id006
+                              inside:
+                                kind: import_from_statement
+                                has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
+                      - inside:
+                          kind: aliased_import
+                          field: alias
+                          inside: {kind: import_from_statement}
+                          not:
+                            all:
+                            - has: {field: name, regex: ^((gmres))$}
+                            - *id006
+                    - kind: import_from_statement
+                      has: {kind: wildcard_import}
+                      not:
+                        has: {field: module_name, regex: ^scipy\.sparse\.linalg$}
       - not:
           has:
             field: arguments
@@ -139,7 +394,7 @@ rule:
               any:
               - inside:
                   stopBy:
-                    not: &id001
+                    not: &id007
                       any:
                       - {kind: pattern_list}
                       - {kind: tuple_pattern}
@@ -154,26 +409,26 @@ rule:
                   field: left
               - inside:
                   stopBy:
-                    not: *id001
+                    not: *id007
                   kind: augmented_assignment
                   field: left
               - inside:
                   stopBy:
-                    not: *id001
+                    not: *id007
                   kind: for_statement
                   field: left
               - inside:
                   stopBy:
-                    not: *id001
+                    not: *id007
                   kind: for_in_clause
                   field: left
               - inside:
                   stopBy:
-                    not: *id001
+                    not: *id007
                   kind: as_pattern_target
               - inside:
                   stopBy:
-                    not: *id001
+                    not: *id007
                   kind: delete_statement
               - inside: {kind: named_expression, field: name}
               - inside: {kind: parameters}
@@ -203,31 +458,6 @@ rule:
                   any:
                   - inside: {kind: type_alias_statement, field: left}
                   - inside: {kind: type_parameter}
-              - nthChild: 1
-                inside:
-                  kind: dotted_name
-                  not: {regex: ^scipy(\.|$)}
-                  inside: {kind: import_statement, field: name}
-              - inside:
-                  kind: aliased_import
-                  field: alias
-                  inside: {kind: import_statement}
-                  not:
-                    has: {field: name, regex: ^scipy(\.|$)}
-              - inside:
-                  kind: aliased_import
-                  field: alias
-                  inside:
-                    kind: import_from_statement
-                    not: &id002
-                      has: {field: module_name, regex: ^scipy(\.|$)}
-              - inside:
-                  kind: dotted_name
-                  regex: ^\w+$
-                  inside:
-                    kind: import_from_statement
-                    field: name
-                    not: *id002
 constraints:
   F: {regex: ^gmres$}
 fix: callback=$V, callback_type='legacy'
@@ -477,7 +707,51 @@ rule:
         - has:
             field: function
             any:
-            - {regex: ^scipy\.io\.(hb_read)$, pattern: scipy.io.$F}
+            - all:
+              - {regex: ^scipy\.io\.(hb_read)$, pattern: scipy.io.$F}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: scipy
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                            not: {regex: ^(scipy)(\.|$)}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^(scipy)$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^(scipy)$}
+                              - &id001
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^(scipy)$}
+                              - *id001
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^$}
             - all:
               - {regex: \.io\.(hb_read)$, pattern: $R.io.$F}
               - inside:
@@ -492,6 +766,49 @@ rule:
                         all:
                         - has: {field: name, regex: ^scipy$}
                         - has: {field: alias, pattern: $R}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $R
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                            not: {regex: ^(scipy)(\.|$)}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^(scipy)$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^(scipy)$}
+                              - &id002
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^(scipy)$}
+                              - *id002
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^$}
             - all:
               - {regex: \.(hb_read)$, pattern: $R.$F}
               - inside:
@@ -516,6 +833,48 @@ rule:
                             all:
                             - has: {field: name, regex: ^io$}
                             - has: {field: alias, pattern: $R}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $R
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^scipy\.(io)$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^(io)$}
+                              - &id003
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^scipy$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^(io)$}
+                              - *id003
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^scipy$}
             - all:
               - {kind: identifier, regex: ^(hb_read)$, pattern: $F}
               - inside:
@@ -528,6 +887,48 @@ rule:
                       all:
                       - has: {field: module_name, regex: ^scipy\.io$}
                       - has: {kind: dotted_name, pattern: $F}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $F
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^scipy\.io\.((hb_read))$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^((hb_read))$}
+                              - &id004
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^scipy\.io$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^((hb_read))$}
+                              - *id004
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^scipy\.io$}
             - all:
               - {kind: identifier, pattern: $F_AS}
               - inside:
@@ -543,6 +944,48 @@ rule:
                           all:
                           - has: {field: name, pattern: $F, regex: ^(hb_read)$}
                           - has: {field: alias, pattern: $F_AS}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $F_AS
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^scipy\.io\.((hb_read))$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^((hb_read))$}
+                              - &id005
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^scipy\.io$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^((hb_read))$}
+                              - *id005
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^scipy\.io$}
         - not:
             has:
               field: arguments
@@ -573,7 +1016,7 @@ rule:
                 any:
                 - inside:
                     stopBy:
-                      not: &id001
+                      not: &id006
                         any:
                         - {kind: pattern_list}
                         - {kind: tuple_pattern}
@@ -588,26 +1031,26 @@ rule:
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: augmented_assignment
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: for_statement
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: for_in_clause
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: as_pattern_target
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: delete_statement
                 - inside: {kind: named_expression, field: name}
                 - inside: {kind: parameters}
@@ -637,31 +1080,6 @@ rule:
                     any:
                     - inside: {kind: type_alias_statement, field: left}
                     - inside: {kind: type_parameter}
-                - nthChild: 1
-                  inside:
-                    kind: dotted_name
-                    not: {regex: ^scipy(\.|$)}
-                    inside: {kind: import_statement, field: name}
-                - inside:
-                    kind: aliased_import
-                    field: alias
-                    inside: {kind: import_statement}
-                    not:
-                      has: {field: name, regex: ^scipy(\.|$)}
-                - inside:
-                    kind: aliased_import
-                    field: alias
-                    inside:
-                      kind: import_from_statement
-                      not: &id002
-                        has: {field: module_name, regex: ^scipy(\.|$)}
-                - inside:
-                    kind: dotted_name
-                    regex: ^\w+$
-                    inside:
-                      kind: import_from_statement
-                      field: name
-                      not: *id002
   - nthChild:
       position: 1
       reverse: true
@@ -726,7 +1144,51 @@ rule:
         - has:
             field: function
             any:
-            - {regex: ^scipy\.io\.(mmread)$, pattern: scipy.io.$F}
+            - all:
+              - {regex: ^scipy\.io\.(mmread)$, pattern: scipy.io.$F}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: scipy
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                            not: {regex: ^(scipy)(\.|$)}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^(scipy)$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^(scipy)$}
+                              - &id001
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^(scipy)$}
+                              - *id001
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^$}
             - all:
               - {regex: \.io\.(mmread)$, pattern: $R.io.$F}
               - inside:
@@ -741,6 +1203,49 @@ rule:
                         all:
                         - has: {field: name, regex: ^scipy$}
                         - has: {field: alias, pattern: $R}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $R
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                            not: {regex: ^(scipy)(\.|$)}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^(scipy)$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^(scipy)$}
+                              - &id002
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^(scipy)$}
+                              - *id002
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^$}
             - all:
               - {regex: \.(mmread)$, pattern: $R.$F}
               - inside:
@@ -765,6 +1270,48 @@ rule:
                             all:
                             - has: {field: name, regex: ^io$}
                             - has: {field: alias, pattern: $R}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $R
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^scipy\.(io)$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^(io)$}
+                              - &id003
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^scipy$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^(io)$}
+                              - *id003
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^scipy$}
             - all:
               - {kind: identifier, regex: ^(mmread)$, pattern: $F}
               - inside:
@@ -777,6 +1324,48 @@ rule:
                       all:
                       - has: {field: module_name, regex: ^scipy\.io$}
                       - has: {kind: dotted_name, pattern: $F}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $F
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^scipy\.io\.((mmread))$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^((mmread))$}
+                              - &id004
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^scipy\.io$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^((mmread))$}
+                              - *id004
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^scipy\.io$}
             - all:
               - {kind: identifier, pattern: $F_AS}
               - inside:
@@ -792,6 +1381,48 @@ rule:
                           all:
                           - has: {field: name, pattern: $F, regex: ^(mmread)$}
                           - has: {field: alias, pattern: $F_AS}
+              - not:
+                  inside:
+                    stopBy: end
+                    kind: module
+                    has:
+                      stopBy: end
+                      any:
+                      - kind: identifier
+                        pattern: $F_AS
+                        any:
+                        - nthChild: 1
+                          inside:
+                            kind: dotted_name
+                            inside: {kind: import_statement, field: name}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_statement}
+                            not:
+                              has: {field: name, regex: ^scipy\.io\.((mmread))$}
+                        - inside:
+                            kind: dotted_name
+                            inside: {kind: import_from_statement, field: name}
+                            not:
+                              all:
+                              - {regex: ^((mmread))$}
+                              - &id005
+                                inside:
+                                  kind: import_from_statement
+                                  has: {field: module_name, regex: ^scipy\.io$}
+                        - inside:
+                            kind: aliased_import
+                            field: alias
+                            inside: {kind: import_from_statement}
+                            not:
+                              all:
+                              - has: {field: name, regex: ^((mmread))$}
+                              - *id005
+                      - kind: import_from_statement
+                        has: {kind: wildcard_import}
+                        not:
+                          has: {field: module_name, regex: ^scipy\.io$}
         - not:
             has:
               field: arguments
@@ -822,7 +1453,7 @@ rule:
                 any:
                 - inside:
                     stopBy:
-                      not: &id001
+                      not: &id006
                         any:
                         - {kind: pattern_list}
                         - {kind: tuple_pattern}
@@ -837,26 +1468,26 @@ rule:
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: augmented_assignment
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: for_statement
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: for_in_clause
                     field: left
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: as_pattern_target
                 - inside:
                     stopBy:
-                      not: *id001
+                      not: *id006
                     kind: delete_statement
                 - inside: {kind: named_expression, field: name}
                 - inside: {kind: parameters}
@@ -886,31 +1517,6 @@ rule:
                     any:
                     - inside: {kind: type_alias_statement, field: left}
                     - inside: {kind: type_parameter}
-                - nthChild: 1
-                  inside:
-                    kind: dotted_name
-                    not: {regex: ^scipy(\.|$)}
-                    inside: {kind: import_statement, field: name}
-                - inside:
-                    kind: aliased_import
-                    field: alias
-                    inside: {kind: import_statement}
-                    not:
-                      has: {field: name, regex: ^scipy(\.|$)}
-                - inside:
-                    kind: aliased_import
-                    field: alias
-                    inside:
-                      kind: import_from_statement
-                      not: &id002
-                        has: {field: module_name, regex: ^scipy(\.|$)}
-                - inside:
-                    kind: dotted_name
-                    regex: ^\w+$
-                    inside:
-                      kind: import_from_statement
-                      field: name
-                      not: *id002
   - nthChild:
       position: 1
       reverse: true

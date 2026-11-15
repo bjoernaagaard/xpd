@@ -96,7 +96,51 @@ rule:
     - has:
         field: function
         any:
-        - {regex: ^scipy\.signal\.(sosfreqz)$, pattern: scipy.signal.$F}
+        - all:
+          - {regex: ^scipy\.signal\.(sosfreqz)$, pattern: scipy.signal.$F}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: scipy
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                        not: {regex: ^(scipy)(\.|$)}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^(scipy)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(scipy)$}
+                          - &id001
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(scipy)$}
+                          - *id001
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^$}
         - all:
           - {regex: \.signal\.(sosfreqz)$, pattern: $R.signal.$F}
           - inside:
@@ -111,6 +155,49 @@ rule:
                     all:
                     - has: {field: name, regex: ^scipy$}
                     - has: {field: alias, pattern: $R}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: $R
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                        not: {regex: ^(scipy)(\.|$)}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^(scipy)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(scipy)$}
+                          - &id002
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(scipy)$}
+                          - *id002
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^$}
         - all:
           - {regex: \.(sosfreqz)$, pattern: $R.$F}
           - inside:
@@ -135,6 +222,48 @@ rule:
                         all:
                         - has: {field: name, regex: ^signal$}
                         - has: {field: alias, pattern: $R}
+          - not:
+              inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: identifier
+                    pattern: $R
+                    any:
+                    - nthChild: 1
+                      inside:
+                        kind: dotted_name
+                        inside: {kind: import_statement, field: name}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_statement}
+                        not:
+                          has: {field: name, regex: ^scipy\.(signal)$}
+                    - inside:
+                        kind: dotted_name
+                        inside: {kind: import_from_statement, field: name}
+                        not:
+                          all:
+                          - {regex: ^(signal)$}
+                          - &id003
+                            inside:
+                              kind: import_from_statement
+                              has: {field: module_name, regex: ^scipy$}
+                    - inside:
+                        kind: aliased_import
+                        field: alias
+                        inside: {kind: import_from_statement}
+                        not:
+                          all:
+                          - has: {field: name, regex: ^(signal)$}
+                          - *id003
+                  - kind: import_from_statement
+                    has: {kind: wildcard_import}
+                    not:
+                      has: {field: module_name, regex: ^scipy$}
     - has:
         field: function
         any:
@@ -155,7 +284,7 @@ rule:
             any:
             - inside:
                 stopBy:
-                  not: &id001
+                  not: &id004
                     any:
                     - {kind: pattern_list}
                     - {kind: tuple_pattern}
@@ -170,26 +299,26 @@ rule:
                 field: left
             - inside:
                 stopBy:
-                  not: *id001
+                  not: *id004
                 kind: augmented_assignment
                 field: left
             - inside:
                 stopBy:
-                  not: *id001
+                  not: *id004
                 kind: for_statement
                 field: left
             - inside:
                 stopBy:
-                  not: *id001
+                  not: *id004
                 kind: for_in_clause
                 field: left
             - inside:
                 stopBy:
-                  not: *id001
+                  not: *id004
                 kind: as_pattern_target
             - inside:
                 stopBy:
-                  not: *id001
+                  not: *id004
                 kind: delete_statement
             - inside: {kind: named_expression, field: name}
             - inside: {kind: parameters}
@@ -219,31 +348,6 @@ rule:
                 any:
                 - inside: {kind: type_alias_statement, field: left}
                 - inside: {kind: type_parameter}
-            - nthChild: 1
-              inside:
-                kind: dotted_name
-                not: {regex: ^scipy(\.|$)}
-                inside: {kind: import_statement, field: name}
-            - inside:
-                kind: aliased_import
-                field: alias
-                inside: {kind: import_statement}
-                not:
-                  has: {field: name, regex: ^scipy(\.|$)}
-            - inside:
-                kind: aliased_import
-                field: alias
-                inside:
-                  kind: import_from_statement
-                  not: &id002
-                    has: {field: module_name, regex: ^scipy(\.|$)}
-            - inside:
-                kind: dotted_name
-                regex: ^\w+$
-                inside:
-                  kind: import_from_statement
-                  field: name
-                  not: *id002
 constraints:
   F: {regex: ^sosfreqz$}
 transform:
