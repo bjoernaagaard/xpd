@@ -3336,7 +3336,7 @@ res = minimize(f, x0, method="L-BFGS-B", jac=grad, bounds=[(0, 1)] * n)
 
 **Severity:** info. **Fix:** none. The same integer gives a different stream under `rng=` than under `random_state=` or `seed=`.
 
-Reports `random_state=` and `seed=` passed by keyword to the functions and classes that SciPy 1.15 moved to `rng=`, such as sparse.random, svds, bootstrap, permutation_test, kmeans2, differential_evolution, basinhopping, dual_annealing, directed_hausdorff, Rotation.random and the qmc engines. SciPy's docs say new code should pass `rng`. The old keywords run without a warning on SciPy 1.18.1. Skipped on SciPy older than 1.15.
+Reports `random_state=` and `seed=` passed by keyword to the functions and classes that SciPy 1.15 moved to `rng=`, such as sparse.random, svds, bootstrap, permutation_test, kmeans2, differential_evolution, basinhopping, dual_annealing, directed_hausdorff, Rotation.random and the qmc engines. SciPy's docs say new code should pass `rng`. The old keywords run without a warning on SciPy 1.18.1. A call under a SciPy version check is left alone, because it is kept for an older SciPy, where `rng=` raises. Skipped on SciPy older than 1.15.
 
 Example:
 
@@ -3374,7 +3374,7 @@ xopt = optimize.minimize(f, x0, jac=grad, method="BFGS").x
 
 **Severity:** info. **Fix:** none, because solve_ivp calls `fun(t, y)` where odeint calls `func(y, t)`, and returns an object.
 
-Reports `integrate.odeint`, which SciPy's docs ask new code to replace with `solve_ivp`. Neither solver was faster on every problem measured, so the message makes no speed claim. It says to keep solve_ivp's default method for a large system, because `method='LSODA'` stores a full Jacobian and raised MemoryError at 1,000,000 equations.
+Reports `integrate.odeint`, which SciPy's docs ask new code to replace with `solve_ivp`. Neither solver was faster on every problem measured, so the message makes no speed claim. It says that solve_ivp raises ValueError when `t_eval` repeats a time, which odeint accepts, and that the values differ in the last digits. It says to keep solve_ivp's default method for a large system, because `method='LSODA'` stores a full Jacobian and raised MemoryError at 1,000,000 equations.
 
 Example:
 
@@ -3392,7 +3392,7 @@ ys = solve_ivp(lambda t, y: -k * y, (t[0], t[-1]), y0, t_eval=t).y.T
 
 **Severity:** info. **Fix:** none, because each replacement takes other arguments and returns a BSpline or another object.
 
-Reports the interpolation classes and functions that SciPy marks as legacy: interp1d, Rbf, UnivariateSpline, InterpolatedUnivariateSpline, LSQUnivariateSpline, splrep, splprep, splev, splint, sproot, spalde, splder and splantider. The message names the replacement SciPy recommends, such as make_splrep for splrep and RBFInterpolator for Rbf. Documents that name an API added in SciPy 1.7 or 1.15 are skipped on an older SciPy.
+Reports the interpolation classes and functions that SciPy marks as legacy: interp1d, Rbf, UnivariateSpline, InterpolatedUnivariateSpline, LSQUnivariateSpline, splrep, splprep, splev, splint, sproot, spalde, splder and splantider. The message names the replacement SciPy recommends, such as make_splrep for splrep and RBFInterpolator for Rbf. For interp1d it names `make_interp_spline(x, y, k=1)`, with `axis=-1` when `y` has more than one dimension, and says that outside the data interp1d raises where make_interp_spline extrapolates and `numpy.interp` repeats the end value. For splev it says to pass `nu=n` where splev took `der=n`. Documents that name an API added in SciPy 1.7 or 1.15 are skipped on an older SciPy.
 
 Example:
 

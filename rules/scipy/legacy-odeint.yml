@@ -6,8 +6,9 @@ id: legacy-odeint
 language: python
 severity: info
 message: SciPy's docs say new code should use solve_ivp instead of odeint. Write solve_ivp(fun, (t0, t1), y0, t_eval=t)
-  with fun taking t before y, and keep its default method for a large system, because method='LSODA' stores a full
-  Jacobian and ran out of memory at 1,000,000 equations.
+  with fun taking t before y. solve_ivp raises ValueError when t_eval repeats a time, which odeint accepts, and
+  its values differ from odeint's in the last digits. Keep its default method for a large system, because method='LSODA'
+  stores a full Jacobian and ran out of memory at 1,000,000 equations.
 rule:
   kind: call
   all:

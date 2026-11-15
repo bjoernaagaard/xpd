@@ -223,13 +223,15 @@ def minimize_known_options():
     )
 
 
-def rng_keywords(x, f, bounds):
+def rng_keywords(x, f, bounds, sp_version=(1, 14)):
     sparse.random(5, 5, density=0.5, random_state=0)  # xpd: rng-keyword, sparse-matrix-api
     sparse_random(5, 5, 0.5, random_state=0)  # xpd: rng-keyword
     kmeans2(x, 3, seed=1)  # xpd: rng-keyword
     optimize.differential_evolution(f, bounds, seed=2)  # xpd: rng-keyword
     qmc.Sobol(2, seed=3)  # xpd: rng-keyword
     stats.bootstrap((x,), np.mean, random_state=4)  # xpd: rng-keyword
+    if sp_version < (1, 15):
+        stats.bootstrap((x,), np.mean, random_state=4)
 
 
 @case
