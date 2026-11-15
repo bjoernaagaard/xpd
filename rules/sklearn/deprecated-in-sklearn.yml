@@ -325,22 +325,23 @@ constraints:
 metadata: { since: "1.8" }
 ---
 # category_encoders has a TargetEncoder too, so the document needs the class imported from
-# sklearn in the same file.
+# sklearn in the same file. That import test reads the whole file, so the class name is tested
+# first in all, which keeps its order. ast-grep checks constraints only after the whole rule.
 id: deprecated-in-sklearn
 language: python
 severity: warning
 message: TargetEncoder(shuffle=, random_state=) is deprecated since 1.9 and will be removed in 1.11. Pass a splitter as cv, such as cv=KFold(5, shuffle=True, random_state=0).
 rule:
   pattern: $C($$$ARGS)
-  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(shuffle|random_state)$ } } }
-  any:
-    - regex: '^sklearn\.'
-    - inside:
-        kind: module
-        stopBy: end
-        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
-constraints:
-  C: { regex: '(^|\.)TargetEncoder$' }
+  all:
+    - has: { field: function, regex: '(^|\.)TargetEncoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(shuffle|random_state)$ } } }
+    - any:
+        - regex: '^sklearn\.'
+        - inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 metadata: { since: "1.9" }
 ---
 id: deprecated-in-sklearn
@@ -393,25 +394,26 @@ constraints:
 metadata: { since: "1.8" }
 ---
 # The hdbscan package has an HDBSCAN class too, so the document needs the class imported from
-# sklearn in the same file.
+# sklearn in the same file. That import test reads the whole file, so the class name is tested
+# first in all, which keeps its order.
 id: deprecated-in-sklearn
 language: python
 severity: warning
 message: HDBSCAN without copy warns, because the default changes from False to True in 1.10. Pass copy=False to keep the current behavior, or copy=True to keep X unchanged.
 rule:
   pattern: $C($$$ARGS)
-  not:
-    has:
-      field: arguments
-      has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^copy$ } }] }
-  any:
-    - regex: '^sklearn\.'
-    - inside:
-        kind: module
-        stopBy: end
-        has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
-constraints:
-  C: { regex: '(^|\.)HDBSCAN$' }
+  all:
+    - has: { field: function, regex: '(^|\.)HDBSCAN$' }
+    - not:
+        has:
+          field: arguments
+          has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^copy$ } }] }
+    - any:
+        - regex: '^sklearn\.'
+        - inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^sklearn(\.|$)' } }, { has: { kind: dotted_name, pattern: $C } }] }
 ---
 id: deprecated-in-sklearn
 language: python
