@@ -204,3 +204,38 @@ def the_faster_relatives():
     calibrated = SVC(kernel="linear", probability=True, random_state=0).fit(X, y)
     embedding = TSNE(perplexity=10, random_state=0).fit_transform(X[:60])
     return boosted, linear, kernel, calibrated, embedding
+
+
+@case
+def refit_per_n_estimators():
+    X, y = table()
+    scores = []
+    for n in [5, 10, 20]:
+        forest = RandomForestClassifier(n_estimators=n, random_state=0)  # xpd: refit-per-n-estimators
+        forest.fit(X[:150], y[:150])
+        scores.append(forest.score(X[150:], y[150:]))
+    boosted = []
+    for n in [5, 10, 20]:
+        model = GradientBoostingClassifier(n_estimators=n, random_state=0).fit(X, y)  # xpd: refit-per-n-estimators, slow-gradient-boosting
+        boosted.append(model.predict_proba(X[:10]))
+    return scores, boosted
+
+
+@case
+def grow_one_forest():
+    X, y = table()
+    forest = RandomForestClassifier(warm_start=True, random_state=0)
+    scores = []
+    for n in [5, 10, 20]:
+        forest.set_params(n_estimators=n)
+        forest.fit(X[:150], y[:150])
+        scores.append(forest.score(X[150:], y[150:]))
+    cross_validated = []
+    for n in [5, 10]:
+        candidate = RandomForestClassifier(n_estimators=n, random_state=0)
+        cross_validated.append(cross_val_score(candidate, X, y, cv=3))
+    deeper = []
+    for depth in [2, 4]:
+        tree_model = RandomForestClassifier(n_estimators=10, max_depth=depth, random_state=0).fit(X, y)
+        deeper.append(tree_model.predict_proba(X[:10]))
+    return scores, cross_validated, deeper
