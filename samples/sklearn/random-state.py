@@ -4,6 +4,8 @@ A line that xpd reports ends with a comment that names the rule. Each case retur
 code computes. A form that raises on scikit-learn 1.9.1 sits in a function that is not a case.
 """
 
+import random
+
 import numpy as np
 import pandas as pd
 from sklearn import cluster
@@ -22,6 +24,10 @@ def case(fn):
     return fn
 
 
+def set_seed(seed):
+    random.seed(seed)
+
+
 def frame(n=300, seed=0):
     r = np.random.default_rng(seed)
     city = r.choice(["berlin", "paris", "rome", "oslo"], n, p=[0.4, 0.3, 0.25, 0.05])
@@ -33,10 +39,13 @@ def frame(n=300, seed=0):
 
 @case
 def missing_random_state(df):
+    set_seed(0)
     X = df[["x1", "x2"]]
     y = df["y"]
+    train_test_split(X, y, test_size=0.2)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)  # xpd: missing-random-state
     model = RandomForestClassifier(n_estimators=10).fit(X_train, y_train)  # xpd: missing-random-state
+    assert isinstance(RandomForestClassifier(n_estimators=10), RandomForestClassifier)
     groups = cluster.KMeans(n_clusters=3).fit_predict(X)  # xpd: missing-random-state
     folds = KFold(n_splits=5, shuffle=True)  # xpd: missing-random-state
     splits = ShuffleSplit(5)  # xpd: missing-random-state
