@@ -53,3 +53,20 @@ rule:
 constraints:
   V: { kind: identifier }
   K: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut)$' }
+---
+id: groups-ignored
+language: python
+severity: error
+message: $V is a $K, which ignores groups=, so rows of one group are in the training and the test folds, and on data with no signal this scored 0.85 where GroupKFold scored 0.48. Pass cv=GroupKFold().
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^groups$' } } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: $V } }] } }
+    - inside:
+        stopBy: end
+        follows: { stopBy: end, has: { pattern: '$V = $K($$$KA)' } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+  V: { kind: identifier }
+  K: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut|PredefinedSplit)$' }

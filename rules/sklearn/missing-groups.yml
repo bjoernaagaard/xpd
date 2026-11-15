@@ -62,3 +62,21 @@ constraints:
   S: { kind: identifier }
   G: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|RFECV)$' }
   K: { regex: '(^|\.)(GroupKFold|StratifiedGroupKFold|GroupShuffleSplit|LeaveOneGroupOut|LeavePGroupsOut)$' }
+---
+id: missing-groups
+language: python
+severity: error
+message: $V is a $K, which splits by group, and $F gets no groups=, so it raises a ValueError. Pass groups= with the group of each row.
+rule:
+  pattern: $F($$$A)
+  not:
+    has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(groups|params)$' } }, { kind: dictionary_splat }] } }
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: $V } }] } }
+    - inside:
+        stopBy: end
+        follows: { stopBy: end, has: { pattern: '$V = $K($$$KA)' } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+  V: { kind: identifier }
+  K: { regex: '(^|\.)(GroupKFold|StratifiedGroupKFold|GroupShuffleSplit|LeaveOneGroupOut|LeavePGroupsOut)$' }

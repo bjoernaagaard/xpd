@@ -61,7 +61,9 @@ def groups_ignored():
     direct = [test for _, test in StratifiedKFold(3).split(X, y, patient)]  # xpd: groups-ignored
     by_patient = GroupKFold(5)
     grouped = [test for _, test in by_patient.split(X, y, patient)]
-    return model, a, b, c, d, shuffled, direct, grouped
+    kept = cross_val_score(model, X, y, groups=patient, cv=folds)  # xpd: groups-ignored
+    by_group = cross_val_score(model, X, y, groups=patient, cv=by_patient)
+    return model, a, b, c, d, shuffled, direct, grouped, kept, by_group
 
 
 def missing_groups():
@@ -73,7 +75,8 @@ def missing_groups():
     more = list(by_patient.split(X, y))  # xpd: missing-groups
     search = GridSearchCV(model, {"C": [0.1, 1.0]}, cv=GroupKFold(5))
     search.fit(X, y)  # xpd: missing-groups
-    return scores, folds, more, search
+    kept = cross_val_score(model, X, y, cv=by_patient)  # xpd: missing-groups
+    return scores, folds, more, search, kept
 
 
 @case
@@ -88,7 +91,10 @@ def with_groups():
     search.fit(X, y, groups=patient)
     plain = GridSearchCV(model, {"C": [0.1, 1.0]}, cv=5)
     plain.fit(X, y)
-    return scores, folds, more, search.best_estimator_, plain.best_estimator_
+    kept = cross_val_score(model, X, y, groups=patient, cv=by_patient)
+    folds_by_row = KFold(5, shuffle=True, random_state=0)
+    by_row = cross_val_score(model, X, y, cv=folds_by_row)
+    return scores, folds, more, search.best_estimator_, plain.best_estimator_, kept, by_row
 
 
 @case

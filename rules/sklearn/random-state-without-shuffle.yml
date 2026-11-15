@@ -1,0 +1,24 @@
+# A k-fold splitter uses random_state only to shuffle, and without shuffle=True it raises "Setting
+# a random_state has no effect since shuffle is False". GroupKFold takes shuffle from 1.6 on.
+id: random-state-without-shuffle
+language: python
+severity: error
+message: $K uses random_state only when it shuffles, so without shuffle=True it raises a ValueError. Pass shuffle=True, or drop random_state.
+rule:
+  pattern: $K($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
+  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { has: { field: value, kind: 'false' } } }] }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+constraints:
+  K: { regex: '(^|\.)(KFold|StratifiedKFold|StratifiedGroupKFold)$' }
+---
+id: random-state-without-shuffle
+language: python
+severity: error
+message: GroupKFold uses random_state only when it shuffles, so without shuffle=True it raises a ValueError. Pass shuffle=True, or drop random_state.
+rule:
+  pattern: $K($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
+  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { has: { field: value, kind: 'false' } } }] }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+constraints:
+  K: { regex: '(^|\.)GroupKFold$' }
+metadata: { since: "1.6" }
