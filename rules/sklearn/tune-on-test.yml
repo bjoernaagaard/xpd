@@ -30,10 +30,27 @@ rule:
               any:
                 - { kind: call, has: { field: arguments, has: { kind: keyword_argument, has: { field: value, pattern: $V }, not: { has: { field: name, regex: '(?i)method|alg|model|name|random_state|seed' } } } } }
                 - has: { field: function, has: { field: object, kind: call, has: { field: arguments, has: { kind: keyword_argument, has: { field: value, pattern: $V }, not: { has: { field: name, regex: '(?i)method|alg|model|name|random_state|seed' } } } } } }
-    # The loop picks: it compares a score with >, or a later max or argmax reads the list the
-    # loop appends to. A loop that only draws a curve per setting is left alone.
+    # The loop picks: it compares a score with > against the best so far, or in a branch that
+    # records or prints the setting, or a later max or argmax reads the list the loop appends to.
+    # The best so far is a name with best or max in it, read by the comparison or assigned in its
+    # branch. A loop that only draws a curve per setting, or prints whether the train score is
+    # far above the test score, is left alone.
     - any:
-        - has: { field: body, stopBy: end, kind: comparison_operator, regex: '>' }
+        - has:
+            field: body
+            stopBy: end
+            kind: comparison_operator
+            regex: '>'
+            any:
+              - has: { stopBy: end, kind: identifier, regex: '(?i)best|max' }
+              - inside:
+                  stopBy: end
+                  any: [{ kind: if_statement }, { kind: elif_clause }]
+                  has:
+                    field: consequence
+                    any:
+                      - has: { stopBy: end, kind: assignment, has: { field: left, regex: '(?i)best|max' } }
+                      - has: { stopBy: end, kind: identifier, pattern: $V }
         - all:
             - precedes:
                 stopBy: end

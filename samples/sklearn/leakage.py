@@ -295,8 +295,21 @@ def tune_on_test():
     for k in (3, 9):
         model = KNeighborsClassifier(n_neighbors=k).fit(X_train, y_train)
         print(k, model.score(X_test, y_test))
+    best_score, best_k = 0.0, None
+    for k in range(1, 10):  # xpd: tune-on-test
+        model = KNeighborsClassifier(n_neighbors=k).fit(X_train, y_train)
+        score = model.score(X_test, y_test)
+        if score > best_score:
+            best_score, best_k = score, k
+    for k in (3, 9):
+        model = KNeighborsClassifier(n_neighbors=k).fit(X_train, y_train)
+        gap = model.score(X_train, y_train) - model.score(X_test, y_test)
+        verdict = "fits"
+        if gap > 0.05:
+            verdict = "overfits"
+        print(k, verdict)
     search = GridSearchCV(KNeighborsClassifier(), {"n_neighbors": list(range(1, 10))}, cv=3).fit(X_train, y_train)
-    return max(scores), search.score(X_test, y_test)
+    return max(scores), best_k, search.score(X_test, y_test)
 
 
 @case
