@@ -2,8 +2,10 @@
 id: legacy-interpolate
 language: python
 severity: info
-message: SciPy marks interpolate.interp1d as legacy. Write numpy.interp for linear interpolation of 1-D data or
-  make_interp_spline for a spline.
+message: SciPy marks interpolate.interp1d as legacy. For linear interpolation write make_interp_spline(x, y, k=1),
+  with axis=-1 when y has more than one dimension, because interp1d works along the last axis and make_interp_spline
+  along the first. numpy.interp does the same for 1-D y only. Outside the data interp1d raises by default, where
+  make_interp_spline extrapolates and numpy.interp repeats the end value.
 rule:
   kind: call
   all:
@@ -568,7 +570,8 @@ metadata: {since: '1.15'}
 id: legacy-interpolate
 language: python
 severity: info
-message: SciPy marks interpolate.splev as legacy. Build a BSpline and call it.
+message: SciPy marks interpolate.splev as legacy. Build a BSpline and call it, with nu=n in the call where splev
+  took der=n.
 rule:
   kind: call
   all:

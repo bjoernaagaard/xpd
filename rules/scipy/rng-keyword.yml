@@ -1,7 +1,8 @@
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -84,6 +85,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^((random|rand|random_array))$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^(random|rand|random_array)$}
 metadata: {since: '1.15'}
@@ -91,7 +99,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -198,6 +207,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^(svds)$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^svds$}
 metadata: {since: '1.15'}
@@ -205,7 +221,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -292,6 +309,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^((goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod))$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^(goodness_of_fit|sobol_indices|dunnett|bootstrap|permutation_test|PermutationMethod|BootstrapMethod)$}
 metadata: {since: '1.15'}
@@ -299,7 +323,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -382,6 +407,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^(BarycentricInterpolator)$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^BarycentricInterpolator$}
 metadata: {since: '1.15'}
@@ -389,7 +421,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -520,6 +553,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^(random)$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^random$}
 metadata: {since: '1.15'}
@@ -527,7 +567,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -634,6 +675,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^((kmeans|kmeans2))$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^(kmeans|kmeans2)$}
 metadata: {since: '1.15'}
@@ -641,7 +689,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -724,6 +773,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^(clarkson_woodruff_transform)$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^clarkson_woodruff_transform$}
 metadata: {since: '1.15'}
@@ -731,7 +787,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -814,6 +871,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^((basinhopping|dual_annealing|check_grad|differential_evolution))$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^(basinhopping|dual_annealing|check_grad|differential_evolution)$}
 metadata: {since: '1.15'}
@@ -821,7 +885,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -928,6 +993,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^(directed_hausdorff)$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^directed_hausdorff$}
 metadata: {since: '1.15'}
@@ -935,7 +1007,8 @@ metadata: {since: '1.15'}
 # SciPy says only the rng keyword should be used in new code, scipy/_lib/_util.py line 136,
 # scipy/spatial/distance.py line 344 and scipy/stats/_resampling.py line 2293. The other functions
 # say in a versionchanged note that the keyword changed to rng. An integer gives a different
-# stream under rng, in runs/rng_stream.txt, so there is no fix.
+# stream under rng, in runs/rng_stream.txt, so there is no fix. A call under a SciPy version check is
+# left alone, because it is kept for a SciPy older than 1.15, where rng= raises TypeError.
 id: rng-keyword
 language: python
 severity: info
@@ -1046,6 +1119,13 @@ rule:
                         all:
                         - has: {field: name, pattern: $F, regex: ^((Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC))$}
                         - has: {field: alias, pattern: $F_AS}
+      - not:
+          any:
+          - inside:
+              kind: if_statement
+              stopBy: end
+              has: {field: condition, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
+          - inside: {kind: conditional_expression, stopBy: end, regex: __version__|SCIPY_|scipy_version|sp_version|sp_base_version|SP_VERSION|SCIPY_VERSION|parse_version|NumpyVersion}
 constraints:
   F: {regex: ^(Halton|LatinHypercube|Sobol|PoissonDisk|MultivariateNormalQMC|MultinomialQMC)$}
 metadata: {since: '1.15'}
