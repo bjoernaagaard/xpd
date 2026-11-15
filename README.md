@@ -93,7 +93,7 @@ one at a time.
 
 | Way | What the agent gets | Setup |
 | --- | --- | --- |
-| Plugin | The hook, the MCP server and the skills together | Load this repository in a client that supports Agent Plugins |
+| Plugin | The MCP server and the skills together | Load this repository in a client that supports Agent Plugins, such as Codex |
 | Hook | The issues of each file, right after the edit | `xpd hook` in the Claude Code settings |
 | MCP server | Typed tools, the rules, the skills and prompts | `xpd mcp` |
 | Skills | When to run each command, and Python style that a linter cannot check | `npx skills add bjoernaagaard/xpd` |
@@ -101,15 +101,24 @@ one at a time.
 ### Plugin
 
 This repository is a plugin in the [Agent Plugins](https://github.com/agentplugins/agent-plugins-spec)
-format, version 1.1.0. A client that supports the format loads the folder and gets everything
-below. The plugin starts xpd with `uvx`, so the machine needs [uv](https://docs.astral.sh/uv/).
+format, version 1.0.0. A client that supports the format loads the folder and gets the MCP
+server and the skills. The plugin starts xpd with `uvx`, so the machine needs
+[uv](https://docs.astral.sh/uv/). Version 1.0.0 has no hooks, so the hook below stays a setting
+of its own.
 
 ```text
 xpd, loaded as a plugin
-├── plugin.json    the name and version of the plugin
-├── skills/        xpd, python-best-practices and python-review
-├── mcp.json       starts the MCP server of this version with uvx
-└── hooks.json     runs the hook of this version with uvx after each tool call
+├── plugin.json                         the name and version of the plugin
+├── skills/                             xpd, python-best-practices and python-review
+├── mcp.json                            starts the MCP server of this version with uvx
+└── .agents/plugins/marketplace.json    lists the plugin for Codex
+```
+
+Codex installs it with two commands.
+
+```sh
+codex plugin marketplace add bjoernaagaard/xpd
+codex plugin add xpd@xpd
 ```
 
 ### Hook

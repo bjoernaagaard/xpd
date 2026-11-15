@@ -1,7 +1,7 @@
 [package]
 # The package and the command share one name, so that `uvx xpd` runs it.
 name = "xpd"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2024"
 rust-version = "1.99"
 description = "Fast, opinionated linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn, for humans and coding agents"
@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["pandas", "python", "linter", "ast-grep", "agents"]
 categories = ["command-line-utilities", "development-tools"]
 # Only what the build needs; samples/ and the dev tool configs stay out of the package.
-include = ["/src", "/rules", "/py", "/build.rs", "/docs/rules.md", "/skills", "/plugin.json", "/mcp.json", "/hooks.json", "/LICENSE-*", "/README.md", "/pyproject.toml"]
+include = ["/src", "/rules", "/py", "/build.rs", "/docs/rules.md", "/skills", "/plugin.json", "/mcp.json", "/LICENSE-*", "/README.md", "/pyproject.toml"]
 
 [[bin]]
 name = "xpd"

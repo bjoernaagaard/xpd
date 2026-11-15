@@ -30,30 +30,38 @@ Add the hook below to `.claude/settings.json` in your project.
 ## Agent plugin
 
 The xpd repository is a plugin in the
-[Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, version 1.1.0. A
-client that supports the format loads the folder and gets the hook, the MCP server and the
-skills, with no settings to write. The plugin starts xpd with `uvx`, so the machine needs
+[Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, version 1.0.0. A
+client that supports the format loads the folder and gets the MCP server and the skills, with
+no settings to write. The plugin starts xpd with `uvx`, so the machine needs
 [uv](https://docs.astral.sh/uv/).
 
 ```text
 xpd, loaded as a plugin
-├── plugin.json    the name and version of the plugin
-├── skills/        xpd, python-best-practices and python-review
-├── mcp.json       starts the MCP server of this version with uvx
-└── hooks.json     runs the hook of this version with uvx after each tool call
+├── plugin.json                         the name and version of the plugin
+├── skills/                             xpd, python-best-practices and python-review
+├── mcp.json                            starts the MCP server of this version with uvx
+└── .agents/plugins/marketplace.json    lists the plugin for Codex
 ```
 
-The same `xpd hook` answers both kinds of client. It tells them apart by the name of the field
-that holds the result of the tool call.
+Codex installs it with two commands.
+
+```sh
+codex plugin marketplace add bjoernaagaard/xpd
+codex plugin add xpd@xpd
+```
+
+Version 1.0.0 of the format has no hooks, so the plugin ships none. Version 1.1.0, a draft,
+adds them, and `xpd hook` already answers a client of that version. It tells the two kinds of
+client apart by the name of the field that holds the result of the tool call.
 
 | Client | Field in the event | Files that xpd lints | How the agent gets the issues |
 | --- | --- | --- | --- |
-| Agent Plugins | `tool_result` | Each `edit`, `write` and `move` in the `file.modify` profile | `additional_context` in JSON on stdout, with exit code 0 |
+| Agent Plugins 1.1.0 | `tool_result` | Each `edit`, `write` and `move` in the `file.modify` profile | `additional_context` in JSON on stdout, with exit code 0 |
 | Claude Code settings | `tool_response` | `tool_input.file_path` | stderr, with exit code 2 |
 
-A plugin's hook runs after every tool call, and it prints nothing for a call that changed no
-Python file. The hook starts in the plugin's folder, so xpd moves to the `cwd` of the event
-before it lints, which is where it finds the project's venv.
+A hook of that format runs after every tool call, and xpd prints nothing for a call that
+changed no Python file. Such a hook starts in the plugin's folder, so xpd moves to the `cwd` of
+the event before it lints, which is where it finds the project's venv.
 
 ## Agent skill
 

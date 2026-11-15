@@ -21,8 +21,8 @@ const MANIFEST: &str = "pack.yml";
 const RULES_PAGE: &str = "docs/rules.md";
 /// The manifest of the agent plugin that this repository is.
 const PLUGIN: &str = "plugin.json";
-/// The plugin's files that start xpd with `uvx xpd@VERSION`.
-const PLUGIN_COMMANDS: [&str; 2] = ["mcp.json", "hooks.json"];
+/// The plugin's file that starts xpd with `uvx xpd@VERSION`.
+const PLUGIN_MCP: &str = "mcp.json";
 /// The `## ` headings of the rules page that hold a pack's sections, each with the pack's
 /// module. A heading names the library as its project writes it, which is not always the name
 /// it is imported by.
@@ -44,11 +44,10 @@ fn plugin_version() -> Result<()> {
         bail!("{PLUGIN} must have \"version\": \"{version}\", as Cargo.toml does");
     }
     // An unpinned uvx would run whatever older xpd its cache holds.
-    for file in PLUGIN_COMMANDS {
-        let commands = fs::read_to_string(file).with_context(|| format!("cannot read {file}"))?;
-        if !commands.contains(&format!("\"xpd@{version}\"")) {
-            bail!("{file} must start \"xpd@{version}\", as Cargo.toml does");
-        }
+    let servers =
+        fs::read_to_string(PLUGIN_MCP).with_context(|| format!("cannot read {PLUGIN_MCP}"))?;
+    if !servers.contains(&format!("\"xpd@{version}\"")) {
+        bail!("{PLUGIN_MCP} must start \"xpd@{version}\", as Cargo.toml does");
     }
     Ok(())
 }
@@ -62,9 +61,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed={RULES_PAGE}");
     println!("cargo:rerun-if-changed=skills");
     println!("cargo:rerun-if-changed={PLUGIN}");
-    for file in PLUGIN_COMMANDS {
-        println!("cargo:rerun-if-changed={file}");
-    }
+    println!("cargo:rerun-if-changed={PLUGIN_MCP}");
     plugin_version()?;
     let page =
         fs::read_to_string(RULES_PAGE).with_context(|| format!("cannot read {RULES_PAGE}"))?;

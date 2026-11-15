@@ -80,7 +80,8 @@ enum Cmd {
     ///
     /// A file with a pipeline of steps also gets the errors and warnings of `xpd graph`.
     ///
-    /// As a hook of an agent plugin, it prints the issues as `additional_context` and exits 0.
+    /// For a client of the Agent Plugins 1.1.0 draft, it prints the issues as
+    /// `additional_context` and exits 0.
     /// As a hook in the Claude Code settings, it prints them on stderr and exits 2. It exits 1
     /// if xpd can't run.
     Hook,
