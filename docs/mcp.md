@@ -5,24 +5,57 @@ through tools instead of a shell. It gets every rule and every result from the x
 it always matches the installed version. The server is built on
 [FastMCP](https://gofastmcp.com) and needs the `mcp` extra.
 
-It gives an agent:
+```text
+xpd mcp
+├── tools        lint, fix, read the dataflow, profile data, compare two scripts, read the rules
+├── resources    every rule with its section of the Rules page, and the three agent skills
+├── prompts      the workflows of the xpd skill
+└── apps         tables and a dataflow chart, in hosts that render MCP Apps
+```
 
-- tools that lint, fix, read the dataflow, profile data and compare two scripts, each with a
-  typed result,
-- the rules, each with its section of [Rules](rules.md), as tools and resources,
-- the three agent skills that ship with xpd,
-- prompts for the workflows of the xpd skill,
-- tables and a dataflow chart in hosts that render MCP Apps.
+## How a call runs
+
+The server holds no rules and no results of its own. It loads the rules and the skills from the
+xpd binary when it starts. A tool that reads project files first checks its paths, and then runs
+the binary in the project root. The data tools return the JSON that the binary prints as a typed
+result, and the `show_` tools also return a table or a chart.
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant Server as xpd mcp
+    participant Binary as xpd binary
+    Agent->>Server: check(paths=["samples/bad.py"])
+    Server->>Server: check that the path is inside the project root
+    Server->>Binary: xpd check --format json -- samples/bad.py
+    Binary-->>Server: {"fixed": 0, "fixable": 0, "issues": [...]}
+    Server-->>Agent: the same JSON, as a typed result
+```
+
+The result of the check includes the following issue.
+
+```json
+{
+  "package": "pandas",
+  "rule": "merge-without-validate",
+  "file": "samples/bad.py",
+  "line": 8,
+  "column": 5,
+  "severity": "warning",
+  "message": "merge without validate= can silently duplicate rows.",
+  "fix": null
+}
+```
 
 ## Install
 
-For Claude Code:
+Run the following command to add the server to Claude Code.
 
 ```sh
 claude mcp add xpd -- uvx --from 'xpd[mcp]' xpd mcp
 ```
 
-For another client, add the server to its `mcpServers` setting:
+For another client, add the server to the `mcpServers` setting of the client.
 
 ```json
 {
@@ -35,29 +68,57 @@ For another client, add the server to its `mcpServers` setting:
 }
 ```
 
-The client starts the server in the project folder, which becomes the project root. With xpd
+The server uses its working directory as the project root, unless `--root` or `XPD_MCP_ROOT`
+names another folder. Set the root when your client starts servers in another folder. With xpd
 installed without the extra, `xpd mcp` prints the `uvx` command above and exits 2.
 
 ## Tools
 
 Every path is relative to the project root, and a path outside it is refused.
 
-| Tool | What it does | Changes files |
-| --- | --- | --- |
-| `check` | Lints files and folders, as [`xpd check`](commands.md#check). `unsafe_fixes` counts unsafe fixes in `fixable` too | No |
-| `fix` | Writes the safe fixes, then lints what is left. With `unsafe`, it asks the user to confirm before it writes unsafe fixes too | Yes |
-| `graph` | Reads the dataflow of step code and Hamilton modules, as [`xpd graph`](commands.md#graph) | No |
-| `profile` | Profiles a data file, as [`xpd profile`](commands.md#profile). Needs pandas in the project's Python | No |
-| `equiv` | Runs two scripts and compares their `result`, as [`xpd equiv`](commands.md#equiv). Needs pandas in the project's Python | Whatever the scripts do |
-| `rules` | Lists the rules, filtered by `package`, `severity`, `fixable` and a text `query` | No |
-| `rule` | Shows one rule with its documentation and examples | No |
-| `show_issues` | Shows what `check` finds as a table | No |
-| `show_dataflow` | Shows what `graph` reads as a chart and a table | No |
-| `show_columns` | Shows what `profile` reads as a table | No |
+| Tool | Arguments | What it does | Changes files |
+| --- | --- | --- | --- |
+| `check` | `paths` (default: the root), `unsafe_fixes` (default: `false`) | Lints files and folders, as [`xpd check`](commands.md#check). `unsafe_fixes` counts unsafe fixes in `fixable` too | No |
+| `fix` | `paths` (default: the root), `unsafe` (default: `false`) | Writes the safe fixes, then lints what is left. With `unsafe`, it writes unsafe fixes too, after the user confirms | Yes |
+| `graph` | `paths` | Reads the dataflow of step code and Hamilton modules, as [`xpd graph`](commands.md#graph) | No |
+| `profile` | `file` | Profiles a data file, as [`xpd profile`](commands.md#profile) | No |
+| `equiv` | `old`, `new` | Runs two scripts and compares their `result`, as [`xpd equiv`](commands.md#equiv) | Whatever the scripts do |
+| `rules` | `package`, `severity`, `fixable`, `query`, all optional | Lists the rules that match every filter given. `package` is a module name, such as `numpy` or `sklearn` | No |
+| `rule` | `package`, `rule` | Shows one rule with its documentation and examples | No |
+| `show_issues` | `paths` (default: the root) | Shows what `check` finds as a table | No |
+| `show_dataflow` | `paths` | Shows what `graph` reads as a chart and a table | No |
+| `show_columns` | `file` | Shows what `profile` reads as a table | No |
 
-The first seven return structured results with an output schema. The `show_` tools return a UI
+`profile` and `equiv` run the project's Python, which is the Python of `VIRTUAL_ENV`, then of the
+nearest `.venv` above the project root, then `python3` on `PATH`. Install pandas there. Both
+scripts that `equiv` runs must assign their output to `result`.
+
+The tools from `check` to `rule` return structured results with an output schema. The `show_` tools return a UI
 for hosts that render [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps), and the
 same JSON as text for hosts that do not.
+
+### Confirmation of unsafe fixes
+
+An unsafe fix may change what the code does, so the user has to confirm it. With `unsafe`,
+`fix` counts the unsafe fixes before it writes any file, and then asks for confirmation.
+
+```text
+fix(paths, unsafe=true)
+  lint paths and count the issues whose fix is "unsafe"
+  if the count is above zero
+    ask the user "Apply 2 unsafe fixes in samples?"
+    if the client has to collect the answer first
+      return the question and write no file
+    if the user declines
+      write the safe fixes only and return what is left
+  write the safe and the unsafe fixes and return what is left
+```
+
+A client on the older protocol is asked during the call. A client on the 2026-07-28 protocol,
+and any background task, gets the question back as the result, and then calls `fix` again with
+the answer. A client that cannot ask its user gets an error, and no file is written.
+
+### Background tasks
 
 `check`, `fix`, `profile` and `equiv` can run as background tasks for clients that ask for one.
 They report progress and log what they run.
@@ -72,7 +133,8 @@ They report progress and log what they run.
 | `xpd://version` | The version of the xpd binary |
 | `skill://xpd/SKILL.md` | The [xpd skill](claude-code.md#agent-skill) |
 | `skill://python-best-practices/SKILL.md` | The Python style skill |
-| `skill://python-review/SKILL.md` | The Python review skill, with its template |
+| `skill://python-review/SKILL.md` | The Python review skill |
+| `skill://python-review/assets/review-template.md` | The template of the review report |
 
 A client can complete the `package` and `rule` parts of a URI, and a rule is completed within
 the package already chosen. Clients that support the Skills extension also list the skills.
@@ -100,8 +162,8 @@ Each flag has an environment setting, for clients that start the server without 
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to bind for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
 
-`xpd mcp -h` lists the flags. Most clients start a server with only the environment variables
-they are given, so set these in the client's `env` setting rather than in your shell.
+`xpd mcp -h` lists the flags. Set the environment settings in the `env`
+setting of the client, because a client may not pass on the variables of your shell.
 
 ## HTTP
 
@@ -112,7 +174,7 @@ uvx --from 'xpd[mcp]' xpd mcp --transport http --port 8000
 ```
 
 Clients connect to `http://127.0.0.1:8000/mcp`. The server binds `127.0.0.1` unless `--host`
-says otherwise. It has no authentication, so bind another address only on a network you trust.
+says otherwise. The server has no authentication. Bind another address only on a network you trust.
 
 ## Other ways to run it
 

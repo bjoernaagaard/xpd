@@ -1,10 +1,11 @@
 # xpd
 
-xpd is an opinionated linter for Python library habits that make code slow or wrong, starting
-with pandas, NumPy, SciPy and scikit-learn.
-It parses each file once with [ast-grep](https://ast-grep.github.io/), runs files in parallel,
-and starts no Python on the hot path, so it is fast enough to run after every edit a coding
-agent makes.
+xpd checks Python code for slow operations and wrong results. It checks code that uses pandas,
+NumPy, SciPy, scikit-learn or Apache Hamilton. xpd can rewrite many of the lines it reports.
+
+xpd reads files in parallel and parses each file once with
+[ast-grep](https://ast-grep.github.io/). Linting starts no Python, so a coding agent can run xpd
+after every edit.
 
 ## Install
 
@@ -18,8 +19,6 @@ Or run it once without installing:
 uvx xpd check .
 ```
 
-Before version 0.7.0 the package was `pdx-lint` and the command was `pdx`.
-
 ## First run
 
 ```sh
@@ -32,5 +31,11 @@ say why the pattern is right in that spot.
 `xpd check . --fix` applies safe fixes. `xpd check . --fix --unsafe-fixes` also applies fixes
 that may change behavior, so read the diff afterwards.
 
-Next: [Commands](commands.md) for every command, or [Claude Code](claude-code.md) to lint each
-agent edit.
+## Where to go next
+
+| Page | What it covers |
+| --- | --- |
+| [Commands](commands.md) | Every command, its output and its exit codes |
+| [Claude Code](claude-code.md) | The hook that lints each edit an agent makes |
+| [MCP server](mcp.md) | The tools, resources and prompts an agent gets from `xpd mcp` |
+| [Rules](rules.md) | Every rule, with code before and after |
