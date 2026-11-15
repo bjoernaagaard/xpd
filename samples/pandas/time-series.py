@@ -272,3 +272,168 @@ def removed_time_series_forms(df):
 def time_series_forms_that_stay(df):
     ts = df.set_index("d").sort_index()
     return ts.shift(1), ts["b"].ffill(), ts.resample("D", closed="left").sum(), pd.to_datetime(df["raw"], errors="coerce"), np.pad(df["a"].to_numpy(), 1), df["s"].str.pad(12), pd.Timedelta("5min")
+
+
+@case
+def day_frequency_with_time_zone(df):
+    ts = df.set_index("d").sort_index()[["b"]].tz_localize("Europe/Copenhagen", ambiguous="NaT", nonexistent="NaT")
+    return (
+        ts.shift(freq="D"),  # xpd: day-frequency-with-time-zone
+        ts.shift(1, "1D"),  # xpd: day-frequency-with-time-zone
+        ts.shift(freq="2D"),  # xpd: day-frequency-with-time-zone
+        ts["b"].pct_change(freq="D"),  # xpd: day-frequency-with-time-zone
+        ts.index + pd.offsets.Day(1),  # xpd: day-frequency-with-time-zone
+        ts.index - pd.tseries.offsets.Day(),  # xpd: day-frequency-with-time-zone
+        ts.resample("D", offset="6h").sum(),  # xpd: day-frequency-with-time-zone
+        ts.resample("1D", origin="start").sum(),  # xpd: day-frequency-with-time-zone
+        ts.groupby(pd.Grouper(freq="D", offset="6h")).sum(),  # xpd: day-frequency-with-time-zone
+    )
+
+
+@case
+def day_frequency_that_stays(df):
+    ts = df.set_index("d").sort_index()[["b"]].tz_localize("UTC")
+    return (
+        ts.shift(freq="24h"),
+        ts.shift(1),
+        ts.index + pd.Timedelta(days=1),
+        ts.resample("D").sum(),
+        ts.resample("24h", offset="6h").sum(),
+        ts.resample("D", origin="start_day").sum(),
+        ts.resample("h", offset="15min").sum(),
+    )
+
+
+@case
+def removed_frequency_in_more_calls(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        ts.pct_change(freq="H"),  # xpd: removed-in-pandas-3
+        ts.pct_change(freq="M"),  # xpd: removed-in-pandas-3
+        ts.shift(1, "15T"),  # xpd: removed-in-pandas-3
+        df["d"].dt.to_period("H"),  # xpd: removed-in-pandas-3
+        df["d"].dt.to_period("A-DEC"),  # xpd: removed-in-pandas-3
+        pd.tseries.frequencies.to_offset("H"),  # xpd: removed-in-pandas-3
+        pd.tseries.frequencies.to_offset("M"),  # xpd: removed-in-pandas-3
+        pd.period_range("2024", periods=3, freq="H"),  # xpd: removed-in-pandas-3
+        pd.Period("2024", "A"),  # xpd: removed-in-pandas-3
+        pd.PeriodIndex(["2024-01-01"], freq="15T"),  # xpd: removed-in-pandas-3
+        pd.timedelta_range("0h", periods=3, freq="H"),  # xpd: removed-in-pandas-3
+        pd.interval_range(pd.Timestamp("2024"), periods=3, freq="H"),  # xpd: removed-in-pandas-3
+        ts.index.snap("H"),  # xpd: removed-in-pandas-3
+    )
+
+
+@case
+def frequency_in_more_calls_that_stays(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return ts.pct_change(freq="h"), ts.shift(1, "15min"), df["d"].dt.to_period("M"), pd.period_range("2024", periods=3, freq="Q"), pd.Period("2024", "Y")
+
+
+@case
+def removed_timedelta_units(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        pd.Timedelta(1, unit="T"),  # xpd: removed-in-pandas-3
+        pd.Timedelta(1, "L"),  # xpd: removed-in-pandas-3
+        pd.to_timedelta(df["a"], unit="N"),  # xpd: removed-in-pandas-3
+        pd.Timedelta("5 L"),  # xpd: removed-in-pandas-3
+        pd.to_timedelta("15T"),  # xpd: removed-in-pandas-3
+        ts.resample("D", offset="30T").sum(),  # xpd: removed-in-pandas-3, day-frequency-with-time-zone
+    )
+
+
+@case
+def deprecated_timedelta_units(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        pd.Timedelta("1H"),  # xpd: deprecated-in-pandas-3
+        pd.to_timedelta("30S"),  # xpd: deprecated-in-pandas-3
+        pd.to_timedelta(df["a"], unit="H"),  # xpd: deprecated-in-pandas-3
+        pd.Timedelta(1, "S"),  # xpd: deprecated-in-pandas-3
+        ts.resample("h", offset="30S").sum(),  # xpd: deprecated-in-pandas-3
+        pd.Timestamp.utcfromtimestamp(0),  # xpd: deprecated-in-pandas-3
+    )
+
+
+@case
+def timedelta_units_that_stay(df):
+    return pd.Timedelta(1, unit="min"), pd.Timedelta("1h"), pd.Timedelta(hours=1), pd.to_timedelta(df["a"], unit="s"), pd.Timestamp.fromtimestamp(0, "UTC")
+
+
+@case
+def removed_time_arguments(df):
+    ts = df.set_index("d").sort_index()[["b"]]
+    return (
+        ts.between_time("08:00", "16:00", include_start=False),  # xpd: removed-in-pandas-3
+        ts.between_time("08:00", "16:00", include_end=False),  # xpd: removed-in-pandas-3
+        pd.Timestamp("2024-01-01", freq="h"),  # xpd: removed-in-pandas-3
+    )
+
+
+@case
+def old_alias_comparison(df):
+    index = pd.date_range("2024-01-01", periods=8, freq="h")
+    return (
+        pd.infer_freq(index) == "H",  # xpd: removed-in-pandas-3
+        pd.infer_freq(index) != "M",  # xpd: removed-in-pandas-3
+        index.freqstr == "15T",  # xpd: removed-in-pandas-3
+    )
+
+
+@case
+def alias_comparison_that_stays(df):
+    index = pd.date_range("2024-01-01", periods=8, freq="h")
+    return pd.infer_freq(index) == "h", index.freqstr == "15min", index.to_period("M").freqstr == "M"
+
+
+@case
+def mixed_offsets_without_utc(df):
+    local = pd.Series(["2024-01-01 00:00+0100", "2024-07-01 00:00+0200"])
+    return pd.to_datetime(local, format="%Y-%m-%d %H:%M%z")  # xpd: mixed-offsets-without-utc
+
+
+@case
+def offsets_read_as_utc(df):
+    local = pd.Series(["2024-01-01 00:00+0100", "2024-07-01 00:00+0200"])
+    return pd.to_datetime(local, format="%Y-%m-%d %H:%M%z", utc=True).dt.tz_convert("Europe/Copenhagen"), pd.to_datetime(df["raw"], format="%Y-%m-%d")
+
+
+@case
+def pytz_error_handler(df):
+    import pytz
+    from pytz.exceptions import AmbiguousTimeError
+
+    try:
+        first = df["d"].dt.tz_localize("Europe/Copenhagen")
+    except pytz.exceptions.NonExistentTimeError:  # xpd: removed-in-pandas-3
+        first = None
+    try:
+        second = df["d"].dt.tz_localize("Europe/Copenhagen")
+    except (pytz.AmbiguousTimeError, KeyError):  # xpd: removed-in-pandas-3
+        second = None
+    try:
+        third = df["d"].dt.floor("h")
+    except AmbiguousTimeError:  # xpd: removed-in-pandas-3
+        third = None
+    return first, second, third
+
+
+@case
+def error_handler_that_stays(df):
+    import pytz
+
+    zone = pytz.timezone("Europe/Copenhagen")
+    try:
+        first = df["d"].dt.tz_localize("Europe/Copenhagen")
+    except (pytz.exceptions.NonExistentTimeError, ValueError):
+        first = None
+    try:
+        second = zone.localize(df["d"].iloc[0].to_pydatetime(), is_dst=None)
+    except pytz.exceptions.AmbiguousTimeError:
+        second = None
+    try:
+        third = df["d"].dt.tz_localize("Europe/Copenhagen")
+    except ValueError as error:
+        raise pytz.exceptions.InvalidTimeError(str(error)) from error
+    return first, second, third

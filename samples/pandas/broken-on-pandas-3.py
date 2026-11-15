@@ -168,6 +168,39 @@ def string_dtype_check(df):
 
 
 @case
+def datetime_unit_check(df):
+    stamps = [c for c in df.columns if df[c].dtype == "datetime64[ns]"]  # xpd: datetime-unit-check
+    other = [c for c in df.columns if df[c].dtype != np.dtype("<M8[ns]")]  # xpd: datetime-unit-check
+    utc_col = df["d"].dt.tz_localize("UTC")
+    return (
+        stamps,
+        other,
+        utc_col.dtype == "datetime64[ns, UTC]",  # xpd: datetime-unit-check
+        str(df["d"].dtype) == "datetime64[ns]",  # xpd: datetime-unit-check
+        df["d"].dtype.name != "datetime64[ns]",  # xpd: datetime-unit-check
+        df.dtypes == "datetime64[ns]",  # xpd: datetime-unit-check
+        pd.api.types.is_datetime64_ns_dtype(df["d"]),  # xpd: datetime-unit-check
+        df.select_dtypes("datetime64[ns]"),  # xpd: datetime-unit-check
+        df.select_dtypes(include=["datetime64[ns]", "number"]),  # xpd: datetime-unit-check
+        utc_col.to_frame().select_dtypes(include="datetime64[ns, UTC]"),  # xpd: datetime-unit-check
+    )
+
+
+@case
+def datetime_check_for_every_unit(df):
+    utc = df["d"].dt.tz_localize("UTC")
+    return (
+        pd.api.types.is_datetime64_dtype(df["d"]),
+        pd.api.types.is_datetime64_any_dtype(utc),
+        isinstance(utc.dtype, pd.DatetimeTZDtype),
+        df["d"].dtype == "datetime64[us]",
+        df.select_dtypes("datetime64"),
+        utc.to_frame().select_dtypes("datetimetz"),
+        df["d"].dtype.kind == "M",
+    )
+
+
+@case
 def groupby_apply_reads_key(df):
     return df.groupby("k").apply(lambda g: g["k"].iloc[0] + str(len(g)))  # xpd: groupby-apply-reads-key, groupby-apply
 

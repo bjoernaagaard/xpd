@@ -10,6 +10,69 @@ constraints:
 fix: $PD.Timestamp.now("UTC")
 metadata: { fix: safe }
 ---
+id: deprecated-in-pandas-3
+language: python
+severity: warning
+message: Timestamp.utcfromtimestamp is deprecated. Write $PD.Timestamp.fromtimestamp($T, "UTC"), which returns the same time.
+rule: { pattern: $PD.Timestamp.utcfromtimestamp($T) }
+constraints:
+  PD: { regex: '^_?(pd|pandas)$' }
+fix: $PD.Timestamp.fromtimestamp($T, "UTC")
+metadata: { fix: safe }
+---
+# "H" and "S" in Timedelta text, in Timedelta, to_timedelta and offset= of resample and Grouper.
+# removed-in-pandas-3 reports "T", "L", "U" and "N", which raise.
+id: deprecated-in-pandas-3
+language: python
+severity: warning
+message: The unit in $S is deprecated in Timedelta text. Write $NEW.
+rule:
+  pattern: $S
+  kind: string
+  regex: '^["'']\s*\d+\s*[HS]["'']$'
+  any:
+    - nthChild: 1
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(Timedelta|to_timedelta)$' } }
+    - inside:
+        kind: keyword_argument
+        has: { field: name, regex: ^offset$ }
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(\.resample|(^|\.)Grouper)$' } }
+transform:
+  HOUR: { replace: { source: $S, replace: 'H(.)$', by: 'h${1}' } }
+  NEW: { replace: { source: $HOUR, replace: 'S(.)$', by: 's${1}' } }
+fix: $NEW
+metadata: { fix: safe }
+---
+# The unit of Timedelta and to_timedelta, by keyword or as the second argument.
+id: deprecated-in-pandas-3
+language: python
+severity: warning
+message: The unit $S is deprecated. Write $NEW.
+rule:
+  pattern: $S
+  kind: string
+  regex: '^["''][HS]["'']$'
+  any:
+    - nthChild: 2
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(Timedelta|to_timedelta)$' } }
+    - inside:
+        kind: keyword_argument
+        has: { field: name, regex: ^unit$ }
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(Timedelta|to_timedelta)$' } }
+transform:
+  HOUR: { replace: { source: $S, replace: 'H(.)$', by: 'h${1}' } }
+  NEW: { replace: { source: $HOUR, replace: 'S(.)$', by: 's${1}' } }
+fix: $NEW
+metadata: { fix: safe }
+---
 # The fix deletes the statement, so it applies only at the top level of the file, where an
 # empty file is still valid. Inside a block it is reported without a fix.
 # Unsafe: pd.get_option reads the value back, so code that reads the option sees the default

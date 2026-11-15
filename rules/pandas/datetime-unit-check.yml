@@ -1,0 +1,114 @@
+# Datetime columns default to microseconds in pandas 3, so a check against a nanosecond dtype is
+# False for them and select_dtypes selects none of them. The fixes are unsafe: they are True for
+# a column of any unit, which is the point of the change. A file that calls as_unit("ns") or
+# astype("datetime64[ns]") makes nanosecond columns itself, so it is left alone. A NumPy array
+# keeps the unit it was made with, so a dtype is compared only on a column taken by a label or
+# on a name like a frame's, a column's or an index's, and never on .values or .array.
+
+id: datetime-unit-check
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this comparison with a nanosecond dtype is False for them. Write pd.api.types.is_datetime64_dtype($X), which is True for every unit.
+rule:
+  pattern: $X.dtype == $D
+  not: { matches: makes-nanoseconds }
+constraints:
+  X: { any: [{ kind: subscript, not: { has: { field: value, regex: '\.(values|array)$' } } }, { regex: '(?i)(^|_)(df|frame|series|ser|col|column|index|idx)(_|\d|$)' }] }
+  D: { matches: naive-nanoseconds }
+utils:
+  naive-nanoseconds: { regex: '^(["''](datetime64\[ns\]|<?M8\[ns\])["'']|(np|numpy)\.dtype\(["''](datetime64\[ns\]|<?M8\[ns\])["'']\))$' }
+  makes-nanoseconds: { inside: { kind: module, stopBy: end, regex: 'as_unit\(["'']ns["'']\)|astype\(["'']datetime64\[ns\]["'']\)' } }
+fix: pd.api.types.is_datetime64_dtype($X)
+metadata: { fix: unsafe }
+---
+id: datetime-unit-check
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this comparison with a nanosecond dtype is True for them. Write not pd.api.types.is_datetime64_dtype($X).
+rule:
+  pattern: $X.dtype != $D
+  not: { matches: makes-nanoseconds }
+constraints:
+  X: { any: [{ kind: subscript, not: { has: { field: value, regex: '\.(values|array)$' } } }, { regex: '(?i)(^|_)(df|frame|series|ser|col|column|index|idx)(_|\d|$)' }] }
+  D: { matches: naive-nanoseconds }
+utils:
+  naive-nanoseconds: { regex: '^(["''](datetime64\[ns\]|<?M8\[ns\])["'']|(np|numpy)\.dtype\(["''](datetime64\[ns\]|<?M8\[ns\])["'']\))$' }
+  makes-nanoseconds: { inside: { kind: module, stopBy: end, regex: 'as_unit\(["'']ns["'']\)|astype\(["'']datetime64\[ns\]["'']\)' } }
+fix: not pd.api.types.is_datetime64_dtype($X)
+metadata: { fix: unsafe }
+---
+# A dtype with a time zone. The zone is part of the old text, so there is no fix.
+id: datetime-unit-check
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this comparison with a nanosecond dtype no longer holds for them. Write isinstance($X.dtype, pd.DatetimeTZDtype), and compare $X.dt.tz when the zone matters.
+rule:
+  any:
+    - pattern: $X.dtype == $D
+    - pattern: $X.dtype != $D
+  not: { matches: makes-nanoseconds }
+constraints:
+  X: { any: [{ kind: subscript, not: { has: { field: value, regex: '\.(values|array)$' } } }, { regex: '(?i)(^|_)(df|frame|series|ser|col|column|index|idx)(_|\d|$)' }] }
+  D: { regex: '^["'']datetime64\[ns, [^"'']+\]["'']$' }
+utils:
+  makes-nanoseconds: { inside: { kind: module, stopBy: end, regex: 'as_unit\(["'']ns["'']\)|astype\(["'']datetime64\[ns\]["'']\)' } }
+---
+# The dtype as text, the dtypes of a frame, and is_datetime64_ns_dtype.
+id: datetime-unit-check
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this test for a nanosecond dtype no longer holds for them. Call pd.api.types.is_datetime64_any_dtype, or is_datetime64_dtype for columns without a time zone.
+rule:
+  any:
+    - pattern: str($X.dtype) == $D
+    - pattern: str($X.dtype) != $D
+    - pattern: $X.dtype.name == $D
+    - pattern: $X.dtype.name != $D
+    - pattern: $Y.dtypes == $D
+    - pattern: $Y.dtypes != $D
+    - pattern: $F($$$A)
+  not: { matches: makes-nanoseconds }
+constraints:
+  X: { any: [{ kind: subscript, not: { has: { field: value, regex: '\.(values|array)$' } } }, { regex: '(?i)(^|_)(df|frame|series|ser|col|column|index|idx)(_|\d|$)' }] }
+  D: { regex: '^["''](datetime64\[ns(, [^"'']+)?\]|<?M8\[ns\])["'']$' }
+  F: { regex: '(^|\.)is_datetime64_ns_dtype$' }
+utils:
+  makes-nanoseconds: { inside: { kind: module, stopBy: end, regex: 'as_unit\(["'']ns["'']\)|astype\(["'']datetime64\[ns\]["'']\)' } }
+---
+# A nanosecond dtype passed to select_dtypes, alone or in a list. "datetime64" selects the
+# columns without a time zone of every unit.
+id: datetime-unit-check
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so select_dtypes with a nanosecond dtype selects none of them. Write "datetime64".
+rule:
+  kind: string
+  regex: '^["''](datetime64\[ns\]|<?M8\[ns\])["'']$'
+  matches: select-argument
+  not: { matches: makes-nanoseconds }
+utils:
+  select-argument:
+    inside:
+      stopBy: { kind: call }
+      kind: argument_list
+      inside: { kind: call, has: { field: function, regex: \.select_dtypes$ } }
+  makes-nanoseconds: { inside: { kind: module, stopBy: end, regex: 'as_unit\(["'']ns["'']\)|astype\(["'']datetime64\[ns\]["'']\)' } }
+fix: '"datetime64"'
+metadata: { fix: unsafe }
+---
+id: datetime-unit-check
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so select_dtypes with a nanosecond dtype selects none of them. Write "datetimetz" for every column with a time zone.
+rule:
+  kind: string
+  regex: '^["'']datetime64\[ns, [^"'']+\]["'']$'
+  matches: select-argument
+  not: { matches: makes-nanoseconds }
+utils:
+  select-argument:
+    inside:
+      stopBy: { kind: call }
+      kind: argument_list
+      inside: { kind: call, has: { field: function, regex: \.select_dtypes$ } }
+  makes-nanoseconds: { inside: { kind: module, stopBy: end, regex: 'as_unit\(["'']ns["'']\)|astype\(["'']datetime64\[ns\]["'']\)' } }

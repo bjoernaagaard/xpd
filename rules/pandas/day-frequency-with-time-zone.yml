@@ -1,0 +1,96 @@
+# "D" is a calendar day on pandas 3 and was 24 hours on pandas 2. The two differ only on an
+# index with a time zone, which xpd cannot see, so these documents report only in a file that
+# names a time zone: tz_localize, tz_convert, tz= or utc=True.
+
+# A shift by days. On pandas 3.1 an index in Europe/Copenhagen raised ValueError in the weeks of
+# 31 March and 27 October 2024, where pandas 2.3 shifted by 24 hours.
+# Unsafe: on datetimes without a daylight saving change "24h" gives the same result, and with one
+# it gives the pandas 2 result where "D" raises. On a PeriodIndex of days "D" is right and "24h"
+# raises, so a receiver with period in its name is left alone.
+id: day-frequency-with-time-zone
+language: python
+severity: warning
+message: On pandas 3 "D" is a calendar day, so on an index with a time zone this raises ValueError when a shifted time falls in a daylight saving change. On pandas 2 it was 24 hours. Write "24h" to keep 24 hours.
+rule:
+  kind: string
+  regex: '^["'']1?D["'']$'
+  all: [{ matches: shift-frequency }, { matches: names-a-time-zone }]
+utils:
+  shift-frequency:
+    any:
+      - nthChild: 2
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '\.shift$', not: { regex: '(?i)period' } } }
+      - inside:
+          kind: keyword_argument
+          has: { field: name, regex: ^freq$ }
+          inside:
+            kind: argument_list
+            inside: { kind: call, has: { field: function, regex: '\.(shift|pct_change)$', not: { regex: '(?i)period' } } }
+  names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
+fix: '"24h"'
+metadata: { fix: unsafe }
+---
+# Several days, where the hours have to be worked out by hand.
+id: day-frequency-with-time-zone
+language: python
+severity: warning
+message: On pandas 3 "D" is a calendar day, so on an index with a time zone this raises ValueError when a shifted time falls in a daylight saving change. On pandas 2 it was 24 hours. Write the hours, such as "48h" for "2D".
+rule:
+  kind: string
+  regex: '^["''](\d\d+|[02-9])D["'']$'
+  all: [{ matches: shift-frequency }, { matches: names-a-time-zone }]
+utils:
+  shift-frequency:
+    any:
+      - nthChild: 2
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '\.shift$', not: { regex: '(?i)period' } } }
+      - inside:
+          kind: keyword_argument
+          has: { field: name, regex: ^freq$ }
+          inside:
+            kind: argument_list
+            inside: { kind: call, has: { field: function, regex: '\.(shift|pct_change)$', not: { regex: '(?i)period' } } }
+  names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
+---
+# The Day offset added to or taken from datetimes.
+id: day-frequency-with-time-zone
+language: python
+severity: warning
+message: On pandas 3 the Day offset is a calendar day, so on datetimes with a time zone this raises ValueError when a result falls in a daylight saving change. On pandas 2 it was 24 hours. Write pd.Timedelta(days=...) to keep 24 hours.
+rule:
+  any:
+    - pattern: $X + $DAY
+    - pattern: $X - $DAY
+  matches: names-a-time-zone
+constraints:
+  DAY: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(tseries\.)?offsets\.Day$' } }
+utils:
+  names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
+---
+# resample and Grouper with a day frequency and offset= or origin=. On pandas 3.1 the bins of an
+# index in Europe/Copenhagen or UTC started at 00:00 with offset="6h", where pandas 2.3 started
+# them at 06:00. "2D" and "7D" and every value of origin did the same. pandas 3.1 raises no
+# error, only a RuntimeWarning.
+id: day-frequency-with-time-zone
+language: python
+severity: warning
+message: On pandas 3 a day frequency ignores offset and origin when the index has a time zone, so the bins start at midnight. Write the frequency in hours, such as "24h" for "D". Those bins keep the offset and move by an hour at a daylight saving change.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^(offset|origin)$ }
+    - not: { has: { field: value, regex: '^["'']start_day["'']$' } }
+  inside:
+    kind: argument_list
+    all:
+      - inside: { kind: call, has: { field: function, regex: '(\.resample|(^|\.)Grouper)$' } }
+      - any:
+          - has: { nthChild: 1, kind: string, regex: '^["'']\d*D["'']$' }
+          - has: { kind: keyword_argument, regex: '^(freq|rule)\s*=\s*["'']\d*D["'']$' }
+    matches: names-a-time-zone
+utils:
+  names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }

@@ -213,6 +213,28 @@ Use instead:
 is_text = pd.api.types.is_string_dtype(df["name"])
 ```
 
+#### datetime-unit-check
+
+**Severity:** error. **Fix:** unsafe: `pd.api.types.is_datetime64_dtype(df["d"])` and `select_dtypes("datetime64")`, which are True for every unit. A dtype with a time zone, `str(dtype)`, `dtype.name`, `dtypes` and `is_datetime64_ns_dtype` have no fix.
+
+Reports `df["d"].dtype == "datetime64[ns]"`, `df["d"].dtype == "datetime64[ns, UTC]"`, `select_dtypes("datetime64[ns]")` and `is_datetime64_ns_dtype(df["d"])`. Datetimes default to microseconds in pandas 3, so on pandas 3.1 each comparison was False for a column parsed from text and `select_dtypes` selected no column.
+
+Example:
+
+```python
+is_time = df["time"].dtype == "datetime64[ns]"
+times = df.select_dtypes("datetime64[ns]")
+```
+
+Use instead:
+
+```python
+is_time = pd.api.types.is_datetime64_dtype(df["time"])
+times = df.select_dtypes("datetime64")
+```
+
+For a column with a time zone, write `isinstance(df["time"].dtype, pd.DatetimeTZDtype)` and `select_dtypes("datetimetz")`.
+
 #### groupby-apply-reads-key
 
 **Severity:** error. **Fix:** none.
@@ -237,7 +259,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 #### removed-in-pandas-3
 
-**Severity:** error. **Fix:** safe: `map`, `"ME"`, `"h"`, `"min"`, `sep=r"\s+"`, `lineterminator=`, `sep=` for a separator passed by position, `is_monotonic_increasing`, `np.` for `pd.np.` and `pd.json_normalize`. unsafe: `ffill()` and `bfill()`, which label and order the rows of a group-by differently, `"M"` in `resample`, `dt.isocalendar().week`, `writer.close()` and `pd.Series(x).value_counts()`. The other forms have no fix.
+**Severity:** error. **Fix:** safe: `map`, `"ME"`, `"h"`, `"min"`, a Timedelta unit such as `"min"` for `"T"`, `sep=r"\s+"`, `lineterminator=`, `sep=` for a separator passed by position, `is_monotonic_increasing`, `np.` for `pd.np.` and `pd.json_normalize`. unsafe: `ffill()` and `bfill()`, which label and order the rows of a group-by differently, `"M"` in `resample`, `dt.isocalendar().week`, `writer.close()`, `pd.Series(x).value_counts()` and the alias in a comparison with `infer_freq` or `freqstr`. The other forms have no fix.
 
 Reports `applymap`, `fillna(method=)`, frequencies such as `"M"`, `"H"` and `"T"`, `delim_whitespace=True`, `dt.week`, and the removed arguments and names listed below.
 
@@ -357,11 +379,58 @@ top = df["region"].value_counts().iloc[0]
 first = df.iloc[0, 0]
 ```
 
+#### day-frequency-with-time-zone
+
+**Severity:** warning. **Fix:** unsafe: `"24h"` for `"D"` and `"1D"` in `shift` and `pct_change`. Several days, the `Day` offset, `resample` and `Grouper` have no fix.
+
+Reports `ts.shift(freq="D")`, `ts.index + pd.offsets.Day(1)` and `ts.resample("D", offset="6h")` in a file that names a time zone. `"D"` was 24 hours on pandas 2 and is a calendar day on pandas 3.
+
+On quarter-hourly data in `Europe/Copenhagen`, pandas 2.3 shifted by 24 hours. pandas 3.1 raised ValueError when the data held 31 March or 27 October 2024, because a shifted time fell in the daylight saving change. With `resample("D", offset="6h")`, pandas 2.3 started each bin at 06:00. pandas 3.1 started it at 00:00 and gave only a RuntimeWarning, also on an index in UTC. `origin=` and a frequency of several days, such as `"7D"`, are ignored in the same way.
+
+Example:
+
+```python
+ts = df.set_index("time").tz_localize("Europe/Copenhagen")
+day_before = ts.shift(freq="D")
+```
+
+Use instead:
+
+```python
+ts = df.set_index("time").tz_localize("Europe/Copenhagen")
+day_before = ts.shift(freq="24h")
+```
+
+`"24h"` gives the pandas 2 result on both versions. It reads the value 24 hours earlier, which is one hour off by the clock on the day after a daylight saving change. In `resample`, bins of `"24h"` keep the offset, and they start an hour later by the clock after a change to summer time.
+
+xpd cannot see whether an index has a time zone. It reports only in a file that holds `tz_localize`, `tz_convert`, `tz=` or `utc=True`, so it misses a frame that got its time zone in another file. On an index without a time zone both versions give the same result. A PeriodIndex of days in such a file is reported by mistake, unless
+its name holds the word period, and there `"24h"` raises.
+
+#### mixed-offsets-without-utc
+
+**Severity:** warning. **Fix:** none.
+
+Reports `pd.to_datetime(s, format="%Y-%m-%d %H:%M%z")` without `utc=`. Local times across a daylight saving change carry two offsets, such as `+0100` and `+0200`. For them pandas 2.3 returned an object Index with a FutureWarning, and pandas 3.1 raises ValueError.
+
+Example:
+
+```python
+times = pd.to_datetime(df["time"], format="%Y-%m-%d %H:%M%z")
+```
+
+Use instead:
+
+```python
+times = pd.to_datetime(df["time"], format="%Y-%m-%d %H:%M%z", utc=True).dt.tz_convert("Europe/Copenhagen")
+```
+
+The replacement is advice. xpd does not apply it automatically, because `utc=True` changes the result of a column that holds one offset, from that offset to UTC.
+
 #### deprecated-in-pandas-3
 
-**Severity:** warning. **Fix:** safe: `pd.Timestamp.now("UTC")`, drop `copy=`. unsafe: delete the copy-on-write option line, because `pd.get_option` reads the value back, and drop `copy=` from `astype`.
+**Severity:** warning. **Fix:** safe: `pd.Timestamp.now("UTC")`, `pd.Timestamp.fromtimestamp(t, "UTC")`, `"h"` and `"s"` for the Timedelta units `"H"` and `"S"`, drop `copy=`. unsafe: delete the copy-on-write option line, because `pd.get_option` reads the value back, and drop `copy=` from `astype`.
 
-Reports `pd.set_option("mode.copy_on_write", True)`, `copy=False` and `pd.Timestamp.utcnow()`. `astype(copy=)` is reported on a column taken by a label or a receiver named like a frame, because NumPy's `astype` has the same keyword.
+Reports `pd.set_option("mode.copy_on_write", True)`, `copy=False`, `pd.Timestamp.utcnow()`, `pd.Timestamp.utcfromtimestamp(t)`, and the units `"H"` and `"S"` in `pd.Timedelta("1H")`, `pd.to_timedelta(x, unit="H")` and `resample(offset="1H")`. `astype(copy=)` is reported on a column taken by a label or a receiver named like a frame, because NumPy's `astype` has the same keyword.
 
 Example:
 
@@ -388,7 +457,14 @@ now = pd.Timestamp.now("UTC")
   `SettingWithCopyWarning`, the option `mode.use_inf_as_na` and `pd.to_numeric(errors="ignore")`.
 - Time series: `tshift`, `pad()`, `first("3D")` and `last("3D")`, `resample(loffset=, base=, kind=)`,
   `date_range(closed=)`, `to_datetime(infer_datetime_format=)` and `to_datetime(errors="ignore")`,
-  `pct_change(fill_method="pad")`, `pd.Timedelta("5T")`, and `astype("timedelta64[D]")`.
+  `pct_change(fill_method="pad")`, `between_time(include_start=, include_end=)`, `pd.Timestamp(freq=)`,
+  and `astype("timedelta64[D]")`.
+- Timedelta units: `"T"`, `"L"`, `"U"` and `"N"` in `pd.Timedelta("5T")`, `pd.Timedelta(1, unit="T")`,
+  `pd.to_timedelta(x, unit="T")` and `resample(offset="30T")`.
+- A handler for `pytz.exceptions.AmbiguousTimeError` or `NonExistentTimeError`. pandas 3 raises ValueError for
+  those times, also when the zone is a pytz object, and the pytz errors are not ValueErrors.
+- An old alias compared with `pd.infer_freq(index)` or `index.freqstr`, as in `pd.infer_freq(index) == "H"`,
+  which is never equal, because pandas returns `"h"`.
 - `iteritems()`, `is_lexsorted()`, `lexsort_depth` and `groupby(axis=1)`.
 
 The `writer.close()` fix is unsafe, because xpd knows the writer only by its name. `DataFrame.lookup`
@@ -424,10 +500,28 @@ Any other chain, such as `df.iloc[0]["a"] = v`, is reported without a fix. Two p
 cannot tell it from a frame. Their fixes are unsafe for that reason.
 
 `removed-in-pandas-3` rewrites a frequency where the call takes only datetimes, such as
-`date_range`, `Grouper`, `floor` and `rolling`. Inside `resample` and `shift` the fix for `"M"`,
-`"Q"` and `"Y"` is unsafe, because those aliases stay valid when the index holds periods. It
-leaves `to_period("M")` and `asfreq("M")` alone, and it reports `"A"` inside `resample`, `asfreq`
-and `shift` without a fix, because the new alias is `"YE"` for datetimes and `"Y"` for periods.
+`date_range`, `timedelta_range`, `interval_range`, `to_offset`, `Grouper`, `floor`, `snap` and
+`rolling`. Inside `resample`, `shift` and `pct_change` the fix for `"M"`, `"Q"` and `"Y"` is
+unsafe, because those aliases stay valid when the index holds periods. It leaves `asfreq("M")`
+alone, and it reports `"A"` inside `resample`, `asfreq`, `shift` and `pct_change` without a fix,
+because the new alias is `"YE"` for datetimes and `"Y"` for periods. Where the call takes
+periods, in `to_period`, `period_range`, `pd.Period` and `pd.PeriodIndex`, it rewrites `"H"`,
+`"T"`, `"S"`, `"L"`, `"U"` and `"N"`, writes `"Y"` for `"A"`, and leaves `"M"`, `"Q"` and `"Y"`
+alone.
+
+The handler for a pytz error is reported when its try block holds a pandas call, such as
+`tz_localize`, `.dt.`, `pd.` or `floor`. It is left alone when it also names ValueError or
+Exception, and when the block calls pytz's own `localize`, which still raises the pytz errors. The fix for an
+alias compared with `infer_freq` or `freqstr` is unsafe, because the comparison can then be
+equal. `"M"` is compared only with `infer_freq`, because the `freqstr` of a monthly PeriodIndex
+is still `"M"`.
+
+`datetime-unit-check` leaves a file alone that calls `as_unit("ns")` or
+`astype("datetime64[ns]")`, because that file makes nanosecond columns itself. It compares a dtype
+only on a column taken by a label, as in `df["time"].dtype`, or on a name such as `series`, `col`
+or `index`, because a NumPy array keeps the unit it was made with. A column read
+from a nanosecond source, such as a NumPy array of `datetime64[ns]`, keeps that unit, and there
+the old comparison is still True.
 
 `deprecated-in-pandas-3` deletes the copy-on-write option only at the top level of a file, and
 reports it without a fix inside a function or another block. Dropping `copy=` from `astype` is

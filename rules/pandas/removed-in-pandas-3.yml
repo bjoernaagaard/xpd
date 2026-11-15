@@ -158,7 +158,9 @@ utils:
       - nthChild: 1
         inside:
           kind: argument_list
-          inside: { kind: call, has: { field: function, regex: '\.(floor|ceil|round|rolling)$' } }
+          # to_offset(is_period=True) is how pandas itself asks for a period alias.
+          not: { has: { kind: keyword_argument, has: { field: name, regex: ^is_period$ } } }
+          inside: { kind: call, has: { field: function, regex: '(\.(floor|ceil|round|rolling|snap)|(^|\.)to_offset)$' } }
       - inside:
           kind: keyword_argument
           has: { field: name, regex: ^(freq|window)$ }
@@ -166,7 +168,7 @@ utils:
             kind: argument_list
             inside:
               kind: call
-              has: { field: function, regex: '(^|\.)(date_range|bdate_range|Grouper|floor|ceil|round|rolling)$' }
+              has: { field: function, regex: '(^|\.)(date_range|bdate_range|timedelta_range|interval_range|DatetimeIndex|TimedeltaIndex|Grouper|floor|ceil|round|rolling|snap)$' }
   # Calls that take datetimes or periods.
   either-argument:
     any:
@@ -174,12 +176,16 @@ utils:
         inside:
           kind: argument_list
           inside: { kind: call, has: { field: function, regex: '\.(resample|asfreq)$' } }
+      - nthChild: 2
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '\.shift$' } }
       - inside:
           kind: keyword_argument
           has: { field: name, regex: ^(freq|rule)$ }
           inside:
             kind: argument_list
-            inside: { kind: call, has: { field: function, regex: '\.(resample|asfreq|shift)$' } }
+            inside: { kind: call, has: { field: function, regex: '\.(resample|asfreq|shift|pct_change)$' } }
 transform:
   YEAR: { replace: { source: $S, replace: '^(.\d*B?)A(S?.*)$', by: '${1}Y${2}' } }
   END: { replace: { source: $YEAR, replace: '^(.\d*)(C?B?[MQY]|SM)(-[A-Z]{3})?(.)$', by: '${1}${2}E${3}${4}' } }
@@ -209,12 +215,16 @@ rule:
       inside:
         kind: argument_list
         inside: { kind: call, has: { field: function, regex: '\.resample$' } }
+    - nthChild: 2
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '\.shift$' } }
     - inside:
         kind: keyword_argument
         has: { field: name, regex: ^(freq|rule)$ }
         inside:
           kind: argument_list
-          inside: { kind: call, has: { field: function, regex: '\.(resample|shift)$' } }
+          inside: { kind: call, has: { field: function, regex: '\.(resample|shift|pct_change)$' } }
 transform:
   NEW: { replace: { source: $S, replace: '^(.\d*[MQY])(-[A-Z]{3})?(.)$', by: '${1}E${2}${3}' } }
 fix: $NEW
@@ -235,12 +245,83 @@ rule:
       inside:
         kind: argument_list
         inside: { kind: call, has: { field: function, regex: '\.(resample|asfreq)$' } }
+    - nthChild: 2
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '\.shift$' } }
     - inside:
         kind: keyword_argument
         has: { field: name, regex: ^(freq|rule)$ }
         inside:
           kind: argument_list
-          inside: { kind: call, has: { field: function, regex: '\.(resample|asfreq|shift)$' } }
+          inside: { kind: call, has: { field: function, regex: '\.(resample|asfreq|shift|pct_change)$' } }
+---
+# A frequency alias where the call takes periods: to_period, period_range, Period and
+# PeriodIndex. "M", "Q" and "Y" remain valid there, and "A" becomes "Y".
+id: removed-in-pandas-3
+language: python
+severity: error
+message: The frequency $S was removed in pandas 3. Write $NEW.
+rule:
+  pattern: $S
+  kind: string
+  regex: '^["''](\d*)([HTSLUN]|A(-[A-Z]{3})?)["'']$'
+  any:
+    - nthChild: 1
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '\.to_period$' } }
+    - nthChild: 2
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.Period$' } }
+    - inside:
+        kind: keyword_argument
+        has: { field: name, regex: ^freq$ }
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(\.to_period|^(pd|pandas)\.(period_range|Period|PeriodIndex))$' } }
+transform:
+  YEAR: { replace: { source: $S, replace: '^(.\d*)A(.*)$', by: '${1}Y${2}' } }
+  HOUR: { replace: { source: $YEAR, replace: '^(.\d*)H(.)$', by: '${1}h${2}' } }
+  MINUTE: { replace: { source: $HOUR, replace: '^(.\d*)T(.)$', by: '${1}min${2}' } }
+  SECOND: { replace: { source: $MINUTE, replace: '^(.\d*)S(.)$', by: '${1}s${2}' } }
+  MILLI: { replace: { source: $SECOND, replace: '^(.\d*)L(.)$', by: '${1}ms${2}' } }
+  MICRO: { replace: { source: $MILLI, replace: '^(.\d*)U(.)$', by: '${1}us${2}' } }
+  NEW: { replace: { source: $MICRO, replace: '^(.\d*)N(.)$', by: '${1}ns${2}' } }
+fix: $NEW
+metadata: { fix: safe }
+---
+# infer_freq and freqstr return the new alias, so a comparison with the old one is False on
+# pandas 2.2 and later. "M" is compared only with infer_freq, because the freqstr of a monthly
+# PeriodIndex is still "M". Unsafe: the comparison can now be True, which is the point.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: pandas returns the new alias here, so this comparison with $S is never equal. Write $NEW.
+rule:
+  pattern: $S
+  kind: string
+  any:
+    - all:
+        - regex: '^["'']\d*[HTSM]["'']$'
+        - any:
+            - inside: { pattern: $F($$$A) == $S }
+            - inside: { pattern: $F($$$A) != $S }
+    - all:
+        - regex: '^["'']\d*[HTS]["'']$'
+        - any:
+            - inside: { pattern: $X.freqstr == $S }
+            - inside: { pattern: $X.freqstr != $S }
+constraints:
+  F: { regex: '^((pd|pandas)\.(tseries\.frequencies\.)?)?infer_freq$' }
+transform:
+  END: { replace: { source: $S, replace: '^(.\d*)M(.)$', by: '${1}ME${2}' } }
+  HOUR: { replace: { source: $END, replace: '^(.\d*)H(.)$', by: '${1}h${2}' } }
+  MINUTE: { replace: { source: $HOUR, replace: '^(.\d*)T(.)$', by: '${1}min${2}' } }
+  NEW: { replace: { source: $MINUTE, replace: '^(.\d*)S(.)$', by: '${1}s${2}' } }
+fix: $NEW
+metadata: { fix: unsafe }
 ---
 # delim_whitespace=True, when the call does not also set sep or delimiter.
 id: removed-in-pandas-3
@@ -515,23 +596,100 @@ rule:
       regex: '^errors\s*=\s*["'']ignore["'']$'
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)to_datetime$' } } }
     - kind: keyword_argument
+      has: { field: name, regex: '^include_(start|end)$' }
+      inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.between_time$' } } }
+    - kind: keyword_argument
+      has: { field: name, regex: '^freq$' }
+      inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.Timestamp$' } } }
+    - kind: keyword_argument
       has: { field: name, regex: '^date_parser$' }
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)read_(csv|table|excel)$' } } }
     - kind: keyword_argument
       regex: '^fill_method\s*=\s*["''](pad|ffill|bfill|backfill)["'']$'
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.pct_change$' } } }
 ---
+# Timedelta text with a removed unit, in Timedelta, to_timedelta and offset= of resample and
+# Grouper. "T", "L", "U" and "N" raise ValueError on pandas 3.1. "H" and "S" still run and warn,
+# so deprecated-in-pandas-3 reports them.
 id: removed-in-pandas-3
 language: python
 severity: error
-message: The unit "T" was removed from Timedelta text and raises ValueError on pandas 3. Write "min".
+message: The unit in $S was removed from Timedelta text and raises ValueError on pandas 3. Write $NEW.
+rule:
+  pattern: $S
+  kind: string
+  regex: '^["'']\s*\d+\s*[TLUN]["'']$'
+  any:
+    - nthChild: 1
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(Timedelta|to_timedelta)$' } }
+    - inside:
+        kind: keyword_argument
+        has: { field: name, regex: ^offset$ }
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(\.resample|(^|\.)Grouper)$' } }
+transform:
+  MINUTE: { replace: { source: $S, replace: 'T(.)$', by: 'min${1}' } }
+  MILLI: { replace: { source: $MINUTE, replace: 'L(.)$', by: 'ms${1}' } }
+  MICRO: { replace: { source: $MILLI, replace: 'U(.)$', by: 'us${1}' } }
+  NEW: { replace: { source: $MICRO, replace: 'N(.)$', by: 'ns${1}' } }
+fix: $NEW
+metadata: { fix: safe }
+---
+# The unit of Timedelta and to_timedelta, by keyword or as the second argument.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: The unit $S was removed and raises ValueError on pandas 3. Write $NEW.
+rule:
+  pattern: $S
+  kind: string
+  regex: '^["''][TLUN]["'']$'
+  any:
+    - nthChild: 2
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(Timedelta|to_timedelta)$' } }
+    - inside:
+        kind: keyword_argument
+        has: { field: name, regex: ^unit$ }
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(Timedelta|to_timedelta)$' } }
+transform:
+  MINUTE: { replace: { source: $S, replace: 'T(.)$', by: 'min${1}' } }
+  MILLI: { replace: { source: $MINUTE, replace: 'L(.)$', by: 'ms${1}' } }
+  MICRO: { replace: { source: $MILLI, replace: 'U(.)$', by: 'us${1}' } }
+  NEW: { replace: { source: $MICRO, replace: 'N(.)$', by: 'ns${1}' } }
+fix: $NEW
+metadata: { fix: safe }
+---
+# pandas 3 uses zoneinfo and raises ValueError for an ambiguous or nonexistent time, also when
+# the zone is a pytz object. The pytz errors are not ValueErrors, so a handler that names only
+# them stops catching. The try block must hold a pandas call, such as tz_localize, .dt. or pd.,
+# and a block that calls pytz's own localize is left alone, because pytz still raises its errors
+# there.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: pandas 3 raises ValueError for an ambiguous or nonexistent time, and no longer the pytz error, so this handler does not catch it. Catch ValueError as well.
 rule:
   any:
-    - pattern: $PD.Timedelta($TEXT)
-    - pattern: $PD.to_timedelta($TEXT)
-constraints:
-  PD: { regex: '^(pd|pandas)$' }
-  TEXT: { kind: string, regex: '^["'']\s*\d+\s*T["'']$' }
+    - kind: attribute
+      regex: '^pytz\.(exceptions\.)?(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+    - kind: identifier
+      regex: '^(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+      not: { inside: { kind: attribute } }
+  inside:
+    kind: except_clause
+    stopBy: { kind: block }
+    not: { regex: '^except[^:]*\b(ValueError|Exception|BaseException)\b' }
+    inside:
+      kind: try_statement
+      has: { field: body, regex: 'tz_localize|tz_convert|\b(pd|pandas)\.|\.dt\.|\.(floor|ceil|round|shift|resample|normalize)\(' }
+      not: { has: { field: body, regex: '\.localize\(' } }
 ---
 id: removed-in-pandas-3
 language: python
