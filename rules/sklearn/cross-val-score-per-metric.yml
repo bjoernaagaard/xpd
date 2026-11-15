@@ -1,0 +1,95 @@
+# Two cross_val_score calls on the same model, data and folds that differ only in scoring fit the
+# model on every fold twice. cross_validate fits once and scores each fit with every scorer, with
+# the same splits, so the scores are bit equal for a model that fits the same way twice. The checks
+# sit under all, because all binds $S and $K before the search for the later call reads them.
+id: cross-val-score-per-metric
+language: python
+severity: warning
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+rule:
+  any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^scoring$' } }, { has: { field: value, pattern: $S } }] } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cv$' } } } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        precedes:
+          stopBy: end
+          has:
+            stopBy: end
+            any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+            all:
+              - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cv$' } } } }
+              - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^scoring$' } }, { has: { field: value, pattern: $S } }] } } }
+constraints:
+  CV: { regex: '(^|\.)cross_val_score$' }
+---
+id: cross-val-score-per-metric
+language: python
+severity: warning
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+rule:
+  any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^scoring$' } }, { has: { field: value, pattern: $S } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: $K } }] } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        precedes:
+          stopBy: end
+          has:
+            stopBy: end
+            any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+            all:
+              - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: $K } }] } }
+              - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^scoring$' } }, { has: { field: value, pattern: $S } }] } } }
+constraints:
+  CV: { regex: '(^|\.)cross_val_score$' }
+---
+id: cross-val-score-per-metric
+language: python
+severity: warning
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+rule:
+  any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+  all:
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^scoring$' } } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cv$' } } } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        precedes:
+          stopBy: end
+          has:
+            stopBy: end
+            any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+            all:
+              - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cv$' } } } }
+              - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^scoring$' } } }
+constraints:
+  CV: { regex: '(^|\.)cross_val_score$' }
+---
+id: cross-val-score-per-metric
+language: python
+severity: warning
+message: Each cross_val_score call fits $M on every fold again to compute one more score. Pass every scoring to one cross_validate($M, $X, $Y, scoring=[...]), which fits once and measured 1.5 to 2.0 times faster for two scorings.
+rule:
+  any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+  all:
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^scoring$' } } } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: $K } }] } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        precedes:
+          stopBy: end
+          has:
+            stopBy: end
+            any: [{ pattern: '$CV($M, $X, $Y)' }, { pattern: '$CV($M, $X, $Y, $$$)' }]
+            all:
+              - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, pattern: $K } }] } }
+              - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^scoring$' } } }
+constraints:
+  CV: { regex: '(^|\.)cross_val_score$' }

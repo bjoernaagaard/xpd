@@ -6,6 +6,8 @@ code computes, so a copy fixed with `xpd check --fix` can be compared with this 
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.preprocessing import StandardScaler
 
 CASES = {}
@@ -61,3 +63,26 @@ def vectorizer_fit_on_other_documents():
     scaled = StandardScaler().fit(X).transform(X)
     once = TfidfVectorizer().fit_transform(docs)
     return vectorizer, X_test, refitted, later, scaled, once
+
+
+@case
+def cross_val_score_per_metric():
+    X, y = table()
+    model = LogisticRegression()
+    accuracy = cross_val_score(model, X, y, cv=5, scoring="accuracy").mean()  # xpd: cross-val-score-per-metric
+    precision = cross_val_score(model, X, y, cv=5, scoring="precision").mean()
+    default = cross_val_score(model, X, y)  # xpd: cross-val-score-per-metric
+    recall = cross_val_score(model, X, y, scoring="recall")
+    return accuracy, precision, default, recall
+
+
+@case
+def cross_validate_once():
+    X, y = table()
+    model = LogisticRegression()
+    scores = cross_validate(model, X, y, cv=5, scoring=["accuracy", "precision"])
+    five = cross_val_score(model, X, y, cv=5, scoring="f1")
+    three = cross_val_score(model, X, y, cv=3, scoring="recall")
+    again = cross_val_score(model, X, y, cv=5, scoring="f1")
+    half = cross_val_score(model, X[:100], y[:100], cv=5, scoring="recall")
+    return scores["test_accuracy"], five, three, again, half
