@@ -11,6 +11,8 @@ rule:
   pattern: $R.ppf($$$ARGS)
   has: { field: arguments, has: { nthChild: 1, any: [{ pattern: 1 - $P }, { pattern: 1.0 - $P }, { pattern: '1. - $P' }] } }
 constraints:
+  # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
+  P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
   R:
     any:
       - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|cauchy|pareto|laplace)$' }]
@@ -59,6 +61,8 @@ rule:
   pattern: $R.isf($$$ARGS)
   has: { field: arguments, has: { nthChild: 1, any: [{ pattern: 1 - $P }, { pattern: 1.0 - $P }, { pattern: '1. - $P' }] } }
 constraints:
+  # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
+  P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
   R:
     any:
       - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|lognorm|f|cauchy|laplace)$' }]
@@ -107,6 +111,8 @@ severity: warning
 message: 1 - $P rounds away the digits of a small $P, so $F(1 - $P) lost at least 3 digits for $P below 5e-7 and gives inf below 1.1e-16, where -$F($P) lost none. Write -$F($P).
 rule: { any: [{ pattern: $F(1 - $P) }, { pattern: $F(1.0 - $P) }, { pattern: '$F(1. - $P)' }] }
 constraints:
+  # A probability written as a number is in view. Only one below 5e-7 can lose 3 digits.
+  P: { not: { any: [{ kind: integer }, { kind: float, not: { regex: '[eE]-(0?[7-9]|[1-9][0-9])$' } }] } }
   F: { any: [{ kind: attribute, regex: '\.ndtri$', has: { field: object, matches: special-module } }, { all: [{ matches: special-name }, { regex: '^ndtri$' }] }] }
 fix: (-$F($P))
 metadata: { fix: unsafe }

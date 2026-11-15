@@ -106,6 +106,7 @@ def ppf_of_complement():
         stats.norm.ppf(1 - alpha / 2),  # xpd: ppf-of-complement
         stats.t.ppf(1 - p, 10),  # xpd: ppf-of-complement
         stats.binom.ppf(1 - p, 10, 0.5),
+        stats.norm.ppf(1 - 0.05),
         stats.norm.ppf(p),
         stats.norm.isf(1.0 - p),  # xpd: ppf-of-complement
         stats.pareto.isf(1 - p, 2.5),
