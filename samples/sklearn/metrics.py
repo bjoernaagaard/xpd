@@ -171,3 +171,49 @@ def scores_first_raises():
     roc_auc_score(y_score, y_test)  # xpd: metric-arguments-swapped
     log_loss(model.predict_proba(X_test), y_test)  # xpd: metric-arguments-swapped
     precision_recall_curve(model.decision_function(X_test), y_test)  # xpd: metric-arguments-swapped
+
+
+def removed_metric_api():
+    from sklearn.metrics.ranking import roc_auc_score  # xpd: removed-metric-api
+    from sklearn.metrics.scorer import SCORERS  # xpd: removed-metric-api
+    from sklearn.metrics import jaccard_similarity_score  # xpd: removed-metric-api
+    from sklearn.metrics import accuracy_score, plot_confusion_matrix  # xpd: removed-metric-api
+    from sklearn.metrics import RocCurveDisplay, make_scorer, mean_squared_error
+
+    model, X_test, y_test = fitted()
+    y_score = model.predict_proba(X_test)[:, 1]
+    print(sorted(metrics.SCORERS))  # xpd: removed-metric-api
+    metrics.plot_roc_curve(model, X_test, y_test)  # xpd: removed-metric-api
+    mean_squared_error(y_test, y_score, squared=False)  # xpd: removed-metric-api
+    metrics.mean_squared_log_error(y_test, y_score, squared=False)  # xpd: removed-metric-api
+    make_scorer(mean_squared_error, squared=False, greater_is_better=False)  # xpd: removed-metric-api
+    log_loss(y_test, y_score, eps=1e-15)  # xpd: removed-metric-api
+    make_scorer(roc_auc_score, needs_proba=True)  # xpd: removed-metric-api
+    metrics.make_scorer(roc_auc_score, needs_threshold=True)  # xpd: removed-metric-api
+    fpr, tpr, _ = roc_curve(y_test, y_score)
+    RocCurveDisplay(fpr=fpr, tpr=tpr, estimator_name="model")  # xpd: removed-metric-api
+    RocCurveDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: removed-metric-api
+    RocCurveDisplay.from_estimator(model, X_test, y_test, label="test", color="red")  # xpd: removed-metric-api
+    RocCurveDisplay(fpr=fpr, tpr=tpr).plot(color="red")  # xpd: removed-metric-api
+    RocCurveDisplay.from_estimator(model, X_test, y_test, name="test", curve_kwargs={"color": "red"})
+    RocCurveDisplay(fpr=fpr, tpr=tpr).plot(curve_kwargs={"color": "red"})
+    return accuracy_score, SCORERS, jaccard_similarity_score, plot_confusion_matrix
+
+
+@case
+def current_metric_api():
+    from sklearn.metrics import RocCurveDisplay, get_scorer_names, jaccard_score, make_scorer, root_mean_squared_error
+
+    model, X_test, y_test = fitted()
+    y_score = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_score)
+    return (
+        model,
+        get_scorer_names(),
+        jaccard_score(y_test, model.predict(X_test)),
+        root_mean_squared_error(y_test, y_score),
+        metrics.mean_squared_error(y_test, y_score),
+        log_loss(y_test, y_score),
+        make_scorer(roc_auc_score, response_method="predict_proba")(model, X_test, y_test),
+        RocCurveDisplay(fpr=fpr, tpr=tpr, name="model").name,
+    )
