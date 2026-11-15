@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 @cache
-def server() -> "FastMCP":
+def from_env() -> "FastMCP":
     from xpd.mcp.server import build  # noqa: PLC0415  importing the package must not start one
     from xpd.mcp.settings import Settings  # noqa: PLC0415
 
@@ -18,6 +18,6 @@ def server() -> "FastMCP":
 
 def __getattr__(name: str) -> "FastMCP":
     if name == "mcp":
-        return server()
+        return from_env()
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
