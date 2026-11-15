@@ -69,6 +69,9 @@ metadata: { since: "1.9" }
 # penalty= on LogisticRegression. Since 1.8 l1_ratio picks the penalty, and its default 0.0
 # gives the L2 penalty. The fixes below hold only when l1_ratio is not passed, because a passed
 # l1_ratio would then pick the penalty instead.
+# Unsafe: with C=np.inf and solver="liblinear" the old form runs and the fixed form raises
+# ValueError, because liblinear needs a penalty. On every other input the fitted model and its
+# predictions were bit equal.
 id: deprecated-in-sklearn
 language: python
 severity: warning
@@ -102,8 +105,10 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $C($REST)
-metadata: { fix: safe, since: "1.8" }
+metadata: { fix: unsafe, since: "1.8" }
 ---
+# Unsafe: with C=np.inf and solver="liblinear" the old form runs and the fixed form raises
+# ValueError. On every other input the fitted model and its predictions were bit equal.
 id: deprecated-in-sklearn
 language: python
 severity: warning
@@ -119,7 +124,7 @@ rule:
         - has: { kind: dictionary_splat }
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
 fix: l1_ratio=1
-metadata: { fix: safe, since: "1.8" }
+metadata: { fix: unsafe, since: "1.8" }
 ---
 # The fix holds only for an l1_ratio written as a number strictly between 0 and 1. At 0 or 1 the
 # deprecated default would pick the L2 or L1 penalty instead of elasticnet.
@@ -183,6 +188,8 @@ rule:
 metadata: { since: "1.8" }
 ---
 # l1_ratio=None with the default penalty gives the L2 penalty, the same as l1_ratio=0.
+# Unsafe: with C=np.inf and solver="saga" the old form raises TypeError and the fixed form
+# runs. On every other input the fitted model and its predictions were bit equal.
 id: deprecated-in-sklearn
 language: python
 severity: warning
@@ -195,7 +202,7 @@ rule:
     not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^penalty$ } }] } }
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
 fix: l1_ratio=0
-metadata: { fix: safe, since: "1.8" }
+metadata: { fix: unsafe, since: "1.8" }
 ---
 # n_jobs=None is the default and gives no warning on 1.9.1.
 id: deprecated-in-sklearn

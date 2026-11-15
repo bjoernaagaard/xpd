@@ -1,7 +1,8 @@
 # LeaveOneOut tests one row per fold. R2 and the ranking scores need two rows or both classes in a
 # fold, so every fold scores nan with an UndefinedMetricWarning, and a search over nan scores picks
 # its first candidate. A regressor scores R2 when no scoring is given. The rule knows a regressor
-# only by its class name in the same call, or by an explicit scoring.
+# only by its class name in the same call, or by an explicit scoring. explained_variance and
+# average_precision score 1 or 0 on a fold of one row and no nan, so they are left alone.
 id: leave-one-out-score
 language: python
 severity: error
@@ -13,7 +14,7 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^scoring$' } }, { has: { field: value, pattern: $SC } }] } }
 constraints:
   F: { regex: '(^|\.)(cross_val_score|cross_validate|GridSearchCV|RandomizedSearchCV|validation_curve|learning_curve|permutation_test_score|RFECV)$' }
-  SC: { regex: '^.(r2|roc_auc\w*|average_precision|explained_variance)\W?$' }
+  SC: { regex: '^.(r2|roc_auc\w*)\W?$' }
 ---
 id: leave-one-out-score
 language: python
