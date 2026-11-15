@@ -5,8 +5,9 @@ code computes, so a copy fixed with `xpd check --fix` can be compared with this 
 """
 
 import numpy as np
+import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.preprocessing import StandardScaler
 
@@ -86,3 +87,35 @@ def cross_validate_once():
     again = cross_val_score(model, X, y, cv=5, scoring="f1")
     half = cross_val_score(model, X[:100], y[:100], cv=5, scoring="recall")
     return scores["test_accuracy"], five, three, again, half
+
+
+@case
+def predict_per_row():
+    X, y = table()
+    model = LogisticRegression().fit(X[:150], y[:150])
+    X_test = X[150:]
+    labels = [model.predict([row])[0] for row in X_test]  # xpd: predict-per-row
+    scores = []
+    for i in range(len(X_test)):
+        scores.append(model.predict_proba(X_test[i].reshape(1, -1))[0, 1])  # xpd: predict-per-row
+    frame = pd.DataFrame(X_test)
+    margins = frame.apply(lambda row: model.decision_function([row])[0], axis=1)  # xpd: apply-axis-1, predict-per-row
+    return model, np.array(labels), np.array(scores), margins.to_numpy()
+
+
+@case
+def predict_once_or_recursively():
+    X, y = table()
+    model = LogisticRegression().fit(X[:150], y[:150])
+    labels = model.predict(X[150:])
+    series = np.arange(40, dtype=float)
+    window = series[:4].copy()
+    forecaster = LinearRegression().fit(np.lib.stride_tricks.sliding_window_view(series[:-1], 4), series[4:])
+    forecast = []
+    for step in range(5):
+        forecast.append(forecaster.predict([window])[0])
+        window = np.append(window[1:], forecast[-1])
+    rows = X[150:160].copy()
+    for i in range(len(rows) - 1):
+        rows[i + 1, 0] = model.predict_proba([rows[i]])[0, 1]
+    return labels, forecast, rows
