@@ -2,7 +2,8 @@
 # distribution in research/scipy-rules/digits/runs/dists.jsonl, and sf was never 1 digit or more
 # worse. For stats.norm the old form lost 3 or more digits above 4.25 and gave 0 above 8.3, in
 # research/scipy-rules/digits/runs/grid.jsonl. lognorm, f, poisson, binom and nbinom are not
-# listed, because their sf did not meet the bar. Unsafe. The last bits change, and a subclass can
+# listed, because their sf did not meet the bar. geom is not listed either: its sf lost 1.4 to 2.7
+# digits from k = 60 to 1,000 in research/scipy-rules/eval/crosscheck/digits-lists-extra.txt. Unsafe. The last bits change, and a subclass can
 # define sf apart from 1 - cdf.
 id: cdf-complement
 language: python
@@ -12,8 +13,8 @@ rule: { all: [{ any: [{ pattern: 1 - $R.cdf($$$A) }, { pattern: 1.0 - $R.cdf($$$
 constraints:
   R:
     any:
-      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|cauchy|geom|pareto|laplace)$' }]
-      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|cauchy|geom|pareto|laplace)$' }] } }
+      - all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|cauchy|pareto|laplace)$' }]
+      - { kind: call, has: { field: function, all: [{ matches: scipy-dist }, { regex: '(^|\.)(norm|t|chi2|gamma|expon|logistic|beta|cauchy|pareto|laplace)$' }] } }
 fix: $R.sf($$$A)
 metadata: { fix: unsafe }
 utils:
