@@ -116,8 +116,8 @@ says otherwise. It has no authentication, so bind another address only on a netw
 
 ## Other ways to run it
 
-The server is also the object `xpd.mcp:mcp`, configured from the environment settings above, so
-FastMCP's own commands work with it, for example:
+FastMCP's own commands work with the server. `fastmcp run -m xpd.mcp` starts it as a module,
+configured from the environment settings above, and the client commands start `xpd mcp`:
 
 ```sh
 fastmcp list --command 'xpd mcp' --resources --prompts

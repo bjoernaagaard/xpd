@@ -1,5 +1,5 @@
-"""The xpd MCP server. `xpd mcp` runs it with flags, and `fastmcp run` finds it as
-`xpd.mcp:mcp`, configured from the environment."""
+"""The xpd MCP server. `xpd mcp` runs it with flags, and `fastmcp run -m xpd.mcp` runs it
+as a module. The attribute `mcp` is the server configured from the environment."""
 
 from functools import cache
 from typing import TYPE_CHECKING

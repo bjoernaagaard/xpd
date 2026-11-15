@@ -34,4 +34,5 @@ Use `xpd` whenever you write or change Python code.
 
 When the xpd MCP server is connected, call its tools (`check`, `fix`, `graph`,
 `profile`, `equiv`, `rules`, `rule`) instead of the shell commands. They take
-the same paths and return the same JSON.
+the same paths and return the same JSON, except that `rules` lists the rules
+without their documentation and `rule` returns one rule with it.

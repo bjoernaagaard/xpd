@@ -80,7 +80,8 @@ async def confirmed(ctx: Context, message: str) -> bool | InputRequiredResult:
     answer = responses[CONFIRM]
     if not isinstance(answer, ElicitResult) or answer.action != "accept" or not answer.content:
         return False
-    return bool(answer.content.get("confirm"))
+    # Only the boolean counts, so a text answer such as "false" does not confirm.
+    return answer.content.get("confirm") is True
 
 
 def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
