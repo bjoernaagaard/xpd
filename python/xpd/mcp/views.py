@@ -68,7 +68,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             paths: Files or folders inside the project root. Default: the whole root.
         """
-        report = await run(ctx, xpd, CHECK, *root.all_inside(paths or ["."]))
+        report = await run(ctx, xpd, CHECK, root.all_inside(paths or ["."]))
         rows = [
             {
                 "place": f"{issue.file}:{issue.line}" if issue.line else issue.file,
@@ -107,7 +107,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             paths: Files or folders inside the project root.
         """
-        report = await run(ctx, xpd, GRAPH, *root.all_inside(paths))
+        report = await run(ctx, xpd, GRAPH, root.all_inside(paths))
         rows = [
             {
                 "place": f"{problem.file}:{problem.line}",
@@ -135,7 +135,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             file: The data file, inside the project root.
         """
-        profile = await run(ctx, xpd, PROFILE, root.inside(file))
+        profile = await run(ctx, xpd, PROFILE, [root.inside(file)])
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             with Row(gap=6):
                 Metric(label="rows", value=profile.rows)

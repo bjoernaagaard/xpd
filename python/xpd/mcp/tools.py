@@ -1,5 +1,7 @@
 """The tools that run xpd on the project's files."""
 
+from collections.abc import Sequence
+
 from fastmcp import Context, FastMCP
 from mcp.types import (
     ElicitRequest,
@@ -31,12 +33,12 @@ RUNS_CODE = ToolAnnotations(
 CONFIRM = "confirm_unsafe_fixes"
 
 
-async def run(ctx: Context, xpd: Xpd, command: Command[T], *args: str) -> T:
+async def run(ctx: Context, xpd: Xpd, command: Command[T], paths: Sequence[str], *flags: str) -> T:
     """Runs one command with progress and a log line, which also reach a background task."""
-    shown = " ".join(["xpd", *command.args[:1], *args])
+    shown = " ".join(["xpd", *command.args[:1], *flags, *paths])
     await ctx.report_progress(0, 1, shown)
     await ctx.info(f"running {shown}")
-    result = await xpd.run(command, *args)
+    result = await xpd.run(command, paths, *flags)
     await ctx.report_progress(1, 1, f"{shown} finished")
     return result
 
@@ -102,7 +104,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         """
         args = root.all_inside(paths or ["."])
         flags = ["--unsafe-fixes"] if unsafe_fixes else []
-        return await run(ctx, xpd, CHECK, *flags, *args)
+        return await run(ctx, xpd, CHECK, args, *flags)
 
     @mcp.tool(tags={"lint", "fix"}, annotations=WRITES, task=True)
     async def fix(
@@ -119,7 +121,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         """
         args = root.all_inside(paths or ["."])
         if unsafe:
-            preview = await run(ctx, xpd, CHECK, "--unsafe-fixes", *args)
+            preview = await run(ctx, xpd, CHECK, args, "--unsafe-fixes")
             unsafe_count = sum(issue.fix == "unsafe" for issue in preview.issues)
             if unsafe_count:
                 where = ", ".join(args)
@@ -134,7 +136,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
                     await ctx.info("unsafe fixes declined, so only safe fixes are written")
                     unsafe = False
         flags = ["--fix", "--unsafe-fixes"] if unsafe else ["--fix"]
-        return await run(ctx, xpd, CHECK, *flags, *args)
+        return await run(ctx, xpd, CHECK, args, *flags)
 
     @mcp.tool(tags={"dataflow"}, annotations=READS)
     async def graph(ctx: Context, paths: list[str]) -> GraphReport:
@@ -149,7 +151,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             paths: Files or folders inside the project root.
         """
-        return await run(ctx, xpd, GRAPH, *root.all_inside(paths))
+        return await run(ctx, xpd, GRAPH, root.all_inside(paths))
 
     @mcp.tool(tags={"data"}, annotations=READS, task=True)
     async def profile(ctx: Context, file: str) -> Profile:
@@ -160,7 +162,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             file: The data file, inside the project root.
         """
-        return await run(ctx, xpd, PROFILE, root.inside(file))
+        return await run(ctx, xpd, PROFILE, [root.inside(file)])
 
     @mcp.tool(tags={"data", "refactor"}, annotations=RUNS_CODE, task=True)
     async def equiv(ctx: Context, old: str, new: str) -> Equivalence:
@@ -173,4 +175,4 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
             old: The script before the refactor, inside the project root.
             new: The script after the refactor, inside the project root.
         """
-        return await run(ctx, xpd, EQUIV, root.inside(old), root.inside(new))
+        return await run(ctx, xpd, EQUIV, [root.inside(old), root.inside(new)])

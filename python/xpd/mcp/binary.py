@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, TypeVar
@@ -41,6 +42,12 @@ RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]), SUCCESS)
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]), SUCCESS)
 
 
+def argv(paths: Sequence[str], flags: Sequence[str]) -> tuple[str, ...]:
+    """The arguments after the command. A client names the paths, so they follow `--`, which
+    keeps a path such as `--fix` from being read as a flag."""
+    return (*flags, "--", *paths)
+
+
 def find_binary() -> Path:
     """`XPD_BIN`, which `xpd mcp` sets, then the scripts folder of this Python, then `PATH`."""
     name = "xpd.exe" if sys.platform == "win32" else "xpd"
@@ -63,7 +70,8 @@ class Xpd:
     binary: Path
     root: Path
 
-    async def run(self, command: Command[T], *args: str) -> T:
+    async def run(self, command: Command[T], paths: Sequence[str], *flags: str) -> T:
+        args = argv(paths, flags)
         process = await asyncio.create_subprocess_exec(
             self.binary,
             *command.args,
@@ -76,16 +84,16 @@ class Xpd:
         stdout, stderr = await process.communicate()
         return self._parse(command, args, process.returncode, stdout, stderr)
 
-    def run_now(self, command: Command[T], *args: str) -> T:
+    def run_now(self, command: Command[T]) -> T:
         """Runs a command that answers at once, for what the server needs before it starts."""
         done = subprocess.run(  # noqa: S603  the binary and its arguments come from this module
-            [self.binary, *command.args, *args],
+            [self.binary, *command.args],
             cwd=self.root,
             stdin=subprocess.DEVNULL,
             capture_output=True,
             check=False,
         )
-        return self._parse(command, args, done.returncode, done.stdout, done.stderr)
+        return self._parse(command, (), done.returncode, done.stdout, done.stderr)
 
     def version(self) -> str:
         done = subprocess.run(  # noqa: S603  the binary comes from find_binary
