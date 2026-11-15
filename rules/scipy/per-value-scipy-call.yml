@@ -127,13 +127,13 @@ utils:
 ---
 # A scipy.stats distribution frozen once per value of a comprehension, then evaluated. Freezing
 # checks the parameters in Python. For 1,000 means and 1,000 points, one call with the means as
-# a column ran 4.9 to 18 times faster, and 18 to 49 times for 10 means and 100 points, on float64
+# a column ran 4.9 to 23 times faster, and 18 to 49 times for 10 means and 100 points, on float64
 # and float32, with bit equal results, in speed/runs/bench.jsonl and bench2.jsonl. No fix,
 # because the parameters need an axis when the points are an array too.
 id: per-value-scipy-call
 language: python
 severity: warning
-message: This freezes $D once per value of $IT. Call $D.$METH once with np.asarray($IT) in place of $X, as a column with [:, None] when the points are an array, which ran 4.9 to 18 times faster for 1,000 values of $X and 1,000 points.
+message: This freezes $D once per value of $IT. Call $D.$METH once with np.asarray($IT) in place of $X, as a column with [:, None] when the points are an array, which ran 4.9 to 23 times faster for 1,000 values of $X and 1,000 points.
 rule:
   kind: call
   pattern: $CALL
