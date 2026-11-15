@@ -44,22 +44,23 @@ constraints:
 # The Pipeline of scikit-learn calls transform on every step but the last, and a sampler has
 # only fit_resample, so fit raises TypeError. A sampler as the last step fits and is left
 # alone. The Pipeline of imbalanced-learn takes samplers, so files that import from
-# imblearn.pipeline are left alone, because the name may be that one.
+# imblearn.pipeline are left alone, because the name may be that one. The import tests read the
+# whole file, so the sampler name is tested first in all, which keeps its order. ast-grep checks
+# constraints only after the whole rule.
 id: pipeline-step-form
 language: python
 severity: error
 message: $S is a sampler, and the Pipeline of scikit-learn raises TypeError at fit on it. Import Pipeline or make_pipeline from imblearn.pipeline, which applies the sampler to the training rows only.
 rule:
   pattern: $S($$$A)
-  any:
-    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(make_pipeline|pipeline\.make_pipeline|sklearn\.pipeline\.make_pipeline)$' } } }
-      precedes: { stopBy: end, regex: '\w' }
-    - inside:
-        kind: tuple
-        precedes: { stopBy: end, kind: tuple }
-        inside: { kind: list, inside: { stopBy: end, kind: call, has: { field: function, regex: '^(Pipeline|pipeline\.Pipeline|sklearn\.pipeline\.Pipeline)$' } } }
   all:
+    - has: { field: function, regex: '(^|\.)(SMOTE|SMOTENC|SMOTEN|ADASYN|BorderlineSMOTE|SVMSMOTE|KMeansSMOTE|RandomOverSampler|RandomUnderSampler|NearMiss|TomekLinks|EditedNearestNeighbours|RepeatedEditedNearestNeighbours|AllKNN|CondensedNearestNeighbour|OneSidedSelection|NeighbourhoodCleaningRule|InstanceHardnessThreshold|ClusterCentroids|SMOTEENN|SMOTETomek)$' }
+    - any:
+        - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(make_pipeline|pipeline\.make_pipeline|sklearn\.pipeline\.make_pipeline)$' } } }
+          precedes: { stopBy: end, regex: '\w' }
+        - inside:
+            kind: tuple
+            precedes: { stopBy: end, kind: tuple }
+            inside: { kind: list, inside: { stopBy: end, kind: call, has: { field: function, regex: '^(Pipeline|pipeline\.Pipeline|sklearn\.pipeline\.Pipeline)$' } } }
     - inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_from_statement, has: { field: module_name, regex: ^sklearn\.pipeline$ } }, { kind: import_from_statement, has: { field: module_name, regex: ^sklearn$ }, regex: '\bpipeline\b' }, { kind: import_statement, regex: '\bsklearn\.pipeline\b' }] } }
     - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_from_statement, regex: '\bimblearn\b.*\bpipeline\b|\bimblearn\.pipeline\b' }, { kind: import_statement, regex: '\bimblearn\.pipeline\b' }] } } }
-constraints:
-  S: { regex: '(^|\.)(SMOTE|SMOTENC|SMOTEN|ADASYN|BorderlineSMOTE|SVMSMOTE|KMeansSMOTE|RandomOverSampler|RandomUnderSampler|NearMiss|TomekLinks|EditedNearestNeighbours|RepeatedEditedNearestNeighbours|AllKNN|CondensedNearestNeighbour|OneSidedSelection|NeighbourhoodCleaningRule|InstanceHardnessThreshold|ClusterCentroids|SMOTEENN|SMOTETomek)$' }
