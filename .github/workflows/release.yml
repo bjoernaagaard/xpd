@@ -62,6 +62,14 @@ jobs:
         if: matrix.platform.target == 'x86_64'
         shell: bash
         run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
+      # FastMCP's own client starts `xpd mcp` from the wheel with the mcp extra and calls a tool.
+      - name: Smoke test the MCP server
+        if: matrix.platform.target == 'x86_64'
+        shell: bash
+        run: |
+          wheel=$(ls dist/*.whl)
+          uv run --isolated --no-project --python 3.11 --with "xpd[mcp] @ ./$wheel" -- \
+            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -124,6 +132,15 @@ jobs:
       - name: Smoke test the wheel
         shell: bash
         run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
+      # FastMCP's own client starts `xpd mcp` from the wheel with the mcp extra and calls a tool.
+      # PyPI has no Windows on Arm wheel of PyYAML for Python 3.11, which the mcp extra needs.
+      - name: Smoke test the MCP server
+        if: matrix.platform.target == 'x64'
+        shell: bash
+        run: |
+          wheel=$(ls dist/*.whl)
+          uv run --isolated --no-project --python 3.11 --with "xpd[mcp] @ ./$wheel" -- \
+            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -158,6 +175,13 @@ jobs:
       - name: Smoke test the wheel
         shell: bash
         run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
+      # FastMCP's own client starts `xpd mcp` from the wheel with the mcp extra and calls a tool.
+      - name: Smoke test the MCP server
+        shell: bash
+        run: |
+          wheel=$(ls dist/*.whl)
+          uv run --isolated --no-project --python 3.11 --with "xpd[mcp] @ ./$wheel" -- \
+            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -230,6 +254,10 @@ jobs:
             sleep 20
           done
           exit 1
+      # The same version with the mcp extra, started and called through FastMCP's own client.
+      - run: |
+          uv run --isolated --no-project --python 3.11 --with "xpd[mcp]==${GITHUB_REF_NAME#v}" -- \
+            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
 
   github-release:
     name: GitHub Release

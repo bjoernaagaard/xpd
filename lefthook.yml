@@ -22,7 +22,8 @@ pre-commit:
       stage_fixed: true
     - name: jactionlint
       glob: ".github/**/*.yml"
-      run: jactionlint
+      # Without paths, jactionlint also lints workflows in ignored folders, such as research/.
+      run: jactionlint {staged_files}
 
 pre-push:
   jobs:
