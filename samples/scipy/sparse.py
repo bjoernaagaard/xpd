@@ -9,6 +9,8 @@ import scipy
 import scipy.sparse as sp
 from scipy import sparse
 from scipy.sparse import csc_array, csr_matrix, eye
+from scipy.sparse import linalg as spla
+from scipy.sparse.linalg import inv, spsolve
 
 CASES = {}
 
@@ -47,6 +49,12 @@ def array_builders():
 
 
 @case
+def both_kinds_in_one_list():
+    d = np.eye(2)
+    return [sp.csr_matrix(d).toarray(), sp.csr_array(d).toarray()]
+
+
+@case
 def matrix_kept_for_old_scipy(old_scipy=False):
     d = np.eye(2)
     if old_scipy:
@@ -63,13 +71,14 @@ def matrix_on_request(kind="matrix"):
 
 
 def empty_csr_writes(rows, cols, vals):
-    a = sp.csr_matrix((4, 4))
+    a = sp.csr_matrix((4, 4))  # xpd: empty-csr-write
     for i, j, v in zip(rows, cols, vals):
-        a[i, j] = v  # xpd: empty-csr-write
-    b = sparse.csc_array((4, 4), dtype=np.float32)
-    b[0, 1] += 2.0  # xpd: empty-csr-write
-    c = sp.csr_array(np.zeros((4, 4)).shape)
-    c[1, :] = np.ones(4)  # xpd: empty-csr-write
+        a[i, j] = v
+    b = sparse.csc_array((4, 4), dtype=np.float32)  # xpd: empty-csr-write
+    b[0, 1] += 2.0
+    c = sp.csr_array(np.zeros((4, 4)).shape)  # xpd: empty-csr-write
+    if len(rows):
+        c[1, :] = np.ones(4)
     return a, b, c
 
 
@@ -87,3 +96,47 @@ def writes_that_do_not_warn():
     d = d.tolil()
     d[0, 1] = 1.0
     return a.tocsr().toarray(), b.toarray(), c.toarray(), d.toarray()
+
+
+def poisson(n):
+    t = sp.diags_array([-1.0, 2.0, -1.0], offsets=[-1, 0, 1], shape=(n, n))
+    return (sp.kron(sp.eye_array(n), t) + sp.kron(t, sp.eye_array(n))).tocsc()
+
+
+@case
+def sparse_inverse_then_product():
+    a = poisson(4)
+    b = np.arange(16.0)
+    x = spla.inv(a) @ b  # xpd: sparse-inv-then-multiply
+    y = inv(a).dot(b)  # xpd: sparse-inv-then-multiply
+    z = spla.spsolve(a, b)
+    w = spla.inv(a)
+    return x, y, z, w.toarray()
+
+
+@case
+def spsolve_per_pass():
+    a = poisson(4)
+    sides = np.arange(48.0).reshape(3, 16)
+    xs = [spla.spsolve(a, b) for b in sides]  # xpd: solve-in-loop
+    ys = []
+    for b in sides:
+        ys.append(spsolve(a, b))  # xpd: solve-in-loop
+    return np.array(xs), np.array(ys)
+
+
+@case
+def spsolve_with_a_new_matrix():
+    a = poisson(4)
+    eye16 = sp.eye_array(16, format="csc")
+    sides = np.arange(48.0).reshape(3, 16)
+    xs = [spla.spsolve(a + s * eye16, b) for s, b in zip((1.0, 2.0, 3.0), sides)]
+    ys = []
+    for m in (a, 2 * a):
+        ys.append(spla.spsolve(m, sides[0]))
+    lu = spla.splu(a)
+    zs = [lu.solve(b) for b in sides]
+    for k in range(2):
+        a = a + eye16
+        zs.append(spla.spsolve(a, sides[k]))
+    return np.array(xs), np.array(ys), np.array(zs)

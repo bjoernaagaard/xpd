@@ -1,0 +1,72 @@
+# A SciPy metric function called inside a comprehension or a loop computes one distance per
+# Python call. On 1,000 by 1,000 points of 3 dimensions cdist ran 960 to 9,600 times faster
+# than a nested comprehension of euclidean, cityblock or cosine, and 30 to 790 times faster on
+# 25 by 40 points, on float64 and float32, in speed/runs/bench.jsonl and bench2.jsonl. The cost
+# is 23 Python calls of input checks and norms per pair, in speed/runs/profile_loops.txt. No fix, because the loop decides which pairs
+# are wanted.
+id: distance-per-pair
+language: python
+severity: warning
+message: This calls $F once per pair of points. Stack the points into arrays and call cdist(XA, XB, '$F') once, or pdist(X, '$F') for the pairs within one array, which ran 960 to 9,600 times faster on 1,000,000 pairs.
+rule:
+  kind: call
+  all:
+    - has:
+        field: function
+        any:
+          - { pattern: $D.$F, matches: distance-module }
+          - { kind: identifier, pattern: $F, matches: from-distance }
+    - inside:
+        stopBy: { kind: function_definition }
+        any:
+          - kind: list_comprehension
+          - kind: generator_expression
+          - kind: set_comprehension
+          - kind: dictionary_comprehension
+          - { kind: block, inside: { any: [{ kind: for_statement }, { kind: while_statement }] } }
+constraints:
+  F: { regex: '^(braycurtis|canberra|chebyshev|cityblock|correlation|cosine|dice|euclidean|hamming|jaccard|jensenshannon|mahalanobis|minkowski|rogerstanimoto|russellrao|seuclidean|sokalsneath|sqeuclidean|yule)$' }
+utils:
+  distance-module:
+    any:
+      - has: { field: object, regex: '^scipy\.spatial\.distance$' }
+      - all:
+          - has: { field: object, pattern: $S.spatial.distance }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $P.distance }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.spatial$' } }, { has: { field: alias, pattern: $P } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $P, regex: '^spatial$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^spatial$' } }, { has: { field: alias, pattern: $P } }] }
+      - all:
+          - has: { field: object, pattern: $D }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.spatial\.distance$' } }, { has: { field: alias, pattern: $D } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy\.spatial$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $D, regex: '^distance$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^distance$' } }, { has: { field: alias, pattern: $D } }] }
+  from-distance:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.spatial\.distance$' } }, { has: { kind: dotted_name, pattern: $F } }]

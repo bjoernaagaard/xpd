@@ -23,13 +23,14 @@ transform:
   ARR: { replace: { source: $N, replace: '_matrix$', by: _array } }
 metadata: { since: "1.8" }
 utils:
-  # A function that also names a sparse array class, or a branch taken on a condition that
-  # names a matrix, builds the matrix on purpose, as code that supports both kinds does.
+  # A function or a literal list, tuple or dict that also names a sparse array class, or a branch
+  # taken on a condition that names a matrix, builds the matrix on purpose, as code that supports
+  # both kinds does.
   chose-matrix:
     any:
       - inside:
           stopBy: end
-          kind: function_definition
+          any: [{ kind: function_definition }, { kind: list }, { kind: tuple }, { kind: dictionary }]
           has: { stopBy: end, kind: identifier, regex: '^((csr|csc|coo|lil|dok|bsr|dia)_array|sparray|eye_array|diags_array|random_array|block_array)$' }
       - inside:
           stopBy: end
@@ -92,13 +93,14 @@ transform:
   NEW: { replace: { source: $T4, replace: '^bmat$', by: block_array } }
 metadata: { since: "1.11" }
 utils:
-  # A function that also names a sparse array class, or a branch taken on a condition that
-  # names a matrix, builds the matrix on purpose, as code that supports both kinds does.
+  # A function or a literal list, tuple or dict that also names a sparse array class, or a branch
+  # taken on a condition that names a matrix, builds the matrix on purpose, as code that supports
+  # both kinds does.
   chose-matrix:
     any:
       - inside:
           stopBy: end
-          kind: function_definition
+          any: [{ kind: function_definition }, { kind: list }, { kind: tuple }, { kind: dictionary }]
           has: { stopBy: end, kind: identifier, regex: '^((csr|csc|coo|lil|dok|bsr|dia)_array|sparray|eye_array|diags_array|random_array|block_array)$' }
       - inside:
           stopBy: end

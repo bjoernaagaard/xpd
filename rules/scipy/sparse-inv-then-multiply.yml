@@ -1,0 +1,117 @@
+# sparse.linalg.inv solves for every column of the identity and stores the whole inverse, which
+# is dense for most matrices. On a tridiagonal csc matrix spsolve ran 260 to 620 times faster with
+# n = 1,000, where the inverse holds 1,000,000 values, and 21 to 53 times with n = 32, on float64
+# and float32, in speed/runs/bench.jsonl and bench2.jsonl. Unsafe: the last bits differ, and
+# spsolve returns a 1-D result for a b of shape (n, 1).
+id: sparse-inv-then-multiply
+language: python
+severity: warning
+message: $L.inv($A) builds the whole inverse, which is dense for most sparse matrices. Write $L.spsolve($A, $B), which ran 260 to 620 times faster with an inverse of 1,000,000 values.
+rule:
+  any:
+    - pattern: $L.inv($A) @ $B
+    - pattern: $L.inv($A).dot($B)
+  has: { stopBy: end, kind: attribute, pattern: $L.inv, matches: sparse-linalg }
+fix: $L.spsolve($A, $B)
+metadata: { fix: unsafe }
+utils:
+  sparse-linalg:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse\.linalg$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse.linalg }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $P.linalg }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $P } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $P, regex: '^sparse$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $P } }] }
+      - all:
+          - has: { field: object, pattern: $L }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse\.linalg$' } }, { has: { field: alias, pattern: $L } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy\.sparse$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $L, regex: '^linalg$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^linalg$' } }, { has: { field: alias, pattern: $L } }] }
+  from-sparse-linalg:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.sparse\.linalg$' } }, { has: { kind: dotted_name, pattern: $F } }]
+---
+# The same product with inv imported by name. No fix, because spsolve may not be imported.
+id: sparse-inv-then-multiply
+language: python
+severity: warning
+message: inv($A) builds the whole inverse, which is dense for most sparse matrices. Write spsolve($A, $B) from scipy.sparse.linalg, which ran 260 to 620 times faster with an inverse of 1,000,000 values.
+rule:
+  any:
+    - pattern: $F($A) @ $B
+    - pattern: $F($A).dot($B)
+  has: { stopBy: end, kind: identifier, pattern: $F, matches: from-sparse-linalg }
+constraints:
+  F: { regex: '^inv$' }
+utils:
+  sparse-linalg:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse\.linalg$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse.linalg }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $P.linalg }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $P } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $P, regex: '^sparse$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $P } }] }
+      - all:
+          - has: { field: object, pattern: $L }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse\.linalg$' } }, { has: { field: alias, pattern: $L } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy\.sparse$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $L, regex: '^linalg$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^linalg$' } }, { has: { field: alias, pattern: $L } }] }
+  from-sparse-linalg:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.sparse\.linalg$' } }, { has: { kind: dotted_name, pattern: $F } }]

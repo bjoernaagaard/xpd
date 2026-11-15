@@ -1,0 +1,118 @@
+# A scipy.special ufunc called once per value of a comprehension. On 1,000,000 values the
+# ufunc called once on the array ran 7 to 23 times faster for gamma and erf, and 5 to 9 times
+# faster on 1,000 values, on float64 and float32, in speed/runs/bench.jsonl and bench2.jsonl,
+# with bit equal results. The cost is the Python call and the scalar boxing per value. No fix,
+# because the loop may run over a list of arrays or a generator.
+id: per-value-scipy-call
+language: python
+severity: warning
+message: This calls $F once per value of $IT, and $F is a NumPy ufunc that takes the whole array. Write $F with np.asarray($IT) in place of $X, which ran 7 to 23 times faster on 1,000,000 values.
+rule:
+  kind: call
+  pattern: $CALL
+  # all keeps the order, so the comprehension binds $X before the arguments are searched for it.
+  all:
+    - inside: { matches: per-value }
+    - has: { field: function, any: [{ pattern: $M.$F, matches: special-module }, { kind: identifier, pattern: $F, matches: from-special }] }
+    - has: { field: arguments, has: { stopBy: end, pattern: $X } }
+constraints:
+  F: { regex: '^(agm|airy|airye|bdtr|bdtrc|bdtri|bdtrik|bdtrin|bei|beip|ber|berp|besselpoly|beta|betainc|betaincc|betainccinv|betaincinv|betaln|binom|boxcox|boxcox1p|btdtria|btdtrib|cbrt|chdtr|chdtrc|chdtri|chdtriv|chndtr|chndtridf|chndtrinc|chndtrix|cosdg|cosm1|cotdg|dawsn|digamma|ellipe|ellipeinc|ellipj|ellipk|ellipkinc|ellipkm1|elliprc|elliprd|elliprf|elliprg|elliprj|entr|erf|erfc|erfcinv|erfcx|erfi|erfinv|eval_chebyc|eval_chebys|eval_chebyt|eval_chebyu|eval_gegenbauer|eval_genlaguerre|eval_hermite|eval_hermitenorm|eval_jacobi|eval_laguerre|eval_legendre|eval_sh_chebyt|eval_sh_chebyu|eval_sh_jacobi|eval_sh_legendre|exp1|exp10|exp2|expi|expit|expm1|expn|exprel|fdtr|fdtrc|fdtri|fdtridfd|fresnel|gamma|gammainc|gammaincc|gammainccinv|gammaincinv|gammaln|gammasgn|gdtr|gdtrc|gdtria|gdtrib|gdtrix|hankel1|hankel1e|hankel2|hankel2e|huber|hyp0f1|hyp1f1|hyp2f1|hyperu|i0|i0e|i1|i1e|inv_boxcox|inv_boxcox1p|it2i0k0|it2j0y0|it2struve0|itairy|iti0k0|itj0y0|itmodstruve0|itstruve0|iv|ive|j0|j1|jn|jv|jve|k0|k0e|k1|k1e|kei|keip|kelvin|ker|kerp|kl_div|kn|kolmogi|kolmogorov|kv|kve|log1p|log_expit|log_ndtr|log_wright_bessel|loggamma|logit|lpmv|mathieu_a|mathieu_b|mathieu_cem|mathieu_modcem1|mathieu_modcem2|mathieu_modsem1|mathieu_modsem2|mathieu_sem|modfresnelm|modfresnelp|modstruve|nbdtr|nbdtrc|nbdtri|nbdtrik|nbdtrin|ncfdtr|ncfdtri|ncfdtridfd|ncfdtridfn|ncfdtrinc|nctdtr|nctdtridf|nctdtrinc|nctdtrit|ndtr|ndtri|ndtri_exp|nrdtrimn|nrdtrisd|obl_ang1|obl_ang1_cv|obl_cv|obl_rad1|obl_rad1_cv|obl_rad2|obl_rad2_cv|owens_t|pbdv|pbvv|pbwa|pdtr|pdtrc|pdtri|pdtrik|poch|powm1|pro_ang1|pro_ang1_cv|pro_cv|pro_rad1|pro_rad1_cv|pro_rad2|pro_rad2_cv|pseudo_huber|psi|radian|rel_entr|rgamma|round|shichi|sici|sindg|smirnov|smirnovi|spence|stdtr|stdtridf|stdtrit|struve|tandg|tklmbda|voigt_profile|wofz|wright_bessel|wrightomega|xlog1py|xlogy|y0|y1|yn|yv|yve|zetac)$' }
+  X: { kind: identifier }
+utils:
+  # One for clause over a name, no if clause, and the element is the call itself with the loop
+  # name as one of its arguments.
+  per-value:
+    any: [{ kind: list_comprehension }, { kind: generator_expression }]
+    all:
+      - has: { field: body, pattern: $CALL }
+      - has: { kind: for_in_clause, all: [{ has: { field: left, kind: identifier, pattern: $X } }, { has: { field: right, pattern: $IT } }] }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  special-module:
+    any:
+      - has: { field: object, regex: '^scipy\.special$' }
+      - all:
+          - has: { field: object, pattern: $S.special }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $M }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.special$' } }, { has: { field: alias, pattern: $M } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $M, regex: '^special$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $M } }] }
+  from-special:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $F } }]
+---
+# A scipy.stats distribution frozen once per value of a comprehension, then evaluated. Freezing
+# checks the parameters in Python. For 1,000 means and 1,000 points, one call with the means as
+# a column ran 4.9 to 18 times faster, and 18 to 49 times for 10 means and 100 points, on float64
+# and float32, with bit equal results, in speed/runs/bench.jsonl and bench2.jsonl. No fix,
+# because the parameters need an axis when the points are an array too.
+id: per-value-scipy-call
+language: python
+severity: warning
+message: This freezes $D once per value of $IT. Call $D.$METH once with np.asarray($IT) in place of $X, as a column with [:, None] when the points are an array, which ran 4.9 to 18 times faster for 1,000 values of $X and 1,000 points.
+rule:
+  kind: call
+  pattern: $CALL
+  all:
+    - inside: { matches: per-value }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, pattern: $METH } }, { has: { field: object, kind: call, all: [{ has: { field: function, any: [{ pattern: $M.$D, matches: stats-module-of }, { kind: identifier, pattern: $D, matches: from-stats-name }] } }, { has: { field: arguments, has: { stopBy: end, pattern: $X } } }] } }] }
+constraints:
+  D: { regex: '^(alpha|anglit|arcsine|argus|bernoulli|beta|betabinom|betanbinom|betaprime|binom|boltzmann|bradford|burr|burr12|cauchy|chi|chi2|cosine|crystalball|dgamma|dlaplace|dpareto_lognorm|dweibull|erlang|expon|exponnorm|exponpow|exponweib|f|fatiguelife|fisk|foldcauchy|foldnorm|gamma|gausshyper|genexpon|genextreme|gengamma|genhalflogistic|genhyperbolic|geninvgauss|genlogistic|gennorm|genpareto|geom|gibrat|gompertz|gumbel_l|gumbel_r|halfcauchy|halfgennorm|halflogistic|halfnorm|hypergeom|hypsecant|invgamma|invgauss|invweibull|irwinhall|jf_skew_t|johnsonsb|johnsonsu|kappa3|kappa4|ksone|kstwo|kstwobign|landau|laplace|laplace_asymmetric|levy|levy_l|levy_stable|loggamma|logistic|loglaplace|lognorm|logser|loguniform|lomax|maxwell|mielke|moyal|nakagami|nbinom|ncf|nchypergeom_fisher|nchypergeom_wallenius|nct|ncx2|nhypergeom|norm|norminvgauss|pareto|pearson3|planck|poisson|poisson_binom|powerlaw|powerlognorm|powernorm|randint|rayleigh|rdist|recipinvgauss|reciprocal|rel_breitwigner|rice|semicircular|skellam|skewcauchy|skewnorm|studentized_range|t|trapezoid|triang|truncexpon|truncnorm|truncpareto|truncweibull_min|tukeylambda|uniform|vonmises|vonmises_line|wald|weibull_max|weibull_min|wrapcauchy|yulesimon|zipf|zipfian)$' }
+  METH: { regex: '^(pdf|logpdf|cdf|logcdf|sf|logsf|ppf|isf|pmf|logpmf)$' }
+  X: { kind: identifier }
+utils:
+  # One for clause over a name, no if clause, and the element is the call itself with the loop
+  # name as one of its arguments.
+  per-value:
+    any: [{ kind: list_comprehension }, { kind: generator_expression }]
+    all:
+      - has: { field: body, pattern: $CALL }
+      - has: { kind: for_in_clause, all: [{ has: { field: left, kind: identifier, pattern: $X } }, { has: { field: right, pattern: $IT } }] }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  stats-module-of:
+    matches: stats-module
+  stats-module:
+    any:
+      - has: { field: object, regex: '^scipy\.stats$' }
+      - all:
+          - has: { field: object, pattern: $S.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $M }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $M } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $M, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $M } }] }
+  from-stats-name:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $D } }]
