@@ -1,40 +1,4366 @@
-# scipy.integrate.trapz, cumtrapz and simps raise AttributeError on SciPy 1.18.1, in
-# research/scipy-rules/removed/runs/probe_scaffold.jsonl. A name counts as SciPy's only when it
-# is rooted at scipy or the file's own imports bind it from scipy.
+# Written by research/scipy-rules/removed/gen_rules.py from the probe table in runs/probe.jsonl.
+# Every old form here raises under `python -W error` on SciPy 1.18.1, saved in runs/proof.jsonl.
+# Code under a SciPy version check, a hasattr check, or a try that catches ImportError or
+# AttributeError is left alone, because it exists for old SciPy.
+# statsmodels replaced `from scipy.integrate import trapz` with `trapezoid` (93f56dc2b2, 410bf74b3e
+# in runs/pairs.txt). The old bodies are not in the research material, so the fix is unsafe.
 id: removed-in-scipy
 language: python
 severity: error
-message: scipy.integrate.$N was removed from SciPy and raises AttributeError. Write $NEW.
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. Write $OBJ.$NEW.
 rule:
-  kind: attribute
-  pattern: $M.$N
-  not: { inside: { kind: assignment, field: left } }
-  any:
-    - has: { field: object, regex: '^scipy\.integrate$' }
-    - all:
-        - has: { field: object, pattern: $S.integrate }
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(cumtrapz|simps|trapz)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.integrate$
+      - pattern: $S.integrate
+        any:
         - inside:
             stopBy: end
             kind: module
             has:
-              kind: import_statement
-              has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] }
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.integrate$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^integrate$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^integrate$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
     - inside:
+        kind: if_statement
         stopBy: end
-        kind: module
         has:
-          any:
-            - kind: import_statement
-              has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.integrate$' } }, { has: { field: alias, pattern: $M } }] }
-            - kind: import_from_statement
-              all:
-                - has: { field: module_name, regex: '^scipy$' }
-                - any:
-                    - has: { field: name, kind: dotted_name, pattern: $M, regex: '^integrate$' }
-                    - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^integrate$' } }, { has: { field: alias, pattern: $M } }] }
-constraints:
-  N: { regex: '^(trapz|cumtrapz|simps)$' }
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
-  T1: { replace: { source: $N, replace: '^trapz$', by: trapezoid } }
-  T2: { replace: { source: $T1, replace: '^cumtrapz$', by: cumulative_trapezoid } }
-  NEW: { replace: { source: $T2, replace: '^simps$', by: simpson } }
+  R1:
+    replace:
+      source: $N
+      replace: ^cumtrapz$
+      by: cumulative_trapezoid
+  R2:
+    replace:
+      source: $R1
+      replace: ^simps$
+      by: simpson
+  NEW:
+    replace:
+      source: $R2
+      replace: ^trapz$
+      by: trapezoid
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+
+---
+# The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.integrate.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(cumtrapz|simps|trapz)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.integrate$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  R1:
+    replace:
+      source: $N
+      replace: ^cumtrapz$
+      by: cumulative_trapezoid
+  R2:
+    replace:
+      source: $R1
+      replace: ^simps$
+      by: simpson
+  NEW:
+    replace:
+      source: $R2
+      replace: ^trapz$
+      by: trapezoid
+fix: $NEW as $N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.integrate.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(cumtrapz|simps|trapz)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.integrate$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  R1:
+    replace:
+      source: $N
+      replace: ^cumtrapz$
+      by: cumulative_trapezoid
+  R2:
+    replace:
+      source: $R1
+      replace: ^simps$
+      by: simpson
+  NEW:
+    replace:
+      source: $R2
+      replace: ^trapz$
+      by: trapezoid
+fix: $NEW
+metadata:
+  fix: unsafe
+
+---
+# The interpreter suggests pinv for pinv2, in runs/proof.jsonl. The old body is not in the research
+# material, so the fix is unsafe.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. Write $OBJ.$NEW.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(pinv2)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.linalg$
+      - pattern: $S.linalg
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^linalg$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  NEW:
+    replace:
+      source: $N
+      replace: ^pinv2$
+      by: pinv
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+
+---
+# The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.linalg.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(pinv2)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.linalg$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  NEW:
+    replace:
+      source: $N
+      replace: ^pinv2$
+      by: pinv
+fix: $NEW as $N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.linalg.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(pinv2)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.linalg$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  NEW:
+    replace:
+      source: $N
+      replace: ^pinv2$
+      by: pinv
+fix: $NEW
+metadata:
+  fix: unsafe
+
+---
+# statsmodels replaced speye with `eye as speye` (83c0cdbdaf in runs/pairs.txt). The old body is not
+# in the research material, so the fix is unsafe.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. Write $OBJ.$NEW.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(speye)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.sparse$
+      - pattern: $S.sparse
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.sparse$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^sparse$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^sparse$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  NEW:
+    replace:
+      source: $N
+      replace: ^speye$
+      by: eye
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+
+---
+# The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.sparse.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(speye)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.sparse$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  NEW:
+    replace:
+      source: $N
+      replace: ^speye$
+      by: eye
+fix: $NEW as $N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.sparse.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(speye)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.sparse$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  NEW:
+    replace:
+      source: $N
+      replace: ^speye$
+      by: eye
+fix: $NEW
+metadata:
+  fix: unsafe
+
+---
+# The new names are the nearest public names on SciPy 1.18.1. The old functions are not in the
+# research material, so the fix is unsafe.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. Write $OBJ.$NEW.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(median_absolute_deviation|gilbrat)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.stats$
+      - pattern: $S.stats
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^stats$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  R1:
+    replace:
+      source: $N
+      replace: ^gilbrat$
+      by: gibrat
+  NEW:
+    replace:
+      source: $R1
+      replace: ^median_absolute_deviation$
+      by: median_abs_deviation
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+
+---
+# The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.stats.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(median_absolute_deviation|gilbrat)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.stats$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  R1:
+    replace:
+      source: $N
+      replace: ^gilbrat$
+      by: gibrat
+  NEW:
+    replace:
+      source: $R1
+      replace: ^median_absolute_deviation$
+      by: median_abs_deviation
+fix: $NEW as $N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.stats.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. Import $NEW.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(median_absolute_deviation|gilbrat)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.stats$
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  R1:
+    replace:
+      source: $N
+      replace: ^gilbrat$
+      by: gibrat
+  NEW:
+    replace:
+      source: $R1
+      replace: ^median_absolute_deviation$
+      by: median_abs_deviation
+fix: $NEW
+metadata:
+  fix: unsafe
+
+---
+# Each window is in scipy.signal.windows under the same name, by runs/relocate.jsonl. The old alias
+# is not in the research material, so the fix is unsafe.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N is no longer in scipy.signal and raises AttributeError on SciPy 1.18.1. Write $OBJ.windows.$N.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(kaiser_bessel_derived|general_gaussian|general_hamming|blackmanharris|general_cosine|exponential|barthann|bartlett|blackman|gaussian|chebwin|flattop|hamming|lanczos|nuttall|bohman|boxcar|cosine|kaiser|parzen|taylor|triang|tukey|dpss|hann)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.signal$
+      - pattern: $S.signal
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^signal$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+fix: $OBJ.windows.$N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.signal.$N is no longer in scipy.signal, so this import raises ImportError on SciPy 1.18.1. Import
+  it from scipy.signal.windows.
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(kaiser_bessel_derived|general_gaussian|general_hamming|blackmanharris|general_cosine|exponential|barthann|bartlett|blackman|gaussian|chebwin|flattop|hamming|lanczos|nuttall|bohman|boxcar|cosine|kaiser|parzen|taylor|triang|tukey|dpss|hann)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.signal$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(kaiser_bessel_derived|general_gaussian|general_hamming|blackmanharris|general_cosine|exponential|barthann|bartlett|blackman|gaussian|chebwin|flattop|hamming|lanczos|nuttall|bohman|boxcar|cosine|kaiser|parzen|taylor|triang|tukey|dpss|hann)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.signal$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+
+---
+# Both live in scipy.stats.mstats, by runs/relocate.jsonl. The fix is unsafe because the old
+# functions are not in the research material.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N is no longer in scipy.stats and raises AttributeError on SciPy 1.18.1. Write $OBJ.mstats.$N.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(kendalltau_seasonal|find_repeats)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.stats$
+      - pattern: $S.stats
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^stats$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+fix: $OBJ.mstats.$N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.stats.$N is no longer in scipy.stats, so this import raises ImportError on SciPy 1.18.1. Import it
+  from scipy.stats.mstats.
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(kendalltau_seasonal|find_repeats)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.stats$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(kendalltau_seasonal|find_repeats)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.stats$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(quadrature|romberg)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.integrate$
+      - pattern: $S.integrate
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.integrate$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^integrate$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^integrate$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(quadrature)$
+      by: Write scipy.integrate.quad, or scipy.integrate.fixed_quad for a fixed order Gaussian rule.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(romberg)$
+      by: Write scipy.integrate.quad, or scipy.integrate.romb on samples.
+  HINT:
+    replace:
+      source: $H2
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.integrate.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(quadrature|romberg)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.integrate$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(quadrature|romberg)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.integrate$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(quadrature)$
+      by: Write scipy.integrate.quad, or scipy.integrate.fixed_quad for a fixed order Gaussian rule.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(romberg)$
+      by: Write scipy.integrate.quad, or scipy.integrate.romb on samples.
+  HINT:
+    replace:
+      source: $H2
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+# interp2d still exists and raises NotImplementedError when called, with `.. versionremoved::
+# 1.14.0` at R/src/scipy/scipy/interpolate/_interpolate.py:147. Its docstring gives the advice in
+# the message.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises NotImplementedError when called on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(interp2d)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.interpolate$
+      - pattern: $S.interpolate
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.interpolate$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^interpolate$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^interpolate$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(interp2d)$
+      by: On a regular grid write RegularGridInterpolator or RectBivariateSpline, and for scattered points LinearNDInterpolator
+        or CloughTocher2DInterpolator.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.interpolate.$N was removed from SciPy, so every call raises NotImplementedError on SciPy 1.18.1.
+  $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(interp2d)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.interpolate$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(interp2d)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.interpolate$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(interp2d)$
+      by: On a regular grid write RegularGridInterpolator or RectBivariateSpline, and for scattered points LinearNDInterpolator
+        or CloughTocher2DInterpolator.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(cmplx_sort|quadratic|impulse2|bspline|cascade|morlet2|morlet|ricker|cubic|lsim2|step2|daub|cwt|qmf)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.signal$
+      - pattern: $S.signal
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^signal$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(impulse2)$
+      by: Write scipy.signal.impulse.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(lsim2)$
+      by: Write scipy.signal.lsim, which simulates a continuous time linear system.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(step2)$
+      by: Write scipy.signal.step.
+  HINT:
+    replace:
+      source: $H3
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.signal.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(cmplx_sort|quadratic|impulse2|bspline|cascade|morlet2|morlet|ricker|cubic|lsim2|step2|daub|cwt|qmf)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.signal$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(cmplx_sort|quadratic|impulse2|bspline|cascade|morlet2|morlet|ricker|cubic|lsim2|step2|daub|cwt|qmf)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.signal$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(impulse2)$
+      by: Write scipy.signal.impulse.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(lsim2)$
+      by: Write scipy.signal.lsim, which simulates a continuous time linear system.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(step2)$
+      by: Write scipy.signal.step.
+  HINT:
+    replace:
+      source: $H3
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|btdtri|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|btdtr|clpmn|lpmn|lpn)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.special$
+      - pattern: $S.special
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.special$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^special$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^special$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(clpmn|lpmn)$
+      by: Write scipy.special.assoc_legendre_p_all.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(btdtr)$
+      by: Write scipy.special.betainc.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(btdtri)$
+      by: Write scipy.special.betaincinv.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(lpn)$
+      by: Write scipy.special.legendre_p_all.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(errprint)$
+      by: Write scipy.special.seterr.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(sph_harm)$
+      by: Write scipy.special.sph_harm_y(n, m, theta, phi), which takes the degree first and the polar angle before
+        the azimuth.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(sph_inkn)$
+      by: Write scipy.special.spherical_in and spherical_kn.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(sph_in)$
+      by: Write scipy.special.spherical_in.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(sph_jnyn)$
+      by: Write scipy.special.spherical_jn and spherical_yn.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(sph_jn)$
+      by: Write scipy.special.spherical_jn.
+  H11:
+    replace:
+      source: $H10
+      replace: ^(sph_kn)$
+      by: Write scipy.special.spherical_kn.
+  H12:
+    replace:
+      source: $H11
+      replace: ^(sph_yn)$
+      by: Write scipy.special.spherical_yn.
+  HINT:
+    replace:
+      source: $H12
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.special.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|btdtri|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|btdtr|clpmn|lpmn|lpn)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.special$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|btdtri|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|btdtr|clpmn|lpmn|lpn)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.special$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(clpmn|lpmn)$
+      by: Write scipy.special.assoc_legendre_p_all.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(btdtr)$
+      by: Write scipy.special.betainc.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(btdtri)$
+      by: Write scipy.special.betaincinv.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(lpn)$
+      by: Write scipy.special.legendre_p_all.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(errprint)$
+      by: Write scipy.special.seterr.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(sph_harm)$
+      by: Write scipy.special.sph_harm_y(n, m, theta, phi), which takes the degree first and the polar angle before
+        the azimuth.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(sph_inkn)$
+      by: Write scipy.special.spherical_in and spherical_kn.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(sph_in)$
+      by: Write scipy.special.spherical_in.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(sph_jnyn)$
+      by: Write scipy.special.spherical_jn and spherical_yn.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(sph_jn)$
+      by: Write scipy.special.spherical_jn.
+  H11:
+    replace:
+      source: $H10
+      replace: ^(sph_kn)$
+      by: Write scipy.special.spherical_kn.
+  H12:
+    replace:
+      source: $H11
+      replace: ^(sph_yn)$
+      by: Write scipy.special.spherical_yn.
+  HINT:
+    replace:
+      source: $H12
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(NumericalInverseHermite|rvs_ratio_uniforms|square_of_sums|signaltonoise|pdf_moments|binom_test|histogram2|chisqprob|frechet_l|frechet_r|histogram|nanmedian|pdfapprox|threshold|fastsort|itemfreq|nanmean|ksprob|nanstd|pdffit|betai|fprob|zprob|erfc|ss)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.stats$
+      - pattern: $S.stats
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^stats$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(NumericalInverseHermite)$
+      by: Import NumericalInverseHermite from scipy.stats.sampling, which import scipy.stats does not load.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(rvs_ratio_uniforms)$
+      by: Import RatioUniforms from scipy.stats.sampling.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(histogram)$
+      by: Write np.histogram.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(nanmean)$
+      by: Write np.nanmean.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(nanmedian)$
+      by: Write np.nanmedian.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(nanstd)$
+      by: Write np.nanstd.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(betai)$
+      by: Write scipy.special.betainc.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(erfc)$
+      by: Write scipy.special.erfc.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(binom_test)$
+      by: Write scipy.stats.binomtest(...).pvalue.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(chisqprob)$
+      by: Write scipy.stats.chi2.sf.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.stats.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(NumericalInverseHermite|rvs_ratio_uniforms|square_of_sums|signaltonoise|pdf_moments|binom_test|histogram2|chisqprob|frechet_l|frechet_r|histogram|nanmedian|pdfapprox|threshold|fastsort|itemfreq|nanmean|ksprob|nanstd|pdffit|betai|fprob|zprob|erfc|ss)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.stats$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(NumericalInverseHermite|rvs_ratio_uniforms|square_of_sums|signaltonoise|pdf_moments|binom_test|histogram2|chisqprob|frechet_l|frechet_r|histogram|nanmedian|pdfapprox|threshold|fastsort|itemfreq|nanmean|ksprob|nanstd|pdffit|betai|fprob|zprob|erfc|ss)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.stats$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(NumericalInverseHermite)$
+      by: Import NumericalInverseHermite from scipy.stats.sampling, which import scipy.stats does not load.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(rvs_ratio_uniforms)$
+      by: Import RatioUniforms from scipy.stats.sampling.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(histogram)$
+      by: Write np.histogram.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(nanmean)$
+      by: Write np.nanmean.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(nanmedian)$
+      by: Write np.nanmedian.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(nanstd)$
+      by: Write np.nanstd.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(betai)$
+      by: Write scipy.special.betainc.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(erfc)$
+      by: Write scipy.special.erfc.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(binom_test)$
+      by: Write scipy.stats.binomtest(...).pvalue.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(chisqprob)$
+      by: Write scipy.stats.chi2.sf.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(calc_lwork|flinalg|slogdet|expm2|expm3|kron|tril|triu|tri)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.linalg$
+      - pattern: $S.linalg
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^linalg$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(kron)$
+      by: Write np.kron.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(slogdet)$
+      by: Write np.linalg.slogdet.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(tri)$
+      by: Write np.tri.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(tril)$
+      by: Write np.tril.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(triu)$
+      by: Write np.triu.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(expm2|expm3)$
+      by: Write scipy.linalg.expm.
+  HINT:
+    replace:
+      source: $H6
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.linalg.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(calc_lwork|flinalg|slogdet|expm2|expm3|kron|tril|triu|tri)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.linalg$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(calc_lwork|flinalg|slogdet|expm2|expm3|kron|tril|triu|tri)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.linalg$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(kron)$
+      by: Write np.kron.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(slogdet)$
+      by: Write np.linalg.slogdet.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(tri)$
+      by: Write np.tri.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(tril)$
+      by: Write np.tril.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(triu)$
+      by: Write np.triu.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(expm2|expm3)$
+      by: Write scipy.linalg.expm.
+  HINT:
+    replace:
+      source: $H6
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(cs_graph_components)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.sparse$
+      - pattern: $S.sparse
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.sparse$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^sparse$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^sparse$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(cs_graph_components)$
+      by: Write scipy.sparse.csgraph.connected_components.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.sparse.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(cs_graph_components)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.sparse$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(cs_graph_components)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.sparse$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(cs_graph_components)$
+      by: Write scipy.sparse.csgraph.connected_components.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(wminkowski)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.spatial\.distance$
+      - pattern: $S.spatial.distance
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - pattern: $S.distance
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.spatial$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^spatial$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^spatial$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id007
+                  stopBy: end
+                  any: &id008
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.spatial\.distance$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^distance$
+                    inside:
+                      kind: import_from_statement
+                      has: &id006
+                        field: module_name
+                        regex: ^scipy\.spatial$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id006
+                    all:
+                    - has:
+                        field: name
+                        regex: ^distance$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id007
+              - kind: try_statement
+                has: *id007
+              - kind: if_statement
+                has: *id007
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id008
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(wminkowski)$
+      by: Write scipy.spatial.distance.minkowski with the weights as w=.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.spatial.distance.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(wminkowski)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.spatial\.distance$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(wminkowski)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.spatial\.distance$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(wminkowski)$
+      by: Write scipy.spatial.distance.minkowski with the weights as w=.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(anneal)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.optimize$
+      - pattern: $S.optimize
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.optimize$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^optimize$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^optimize$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(anneal)$
+      by: Write scipy.optimize.dual_annealing.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.optimize.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(anneal)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.optimize$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(anneal)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.optimize$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(anneal)$
+      by: Write scipy.optimize.dual_annealing.
+  HINT:
+    replace:
+      source: $H1
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(imread)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.ndimage$
+      - pattern: $S.ndimage
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.ndimage$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^ndimage$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^ndimage$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  HINT:
+    replace:
+      source: $N
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.ndimage.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(imread)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.ndimage$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(imread)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy\.ndimage$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  HINT:
+    replace:
+      source: $N
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+# scipy.misc holds no names on SciPy 1.18.1 and warns when imported, by runs/probe.jsonl and
+# R/src/scipy/scipy/misc/__init__.py.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.misc is empty on SciPy 1.18.1, and importing it warns with DeprecationWarning. Import comb, factorial
+  and logsumexp from scipy.special, and face, ascent and electrocardiogram from scipy.datasets.
+rule:
+  all:
+  - kind: dotted_name
+  - regex: ^scipy\.misc(\.\w+)*$
+  - not:
+      matches: compat-code
+  - any:
+    - inside:
+        kind: import_statement
+    - inside:
+        kind: aliased_import
+        inside:
+          kind: import_statement
+    - inside:
+        kind: import_from_statement
+        field: module_name
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.misc is empty on SciPy 1.18.1, and importing it warns with DeprecationWarning. Import comb, factorial
+  and logsumexp from scipy.special, and face, ascent and electrocardiogram from scipy.datasets.
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(misc)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(misc)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.misc is empty on SciPy 1.18.1, so $OBJ.$N raises AttributeError. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(\w+)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.misc$
+      - pattern: $S.misc
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.misc$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^misc$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^misc$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(pade)$
+      by: Write mpmath.pade, since scipy.interpolate.pade is deprecated too.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(ascent)$
+      by: Write scipy.datasets.ascent, which needs the pooch package.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(electrocardiogram)$
+      by: Write scipy.datasets.electrocardiogram, which needs the pooch package.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(face)$
+      by: Write scipy.datasets.face, which needs the pooch package.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(derivative)$
+      by: Write scipy.differentiate.derivative, which takes different arguments.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(comb)$
+      by: Write scipy.special.comb.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(factorial)$
+      by: Write scipy.special.factorial.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(factorial2)$
+      by: Write scipy.special.factorial2.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(factorialk)$
+      by: Write scipy.special.factorialk.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(logsumexp)$
+      by: Write scipy.special.logsumexp.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+# Each name is public in NumPy 2.5.4 and raises on the scipy namespace, by runs/probe.jsonl. Humans
+# made this change in scikit-learn 823ed5a8d0 (runs/pairs.txt). The old scipy/__init__.py is not in
+# the research material, so which NumPy function each name was cannot be shown, and the fix is
+# unsafe.
+id: removed-in-scipy
+language: python
+severity: error
+message: SciPy no longer re-exports NumPy, so $OBJ.$N raises AttributeError on SciPy 1.18.1. Write np.$N.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(format_float_positional|format_float_scientific|bitwise_right_shift|histogram_bin_edges|bitwise_left_shift|datetime_as_string|asarray_chkfinite|ascontiguousarray|diag_indices_from|ravel_multi_index|tril_indices_from|triu_indices_from|apply_along_axis|broadcast_arrays|broadcast_shapes|get_printoptions|matrix_transpose|may_share_memory|savez_compressed|set_printoptions|apply_over_axes|complexfloating|cumulative_prod|min_scalar_type|take_along_axis|unsignedinteger|asfortranarray|bitwise_invert|busdaycalendar|cumulative_sum|put_along_axis|unique_inverse|bitwise_count|busday_offset|count_nonzero|datetime_data|fill_diagonal|greater_equal|little_endian|nanpercentile|promote_types|real_if_close|shares_memory|signedinteger|unique_counts|unique_values|unravel_index|argpartition|array2string|broadcast_to|busday_count|column_stack|diag_indices|floor_divide|fromfunction|iscomplexobj|mask_indices|nested_iters|permute_dims|printoptions|searchsorted|show_runtime|sort_complex|tril_indices|triu_indices|array_equal|array_equiv|array_split|binary_repr|bitwise_and|bitwise_not|bitwise_xor|clongdouble|common_type|concatenate|einsum_path|euler_gamma|expand_dims|flatnonzero|float_power|from_dlpack|get_include|histogram2d|histogramdd|intersect1d|logical_and|logical_not|logical_xor|mintypecode|nanquantile|ndenumerate|result_type|right_shift|timedelta64|true_divide|ScalarType|array_repr|asanyarray|atleast_1d|atleast_2d|atleast_3d|bitwise_or|complex128|complex256|datetime64|empty_like|exceptions|frombuffer|frompyfunc|fromstring|genfromtxt|getbufsize|geterrcall|issubdtype|left_shift|less_equal|logaddexp2|logical_or|longdouble|nan_to_num|nancumprod|percentile|polynomial|reciprocal|sctypeDict|setbufsize|seterrcall|trim_zeros|unique_all|unpackbits|zeros_like|array_str|base_repr|broadcast|character|complex64|conjugate|correlate|ctypeslib|fromregex|full_like|geomspace|heaviside|histogram|index_exp|is_busday|iscomplex|isfortran|isrealobj|logaddexp|nanargmax|nanargmin|nancumsum|nanmedian|nextafter|not_equal|ones_like|partition|piecewise|remainder|setdiff1d|tensordot|transpose|trapezoid|typecodes|ulonglong|vectorize|absolute|allclose|argwhere|asmatrix|bartlett|bincount|blackman|can_cast|compress|convolve|copysign|corrcoef|diagflat|diagonal|digitize|errstate|flatiter|flexible|float128|floating|fromfile|fromiter|gradient|identity|isfinite|isneginf|isposinf|isscalar|iterable|linspace|logspace|longlong|meshgrid|moveaxis|multiply|negative|packbits|positive|quantile|recarray|rollaxis|setxor1d|subtract|swapaxes|typename|arccosh|arcsinh|arctan2|arctanh|argsort|asarray|average|cdouble|csingle|cumprod|deg2rad|degrees|ediff1d|extract|float16|float32|float64|generic|greater|hamming|hanning|indices|inexact|integer|isclose|isdtype|lexsort|loadtxt|maximum|minimum|nanmean|nanprod|ndarray|ndindex|newaxis|nonzero|object_|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|putmask|rad2deg|radians|require|reshape|savetxt|signbit|spacing|squeeze|strings|testing|union1d|unstack|False_|append|arange|arccos|arcsin|arctan|argmax|argmin|around|astype|bytes_|choose|concat|copyto|cumsum|delete|divide|divmod|double|dsplit|dstack|dtypes|einsum|fliplr|flipud|geterr|hsplit|hstack|insert|interp|invert|isreal|kaiser|matmul|matrix|matvec|median|memmap|nanmax|nanmin|nanstd|nansum|nanvar|nditer|number|poly1d|random|record|repeat|resize|select|seterr|single|square|typing|uint16|uint32|uint64|unique|unwrap|ushort|vander|vecdot|vecmat|vsplit|vstack|True_|acosh|angle|array|asinh|atan2|atanh|block|bool_|cross|dtype|emath|empty|equal|expm1|finfo|floor|frexp|hypot|iinfo|inner|int16|int32|int64|isinf|isnan|isnat|ldexp|log10|log1p|mgrid|ogrid|outer|place|power|ravel|roots|rot90|round|savez|shape|short|split|stack|trace|trunc|ubyte|ufunc|uint8|uintc|uintp|ulong|where|zeros|acos|amax|amin|asin|atan|bmat|bool|byte|cbrt|ceil|char|clip|conj|copy|core|cosh|diag|diff|exp2|f2py|fabs|flip|fmax|fmin|fmod|full|half|imag|info|int8|int_|intc|intp|isin|kron|less|load|log2|long|mean|modf|ndim|ones|poly|prod|real|rint|roll|save|sign|sinc|sinh|size|sort|sqrt|str_|take|tanh|tile|tril|triu|uint|vdot|void|abs|add|all|any|cos|cov|dot|exp|eye|fix|gcd|inf|ix_|lcm|lib|log|max|min|mod|nan|pad|pow|ptp|put|rec|sin|std|sum|tan|tri|var|c_|i0|ma|pi|r_|s_|e)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy$
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+fix: np.$N
+metadata:
+  fix: unsafe
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: SciPy no longer re-exports NumPy, so importing $N from scipy raises ImportError on SciPy 1.18.1. Import
+  it from numpy.
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(format_float_positional|format_float_scientific|bitwise_right_shift|histogram_bin_edges|bitwise_left_shift|datetime_as_string|asarray_chkfinite|ascontiguousarray|diag_indices_from|ravel_multi_index|tril_indices_from|triu_indices_from|apply_along_axis|broadcast_arrays|broadcast_shapes|get_printoptions|matrix_transpose|may_share_memory|savez_compressed|set_printoptions|apply_over_axes|complexfloating|cumulative_prod|min_scalar_type|take_along_axis|unsignedinteger|asfortranarray|bitwise_invert|busdaycalendar|cumulative_sum|put_along_axis|unique_inverse|bitwise_count|busday_offset|count_nonzero|datetime_data|fill_diagonal|greater_equal|little_endian|nanpercentile|promote_types|real_if_close|shares_memory|signedinteger|unique_counts|unique_values|unravel_index|argpartition|array2string|broadcast_to|busday_count|column_stack|diag_indices|floor_divide|fromfunction|iscomplexobj|mask_indices|nested_iters|permute_dims|printoptions|searchsorted|show_runtime|sort_complex|tril_indices|triu_indices|array_equal|array_equiv|array_split|binary_repr|bitwise_and|bitwise_not|bitwise_xor|clongdouble|common_type|concatenate|einsum_path|euler_gamma|expand_dims|flatnonzero|float_power|from_dlpack|get_include|histogram2d|histogramdd|intersect1d|logical_and|logical_not|logical_xor|mintypecode|nanquantile|ndenumerate|result_type|right_shift|timedelta64|true_divide|ScalarType|array_repr|asanyarray|atleast_1d|atleast_2d|atleast_3d|bitwise_or|complex128|complex256|datetime64|empty_like|exceptions|frombuffer|frompyfunc|fromstring|genfromtxt|getbufsize|geterrcall|issubdtype|left_shift|less_equal|logaddexp2|logical_or|longdouble|nan_to_num|nancumprod|percentile|polynomial|reciprocal|sctypeDict|setbufsize|seterrcall|trim_zeros|unique_all|unpackbits|zeros_like|array_str|base_repr|broadcast|character|complex64|conjugate|correlate|ctypeslib|fromregex|full_like|geomspace|heaviside|histogram|index_exp|is_busday|iscomplex|isfortran|isrealobj|logaddexp|nanargmax|nanargmin|nancumsum|nanmedian|nextafter|not_equal|ones_like|partition|piecewise|remainder|setdiff1d|tensordot|transpose|trapezoid|typecodes|ulonglong|vectorize|absolute|allclose|argwhere|asmatrix|bartlett|bincount|blackman|can_cast|compress|convolve|copysign|corrcoef|diagflat|diagonal|digitize|errstate|flatiter|flexible|float128|floating|fromfile|fromiter|gradient|identity|isfinite|isneginf|isposinf|isscalar|iterable|linspace|logspace|longlong|meshgrid|moveaxis|multiply|negative|packbits|positive|quantile|recarray|rollaxis|setxor1d|subtract|swapaxes|typename|arccosh|arcsinh|arctan2|arctanh|argsort|asarray|average|cdouble|csingle|cumprod|deg2rad|degrees|ediff1d|extract|float16|float32|float64|generic|greater|hamming|hanning|indices|inexact|integer|isclose|isdtype|lexsort|loadtxt|maximum|minimum|nanmean|nanprod|ndarray|ndindex|newaxis|nonzero|object_|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|putmask|rad2deg|radians|require|reshape|savetxt|signbit|spacing|squeeze|strings|testing|union1d|unstack|False_|append|arange|arccos|arcsin|arctan|argmax|argmin|around|astype|bytes_|choose|concat|copyto|cumsum|delete|divide|divmod|double|dsplit|dstack|dtypes|einsum|fliplr|flipud|geterr|hsplit|hstack|insert|interp|invert|isreal|kaiser|matmul|matrix|matvec|median|memmap|nanmax|nanmin|nanstd|nansum|nanvar|nditer|number|poly1d|random|record|repeat|resize|select|seterr|single|square|typing|uint16|uint32|uint64|unique|unwrap|ushort|vander|vecdot|vecmat|vsplit|vstack|True_|acosh|angle|array|asinh|atan2|atanh|block|bool_|cross|dtype|emath|empty|equal|expm1|finfo|floor|frexp|hypot|iinfo|inner|int16|int32|int64|isinf|isnan|isnat|ldexp|log10|log1p|mgrid|ogrid|outer|place|power|ravel|roots|rot90|round|savez|shape|short|split|stack|trace|trunc|ubyte|ufunc|uint8|uintc|uintp|ulong|where|zeros|acos|amax|amin|asin|atan|bmat|bool|byte|cbrt|ceil|char|clip|conj|copy|core|cosh|diag|diff|exp2|f2py|fabs|flip|fmax|fmin|fmod|full|half|imag|info|int8|int_|intc|intp|isin|kron|less|load|log2|long|mean|modf|ndim|ones|poly|prod|real|rint|roll|save|sign|sinc|sinh|size|sort|sqrt|str_|take|tanh|tile|tril|triu|uint|vdot|void|abs|add|all|any|cos|cov|dot|exp|eye|fix|gcd|inf|ix_|lcm|lib|log|max|min|mod|nan|pad|pow|ptp|put|rec|sin|std|sum|tan|tri|var|c_|i0|ma|pi|r_|s_|e)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(format_float_positional|format_float_scientific|bitwise_right_shift|histogram_bin_edges|bitwise_left_shift|datetime_as_string|asarray_chkfinite|ascontiguousarray|diag_indices_from|ravel_multi_index|tril_indices_from|triu_indices_from|apply_along_axis|broadcast_arrays|broadcast_shapes|get_printoptions|matrix_transpose|may_share_memory|savez_compressed|set_printoptions|apply_over_axes|complexfloating|cumulative_prod|min_scalar_type|take_along_axis|unsignedinteger|asfortranarray|bitwise_invert|busdaycalendar|cumulative_sum|put_along_axis|unique_inverse|bitwise_count|busday_offset|count_nonzero|datetime_data|fill_diagonal|greater_equal|little_endian|nanpercentile|promote_types|real_if_close|shares_memory|signedinteger|unique_counts|unique_values|unravel_index|argpartition|array2string|broadcast_to|busday_count|column_stack|diag_indices|floor_divide|fromfunction|iscomplexobj|mask_indices|nested_iters|permute_dims|printoptions|searchsorted|show_runtime|sort_complex|tril_indices|triu_indices|array_equal|array_equiv|array_split|binary_repr|bitwise_and|bitwise_not|bitwise_xor|clongdouble|common_type|concatenate|einsum_path|euler_gamma|expand_dims|flatnonzero|float_power|from_dlpack|get_include|histogram2d|histogramdd|intersect1d|logical_and|logical_not|logical_xor|mintypecode|nanquantile|ndenumerate|result_type|right_shift|timedelta64|true_divide|ScalarType|array_repr|asanyarray|atleast_1d|atleast_2d|atleast_3d|bitwise_or|complex128|complex256|datetime64|empty_like|exceptions|frombuffer|frompyfunc|fromstring|genfromtxt|getbufsize|geterrcall|issubdtype|left_shift|less_equal|logaddexp2|logical_or|longdouble|nan_to_num|nancumprod|percentile|polynomial|reciprocal|sctypeDict|setbufsize|seterrcall|trim_zeros|unique_all|unpackbits|zeros_like|array_str|base_repr|broadcast|character|complex64|conjugate|correlate|ctypeslib|fromregex|full_like|geomspace|heaviside|histogram|index_exp|is_busday|iscomplex|isfortran|isrealobj|logaddexp|nanargmax|nanargmin|nancumsum|nanmedian|nextafter|not_equal|ones_like|partition|piecewise|remainder|setdiff1d|tensordot|transpose|trapezoid|typecodes|ulonglong|vectorize|absolute|allclose|argwhere|asmatrix|bartlett|bincount|blackman|can_cast|compress|convolve|copysign|corrcoef|diagflat|diagonal|digitize|errstate|flatiter|flexible|float128|floating|fromfile|fromiter|gradient|identity|isfinite|isneginf|isposinf|isscalar|iterable|linspace|logspace|longlong|meshgrid|moveaxis|multiply|negative|packbits|positive|quantile|recarray|rollaxis|setxor1d|subtract|swapaxes|typename|arccosh|arcsinh|arctan2|arctanh|argsort|asarray|average|cdouble|csingle|cumprod|deg2rad|degrees|ediff1d|extract|float16|float32|float64|generic|greater|hamming|hanning|indices|inexact|integer|isclose|isdtype|lexsort|loadtxt|maximum|minimum|nanmean|nanprod|ndarray|ndindex|newaxis|nonzero|object_|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|putmask|rad2deg|radians|require|reshape|savetxt|signbit|spacing|squeeze|strings|testing|union1d|unstack|False_|append|arange|arccos|arcsin|arctan|argmax|argmin|around|astype|bytes_|choose|concat|copyto|cumsum|delete|divide|divmod|double|dsplit|dstack|dtypes|einsum|fliplr|flipud|geterr|hsplit|hstack|insert|interp|invert|isreal|kaiser|matmul|matrix|matvec|median|memmap|nanmax|nanmin|nanstd|nansum|nanvar|nditer|number|poly1d|random|record|repeat|resize|select|seterr|single|square|typing|uint16|uint32|uint64|unique|unwrap|ushort|vander|vecdot|vecmat|vsplit|vstack|True_|acosh|angle|array|asinh|atan2|atanh|block|bool_|cross|dtype|emath|empty|equal|expm1|finfo|floor|frexp|hypot|iinfo|inner|int16|int32|int64|isinf|isnan|isnat|ldexp|log10|log1p|mgrid|ogrid|outer|place|power|ravel|roots|rot90|round|savez|shape|short|split|stack|trace|trunc|ubyte|ufunc|uint8|uintc|uintp|ulong|where|zeros|acos|amax|amin|asin|atan|bmat|bool|byte|cbrt|ceil|char|clip|conj|copy|core|cosh|diag|diff|exp2|f2py|fabs|flip|fmax|fmin|fmod|full|half|imag|info|int8|int_|intc|intp|isin|kron|less|load|log2|long|mean|modf|ndim|ones|poly|prod|real|rint|roll|save|sign|sinc|sinh|size|sort|sqrt|str_|take|tanh|tile|tril|triu|uint|vdot|void|abs|add|all|any|cos|cov|dot|exp|eye|fix|gcd|inf|ix_|lcm|lib|log|max|min|mod|nan|pad|pow|ptp|put|rec|sin|std|sum|tan|tri|var|c_|i0|ma|pi|r_|s_|e)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from the scipy namespace and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(derivative|factorial2|factorial|comb|face|lena|pade)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy$
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+  - not:
+      matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(pade)$
+      by: Write mpmath.pade, since scipy.interpolate.pade is deprecated too.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(ascent)$
+      by: Write scipy.datasets.ascent, which needs the pooch package.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(electrocardiogram)$
+      by: Write scipy.datasets.electrocardiogram, which needs the pooch package.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(face)$
+      by: Write scipy.datasets.face, which needs the pooch package.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(derivative)$
+      by: Write scipy.differentiate.derivative, which takes different arguments.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(comb)$
+      by: Write scipy.special.comb.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(factorial)$
+      by: Write scipy.special.factorial.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(factorial2)$
+      by: Write scipy.special.factorial2.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(factorialk)$
+      by: Write scipy.special.factorialk.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(logsumexp)$
+      by: Write scipy.special.logsumexp.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+
+---
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.$N was removed from the scipy namespace, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  any:
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(derivative|factorial2|factorial|comb|face|lena|pade)$
+    - inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy$
+    - not:
+        matches: compat-code
+  - all:
+    - kind: dotted_name
+    - pattern: $N
+    - regex: ^(derivative|factorial2|factorial|comb|face|lena|pade)$
+    - inside:
+        kind: aliased_import
+        field: name
+        inside:
+          kind: import_from_statement
+          has:
+            field: module_name
+            regex: ^scipy$
+    - not:
+        matches: compat-code
+utils:
+  compat-code:
+    any:
+    - inside:
+        kind: if_statement
+        stopBy: end
+        has:
+          field: condition
+          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: conditional_expression
+        stopBy: end
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+    - inside:
+        kind: try_statement
+        stopBy: end
+        has:
+          kind: except_clause
+          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(pade)$
+      by: Write mpmath.pade, since scipy.interpolate.pade is deprecated too.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(ascent)$
+      by: Write scipy.datasets.ascent, which needs the pooch package.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(electrocardiogram)$
+      by: Write scipy.datasets.electrocardiogram, which needs the pooch package.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(face)$
+      by: Write scipy.datasets.face, which needs the pooch package.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(derivative)$
+      by: Write scipy.differentiate.derivative, which takes different arguments.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(comb)$
+      by: Write scipy.special.comb.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(factorial)$
+      by: Write scipy.special.factorial.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(factorial2)$
+      by: Write scipy.special.factorial2.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(factorialk)$
+      by: Write scipy.special.factorialk.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(logsumexp)$
+      by: Write scipy.special.logsumexp.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
