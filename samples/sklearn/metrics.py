@@ -174,7 +174,7 @@ def scores_first_raises():
 
 
 def removed_metric_api():
-    from sklearn.metrics.ranking import roc_auc_score  # xpd: removed-metric-api
+    from sklearn.metrics.ranking import roc_auc_score  # xpd: removed-in-sklearn
     from sklearn.metrics.scorer import SCORERS  # xpd: removed-metric-api
     from sklearn.metrics import jaccard_similarity_score  # xpd: removed-metric-api
     from sklearn.metrics import accuracy_score, plot_confusion_matrix  # xpd: removed-metric-api

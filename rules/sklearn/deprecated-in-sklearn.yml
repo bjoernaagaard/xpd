@@ -481,15 +481,3 @@ rule:
     - pattern: $X.stable_cumsum($$$A)
       regex: '^sklearn\.utils\.extmath\.'
 metadata: { since: "1.8" }
----
-id: deprecated-in-sklearn
-language: python
-severity: warning
-message: sklearn.metrics.cluster.entropy is deprecated since 1.8 and will be removed in 1.10, and scikit-learn has no replacement. Compute the entropy of the label counts yourself.
-rule:
-  any:
-    - kind: import_from_statement
-      regex: '^from\s+sklearn\.metrics\.cluster\s+import\b[^#]*\bentropy\b'
-    - pattern: $X.entropy($$$A)
-      regex: '^sklearn\.metrics\.cluster\.'
-metadata: { since: "1.8" }

@@ -49,7 +49,7 @@ def groups_cross_validation():
     labels = cross_val_predict(model, X, y, groups=g, cv=StratifiedKFold(3))  # xpd: groups-ignored
     grouped_scores = cross_val_score(model, X, y, groups=g, cv=GroupKFold(3))
     splitter = KFold(3)
-    held = cross_val_score(model, X, y, groups=g, cv=splitter)
+    held = cross_val_score(model, X, y, groups=g, cv=splitter)  # xpd: groups-ignored
     plain = cross_val_score(model, X, y, cv=5)
     return ignored, five, kfold["test_score"], labels, grouped_scores, held, plain
 
@@ -69,7 +69,7 @@ def groups_search():
 
 def group_splitter_without_groups():
     X, y, g = grouped()
-    cross_val_score(LogisticRegression(), X, y, cv=GroupKFold(3))  # xpd: groups-ignored
+    cross_val_score(LogisticRegression(), X, y, cv=GroupKFold(3))  # xpd: missing-groups
     cross_val_score(LogisticRegression(), X, y, cv=GroupKFold(3), groups=g)
 
 

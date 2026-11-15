@@ -3,20 +3,6 @@
 id: removed-metric-api
 language: python
 severity: error
-message: $MOD was removed, so this import raises. Import the same names from sklearn.metrics.
-rule:
-  any:
-    - kind: import_from_statement
-      has: { field: module_name, pattern: $MOD }
-      not: { has: { stopBy: end, kind: identifier, regex: ^SCORERS$ } }
-    - kind: import_statement
-      has: { stopBy: end, kind: dotted_name, pattern: $MOD }
-constraints:
-  MOD: { regex: '^sklearn\.metrics\.(scorer|ranking|classification|regression|base|pairwise_fast|cluster\.(supervised|unsupervised|bicluster))$' }
----
-id: removed-metric-api
-language: python
-severity: error
 message: SCORERS was removed from sklearn.metrics, so this raises. Call sklearn.metrics.get_scorer_names() for the names and get_scorer(name) for a scorer.
 rule:
   any:

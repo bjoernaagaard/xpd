@@ -224,62 +224,6 @@ utils:
 fix: sklearn.feature_extraction.text
 metadata: { fix: unsafe }
 ---
-# get_scorer_names returns the sorted keys of the private _SCORERS dict that replaced SCORERS.
-id: removed-in-sklearn
-language: python
-severity: error
-message: sklearn.metrics.SCORERS was removed. Call get_scorer_names() for the scorer names, or get_scorer(name) for one scorer.
-rule:
-  any:
-    - kind: import_from_statement
-      regex: '^from\s+sklearn\.metrics(\.scorer)?\s+import\b[^#]*\bSCORERS\b'
-    - kind: attribute
-      regex: '^(sklearn\.)?metrics(\.scorer)?\.SCORERS$'
-  not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
----
-# The plotting functions are reported only where they are imported from sklearn, because many
-# projects define their own plot_confusion_matrix.
-id: removed-in-sklearn
-language: python
-severity: error
-message: sklearn.metrics.$F was removed. Call $D.from_estimator, or $D.from_predictions with predictions you already have.
-rule:
-  any:
-    - kind: dotted_name
-      pattern: $F
-      inside: { kind: import_from_statement, has: { field: module_name, regex: '^sklearn\.metrics$' } }
-    - kind: dotted_name
-      pattern: $F
-      inside: { kind: aliased_import, inside: { kind: import_from_statement, has: { field: module_name, regex: '^sklearn\.metrics$' } } }
-    - kind: identifier
-      pattern: $F
-      inside: { kind: attribute, field: attribute, regex: '^(sklearn\.)?metrics\.\w+$' }
-  not: { matches: compat-code }
-constraints:
-  F: { regex: '^plot_(confusion_matrix|roc_curve|precision_recall_curve)$' }
-transform:
-  D1: { replace: { source: $F, replace: '^plot_confusion_matrix$', by: ConfusionMatrixDisplay } }
-  D2: { replace: { source: $D1, replace: '^plot_roc_curve$', by: RocCurveDisplay } }
-  D: { replace: { source: $D2, replace: '^plot_precision_recall_curve$', by: PrecisionRecallDisplay } }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
----
-id: removed-in-sklearn
-language: python
-severity: error
-message: sklearn.metrics.jaccard_similarity_score was removed. Call jaccard_score, and pick its average for multiclass or multilabel targets.
-rule:
-  any:
-    - kind: import_from_statement
-      regex: '^from\s+sklearn\.metrics\s+import\b[^#]*\bjaccard_similarity_score\b'
-    - pattern: $M.jaccard_similarity_score($$$A)
-      regex: '^(sklearn\.)?metrics\.'
-  not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
----
 # get_feature_names returned a list. get_feature_names_out returns an array, and on a frame it
 # names the input columns where get_feature_names named them x0, x1 and so on. A file that
 # defines its own get_feature_names is left alone, because the call may reach that method.
@@ -728,39 +672,6 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
-id: removed-in-sklearn
-language: python
-severity: error
-message: $C no longer takes fit_params=. Drop fit_params=None, which was its default.
-rule:
-  pattern: $C($$$ARGS)
-  has: { field: arguments, has: { kind: keyword_argument, regex: '^fit_params\s*=\s*None$' } }
-  not: { matches: compat-code }
-constraints:
-  C: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV)$' }
-rewriters:
-  - id: drop
-    rule: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } }
-    fix: ""
-  - id: keep
-    rule:
-      pattern: $ARG
-      not:
-        any:
-          - kind: comment
-          - kind: keyword_argument
-            has: { field: name, regex: ^fit_params$ }
-    fix: "$ARG, "
-transform:
-  KEPT:
-    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
-  REST:
-    replace: { source: $KEPT, replace: ", $", by: "" }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
-fix: $C($REST)
-metadata: { fix: unsafe }
----
 # multi_class="multinomial" is what 1.9.1 always fits for three or more classes, and "auto" chose
 # it too, except for binary targets and liblinear, where 1.9.1 fits the binary model itself.
 id: removed-in-sklearn
@@ -850,23 +761,6 @@ utils:
 id: removed-in-sklearn
 language: python
 severity: error
-message: $C no longer takes fit_params=. Pass them to fit, as in search.fit(X, y, sample_weight=w).
-rule:
-  kind: keyword_argument
-  has: { field: name, regex: ^fit_params$ }
-  not:
-    any:
-      - regex: '^fit_params\s*=\s*None$'
-      - matches: compat-code
-  inside:
-    kind: argument_list
-    inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(GridSearchCV|RandomizedSearchCV)$' } }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
----
-id: removed-in-sklearn
-language: python
-severity: error
 message: $C no longer takes n_iter=. Pass max_iter for the number of passes over the data, with tol=None to run all of them.
 rule:
   kind: keyword_argument
@@ -892,21 +786,6 @@ rule:
     inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(LassoCV|ElasticNetCV|MultiTaskLassoCV|MultiTaskElasticNetCV)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
----
-id: removed-in-sklearn
-language: python
-severity: error
-message: mean_squared_error no longer takes squared=. Call root_mean_squared_error for squared=False, and drop squared=True.
-rule:
-  kind: keyword_argument
-  has: { field: name, regex: ^squared$ }
-  not: { matches: compat-code }
-  inside:
-    kind: argument_list
-    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)mean_squared(_log)?_error$' } }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
-metadata: { since: "1.4" }
 ---
 # The docstrings of the forest and extra-tree classes say the default of max_features changed
 # from "auto" to "sqrt" for classifiers and to 1.0 for regressors in 1.1.

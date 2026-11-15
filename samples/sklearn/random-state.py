@@ -78,7 +78,7 @@ def random_by_argument(df=None):
     X = df[["x1", "x2"]].to_numpy()
     y = df["y"].to_numpy()
     embedded = TSNE(init="random", perplexity=10).fit_transform(X)  # xpd: missing-random-state
-    calibrated = SVC(probability=True).fit(X, y)  # xpd: missing-random-state
+    calibrated = SVC(probability=True).fit(X, y)  # xpd: deprecated-in-sklearn, missing-random-state
     mixture = GaussianMixture(n_components=3).fit(X)  # xpd: missing-random-state
     boosted = HistGradientBoostingClassifier(early_stopping=True).fit(X, y)  # xpd: missing-random-state
     large = HistGradientBoostingClassifier(max_iter=20).fit(X, y)  # xpd: missing-random-state

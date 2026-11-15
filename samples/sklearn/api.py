@@ -159,7 +159,7 @@ def power_t():
 
 def removed_helpers():
     from sklearn.utils.extmath import stable_cumsum  # xpd: deprecated-in-sklearn
-    from sklearn.metrics.cluster import entropy  # xpd: deprecated-in-sklearn
+    from sklearn.metrics.cluster import entropy  # xpd: deprecated-metric-api
     from sklearn.metrics.cluster import mutual_info_score
     return stable_cumsum, entropy, mutual_info_score
 
@@ -270,7 +270,7 @@ def dropped_keywords():
         KMeans(n_clusters=2, random_state=0).fit(X).labels_,
         attempt(lambda: RandomForestClassifier(n_estimators=5, min_impurity_split=None, random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
         attempt(lambda: Ridge(normalize=False).fit(X, y).coef_),  # xpd: removed-in-sklearn
-        attempt(lambda: GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, fit_params=None).fit(X, y).best_params_),  # xpd: removed-in-sklearn
+        attempt(lambda: GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, fit_params=None).fit(X, y).best_params_),  # xpd: fit-params-keyword
         attempt(lambda: IsolationForest(behaviour="new", random_state=0).fit(X).predict(X)),  # xpd: removed-in-sklearn
         attempt(lambda: AdaBoostClassifier(algorithm="SAMME", random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
         attempt(lambda: GridSearchCV(LogisticRegression(), {"C": [0.1, 1.0]}, iid=False).fit(X, y).best_params_),  # xpd: removed-in-sklearn
@@ -312,27 +312,27 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     from sklearn.externals.six import StringIO  # xpd: removed-in-sklearn
     from sklearn.feature_selection import RFE
     from sklearn.linear_model import LassoCV, Ridge
-    from sklearn.metrics import SCORERS  # xpd: removed-in-sklearn
+    from sklearn.metrics import SCORERS  # xpd: removed-metric-api
     from sklearn.metrics import get_scorer_names, jaccard_score, mean_squared_error
-    from sklearn.metrics import jaccard_similarity_score  # xpd: removed-in-sklearn
-    from sklearn.metrics import plot_confusion_matrix, plot_roc_curve  # xpd: removed-in-sklearn, removed-in-sklearn
+    from sklearn.metrics import jaccard_similarity_score  # xpd: removed-metric-api
+    from sklearn.metrics import plot_confusion_matrix, plot_roc_curve  # xpd: removed-metric-api
     from sklearn.model_selection import GridSearchCV, KFold, ShuffleSplit, StratifiedKFold, cross_val_score
     from sklearn.preprocessing import Imputer  # xpd: removed-in-sklearn
     from sklearn.impute import SimpleImputer
     import sklearn.externals.joblib  # xpd: removed-in-sklearn
     datasets.load_boston()  # xpd: removed-in-sklearn
     load_diabetes()
-    metrics.SCORERS.keys()  # xpd: removed-in-sklearn
-    metrics.plot_precision_recall_curve(model, X_test, y_test)  # xpd: removed-in-sklearn
+    metrics.SCORERS.keys()  # xpd: removed-metric-api
+    metrics.plot_precision_recall_curve(model, X_test, y_test)  # xpd: removed-metric-api
     get_scorer_names()
     LogisticRegression(multi_class="ovr")  # xpd: removed-in-sklearn
     RandomForestClassifier(min_impurity_split=0.1, random_state=0)  # xpd: removed-in-sklearn
     RandomForestClassifier(min_impurity_decrease=0.1, random_state=0)
     Ridge(normalize=True)  # xpd: removed-in-sklearn
-    GridSearchCV(model, grid, fit_params={"sample_weight": y})  # xpd: removed-in-sklearn
+    GridSearchCV(model, grid, fit_params={"sample_weight": y})  # xpd: fit-params-keyword
     SGDClassifier(n_iter=5, random_state=0)  # xpd: removed-in-sklearn
     LassoCV(n_alphas=100, alphas=None)  # xpd: removed-in-sklearn
-    mean_squared_error(y, y, squared=False)  # xpd: removed-in-sklearn
+    mean_squared_error(y, y, squared=False)  # xpd: removed-metric-api
     GradientBoostingClassifier(max_features="auto", random_state=0)  # xpd: removed-in-sklearn
     grid = {"max_features": ["auto", "sqrt"], "n_estimators": [10, 50]}  # xpd: removed-in-sklearn
     grid = {"rf__max_features": ["sqrt", "log2"], "solver": ["auto"]}
