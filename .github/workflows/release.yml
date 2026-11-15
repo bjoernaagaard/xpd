@@ -111,13 +111,10 @@ jobs:
     strategy:
       matrix:
         platform:
+          # No Windows on Arm wheel: cryptography and pydantic-monty, which FastMCP needs, have
+          # none on PyPI, so xpd could not be installed there.
           - runner: windows-latest
             target: x64
-            python: '3.11'
-          # PyPI has no Windows on Arm wheel of PyYAML, which FastMCP needs, for Python 3.11.
-          - runner: windows-11-arm
-            target: aarch64
-            python: '3.12'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -134,13 +131,13 @@ jobs:
           enable-cache: false
       - name: Smoke test the wheel
         shell: bash
-        run: uv run --isolated --no-project --python ${{ matrix.platform.python }} --with dist/*.whl -- xpd check samples/good.py --format text
+        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
       # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
       - name: Smoke test the MCP server
         shell: bash
         run: |
           wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python ${{ matrix.platform.python }} --with "./$wheel" -- \
+          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
             fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

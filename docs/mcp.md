@@ -172,7 +172,7 @@ Each flag has an environment setting, for clients that start the server without 
 | Flag | Environment | Default | Effect |
 | --- | --- | --- | --- |
 | `--root PATH` | `XPD_MCP_ROOT` | The working directory, or the client's first root when xpd is a plugin | The project root. Every path must be inside it |
-| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute`. It does not run on Windows on Arm, where its sandbox has no wheel |
+| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute`. |
 | `--transport stdio\|http` | `FASTMCP_TRANSPORT` | `stdio` | How clients connect |
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to bind for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
