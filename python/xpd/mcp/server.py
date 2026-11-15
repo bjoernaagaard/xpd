@@ -11,7 +11,7 @@ from fastmcp_tasks import TasksExtension
 
 from xpd.mcp import catalog, prompts, tools, views
 from xpd.mcp.binary import RULES, SKILLS, Xpd, find_binary
-from xpd.mcp.root import Root
+from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
 
 INSTRUCTIONS = """\
@@ -34,8 +34,8 @@ skill://python-review/SKILL.md hold the style a linter cannot check."""
 
 
 def build(settings: Settings) -> FastMCP:
-    root = Root.at(settings.root)
-    xpd = Xpd(find_binary(), root.path)
+    project = Project(Root.at(settings.root) if settings.root else None)
+    xpd = Xpd(find_binary())
     # The binary's rules and skills do not change while it runs, so the server reads them once.
     rules = catalog.Catalog(tuple(xpd.run_now(RULES)))
     skills = [
@@ -51,8 +51,8 @@ def build(settings: Settings) -> FastMCP:
         transforms=[CodeMode()] if settings.code_mode else [],
     )
     mcp.add_extension(TasksExtension())
-    tools.register(mcp, xpd, root)
-    views.register(mcp, xpd, root)
+    tools.register(mcp, xpd, project)
+    views.register(mcp, xpd, project)
     catalog.register(mcp, rules)
     prompts.register(mcp)
 

@@ -69,9 +69,23 @@ For another client, add the server to the `mcpServers` setting of the client.
 ```
 
 The server uses its working directory as the project root, unless `--root` or `XPD_MCP_ROOT`
-names another folder. Set the root when your client starts servers in another folder. An xpd
-binary built with `cargo` has no Python package, so its `xpd mcp` prints `uvx xpd mcp` and
-exits 2.
+names another folder. Set the root when your client starts servers in another folder.
+
+A client that loads xpd as an [agent plugin](claude-code.md#agent-plugin) starts the server in
+the plugin's folder and sets `PLUGIN_ROOT`. There the server asks the client for its
+[roots](https://modelcontextprotocol.io/specification/2025-06-18/client/roots) on each call and
+uses the first one that is a folder on the machine as the project root. A tool fails with a
+message when such a client names no such root.
+
+```text
+project root of a call
+├── --root or XPD_MCP_ROOT is set    that folder
+├── PLUGIN_ROOT is set               the first folder the client names as a root
+└── otherwise                        the working directory
+```
+
+An xpd binary built with `cargo` has no Python package, so its `xpd mcp` prints `uvx xpd mcp`
+and exits 2.
 
 ## Tools
 
@@ -157,7 +171,7 @@ Each flag has an environment setting, for clients that start the server without 
 
 | Flag | Environment | Default | Effect |
 | --- | --- | --- | --- |
-| `--root PATH` | `XPD_MCP_ROOT` | The working directory | The project root. Every path must be inside it |
+| `--root PATH` | `XPD_MCP_ROOT` | The working directory, or the client's first root when xpd is a plugin | The project root. Every path must be inside it |
 | `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute`. It does not run on Windows on Arm, where its sandbox has no wheel |
 | `--transport stdio\|http` | `FASTMCP_TRANSPORT` | `stdio` | How clients connect |
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to bind for HTTP |

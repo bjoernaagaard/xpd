@@ -8,6 +8,7 @@ from collections import Counter
 
 from fastmcp import Context, FastMCP
 from fastmcp.tools import ToolResult
+from mcp.types import InputRequiredResult
 from prefab_ui.app import PrefabApp
 from prefab_ui.components import (
     Badge,
@@ -22,7 +23,7 @@ from prefab_ui.components import (
 
 from xpd.mcp.binary import CHECK, GRAPH, PROFILE, Xpd
 from xpd.mcp.models import GraphReport, Output
-from xpd.mcp.root import Root
+from xpd.mcp.root import Project
 from xpd.mcp.tools import READS, run
 
 SEVERITY_BADGES = {
@@ -59,16 +60,21 @@ def dataflow_chart(report: GraphReport) -> str:
     return "\n".join(lines)
 
 
-def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
+def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(app=True, tags={"lint", "app"}, annotations=READS)
-    async def show_issues(ctx: Context, paths: list[str] | None = None) -> ToolResult:
+    async def show_issues(
+        ctx: Context, paths: list[str] | None = None
+    ) -> ToolResult | InputRequiredResult:
         """Show what `check` finds as a sortable, searchable table, in hosts that render MCP
         Apps. Use `check` when you need the data.
 
         Args:
             paths: Files or folders inside the project root. Default: the whole root.
         """
-        report = await run(ctx, xpd, CHECK, root.all_inside(paths or ["."]))
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        report = await run(ctx, xpd, CHECK, root, root.all_inside(paths or ["."]))
         rows = [
             {
                 "place": f"{issue.file}:{issue.line}" if issue.line else issue.file,
@@ -100,14 +106,17 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         return shown(app, report)
 
     @mcp.tool(app=True, tags={"dataflow", "app"}, annotations=READS)
-    async def show_dataflow(ctx: Context, paths: list[str]) -> ToolResult:
+    async def show_dataflow(ctx: Context, paths: list[str]) -> ToolResult | InputRequiredResult:
         """Show what `graph` reads as a flowchart of steps or nodes and a table of its problems,
         in hosts that render MCP Apps. Use `graph` when you need the data.
 
         Args:
             paths: Files or folders inside the project root.
         """
-        report = await run(ctx, xpd, GRAPH, root.all_inside(paths))
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        report = await run(ctx, xpd, GRAPH, root, root.all_inside(paths))
         rows = [
             {
                 "place": f"{problem.file}:{problem.line}",
@@ -128,14 +137,17 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         return shown(app, report)
 
     @mcp.tool(app=True, tags={"data", "app"}, annotations=READS)
-    async def show_columns(ctx: Context, file: str) -> ToolResult:
+    async def show_columns(ctx: Context, file: str) -> ToolResult | InputRequiredResult:
         """Show what `profile` reads as a table of columns, in hosts that render MCP Apps. Use
         `profile` when you need the data. Needs pandas in the project's Python.
 
         Args:
             file: The data file, inside the project root.
         """
-        profile = await run(ctx, xpd, PROFILE, [root.inside(file)])
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        profile = await run(ctx, xpd, PROFILE, root, [root.inside(file)])
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             with Row(gap=6):
                 Metric(label="rows", value=profile.rows)

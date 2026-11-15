@@ -193,7 +193,8 @@ Output is text on a terminal and JSON otherwise. The JSON has `pipelines`, each 
 
 ## hook
 
-Reads a Claude Code hook event on stdin and lints the `.py` file the edit touched. When the file
+Reads a `PostToolUse` hook event on stdin, from Claude Code or from a client of the Agent Plugins
+format, and lints the `.py` files the edit touched. When the file
 holds a pipeline of steps, the hook also prints the errors and warnings of `xpd graph` for it. See
 [Claude Code](claude-code.md).
 

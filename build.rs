@@ -19,6 +19,10 @@ use anyhow::{Context, Result, bail, ensure};
 const MANIFEST: &str = "pack.yml";
 /// The page with one `#### <rule id>` section for every rule and package check.
 const RULES_PAGE: &str = "docs/rules.md";
+/// The manifest of the agent plugin that this repository is.
+const PLUGIN: &str = "plugin.json";
+/// The plugin's files that start xpd with `uvx xpd@VERSION`.
+const PLUGIN_COMMANDS: [&str; 2] = ["mcp.json", "hooks.json"];
 /// The `## ` headings of the rules page that hold a pack's sections, each with the pack's
 /// module. A heading names the library as its project writes it, which is not always the name
 /// it is imported by.
@@ -31,6 +35,24 @@ const PACK_HEADINGS: &[(&str, &str)] = &[
     ("Python", "python"),
 ];
 
+/// Fails the build when the agent plugin names another version than the crate, so a release
+/// cannot ship skills under an old version or start an old xpd.
+fn plugin_version() -> Result<()> {
+    let version = env::var("CARGO_PKG_VERSION").context("cargo sets CARGO_PKG_VERSION")?;
+    let manifest = fs::read_to_string(PLUGIN).with_context(|| format!("cannot read {PLUGIN}"))?;
+    if !manifest.contains(&format!("\"version\": \"{version}\"")) {
+        bail!("{PLUGIN} must have \"version\": \"{version}\", as Cargo.toml does");
+    }
+    // An unpinned uvx would run whatever older xpd its cache holds.
+    for file in PLUGIN_COMMANDS {
+        let commands = fs::read_to_string(file).with_context(|| format!("cannot read {file}"))?;
+        if !commands.contains(&format!("\"xpd@{version}\"")) {
+            bail!("{file} must start \"xpd@{version}\", as Cargo.toml does");
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let out =
         PathBuf::from(env::var_os("OUT_DIR").context("cargo sets OUT_DIR for build scripts")?);
@@ -39,6 +61,11 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed={}", root.display());
     println!("cargo:rerun-if-changed={RULES_PAGE}");
     println!("cargo:rerun-if-changed=skills");
+    println!("cargo:rerun-if-changed={PLUGIN}");
+    for file in PLUGIN_COMMANDS {
+        println!("cargo:rerun-if-changed={file}");
+    }
+    plugin_version()?;
     let page =
         fs::read_to_string(RULES_PAGE).with_context(|| format!("cannot read {RULES_PAGE}"))?;
     let mut docs = rule_docs(&page)?;

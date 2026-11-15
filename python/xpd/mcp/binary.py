@@ -65,18 +65,17 @@ def find_binary() -> Path:
 
 @dataclass(frozen=True)
 class Xpd:
-    """The binary, run in the project root so it finds the project's venv as a user's run does."""
-
     binary: Path
-    root: Path
 
-    async def run(self, command: Command[T], paths: Sequence[str], *flags: str) -> T:
+    async def run(self, command: Command[T], cwd: Path, paths: Sequence[str], *flags: str) -> T:
+        """Runs in `cwd`, the project root, so the binary finds the project's venv as a user's
+        run does."""
         args = argv(paths, flags)
         process = await asyncio.create_subprocess_exec(
             self.binary,
             *command.args,
             *args,
-            cwd=self.root,
+            cwd=cwd,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -88,7 +87,6 @@ class Xpd:
         """Runs a command that answers at once, for what the server needs before it starts."""
         done = subprocess.run(  # noqa: S603  the binary and its arguments come from this module
             [self.binary, *command.args],
-            cwd=self.root,
             stdin=subprocess.DEVNULL,
             capture_output=True,
             check=False,

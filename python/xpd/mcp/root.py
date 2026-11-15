@@ -3,8 +3,27 @@ a client passes must resolve inside it."""
 
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
+from fastmcp import Context
 from fastmcp.exceptions import ToolError
+from mcp.types import (
+    ClientCapabilities,
+    InputRequiredResult,
+    ListRootsRequest,
+    ListRootsResult,
+    RootsCapability,
+)
+
+from xpd.mcp.protocol import uses_handshake
+
+# The key of the client's roots in a round of the modern protocol.
+ROOTS = "project_roots"
+NO_ROOTS = (
+    "xpd does not know the project root, because the client names no folder as a root. "
+    "Start the server with --root or XPD_MCP_ROOT."
+)
 
 
 @dataclass(frozen=True)
@@ -26,3 +45,51 @@ class Root:
 
     def all_inside(self, paths: list[str]) -> list[str]:
         return [self.inside(raw) for raw in paths]
+
+
+@dataclass(frozen=True)
+class Project:
+    """Where the root of a call comes from: the server's settings, or else the client's roots,
+    which is how a server that starts outside the project learns where the project is."""
+
+    fixed: Root | None
+
+    def roots_request(self, ctx: Context) -> dict[str, ListRootsRequest]:
+        """What a tool adds to another question it returns, so the next round still has the
+        roots."""
+        asks = self.fixed is None and not uses_handshake(ctx)
+        return {ROOTS: ListRootsRequest()} if asks else {}
+
+    async def root(self, ctx: Context) -> Root | InputRequiredResult:
+        """The root, or the request that asks the client for its roots on this protocol."""
+        if self.fixed is not None:
+            return self.fixed
+        if uses_handshake(ctx):
+            if not ctx.session.check_client_capability(ClientCapabilities(roots=RootsCapability())):
+                raise ToolError(NO_ROOTS)
+            listed = await ctx.session.list_roots()
+        else:
+            responses = ctx.input_responses
+            if responses is None or ROOTS not in responses:
+                return InputRequiredResult(
+                    result_type="input_required", input_requests=self.roots_request(ctx)
+                )
+            listed = responses[ROOTS]
+        if not isinstance(listed, ListRootsResult):
+            raise ToolError(NO_ROOTS)
+        # The first root that is a folder on this machine is the project.
+        for root in listed.roots:
+            if folder := local_folder(str(root.uri)):
+                return Root.at(folder)
+        raise ToolError(NO_ROOTS)
+
+
+def local_folder(uri: str) -> Path | None:
+    """The folder that a `file:` URI names on this machine, if it is one."""
+    parsed = urlparse(uri)
+    if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
+        return None
+    # Some clients write the colon of a Windows drive as %3A, which url2pathname does not read
+    # as a drive.
+    path = Path(url2pathname(parsed.path.replace("%3A", ":").replace("%3a", ":")))
+    return path if path.is_dir() else None

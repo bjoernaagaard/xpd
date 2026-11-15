@@ -36,6 +36,6 @@ that may change behavior, so read the diff afterwards.
 | Page | What it covers |
 | --- | --- |
 | [Commands](commands.md) | Every command, its output and its exit codes |
-| [Claude Code](claude-code.md) | The hook that lints each edit an agent makes |
+| [Claude Code](claude-code.md) | The hook that lints each edit an agent makes, and xpd as an agent plugin |
 | [MCP server](mcp.md) | The tools, resources and prompts an agent gets from `xpd mcp` |
 | [Rules](rules.md) | Every rule, with code before and after |

@@ -11,12 +11,21 @@ Transport = Literal["stdio", "http"]
 TRUE = {"1", "true", "yes", "on"}
 
 
+def default_root() -> Path | None:
+    """`XPD_MCP_ROOT`, else the working directory. A client that loads xpd as an agent plugin
+    sets `PLUGIN_ROOT` and starts the server in the plugin's folder, so there the root is
+    `None` and each call takes it from the client's roots."""
+    if named := os.environ.get("XPD_MCP_ROOT"):
+        return Path(named)
+    return None if "PLUGIN_ROOT" in os.environ else Path.cwd()
+
+
 @dataclass(frozen=True)
 class Settings:
     """`transport`, `host` and `port` stay `None` unless a flag sets them, so FastMCP's own
     FASTMCP_TRANSPORT, FASTMCP_HOST and FASTMCP_PORT apply, with stdio on 127.0.0.1:8000."""
 
-    root: Path
+    root: Path | None
     code_mode: bool
     transport: Transport | None = None
     host: str | None = None
@@ -25,7 +34,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
-            root=Path(os.environ.get("XPD_MCP_ROOT") or Path.cwd()),
+            root=default_root(),
             code_mode=os.environ.get("XPD_MCP_CODE_MODE", "").lower() in TRUE,
         )
 
@@ -41,7 +50,8 @@ class Settings:
             type=Path,
             default=env.root,
             help="The project root. Every path a tool gets must be inside it. "
-            "Default: XPD_MCP_ROOT, else the working directory.",
+            "Default: XPD_MCP_ROOT, else the working directory. As an agent plugin, "
+            "the default is the first root the client names.",
         )
         parser.add_argument(
             "--code-mode",

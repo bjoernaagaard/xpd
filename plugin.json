@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.1.0/plugin.schema.json",
+  "name": "xpd",
+  "displayName": "xpd",
+  "version": "0.14.0",
+  "description": "Lints Python that uses pandas, NumPy, SciPy, scikit-learn or Apache Hamilton for slow operations and wrong results, after each edit and through MCP tools.",
+  "author": {
+    "name": "Bjørn Aagaard",
+    "url": "https://github.com/bjoernaagaard"
+  },
+  "homepage": "https://bjoernaagaard.github.io/xpd/",
+  "repository": "https://github.com/bjoernaagaard/xpd",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["python", "linter", "pandas", "numpy", "scipy", "scikit-learn", "hamilton"]
+}

@@ -2,7 +2,7 @@
 
 use std::ffi::OsString;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 use anyhow::{Context, Result};
@@ -76,11 +76,13 @@ enum Cmd {
         #[arg(long)]
         unsafe_fixes: bool,
     },
-    /// Claude Code `PostToolUse` hook: reads hook JSON on stdin and lints the edited .py file.
+    /// `PostToolUse` hook: reads the event JSON on stdin and lints the .py files it changed.
     ///
     /// A file with a pipeline of steps also gets the errors and warnings of `xpd graph`.
     ///
-    /// Exit 2 with issues on stderr so the agent sees them, 1 if xpd can't run, 0 otherwise.
+    /// As a hook of an agent plugin, it prints the issues as `additional_context` and exits 0.
+    /// As a hook in the Claude Code settings, it prints them on stderr and exits 2. It exits 1
+    /// if xpd can't run.
     Hook,
     /// Profile a data file (csv, parquet, feather, json, xlsx). Needs pandas.
     Profile { file: PathBuf },
@@ -279,7 +281,60 @@ fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
     }
 }
 
-/// Lints the file named in the hook JSON on stdin, and prints its issues to stderr.
+/// A `PostToolUse` event, from one of the two clients that `xpd hook` answers.
+enum HookEvent {
+    /// A client of the Agent Plugins specification, which names the completed call's result
+    /// `tool_result`. It reads the issues from stdout as `additional_context`.
+    AgentPlugin {
+        /// The agent's working directory. The hook itself starts in the plugin's folder.
+        cwd: Option<PathBuf>,
+        files: Vec<PathBuf>,
+    },
+    /// A hook in the Claude Code settings. It reads the issues from stderr when the exit code
+    /// is 2.
+    ClaudeCode { files: Vec<PathBuf> },
+}
+
+impl HookEvent {
+    fn parse(event: &Value) -> Self {
+        let path =
+            |value: &Value, key: &str| value.get(key).and_then(Value::as_str).map(PathBuf::from);
+        if event.get("tool_result").is_none() {
+            let files = event
+                .get("tool_input")
+                .and_then(|input| path(input, "file_path"));
+            return Self::ClaudeCode {
+                files: files.into_iter().collect(),
+            };
+        }
+        // Only the file.modify profile names files. A call that reports an error may still have
+        // changed some of them.
+        let modified =
+            event.pointer("/tool_profile/name").and_then(Value::as_str) == Some("file.modify");
+        let operations = event
+            .pointer("/tool_profile/input/operations")
+            .and_then(Value::as_array)
+            .filter(|_| modified);
+        let files = operations
+            .into_iter()
+            .flatten()
+            .filter_map(
+                |operation| match operation.get("kind").and_then(Value::as_str) {
+                    Some("edit" | "write") => path(operation, "path"),
+                    Some("move") => path(operation, "to"),
+                    _ => None,
+                },
+            )
+            .collect();
+        Self::AgentPlugin {
+            cwd: path(event, "cwd"),
+            files,
+        }
+    }
+}
+
+/// Lints the Python files that the hook event on stdin changed, and hands the issues to the
+/// client the way that client reads them.
 fn hook() -> ExitCode {
     use std::io::Read;
 
@@ -288,43 +343,74 @@ fn hook() -> ExitCode {
         eprintln!("xpd hook: cannot read stdin: {e}");
         return ExitCode::from(HOOK_FAILED);
     }
-    let value: Value = match serde_json::from_str(&input) {
-        Ok(v) => v,
+    let event = match serde_json::from_str(&input) {
+        Ok(event) => HookEvent::parse(&event),
         Err(e) => {
             eprintln!("xpd hook: stdin is not hook JSON: {e}");
             return ExitCode::from(HOOK_FAILED);
         }
     };
-    let Some(path) = value
-        .pointer("/tool_input/file_path")
-        .and_then(Value::as_str)
-    else {
-        return ExitCode::SUCCESS;
+    let (cwd, files) = match &event {
+        HookEvent::AgentPlugin { cwd, files } => (cwd.as_ref(), files),
+        HookEvent::ClaudeCode { files } => (None, files),
     };
-    if !scan::is_python(Path::new(path)) {
+    let files: Vec<&PathBuf> = files.iter().filter(|file| scan::is_python(file)).collect();
+    if files.is_empty() {
         return ExitCode::SUCCESS;
     }
-    let report = match lint(&[PathBuf::from(path)], None, Scope::Files) {
-        Ok(r) => r,
+    // The project's venv is found from the working directory, as in a user's run.
+    if let Some(Err(e)) = cwd.map(std::env::set_current_dir) {
+        eprintln!("xpd hook: cannot enter the agent's working directory: {e}");
+        return ExitCode::from(HOOK_FAILED);
+    }
+    let lines = match hook_lines(&files) {
+        Ok(lines) => lines,
         Err(e) => {
             eprintln!("xpd hook: {e:#}");
             return ExitCode::from(HOOK_FAILED);
         }
     };
-    // A file with a pipeline of steps also gets the errors and warnings of `xpd graph`.
-    let steps = std::fs::read_to_string(path)
-        .map(|src| Graph::step_lines(Path::new(path), &src))
-        .unwrap_or_default();
-    if report.issues.is_empty() && steps.is_empty() {
+    if lines.is_empty() {
         return ExitCode::SUCCESS;
     }
-    for i in &report.issues {
-        eprintln!("{}", i.line(Applicability::Safe));
+    match event {
+        HookEvent::AgentPlugin { .. } => {
+            println!(
+                "{}",
+                serde_json::json!({ "additional_context": lines.join("\n") })
+            );
+            ExitCode::SUCCESS
+        }
+        HookEvent::ClaudeCode { .. } => {
+            eprintln!("{}", lines.join("\n"));
+            ExitCode::from(HOOK_BLOCK)
+        }
     }
-    for line in &steps {
-        eprintln!("{line}");
+}
+
+/// The issues of the Python files in `files`. A file with a pipeline of steps also gets the
+/// errors and warnings of `xpd graph`.
+fn hook_lines(files: &[&PathBuf]) -> Result<Vec<String>> {
+    // One call can edit a file and then move or delete it, so a named file may be gone.
+    let files: Vec<PathBuf> = files
+        .iter()
+        .filter(|file| file.is_file())
+        .map(|file| (*file).clone())
+        .collect();
+    if files.is_empty() {
+        return Ok(Vec::new());
     }
-    ExitCode::from(HOOK_BLOCK)
+    let report = lint(&files, None, Scope::Files)?;
+    let issues = report
+        .issues
+        .iter()
+        .map(|issue| issue.line(Applicability::Safe));
+    let steps = files.iter().flat_map(|file| {
+        std::fs::read_to_string(file)
+            .map(|src| Graph::step_lines(file, &src))
+            .unwrap_or_default()
+    });
+    Ok(issues.chain(steps).collect())
 }
 
 /// Runs `script` with the project's Python and passes on its exit code.

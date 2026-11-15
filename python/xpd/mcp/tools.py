@@ -10,11 +10,11 @@ from mcp.types import (
     InputRequiredResult,
     ToolAnnotations,
 )
-from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 
 from xpd.mcp.binary import CHECK, EQUIV, GRAPH, PROFILE, Command, T, Xpd
 from xpd.mcp.models import CheckReport, Equivalence, GraphReport, Profile
-from xpd.mcp.root import Root
+from xpd.mcp.protocol import uses_handshake
+from xpd.mcp.root import Project, Root
 
 # Reads the project's files and changes nothing, so a client may run it without asking.
 READS = ToolAnnotations(
@@ -33,25 +33,17 @@ RUNS_CODE = ToolAnnotations(
 CONFIRM = "confirm_unsafe_fixes"
 
 
-async def run(ctx: Context, xpd: Xpd, command: Command[T], paths: Sequence[str], *flags: str) -> T:
-    """Runs one command with progress and a log line, which also reach a background task."""
+async def run(
+    ctx: Context, xpd: Xpd, command: Command[T], root: Root, paths: Sequence[str], *flags: str
+) -> T:
+    """Runs one command in the root with progress and a log line, which also reach a background
+    task."""
     shown = " ".join(["xpd", *command.args[:1], *flags, *paths])
     await ctx.report_progress(0, 1, shown)
     await ctx.info(f"running {shown}")
-    result = await xpd.run(command, paths, *flags)
+    result = await xpd.run(command, root.path, paths, *flags)
     await ctx.report_progress(1, 1, f"{shown} finished")
     return result
-
-
-def uses_handshake(ctx: Context) -> bool:
-    """Whether the client can be asked mid-call with ctx.elicit. The 2026-07-28 protocol and
-    background tasks ask by returning an InputRequiredResult instead."""
-    request = ctx.request_context
-    return (
-        not ctx.is_background_task
-        and request is not None
-        and request.protocol_version not in MODERN_PROTOCOL_VERSIONS
-    )
 
 
 def ask_to_confirm(message: str) -> InputRequiredResult:
@@ -84,11 +76,39 @@ async def confirmed(ctx: Context, message: str) -> bool | InputRequiredResult:
     return answer.content.get("confirm") is True
 
 
-def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
+async def unsafe_confirmed(
+    ctx: Context, xpd: Xpd, project: Project, root: Root, paths: Sequence[str]
+) -> bool | InputRequiredResult:
+    """Whether `fix` may write the unsafe fixes in `paths`. It asks the user only when there
+    are some."""
+    preview = await run(ctx, xpd, CHECK, root, paths, "--unsafe-fixes")
+    count = sum(issue.fix == "unsafe" for issue in preview.issues)
+    if not count:
+        return True
+    answer = await confirmed(
+        ctx,
+        f"Apply {count} unsafe fixes in {', '.join(paths)}? "
+        "An unsafe fix may change what the code does.",
+    )
+    if isinstance(answer, InputRequiredResult):
+        # Each round starts over, so the question also asks for the roots again.
+        requests = {**(answer.input_requests or {}), **project.roots_request(ctx)}
+        return answer.model_copy(update={"input_requests": requests})
+    if not answer:
+        await ctx.info("unsafe fixes declined, so only safe fixes are written")
+    return answer
+
+
+def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
+    register_lint(mcp, xpd, project)
+    register_data(mcp, xpd, project)
+
+
+def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"lint"}, annotations=READS, task=True)
     async def check(
         ctx: Context, paths: list[str] | None = None, *, unsafe_fixes: bool = False
-    ) -> CheckReport:
+    ) -> CheckReport | InputRequiredResult:
         """Lint Python files for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn,
         Apache Hamilton and Python itself. Changes no file.
 
@@ -103,9 +123,12 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
                 Default: the whole root.
             unsafe_fixes: Count unsafe fixes, which may change behavior, in `fixable` too.
         """
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
         args = root.all_inside(paths or ["."])
         flags = ["--unsafe-fixes"] if unsafe_fixes else []
-        return await run(ctx, xpd, CHECK, args, *flags)
+        return await run(ctx, xpd, CHECK, root, args, *flags)
 
     @mcp.tool(tags={"lint", "fix"}, annotations=WRITES, task=True)
     async def fix(
@@ -120,27 +143,22 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
             paths: Files or folders inside the project root. Default: the whole root.
             unsafe: Also apply unsafe fixes, after the user confirms.
         """
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
         args = root.all_inside(paths or ["."])
         if unsafe:
-            preview = await run(ctx, xpd, CHECK, args, "--unsafe-fixes")
-            unsafe_count = sum(issue.fix == "unsafe" for issue in preview.issues)
-            if unsafe_count:
-                where = ", ".join(args)
-                answer = await confirmed(
-                    ctx,
-                    f"Apply {unsafe_count} unsafe fixes in {where}? "
-                    "An unsafe fix may change what the code does.",
-                )
-                if isinstance(answer, InputRequiredResult):
-                    return answer
-                if not answer:
-                    await ctx.info("unsafe fixes declined, so only safe fixes are written")
-                    unsafe = False
+            answer = await unsafe_confirmed(ctx, xpd, project, root, args)
+            if isinstance(answer, InputRequiredResult):
+                return answer
+            unsafe = answer
         flags = ["--fix", "--unsafe-fixes"] if unsafe else ["--fix"]
-        return await run(ctx, xpd, CHECK, args, *flags)
+        return await run(ctx, xpd, CHECK, root, args, *flags)
 
+
+def register_data(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"dataflow"}, annotations=READS)
-    async def graph(ctx: Context, paths: list[str]) -> GraphReport:
+    async def graph(ctx: Context, paths: list[str]) -> GraphReport | InputRequiredResult:
         """Read the dataflow of step code or Apache Hamilton modules without running them: which
         step or node reads which, and what does not connect. Changes no file.
 
@@ -152,10 +170,13 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             paths: Files or folders inside the project root.
         """
-        return await run(ctx, xpd, GRAPH, root.all_inside(paths))
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        return await run(ctx, xpd, GRAPH, root, root.all_inside(paths))
 
     @mcp.tool(tags={"data"}, annotations=READS, task=True)
-    async def profile(ctx: Context, file: str) -> Profile:
+    async def profile(ctx: Context, file: str) -> Profile | InputRequiredResult:
         """Profile a data file (csv, parquet, feather, json or xlsx): each column's dtype,
         nulls, distinct values and memory. Run it before you choose methods for the data.
         Needs pandas in the project's Python. Changes no file.
@@ -163,10 +184,13 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
         Args:
             file: The data file, inside the project root.
         """
-        return await run(ctx, xpd, PROFILE, [root.inside(file)])
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        return await run(ctx, xpd, PROFILE, root, [root.inside(file)])
 
     @mcp.tool(tags={"data", "refactor"}, annotations=RUNS_CODE, task=True)
-    async def equiv(ctx: Context, old: str, new: str) -> Equivalence:
+    async def equiv(ctx: Context, old: str, new: str) -> Equivalence | InputRequiredResult:
         """Run two scripts with the project's Python and check that they leave an equal
         `result` (DataFrames and Series with pandas.testing, anything else with
         numpy.testing). A refactor of data logic is done when this says `equivalent: true`.
@@ -176,4 +200,7 @@ def register(mcp: FastMCP, xpd: Xpd, root: Root) -> None:
             old: The script before the refactor, inside the project root.
             new: The script after the refactor, inside the project root.
         """
-        return await run(ctx, xpd, EQUIV, [root.inside(old), root.inside(new)])
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        return await run(ctx, xpd, EQUIV, root, [root.inside(old), root.inside(new)])
