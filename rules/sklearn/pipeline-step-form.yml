@@ -1,0 +1,65 @@
+# scikit-learn splits a parameter name at the first two underscores to find the step, so a
+# step name with __ in it raises ValueError at fit.
+id: pipeline-step-form
+language: python
+severity: error
+message: The step name $N has two underscores in a row, and fit raises ValueError on it, because set_params splits parameter names there. Use one underscore.
+rule:
+  kind: string
+  pattern: $N
+  regex: '^[rRuU]?["''][^"'']*__'
+  nthChild: 1
+  inside:
+    kind: tuple
+    inside:
+      kind: list
+      any:
+        - nthChild: 1
+          inside: { kind: argument_list, inside: { kind: call, matches: step-container } }
+        - inside: { kind: keyword_argument, has: { field: name, regex: ^(steps|transformers|transformer_list)$ }, inside: { kind: argument_list, inside: { kind: call, matches: step-container } } }
+utils:
+  step-container:
+    has: { field: function, regex: '(^|\.)(Pipeline|ColumnTransformer|FeatureUnion)$' }
+---
+id: pipeline-step-form
+language: python
+severity: error
+message: $F takes the steps as separate arguments, and a single list raises TypeError at fit. Remove the square brackets.
+rule:
+  pattern: $F($L)
+constraints:
+  F: { regex: '(^|\.)(make_pipeline|make_union)$' }
+  L: { kind: list }
+---
+id: pipeline-step-form
+language: python
+severity: error
+message: Pipeline takes a list of (name, estimator) pairs, and bare estimators raise TypeError at fit. Give each step a name, or call make_pipeline with the estimators.
+rule:
+  pattern: $C($$$A)
+  has: { field: arguments, has: { nthChild: 1, kind: list, has: { kind: call } } }
+constraints:
+  C: { regex: '(^|\.)Pipeline$' }
+---
+# The Pipeline of scikit-learn calls transform on every step but the last, and a sampler has
+# only fit_resample, so fit raises TypeError. A sampler as the last step fits and is left
+# alone. The Pipeline of imbalanced-learn takes samplers, so files that import from
+# imblearn.pipeline are left alone, because the name may be that one.
+id: pipeline-step-form
+language: python
+severity: error
+message: $S is a sampler, and the Pipeline of scikit-learn raises TypeError at fit on it. Import Pipeline or make_pipeline from imblearn.pipeline, which applies the sampler to the training rows only.
+rule:
+  pattern: $S($$$A)
+  any:
+    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(make_pipeline|pipeline\.make_pipeline|sklearn\.pipeline\.make_pipeline)$' } } }
+      precedes: { stopBy: end, regex: '\w' }
+    - inside:
+        kind: tuple
+        precedes: { stopBy: end, kind: tuple }
+        inside: { kind: list, inside: { stopBy: end, kind: call, has: { field: function, regex: '^(Pipeline|pipeline\.Pipeline|sklearn\.pipeline\.Pipeline)$' } } }
+  all:
+    - inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_from_statement, has: { field: module_name, regex: ^sklearn\.pipeline$ } }, { kind: import_from_statement, has: { field: module_name, regex: ^sklearn$ }, regex: '\bpipeline\b' }, { kind: import_statement, regex: '\bsklearn\.pipeline\b' }] } }
+    - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_from_statement, regex: '\bimblearn\b.*\bpipeline\b|\bimblearn\.pipeline\b' }, { kind: import_statement, regex: '\bimblearn\.pipeline\b' }] } } }
+constraints:
+  S: { regex: '(^|\.)(SMOTE|SMOTENC|SMOTEN|ADASYN|BorderlineSMOTE|SVMSMOTE|KMeansSMOTE|RandomOverSampler|RandomUnderSampler|NearMiss|TomekLinks|EditedNearestNeighbours|RepeatedEditedNearestNeighbours|AllKNN|CondensedNearestNeighbour|OneSidedSelection|NeighbourhoodCleaningRule|InstanceHardnessThreshold|ClusterCentroids|SMOTEENN|SMOTETomek)$' }

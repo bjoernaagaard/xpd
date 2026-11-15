@@ -70,3 +70,40 @@ constraints:
   F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
   V: { kind: identifier }
   K: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut|PredefinedSplit)$' }
+---
+# The search built in the same block with no cv, an int cv, or a splitter that drops groups,
+# and fitted with groups=.
+id: groups-ignored
+language: python
+severity: error
+message: The search ignores groups with this cv, so rows of one group sit in both the training and the test folds. Pass cv=GroupKFold(n_splits=5) to the search.
+rule:
+  pattern: $S.fit($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^groups$ }, not: { has: { field: value, regex: ^None$ } } } }
+  any:
+    - has: { field: function, has: { field: object, matches: search-without-group-cv } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows:
+          stopBy: end
+          kind: expression_statement
+          has:
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $S }
+              - has: { field: right, matches: search-without-group-cv }
+utils:
+  search-without-group-cv:
+    kind: call
+    has: { field: function, regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV)$' }
+    not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { matches: other-cv }] } } }
+  other-cv:
+    kind: keyword_argument
+    has: { field: name, regex: ^cv$ }
+    not: { has: { field: value, matches: plain-cv } }
+  plain-cv:
+    any:
+      - kind: integer
+      - kind: call
+        has: { field: function, regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold|RepeatedStratifiedKFold|TimeSeriesSplit|LeaveOneOut|LeavePOut)$' }

@@ -1,0 +1,12 @@
+# force_int_remainder_cols is gone from ColumnTransformer and make_column_transformer on
+# scikit-learn 1.9.1, which raise TypeError on it. The remainder columns now come back in the
+# form the other columns were given in.
+id: column-transformer-removed
+language: python
+severity: error
+message: $C no longer takes force_int_remainder_cols and raises TypeError on scikit-learn 1.9. Drop the keyword.
+rule:
+  pattern: $C($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^force_int_remainder_cols$ } } }
+constraints:
+  C: { regex: '(^|\.)(ColumnTransformer|make_column_transformer)$' }
