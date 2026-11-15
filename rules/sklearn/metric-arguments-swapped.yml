@@ -1,14 +1,15 @@
-# scikit-learn metrics take the true values first. These metrics return another number with the
-# two swapped. accuracy_score and f1_score are left alone, because they return the same number.
-# The rule reads the names of the two arguments. Unsafe: a name can mislead.
+# scikit-learn metrics take the true values first. Swapped, precision becomes recall. The rule
+# reads the names of the two arguments. accuracy_score, f1_score, matthews_corrcoef,
+# cohen_kappa_score, jaccard_score and the error metrics such as mean_squared_error return the
+# same number in either order, so they are left alone. Unsafe: a name can mislead.
 id: metric-arguments-swapped
 language: python
 severity: error
-message: $F takes the true values first and the predictions second. In this order it returns another number.
+message: $F takes the true values first and the predictions second. In this order the precision it gives is the recall, which scored 0.47 on data with no signal where the honest precision was 0.29.
 rule:
   pattern: $F($P, $T)
 constraints:
-  F: { regex: '(^|\.)(precision_score|recall_score|confusion_matrix|classification_report|r2_score|explained_variance_score|mean_absolute_percentage_error|balanced_accuracy_score|fbeta_score)$' }
+  F: { regex: '(^|\.)(precision_score|classification_report|precision_recall_fscore_support)$' }
   P: { regex: '(?i)pred|y_?hat' }
   T: { regex: '(?i)(true|test|val|actual|target|label|^y$)', not: { regex: '(?i)pred|hat' } }
 fix: $F($T, $P)
@@ -17,12 +18,63 @@ metadata: { fix: unsafe }
 id: metric-arguments-swapped
 language: python
 severity: error
-message: $F takes the true values first and the predictions second. In this order it returns another number.
+message: $F takes the true values first and the predictions second. In this order the precision it gives is the recall, which scored 0.47 on data with no signal where the honest precision was 0.29.
 rule:
   pattern: $F($P, $T, $$$REST)
 constraints:
-  F: { regex: '(^|\.)(precision_score|recall_score|confusion_matrix|classification_report|r2_score|explained_variance_score|mean_absolute_percentage_error|balanced_accuracy_score|fbeta_score)$' }
+  F: { regex: '(^|\.)(precision_score|classification_report|precision_recall_fscore_support)$' }
   P: { regex: '(?i)pred|y_?hat' }
   T: { regex: '(?i)(true|test|val|actual|target|label|^y$)', not: { regex: '(?i)pred|hat' } }
 fix: $F($T, $P, $$$REST)
 metadata: { fix: unsafe }
+---
+# These return another number with the two swapped, but on data with no signal the swapped
+# number is not above the honest one, so no proof can show it, and the documents are info.
+id: metric-arguments-swapped
+language: python
+severity: info
+message: $F takes the true values first and the predictions second. In this order it returns another number.
+rule:
+  pattern: $F($P, $T)
+constraints:
+  F: { regex: '(^|\.)(recall_score|fbeta_score|balanced_accuracy_score|confusion_matrix|multilabel_confusion_matrix|class_likelihood_ratios|r2_score|explained_variance_score|mean_absolute_percentage_error|mean_poisson_deviance|mean_gamma_deviance|d2_absolute_error_score|d2_pinball_score|d2_tweedie_score|roc_auc_score|average_precision_score)$' }
+  P: { regex: '(?i)pred|y_?hat', not: { regex: '(?i)prob|score' } }
+  T: { regex: '(?i)(true|test|val|actual|target|label|^y$)', not: { regex: '(?i)pred|hat' } }
+fix: $F($T, $P)
+metadata: { fix: unsafe }
+---
+id: metric-arguments-swapped
+language: python
+severity: info
+message: $F takes the true values first and the predictions second. In this order it returns another number.
+rule:
+  pattern: $F($P, $T, $$$REST)
+constraints:
+  F: { regex: '(^|\.)(recall_score|fbeta_score|balanced_accuracy_score|confusion_matrix|multilabel_confusion_matrix|class_likelihood_ratios|r2_score|explained_variance_score|mean_absolute_percentage_error|mean_poisson_deviance|mean_gamma_deviance|d2_absolute_error_score|d2_pinball_score|d2_tweedie_score|roc_auc_score|average_precision_score)$' }
+  P: { regex: '(?i)pred|y_?hat', not: { regex: '(?i)prob|score' } }
+  T: { regex: '(?i)(true|test|val|actual|target|label|^y$)', not: { regex: '(?i)pred|hat' } }
+fix: $F($T, $P, $$$REST)
+metadata: { fix: unsafe }
+---
+# Scores or probabilities first make the true values continuous, and these metrics raise on a
+# continuous target.
+id: metric-arguments-swapped
+language: python
+severity: error
+message: $F takes the true labels first and the scores second, so this raises. Pass the labels first.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve|log_loss|brier_score_loss)$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: 1
+          any:
+            - pattern: $M.predict_proba($$$X)
+            - pattern: $M.predict_proba($$$X)[$I]
+            - pattern: $M.decision_function($$$X)
+            - { kind: identifier, regex: '(?i)prob|score' }
+    - has:
+        field: arguments
+        has: { nthChild: 2, kind: identifier, regex: '(?i)(true|test|val|actual|target|label|^y$)', not: { regex: '(?i)pred|hat|prob|score' } }
