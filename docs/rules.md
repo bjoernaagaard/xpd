@@ -3296,24 +3296,6 @@ A = mmread("matrix.mtx", spmatrix=True)
 result = stats.anderson(sample, method="interpolate")
 ```
 
-#### mode-keepdims
-
-**Severity:** error. **Fix:** unsafe: `keepdims=True`. It gives back the old shape, but for 2-D input the old form returns the mode of the first column today, and the fix returns the first row.
-
-Reports `stats.mode(x)[0][0]`, `stats.mode(x)[1][0]`, `stats.mode(x).mode[0]` and `stats.mode(x).count[0]` without `keepdims=` or `axis=`. stats.mode returns plain values unless `keepdims=True`, so the second index raises IndexError for 1-D input on SciPy 1.18.1.
-
-Example:
-
-```python
-most_common = stats.mode(labels)[0][0]
-```
-
-Use instead:
-
-```python
-most_common = stats.mode(labels).mode
-```
-
 #### minimize-unknown-option
 
 **Severity:** warning. **Fix:** none.

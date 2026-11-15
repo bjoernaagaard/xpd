@@ -175,9 +175,9 @@ def read_harwell_boeing(path):
 
 
 def mode_indexing(x):
-    value = stats.mode(x)[0][0]  # xpd: mode-keepdims
-    count = stats.mode(x)[1][0]  # xpd: mode-keepdims
-    first = stats.mode(x).mode[0]  # xpd: mode-keepdims
+    value = stats.mode(x)[0][0]
+    count = stats.mode(x)[1][0]
+    first = stats.mode(x).mode[0]
     return value, count, first
 
 
