@@ -1,7 +1,7 @@
 [project]
 site_name = "xpd"
 site_url = "https://bjoernaagaard.github.io/xpd/"
-site_description = "Fast, opinionated linter for Python library habits, starting with pandas and scikit-learn"
+site_description = "Fast, opinionated linter for Python library habits, starting with pandas, NumPy and scikit-learn"
 repo_url = "https://github.com/bjoernaagaard/xpd"
 repo_name = "bjoernaagaard/xpd"
 edit_uri = "edit/main/docs/"

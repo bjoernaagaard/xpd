@@ -1,6 +1,6 @@
 ---
 name: xpd
-description: "Python library habits: run xpd to lint code for slow or wrong use of libraries such as pandas, profile data files, and prove refactors are equivalent."
+description: "Python library habits: run xpd to lint code for slow or wrong use of libraries such as pandas and NumPy, profile data files, and prove refactors are equivalent."
 ---
 
 # xpd

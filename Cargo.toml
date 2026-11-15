@@ -1,10 +1,10 @@
 [package]
 # The package and the command share one name, so that `uvx xpd` runs it.
 name = "xpd"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.99"
-description = "Fast, opinionated linter for Python library habits, starting with pandas and scikit-learn, for humans and coding agents"
+description = "Fast, opinionated linter for Python library habits, starting with pandas, NumPy and scikit-learn, for humans and coding agents"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/bjoernaagaard/xpd"
 homepage = "https://bjoernaagaard.github.io/xpd/"
