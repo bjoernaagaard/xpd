@@ -1,0 +1,34 @@
+# These functions take params= since scikit-learn 1.4, and fit_params= raises TypeError on
+# 1.9.1. A rename has no fix here, because the old form raises and leaves nothing to compare.
+id: fit-params-keyword
+language: python
+severity: error
+message: $F no longer takes fit_params and raises TypeError on scikit-learn 1.9. Rename the keyword to params.
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict)$' }
+metadata: { since: "1.4" }
+---
+# These three took params= in scikit-learn 1.6.
+id: fit-params-keyword
+language: python
+severity: error
+message: $F no longer takes fit_params and raises TypeError on scikit-learn 1.9. Rename the keyword to params.
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+constraints:
+  F: { regex: '(^|\.)(learning_curve|validation_curve|permutation_test_score)$' }
+metadata: { since: "1.6" }
+---
+id: fit-params-keyword
+language: python
+severity: error
+message: $C no longer takes fit_params and raises TypeError on scikit-learn 1.9. Drop it and pass the values to fit, as in search.fit(X, y, sample_weight=w).
+rule:
+  pattern: $C($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+constraints:
+  C: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV)$' }

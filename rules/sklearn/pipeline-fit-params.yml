@@ -1,0 +1,30 @@
+# With metadata routing off, Pipeline.fit takes only <step>__<name> keywords and raises
+# ValueError on a plain name. The pipeline is the one built in an earlier statement of the same
+# block, or the call itself. X and y passed by name are the data, not step parameters.
+id: pipeline-fit-params
+language: python
+severity: error
+message: Pipeline.fit raises ValueError on $K, because it takes step parameters as the step name, two underscores and the name. Write it as <last step>__$K, such as logisticregression__$K for make_pipeline.
+rule:
+  pattern: $P.fit($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, pattern: $K } } }
+  any:
+    - has: { field: function, has: { field: object, matches: pipeline-call } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows:
+          stopBy: end
+          kind: expression_statement
+          has:
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $P }
+              - has: { field: right, matches: pipeline-call }
+  not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } } } }
+constraints:
+  K: { regex: '^[A-Za-z_]\w*$', not: { any: [{ regex: '__' }, { regex: '^(X|y)$' }] } }
+utils:
+  pipeline-call:
+    kind: call
+    has: { field: function, regex: '(^|\.)(Pipeline|make_pipeline)$' }

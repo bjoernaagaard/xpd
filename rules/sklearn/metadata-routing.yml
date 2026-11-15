@@ -1,0 +1,96 @@
+# Metadata routing is off unless the code turns it on with set_config or config_context. The
+# file counts as routed when any call in it passes enable_metadata_routing with a value other
+# than False. Each form below raises on scikit-learn 1.9.1.
+id: metadata-routing
+language: python
+severity: error
+message: $M works only when metadata routing is on, so it raises RuntimeError here. Call sklearn.set_config(enable_metadata_routing=True) before you build the estimator.
+rule:
+  pattern: $E.$M($$$A)
+  not: { matches: routed-file }
+constraints:
+  M: { regex: '^set_(fit|partial_fit|score|predict|predict_proba|predict_log_proba|decision_function|transform|fit_transform|inverse_transform|split)_request$' }
+utils:
+  routed-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
+---
+id: metadata-routing
+language: python
+severity: error
+message: Pipeline raises ValueError at fit when transform_input is set and metadata routing is off. Call sklearn.set_config(enable_metadata_routing=True), or drop transform_input.
+rule:
+  pattern: $C($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^transform_input$ }, not: { has: { field: value, regex: ^None$ } } } }
+  not: { matches: routed-file }
+constraints:
+  C: { regex: '(^|\.)Pipeline$' }
+utils:
+  routed-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
+---
+id: metadata-routing
+language: python
+severity: error
+message: 'With metadata routing on, $F raises ValueError when it gets groups=. Pass params={"groups": groups} instead.'
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^groups$ }, not: { has: { field: value, regex: ^None$ } } } }
+  matches: routed-file
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+utils:
+  routed-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
+---
+# The step__param form belongs to routing being off. With routing on, Pipeline.fit routes a
+# plain name to every step that requested it.
+id: metadata-routing
+language: python
+severity: error
+message: With metadata routing on, fit raises TypeError on $K, because routing takes plain names. Pass the plain name and call set_fit_request on the step that should get it.
+rule:
+  pattern: $O.fit($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, pattern: $K } } }
+  matches: routed-file
+constraints:
+  K: { regex: '^[A-Za-z]\w*__\w+$' }
+utils:
+  routed-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
+---
+# With routing on, metadata reaches an estimator only after it asks for it. A function or a
+# script that never calls a set_*_request method has asked for nothing, so params raises
+# UnsetMetadataPassedError.
+id: metadata-routing
+language: python
+severity: error
+message: With metadata routing on, $F raises UnsetMetadataPassedError, because no estimator here asked for the params. Call set_fit_request and set_score_request on the estimator, such as set_fit_request(sample_weight=True).
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^params$ }, not: { has: { field: value, regex: '^(None|\{\})$' } } } }
+  matches: routed-file
+  not:
+    inside:
+      stopBy: { any: [{ kind: function_definition }, { kind: module }] }
+      any: [{ kind: function_definition }, { kind: module }]
+      has: { stopBy: end, kind: identifier, regex: '^set_\w+_request$' }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+utils:
+  routed-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
