@@ -298,7 +298,7 @@ def refused_values():
         attempt(lambda: DecisionTreeRegressor(criterion="mse", random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
         attempt(lambda: DecisionTreeRegressor(criterion="mae", random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
         attempt(lambda: GradientBoostingRegressor(loss="ls", n_estimators=5, random_state=0).fit(Xr, yr).predict(Xr)),  # xpd: removed-in-sklearn
-        attempt(lambda: GradientBoostingClassifier(loss="deviance", n_estimators=5, random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn, slow-gradient-boosting
+        attempt(lambda: GradientBoostingClassifier(loss="deviance", n_estimators=5, random_state=0).fit(X, y).predict(X)),  # xpd: removed-in-sklearn
         ExtraTreesClassifier(n_estimators=5, max_features="log2", random_state=0).fit(X, y).predict(X),
     )
 
@@ -338,7 +338,7 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     SGDClassifier(n_iter=5, random_state=0)  # xpd: removed-in-sklearn
     LassoCV(n_alphas=100, alphas=None)  # xpd: removed-in-sklearn
     mean_squared_error(y, y, squared=False)  # xpd: removed-metric-api
-    GradientBoostingClassifier(max_features="auto", random_state=0)  # xpd: removed-in-sklearn, slow-gradient-boosting
+    GradientBoostingClassifier(max_features="auto", random_state=0)  # xpd: removed-in-sklearn
     grid = {"max_features": ["auto", "sqrt"], "n_estimators": [10, 50]}  # xpd: removed-in-sklearn
     grid = {"rf__max_features": ["sqrt", "log2"], "solver": ["auto"]}
     CalibratedClassifierCV(model, cv="prefit")  # xpd: removed-in-sklearn

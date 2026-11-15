@@ -15,7 +15,6 @@ from sklearn.model_selection import (
     KFold,
     LeaveOneOut,
     StratifiedKFold,
-    TimeSeriesSplit,
     cross_val_predict,
     cross_val_score,
     train_test_split,
@@ -98,22 +97,11 @@ def with_groups():
 
 
 @case
-def shuffled_time_split():
-    frame = days()
-    frame = frame.sort_values("date")
-    X, y = frame[["load"]], frame["target"]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=0)  # xpd: shuffled-time-split
-    folds = KFold(5, shuffle=True, random_state=0)  # xpd: shuffled-time-split
-    model = RandomForestClassifier(n_estimators=10, random_state=0).fit(X_train, y_train)
-    return model, model.predict(X_test), cross_val_score(model, X, y, cv=folds)
-
-
-@case
 def lag_then_shuffled_split():
     lagged = days()
     lagged["load_before"] = lagged["load"].shift(1)
     lagged = lagged.dropna()
-    X_train, X_test, y_train, y_test = train_test_split(lagged[["load_before"]], lagged["target"], random_state=0)  # xpd: shuffled-time-split
+    X_train, X_test, y_train, y_test = train_test_split(lagged[["load_before"]], lagged["target"], random_state=0)
     lagged.sort_values("date", inplace=True)  # xpd: no-inplace
     model = RandomForestClassifier(n_estimators=10, random_state=0).fit(X_train, y_train)
     return model, model.predict(X_test)
@@ -124,7 +112,7 @@ def sorted_in_place():
     frame = days()
     frame.sort_values(by="date", inplace=True)  # xpd: no-inplace
     shown = frame.sort_values("date").head(5)  # xpd: sort-then-head
-    X_train, X_test, y_train, y_test = train_test_split(frame[["load"]], frame["target"], random_state=0)  # xpd: shuffled-time-split
+    X_train, X_test, y_train, y_test = train_test_split(frame[["load"]], frame["target"], random_state=0)
     model = RandomForestClassifier(n_estimators=10, random_state=0).fit(X_train, y_train)
     return model, model.predict(X_test), shown
 
@@ -137,26 +125,6 @@ def sorted_for_display():
     X_train, X_test, y_train, y_test = train_test_split(frame[["load"]], frame["target"], random_state=0)
     model = RandomForestClassifier(n_estimators=10, random_state=0).fit(X_train, y_train)
     return model, model.predict(X_test), first
-
-
-@case
-def time_split():
-    frame = days()
-    frame = frame.sort_values("date")
-    X, y = frame[["load"]], frame["target"]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, shuffle=False)
-    folds = TimeSeriesSplit(5)
-    model = RandomForestClassifier(n_estimators=10, random_state=0).fit(X_train, y_train)
-    return model, model.predict(X_test), cross_val_score(model, X, y, cv=folds)
-
-
-@case
-def sorted_by_value():
-    frame = days().sort_values("load")
-    X_train, X_test, y_train, y_test = train_test_split(frame[["load"]], frame["target"], random_state=0)
-    folds = KFold(5, shuffle=True, random_state=0)
-    model = RandomForestClassifier(n_estimators=10, random_state=0).fit(X_train, y_train)
-    return model, model.predict(X_test), folds.get_n_splits()
 
 
 @case

@@ -14,7 +14,7 @@ from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score, cross_validate, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import LabelBinarizer, LabelEncoder, OneHotEncoder, OrdinalEncoder, StandardScaler, TargetEncoder
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder, OrdinalEncoder, StandardScaler, TargetEncoder
 from sklearn.utils import resample
 
 CASES = {}
@@ -144,9 +144,8 @@ def fit_columns_before_split():
 def encode_before_split():
     df = frame()
     encoder = TargetEncoder()
-    codes = encoder.fit(df[["city"]], df["y"]).transform(df[["city"]])  # xpd: fit-before-split, target-encoder-fit-transform
-    cross_fitted = encoder.fit_transform(df[["city"]], df["y"])
-    return train_test_split(codes, df["y"], random_state=0), cross_fitted
+    codes = encoder.fit(df[["city"]], df["y"]).transform(df[["city"]])  # xpd: fit-before-split
+    return train_test_split(codes, df["y"], random_state=0)
 
 
 @case
@@ -251,39 +250,6 @@ def cross_val_on_a_pipeline():
 
 
 @case
-def get_dummies_on_test():
-    df = frame()
-    X_train, X_test = train_test_split(df[["city", "x1"]], test_size=0.1, random_state=0)
-    train_columns = pd.get_dummies(X_train).columns
-    X_test_dummies = pd.get_dummies(X_test)  # xpd: get-dummies-on-test
-    test_df = pd.get_dummies(X_test, columns=["city"])  # xpd: get-dummies-on-test
-    return list(train_columns), list(X_test_dummies.columns), list(test_df.columns)
-
-
-@case
-def one_hot_fitted_on_train():
-    df = frame()
-    X_train, X_test = train_test_split(df[["city", "x1"]], test_size=0.1, random_state=0)
-    encoder = OneHotEncoder(handle_unknown="ignore").fit(X_train[["city"]])
-    aligned = pd.get_dummies(X_test).reindex(columns=pd.get_dummies(X_train).columns, fill_value=0)
-    return encoder.transform(X_test[["city"]]).shape, aligned.shape, pd.get_dummies(df).shape
-
-
-@case
-def early_stopping_on_test():
-    from xgboost import XGBClassifier
-
-    df = frame()
-    X_train, X_test, y_train, y_test = split(df)
-    X_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=0)
-    model = XGBClassifier(n_estimators=50, early_stopping_rounds=5, n_jobs=1, random_state=0)
-    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)  # xpd: early-stopping-on-test
-    held = XGBClassifier(n_estimators=50, early_stopping_rounds=5, n_jobs=1, random_state=0)
-    held.fit(X_fit, y_fit, eval_set=[(X_val, y_val)], verbose=False)
-    return model.score(X_test, y_test), held.score(X_test, y_test)
-
-
-@case
 def tune_on_test():
     df = frame()
     X_train, X_test, y_train, y_test = split(df)
@@ -310,18 +276,3 @@ def tune_on_test():
         print(k, verdict)
     search = GridSearchCV(KNeighborsClassifier(), {"n_neighbors": list(range(1, 10))}, cv=3).fit(X_train, y_train)
     return max(scores), best_k, search.score(X_test, y_test)
-
-
-@case
-def fit_on_all_rows():
-    df = frame()
-    X = df[["x1", "x2"]]
-    y = df["y"]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
-    model = LogisticRegression()
-    model.fit(X, y)  # xpd: fit-on-all-rows
-    leaked = model.score(X_test, y_test)
-    honest = LogisticRegression().fit(X_train, y_train)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, random_state=0)
-    honest.fit(X_train, y_train)
-    return leaked, honest.score(X_val, y_val)

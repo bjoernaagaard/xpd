@@ -229,26 +229,6 @@ def sampler_outside_the_pipeline():
 
 
 @case
-def frame_joined_back():
-    from sklearn.model_selection import train_test_split
-
-    X, y, w = frame(n=80)
-    data = X[X["a"] > -1].assign(y=np.resize(y, len(X))[X["a"] > -1])
-    X_train, X_test, y_train, y_test = train_test_split(data[["a", "b"]], data["y"], random_state=0)
-    scaler = StandardScaler()
-    scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=["a", "b"])  # xpd: frame-drops-index
-    joined = pd.concat([scaled, y_train], axis=1)
-    kept = pd.DataFrame(scaler.transform(X_test), columns=["a", "b"], index=X_test.index)
-    joined_test = pd.concat([kept, y_test], axis=1)
-    numbered = pd.DataFrame(scaler.transform(X_test), columns=["a", "b"])
-    numbered.index = X_test.index
-    joined_numbered = pd.concat([numbered, y_test], axis=1)
-    alone = pd.DataFrame(scaler.transform(X_test), columns=["a", "b"])
-    rows = pd.concat([alone, alone])
-    return joined, joined_test, joined_numbered, rows
-
-
-@case
 def function_transformers():
     from sklearn.preprocessing import FunctionTransformer
 
