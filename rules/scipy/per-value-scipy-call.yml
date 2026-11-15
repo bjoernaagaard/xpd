@@ -57,6 +57,74 @@ utils:
         kind: import_from_statement
         all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $F } }]
 ---
+# A distribution method of scipy.stats called once per value of a comprehension. Each call
+# checks its arguments in Python for about 50 microseconds. On 1,000,000 values one call on the
+# array ran 34 to 1,045 times faster for norm.cdf and t.sf, and 54 to 165 times on 1,000
+# values, on float64 and float32. The cost is 68 Python calls of argument checks per value, in
+# speed/runs/profile_loops.txt, in
+# speed/runs/bench_stats.jsonl and bench_stats2.jsonl. No fix, because the loop may run over a
+# list of arrays.
+id: per-value-scipy-call
+language: python
+severity: warning
+message: This calls $D.$METH once per value of $IT, and every argument of $METH broadcasts. Pass np.asarray($IT) in place of $X and call it once, which ran 34 to 1,045 times faster on 1,000,000 values.
+rule:
+  kind: call
+  pattern: $CALL
+  # all keeps the order, so the comprehension binds $X before the arguments are searched for it.
+  all:
+    - inside: { matches: per-value }
+    - has: { field: function, any: [{ pattern: $M.$D.$METH, matches: stats-dist }, { pattern: $D.$METH, matches: from-stats }] }
+    - has: { field: arguments, has: { stopBy: end, pattern: $X } }
+constraints:
+  D: { regex: '^(alpha|anglit|arcsine|argus|bernoulli|beta|betabinom|betanbinom|betaprime|binom|boltzmann|bradford|burr|burr12|cauchy|chi|chi2|cosine|crystalball|dgamma|dlaplace|dpareto_lognorm|dweibull|erlang|expon|exponnorm|exponpow|exponweib|f|fatiguelife|fisk|foldcauchy|foldnorm|gamma|gausshyper|genexpon|genextreme|gengamma|genhalflogistic|genhyperbolic|geninvgauss|genlogistic|gennorm|genpareto|geom|gibrat|gompertz|gumbel_l|gumbel_r|halfcauchy|halfgennorm|halflogistic|halfnorm|hypergeom|hypsecant|invgamma|invgauss|invweibull|irwinhall|jf_skew_t|johnsonsb|johnsonsu|kappa3|kappa4|ksone|kstwo|kstwobign|landau|laplace|laplace_asymmetric|levy|levy_l|levy_stable|loggamma|logistic|loglaplace|lognorm|logser|loguniform|lomax|maxwell|mielke|moyal|nakagami|nbinom|ncf|nchypergeom_fisher|nchypergeom_wallenius|nct|ncx2|nhypergeom|norm|norminvgauss|pareto|pearson3|planck|poisson|poisson_binom|powerlaw|powerlognorm|powernorm|randint|rayleigh|rdist|recipinvgauss|reciprocal|rel_breitwigner|rice|semicircular|skellam|skewcauchy|skewnorm|studentized_range|t|trapezoid|triang|truncexpon|truncnorm|truncpareto|truncweibull_min|tukeylambda|uniform|vonmises|vonmises_line|wald|weibull_max|weibull_min|wrapcauchy|yulesimon|zipf|zipfian)$' }
+  METH: { regex: '^(pdf|logpdf|cdf|logcdf|sf|logsf|ppf|isf|pmf|logpmf)$' }
+  X: { kind: identifier }
+utils:
+  # One for clause over a name, no if clause, and the element is the call itself with the loop
+  # name as one of its arguments.
+  per-value:
+    any: [{ kind: list_comprehension }, { kind: generator_expression }]
+    all:
+      - has: { field: body, pattern: $CALL }
+      - has: { kind: for_in_clause, all: [{ has: { field: left, kind: identifier, pattern: $X } }, { has: { field: right, pattern: $IT } }] }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  stats-dist:
+    has:
+      field: object
+      matches: stats-module
+  stats-module:
+    any:
+      - has: { field: object, regex: '^scipy\.stats$' }
+      - all:
+          - has: { field: object, pattern: $S.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $M }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $M } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $M, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $M } }] }
+  from-stats-name:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $D } }]
+  from-stats:
+    has: { field: object, kind: identifier, pattern: $D, matches: from-stats-name }
+---
 # A scipy.stats distribution frozen once per value of a comprehension, then evaluated. Freezing
 # checks the parameters in Python. For 1,000 means and 1,000 points, one call with the means as
 # a column ran 4.9 to 18 times faster, and 18 to 49 times for 10 means and 100 points, on float64
@@ -116,3 +184,61 @@ utils:
       has:
         kind: import_from_statement
         all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $D } }]
+---
+# stats.scoreatpercentile sorts its data again on every call, and it takes a sequence of
+# percentiles. For 1,000 percentiles of 1,000 values one call ran 2.1 to 3.2 times faster, and
+# 1.12 to 1.17 times for 10 percentiles of 100 values, on float64 and float32, in
+# speed/runs/bench_stats.jsonl and bench_stats2.jsonl. No fix, because the comprehension may
+# feed a list where the call returns an array.
+id: per-value-scipy-call
+language: python
+severity: warning
+message: This calls $F once per value of $IT, and each call sorts the data again. Pass np.asarray($IT) as the percentiles in one call, which sorts once and ran 2.1 to 3.2 times faster for 1,000 percentiles of 1,000 values.
+rule:
+  kind: call
+  pattern: $CALL
+  all:
+    - inside: { matches: per-value }
+    - has: { field: function, any: [{ pattern: $M.$F, matches: stats-module }, { kind: identifier, pattern: $F, matches: from-stats-name }] }
+    - has: { field: arguments, has: { nthChild: 2, pattern: $X } }
+constraints:
+  F: { regex: '^scoreatpercentile$' }
+  X: { kind: identifier }
+utils:
+  # One for clause over a name, no if clause, and the element is the call itself with the loop
+  # name as one of its arguments.
+  per-value:
+    any: [{ kind: list_comprehension }, { kind: generator_expression }]
+    all:
+      - has: { field: body, pattern: $CALL }
+      - has: { kind: for_in_clause, all: [{ has: { field: left, kind: identifier, pattern: $X } }, { has: { field: right, pattern: $IT } }] }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  stats-module:
+    any:
+      - has: { field: object, regex: '^scipy\.stats$' }
+      - all:
+          - has: { field: object, pattern: $S.stats }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $M }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.stats$' } }, { has: { field: alias, pattern: $M } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $M, regex: '^stats$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^stats$' } }, { has: { field: alias, pattern: $M } }] }
+  from-stats-name:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.stats$' } }, { has: { kind: dotted_name, pattern: $F } }]

@@ -87,9 +87,9 @@ def special_on_arrays():
 @case
 def stats_per_value():
     x = np.linspace(-2.0, 2.0, 5)
-    a = np.array([stats.norm.cdf(v) for v in x])
-    b = [norm.sf(v, loc=1.0) for v in x]
-    c = np.array([stats.t.ppf(q, 5) for q in (0.9, 0.95, 0.99)])
+    a = np.array([stats.norm.cdf(v) for v in x])  # xpd: per-value-scipy-call
+    b = [norm.sf(v, loc=1.0) for v in x]  # xpd: per-value-scipy-call
+    c = np.array([stats.t.ppf(q, 5) for q in (0.9, 0.95, 0.99)])  # xpd: per-value-scipy-call
     return a, b, c
 
 
@@ -155,3 +155,13 @@ def frozen_per_value():
     frozen = stats.norm(0.0, 2.0)
     d = [frozen.pdf(v) for v in x]
     return a, b, c, d
+
+
+
+@case
+def percentiles_per_value():
+    x = np.linspace(0.0, 10.0, 11)
+    a = [stats.scoreatpercentile(x, p) for p in (10, 50, 90)]  # xpd: per-value-scipy-call
+    b = stats.scoreatpercentile(x, [10, 50, 90])
+    c = [stats.scoreatpercentile(row, 50) for row in (x, 2 * x)]
+    return a, b, c
