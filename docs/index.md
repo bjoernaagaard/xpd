@@ -1,7 +1,7 @@
 # xpd
 
 xpd is an opinionated linter for Python library habits that make code slow or wrong, starting
-with pandas, NumPy and scikit-learn.
+with pandas, NumPy, SciPy and scikit-learn.
 It parses each file once with [ast-grep](https://ast-grep.github.io/), runs files in parallel,
 and starts no Python on the hot path, so it is fast enough to run after every edit a coding
 agent makes.
