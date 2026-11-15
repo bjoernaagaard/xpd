@@ -17,13 +17,13 @@ use crate::venv::{Distributions, Venv};
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct PackageCheck {
     /// Rule name in the report, such as `missing-pyarrow`.
-    id: String,
+    pub(crate) id: String,
     /// Distribution name, such as `pandas-stubs`.
     package: String,
     /// When not empty, the check runs only in a project that uses one of these tools.
     #[serde(default)]
     only_with: Vec<String>,
-    message: String,
+    pub(crate) message: String,
 }
 
 impl PackageCheck {
@@ -34,6 +34,9 @@ impl PackageCheck {
             && (self.only_with.is_empty() || self.only_with.iter().any(|tool| uses(tool)))
     }
 }
+
+/// Every package check reports at this severity.
+pub(crate) const SEVERITY: Severity = Severity::Warning;
 
 /// One warning for each package that a pack asks for and the venv lacks. A pack is checked only
 /// when the venv has its library. `installed` is what `venv` holds.
@@ -54,7 +57,7 @@ pub(crate) fn missing(packs: &[Pack], venv: &Venv, installed: &Distributions) ->
             rule: check.id.clone(),
             file: file.clone(),
             position: None,
-            severity: Severity::Warning,
+            severity: SEVERITY,
             message: check.message.clone(),
             fix: None,
         })

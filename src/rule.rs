@@ -44,7 +44,7 @@ pub(crate) struct Rule {
     /// `None` when the rule has no fix.
     pub(crate) fix: Option<Applicability>,
     /// The first library version the rule applies to.
-    since: Option<Version>,
+    pub(crate) since: Option<Version>,
     /// The rule's `files:` globs. When set, the rule runs only on a path that matches one.
     files: Option<GlobSet>,
     /// The rule's `ignores:` globs. The rule skips a path that matches one.

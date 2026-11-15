@@ -8,12 +8,14 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
+use crate::catalog;
 use crate::graph::Graph;
 use crate::pack;
 use crate::package_check;
 use crate::report::Report;
 use crate::rule::Applicability;
 use crate::scan;
+use crate::skills;
 use crate::venv::{self, Venv};
 
 /// The agent skill that `xpd skill` prints.
@@ -39,7 +41,7 @@ struct Cli {
     cmd: Cmd,
 }
 
-/// How `check` and `graph` print what they found.
+/// How `check`, `graph` and `rules` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum Format {
     Text,
@@ -100,8 +102,25 @@ enum Cmd {
         #[arg(long, value_enum)]
         format: Option<Format>,
     },
+    /// List every rule and package check, with its severity, fix and documentation.
+    ///
+    /// The JSON has one object per rule, with `package`, `rule`, `severity`, `message`, `fix`,
+    /// `since`, `url` and `doc`, the rule's section of the rules page as Markdown.
+    #[command(after_long_help = "Examples:
+  xpd rules
+  xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]
+    Rules {
+        /// Output format. Default: text on a terminal, json otherwise.
+        #[arg(long, value_enum)]
+        format: Option<Format>,
+    },
     /// Print the agent skill (SKILL.md) for this xpd version.
-    Skill,
+    Skill {
+        /// Print every skill that ships with xpd, with the path and text of each of its files,
+        /// as JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Runs the command the arguments name.
@@ -132,11 +151,40 @@ pub(crate) fn run() -> ExitCode {
         Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
-        Cmd::Skill => {
+        Cmd::Rules { format } => rules(format.unwrap_or(default_format)),
+        Cmd::Skill { json: false } => {
             print!("{SKILL}");
             ExitCode::SUCCESS
         }
+        Cmd::Skill { json: true } => {
+            println!("{}", skills::to_json());
+            ExitCode::SUCCESS
+        }
     }
+}
+
+/// Prints every rule of every pack, whatever the project's venv holds.
+fn rules(format: Format) -> ExitCode {
+    let packs = match pack::load(None) {
+        Ok(packs) => packs,
+        Err(e) => {
+            eprintln!("xpd: invalid embedded rules: {e:#}");
+            return ExitCode::from(CHECK_FAILED);
+        }
+    };
+    let entries = catalog::entries(&packs);
+    match format {
+        Format::Json => {
+            let rules: Vec<Value> = entries.iter().map(catalog::Entry::to_json).collect();
+            println!("{}", Value::Array(rules));
+        }
+        Format::Text => {
+            for entry in &entries {
+                println!("{}", entry.line());
+            }
+        }
+    }
+    ExitCode::SUCCESS
 }
 
 /// Lints `paths` with the rules for the library versions in the project's venv, after writing

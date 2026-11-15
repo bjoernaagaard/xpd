@@ -1,5 +1,6 @@
 //! Release numbers of Python distributions, such as `3.1.1`.
 
+use std::fmt;
 use std::str::FromStr;
 
 use anyhow::{Context, Error, Result, ensure};
@@ -42,5 +43,18 @@ impl TryFrom<String> for Version {
 
     fn try_from(text: String) -> Result<Self> {
         text.parse()
+    }
+}
+
+impl fmt::Display for Version {
+    /// Writes at least a major and a minor part, so `2.0` stays `2.0` after its zero is dropped.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = self.0.iter();
+        write!(f, "{}", parts.next().unwrap_or(&0))?;
+        match parts.next() {
+            Some(minor) => write!(f, ".{minor}")?,
+            None => write!(f, ".0")?,
+        }
+        parts.try_for_each(|part| write!(f, ".{part}"))
     }
 }

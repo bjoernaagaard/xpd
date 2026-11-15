@@ -21,6 +21,16 @@ struct PackSource {
     /// The text of `pack.yml`, when the pack has one.
     manifest: Option<&'static str>,
     rules: &'static [RuleSource],
+    /// The `#### <id>` section of docs/rules.md for each rule and package check of the pack.
+    /// build.rs fails when one is missing.
+    docs: &'static [DocSource],
+}
+
+/// One section of docs/rules.md, from its heading to the next heading.
+#[derive(Debug)]
+struct DocSource {
+    id: &'static str,
+    text: &'static str,
 }
 
 /// One rule file, `rules/<module>/<id>.yml`. build.rs checks that its documents have that id.
@@ -65,6 +75,7 @@ pub(crate) struct Pack {
     pub(crate) aliases: BTreeMap<String, String>,
     /// Packages the library works better with.
     pub(crate) package_checks: Vec<PackageCheck>,
+    docs: &'static [DocSource],
 }
 
 impl TryFrom<&PackSource> for Pack {
@@ -102,6 +113,7 @@ impl TryFrom<&PackSource> for Pack {
             rules,
             aliases: manifest.aliases,
             package_checks: manifest.packages,
+            docs: source.docs,
         })
     }
 }
@@ -126,6 +138,14 @@ impl Pack {
             }
             Gate::EveryFile => true,
         }
+    }
+
+    /// The Markdown section of docs/rules.md about the rule or package check `id`.
+    pub(crate) fn doc(&self, id: &str) -> Option<&'static str> {
+        self.docs
+            .iter()
+            .find(|doc| doc.id == id)
+            .map(|doc| doc.text)
     }
 
     /// Drops the rules that need a newer version of the library than `installed`.

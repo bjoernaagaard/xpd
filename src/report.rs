@@ -29,7 +29,7 @@ pub(crate) struct Issue {
     pub(crate) fix: Option<Applicability>,
 }
 
-fn severity_name(severity: &Severity) -> &'static str {
+pub(crate) fn severity_name(severity: &Severity) -> &'static str {
     match severity {
         Severity::Error => "error",
         Severity::Warning => "warning",
