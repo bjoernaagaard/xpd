@@ -201,7 +201,7 @@ def the_faster_relatives():
     boosted = HistGradientBoostingClassifier(max_iter=20, random_state=0).fit(X, y)
     linear = LinearSVC().fit(X, y)
     kernel = SVC(kernel="rbf").fit(X, y)
-    calibrated = SVC(kernel="linear", probability=True, random_state=0).fit(X, y)
+    calibrated = SVC(kernel="linear", probability=True, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
     embedding = TSNE(perplexity=10, random_state=0).fit_transform(X[:60])
     return boosted, linear, kernel, calibrated, embedding
 
