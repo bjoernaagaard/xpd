@@ -1,0 +1,25 @@
+# FunctionTransformer learns nothing at fit. A function that takes the mean, the spread or
+# the range of the rows it gets uses the test rows at predict time, so a prediction depends on
+# the other rows in the batch. LogisticRegression scored 0.773 with batches of 5 test rows and
+# 0.847 with StandardScaler, over 30 seeds of data with signal. On data with no signal both
+# stay near 0.5, so this is info. A reduction along axis 1 works per row and is left alone.
+id: stateful-function-transformer
+language: python
+severity: info
+message: This function takes statistics of the rows it gets, so at predict time it scales by the test rows, and a prediction changes with the other rows in the batch. Use StandardScaler or MinMaxScaler, which learn the statistics at fit.
+rule:
+  pattern: $F($$$A)
+  has:
+    field: arguments
+    any:
+      - has: { nthChild: 1, matches: batch-lambda }
+      - has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^func$ } }, { has: { field: value, matches: batch-lambda } }] }
+constraints:
+  F: { regex: '(^|\.)FunctionTransformer$' }
+utils:
+  batch-lambda:
+    kind: lambda
+    has:
+      field: body
+      regex: '\.(mean|std|var|min|max|median|quantile)\(|\b(np|numpy)\.(mean|std|var|min|max|median|percentile|quantile|nanmean|nanstd|nanmin|nanmax|amin|amax|ptp)\('
+      not: { regex: 'axis\s*=\s*(1|-1)' }

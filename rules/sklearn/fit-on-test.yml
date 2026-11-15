@@ -1,17 +1,51 @@
-# fit and fit_transform learn from the rows they are given. Called on test rows, the scaler or
-# encoder gives the same value another scale or code than in training, and a model fitted on
-# test rows is scored on rows it has seen. The rule reads the name of the first argument.
-# Unsafe: fit_transform on a name with test in it can be meant, as on a frame called latest_test
-# that is the whole data.
+# A model fitted on the test rows and scored on them scored 0.997 AUC on noise. The rule reads
+# the name of the first argument. PermutationImportance and permutation_importance are meant to
+# be fitted on held-out rows, so they are left alone. A LabelBinarizer or MultiLabelBinarizer
+# fitted on the test labels turns them into columns for a metric, so the documents below leave
+# one alone when it is built in the same expression or assigned in the same block. A LabelEncoder
+# refitted on test columns gives codes that differ from training, so it is left alone only when
+# its result goes straight into another call, such as a plot, and never into a stored column.
 id: fit-on-test
 language: python
 severity: error
-message: fit_transform on test data learns from the test rows, so the same value gets another code or scale than in training. Call transform on the object that was fitted on the training data.
+message: This fits on the test rows, so a score on those rows says nothing about new data. A model fitted this way scored 0.997 AUC on data with no signal. Fit on the training rows.
+rule:
+  any:
+    - pattern: $S.fit($X, $Y)
+    - pattern: $S.fit($X, $Y, $$$REST)
+constraints:
+  # df_cv_and_test_X joins the test rows to the others for a final fit, which is meant.
+  X: { regex: '(?i)(^|[^a-z])test([^a-z]|$)', not: { any: [{ regex: '(?i)train|_and_|_all|full|combined|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+  Y: { not: { kind: keyword_argument } }
+  S: { not: { regex: '(?i)permutation' } }
+---
+id: fit-on-test
+language: python
+severity: error
+message: partial_fit on the test rows trains the model on them, so a score on those rows says nothing about new data. It scored 0.924 AUC on data with no signal. Call partial_fit on the training rows only.
+rule:
+  pattern: $S.partial_fit($X, $$$REST)
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+---
+# A step that learns from the rows alone gives the same value another scale or code on the test
+# rows. On a random 60-row test part a scaler moved the AUC by less than 0.001, so this is info.
+# Refitted on test batches of 5 rows it lost 0.048 AUC, and an OrdinalEncoder refitted on 30
+# test rows lost 0.058. The rule reads the name of the step, because PolynomialFeatures and plots
+# of the test rows refit on purpose.
+# Unsafe: fit_transform on a name with test in it can be meant, as on a frame called latest_test
+# that is the whole data, and transform raises on a level the fitted step has not seen.
+id: fit-on-test
+language: python
+severity: info
+message: fit_transform on test data learns from the test rows, so the same value can get another code or scale than in training. Call $S.transform($X) on the object that was fitted on the training data.
 rule:
   pattern: $S.fit_transform($X)
 constraints:
-  X: { regex: '(?i)(^|[^a-z])(test|val|valid|validation|holdout)([^a-z]|$)', not: { regex: '(?i)train' } }
-  S: { not: { kind: call } }
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+  # Only steps whose names say they learn a scale, a code or a fill value. PolynomialFeatures
+  # learns nothing from the values, and a PCA on test rows is mostly a plot.
+  S: { not: { kind: call }, regex: '(?i)scal|^(sc|ss|st|si|simp|le|lbl|enc|ohe|tf|cv)$|imput|encod|tfidf|vectori' }
 fix: $S.transform($X)
 metadata: { fix: unsafe }
 ---
@@ -19,30 +53,61 @@ metadata: { fix: unsafe }
 # fitted on the training data, so there is nothing to call transform on.
 id: fit-on-test
 language: python
-severity: error
+severity: info
 message: fit_transform on test data learns from the test rows. Fit the step on the training data, keep it, and call transform here.
 rule:
   pattern: $S.fit_transform($X)
+  not: { matches: label-step }
 constraints:
-  X: { regex: '(?i)(^|[^a-z])(test|val|valid|validation|holdout)([^a-z]|$)', not: { regex: '(?i)train' } }
-  S: { kind: call }
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+  S: { kind: call, regex: '^[\w.]*(Scaler|Imputer|Encoder|Vectorizer|QuantileTransformer|PowerTransformer|KBinsDiscretizer)\(' }
+utils:
+  label-step:
+    any:
+      - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }
+      - all:
+          - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*LabelEncoder\(' } }
+          - inside: { kind: argument_list }
+      - inside:
+          any: [{ kind: block }, { kind: module }]
+          stopBy: end
+          has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }] } }
 ---
+# With the target, the step learns from the test labels. A category_encoders TargetEncoder
+# refitted this way scored 0.992 AUC on noise, but SelectKBest scored 0.438 and the
+# scikit-learn TargetEncoder, which cross-fits, 0.507, so the form as a whole has no proof.
 id: fit-on-test
 language: python
-severity: error
-message: fit_transform on test data learns from the test rows. Call transform on the object that was fitted on the training data.
+severity: info
+message: fit_transform on test data learns from the test rows and their labels. Call transform on the object that was fitted on the training data.
 rule:
   pattern: $S.fit_transform($X, $$$REST)
 constraints:
-  X: { regex: '(?i)(^|[^a-z])(test|val|valid|validation|holdout)([^a-z]|$)', not: { regex: '(?i)train' } }
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+  # Only encoders and selectors. A ranking step on test predictions is post-processing.
+  S: { regex: '(?i)encod|^(enc|te)$|select|kbest|rfe' }
 ---
+# fit with the rows alone is how a scaler or an encoder is fitted. On noise it moved nothing, and
+# on data with signal it cost up to 0.058 AUC in the shapes above, so this is info.
 id: fit-on-test
 language: python
-severity: error
-message: This fits on the test data, so a score on those rows says nothing about new data. Fit on the training data.
+severity: info
+message: This fits $S on the test rows, so the same value can get another scale or code than in training. Fit $S on the training rows and call transform on the test rows.
 rule:
-  any:
-    - pattern: $S.fit($X)
-    - pattern: $S.fit($X, $$$REST)
+  pattern: $S.fit($X)
+  not: { matches: label-step }
 constraints:
-  X: { regex: '(?i)(^|[^a-z])test([^a-z]|$)', not: { regex: '(?i)train' } }
+  # A fit on the training and test rows joined, as in an encoder that must know every level, is
+  # left alone.
+  X: { regex: '(?i)(^|[^a-z])test([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+utils:
+  label-step:
+    any:
+      - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }
+      - all:
+          - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*LabelEncoder\(' } }
+          - inside: { kind: argument_list }
+      - inside:
+          any: [{ kind: block }, { kind: module }]
+          stopBy: end
+          has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }] } }

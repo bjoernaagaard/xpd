@@ -1,15 +1,20 @@
 """Splits and models that draw from a new seed on every run, and the same with a seed.
 
 A line that xpd reports ends with a comment that names the rule. Each case returns what the
-code computes.
+code computes. A form that raises on scikit-learn 1.9.1 sits in a function that is not a case.
 """
+
+import random
 
 import numpy as np
 import pandas as pd
 from sklearn import cluster
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import KFold, ShuffleSplit, train_test_split
+from sklearn.manifold import TSNE
+from sklearn.mixture import GaussianMixture
+from sklearn.model_selection import GroupKFold, KFold, ShuffleSplit, StratifiedKFold, train_test_split
+from sklearn.svm import SVC
 
 CASES = {}
 
@@ -17,6 +22,10 @@ CASES = {}
 def case(fn):
     CASES[fn.__name__] = fn
     return fn
+
+
+def set_seed(seed):
+    random.seed(seed)
 
 
 def frame(n=300, seed=0):
@@ -30,10 +39,13 @@ def frame(n=300, seed=0):
 
 @case
 def missing_random_state(df):
+    set_seed(0)
     X = df[["x1", "x2"]]
     y = df["y"]
+    train_test_split(X, y, test_size=0.2)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)  # xpd: missing-random-state
     model = RandomForestClassifier(n_estimators=10).fit(X_train, y_train)  # xpd: missing-random-state
+    assert isinstance(RandomForestClassifier(n_estimators=10), RandomForestClassifier)
     groups = cluster.KMeans(n_clusters=3).fit_predict(X)  # xpd: missing-random-state
     folds = KFold(n_splits=5, shuffle=True)  # xpd: missing-random-state
     splits = ShuffleSplit(5)  # xpd: missing-random-state
@@ -51,3 +63,45 @@ def with_random_state(df):
     other = RandomForestClassifier(**params).fit(X_train, y_train)
     plain = LogisticRegression().fit(X_train, y_train)
     return model.score(X_test, y_test), other.score(X_test, y_test), plain.score(X_test, y_test), KFold(n_splits=5).get_n_splits(), KFold(5, shuffle=True, random_state=1).get_n_splits(), len(past), len(future)
+
+
+def random_state_without_shuffle():
+    a = KFold(n_splits=5, random_state=42)  # xpd: random-state-without-shuffle
+    b = StratifiedKFold(n_splits=5, shuffle=False, random_state=1)  # xpd: random-state-without-shuffle
+    c = GroupKFold(n_splits=5, random_state=0)  # xpd: random-state-without-shuffle
+    return a, b, c
+
+
+@case
+def random_state_with_shuffle():
+    a = KFold(n_splits=5, shuffle=True, random_state=42)
+    b = StratifiedKFold(n_splits=5, random_state=None)
+    c = GroupKFold(n_splits=5, shuffle=True, random_state=0)
+    d = KFold(n_splits=5)
+    return a.get_n_splits(), b.get_n_splits(), c.get_n_splits(), d.get_n_splits()
+
+
+@case
+def random_by_argument(df=None):
+    df = frame() if df is None else df
+    X = df[["x1", "x2"]].to_numpy()
+    y = df["y"].to_numpy()
+    embedded = TSNE(init="random", perplexity=10).fit_transform(X)  # xpd: missing-random-state
+    calibrated = SVC(probability=True).fit(X, y)  # xpd: deprecated-in-sklearn, missing-random-state
+    mixture = GaussianMixture(n_components=3).fit(X)  # xpd: missing-random-state
+    boosted = HistGradientBoostingClassifier(early_stopping=True).fit(X, y)  # xpd: missing-random-state
+    large = HistGradientBoostingClassifier(max_iter=20).fit(X, y)  # xpd: missing-random-state
+    return embedded, calibrated.predict_proba(X), mixture.predict(X), boosted.predict(X), large.predict(X)
+
+
+@case
+def same_without_seed(df=None):
+    df = frame() if df is None else df
+    X = df[["x1", "x2"]].to_numpy()
+    y = df["y"].to_numpy()
+    embedded = TSNE(perplexity=10).fit_transform(X)
+    plain = SVC().fit(X, y)
+    single = GaussianMixture(n_components=1).fit(X)
+    fixed = HistGradientBoostingClassifier(early_stopping=False).fit(X, y)
+    seeded = GaussianMixture(n_components=3, random_state=0).fit(X)
+    return embedded, plain.predict(X), single.predict(X), fixed.predict(X), seeded.predict(X)

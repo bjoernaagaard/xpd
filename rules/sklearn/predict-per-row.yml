@@ -1,0 +1,80 @@
+# A scikit-learn predict call validates its input and sets up the computation each time, so one
+# call per row repeats that work for every row. The rule reports a call whose rows come from the
+# loop variable: the row itself, or the data indexed by it. any stops at the first form that
+# matches, so a longer form comes before a shorter form it contains.
+id: predict-per-row
+language: python
+severity: warning
+message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured 2.7 to 860 times faster on 500 and 5,000 rows.
+rule:
+  kind: call
+  pattern: $M.$P($$$A)
+  # all reads the argument first, so the loop is read with $R bound.
+  all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 1
+          any:
+            - pattern: '[$R]'
+            - pattern: $R.values.reshape(1, -1)
+            - pattern: $R.to_numpy().reshape(1, -1)
+            - pattern: np.array([$R])
+            - pattern: np.array($R).reshape(1, -1)
+            - pattern: $R.to_frame().T
+            - pattern: $R.reshape(1, -1)
+    - any:
+      - inside:
+          stopBy: end
+          kind: for_statement
+          has: { field: left, any: [{ pattern: $R }, { has: { pattern: $R } }] }
+      - inside:
+          stopBy: end
+          any: [{ kind: list_comprehension }, { kind: generator_expression }]
+          has: { kind: for_in_clause, has: { field: left, any: [{ pattern: $R }, { has: { pattern: $R } }] } }
+      - inside:
+          stopBy: end
+          kind: lambda
+          has: { field: parameters, has: { pattern: $R } }
+constraints:
+  P: { regex: '^(predict|predict_proba|predict_log_proba|decision_function)$' }
+---
+# A loop that writes into the data it predicts from builds the rows as it goes, as recursive
+# forecasting does, and is left alone.
+id: predict-per-row
+language: python
+severity: warning
+message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured 2.7 to 860 times faster on 500 and 5,000 rows.
+rule:
+  kind: call
+  pattern: $M.$P($$$A)
+  # all reads the argument first, so the loop is read with $R bound.
+  all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 1
+          any:
+            - pattern: '[$X[$R]]'
+            - pattern: $X.iloc[$R].values.reshape(1, -1)
+            - pattern: $X.iloc[$R].to_numpy().reshape(1, -1)
+            - pattern: '$X.iloc[[$R]]'
+            - pattern: $X[$R].reshape(1, -1)
+            - pattern: '$X[$R:$R + 1]'
+            - pattern: '$X.iloc[$R:$R + 1]'
+    - any:
+      - inside:
+          stopBy: end
+          kind: for_statement
+          has: { field: left, any: [{ pattern: $R }, { has: { pattern: $R } }] }
+          not: { has: { field: body, has: { stopBy: end, kind: assignment, has: { field: left, any: [{ kind: subscript, has: { field: value, pattern: $X } }, { has: { kind: subscript, has: { field: value, pattern: $X } } }] } } } }
+      - inside:
+          stopBy: end
+          any: [{ kind: list_comprehension }, { kind: generator_expression }]
+          has: { kind: for_in_clause, has: { field: left, any: [{ pattern: $R }, { has: { pattern: $R } }] } }
+      - inside:
+          stopBy: end
+          kind: lambda
+          has: { field: parameters, has: { pattern: $R } }
+constraints:
+  P: { regex: '^(predict|predict_proba|predict_log_proba|decision_function)$' }

@@ -1,0 +1,52 @@
+# OneHotEncoder returns a sparse matrix unless sparse_output=False, and pandas output raises
+# ValueError on a sparse matrix. set_output on a Pipeline or ColumnTransformer reaches every
+# step inside it.
+id: pandas-output-sparse
+language: python
+severity: error
+message: OneHotEncoder returns a sparse matrix by default, and pandas output raises ValueError on it. Pass sparse_output=False to the OneHotEncoder.
+rule:
+  pattern: $E.set_output($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^transform\s*=\s*["'']pandas["'']$' } }
+  any:
+    - has: { field: function, has: { field: object, matches: holds-sparse-encoder } }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows:
+          stopBy: end
+          kind: expression_statement
+          has:
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $E }
+              - has: { field: right, matches: holds-sparse-encoder }
+utils:
+  sparse-encoder:
+    kind: call
+    has: { field: function, regex: '(^|\.)OneHotEncoder$' }
+    not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^(sparse|sparse_output)$ }, not: { has: { field: value, regex: ^True$ } } }] } } }
+  holds-sparse-encoder:
+    any:
+      - matches: sparse-encoder
+      - kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(Pipeline|make_pipeline|ColumnTransformer|make_column_transformer|FeatureUnion|make_union)$' }
+          - has: { field: arguments, stopBy: end, matches: sparse-encoder }
+---
+# set_config and config_context set pandas output for every transformer in the program.
+id: pandas-output-sparse
+language: python
+severity: error
+message: This file sets pandas output for every transformer, and OneHotEncoder returns a sparse matrix by default, which raises ValueError. Pass sparse_output=False.
+rule:
+  matches: sparse-encoder
+  inside:
+    kind: module
+    stopBy: end
+    has: { stopBy: end, kind: keyword_argument, regex: '^transform_output\s*=\s*["'']pandas["'']$' }
+utils:
+  sparse-encoder:
+    kind: call
+    has: { field: function, regex: '(^|\.)OneHotEncoder$' }
+    not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^(sparse|sparse_output)$ }, not: { has: { field: value, regex: ^True$ } } }] } } }

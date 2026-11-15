@@ -1,0 +1,37 @@
+# RandomForestClassifier, ExtraTreesClassifier and BaggingClassifier compute predict as the class
+# with the largest predict_proba, so predict and predict_proba on the same rows run every tree
+# twice. A name the file also binds to another class is left alone, because the rule cannot tell
+# which binding the call sees.
+id: predict-and-predict-proba
+language: python
+severity: warning
+message: $M.predict($X) computes the same probabilities as $M.predict_proba($X) and returns the class with the largest one. Call predict_proba once, keep the whole matrix, and take $M.classes_[proba.argmax(axis=1)] as the labels, which gives the same labels and measured at least 1.7 times faster.
+rule:
+  pattern: $M.predict($X)
+  all:
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        any:
+          - precedes: { stopBy: end, has: { stopBy: end, pattern: $M.predict_proba($X) } }
+          - follows: { stopBy: end, has: { stopBy: end, pattern: $M.predict_proba($X) } }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, pattern: $M }
+            - has: { field: right, regex: '^(\w+\.)*(RandomForestClassifier|ExtraTreesClassifier|BaggingClassifier)\(' }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $M }
+              - has: { field: right, regex: '^(\w+\.)*[A-Z]\w*\(' }
+              - not: { has: { field: right, regex: '^(\w+\.)*(RandomForestClassifier|ExtraTreesClassifier|BaggingClassifier)\(' } }

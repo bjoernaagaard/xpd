@@ -1,9 +1,22 @@
-# Without random_state these draw from a new seed on every run, so a score cannot be
-# reproduced. The classes listed changed their output between two runs on scikit-learn 1.9.1.
-# A file that calls np.random.seed is left alone, because scikit-learn then draws from that seed.
+# Without random_state these draw from a new seed on every run, so a result cannot be
+# reproduced. A seed does not move the expected score, so the rule is info. Each class listed gave
+# another output in five fresh runs on scikit-learn 1.9.1. LogisticRegression, PCA, TSNE with its
+# default init, GaussianMixture with one component, Perceptron and AdaBoostClassifier gave the same
+# output and are not listed. A file that seeds NumPy's global generator is left alone, because
+# scikit-learn then draws from that seed. That is a call to np.random.seed, or to a seed helper
+# such as set_seed or seed_everything that the file does not define, because such a helper
+# usually seeds NumPy. A helper the file defines is judged by np.random.seed alone. TensorFlow,
+# PyTorch and the random module have helpers with such names that leave NumPy unseeded, so a
+# helper imported from them does not count. A train_test_split statement whose
+# result is thrown away, and a constructor that only an isinstance call reads, change no result and
+# are left alone.
+#
+# The seed test reads the whole file, so a rule that starts from every call tests the class name
+# first in all, which keeps its order. ast-grep checks constraints only after the whole rule has
+# matched, so a name test there would come after the file test.
 id: missing-random-state
 language: python
-severity: warning
+severity: info
 message: train_test_split shuffles with a new seed on every run, so the score changes from run to run. Pass random_state.
 rule:
   pattern: train_test_split($$$ARGS)
@@ -11,32 +24,130 @@ rule:
     any:
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|shuffle)$' } } }
       - has: { field: arguments, has: { kind: dictionary_splat } }
-      - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
+      - inside: { kind: expression_statement }
+      - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+        - all:
+            - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
+            - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
+            - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }
 ---
 id: missing-random-state
 language: python
-severity: warning
+severity: info
 message: $C draws random numbers with a new seed on every run, so the result changes from run to run. Pass random_state.
 rule:
   pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees?(Classifier|Regressor)|Bagging(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|AdaBoostRegressor|IsolationForest|RandomTreesEmbedding|DecisionTree(Classifier|Regressor)|KMeans|MiniBatchKMeans|SpectralClustering|AffinityPropagation|MLP(Classifier|Regressor)|SGD(Classifier|Regressor|OneClassSVM)|TruncatedSVD|NMF|LatentDirichletAllocation|FastICA|MiniBatchDictionaryLearning|MDS|SpectralEmbedding|Nystroem|RBFSampler|(Sparse|Gaussian)RandomProjection|ShuffleSplit|StratifiedShuffleSplit|Repeated(Stratified)?KFold)$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
+          - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^isinstance$' } } }
+          - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+        - all:
+            - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
+            - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
+            - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }
+---
+id: missing-random-state
+language: python
+severity: info
+message: $C with shuffle=True shuffles with a new seed on every run, so the folds change from run to run. Pass random_state.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(KFold|StratifiedKFold|GroupKFold|StratifiedGroupKFold)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' } }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+        - all:
+            - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
+            - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
+            - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }
+---
+# These draw random numbers only with the argument shown: TSNE(init="random"),
+# SVC(probability=True), HistGradientBoosting with early_stopping=True, and a mixture with more
+# than one component.
+id: missing-random-state
+language: python
+severity: info
+message: $C with these arguments draws random numbers with a new seed on every run, so the result changes from run to run. Pass random_state.
+rule:
+  pattern: $C($$$ARGS)
+  any:
+    - all: [{ has: { field: function, regex: '(^|\.)TSNE$' } }, { has: { field: arguments, has: { kind: keyword_argument, regex: '^init\s*=\s*.random.$' } } }]
+    - all: [{ has: { field: function, regex: '(^|\.)SVC$' } }, { has: { field: arguments, has: { kind: keyword_argument, regex: '^probability\s*=\s*True$' } } }]
+    - all: [{ has: { field: function, regex: '(^|\.)HistGradientBoosting(Classifier|Regressor)$' } }, { has: { field: arguments, has: { kind: keyword_argument, regex: '^early_stopping\s*=\s*True$' } } }]
+    - all: [{ has: { field: function, regex: '(^|\.)(Bayesian)?GaussianMixture$' } }, { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^n_components$' } }, { not: { has: { field: value, regex: '^1$' } } }] } } }]
   not:
     any:
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
       - has: { field: arguments, has: { kind: dictionary_splat } }
-      - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
-constraints:
-  C: { regex: '(^|\.)(RandomForest(Classifier|Regressor)|ExtraTrees(Classifier|Regressor)|Bagging(Classifier|Regressor)|GradientBoosting(Classifier|Regressor)|IsolationForest|DecisionTree(Classifier|Regressor)|KMeans|MiniBatchKMeans|GaussianMixture|MLP(Classifier|Regressor)|SGD(Classifier|Regressor)|TruncatedSVD|NMF|TSNE|ShuffleSplit|StratifiedShuffleSplit|RepeatedKFold)$' }
+      - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^isinstance$' } } }
+      - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+        - all:
+            - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
+            - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
+            - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }
 ---
+# With more than 10000 rows HistGradientBoosting stops early on a validation part it draws at
+# random, so from that size the result changes. A pattern cannot see the number of rows. A call
+# that only reads get_params fits nothing and is left alone.
 id: missing-random-state
 language: python
-severity: warning
-message: $C with shuffle=True shuffles with a new seed on every run, so the folds change from run to run. Pass random_state.
+severity: info
+message: $C holds out a random validation part when it gets more than 10000 rows, so from that size the result changes from run to run. Pass random_state.
 rule:
   pattern: $C($$$ARGS)
-  has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' } }
-  not:
-    any:
-      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
-      - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
-constraints:
-  C: { regex: '(^|\.)(KFold|StratifiedKFold|GroupKFold|StratifiedGroupKFold)$' }
+  all:
+    - has: { field: function, regex: '(^|\.)HistGradientBoosting(Classifier|Regressor)$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|early_stopping)$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: attribute, has: { field: attribute, regex: '^get_params$' } }
+          - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^isinstance$' } } }
+          - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      any:
+        - has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+        - all:
+            - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
+            - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
+            - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }

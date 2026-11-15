@@ -1,0 +1,102 @@
+# scikit-learn splits a parameter name at the first two underscores to find the step, so a
+# step name with __ in it raises ValueError at fit. Other libraries have a Pipeline too, so the
+# first three documents report a call only when its name comes from scikit-learn. That test reads
+# the whole file, so it comes after the test of the name.
+id: pipeline-step-form
+language: python
+severity: error
+message: The step name $N has two underscores in a row, and fit raises ValueError on it, because set_params splits parameter names there. Use one underscore.
+rule:
+  kind: string
+  pattern: $N
+  regex: '^[rRuU]?["''][^"'']*__'
+  nthChild: 1
+  inside:
+    kind: tuple
+    inside:
+      kind: list
+      any:
+        - nthChild: 1
+          inside: { kind: argument_list, inside: { kind: call, matches: step-container } }
+        - inside: { kind: keyword_argument, has: { field: name, regex: ^(steps|transformers|transformer_list)$ }, inside: { kind: argument_list, inside: { kind: call, matches: step-container } } }
+utils:
+  step-container:
+    all:
+      - has: { field: function, pattern: $F, regex: '(^|\.)(Pipeline|ColumnTransformer|FeatureUnion)$' }
+      - matches: from-sklearn
+  from-sklearn:
+    any:
+      - has: { field: function, regex: '^sklearn\.(pipeline|compose)\.\w+$' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, regex: '^(pipeline|compose)$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn$' } }, { has: { kind: dotted_name, regex: '^(pipeline|compose)$' } }] } }
+      - all:
+          - has: { field: function, kind: identifier }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
+---
+id: pipeline-step-form
+language: python
+severity: error
+message: $F takes the steps as separate arguments, and a single list raises TypeError at fit. Remove the square brackets.
+rule:
+  pattern: $F($L)
+  all:
+    - has: { field: function, regex: '(^|\.)(make_pipeline|make_union)$' }
+    - matches: from-sklearn
+constraints:
+  L: { kind: list }
+utils:
+  from-sklearn:
+    any:
+      - has: { field: function, regex: '^sklearn\.(pipeline|compose)\.\w+$' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, regex: '^(pipeline|compose)$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn$' } }, { has: { kind: dotted_name, regex: '^(pipeline|compose)$' } }] } }
+      - all:
+          - has: { field: function, kind: identifier }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
+---
+id: pipeline-step-form
+language: python
+severity: error
+message: Pipeline takes a list of (name, estimator) pairs, and bare estimators raise TypeError at fit. Give each step a name, or call make_pipeline with the estimators.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)Pipeline$' }
+    - has: { field: arguments, has: { nthChild: 1, kind: list, has: { kind: call } } }
+    - matches: from-sklearn
+utils:
+  from-sklearn:
+    any:
+      - has: { field: function, regex: '^sklearn\.(pipeline|compose)\.\w+$' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, regex: '^(pipeline|compose)$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn$' } }, { has: { kind: dotted_name, regex: '^(pipeline|compose)$' } }] } }
+      - all:
+          - has: { field: function, kind: identifier }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
+---
+# The Pipeline of scikit-learn calls transform on every step but the last, and a sampler has
+# only fit_resample, so fit raises TypeError. A sampler as the last step fits and is left
+# alone. The Pipeline of imbalanced-learn takes samplers, so files that import from
+# imblearn.pipeline are left alone, because the name may be that one. The import tests read the
+# whole file, so the sampler name is tested first in all, which keeps its order. ast-grep checks
+# constraints only after the whole rule.
+id: pipeline-step-form
+language: python
+severity: error
+message: $S is a sampler, and the Pipeline of scikit-learn raises TypeError at fit on it. Import Pipeline or make_pipeline from imblearn.pipeline, which applies the sampler to the training rows only.
+rule:
+  pattern: $S($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)(SMOTE|SMOTENC|SMOTEN|ADASYN|BorderlineSMOTE|SVMSMOTE|KMeansSMOTE|RandomOverSampler|RandomUnderSampler|NearMiss|TomekLinks|EditedNearestNeighbours|RepeatedEditedNearestNeighbours|AllKNN|CondensedNearestNeighbour|OneSidedSelection|NeighbourhoodCleaningRule|InstanceHardnessThreshold|ClusterCentroids|SMOTEENN|SMOTETomek)$' }
+    - any:
+        - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(make_pipeline|pipeline\.make_pipeline|sklearn\.pipeline\.make_pipeline)$' } } }
+          precedes: { stopBy: end, regex: '\w' }
+        - inside:
+            kind: tuple
+            precedes: { stopBy: end, kind: tuple }
+            inside: { kind: list, inside: { stopBy: end, kind: call, has: { field: function, regex: '^(Pipeline|pipeline\.Pipeline|sklearn\.pipeline\.Pipeline)$' } } }
+    - inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_from_statement, has: { field: module_name, regex: ^sklearn\.pipeline$ } }, { kind: import_from_statement, has: { field: module_name, regex: ^sklearn$ }, regex: '\bpipeline\b' }, { kind: import_statement, regex: '\bsklearn\.pipeline\b' }] } }
+    - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ kind: import_from_statement, regex: '\bimblearn\b.*\bpipeline\b|\bimblearn\.pipeline\b' }, { kind: import_statement, regex: '\bimblearn\.pipeline\b' }] } } }

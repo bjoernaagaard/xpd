@@ -1,0 +1,29 @@
+# LeaveOneOut tests one row per fold. R2 and the ranking scores need two rows or both classes in a
+# fold, so every fold scores nan with an UndefinedMetricWarning, and a search over nan scores picks
+# its first candidate. A regressor scores R2 when no scoring is given. The rule knows a regressor
+# only by its class name in the same call, or by an explicit scoring. explained_variance and
+# average_precision score 1 or 0 on a fold of one row and no nan, so they are left alone.
+id: leave-one-out-score
+language: python
+severity: error
+message: With LeaveOneOut each fold tests one row, and $SC needs more than one row, so every fold scores nan. Score once on cross_val_predict(..., cv=LeaveOneOut()), or use KFold.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, regex: '^(\w+\.)?LeaveOneOut\(\)$' } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^scoring$' } }, { has: { field: value, pattern: $SC } }] } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|GridSearchCV|RandomizedSearchCV|validation_curve|learning_curve|permutation_test_score|RFECV)$' }
+  SC: { regex: '^.(r2|roc_auc\w*)\W?$' }
+---
+id: leave-one-out-score
+language: python
+severity: error
+message: With LeaveOneOut each fold tests one row, and $M scores R2 by default, which needs more than one row, so every fold scores nan. Pass scoring="neg_mean_squared_error", or score R2 once on cross_val_predict(..., cv=LeaveOneOut()).
+rule:
+  pattern: $F($M($$$MA), $$$A)
+  has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { has: { field: value, regex: '^(\w+\.)?LeaveOneOut\(\)$' } }] } }
+  not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^scoring$' } }, { kind: dictionary_splat }] } } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|GridSearchCV|RandomizedSearchCV|validation_curve|learning_curve|permutation_test_score|RFECV)$' }
+  M: { regex: '(^|\.)(\w*Regressor|LinearRegression|Ridge|RidgeCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|Lars|LassoLars|BayesianRidge|ARDRegression|HuberRegressor|TheilSenRegressor|RANSACRegressor|PoissonRegressor|GammaRegressor|TweedieRegressor|QuantileRegressor|SVR|LinearSVR|NuSVR|KernelRidge|PLSRegression|GaussianProcessRegressor|IsotonicRegression|XGBRegressor|LGBMRegressor)$' }

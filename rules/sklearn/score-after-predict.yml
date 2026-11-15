@@ -1,0 +1,73 @@
+# score predicts the rows again. The rule names only the classes whose predict costs more than
+# the metric. LogisticRegression and LinearRegression measured 1.4 times the metric alone, and
+# DecisionTreeClassifier 1.45 at 1,000 rows, below the bar, so they are left alone. A name the
+# file also binds to another class is left alone, because the rule cannot tell which binding the
+# call sees.
+id: score-after-predict
+language: python
+severity: warning
+message: $M.score($X, $Y) predicts $X again, and $P already holds those predictions. Pass $P to the metric, as accuracy_score($Y, $P) for a classifier or r2_score($Y, $P) for a regressor, which gives the same number and measured 1.6 to 690 times faster, depending on the model.
+rule:
+  pattern: $M.score($X, $Y)
+  all:
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows: { stopBy: end, has: { stopBy: end, any: [{ pattern: $P = $M.predict($X) }, { pattern: $P = $M.fit($$$).predict($X) }] } }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, pattern: $M }
+            - has: { field: right, regex: '^(\w+\.)*((RandomForest|ExtraTrees|GradientBoosting|HistGradientBoosting|AdaBoost|Bagging|KNeighbors|MLP)(Classifier|Regressor)|SVC|SVR|NuSVC|NuSVR|GaussianNB)\(' }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $M }
+              - has: { field: right, regex: '^(\w+\.)*[A-Z]\w*\(' }
+              - not: { has: { field: right, regex: '^(\w+\.)*((RandomForest|ExtraTrees|GradientBoosting|HistGradientBoosting|AdaBoost|Bagging|KNeighbors|MLP)(Classifier|Regressor)|SVC|SVR|NuSVC|NuSVR|GaussianNB)\(' } }
+---
+# Unsafe: code between the two lines can change $P or $X.
+id: score-after-predict
+language: python
+severity: warning
+message: $M.predict($X) runs again here, and $P already holds those predictions. Pass $P, which gives the same number and measured 1.6 to 690 times faster, depending on the model.
+rule:
+  pattern: $F($Y, $M.predict($X))
+  all:
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows: { stopBy: end, has: { stopBy: end, any: [{ pattern: $P = $M.predict($X) }, { pattern: $P = $M.fit($$$).predict($X) }] } }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, pattern: $M }
+            - has: { field: right, regex: '^(\w+\.)*((RandomForest|ExtraTrees|GradientBoosting|HistGradientBoosting|AdaBoost|Bagging|KNeighbors|MLP)(Classifier|Regressor)|SVC|SVR|NuSVC|NuSVR|GaussianNB)\(' }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $M }
+              - has: { field: right, regex: '^(\w+\.)*[A-Z]\w*\(' }
+              - not: { has: { field: right, regex: '^(\w+\.)*((RandomForest|ExtraTrees|GradientBoosting|HistGradientBoosting|AdaBoost|Bagging|KNeighbors|MLP)(Classifier|Regressor)|SVC|SVR|NuSVC|NuSVR|GaussianNB)\(' } }
+constraints:
+  F: { regex: '(^|\.)(accuracy_score|balanced_accuracy_score|f1_score|precision_score|recall_score|fbeta_score|confusion_matrix|classification_report|r2_score|mean_squared_error|root_mean_squared_error|mean_absolute_error|mean_absolute_percentage_error|median_absolute_error|explained_variance_score|matthews_corrcoef|cohen_kappa_score)$' }
+fix: $F($Y, $P)
+metadata: { fix: unsafe }

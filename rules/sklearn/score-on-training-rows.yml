@@ -1,0 +1,45 @@
+# A model scored on the rows it was fitted on reports how well it remembers them. The rule
+# reports such a score only when no held-out rows are scored in the function around it, in the
+# functions next to that one, or in the file when the score sits outside a function. Held-out
+# rows are a predict or score on a name with test, val or holdout in it, or a cross-validation
+# or search. The rule reads variable names.
+id: score-on-training-rows
+language: python
+severity: error
+message: This scores the model on the rows it was fitted on, and no held-out rows are scored around it. On data with no signal a DecisionTreeClassifier scored 1.00 this way where the honest accuracy is 0.50. Score it on test rows the fit never saw.
+rule:
+  any:
+    - pattern: $M.score($X, $$$Y)
+    - kind: call
+      all:
+        - has: { field: function, regex: '(^|\.)(accuracy_score|balanced_accuracy_score|f1_score|precision_score|recall_score|r2_score|roc_auc_score|classification_report|confusion_matrix)$' }
+        - has: { field: arguments, has: { nthChild: 2, any: [{ pattern: '$M.predict($X)' }, { pattern: '$M.predict_proba($X)[$I]' }] } }
+  not: { matches: held-out-scored }
+constraints:
+  X: { regex: '(?i)train', not: { regex: '(?i)test|val|hold' } }
+utils:
+  held-out-scored:
+    any:
+      - inside:
+          any: [{ kind: function_definition }, { kind: module }]
+          stopBy: { kind: function_definition }
+          has: { stopBy: end, matches: held-out-call }
+      # A helper that scores the training rows often sits next to one that scores the test rows.
+      - inside:
+          kind: function_definition
+          stopBy: { kind: function_definition }
+          any:
+            - follows: { stopBy: end, has: { stopBy: end, matches: held-out-call } }
+            - precedes: { stopBy: end, has: { stopBy: end, matches: held-out-call } }
+            - inside:
+                kind: decorated_definition
+                any:
+                  - follows: { stopBy: end, has: { stopBy: end, matches: held-out-call } }
+                  - precedes: { stopBy: end, has: { stopBy: end, matches: held-out-call } }
+  held-out-call:
+    kind: call
+    any:
+      - has: { field: function, regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|learning_curve|validation_curve|permutation_test_score)$' }
+      - all:
+          - has: { field: function, regex: '\.(predict|predict_proba|decision_function|score|evaluate)$' }
+          - has: { field: arguments, has: { nthChild: 1, regex: '(?i)test|val|hold|_te\b|xte\b' } }
