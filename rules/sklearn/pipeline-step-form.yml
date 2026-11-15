@@ -1,5 +1,7 @@
 # scikit-learn splits a parameter name at the first two underscores to find the step, so a
-# step name with __ in it raises ValueError at fit.
+# step name with __ in it raises ValueError at fit. Other libraries have a Pipeline too, so the
+# first three documents report a call only when its name comes from scikit-learn. That test reads
+# the whole file, so it comes after the test of the name.
 id: pipeline-step-form
 language: python
 severity: error
@@ -19,7 +21,18 @@ rule:
         - inside: { kind: keyword_argument, has: { field: name, regex: ^(steps|transformers|transformer_list)$ }, inside: { kind: argument_list, inside: { kind: call, matches: step-container } } }
 utils:
   step-container:
-    has: { field: function, regex: '(^|\.)(Pipeline|ColumnTransformer|FeatureUnion)$' }
+    all:
+      - has: { field: function, pattern: $F, regex: '(^|\.)(Pipeline|ColumnTransformer|FeatureUnion)$' }
+      - matches: from-sklearn
+  from-sklearn:
+    any:
+      - has: { field: function, regex: '^sklearn\.(pipeline|compose)\.\w+$' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, regex: '^(pipeline|compose)$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn$' } }, { has: { kind: dotted_name, regex: '^(pipeline|compose)$' } }] } }
+      - all:
+          - has: { field: function, kind: identifier }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
 ---
 id: pipeline-step-form
 language: python
@@ -27,19 +40,42 @@ severity: error
 message: $F takes the steps as separate arguments, and a single list raises TypeError at fit. Remove the square brackets.
 rule:
   pattern: $F($L)
+  all:
+    - has: { field: function, regex: '(^|\.)(make_pipeline|make_union)$' }
+    - matches: from-sklearn
 constraints:
-  F: { regex: '(^|\.)(make_pipeline|make_union)$' }
   L: { kind: list }
+utils:
+  from-sklearn:
+    any:
+      - has: { field: function, regex: '^sklearn\.(pipeline|compose)\.\w+$' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, regex: '^(pipeline|compose)$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn$' } }, { has: { kind: dotted_name, regex: '^(pipeline|compose)$' } }] } }
+      - all:
+          - has: { field: function, kind: identifier }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
 ---
 id: pipeline-step-form
 language: python
 severity: error
 message: Pipeline takes a list of (name, estimator) pairs, and bare estimators raise TypeError at fit. Give each step a name, or call make_pipeline with the estimators.
 rule:
-  pattern: $C($$$A)
-  has: { field: arguments, has: { nthChild: 1, kind: list, has: { kind: call } } }
-constraints:
-  C: { regex: '(^|\.)Pipeline$' }
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)Pipeline$' }
+    - has: { field: arguments, has: { nthChild: 1, kind: list, has: { kind: call } } }
+    - matches: from-sklearn
+utils:
+  from-sklearn:
+    any:
+      - has: { field: function, regex: '^sklearn\.(pipeline|compose)\.\w+$' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, regex: '^(pipeline|compose)$' } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn$' } }, { has: { kind: dotted_name, regex: '^(pipeline|compose)$' } }] } }
+      - all:
+          - has: { field: function, kind: identifier }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
 ---
 # The Pipeline of scikit-learn calls transform on every step but the last, and a sampler has
 # only fit_resample, so fit raises TypeError. A sampler as the last step fits and is left

@@ -130,7 +130,10 @@ def pipeline_step_keyword():
     return pipe.predict(X[["a"]]), model.coef_
 
 
-def step_forms_that_raise():
+def step_forms_that_raise(xfeat):
+    import sklearn.pipeline
+    from sklearn import pipeline
+
     X, y, w = frame()
     Pipeline([("scale__a", StandardScaler()), ("model", LogisticRegression())]).fit(X[["a"]], y)  # xpd: pipeline-step-form
     ColumnTransformer([("num__scale", StandardScaler(), ["a"])]).fit(X)  # xpd: pipeline-step-form
@@ -138,6 +141,10 @@ def step_forms_that_raise():
     make_pipeline([StandardScaler(), LogisticRegression()]).fit(X[["a"]], y)  # xpd: pipeline-step-form
     make_union([StandardScaler()]).fit(X[["a"]])  # xpd: pipeline-step-form
     Pipeline([StandardScaler(), LogisticRegression()]).fit(X[["a"]], y)  # xpd: pipeline-step-form
+    sklearn.pipeline.Pipeline([StandardScaler(), LogisticRegression()]).fit(X[["a"]], y)  # xpd: pipeline-step-form
+    pipeline.Pipeline([StandardScaler(), LogisticRegression()]).fit(X[["a"]], y)  # xpd: pipeline-step-form
+    xfeat.Pipeline([StandardScaler(), LogisticRegression()]).fit(X[["a"]], y)
+    xfeat.make_pipeline([StandardScaler(), LogisticRegression()]).fit(X[["a"]], y)
 
 
 @case
