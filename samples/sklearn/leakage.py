@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score, cross_validate, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, OrdinalEncoder, StandardScaler, TargetEncoder
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder, OneHotEncoder, OrdinalEncoder, StandardScaler, TargetEncoder
 from sklearn.utils import resample
 
 CASES = {}
@@ -49,8 +49,9 @@ def fit_transform_on_test():
     X_val_scaled = StandardScaler().fit_transform(X_val)  # xpd: fit-on-test
     test = df.tail(30)
     codes = OrdinalEncoder().fit_transform(test[["city"]])  # xpd: fit-on-test
+    city_codes = LabelEncoder().fit_transform(test["city"])  # xpd: fit-on-test
     picked = SelectKBest(f_classif, k=1).fit_transform(X_test, y_test)  # xpd: fit-on-test
-    return X_train_scaled, X_test_scaled, X_val_scaled, codes, picked
+    return X_train_scaled, X_test_scaled, X_val_scaled, codes, city_codes, picked
 
 
 @case
@@ -64,7 +65,11 @@ def refits_that_are_meant():
     poly = PolynomialFeatures(2)
     squares = poly.fit_transform(X_test)
     every_city = LabelEncoder().fit(pd.concat([X_train.index.to_series(), X_test.index.to_series()]))
-    return scaled, squares, every_city.classes_
+    test = df.tail(30)
+    city_counts = np.bincount(LabelEncoder().fit_transform(test["city"]))
+    lb = LabelBinarizer()
+    lb.fit(y_test)
+    return scaled, squares, every_city.classes_, city_counts, lb.transform(y_test)
 
 
 @case
@@ -74,7 +79,9 @@ def fit_on_test():
     model = LogisticRegression().fit(X_test, y_test)  # xpd: fit-on-test
     scaler = StandardScaler()
     scaler.fit(X_test)  # xpd: fit-on-test
-    return model.score(X_test, y_test), scaler.mean_
+    le = LabelEncoder()
+    le.fit(y_test)  # xpd: fit-on-test
+    return model.score(X_test, y_test), scaler.mean_, le.classes_
 
 
 @case

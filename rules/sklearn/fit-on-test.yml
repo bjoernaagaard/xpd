@@ -1,6 +1,10 @@
 # A model fitted on the test rows and scored on them scored 0.997 AUC on noise. The rule reads
 # the name of the first argument. PermutationImportance and permutation_importance are meant to
-# be fitted on held-out rows, so they are left alone.
+# be fitted on held-out rows, so they are left alone. A LabelBinarizer or MultiLabelBinarizer
+# fitted on the test labels turns them into columns for a metric, so the documents below leave
+# one alone when it is built in the same expression or assigned in the same block. A LabelEncoder
+# refitted on test columns gives codes that differ from training, so it is left alone only when
+# its result goes straight into another call, such as a plot, and never into a stored column.
 id: fit-on-test
 language: python
 severity: error
@@ -53,9 +57,21 @@ severity: info
 message: fit_transform on test data learns from the test rows. Fit the step on the training data, keep it, and call transform here.
 rule:
   pattern: $S.fit_transform($X)
+  not: { matches: label-step }
 constraints:
   X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
   S: { kind: call, regex: '^[\w.]*(Scaler|Imputer|Encoder|Vectorizer|QuantileTransformer|PowerTransformer|KBinsDiscretizer)\(' }
+utils:
+  label-step:
+    any:
+      - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }
+      - all:
+          - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*LabelEncoder\(' } }
+          - inside: { kind: argument_list }
+      - inside:
+          any: [{ kind: block }, { kind: module }]
+          stopBy: end
+          has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }] } }
 ---
 # With the target, the step learns from the test labels. A category_encoders TargetEncoder
 # refitted this way scored 0.992 AUC on noise, but SelectKBest scored 0.438 and the
@@ -79,7 +95,19 @@ severity: info
 message: This fits $S on the test rows, so the same value can get another scale or code than in training. Fit $S on the training rows and call transform on the test rows.
 rule:
   pattern: $S.fit($X)
+  not: { matches: label-step }
 constraints:
   # A fit on the training and test rows joined, as in an encoder that must know every level, is
   # left alone.
   X: { regex: '(?i)(^|[^a-z])test([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+utils:
+  label-step:
+    any:
+      - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }
+      - all:
+          - has: { field: function, has: { field: object, kind: call, regex: '^[\w.]*LabelEncoder\(' } }
+          - inside: { kind: argument_list }
+      - inside:
+          any: [{ kind: block }, { kind: module }]
+          stopBy: end
+          has: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, kind: call, regex: '^[\w.]*(LabelBinarizer|MultiLabelBinarizer)\(' } }] } }
