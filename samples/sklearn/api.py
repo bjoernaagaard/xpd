@@ -65,8 +65,9 @@ def logistic_penalty():
     jobs = LogisticRegression(n_jobs=-1, C=0.5).fit(X, y)  # xpd: deprecated-in-sklearn
     saga = LogisticRegression(solver="saga", penalty="l1", max_iter=3000, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
     silent = LogisticRegression(l1_ratio=1, solver="liblinear", C=0.5).fit(X, y)
+    default_jobs = LogisticRegression(n_jobs=None, l1_ratio=1, solver="liblinear", C=0.5).fit(X, y)
     return (fitted(l2), l2.predict_proba(X), fitted(l1), l1.predict_proba(X), fitted(net), net.predict_proba(X),
-            fitted(none), none.predict_proba(X), fitted(jobs), jobs.predict_proba(X), fitted(saga), saga.predict_proba(X), silent.predict(X))
+            fitted(none), none.predict_proba(X), fitted(jobs), jobs.predict_proba(X), fitted(saga), saga.predict_proba(X), silent.predict(X), default_jobs.predict(X))
 
 
 def logistic_penalty_other(X, y, kind):
