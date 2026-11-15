@@ -301,3 +301,13 @@ def score_on_training_and_test_rows():
         return model, model.score(X_train, y_train), model.score(X_test, y_test)
 
     return report()
+
+
+@case
+def auc_scorer_from_labels():
+    from sklearn.metrics import make_scorer
+
+    model, X_test, y_test = fitted()
+    labels_scorer = make_scorer(roc_auc_score, greater_is_better=True)  # xpd: auc-from-labels
+    scores_scorer = make_scorer(roc_auc_score, response_method=("decision_function", "predict_proba"))
+    return model, labels_scorer(model, X_test, y_test), scores_scorer(model, X_test, y_test)

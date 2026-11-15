@@ -200,3 +200,21 @@ rule:
   has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)[:, 0]' } }
 constraints:
   F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve)$' }
+---
+# make_scorer calls predict unless response_method says otherwise, so the scorer ranks labels.
+# On data with no signal both forms give 0.5, so the document is info.
+id: auc-from-labels
+language: python
+severity: info
+message: make_scorer calls predict by default, so $F ranks the class labels. Pass response_method=("decision_function", "predict_proba"), or use scoring="$NAME".
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '^((sklearn\.)?metrics\.)?make_scorer$' }
+    - has: { field: arguments, has: { nthChild: 1, pattern: $F } }
+  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(response_method|needs_proba|needs_threshold)$ } } } }
+constraints:
+  F: { regex: '^(metrics\.)?(roc_auc_score|average_precision_score)$' }
+transform:
+  NAME: { replace: { source: $F, replace: '^(metrics\.)?(roc_auc|average_precision)(_score)?$', by: '$2' } }
+metadata: { since: "1.4" }
