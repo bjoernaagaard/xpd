@@ -24,6 +24,7 @@ def case(fn):
 
 def imports():
     from numpy import float_, isin  # xpd: removed-in-numpy-2
+    from numpy import isin, float_  # xpd: removed-in-numpy-2
     from numpy import AxisError as AxisProblem  # xpd: removed-in-numpy-2
     from numpy import trapz  # xpd: removed-in-numpy-2
     from numpy.lib import pad, median  # xpd: removed-in-numpy-2
@@ -169,6 +170,7 @@ def deprecated_imports():
     from numpy.core import records  # xpd: deprecated-in-numpy-2
     import numpy.core.multiarray as multiarray  # xpd: deprecated-in-numpy-2
     from numpy import core  # xpd: deprecated-in-numpy-2
+    from numpy import isin, core  # xpd: deprecated-in-numpy-2
     from numpy.core.multiarray import _reconstruct
     from numpy.lib.array_utils import normalize_axis_index
     from numpy.char import chararray  # xpd: deprecated-in-numpy-2
