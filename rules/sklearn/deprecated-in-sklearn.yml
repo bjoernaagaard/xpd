@@ -45,6 +45,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^probability$ }
     fix: "$ARG, "
@@ -91,6 +92,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^penalty$ }
     fix: "$ARG, "
@@ -143,6 +145,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^penalty$ }
     fix: "$ARG, "
@@ -216,6 +219,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^n_jobs$ }
     fix: "$ARG, "
@@ -296,6 +300,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^criterion$ }
     fix: "$ARG, "

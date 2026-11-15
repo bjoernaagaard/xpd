@@ -442,7 +442,7 @@ rule:
       not:
         any:
           - has: { kind: keyword_argument, has: { field: name, regex: ^n_splits$ } }
-          - has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }] } }
+          - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }, { kind: line_continuation }] } }
           - has: { kind: keyword_argument, has: { field: name, regex: ^(n|y|labels)$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(KFold|StratifiedKFold|GroupKFold)$' } }
 utils:
@@ -466,7 +466,7 @@ rule:
       not:
         any:
           - has: { kind: keyword_argument, has: { field: name, regex: ^n_splits$ } }
-          - has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }] } }
+          - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }, { kind: line_continuation }] } }
           - has: { kind: keyword_argument, has: { field: name, regex: ^(n|y|labels)$ } }
       inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(ShuffleSplit|StratifiedShuffleSplit|GroupShuffleSplit)$' } }
 utils:
@@ -494,6 +494,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^n_jobs$ }
     fix: "$ARG, "
@@ -527,6 +528,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^behaviour$ }
     fix: "$ARG, "
@@ -560,6 +562,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^algorithm$ }
     fix: "$ARG, "
@@ -593,6 +596,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^iid$ }
     fix: "$ARG, "
@@ -626,6 +630,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^min_impurity_split$ }
     fix: "$ARG, "
@@ -659,6 +664,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^normalize$ }
     fix: "$ARG, "
@@ -694,6 +700,7 @@ rewriters:
       not:
         any:
           - kind: comment
+          - kind: line_continuation
           - kind: keyword_argument
             has: { field: name, regex: ^multi_class$ }
     fix: "$ARG, "
@@ -986,11 +993,11 @@ rule:
   any:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(n|y|labels)$ } } }
     - all:
-        - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] } } }
+        - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } } }
         - any:
             - regex: '(^|\.)LeaveOneOut\('
             - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(n_folds|n_iter|indices)$ } } }
-            - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { kind: comment } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] } } }
+            - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } } }
   not: { matches: compat-code }
 constraints:
   C: { regex: '(^|\.)(KFold|StratifiedKFold|ShuffleSplit|StratifiedShuffleSplit|LeaveOneOut|LeavePOut)$' }
@@ -1011,8 +1018,8 @@ rule:
     - has:
         field: arguments
         has:
-          nthChild: { position: 1, ofRule: { not: { kind: comment } } }
-          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+          nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] }
     - not:
         any:
           - has: { field: arguments, has: { kind: list_splat } }
@@ -1037,8 +1044,8 @@ rule:
     - has:
         field: arguments
         has:
-          nthChild: { position: 2, ofRule: { not: { kind: comment } } }
-          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+          nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] }
     - not:
         any:
           - has: { field: arguments, has: { kind: list_splat } }
@@ -1063,8 +1070,8 @@ rule:
     - has:
         field: arguments
         has:
-          nthChild: { position: 3, ofRule: { not: { kind: comment } } }
-          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+          nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] }
     - not:
         any:
           - has: { field: arguments, has: { kind: list_splat } }
@@ -1089,8 +1096,8 @@ rule:
     - has:
         field: arguments
         has:
-          nthChild: { position: 4, ofRule: { not: { kind: comment } } }
-          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }] }
+          nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+          not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] }
     - not:
         any:
           - has: { field: arguments, has: { kind: list_splat } }

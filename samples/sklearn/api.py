@@ -63,11 +63,15 @@ def logistic_penalty():
     net = LogisticRegression(penalty="elasticnet", l1_ratio=0.5, solver="saga", max_iter=3000, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
     none = LogisticRegression(l1_ratio=None).fit(X, y)  # xpd: deprecated-in-sklearn
     jobs = LogisticRegression(n_jobs=-1, C=0.5).fit(X, y)  # xpd: deprecated-in-sklearn
+    wrapped = LogisticRegression(  # xpd: deprecated-in-sklearn
+        n_jobs=2, \
+        C=0.5).fit(X, y)
     saga = LogisticRegression(solver="saga", penalty="l1", max_iter=3000, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
     silent = LogisticRegression(l1_ratio=1, solver="liblinear", C=0.5).fit(X, y)
     default_jobs = LogisticRegression(n_jobs=None, l1_ratio=1, solver="liblinear", C=0.5).fit(X, y)
     return (fitted(l2), l2.predict_proba(X), fitted(l1), l1.predict_proba(X), fitted(net), net.predict_proba(X),
-            fitted(none), none.predict_proba(X), fitted(jobs), jobs.predict_proba(X), fitted(saga), saga.predict_proba(X), silent.predict(X), default_jobs.predict(X))
+            fitted(none), none.predict_proba(X), fitted(jobs), jobs.predict_proba(X), fitted(saga), saga.predict_proba(X), silent.predict(X), default_jobs.predict(X),
+            fitted(wrapped), wrapped.predict_proba(X))
 
 
 def logistic_penalty_other(X, y, kind):
@@ -347,6 +351,13 @@ def removed_forms(model, X, y, X_test, y_test, grid):
     GridSearchCV(model, grid, "accuracy")  # xpd: removed-in-sklearn
     cross_val_score(model, X, y, 5)  # xpd: removed-in-sklearn
     cross_val_score(model, X, y, cv=5)
+    cross_val_score(model, X,  # xpd: removed-in-sklearn
+                    y, \
+                    5)
+    cross_val_score(model, X, \
+                    y, cv=5)
+    StratifiedKFold(3, \
+                    shuffle=False)
     StratifiedKFold(y, n_folds=3)  # xpd: removed-in-sklearn
     ShuffleSplit(len(X), 10, test_size=0.4, random_state=0)  # xpd: removed-in-sklearn
     KFold(n=len(y), n_folds=3)  # xpd: removed-in-sklearn
