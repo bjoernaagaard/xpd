@@ -1,0 +1,41 @@
+# A Problem gets the whole population as one array, with one row per solution, and it must write
+# out["F"] with one row per solution and one column per objective. np.array([f1, f2]) has one row
+# per objective. pymoo reshapes it to the expected shape without transposing, so the values of
+# the first objective fill the first rows and every solution gets the wrong numbers.
+#
+# On pymoo 0.6.2 two objectives over four solutions, f1 = x0 and f2 = 10 + x1, came back as
+# [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]] where np.column_stack gave
+# [[0.1, 10.2], [0.3, 10.4], [0.5, 10.6], [0.7, 10.8]]. NSGA2 with 20 solutions and 20 generations
+# then reported a least f2 of 0.003, and the true least is 10. np.vstack, np.stack and np.asarray
+# gave the same rows, and out["G"] is reshaped the same way. pymoo 0.5.0 raised on the same
+# class, so the document carries since.
+#
+# The class must inherit from the Problem that the file imports from pymoo. An ElementwiseProblem
+# gets one solution, where a list of numbers is right, and is left alone. So is a class that
+# passes elementwise=True, and a stack with axis.
+id: objectives-stacked-by-row
+language: python
+severity: error
+message: $NP.$FN of a list has one row per objective, and pymoo reshapes it to one row per solution without transposing, so each solution gets the wrong values. Two objectives over four solutions came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and NSGA2 then reported a least f2 of 0.003 where the true least is 10. Write $NP.column_stack($LIST).
+rule:
+  pattern: $NP.$FN($LIST)
+  all:
+    - has: { field: function, regex: '^(np|numpy|anp)\.(array|asarray|vstack|stack|row_stack)$' }
+    - has: { field: arguments, has: { nthChild: 1, kind: list, has: { nthChild: 2 } } }
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, kind: subscript, regex: '^\w+\[\s*["''](F|G|H)["'']\s*\]$' }
+    - inside:
+        stopBy: end
+        kind: class_definition
+        all:
+          - has: { field: superclasses, has: { kind: identifier, regex: '^Problem$' } }
+          - not: { has: { stopBy: end, kind: keyword_argument, regex: '^elementwise(_evaluation)?\s*=\s*True$' } }
+          - inside:
+              kind: module
+              stopBy: end
+              has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\bProblem\b' }
+# Unsafe: the fix changes the values, to the ones the code meant.
+fix: $NP.column_stack($LIST)
+metadata: { fix: unsafe, since: "0.6" }

@@ -1,0 +1,73 @@
+# pymoo 0.6 sizes out["G"] by n_ieq_constr and out["H"] by n_eq_constr, and both default to 0.
+# A problem that writes a constraint it never declared raises on the first evaluation. On pymoo
+# 0.6.2 the Exception read "Problem Error: G can not be set, expected shape (2, 0) but provided
+# (2,)". pymoo 0.5.0 ignored the constraint without an error, so the documents carry since.
+#
+# The class must inherit from the Problem or ElementwiseProblem the file imports from pymoo, and
+# it must call super().__init__ with keywords only. A class that names the count anywhere, passes
+# **kwargs or a positional argument, or has no __init__ call is left alone.
+id: constraint-not-declared
+language: python
+severity: error
+message: This writes out["G"], and the class never passes n_ieq_constr, which defaults to 0. Evaluated on 2 solutions, it raised Exception, "Problem Error, G can not be set, expected shape (2, 0) but provided (2,)". Pass n_ieq_constr with the number of inequality constraints to super().__init__.
+rule:
+  kind: subscript
+  regex: '^\w+\[\s*["'']G["'']\s*\]$'
+  all:
+    - inside: { kind: assignment, field: left }
+    - inside:
+        stopBy: end
+        kind: class_definition
+        all:
+          - not: { regex: '\bn_(ieq_)?constr\b' }
+          - has: { stopBy: end, matches: keyword-only-init }
+          - matches: problem-class
+utils:
+  problem-class:
+    kind: class_definition
+    all:
+      - has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+  keyword-only-init:
+    kind: call
+    all:
+      - has: { field: function, regex: '^super\(\)\.__init__$' }
+      - has: { field: arguments, has: { kind: keyword_argument } }
+      - not: { has: { field: arguments, has: { all: [{ not: { kind: keyword_argument } }, { not: { regex: '^[(),]$' } }] } } }
+metadata: { since: "0.6" }
+---
+id: constraint-not-declared
+language: python
+severity: error
+message: This writes out["H"], and the class never passes n_eq_constr, which defaults to 0. Evaluated on 20 solutions, it raised Exception, "Problem Error, H can not be set, expected shape (20, 0) but provided (20,)". Pass n_eq_constr with the number of equality constraints to super().__init__.
+rule:
+  kind: subscript
+  regex: '^\w+\[\s*["'']H["'']\s*\]$'
+  all:
+    - inside: { kind: assignment, field: left }
+    - inside:
+        stopBy: end
+        kind: class_definition
+        all:
+          - not: { regex: '\bn_eq_constr\b' }
+          - has: { stopBy: end, matches: keyword-only-init }
+          - matches: problem-class
+utils:
+  problem-class:
+    kind: class_definition
+    all:
+      - has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+  keyword-only-init:
+    kind: call
+    all:
+      - has: { field: function, regex: '^super\(\)\.__init__$' }
+      - has: { field: arguments, has: { kind: keyword_argument } }
+      - not: { has: { field: arguments, has: { all: [{ not: { kind: keyword_argument } }, { not: { regex: '^[(),]$' } }] } } }
+metadata: { since: "0.6" }

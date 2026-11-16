@@ -1,0 +1,53 @@
+# The hypervolume is the space between the solutions and the reference point. Both documents
+# were run on pymoo 0.6.2. The class must be the HV or Hypervolume that the file imports from
+# pymoo.indicators.hv.
+
+# A reference point taken as the largest value of each objective lies on the solutions that hold
+# those values, so they add no volume. Three solutions scored 0.09 with ref_point=F.max(axis=0)
+# and 0.37 with the point (1, 1), and the two extreme solutions alone scored 0.0.
+id: hv-reference-point
+language: python
+severity: warning
+message: A reference point at the largest value of each objective gives no volume to the solutions that hold those values. Two extreme solutions alone scored 0.0, and three solutions scored 0.09 where the fixed point (1, 1) gave 0.37. Use one fixed point that is worse than every solution in every objective, and keep it for every run you compare.
+rule:
+  kind: keyword_argument
+  regex: '^ref_point\s*='
+  all:
+    - has:
+        field: value
+        any:
+          - pattern: $F.max(axis=0)
+          - pattern: $NP.max($F, axis=0)
+          - pattern: $NP.amax($F, axis=0)
+          - pattern: $F.max(0)
+    - inside: { kind: argument_list, inside: { matches: hv-call } }
+utils:
+  hv-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(HV|Hypervolume)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.indicators\.hv\s+import\b[^#]*\b(HV|Hypervolume)\b' }
+metadata: { since: "0.6" }
+---
+# HV() with no reference point and no Pareto front raised AssertionError, "For Hypervolume a
+# reference point needs to be provided!"
+id: hv-reference-point
+language: python
+severity: error
+message: $HV needs a reference point, and without one it raises AssertionError, "For Hypervolume a reference point needs to be provided!". Pass ref_point, a point that is worse than every solution in every objective.
+rule:
+  pattern: $HV()
+  matches: hv-call
+utils:
+  hv-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(HV|Hypervolume)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.indicators\.hv\s+import\b[^#]*\b(HV|Hypervolume)\b' }
+metadata: { since: "0.6" }

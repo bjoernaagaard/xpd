@@ -1,0 +1,82 @@
+# minimize runs a deep copy of the algorithm and returns it as res.algorithm. The object given to
+# minimize is never set up. On pymoo 0.6.2, after minimize(problem, algorithm, ("n_gen", 10)),
+# algorithm.pop, algorithm.opt and algorithm.n_gen were None, algorithm.result() raised
+# TypeError, and a callback given to the constructor had recorded 0 generations, where
+# res.algorithm held 20 solutions, n_gen 11 and a callback with 10 records.
+#
+# The name must be the second argument of a minimize, imported from pymoo.optimize, that does
+# not pass copy_algorithm, and the read must come in a later statement of the same block or
+# inside one. The rule is silent when the name is assigned again after the run, and in a file
+# that also drives the same name with setup or next.
+id: algorithm-read-after-minimize
+language: python
+severity: error
+message: minimize ran a deep copy of $ALG and left $ALG itself untouched, so $ALG.$ATTR holds nothing from the run. After a run of 10 generations, pop, opt and n_gen were None, result() raised TypeError, and the callback had 0 records. Read $RES.algorithm.$ATTR from the result of minimize.
+rule:
+  kind: attribute
+  all:
+    - has: { field: attribute, pattern: $ATTR, regex: '^(pop|opt|off|n_gen|n_iter|history|callback|result)$' }
+    - has: { field: object, kind: identifier, pattern: $ALG }
+    - not: { inside: { kind: assignment, field: left } }
+    - inside:
+        stopBy: { any: [{ kind: function_definition }, { kind: lambda }, { kind: class_definition }] }
+        all:
+          - not: { any: [{ kind: function_definition }, { kind: lambda }, { kind: class_definition }, { kind: decorated_definition }] }
+          - follows:
+              stopBy: end
+              kind: expression_statement
+              has: { matches: run-of-alg }
+    - not:
+        inside:
+          stopBy: end
+          any:
+            - kind: for_statement
+              has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] }
+            - any: [{ kind: list_comprehension }, { kind: dictionary_comprehension }, { kind: set_comprehension }, { kind: generator_expression }]
+              has: { kind: for_in_clause, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+    - not:
+        inside:
+          stopBy: end
+          follows:
+            stopBy: end
+            all:
+              - has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+              - follows:
+                  stopBy: end
+                  kind: expression_statement
+                  has: { matches: run-of-alg }
+    - not:
+        inside:
+          stopBy: end
+          any: [{ kind: for_statement }, { kind: while_statement }, { kind: if_statement }, { kind: with_statement }, { kind: try_statement }]
+          has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(setup|next|infill|advance|ask|tell)$' } }, { has: { field: object, pattern: $ALG } }] } }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+  run-of-alg:
+    kind: assignment
+    all:
+      - has: { field: left, kind: identifier, pattern: $RES }
+      - has:
+          field: right
+          kind: call
+          all:
+            - has: { field: function, regex: '^minimize$' }
+            - has: { field: arguments, has: { nthChild: 2, kind: identifier, pattern: $ALG } }
+            - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^copy_algorithm$' } } } }
+            - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+            - matches: pymoo-minimize
+metadata: { since: "0.6" }

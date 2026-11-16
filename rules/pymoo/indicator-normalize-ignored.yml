@@ -1,0 +1,34 @@
+# The distance indicators took normalize in pymoo 0.4. Their constructors end in **kwargs, so
+# the keyword is still accepted, and it does nothing. With a front whose first objective runs to
+# 1000, IGD(pf, normalize=True) gave 0.082 on pymoo 0.4.2.2. On 0.5.0 and on 0.6.2 it gave 25.25,
+# the same as IGD(pf), and on 0.6.0 and 0.6.2 IGD(pf, zero_to_one=True) gave 0.082. zero_to_one is
+# from 0.6.0, which is what since names.
+#
+# The class must be one the file imports from pymoo.indicators.
+id: indicator-normalize-ignored
+language: python
+severity: error
+message: normalize is not read by $C, so the distances stay on the scale of the objectives. With a front whose first objective runs to 1000, IGD with normalize=True gave 25.25, the same as without it, where zero_to_one=True gave 0.082. Write zero_to_one=True.
+rule:
+  kind: identifier
+  regex: '^normalize$'
+  inside:
+    kind: keyword_argument
+    field: name
+    all:
+      - has: { field: value, regex: '^True$' }
+      - inside:
+          kind: argument_list
+          all:
+            - not: { has: { kind: keyword_argument, has: { field: name, regex: '^zero_to_one$' } } }
+            - inside:
+                kind: call
+                all:
+                  - has: { field: function, pattern: $C, regex: '^(GD|GDPlus|IGD|IGDPlus)$' }
+                  - inside:
+                      kind: module
+                      stopBy: end
+                      has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.indicators\.\w+\s+import\b[^#]*\b(GD|GDPlus|IGD|IGDPlus)\b' }
+# Unsafe: the fixed call returns the normalized distance, which is another number.
+fix: zero_to_one
+metadata: { fix: unsafe, since: "0.6" }

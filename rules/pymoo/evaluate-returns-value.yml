@@ -1,0 +1,34 @@
+# pymoo reads the objectives from the dictionary that _evaluate gets as its third parameter, and
+# it ignores what the method returns. On pymoo 0.6.2 a Problem and an ElementwiseProblem whose
+# _evaluate returned the value and never touched the dictionary both got inf for every objective,
+# and GA returned res.F = [inf] without an error.
+#
+# The method must be in a class that inherits from the Problem or ElementwiseProblem the file
+# imports from pymoo, its third parameter must be named out, and its body must not name out
+# anywhere, so a method that hands out to a helper is left alone.
+id: evaluate-returns-value
+language: python
+severity: error
+message: pymoo ignores what _evaluate returns and reads the objectives from out, which this method never writes. Every objective then comes back as inf, and GA returned res.F = [inf] without an error. Write the value to out["F"].
+rule:
+  kind: return_statement
+  regex: '^return\s+\S'
+  all:
+    - not: { regex: '^return\s+(None|NotImplemented)\s*$' }
+    - inside:
+        stopBy: { kind: function_definition }
+        kind: function_definition
+        all:
+          - has: { field: name, regex: '^_evaluate$' }
+          - has: { field: parameters, has: { nthChild: 3, regex: '^out$' } }
+          - not: { has: { field: body, has: { stopBy: end, kind: identifier, regex: '^out$' } } }
+          - inside:
+              stopBy: end
+              kind: class_definition
+              all:
+                - has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+                - inside:
+                    kind: module
+                    stopBy: end
+                    has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+metadata: { since: "0.6" }

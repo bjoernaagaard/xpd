@@ -1,0 +1,55 @@
+# minimize without seed builds numpy.random.default_rng(None), so every run starts from another
+# state. On pymoo 0.6.2 two runs of NSGA2 on ZDT1 without a seed returned different fronts, and
+# two runs with seed=1 returned the same front. A seed does not make a run better, so the rule
+# is info.
+#
+# The call must be the minimize that the file imports from pymoo.optimize. It is left alone when
+# it takes **kwargs, when the algorithm it gets was built with seed, and in a file that calls
+# np.random.seed, which numpy-seed-ignored reports.
+id: unseeded-run
+language: python
+severity: info
+message: minimize without seed starts from a new random state on every run, and two runs returned different fronts. Pass seed, such as seed=1, to get the same result again.
+rule:
+  kind: call
+  all:
+    - matches: unseeded-minimize
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+  unseeded-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - not:
+          any:
+            - has: { field: arguments, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+            - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|random_seed)$' } } }
+            - has: { field: arguments, has: { kind: dictionary_splat } }
+            - has: { field: arguments, has: { kind: list_splat } }
+      - matches: pymoo-minimize
+      - not:
+          all:
+            - has: { field: arguments, has: { nthChild: 2, kind: identifier, pattern: $SEEDED } }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $SEEDED }
+                    - has: { field: right, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^seed$' } } }

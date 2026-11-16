@@ -1,0 +1,45 @@
+# pymoo 0.6.0 split the constraint count into n_ieq_constr, for out["G"], and n_eq_constr, for
+# out["H"]. Problem.__init__ no longer has n_constr. It still reads the keyword from **kwargs and
+# takes it as n_ieq_constr, and problem.n_constr is now the sum of the two counts.
+#
+# On pymoo 0.6.2 a problem built with n_constr=1 and one built with n_ieq_constr=1 had the same
+# n_ieq_constr, and GA with seed=1 returned the same X, F and G for both, bit for bit. The only
+# difference is that the first keeps {"n_constr": 1} in problem.data. pymoo 0.5.0 does not know
+# n_ieq_constr and ignores it, so the document carries since.
+#
+# The keyword must be given to super().__init__ inside a class that inherits from the Problem or
+# ElementwiseProblem the file imports from pymoo, or to one of those two classes called by name.
+# A call that also passes n_ieq_constr is left alone.
+id: n-constr-keyword
+language: python
+severity: info
+message: n_constr is no longer a parameter of Problem since pymoo 0.6.0, which reads it from **kwargs as n_ieq_constr. Write n_ieq_constr for the constraints in out["G"], and n_eq_constr for those in out["H"].
+rule:
+  kind: identifier
+  regex: '^n_constr$'
+  inside:
+    kind: keyword_argument
+    field: name
+    inside:
+      kind: argument_list
+      all:
+        - not: { has: { kind: keyword_argument, has: { field: name, regex: '^n_ieq_constr$' } } }
+        - inside: { matches: problem-init }
+utils:
+  problem-init:
+    kind: call
+    all:
+      - any:
+          - all:
+              - has: { field: function, regex: '^(super\(\)|Problem|ElementwiseProblem)\.__init__$' }
+              - inside:
+                  stopBy: end
+                  kind: class_definition
+                  has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+          - has: { field: function, regex: '^(Problem|ElementwiseProblem)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+fix: n_ieq_constr
+metadata: { fix: safe, since: "0.6" }

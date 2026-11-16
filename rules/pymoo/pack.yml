@@ -1,0 +1,9 @@
+# The pymoo pack. Every other .yml file in this folder is a rule.
+
+# A fix that writes `np.` applies only in a file with `import numpy as np`. Elsewhere the issue
+# has no fix.
+aliases:
+  np: numpy
+# The pack has no package check. pymoo 0.6.2 installs what it needs to run, moocore and cma
+# among them, and its wheels hold the built functions. autograd, jax, dask, joblib, ray and
+# optuna each serve one module that most projects never import.

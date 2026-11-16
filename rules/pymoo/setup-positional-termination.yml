@@ -1,0 +1,42 @@
+# Algorithm.setup took the termination as its second positional argument up to pymoo 0.5.0. In
+# 0.6.0 to 0.6.1.5 that call raises TypeError, "Algorithm.setup() takes 2 positional arguments
+# but 3 were given". Since 0.6.1.6 the second parameter is verbose, so the tuple is read as a
+# true verbose and no termination is set. On pymoo 0.6.2, NSGA2 set up with ("n_gen", 7) printed
+# a line for every generation, had a DefaultMultiObjectiveTermination, and was still running
+# after 30 generations.
+#
+# The object must be a name that the file binds to a pymoo algorithm class and to nothing else,
+# and the second argument must be a tuple that starts with a text, or a get_termination call.
+id: setup-positional-termination
+language: python
+severity: error
+message: setup takes the termination by keyword since pymoo 0.6.0. A second positional argument raises TypeError up to 0.6.1.5. Since 0.6.1.6 it is read as verbose, so the run prints every generation and stops by the default termination. A run asked for 7 generations was still going after 30. Write termination=$T.
+rule:
+  pattern: $A.setup($P, $T, $$$REST)
+  all:
+    - has: { field: arguments, has: { nthChild: 2, any: [{ kind: tuple, has: { nthChild: 1, kind: string } }, { kind: call, has: { field: function, regex: '(^|\.)get_termination$' } }] } }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, pattern: $A }
+            - has: { field: right, regex: '^(AGEMOEA|AGEMOEA2|BGA|BIPOPCMAES|BRKGA|CMAES|CMOPSO|CTAEA|DE|DIRECT|DNSGA2|EPPSO|ES|G3PCX|GA|GDE3|GDE32NN|GDE3MNN|GDE3PCD|ISRES|KGB|MOEAD|MOPSO_CD|MixedVariableGA|NRBO|NSDE|NSDER|NSGA2|NSGA3|NelderMead|NicheGA|OmniOptimizer|PINSGA2|PSO|ParallelMOEAD|PatternSearch|RNSGA2|RNSGA3|RVEA|RandomSearch|SMSEMOA|SPEA2|SRES|SimpleCMAES|UNSGA3)\(' }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $A }
+              - not: { has: { field: right, regex: '^(AGEMOEA|AGEMOEA2|BGA|BIPOPCMAES|BRKGA|CMAES|CMOPSO|CTAEA|DE|DIRECT|DNSGA2|EPPSO|ES|G3PCX|GA|GDE3|GDE32NN|GDE3MNN|GDE3PCD|ISRES|KGB|MOEAD|MOPSO_CD|MixedVariableGA|NRBO|NSDE|NSDER|NSGA2|NSGA3|NelderMead|NicheGA|OmniOptimizer|PINSGA2|PSO|ParallelMOEAD|PatternSearch|RNSGA2|RNSGA3|RVEA|RandomSearch|SMSEMOA|SPEA2|SRES|SimpleCMAES|UNSGA3)\(' } }
+constraints:
+  P: { not: { kind: keyword_argument } }
+  A: { kind: identifier }
+# Unsafe: the fixed call stops where the tuple says, and the old one did not.
+fix: $A.setup($P, termination=$T, $$$REST)
+metadata: { fix: unsafe, since: "0.6" }

@@ -1,9 +1,10 @@
 # Rules
 
-xpd has nine rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+xpd has ten rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
-[Category Encoders](#category-encoders), [Hamilton](#hamilton) and [Python](#python). A library's
-rules run only on files that import it. The Python rules run on every file.
+[Category Encoders](#category-encoders), [pymoo](#pymoo), [Hamilton](#hamilton) and
+[Python](#python). A library's rules run only on files that import it. The Python rules run on
+every file.
 
 ## pandas
 
@@ -7315,6 +7316,632 @@ These habits were looked at and have no rule.
 - `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
   index.
 
+## pymoo
+
+These rules run on files that import `pymoo`, the module of [pymoo](https://pymoo.org/), which
+runs single-objective and multi-objective optimization with evolutionary algorithms. They report
+imports and options that older releases had and that raise on pymoo 0.6.2, problem classes that
+hand pymoo wrong numbers, keywords that pymoo accepts and never reads, runs whose result is not
+the one the code asks for, and reference points and weights that give another number than the
+code means. Every number in this section was measured on pymoo 0.6.2 with NumPy 2.4.6, unless
+another release is named. Examples assume that the pymoo names they use are imported. Names such
+as `problem`, `F` and `pf` represent values supplied by your program.
+
+pymoo renamed its modules in 0.5.0, removed `pymoo.factory` and most keywords of the 0.4 API in
+0.6.0 and 0.6.1, and moved its random numbers to a generator of its own in 0.6.1.6. A rule
+document about such a change carries `since`. xpd reads the installed version from the project's
+venv, as it does for pandas, and skips the document on an older release, so a project that still
+has pymoo 0.5.0 gets no report about 0.6. When the venv has no pymoo, or there is no venv, every
+document runs.
+
+A pattern sees no types, so every rule ties what it reports to pymoo by a name. A class or a
+function must be one the file imports from pymoo, such as `Problem` from `pymoo.core.problem` or
+`minimize` from `pymoo.optimize`, and an object must be a name the file binds to such a class.
+One document of `deprecated-in-pymoo`, about the `"feasible"` key, reads the name of a variable
+instead. It says so and has no fix.
+
+### How a rule earns its place
+
+Every rule document ships on something that was run, and it is one of four kinds:
+
+- An interpreter proof runs the old form and the new form. It passes when the old form raises or
+  warns and the new form runs clean. For a removed import, the old form also had to run on the
+  last release that has it and raise on the next one. The eleven releases from 0.4.2.2 to 0.6.2
+  were installed from PyPI for that, and `since` names the first release where the form raises.
+- A value proof runs the old and the new form on the same input and gives both results.
+- A rerun proof runs the old form twice. It passes when the two results differ and the new form
+  gives the same result twice.
+- A speed proof times both forms and compares what they return.
+
+A document is `error` only on an interpreter proof or a value proof, and its message quotes what
+was measured. A document that can also match code that is meant, such as a mutation that few
+individuals should get, is `warning`.
+
+The lists inside the rules were read from the installed releases and not written by hand. The
+130 removed modules, the 49 names that a kept module lost, the ten termination names that 0.6.0
+dropped and the 45 algorithm classes are what the wheels hold, and each removed import was run
+on the release before and on the release at the version named. The first two lists leave out
+`pymoo.experimental`, `pymoo.usage`, `pymoo.docs` and `pymoo.vendor`. Each of the 89 replacement modules
+that a fix writes was imported on 0.6.2 together with every name the fix lets through.
+
+The rules were then run over two sets of code, and reports were read. The first is pymoo's own
+code at the 0.6.2 tag: 541 Python files, which are the library, its examples, its tests and the
+Python code of its documentation pages. The second is 2,046 files from 409 public repositories
+that import pymoo, found by a code search on GitHub. Another 2,464 files in those repositories
+are copies of pymoo's own modules and are not counted. A rule that reported correct code was
+narrowed, and the table gives what is left.
+
+| Rule | Severity | Proof | Reports on pymoo's own code | Reports on public code | Wrong advice | Fix |
+| --- | --- | --- | --- | --- | --- | --- |
+| [`removed-in-pymoo`](#removed-in-pymoo) | error | interpreter: ModuleNotFoundError, ImportError, Exception, AttributeError | 0 | 1,694 | 0 of 40 read | unsafe |
+| [`deprecated-in-pymoo`](#deprecated-in-pymoo) | warning | interpreter: DeprecationWarning, and the same class or array | 2 | 97 | 0 of 36 read | safe |
+| [`n-constr-keyword`](#n-constr-keyword) | info | value: the same X, F and G | 2 | 232 | 0 of 28 read | safe |
+| [`ignored-problem-keyword`](#ignored-problem-keyword) | error, warning | value: [0.66, 0.93, 1.26] against [0.14, 0.77, 1.94], and 0 calls of the starmap | 1 | 67 | 0 of 9 read | none |
+| [`setup-positional-termination`](#setup-positional-termination) | error | value: past 30 generations where 7 were asked | 0 | 1 | 0 | unsafe |
+| [`has-terminated-assignment`](#has-terminated-assignment) | error | value: 0 more generations against 15 | 0 | 4 | 0 | none |
+| [`mutation-prob-per-individual`](#mutation-prob-per-individual) | warning | value: 2 percent of the individuals against 57 percent | 0 | 48 | 0 of 14 read | unsafe |
+| [`indicator-normalize-ignored`](#indicator-normalize-ignored) | error | value: 25.25 against 0.082 | 0 | 0 | no reports | unsafe |
+| [`objectives-stacked-by-row`](#objectives-stacked-by-row) | error | value: a least f2 of 0.003 against 10 | 0 | 0 | no reports | unsafe |
+| [`evaluate-returns-value`](#evaluate-returns-value) | error | value: F is inf | 0 | 0 | no reports | none |
+| [`constraint-not-declared`](#constraint-not-declared) | error | interpreter: Exception | 0 | 0 | no reports | none |
+| [`evaluate-indexing`](#evaluate-indexing) | error | interpreter: IndexError, Exception | 0 | 24 | 0 | none |
+| [`elementwise-runner`](#elementwise-runner) | error | interpreter: TypeError, and value: 0 calls of the runner | 0 | 0 | no reports | none |
+| [`minimize-ignored-keyword`](#minimize-ignored-keyword) | error | value: 1,000 generations where 7 were asked, and rerun | 2 | 1 | 0 | unsafe |
+| [`algorithm-read-after-minimize`](#algorithm-read-after-minimize) | error | value: None, and interpreter: TypeError | 0 | 0 | no reports | none |
+| [`reused-algorithm-without-copy`](#reused-algorithm-without-copy) | error | value: the F of the first run | 0 | 0 | no reports | none |
+| [`unread-history`](#unread-history) | info | speed: 2.6 times, and 20.3 MB against 0.13 MB | 6 | 110 | 1 of 6 read | none |
+| [`moead-arguments`](#moead-arguments) | error | interpreter: TypeError, AttributeError | 0 | 3 | 0 | none |
+| [`unseeded-run`](#unseeded-run) | info | rerun: the result differs | 21 | 286 | 0 of 24 read | none |
+| [`numpy-seed-ignored`](#numpy-seed-ignored) | warning | rerun: the result differs | 23 | 148 | 0 of 32 read | none |
+| [`hv-reference-point`](#hv-reference-point) | warning, error | value: 0.09 against 0.37, and interpreter: AssertionError | 0 | 2 | 0 | none |
+| [`decision-weights`](#decision-weights) | warning | value: another solution is picked | 0 | 0 | no reports | none |
+
+A value proof gives the old form's result against the new form's. Wrong advice counts the reports
+where following the message would not fix a real problem in that code. Where a rule has more
+reports than were read, the cell says how many were read. A rule with fewer reports had every
+report read.
+
+The one report with wrong advice is a documentation page of pymoo that saves the history for a
+later page to plot, which xpd reads as another file. The public reports of `unread-history` were
+not judged for that reason: 94 of the 110 are in a repository where some other file names
+history, so the rule is `info`. The 57 reports on pymoo's own code are otherwise real. Its
+examples pass `n_gen=100` to `minimize`, where it does nothing, its documentation reads the
+deprecated `"feasible"` key, and the custom operators in its guide draw from `np.random`.
+
+Three rules were narrowed after the first run. `algorithm-read-after-minimize` reported 29
+callbacks and comprehensions that have a variable named like the algorithm, and now needs the
+read in the scope of the run. `evaluate-returns-value` reported one base class that returns
+`NotImplemented`. `unread-history` reported runs inside functions, whose caller may read the
+history.
+
+Recall was not measured. No set of real pymoo code was held back, so the table says how often a
+rule is wrong when it reports, and not how often it misses.
+
+The pack has no rule for the following, because a pattern cannot see what decides them.
+
+| Habit | What was measured | Why there is no rule |
+| --- | --- | --- |
+| A constraint written with the wrong sign | `out["G"]` must be at most 0 where the constraint holds | The direction a constraint is meant in is not in the code |
+| A maximised objective that is not negated back | pymoo only minimizes, so `res.F` holds the negated value | The problem class and the code that reads `res.F` are mostly in different files |
+| `pop_size` below the number of reference directions in `NSGA3` | pymoo prints a warning, and 54 solutions came back for 91 directions | The number of directions is a binomial of two arguments |
+| A problem without `xl` and `xu` | `GA` raised TypeError when it sampled | A binary or a permutation problem needs no bounds |
+| Variables given with `vars` and run with `NSGA2` | TypeError, `'>=' not supported between instances of 'dict' and 'dict'` | The problem and the algorithm are tied only by the call that runs them |
+| A hypervolume of objectives on another scale than the reference point | `HV(ref_point=[1.1, 1.1])` gave 0.0 for a first objective between 100 and 900 | The scale of the objectives is in the data |
+| `ASF` on objectives that are not normalized | It picked another solution than on normalized objectives | Whether the objectives share a scale is in the data |
+| Silencing the warning about functions that are not compiled | With the compiled functions switched off, sorting 2,000 points took 27 times as long on pymoo 0.6.1.6 and no longer than before on 0.6.2 | Nothing is slower on the current release |
+
+### Older releases
+
+Each form below worked on an older pymoo. On pymoo 0.6.2 it raises, warns, or is accepted and
+does nothing.
+
+#### removed-in-pymoo
+
+**Severity:** error. **Fix:** unsafe: the new module for 89 removed modules when every imported name is still in it, such as `pymoo.core.problem` for `pymoo.model.problem` and `pymoo.algorithms.moo.nsga2` for `pymoo.algorithms.nsga2`, the new import for `get_problem`, `get_termination` or `get_reference_directions` imported alone from `pymoo.factory`, and `do` for `calc` on an indicator. The other forms have no fix.
+
+Reports an import of one of the 130 modules that pymoo removed between 0.5.0 and 0.6.2, with the module that took its place where there is one. That covers `pymoo.model`, the algorithm modules of 0.4 such as `pymoo.algorithms.nsga2` and `pymoo.algorithms.so_genetic_algorithm`, the long operator modules such as `pymoo.operators.crossover.simulated_binary_crossover`, `pymoo.performance_indicator`, `pymoo.decision_making`, `pymoo.util.termination`, `pymoo.operators.mixed_variable_operator`, `pymoo.interface`, `pymoo.util.function_loader` and `pymoo.factory`. It also reports the functions of `pymoo.factory` that built an object from a name, each with the classes to use, 49 names that a module of 0.6.2 no longer has, such as `Display` in `pymoo.util.display` and `starmap_parallelized_eval` in `pymoo.core.problem`, the ten termination names that 0.6.0 dropped, such as `"f_tol"` and `"x_tol"`, given to `get_termination` or in a tuple given to `minimize`, and `calc` on an indicator. An import inside a `try` block that catches the error, or behind a version check, is left alone.
+
+Example:
+
+```python
+from pymoo.factory import get_problem, get_sampling, get_crossover, get_mutation
+from pymoo.algorithms.nsga2 import NSGA2
+from pymoo.performance_indicator.hv import Hypervolume
+
+algorithm = NSGA2(
+    pop_size=100,
+    sampling=get_sampling("real_random"),
+    crossover=get_crossover("real_sbx", prob=0.9, eta=15),
+    mutation=get_mutation("real_pm", eta=20),
+)
+res = minimize(get_problem("zdt1"), algorithm, ("f_tol", 0.0025), seed=1)
+hv = Hypervolume(ref_point=np.array([1.1, 1.1])).calc(res.F)
+```
+
+Use instead:
+
+```python
+from pymoo.problems import get_problem
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.indicators.hv import HV
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.termination.default import DefaultMultiObjectiveTermination
+
+algorithm = NSGA2(
+    pop_size=100,
+    sampling=FloatRandomSampling(),
+    crossover=SBX(prob=0.9, eta=15),
+    mutation=PM(eta=20),
+)
+res = minimize(get_problem("zdt1"), algorithm, DefaultMultiObjectiveTermination(ftol=0.0025), seed=1)
+hv = HV(ref_point=np.array([1.1, 1.1]))(res.F)
+```
+
+#### deprecated-in-pymoo
+
+**Severity:** warning. **Fix:** safe: `from pymoo.parallelization import StarmapParallelization` for the import from `pymoo.core.problem` when the statement imports that one name, and `"FEAS"` for `"feasible"` on the population of a result of `minimize`. The key on another object has no fix.
+
+Reports `StarmapParallelization` imported from `pymoo.core.problem`, which raises ImportError on pymoo 0.6.1.6 and DeprecationWarning on 0.6.2, where both paths give the same class. It also reports the key `"feasible"` given to `get`, which raised 40 warnings for a population of 20 where `"FEAS"` returned an equal array with none. One document needs `res.pop`, `res.opt` or `res.off`, where `res` is the result of `minimize`. Another reads the name of the object, a variable or an attribute named `pop`, `opt`, `off` or `population`, so `get` on a dictionary of that name gets a wrong report.
+
+Example:
+
+```python
+from pymoo.core.problem import StarmapParallelization
+
+feasible = res.pop.get("feasible")
+```
+
+Use instead:
+
+```python
+from pymoo.parallelization import StarmapParallelization
+
+feasible = res.pop.get("FEAS")
+```
+
+#### n-constr-keyword
+
+**Severity:** info. **Fix:** safe: `n_ieq_constr=`.
+
+Reports `n_constr=` given to `super().__init__` in a problem class, or to `Problem` and `ElementwiseProblem` called by name. `Problem` has no such parameter since pymoo 0.6.0 and reads it from `**kwargs` as `n_ieq_constr`. A problem built with either keyword had the same `n_ieq_constr`, and `GA` with `seed=1` returned the same `X`, `F` and `G` for both, bit for bit. A call that passes both keywords is left alone.
+
+Example:
+
+```python
+class Welded(Problem):
+    def __init__(self):
+        super().__init__(n_var=4, n_obj=2, n_constr=4, xl=xl, xu=xu)
+```
+
+Use instead:
+
+```python
+class Welded(Problem):
+    def __init__(self):
+        super().__init__(n_var=4, n_obj=2, n_ieq_constr=4, xl=xl, xu=xu)
+```
+
+#### ignored-problem-keyword
+
+**Severity:** error for `elementwise_evaluation` and `parallelization`, warning for `type_var`. **Fix:** none.
+
+Reports three keywords of the pymoo 0.4 `Problem` that pymoo 0.6 stores in `problem.data` and never reads. With `elementwise_evaluation=True` the method gets the whole population where it expects one solution, and a method of `x[0]`, `x[1]` and `x[2]` returned [0.66, 0.93, 1.26] for three solutions whose values are [0.14, 0.77, 1.94]. With `parallelization=("starmap", pool.starmap)` the starmap was called 0 times in 3 generations, where pymoo 0.4.2.2 called it 3 times. A problem built with `type_var=int` had `vtype` None.
+
+Example:
+
+```python
+class Sphere(Problem):
+    def __init__(self, pool):
+        super().__init__(n_var=3, n_obj=1, xl=0.0, xu=1.0, elementwise_evaluation=True, parallelization=("starmap", pool.starmap))
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = x[0] ** 2 + x[1] ** 2 + x[2] ** 2
+```
+
+Use instead:
+
+```python
+class Sphere(ElementwiseProblem):
+    def __init__(self, pool):
+        super().__init__(n_var=3, n_obj=1, xl=0.0, xu=1.0, elementwise_runner=StarmapParallelization(pool.starmap))
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = x[0] ** 2 + x[1] ** 2 + x[2] ** 2
+```
+
+#### setup-positional-termination
+
+**Severity:** error. **Fix:** unsafe: `termination=` before the second argument.
+
+Reports a termination given to `setup` as the second positional argument, on a name the file binds to a pymoo algorithm. That was the form up to pymoo 0.5.0. It raises TypeError from 0.6.0 to 0.6.1.5, and since 0.6.1.6 the second parameter is `verbose`. `NSGA2` set up with `("n_gen", 7)` then printed a line for every generation and was still running after 30.
+
+Example:
+
+```python
+algorithm = NSGA2(pop_size=100)
+algorithm.setup(problem, ("n_gen", 200), seed=1)
+```
+
+Use instead:
+
+```python
+algorithm = NSGA2(pop_size=100)
+algorithm.setup(problem, termination=("n_gen", 200), seed=1)
+```
+
+#### has-terminated-assignment
+
+**Severity:** error. **Fix:** none.
+
+Reports `has_terminated = False` on an object, in a file that loads something with `np.load`, pickle or dill. The checkpoint recipe of pymoo 0.4 and 0.5 used that line to let a loaded algorithm run on. Since 0.6.0 nothing reads the attribute. An `NSGA2` that had finished its 5 generations ran 0 more generations after the line, and 15 more after it got a new termination.
+
+Example:
+
+```python
+(checkpoint,) = np.load("checkpoint.npy", allow_pickle=True).flatten()
+checkpoint.has_terminated = False
+res = minimize(problem, checkpoint, ("n_gen", 20), seed=1, copy_algorithm=False)
+```
+
+Use instead:
+
+```python
+(checkpoint,) = np.load("checkpoint.npy", allow_pickle=True).flatten()
+checkpoint.termination = MaximumGenerationTermination(20)
+res = minimize(problem, checkpoint, copy_algorithm=False)
+```
+
+#### mutation-prob-per-individual
+
+**Severity:** warning. **Fix:** unsafe: `prob_var=`.
+
+Reports `prob=` on `PM`, `PolynomialMutation`, `BitflipMutation`, `BFM`, `GaussianMutation` and `GM` when the value is 1 divided by something, or a number of at most 0.2, and the call has no `prob_var`. Up to pymoo 0.5.0 `prob` was the chance that one variable changes. Since 0.6.0 it is the share of individuals that mutate, and `prob_var` is the chance per variable. On 20,000 individuals of 30 variables, `prob=1/30` changed 63 percent of the individuals on pymoo 0.5.0 and 2 percent on 0.6.2, where `prob_var=1/30` changed 57 percent.
+
+Example:
+
+```python
+mutation = PM(prob=1 / problem.n_var, eta=20)
+```
+
+Use instead:
+
+```python
+mutation = PM(prob_var=1 / problem.n_var, eta=20)
+```
+
+#### indicator-normalize-ignored
+
+**Severity:** error. **Fix:** unsafe: `zero_to_one=`.
+
+Reports `normalize=True` on `GD`, `GDPlus`, `IGD` and `IGDPlus`. The keyword is from pymoo 0.4, and the constructors still accept it and do nothing with it. With a front whose first objective runs to 1000, `IGD(pf, normalize=True)` gave 0.082 on pymoo 0.4.2.2. On 0.6.2 it gave 25.25, the same as `IGD(pf)`, where `IGD(pf, zero_to_one=True)` gave 0.082.
+
+Example:
+
+```python
+igd = IGD(pf, normalize=True)(res.F)
+```
+
+Use instead:
+
+```python
+igd = IGD(pf, zero_to_one=True)(res.F)
+```
+
+### The problem class
+
+A `Problem` gets the whole population in one call of `_evaluate`, as an array with one row per
+solution. An `ElementwiseProblem` gets one solution, as an array with one value per variable.
+Both write their results to the dictionary `out`.
+
+#### objectives-stacked-by-row
+
+**Severity:** error. **Fix:** unsafe: `np.column_stack` on the same list.
+
+Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. That array has one row per objective, and pymoo reshapes it to one row per solution without transposing. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10. An `ElementwiseProblem`, where a list of numbers is right, and a stack followed by `.T` are left alone.
+
+Example:
+
+```python
+class TwoObjectives(Problem):
+    def _evaluate(self, x, out, *args, **kwargs):
+        f1 = x[:, 0]
+        f2 = 10 + x[:, 1]
+        out["F"] = np.array([f1, f2])
+```
+
+Use instead:
+
+```python
+class TwoObjectives(Problem):
+    def _evaluate(self, x, out, *args, **kwargs):
+        f1 = x[:, 0]
+        f2 = 10 + x[:, 1]
+        out["F"] = np.column_stack([f1, f2])
+```
+
+#### evaluate-returns-value
+
+**Severity:** error. **Fix:** none.
+
+Reports a `return` with a value in `_evaluate` when the method never names its `out` parameter. pymoo ignores the returned value, and every objective then comes back as inf. `GA` returned `res.F = [inf]` without an error. A method that hands `out` to a helper is left alone.
+
+Example:
+
+```python
+class Sphere(Problem):
+    def _evaluate(self, x, out, *args, **kwargs):
+        return (x**2).sum(axis=1)
+```
+
+Use instead:
+
+```python
+class Sphere(Problem):
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+```
+
+#### constraint-not-declared
+
+**Severity:** error. **Fix:** none.
+
+Reports `out["G"]` written in a class that never passes `n_ieq_constr`, and `out["H"]` in a class that never passes `n_eq_constr`. Both counts default to 0, and the first evaluation raises Exception, "Problem Error: G can not be set, expected shape (2, 0) but provided (2,)". pymoo 0.5.0 ignored such a constraint without an error. The class must call `super().__init__` with keywords only, so a class that passes `**kwargs` on is left alone.
+
+Example:
+
+```python
+class Bounded(Problem):
+    def __init__(self):
+        super().__init__(n_var=2, n_obj=1, xl=0.0, xu=1.0)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+        out["G"] = 0.5 - x[:, 0]
+```
+
+Use instead:
+
+```python
+class Bounded(Problem):
+    def __init__(self):
+        super().__init__(n_var=2, n_obj=1, n_ieq_constr=1, xl=0.0, xu=1.0)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+        out["G"] = 0.5 - x[:, 0]
+```
+
+#### evaluate-indexing
+
+**Severity:** error. **Fix:** none.
+
+Reports `x[:, 0]` on the parameter of `_evaluate` in an `ElementwiseProblem`, which raised IndexError, "too many indices for array". It also reports `x[0]` in a `Problem` whose `_evaluate` uses the parameter only with whole numbers as subscripts and has no loop. That takes the first solution and not the first variable, and with 100 solutions of 2 variables it raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided (2,)".
+
+Example:
+
+```python
+class Sphere(Problem):
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = x[0] ** 2 + x[1] ** 2
+```
+
+Use instead:
+
+```python
+class Sphere(ElementwiseProblem):
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = x[0] ** 2 + x[1] ** 2
+```
+
+#### elementwise-runner
+
+**Severity:** error. **Fix:** none.
+
+Reports `elementwise_runner=pool.starmap`, which raised TypeError, "ElementwiseEvaluationFunction.__call__() takes 2 positional arguments but 3 were given", because a runner is called as `runner(f, X)`. It also reports `elementwise_runner=` given to a class that the file defines with `Problem` as its base. A `Problem` evaluates the population in one call and never calls the runner: in 3 generations it was called 0 times, where an `ElementwiseProblem` called it 3 times.
+
+Example:
+
+```python
+problem = MyElementwiseProblem(elementwise_runner=pool.starmap)
+```
+
+Use instead:
+
+```python
+problem = MyElementwiseProblem(elementwise_runner=StarmapParallelization(pool.starmap))
+```
+
+### Running an algorithm
+
+#### minimize-ignored-keyword
+
+**Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` and `random_seed=`. The stopping keywords have no fix.
+
+Reports `n_gen`, `n_eval`, `n_evals`, `n_iter`, `n_max_gen`, `max_gen` and `generations` given to `minimize` as keywords. `minimize` hands a keyword it does not know to the algorithm, which stores it and reads it nowhere. With each of the seven, `NSGA2` ran 1,000 generations and 20,000 evaluations, which is where the default termination stops. It also reports `random_state` and `random_seed`: two runs with either set to 1 returned different fronts, and two runs with `seed=1` the same front.
+
+Example:
+
+```python
+res = minimize(problem, NSGA2(pop_size=100), n_gen=200, random_state=1)
+```
+
+Use instead:
+
+```python
+res = minimize(problem, NSGA2(pop_size=100), termination=("n_gen", 200), seed=1)
+```
+
+#### algorithm-read-after-minimize
+
+**Severity:** error. **Fix:** none.
+
+Reports `pop`, `opt`, `off`, `n_gen`, `n_iter`, `history`, `callback` and `result` read from an algorithm after it was given to `minimize`. `minimize` runs a deep copy and returns it as `res.algorithm`. After a run of 10 generations, `algorithm.pop`, `algorithm.opt` and `algorithm.n_gen` were None, `algorithm.result()` raised TypeError, and a callback given to the constructor had 0 records, where the one in `res.algorithm` had 10. A call with `copy_algorithm`, a name that is assigned again after the run, and a file that also drives the same name with `setup` or `next` are left alone.
+
+Example:
+
+```python
+algorithm = NSGA2(pop_size=100, callback=Best())
+res = minimize(problem, algorithm, ("n_gen", 200), seed=1)
+best = algorithm.callback.data["best"]
+```
+
+Use instead:
+
+```python
+algorithm = NSGA2(pop_size=100, callback=Best())
+res = minimize(problem, algorithm, ("n_gen", 200), seed=1)
+best = res.algorithm.callback.data["best"]
+```
+
+#### reused-algorithm-without-copy
+
+**Severity:** error. **Fix:** none.
+
+Reports a second `minimize` on the same algorithm when both calls pass `copy_algorithm=False`, in one block or in a loop that never assigns the name. `minimize` then sets the algorithm up only when it has no problem yet. A second call with another problem, `("n_gen", 30)` and another seed returned the `F` of the first call, still at generation 11 and still on the first problem.
+
+Example:
+
+```python
+algorithm = NSGA2(pop_size=100)
+for problem in problems:
+    results.append(minimize(problem, algorithm, ("n_gen", 200), seed=1, copy_algorithm=False))
+```
+
+Use instead:
+
+```python
+for problem in problems:
+    algorithm = NSGA2(pop_size=100)
+    results.append(minimize(problem, algorithm, ("n_gen", 200), seed=1, copy_algorithm=False))
+```
+
+#### unread-history
+
+**Severity:** info. **Fix:** none.
+
+Reports `save_history=True` given to `minimize` outside every function, in a file that never names `history` and does not use pickle, dill or joblib. The option keeps a deep copy of the algorithm for every generation. `NSGA2` with 100 solutions and 200 generations took 2.6 times as long with it, 1.17 against 0.45 seconds, and its result pickled to 20.3 MB against 0.13 MB, with the same `F`. When another file reads the history of this run, the report is wrong.
+
+Example:
+
+```python
+res = minimize(problem, algorithm, ("n_gen", 200), seed=1, save_history=True)
+print(res.F)
+```
+
+Use instead:
+
+```python
+res = minimize(problem, algorithm, ("n_gen", 200), seed=1)
+print(res.F)
+```
+
+#### moead-arguments
+
+**Severity:** error. **Fix:** none.
+
+Reports `pop_size=` on `MOEAD`, which sets the population to the number of reference directions itself since pymoo 0.5.0 and raises TypeError, "got multiple values for keyword argument 'pop_size'". It also reports `decomposition=` given as a text such as `"pbi"`, the form of pymoo 0.4, which raises AttributeError in the first generation, "'str' object has no attribute 'do'".
+
+Example:
+
+```python
+algorithm = MOEAD(ref_dirs, pop_size=100, decomposition="pbi")
+```
+
+Use instead:
+
+```python
+algorithm = MOEAD(ref_dirs, decomposition=PBI())
+```
+
+### Random numbers
+
+#### unseeded-run
+
+**Severity:** info. **Fix:** none.
+
+Reports `minimize` without `seed`. Two runs of `NSGA2` on ZDT1 then returned different fronts, and two runs with `seed=1` the same front. A call that takes `**kwargs`, a call whose algorithm was built with `seed`, and a file that calls `np.random.seed`, which `numpy-seed-ignored` reports, are left alone.
+
+Example:
+
+```python
+res = minimize(problem, NSGA2(pop_size=100), ("n_gen", 200))
+```
+
+Use instead:
+
+```python
+res = minimize(problem, NSGA2(pop_size=100), ("n_gen", 200), seed=1)
+```
+
+#### numpy-seed-ignored
+
+**Severity:** warning. **Fix:** none.
+
+Reports `np.random.seed` in a file whose `minimize` gets no `seed`, and a draw from `np.random` inside `_do` of a class that inherits from `Sampling`, `Crossover` or `Mutation`. Since pymoo 0.6.1.6 the library draws from a generator that `minimize` builds from `seed` and passes to each operator as `random_state`. On pymoo 0.6.1.5 two runs after `np.random.seed(1)` returned the same front, and on 0.6.1.6 and 0.6.2 they returned different fronts. A sampling, a crossover and a mutation that drew from `np.random` each gave different results in two runs with `seed=1`, and the same result twice when they drew from `random_state`.
+
+Example:
+
+```python
+class MySampling(Sampling):
+    def _do(self, problem, n_samples, **kwargs):
+        return np.random.random((n_samples, problem.n_var))
+
+np.random.seed(1)
+res = minimize(problem, NSGA2(pop_size=100, sampling=MySampling()), ("n_gen", 200))
+```
+
+Use instead:
+
+```python
+class MySampling(Sampling):
+    def _do(self, problem, n_samples, random_state=None, **kwargs):
+        return random_state.random((n_samples, problem.n_var))
+
+res = minimize(problem, NSGA2(pop_size=100, sampling=MySampling()), ("n_gen", 200), seed=1)
+```
+
+### Indicators and decisions
+
+#### hv-reference-point
+
+**Severity:** warning for a reference point taken from the solutions, error for none. **Fix:** none.
+
+Reports `ref_point=F.max(axis=0)` and `ref_point=np.max(F, axis=0)` on `HV` and `Hypervolume`. A reference point at the largest value of each objective lies on the solutions that hold those values, so they add no volume. Three solutions scored 0.09 with it and 0.37 with the fixed point (1, 1), and the two extreme solutions alone scored 0.0. It also reports `HV()` with no argument, which raises AssertionError, "For Hypervolume a reference point needs to be provided!".
+
+Example:
+
+```python
+hv = HV(ref_point=res.F.max(axis=0))(res.F)
+```
+
+Use instead:
+
+```python
+hv = HV(ref_point=np.array([1.1, 1.1]))(res.F)
+```
+
+#### decision-weights
+
+**Severity:** warning. **Fix:** none.
+
+Reports `ASF().do(F, np.array([0.2, 0.8]))`, where the weights are written out and are not all the same. `ASF` divides each objective by its weight, so the larger weight counts less, and the pymoo guide passes `1 / weights`. With the weights (0.2, 0.8) it picked the solution (0.1, 0.9), and with `1 / weights` it picked (0.9, 0.1). It also reports a weight above 1 written out in the argument of `PseudoWeights`, which compares the weights with shares that sum to 1: (2, 8) picked row 0 of five solutions, where (0.2, 0.8) picked row 3.
+
+Example:
+
+```python
+i = ASF().do(F, np.array([0.2, 0.8])).argmin()
+j = PseudoWeights(np.array([2, 8])).do(F)
+```
+
+Use instead:
+
+```python
+i = ASF().do(F, 1 / np.array([0.2, 0.8])).argmin()
+j = PseudoWeights(np.array([0.2, 0.8])).do(F)
+```
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
@@ -7771,8 +8398,9 @@ cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --un
 ```
 
 The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
-`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/hamilton/` and
-`samples/python/` mark each line a rule reports with a comment that names the rules.
+`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/pymoo/`,
+`samples/hamilton/` and `samples/python/` mark each line a rule reports with a comment that names
+the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the
