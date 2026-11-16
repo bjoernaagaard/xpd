@@ -178,5 +178,53 @@
   {
     "query": "fixed effects panel regression",
     "expected": "linearmodels.PanelOLS"
+  },
+  {
+    "query": "grouped regression, going from one model on all data to 24 individual models",
+    "expected": "sklego.meta.GroupedPredictor"
+  },
+  {
+    "query": "compute the average of an array along an axis",
+    "expected": "numpy.mean"
+  },
+  {
+    "query": "encode categories using target statistics",
+    "expected": "category_encoders.TargetEncoder"
+  },
+  {
+    "query": "draw a bar chart",
+    "expected": "plotly.express.bar"
+  },
+  {
+    "query": "draw a histogram",
+    "expected": "plotly.express.histogram"
+  },
+  {
+    "query": "build a Hamilton driver",
+    "expected": "hamilton.driver.Builder"
+  },
+  {
+    "query": "bar chart of amounts by category",
+    "expected": "plotly.express.bar"
+  },
+  {
+    "query": "multi-hot encoding for delimiter-separated items",
+    "expected": "category_encoders/recipe/multi-hot-encoding-for-cells-that-contain-several"
+  },
+  {
+    "query": "maximum relevance minimum redundancy feature selection example",
+    "expected": "sklego/recipe/maximum-relevance-minimum-redundancy-mrmr-is-an-iterative"
+  },
+  {
+    "query": "reweight input signals with weights that sum to one",
+    "expected": "sklego/recipe/probweightregression-assumes-that-all-input-signals-in-x"
+  },
+  {
+    "query": "split conformal prediction intervals worked example",
+    "expected": "mapie/recipe/computes-prediction-intervals-using-the-split-conformal-regression"
+  },
+  {
+    "query": "show a block bootstrap training set example",
+    "expected": "mapie/recipe/generate-a-sampling-method-that-block-bootstraps-the"
   }
 ]
