@@ -2,8 +2,9 @@
 # every process, so a result that rests on them changes from run to run. Each form below gave
 # two different results in two runs on arch 9.0.0 and on 8.0.0, and the same result twice with
 # the seed that the message names. np.random.seed(0) before each run did not make them equal,
-# because arch does not draw from NumPy's global generator. A seed does not move what the method
-# estimates, so the rule is info.
+# because arch does not draw from NumPy's global generator: that was run on 9.0.0 for each of
+# the six bootstraps, for SPA, StepM and MCS, for both forecast methods and for simulate. A seed
+# does not move what the method estimates, so the rule is info.
 #
 # seed is a keyword of the bootstraps, the tests and the distributions since arch 5.0: on 4.19
 # IIDBootstrap(x, seed=0) raised TypeError and on 5.0 it ran. Every document carries since.
@@ -151,4 +152,5 @@ utils:
         all:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
 metadata: { since: "5.0" }

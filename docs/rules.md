@@ -7340,9 +7340,10 @@ call is read by the name of its class or function, such as `arch_model` or `IIDB
 short name that another library may have, such as `SPA`, `MCS` or `Normal`, is read only when the
 file imports it from arch. A method such as `fit`, `forecast` or `conf_int` is read only on a
 model, a result or a bootstrap that the file builds from an arch name and assigns to a variable,
-and the rule is silent when the same variable is assigned anything else anywhere in the file. An
-option or a value is read only when it is written in the call. A variable in its place is never
-taken for the bad value.
+and the rule is silent when the same variable is assigned anything else anywhere in the file, or
+is bound there in another way: as a parameter, a loop variable, an `as` target or one name of a
+tuple assignment. `samples/arch/names.py` shows each case. An option or a value is read only when
+it is written in the call. A variable in its place is never taken for the bad value.
 
 ### How a rule earns its place
 
@@ -7377,20 +7378,20 @@ correct code there was narrowed or dropped, and the table gives what is left.
 | [`removed-in-arch`](#removed-in-arch) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, AttributeError, ValueError | 1 | 34 | 0 | unsafe |
 | [`arch-unknown-option`](#arch-unknown-option) | error | interpreter: ValueError | 0 | 13 | 0 | none |
 | [`arch-ignored-argument`](#arch-ignored-argument) | warning | same result, and rerun for the two seeds | 10 | 21 | 1 | none |
-| [`unscaled-returns`](#unscaled-returns) | warning | numbers: mu 4.02 against 0.056, with optimizer code 4 | 0 | 23 | 0 | none |
+| [`unscaled-returns`](#unscaled-returns) | warning | numbers: mu 4.02 against 0.056, with optimizer code 4 | 0 | 21 | 0 | none |
 | [`rescaled-units`](#rescaled-units) | warning | numbers: a variance forecast 10,000 times the data's | 4 | 14 | 7 | none |
 | [`analytic-forecast-horizon`](#analytic-forecast-horizon) | error | interpreter: ValueError | 0 | 0 | no reports | none |
 | [`forecast-per-origin`](#forecast-per-origin) | warning | speed: 0.106 seconds against 0.0005 | 1 | 0 | 0 | none |
-| [`reindex-is-default`](#reindex-is-default) | info | equal frames with and without the argument | 25 | 64 | 0 | safe |
+| [`reindex-is-default`](#reindex-is-default) | info | equal frames with and without the argument | 20 | 61 | 0 | safe |
 | [`fit-output-in-loop`](#fit-output-in-loop) | info | output: 240 lines for 20 fits | 0 | 15 | 0 | none |
 | [`arch-unseeded-draws`](#arch-unseeded-draws) | info | rerun: the result differs | 109 | 182 | 1 | none |
 | [`results-before-compute`](#results-before-compute) | error | interpreter: RuntimeError | 2 | 0 | 2 | none |
 | [`opt-bandwidth-as-bandwidth`](#opt-bandwidth-as-bandwidth) | warning | numbers: 0.5245 against 0.5158 | 0 | 0 | no reports | none |
 
 Wrong advice counts the reports where following the message would not fix a real problem in that
-code. There are 11 among the 518 reports: 8 in arch's own code and 3 in public code, and each
+code. There are 11 among the 508 reports: 8 in arch's own code and 3 in public code, and each
 rule's section says which they are. One report is in the library's own source, on a placeholder
-bootstrap that a base class builds and never draws from, and the other 151 on arch's own code
+bootstrap that a base class builds and never draws from, and the other 146 on arch's own code
 are in its tests, notebooks and documentation.
 
 One rule was written and dropped. It reported `forecast(start=...)` on a result whose `fit` had
@@ -7403,8 +7404,9 @@ the fitted rows on purpose.
 
 Recall was not measured. No set of real arch code was held back, so the table says how often a
 rule is wrong when it reports, and not how often it misses. A rule that follows a variable
-through the file is silent when the same name is assigned something else anywhere in it, also in
-another function.
+through the file is silent when the same name is bound to something else anywhere in it, also in
+another function, so a file that reuses a name such as `res` for an arch result and for another
+object gets no report on that name.
 
 ### Removed API
 
@@ -7664,7 +7666,7 @@ multiplied anywhere, such as `100 * prices.pct_change()` or `returns = returns *
 alone, and so is a call that says `rescale`, in either way. Returns that come from a file or a
 function are not seen.
 
-All 23 reports on the public code were returns as decimals: each series was a `pct_change` or a
+All 21 reports on the public code were returns as decimals: each series was a `pct_change` or a
 log difference with no factor.
 
 #### rescaled-units
@@ -7799,8 +7801,8 @@ and with `start`, which is why the fix is safe. `reindex=True` still returns the
 is left alone.
 
 The import `from arch.__future__ import reindexing` belongs to the same habit and is reported by
-[`removed-in-arch`](#removed-in-arch). The public code had 64 reports of this rule, and arch's own
-tests, notebooks and documentation had 25.
+[`removed-in-arch`](#removed-in-arch). The public code had 61 reports of this rule, and arch's own
+tests, notebooks and documentation had 20.
 
 #### fit-output-in-loop
 
@@ -7867,7 +7869,7 @@ without a seed differed on both releases, and the table gives the numbers of 9.0
 | `forecast(horizon=5, method="bootstrap")`, last step | 2.587, 2.578 | 2.595 twice | `random_state=np.random.RandomState(0)` |
 | `arch_model(None).simulate(params, 100)`, last value | -1.24, 0.07 | 0.097 twice | `Normal(seed=0)` as the model's distribution |
 
-`np.random.seed(0)` before each run did not make any of them equal: the bootstrap gave -0.1328
+`np.random.seed(0)` before each run did not make any of them equal: `IIDBootstrap` gave -0.1328
 and -0.15246, the simulated forecast 2.676 and 2.534, the bootstrap forecast 2.468 and 2.737,
 and `simulate` -1.27 and 0.30. arch does not draw from NumPy's global generator. 49 of the 291
 reports in the corpus are in a file that calls `np.random.seed`. One report has wrong advice: a

@@ -2,7 +2,7 @@
 # created. On arch 9.0.0 and 8.0.0 each result below raised RuntimeError on a new object:
 # pvalues, critical_values and better_models of SPA with "compute must be called before pvalues
 # are available", superior_models of StepM, and pvalues, included and excluded of MCS with "Must
-# call compute before accessing results". RealityCheck is another name for SPA.
+# call compute before accessing results". RealityCheck is a subclass of SPA and raised the same three.
 #
 # The rule reports a result read straight from the constructor call, and a result read from a
 # name that the file assigns such an object to, and nothing else, when the file never calls
@@ -25,6 +25,7 @@ rule:
             all:
               - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, matches: comparison-call } }] } }
               - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $S } }, { not: { has: { field: right, matches: comparison-call } } }] } } }
+              - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $S } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $S } }, { kind: named_expression, has: { field: name, pattern: $S } }] } } }
               - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: '^compute$' } }, { has: { field: object, pattern: $S } }] } } }
   not: { matches: expected-to-raise }
 utils:

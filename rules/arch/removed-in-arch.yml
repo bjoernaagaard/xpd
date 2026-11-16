@@ -61,6 +61,7 @@ utils:
         all:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
   fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
   result:
     any:
@@ -70,6 +71,7 @@ utils:
         all:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $R } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $R } }, { kind: named_expression, has: { field: name, pattern: $R } }] } } }
 fix: plot_type
 metadata: { fix: unsafe, since: "9.0" }
 ---
@@ -107,6 +109,7 @@ utils:
         all:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
   fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
   result:
     any:
@@ -116,6 +119,7 @@ utils:
         all:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $R } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $R } }, { kind: named_expression, has: { field: name, pattern: $R } }] } } }
 metadata: { since: "9.0" }
 ---
 # The bootstraps took random_state until arch 8.0, with a FutureWarning from 5.0 on. They take
@@ -241,6 +245,7 @@ utils:
     all:
       - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: resampler-call } }] } }
       - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: resampler-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
 metadata: { since: "8.0" }
 ---
 # The random_state property of a bootstrap gave its RandomState until arch 8.0. generator gives
@@ -265,6 +270,7 @@ utils:
     all:
       - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: resampler-call } }] } }
       - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: resampler-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
 metadata: { since: "8.0" }
 ---
 # arch.utility exported cov_nw until arch 8.0. The function is still in arch.utility.cov, which
@@ -327,6 +333,7 @@ utils:
     all:
       - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: block-call } }] } }
       - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: block-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
   comparison-call: { kind: call, has: { field: function, regex: '(^|\.)(SPA|StepM|MCS|RealityCheck)$' } }
   comparison:
     kind: identifier
@@ -334,6 +341,7 @@ utils:
     all:
       - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: comparison-call } }] } }
       - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: comparison-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
 metadata: { since: "9.0" }
 ---
 # SPA, StepM and RealityCheck took nested=True with studentize=False until arch 9.0, where the

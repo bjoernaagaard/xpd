@@ -113,7 +113,7 @@ rule:
 id: arch-ignored-argument
 language: python
 severity: warning
-message: $C searches for a lag length only when lags is not given, so $K is ignored here. With lags=4 the statistic was the same for every method and for every max_lags on arch 9.0.0. Drop $K, or drop lags to let the search choose.
+message: $C searches for a lag length only when lags is not given, so $K is ignored here. With lags=4 the statistic was the same for method "aic", "bic" and "t-stat" and for max_lags 2 and 20 on arch 9.0.0. Drop $K, or drop lags to let the search choose.
 rule:
   kind: keyword_argument
   all:
