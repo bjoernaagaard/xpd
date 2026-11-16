@@ -1,0 +1,13 @@
+# The linearmodels pack, for files that import linearmodels. Every other .yml file in this
+# folder is a rule.
+
+# No fix in this pack writes a short name such as `lm.`, so the pack lists no alias. Each fix
+# rewrites names the code already has.
+aliases: {}
+
+# The pack has no package checks. pyhdfe and formulaic are requirements of linearmodels 7.1, so
+# they are always there. xxhash is the one optional package: AbsorbingLS hashes its inputs with
+# it for the cache when it is installed. A fit with two absorbed columns took 0.345 s with it
+# and 0.361 s without on 100,000 rows, and 1.418 s against 1.289 s on 1,000,000, so a check
+# would send projects after a package that saves no time.
+packages: []

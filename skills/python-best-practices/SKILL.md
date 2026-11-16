@@ -207,7 +207,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
 | Mock imports | `xpd check`: `python/mock-import` |
-| Slow or wrong pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, arch and Hamilton code | `xpd check`, in files that import them |
+| Slow or wrong pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch and Hamilton code | `xpd check`, in files that import them |
 
 The rest of this file needs a reader. The `python-review` skill is that reader.
 

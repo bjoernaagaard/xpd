@@ -1,10 +1,10 @@
 # Rules
 
-xpd has ten rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+xpd has eleven rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
-[Category Encoders](#category-encoders), [arch](#arch), [Hamilton](#hamilton) and
-[Python](#python). A library's
-rules run only on files that import it. The Python rules run on every file.
+[Category Encoders](#category-encoders), [linearmodels](#linearmodels), [arch](#arch),
+[Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it.
+The Python rules run on every file.
 
 ## pandas
 
@@ -7316,6 +7316,750 @@ These habits were looked at and have no rule.
 - `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
   index.
 
+## linearmodels
+
+These rules run on files that import `linearmodels`, the module of
+[linearmodels](https://bashtage.github.io/linearmodels/), which fits panel models, instrument
+models, systems of equations and factor models of asset prices. They report formulas and
+arguments that fit another model than the code reads as, covariance options that give other
+standard errors than the code asks for, code that raises on linearmodels 7.1, names of
+statsmodels results read on linearmodels results, and forms that a release removed or
+deprecated. Every number in this section was measured on linearmodels 7.1 with pandas 3.1.1,
+NumPy 2.5.5, SciPy 1.18.1, statsmodels 0.15.0 and formulaic 1.2.2 on Python 3.13, and a number
+for another release names it. The data sets `wage_panel`, `mroz` and `french` are the ones in
+`linearmodels.datasets`. Examples assume that the linearmodels names they use are imported and
+that `sm` is `statsmodels.api`. Names such as `data`, `y`, `X` and `instruments` represent
+values supplied by your program.
+
+Most of the pack is about one fact: linearmodels looks like statsmodels and differs from it in
+small ways. It adds no intercept to a formula, it names its covariances and its results in
+another way, its `IV2SLS` takes other arguments in another order, and `summary` is a property.
+Code written from the memory of statsmodels runs into each of these.
+
+Four class names exist in statsmodels as well: `OLS`, `IV2SLS`, `IVGMM` and `SUR`. A rule about
+one of them reports a call only with proof that the class comes from linearmodels. The proof is
+the module in front of the name, as in `linearmodels.IV2SLS` or `lm.IV2SLS` after
+`import linearmodels as lm`, or an import of the name from `linearmodels` in the same file. A
+file that imports the same name from two libraries gives no proof, so those rules stay silent
+there. The other 15 model classes of `linearmodels.__all__` have names of their own and need no
+proof.
+
+A rule about `fit` or about a result reads only an object it can follow to a linearmodels
+class: a call on the class itself, such as `PanelOLS(y, X).fit(...)`, or a name that its
+function, or the module outside any function, assigns from such calls and from nothing else. A
+name that is also assigned from anything else, that a loop, a `with` statement or a lambda
+parameter binds, or that comes in as an argument is left alone. A statsmodels model in the same
+file is therefore not reported: the 950 real files hold 583 `cov_type=` strings with a
+statsmodels name, such as `"HC3"` and `"cluster"`, and no rule reports one of them.
+
+A rule reads an argument only when it is written out. A `cov_type`, a formula or a flag that is
+a name, an f-string or a value unpacked from a dictionary is left alone.
+
+A rule document whose advice needs a newer release carries `since`. xpd reads the installed
+version from the project's venv, as it does for pandas, and skips that document on an older
+release. When the venv has no linearmodels, or there is no venv, every document runs. Each
+`since` was checked by installing the release before it and the release at it from PyPI and
+running the form on both: 4.14 and 4.15, 4.17 and 4.18, 4.31 and 5.0, and 7.0 and 7.1.
+
+### How a rule earns its place
+
+Every `error` and `warning` document ships on a proof that was run, and the message quotes what
+the proof measured. A proof is one of four kinds:
+
+- A result proof runs the old and the new form on the same data and prints what each returns.
+  It passes when the old form gives another number than the code reads as, with no error and
+  no warning, such as a coefficient of 0.2184 where 0.0338 is the one with an intercept.
+- An interpreter proof runs the old form under `python -W error`. It passes when the old form
+  raises an exception or a warning and the new form runs clean. Old releases warn about their
+  own dependencies, so on those only a warning from linearmodels counted.
+- A simulation proof draws data whose true coefficient is known, at least 1,000 times, and
+  counts how often the 95% interval covers it or how often a true null is rejected at 5%.
+- A speed proof times both forms on one thread, as the median of 5 fits, at two sizes. It
+  passes when the new form is at least 1.5 times faster at both.
+
+A document is `info` when its advice depends on something the code does not show, such as the
+dtype of a column or how the errors are related. A form that was run on 7.1 and on 7.0 gave the
+same result on both unless the text says otherwise.
+
+The rules were run over two sets of code. The first is the library's own code at 7.1, 258
+files: the 229 Python files of the repository, of which 165 are tests, the code cells of its 12
+notebooks, the code blocks of 9 `.rst` and `.md` pages, and the doctest lines of 8 modules. The
+second is 950 files from 623 public repositories that mention `linearmodels`, found through the
+GitHub code search, at most 4 from one repository, with notebooks turned into their code cells.
+Four rules were narrowed after these runs, and the table gives the reports that are left:
+
+- `time-before-entity-index` reported 2 frames that no panel model reads, and one frame indexed
+  by date and hour on purpose. The frame must now reach a panel model, and `hour` is a time.
+- `statsmodels-result-name` reported `res.tvalues` behind `hasattr(res, "tstats")`. Code under a
+  `hasattr` check is now left alone by every rule about a form that raises.
+- `hand-written-hausman` reported a test of OLS against instruments, which the method of 7.1
+  does not do. Its message now names `wu_hausman()` as well.
+- `absorb-not-categorical` matched its own name in a comment. It now looks for `category`.
+
+| Rule | Severity | Proof | Reports on the library | Reports on 950 real files | Fix |
+| --- | --- | --- | --- | --- | --- |
+| [`formula-without-constant`](#formula-without-constant) | warning | result: 0.2184 against 0.0338 | 3 | 17 | none |
+| [`effects-outside-panel-ols`](#effects-outside-panel-ols) | error | result: equal coefficients with and without the term | 0 | 0 | none |
+| [`effects-keyword-with-formula`](#effects-keyword-with-formula) | error | interpreter: TypeError | 0 | 3 | none |
+| [`formula-power-term`](#formula-power-term) | error | result: 2 columns where 3 were written | 1 | 1 | none |
+| [`first-difference-constant`](#first-difference-constant) | error | interpreter: ValueError | 0 | 0 | none |
+| [`weights-column-name`](#weights-column-name) | error | interpreter: TypeError | 0 | 0 | none |
+| [`panel-ols-without-effects`](#panel-ols-without-effects) | warning | result: 0.0349 against 0.0698 | 42 | 37 | none |
+| [`too-many-effects`](#too-many-effects) | error | interpreter: ValueError | 0 | 0 | none |
+| [`time-before-entity-index`](#time-before-entity-index) | warning | result: 0.1622 against 0.2483 | 1 | 1 | unsafe |
+| [`use-lsdv`](#use-lsdv) | warning | speed: 17 times at the lowest | 2 | 2 | none |
+| [`clustered-without-clusters`](#clustered-without-clusters) | error | result: 0.0413 against 0.0494. Interpreter: TypeError | 4 | 31 | none |
+| [`cov-option-without-cov-type`](#cov-option-without-cov-type) | error | interpreter: ValueError, TypeError. Result: 0.2037 against 0.3002 | 0 | 0 | none |
+| [`unknown-cov-type`](#unknown-cov-type) | error | interpreter: UnknownOptionError | 2 | 0 | none |
+| [`kernel-default-bandwidth`](#kernel-default-bandwidth) | warning | result: 0.8022 on 7.0 against 0.3794 on 7.1 | 22 | 1 | none |
+| [`panel-default-covariance`](#panel-default-covariance) | info | simulation: 17.3% against 5.7% rejections | 325 | 372 | none |
+| [`iv-missing-arguments`](#iv-missing-arguments) | error | interpreter: TypeError | 0 | 2 | none |
+| [`iv-arguments-swapped`](#iv-arguments-swapped) | warning | result: 0.2021 against 0.0664 | 0 | 0 | none |
+| [`iv-without-exog`](#iv-without-exog) | warning | simulation: 2.002 against 0.990 for a true 1.0 | 4 | 2 | none |
+| [`manual-two-stage`](#manual-two-stage) | warning | simulation: 99.6% against 95.7% coverage | 0 | 0 | none |
+| [`absorb-not-categorical`](#absorb-not-categorical) | info | result: 3.397 against 1.022 for a true 1.0 | 0 | 5 | none |
+| [`statsmodels-result-name`](#statsmodels-result-name) | error | interpreter: TypeError, AttributeError | 0 | 15 | unsafe |
+| [`invalid-compare-precision`](#invalid-compare-precision) | error | interpreter: ValueError | 0 | 0 | none |
+| [`hand-written-hausman`](#hand-written-hausman) | info | none: the method runs on 7.1 and is absent on 7.0 | 6 | 27 | none |
+| [`removed-in-linearmodels`](#removed-in-linearmodels) | error | interpreter: ModuleNotFoundError, AttributeError | 0 | 0 | unsafe |
+| [`deprecated-in-linearmodels`](#deprecated-in-linearmodels) | warning | interpreter: FutureWarning. Result: equal order | 12 | 0 | safe |
+
+A result proof gives the old form's number against the new form's number.
+
+Of the 424 reports on the library, 401 are in its tests, which call the forms on purpose: 308
+fits with the default covariance, 42 `PanelOLS` models without effects that are compared with
+`PooledOLS`, 22 kernel estimators with the default bandwidth, and 11 uses of the deprecated
+names inside the tests of the deprecations. One report names a line where the advice is wrong: a
+documentation page shows `set_index(['year','firm'])` for the `PanelOLS` that pandas had in
+2017, which took the time first. One report is a defect of the library's own README, whose
+first example writes `exper + exper ** 2` and fits a model without the squared term.
+
+Of the 516 reports on the 950 real files, 112 are errors or warnings, and each was read. None
+names a line where the rule's claim is false. The 404 others are `info`: 20 of the 372
+`panel-default-covariance` reports, 14 of the 27 `hand-written-hausman` reports and all 5
+`absorb-not-categorical` reports were read,
+and each is a fit or a model of the kind the rule describes. The files hold 583 `cov_type=`
+strings with a statsmodels name, such as `"HC3"` and `"cluster"`, and `unknown-cov-type` reports
+none of them. The 20 that were read are calls on statsmodels models. Recall was not measured, so
+nothing here says how often a rule misses the form it describes. With the pack, xpd took 7%
+more processor time on the 950 files than without it, 744 s against 696 s.
+
+### Formulas
+
+linearmodels parses formulas with formulaic, and every model has a `from_formula`. The rules in
+this group read a formula only when it is a string in the `from_formula` call: the first
+argument, the `formula` keyword, or a value of the dictionary that a system model takes.
+
+#### formula-without-constant
+
+**Severity:** warning. **Fix:** none.
+
+Reports a formula with no `1` term in `from_formula` of `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FamaMacBeth`, `PanelOLS`, the instrument models and the system models. linearmodels adds no intercept to a formula. statsmodels and R add one, so `"y ~ x"` is a regression through the origin here and a regression with an intercept there.
+
+Example:
+
+```python
+model = PooledOLS.from_formula("lwage ~ exper", data)
+iv = IV2SLS.from_formula("lwage ~ exper + [educ ~ fatheduc + motheduc]", data)
+```
+
+Use instead:
+
+```python
+model = PooledOLS.from_formula("lwage ~ 1 + exper", data)
+iv = IV2SLS.from_formula("lwage ~ 1 + exper + [educ ~ fatheduc + motheduc]", data)
+```
+
+On the wage panel, on 7.1 and on 7.0, `PooledOLS` gave `exper` a coefficient of 0.2184 for `"lwage ~ exper"` and 0.0338, with an intercept of 1.4289, for `"lwage ~ 1 + exper"`. `RandomEffects` gave 0.1119 against 0.0589, `BetweenOLS` 0.2364 against -0.0229, and `IV2SLS` on the mroz data gave `educ` 0.0769 against 0.0664. The rule stays silent when the formula says `- 1` or `0 +`, which states that no intercept is meant, when it names a column that looks like a constant, such as `const`, when it has a `C()` term, whose dummies span the intercept, and when a `PanelOLS` formula has effects or the call has `other_effects`, which absorb it. A no-intercept model can be meant, so this is a warning.
+
+#### effects-outside-panel-ols
+
+**Severity:** error. **Fix:** none.
+
+Reports `EntityEffects`, `FixedEffects` or `TimeEffects` in a formula given to `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FirstDifferenceOLS` or `FamaMacBeth`. Every panel model takes the three terms out of the formula, and only `PanelOLS` then uses them.
+
+Example:
+
+```python
+model = RandomEffects.from_formula("lwage ~ 1 + hours + EntityEffects", data)
+```
+
+Use instead:
+
+```python
+model = PanelOLS.from_formula("lwage ~ 1 + hours + EntityEffects", data)
+```
+
+On 7.1 and 7.0, each of the five classes returned the same coefficients for `"lwage ~ 1 + hours"` with and without each of the three terms, and raised no error and no warning. The reader of the formula sees fixed effects that the model does not have.
+
+#### effects-keyword-with-formula
+
+**Severity:** error. **Fix:** none.
+
+Reports `entity_effects=` or `time_effects=` given to `PanelOLS.from_formula`. The constructor takes the two keywords, and `from_formula` reads the effects from the formula.
+
+Example:
+
+```python
+model = PanelOLS.from_formula("lwage ~ 1 + exper", data, entity_effects=True)
+```
+
+Use instead:
+
+```python
+model = PanelOLS.from_formula("lwage ~ 1 + exper + EntityEffects", data)
+```
+
+7.1 and 7.0 raised `TypeError: PanelOLS.from_formula() got an unexpected keyword argument 'entity_effects'`. Three of the 950 real files have the form.
+
+#### formula-power-term
+
+**Severity:** error. **Fix:** none.
+
+Reports a term that is a name, `**` and a number, such as `exper**2`, in a formula of any model. A formula reads `**` as a power of interactions, so `exper**2` is `exper`. The squared values need `I(exper**2)`.
+
+Example:
+
+```python
+model = IV2SLS.from_formula("lwage ~ 1 + exper + exper**2", data)
+```
+
+Use instead:
+
+```python
+model = IV2SLS.from_formula("lwage ~ 1 + exper + I(exper**2)", data)
+```
+
+On 7.1 and 7.0 the first formula gave a model with the columns `Intercept` and `exper` on `IV2SLS` and on `PooledOLS`, with no error, and the second gave three columns. The README of linearmodels itself has `exper + exper ** 2` in its first example, which fits a model with the columns `Intercept`, `exper` and `educ`. `(a + b)**2`, which is the use the operator is for, is left alone.
+
+#### first-difference-constant
+
+**Severity:** error. **Fix:** none.
+
+Reports a `1` term in a formula of `FirstDifferenceOLS`, and `add_constant(...)` as its `exog`. A first difference removes everything that is constant over time, so the model refuses a constant.
+
+Example:
+
+```python
+model = FirstDifferenceOLS.from_formula("lwage ~ 1 + hours", data)
+model = FirstDifferenceOLS(y, sm.add_constant(X))
+```
+
+Use instead:
+
+```python
+model = FirstDifferenceOLS.from_formula("lwage ~ hours", data)
+model = FirstDifferenceOLS(y, X)
+```
+
+Both forms raised `ValueError: Constants are not allowed in first difference regressions.` on 7.1 and 7.0.
+
+#### weights-column-name
+
+**Severity:** error. **Fix:** none.
+
+Reports `weights="name"` on a model or on its `from_formula`. statsmodels and R take the weights of a formula model as the name of a column. linearmodels takes the values.
+
+Example:
+
+```python
+model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights="hours")
+```
+
+Use instead:
+
+```python
+model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights=data["hours"])
+```
+
+7.1 raised `TypeError: weights must be array_like ... Got str` on `PooledOLS` and on `IV2SLS`, and 7.0 raised `AttributeError: 'str' object has no attribute 'ndim'`.
+
+### Panel models
+
+A panel model takes a frame whose index has two levels, the entity first and the time second.
+`PanelOLS` is the only class with effects, and it has none until it is told to.
+
+#### panel-ols-without-effects
+
+**Severity:** warning. **Fix:** none.
+
+Reports `PanelOLS(...)` with none of `entity_effects`, `time_effects` and `other_effects`, and `PanelOLS.from_formula` with a formula that has no effects term. The name of the class reads like a fixed effects estimator, and without one of the three it fits pooled OLS.
+
+Example:
+
+```python
+fixed = PanelOLS(y, X).fit()
+```
+
+Use instead:
+
+```python
+fixed = PanelOLS(y, X, entity_effects=True).fit()
+pooled = PooledOLS(y, X).fit()
+```
+
+On the wage panel, on 7.1 and 7.0, `PanelOLS(y, X)` and `PooledOLS(y, X)` returned the same coefficients, with `exper` at 0.0349, and `PanelOLS(y, X, entity_effects=True)` returned 0.0698. The rule reports 37 calls in 25 of the 950 real files. Among them are results named `fe_model` and `mod_fe`, and a function whose docstring starts "One- and two-way fixed effects estimator for panel data" and whose body is `PanelOLS(y, exogenous).fit()`. A call that passes any of the three keywords is left alone, also with the value `False`, and so is a call that unpacks its keywords. A formula with a `C()` term may hold the effects as dummies and is left alone too.
+
+#### too-many-effects
+
+**Severity:** error. **Fix:** none.
+
+Reports `PanelOLS` with `entity_effects=True`, `time_effects=True` and `other_effects`, and a formula with both effect terms next to `other_effects`. The model takes two effects at most.
+
+Example:
+
+```python
+model = PanelOLS(y, X, entity_effects=True, time_effects=True, other_effects=data.occupation)
+```
+
+Use instead:
+
+```python
+effects = data.reset_index()[["nr", "year", "occupation"]].astype("category")
+model = AbsorbingLS(y.reset_index(drop=True), X.reset_index(drop=True), absorb=effects)
+```
+
+7.1 and 7.0 raised `ValueError: At most two effects supported.` for both forms. `AbsorbingLS` with the three columns as categories ran on 7.1.
+
+#### time-before-entity-index
+
+**Severity:** warning. **Fix:** unsafe: the two names in the other order.
+
+Reports `set_index([time, entity])` where the first name is a usual name for a time, such as `"year"` or `"date"`, the second is not, and the frame reaches a panel model. Nothing checks which level is which.
+
+Example:
+
+```python
+data = wage.set_index(["year", "nr"])
+model = PanelOLS(data.lwage, data[["hours", "married"]], entity_effects=True)
+```
+
+Use instead:
+
+```python
+data = wage.set_index(["nr", "year"])
+model = PanelOLS(data.lwage, data[["hours", "married"]], entity_effects=True)
+```
+
+With the year first, `PanelOLS` read the wage panel as 8 entities over 545 periods, and `entity_effects=True` gave `married` 0.1622, which is what `time_effects=True` gives on the right index, where the entity effects estimate is 0.2483. No error and no warning was raised. The rule knows the order only by the names. A two level index is also made for other uses, so the frame must reach a panel model: the `set_index` call is an argument of the model, or its result is assigned to a name that a panel model in the same function reads. The first form of the rule read every `set_index` in a file that imports linearmodels, and 2 of its 4 reports on the real files were a table of portfolios by month that no panel model reads. The rule also stays silent when another statement in the function can change the index of the same name, such as `swaplevel`, a second `set_index`, a merge or an assignment to `.index`.
+
+#### use-lsdv
+
+**Severity:** warning. **Fix:** none.
+
+Reports `use_lsdv=True` in `fit` of a `PanelOLS`. It estimates each effect as a dummy column, where the default removes the effects by subtracting group means and gives the same estimates.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(use_lsdv=True)
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+```
+
+On one thread, as the median of 5 fits with entity effects, 3 regressors and 10 periods, LSDV took 0.298 s against 0.017 s for 500 entities, which is 17 times, and 77.1 s against 0.051 s for 3,000 entities, which is 1,508 times. 7.0 gave 18 times and 1,382 times. The coefficients differed by at most 2.2e-16 and the standard errors by at most 1.7e-18, so the estimates are equal and not bit equal, and the rule has no fix. `use_lsmr=True` and `low_memory=True` ran within 10% of the default and are not reported.
+
+### Covariance
+
+`fit` takes `cov_type` and, next to it as keywords, the options of that covariance. Each model
+has its own short list of names, and none of them is a statsmodels name.
+
+#### clustered-without-clusters
+
+**Severity:** error. **Fix:** none.
+
+Reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and `clusters`. Without them every observation is a cluster of its own, which is the heteroskedasticity robust covariance under another name.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered")
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
+```
+
+On 7.1 and 7.0, `PanelOLS` with entity effects on the wage panel gave the first standard error 0.041301 for `cov_type="clustered"`, 0.041301 for `cov_type="robust"` and 0.049385 with `cluster_entity=True`. `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS` gave equal pairs in the same way, and so did `OLS`, `IV2SLS`, `IVLIML`, `AbsorbingLS`, `SUR` and `IV3SLS`, which take the groups as `clusters=`: 0.427716 both ways on `IV2SLS`. `IVGMM`, `IVGMMCUE` and `IVJIVE` raise `TypeError` instead, and the rule reports them with that message. The rule reports 31 calls in 9 of the 950 real files, each a regression table whose standard errors are said to be clustered and are not. `BetweenOLS` is left out, because it refuses `cluster_entity` and its rows are the entities already.
+
+#### cov-option-without-cov-type
+
+**Severity:** error. **Fix:** none.
+
+Reports `cluster_entity`, `cluster_time` or `clusters` in a `fit` call whose `cov_type` is absent or is another name than `"clustered"`, and `bandwidth` or `kernel` in a call whose `cov_type` is absent or is not a kernel covariance.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cluster_entity=True)
+fama = FamaMacBeth(y, X).fit(bandwidth=3)
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
+fama = FamaMacBeth(y, X).fit(cov_type="kernel", bandwidth=3)
+```
+
+7.1 raised `ValueError: The keyword argument 'cluster_entity' is not accepted with cov_type='unadjusted'` on `PanelOLS`. Each of the 15 classes other than `FamaMacBeth` and the factor models was run with each of the five keywords against no `cov_type` and against each name the rule reads, which is 930 calls on 7.1 and 868 on 7.0, and every one raised: `ValueError` or `UnknownOptionError` on 7.1, and `ValueError`, `TypeError` or `KeyError` on 7.0. `FamaMacBeth.fit` names `bandwidth` and `kernel` in its signature and reads them only with `cov_type="kernel"`: on 7.1 and 7.0 the first standard error on the wage panel was 0.203664 with no option, with `bandwidth=3` and with `kernel="parzen"`, and 0.300158 with `cov_type="kernel"` and `bandwidth=3`. The factor models ignored the two keywords on 7.0, where `TradedFactorModel.fit(bandwidth=3)` returned the standard error of the default, and raise `ValueError` on 7.1.
+
+#### unknown-cov-type
+
+**Severity:** error. **Fix:** none.
+
+Reports a `cov_type` string that the model does not take, such as `"HC1"`, `"HAC"`, `"cluster"` or `"nonrobust"` of statsmodels, `"clustered"` on `FamaMacBeth` or `IVSystemGMM`, `"kernel"` on `BetweenOLS`, and `"unadjusted"` on a factor model.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="HC1")
+iv = IV2SLS(y, exog, endog, instruments).fit(cov_type="nonrobust")
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="robust")
+iv = IV2SLS(y, exog, endog, instruments).fit(cov_type="unadjusted", debiased=True)
+```
+
+7.1 raises `UnknownOptionError`, which is both a `ValueError` and a `KeyError`, with the list of names the model takes, and 7.0 raised `ValueError` or `KeyError`. The lists were read from that error for each of the 19 model classes, and each name on a list was then run on its class:
+
+| Models | Names |
+| --- | --- |
+| `PanelOLS`, `PooledOLS`, `RandomEffects`, `FirstDifferenceOLS` | `unadjusted`, `homoskedastic`, `conventional`, `robust`, `heteroskedastic`, `clustered`, `kernel`, `dk`, `driscoll-kraay`, `ac`, `autocorrelated` |
+| `BetweenOLS` | `unadjusted`, `homoskedastic`, `conventional`, `robust`, `heteroskedastic`, `clustered` |
+| `FamaMacBeth` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel` |
+| `OLS`, `IV2SLS`, `IVLIML`, `AbsorbingLS` | `unadjusted`, `homoskedastic`, `homo`, `robust`, `heteroskedastic`, `hccm`, `kernel`, `clustered`, `one-way`, and the four class names such as `KernelCovariance` |
+| `IVGMM`, `IVGMMCUE`, `IVJIVE` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `clustered` |
+| `SUR`, `IV3SLS` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `hac`, `clustered` |
+| `IVSystemGMM` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `hac` |
+| `TradedFactorModel`, `LinearFactorModel`, `LinearFactorModelGMM` | `robust`, `heteroskedastic`, `kernel` |
+
+Since 7.1 the names are not case sensitive, so the rule takes a known name in any case. On `OLS` with the mroz data, the standard errors of linearmodels were equal to those of statsmodels to 1e-13 for `"robust"` and `"HC0"`, for `"robust"` with `debiased=True` and `"HC1"`, for `"unadjusted"` with `debiased=True` and `"nonrobust"`, and for `"clustered"` with `clusters=` and `debiased=True` and `"cluster"` with the same groups. The message for the instrument models gives that table. The panel models default to `debiased=True`, and their default standard errors were equal to those of statsmodels.
+
+#### kernel-default-bandwidth
+
+**Severity:** warning. **Fix:** none.
+
+Reports `weight_type="kernel"` on `IVGMM`, `IVGMMCUE` and `IVSystemGMM`, and `cov_type="kernel"` in `fit` of `IVGMM` and `IVGMMCUE`, with neither `bandwidth` nor `optimal_bw`. 7.1 changed the default bandwidth from `nobs - 2` to one selected from the data, so the same code gives other numbers on 7.0 and on 7.1.
+
+Example:
+
+```python
+result = IVGMM(y, exog, endog, instruments, weight_type="kernel").fit()
+```
+
+Use instead:
+
+```python
+result = IVGMM(y, exog, endog, instruments, weight_type="kernel", optimal_bw=True).fit()
+```
+
+On the mroz data, `IVGMM(..., weight_type="kernel")` had a J statistic of 0.8022 and a first standard error of 0.43964 on 7.0, and 0.3794 and 0.43137 on 7.1, where it also gave `DefaultBandwidthWarning`. With `optimal_bw=True` both releases gave 0.3794 and 0.43137, and with `bandwidth=4` both gave 0.43117. `IVGMM(...).fit(cov_type="kernel")` gave 0.35929 on 7.0 and 0.4658 on 7.1, and 0.46795 on both with `bandwidth=4`. `IVSystemGMM.fit(cov_type="kernel")` and `IV2SLS.fit(cov_type="kernel")` gave the same numbers on both releases with no warning and are not reported.
+
+#### panel-default-covariance
+
+**Severity:** info. **Fix:** none.
+
+Reports `fit` with no `cov_type` on `PanelOLS`, `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS`. The default is `"unadjusted"`, the covariance for errors that are homoskedastic and unrelated over time, and the errors of one entity usually are related.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
+```
+
+Over 1,000 draws of 200 entities and 8 periods, with an AR(1) regressor and an AR(1) error within each entity, both with coefficient 0.8, and a true slope of 0, `PanelOLS` with entity effects gave p below 0.05 in 17.3% of the draws with the default, 16.4% with `cov_type="robust"` and 5.7% with `cov_type="clustered"` and `cluster_entity=True`. In a second simulation with 300 entities, 3 periods and errors that are heteroskedastic and unrelated over time, the shares were 22.4%, 7.1% and 5.0%. Those are two simulations, and how far the default is off depends on the data, so the rule is info. It is the rule with the most reports: 372 in 142 of the 950 real files. `BetweenOLS` has one row for each entity and `FamaMacBeth` has its own covariance, so both are left alone, and a call that states `cov_type`, also as `"unadjusted"`, has made its choice.
+
+### Instruments and absorbed effects
+
+`IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE` and `IVJIVE` take four arrays in the order dependent,
+exog, endog, instruments. None of the four has a default, and none of the models adds a
+constant.
+
+#### iv-missing-arguments
+
+**Severity:** error. **Fix:** none.
+
+Reports an instrument model called with two or three arguments, and the keyword `instrument=`. statsmodels has an `IV2SLS` of its own, in `statsmodels.sandbox.regression.gmm`, with the signature `(endog, exog, instrument=None)`, where `endog` is the dependent variable.
+
+Example:
+
+```python
+model = IV2SLS(y, X, Z)
+```
+
+Use instead:
+
+```python
+model = IV2SLS(y, exog, endog, instruments)
+```
+
+7.1 and 7.0 raised `TypeError: IV2SLS.__init__() missing 1 required positional argument: 'instruments'`, and `TypeError: ... got an unexpected keyword argument 'instrument'. Did you mean 'instruments'?` for the keyword. Two of the 950 real files call `IV2SLS(Y, X, Z)` on the class they import from linearmodels. A call that names one of the four as a keyword, or that unpacks its arguments, is left alone.
+
+#### iv-arguments-swapped
+
+**Severity:** warning. **Fix:** none.
+
+Reports an instrument model whose second argument has `endog` in its name and whose third has `exog`. The order of linearmodels is exog and then endog, and nothing checks the roles.
+
+Example:
+
+```python
+model = IV2SLS(dependent, endog, exog, instruments)
+```
+
+Use instead:
+
+```python
+model = IV2SLS(dependent, exog, endog, instruments)
+```
+
+On the mroz data, `IV2SLS(lwage, educ, [const, exper], [fatheduc, motheduc])` ran without an error and gave `educ` 0.2021, where the right order gave 0.0664. The rule knows the roles only from the names, and reports no other case.
+
+#### iv-without-exog
+
+**Severity:** warning. **Fix:** none.
+
+Reports `None` written as the `exog` of an instrument model that has an endogenous regressor. The model then has no intercept.
+
+Example:
+
+```python
+model = IV2SLS(y, None, x, z)
+```
+
+Use instead:
+
+```python
+model = IV2SLS(y, sm.add_constant(controls), x, z)
+```
+
+Over 2,000 draws of 500 rows from `y = 2 + x + error` with one instrument, the mean estimate of the coefficient on `x` was 2.002 without `exog` and 0.990 with a constant column as `exog`. On the mroz data the coefficient on `educ` was 0.0928 without `exog` and 0.0664 with a constant and `exper`. Data with mean zero needs no intercept, so this is a warning.
+
+#### manual-two-stage
+
+**Severity:** warning. **Fix:** none.
+
+Reports a model whose `exog` holds `.fitted_values` of another fit. That is two stage least squares by hand: the coefficient is right, and the standard errors come from residuals that use the fitted values in place of the regressor.
+
+Example:
+
+```python
+first = OLS(data.educ, data[["const", "exper", "fatheduc", "motheduc"]]).fit()
+second = OLS(data.lwage, pd.concat([data[["const", "exper"]], first.fitted_values], axis=1)).fit()
+```
+
+Use instead:
+
+```python
+result = IV2SLS(data.lwage, data[["const", "exper"]], data.educ, data[["fatheduc", "motheduc"]]).fit()
+```
+
+On the mroz data both ways gave `educ` 0.0664, with an unadjusted standard error of 0.0327 by hand and 0.0311 from `IV2SLS`. Over 2,000 draws of 500 rows with one instrument, the 95% interval of the hand-made second stage covered the true coefficient in 99.6% of the draws and the interval of `IV2SLS` in 95.7%, and the hand-made standard error was 1.37 times the other on average. Which way the error goes depends on the data. The rule sees only the form where the fitted values are written in the call. A second stage that reads them from a column it stored earlier is not seen, and neither corpus has the form the rule reads.
+
+#### absorb-not-categorical
+
+**Severity:** info. **Fix:** none.
+
+Reports `AbsorbingLS(..., absorb=...)` in a file that never says `category`, `Categorical` or `cut(`. `absorb` reads the dtype of each column: a categorical column is absorbed as one effect for each category, and any other column as one continuous regressor.
+
+Example:
+
+```python
+model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]])
+```
+
+Use instead:
+
+```python
+model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]].astype("category"))
+```
+
+With 200 firms, a firm effect in the regressor and a true coefficient of 1.0, `absorb` with the integer firm id gave 3.397, where no `absorb` at all gave 3.398, and the same column as a category gave 1.022. No error and no warning was raised. A text column raises `TypeError` on 7.1, and 7.0 took it like the integers. One of the 4 real files that the rule reports turns its columns into text with `astype(str)` right before the call. The code does not show a dtype, so the rule is info, and data that is categorical when it is loaded is reported without need.
+
+### Results
+
+#### statsmodels-result-name
+
+**Severity:** error. **Fix:** unsafe: `summary` for `summary()`, `std_errors` for `bse`, `tstats` for `tvalues`, `resids` for `resid` and `fitted_values` for `fittedvalues`. The other names have no fix.
+
+Reports a name of a statsmodels result read on a linearmodels result: `summary()` called, and `bse`, `tvalues`, `resid`, `fittedvalues`, `aic`, `bic`, `llf`, `fvalue`, `f_pvalue`, `ssr`, `mse_resid`, `cov_params`, `t_test`, `f_test`, `get_robustcov_results`, `summary2`, `save` and 36 more.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+print(result.summary())
+errors = result.bse
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+print(result.summary)
+errors = result.std_errors
+```
+
+`summary` is a property, and on 7.1 and 7.0 `summary()` raised `TypeError: 'Summary' object is not callable` on the result of each of the 19 model classes. The other names are the 53 public names of a statsmodels 0.15.0 OLS result that none of those 19 results has, found with `dir()` and `hasattr`, and each raises `AttributeError`. The results of the factor models have no residuals under either name, so `resid` and `fittedvalues` are not reported on them.
+
+| statsmodels | linearmodels |
+| --- | --- |
+| `summary()` | `summary` |
+| `bse` | `std_errors` |
+| `tvalues` | `tstats` |
+| `resid` | `resids` |
+| `fittedvalues` | `fitted_values` |
+| `cov_params()` | `cov` |
+| `fvalue`, `f_pvalue` | `f_statistic.stat`, `f_statistic.pval` |
+| `ssr` | `resid_ss` |
+| `mse_resid` | `s2` |
+| `llf` | `loglik`, on the panel results |
+| `t_test`, `f_test` | `wald_test`, on the panel and instrument results |
+| `get_robustcov_results` | a new `fit(cov_type=...)` |
+
+On `OLS` with the mroz data, each pair of the table from `bse` to `mse_resid` was equal to 1e-11 for an unadjusted fit with `debiased=True`, and `loglik` of `PooledOLS` was equal to `llf`. The rule reports 15 reads in 6 of the 950 real files. `.summary()` is called in 171 of those files, and the rule reports it in the 3 where the result can be followed to a linearmodels model. Code under a `hasattr` check is a compatibility path and stays silent.
+
+#### invalid-compare-precision
+
+**Severity:** error. **Fix:** none.
+
+Reports `compare(..., precision=...)` of `linearmodels.panel` or `linearmodels.iv` with a string other than `"tstats"`, `"std_errors"`, `"std-errors"` and `"pvalues"`.
+
+Example:
+
+```python
+table = compare({"pooled": pooled, "fixed": fixed}, precision="se")
+```
+
+Use instead:
+
+```python
+table = compare({"pooled": pooled, "fixed": fixed}, precision="std_errors")
+```
+
+On 7.1 and 7.0 both functions took the four strings in any case, and raised `ValueError: Unknown precision value. Must be one of 'tstats', 'std_errors' or 'pvalues'.` for `"se"`, `"stderr"`, `"t"`, `"p"`, `"tstat"`, `"std_err"`, `"pvalue"`, `"t-stats"` and `"bse"`. The four strings were also read from the source. The rule reads `compare` only when the file imports it from linearmodels or calls it through the module.
+
+#### hand-written-hausman
+
+**Severity:** info. **Fix:** none. Needs linearmodels 7.1.
+
+Reports a function whose name starts with `hausman`. 7.1 added the Hausman test of random effects against fixed effects as a method of the random effects result, and the instrument results have had `wu_hausman()` for longer.
+
+Example:
+
+```python
+def hausman(fe, re):
+    b = fe.params - re.params
+    v = fe.cov - re.cov
+    return float(b @ np.linalg.inv(v) @ b)
+```
+
+Use instead:
+
+```python
+test = random_effects_result.hausman(fixed_effects_result)
+```
+
+On 7.1 the method returned a `HausmanTestResults` with the fields `statistic` and `estimates`, and 7.0 has no such method. The rule reports 27 functions in 27 of the 950 real files. It cannot see what a function tests, so it is info, and the message names both tests.
+
+### Removed and deprecated forms
+
+Each form below was run on the release before and the release at the version the rule names,
+both installed from PyPI.
+
+#### removed-in-linearmodels
+
+**Severity:** error. **Fix:** unsafe: `wald_test` for `test_linear_constraint`. The import has no fix.
+
+Reports an import of `linearmodels.utility`, which 4.18 split into the modules of `linearmodels.shared`, and `test_linear_constraint` on a result of `OLS`, `IV2SLS`, `IVLIML` or `IVGMM`, which 4.15 removed after 4.12 renamed it `wald_test`.
+
+Example:
+
+```python
+from linearmodels.utility import MissingValueWarning, WaldTestStatistic
+
+test = result.test_linear_constraint(restriction, value)
+```
+
+Use instead:
+
+```python
+from linearmodels.shared.exceptions import MissingValueWarning
+from linearmodels.shared.hypotheses import WaldTestStatistic
+
+test = result.wald_test(restriction, value)
+```
+
+The import ran on 4.17 and raised `ModuleNotFoundError: No module named 'linearmodels.utility'` on 4.18 and on 7.1. `test_linear_constraint` returned a `WaldTestStatistic` on 4.14 and raised `AttributeError` on 4.15, and `wald_test` ran on both. The 22 public names of the old module were looked up in the 7.1 source:
+
+| Names of `linearmodels.utility` | Module on 7.1 |
+| --- | --- |
+| `MissingValueWarning`, `MemoryWarning`, `InferenceUnavailableWarning`, `SingletonWarning`, `missing_warning` | `linearmodels.shared.exceptions` |
+| `AttrDict`, `ensure_unique_column`, `panel_to_frame` | `linearmodels.shared.utility` |
+| `WaldTestStatistic`, `InvalidTestStatistic`, `InapplicableTestStatistic`, `InvalidTestWarning`, `quadratic_form_test` | `linearmodels.shared.hypotheses` |
+| `has_constant`, `inv_sqrth` | `linearmodels.shared.linalg` |
+| `pval_format`, `param_table`, `format_wide` | `linearmodels.shared.io` |
+| `get_string`, `get_float`, `get_bool`, `get_array_like` | `linearmodels.shared.typed_getters` |
+
+Code inside a try block with an except clause is a compatibility path and stays silent.
+
+#### deprecated-in-linearmodels
+
+**Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module. The other forms have no fix.
+
+Reports `from linearmodels.__future__ import ordering`, the `lsmr_options` keyword of `AbsorbingLS.fit`, and `linearmodels.DROP_MISSING`. 7.1 gives `FutureWarning` for each, and 8.0 removes them.
+
+Example:
+
+```python
+from linearmodels.__future__ import ordering
+
+result = model.fit(method="lsmr", lsmr_options={"atol": 1e-10})
+```
+
+Use instead:
+
+```python
+result = model.fit(method="lsmr", absorb_options={"atol": 1e-10})
+```
+
+The import turned off the sorting of formula variables in 4.31, and 5.0 made that the default. With `"y ~ 1 + z + x + w"`, 4.31 gave the order `Intercept, w, x, z` without the import and `Intercept, z, x, w` with it, and 5.0, 7.0 and 7.1 gave `Intercept, z, x, w` both ways. The fix deletes a line that does nothing from 5.0 on, the cases of `samples/linearmodels/migration.py` returned equal values before and after it, and `since` keeps the document away from a project on 4.31. Inside a function or a block the import has no fix, because it may be the only statement there. `absorb_options` ran on 4.18 and raised `TypeError` on 4.17, and `lsmr_options` gave `FutureWarning` on 4.31, 5.0, 7.0 and 7.1. The new form needs `method="lsmr"` next to the options, since the default method may pick an algorithm that does not take them, so it has no fix. Reading `DROP_MISSING` ran clean on 7.0 and gave `FutureWarning: linearmodels.DROP_MISSING has no effect` on 7.1.
+
+### What the pack leaves out
+
+- `check_rank=False`. On columns that are exactly collinear, 7.1 raised `LinAlgError: Singular
+  matrix`, so the flag did not give wrong numbers in silence where it was tried.
+- Inputs whose labels do not match. 7.1 raises `ValueError` where 7.0 paired them by position,
+  and a pattern cannot see an index.
+- A frame without a two level index, a time level of text, and regressors that the effects
+  absorb. Each raises with a clear message, and none shows in the code.
+- The changes of 7.1 to weighted models, to `FamaMacBeth` p-values and to the Hausman and
+  specification tests. The code is the same on both releases, so a rule would report every use.
+- Patsy functions that formulaic lacks. `te()` raised, and `cr()` and `cc()` raised a rank
+  error next to an intercept. `Q()`, `center()`, `standardize()`, `bs()` and
+  `C(x, Treatment(reference=...))` all ran. No use of the three was found in the real files.
+- `SUR`, `IV3SLS`, `IVSystemGMM` and the factor models have no rule of their own. The formula,
+  covariance and result rules read them.
+- xxhash, which `AbsorbingLS` uses for its cache when it is installed. A fit with two absorbed
+  columns took 0.345 s with it and 0.361 s without on 100,000 rows, and 1.418 s against 1.289 s
+  on 1,000,000, so the pack has no package check.
+
 ## arch
 
 These rules run on files that import `arch`, the module of
@@ -8444,9 +9188,9 @@ cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --un
 ```
 
 The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
-`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/arch/`,
-`samples/hamilton/` and
-`samples/python/` mark each line a rule reports with a comment that names the rules.
+`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/linearmodels/`,
+`samples/arch/`, `samples/hamilton/` and `samples/python/` mark each line a rule reports with a
+comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the

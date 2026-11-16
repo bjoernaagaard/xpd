@@ -1,0 +1,83 @@
+# A panel model takes a frame with two index levels and reads the first as the entity and the
+# second as the time. Nothing checks which is which. On linearmodels 7.1,
+# wage_panel.set_index(["year", "nr"]) made PanelOLS report 8 entities and 545 periods, and
+# entity_effects=True then gave married 0.1622, which is what time_effects=True gives on the right
+# index, where the entity effects estimate is 0.2483. No error and no warning was raised.
+#
+# The rule reads the names in a set_index call with a list of two strings, and reports when the
+# first is a usual name for a time and the second is not. It knows the order only by the names, so
+# a frame whose entity column is called year would be reported too. A two level index is also made
+# for other uses, so the frame must reach a panel model: the call is an argument of the model, or
+# its result is assigned to a name that a panel model in the same function reads. The rule stays
+# silent when another statement in that function can change the index of the same name, such as a
+# second set_index, swaplevel, a merge or an assignment to .index. The fix changes the estimates
+# on purpose, so it is unsafe.
+id: time-before-entity-index
+language: python
+severity: warning
+message: The panel models read the first level of the index as the entity and the second as the time, and $A is named like a time. With year first, PanelOLS read the wage panel as 8 entities over 545 periods, and entity_effects=True gave married 0.1622, the estimate with year effects, where the worker effects give 0.2483. Put the entity first, as in [$B, $A].
+rule:
+  kind: list
+  pattern: '[$A, $B]'
+  nthChild: 1
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      pattern: $SET
+      all:
+        - has: { field: function, kind: attribute, has: { field: attribute, regex: '^set_index$' } }
+        - any:
+            # The frame goes straight into the model.
+            - inside: { stopBy: end, kind: argument_list, inside: { kind: call, matches: lm-build } }
+            # Or it is assigned to a name that a panel model in the same function reads.
+            - all:
+                - any:
+                    - inside: { stopBy: end, kind: assignment, has: { field: left, kind: identifier, pattern: $D } }
+                    - all:
+                        - has: { field: function, has: { field: object, kind: identifier, pattern: $D } }
+                        - has: { field: arguments, has: { kind: keyword_argument, regex: '^inplace\s*=\s*True$' } }
+                - inside:
+                    stopBy: { kind: function_definition }
+                    any: [{ kind: function_definition }, { kind: module }]
+                    all:
+                      - has: { stopBy: end, kind: call, matches: lm-build, has: { field: arguments, has: { stopBy: end, kind: identifier, pattern: $D } } }
+                      # Another statement that can change the index of the same name leaves the order open.
+                      - not: { has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, regex: '(^|\.)(set_index|reset_index|swaplevel|reorder_levels|stack|unstack|pivot|pivot_table|melt|groupby|merge|join|concat|from_arrays|from_tuples|from_frame|from_product)$' } }, { not: { pattern: $SET } }, { not: { inside: { stopBy: end, pattern: $SET } } }, { any: [{ inside: { stopBy: end, kind: assignment, has: { field: left, pattern: $D } } }, { all: [{ has: { field: function, has: { field: object, pattern: $D } } }, { has: { field: arguments, has: { kind: keyword_argument, regex: '^inplace\s*=\s*True$' } } }] }] }] } }
+                      - not: { has: { stopBy: end, kind: assignment, has: { field: left, kind: attribute, regex: '\.index$', has: { field: object, pattern: $D } } } }
+constraints:
+  A: { kind: string, regex: '(?i)^[a-zA-Z]*["''](year|years|yr|fyear|date|dates|datadate|time|month|quarter|qtr|period|periods|week|day|hour|minute|datetime|timestamp|yearmonth|year_month|yyyymm|ym|wave|season|t)["'']$' }
+  B: { kind: string, not: { regex: '(?i)^[a-zA-Z]*["''](year|years|yr|fyear|date|dates|datadate|time|month|quarter|qtr|period|periods|week|day|hour|minute|datetime|timestamp|yearmonth|year_month|yyyymm|ym|wave|season|t)["'']$' } }
+utils:
+  # The class names that another library also has count only with proof of the import.
+  lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth)$' }] }
+  from-linearmodels:
+    any:
+      - { kind: attribute, regex: '^linearmodels\.' }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^linearmodels(\.|$)' } }, { has: { field: alias, pattern: $LMMOD } }] } } }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { has: { kind: dotted_name, pattern: $LMMOD } }] } } }
+      - kind: identifier
+        pattern: $LMCLS
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { any: [{ has: { kind: dotted_name, pattern: $LMCLS } }, { has: { kind: wildcard_import } }] }] } }
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^linearmodels(\.|$)' } } }, { has: { kind: dotted_name, pattern: $LMCLS } }] } } }
+  # A call that builds a model: the class itself, or one of its constructors.
+  lm-build:
+    kind: call
+    any:
+      - has: { field: function, matches: lm-class }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: lm-class } }] }
+  lm-from-formula:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^from_formula$' } }, { has: { field: object, matches: lm-class } }] }
+  # A model is a build call, or a name that its function, or the module outside any function,
+  # assigns from build calls and from nothing else. A name that a loop, a with statement, an
+  # except clause, a walrus or a lambda parameter also binds is left alone.
+  lm-model: { any: [{ matches: lm-build }, { kind: identifier, pattern: $LMV, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { has: { field: right, matches: lm-build } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { not: { has: { field: right, matches: lm-build } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMV } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMV } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] }, { kind: named_expression, has: { field: name, pattern: $LMV } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMV } } }] } } }] } }] }
+  lm-fit: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: lm-model } }] } }
+  # A result is a fit call on a model, or a name assigned from such calls and from nothing else.
+  lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
+  expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
+fix: '[$B, $A]'
+metadata: { fix: unsafe }

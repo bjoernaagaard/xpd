@@ -1,0 +1,98 @@
+# The kernel estimators of IVGMM, IVGMMCUE and IVSystemGMM took nobs - 2 as the bandwidth until
+# 7.0, and 7.1 selects it from the data. The same code gives other numbers on the two releases:
+# IVGMM(..., weight_type="kernel") on the mroz data had a J statistic of 0.8022 and a first
+# standard error of 0.43964 on 7.0, and 0.3794 and 0.43137 on 7.1, where it also gave
+# DefaultBandwidthWarning. With optimal_bw=True both releases gave 0.3794 and 0.43137, and with
+# bandwidth=4 both gave 0.43117. IVSystemGMM changed in the same way.
+#
+# The rule stays silent when either keyword is given, whatever its value, and when the call
+# unpacks keywords from a dictionary.
+id: kernel-default-bandwidth
+language: python
+severity: warning
+message: weight_type="kernel" with no bandwidth and no optimal_bw uses a default that linearmodels 7.1 changed, from nobs - 2 to a bandwidth selected from the data, and 7.1 gives DefaultBandwidthWarning. On the mroz data the J statistic of IVGMM went from 0.8022 on 7.0 to 0.3794 on 7.1. Pass optimal_bw=True or a bandwidth, which give the same numbers on both.
+rule:
+  kind: call
+  all:
+    - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(weight_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:kernel)["'']+$' } }] } } }
+    - matches: lm-build
+    - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(bandwidth|optimal_bw)$' } }] } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+utils:
+  # The class names that another library also has count only with proof of the import.
+  lm-class: { any: [{ regex: '(^|\.)(IVGMMCUE|IVSystemGMM)$' }, { all: [{ regex: '(^|\.)(IVGMM)$' }, { matches: from-linearmodels }] }] }
+  from-linearmodels:
+    any:
+      - { kind: attribute, regex: '^linearmodels\.' }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^linearmodels(\.|$)' } }, { has: { field: alias, pattern: $LMMOD } }] } } }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { has: { kind: dotted_name, pattern: $LMMOD } }] } } }
+      - kind: identifier
+        pattern: $LMCLS
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { any: [{ has: { kind: dotted_name, pattern: $LMCLS } }, { has: { kind: wildcard_import } }] }] } }
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^linearmodels(\.|$)' } } }, { has: { kind: dotted_name, pattern: $LMCLS } }] } } }
+  # A call that builds a model: the class itself, or one of its constructors.
+  lm-build:
+    kind: call
+    any:
+      - has: { field: function, matches: lm-class }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: lm-class } }] }
+  lm-from-formula:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^from_formula$' } }, { has: { field: object, matches: lm-class } }] }
+  # A model is a build call, or a name that its function, or the module outside any function,
+  # assigns from build calls and from nothing else. A name that a loop, a with statement, an
+  # except clause, a walrus or a lambda parameter also binds is left alone.
+  lm-model: { any: [{ matches: lm-build }, { kind: identifier, pattern: $LMV, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { has: { field: right, matches: lm-build } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { not: { has: { field: right, matches: lm-build } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMV } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMV } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] }, { kind: named_expression, has: { field: name, pattern: $LMV } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMV } } }] } } }] } }] }
+  lm-fit: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: lm-model } }] } }
+  # A result is a fit call on a model, or a name assigned from such calls and from nothing else.
+  lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
+  expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
+---
+# The kernel covariance of IVGMM.fit changed in the same way: 0.35929 on 7.0 and 0.4658 on 7.1,
+# with the warning, and 0.46795 on both with bandwidth=4. IVSystemGMM.fit(cov_type="kernel") gave
+# 0.4658 on both releases with no warning, and IV2SLS always selected its bandwidth, so neither is
+# reported.
+id: kernel-default-bandwidth
+language: python
+severity: warning
+message: cov_type="kernel" with no bandwidth and no optimal_bw uses a default that linearmodels 7.1 changed, from nobs - 2 to a bandwidth selected from the data, and 7.1 gives DefaultBandwidthWarning. On the mroz data the first standard error of IVGMM went from 0.3593 on 7.0 to 0.4658 on 7.1. Pass optimal_bw=True or a bandwidth.
+rule:
+  kind: call
+  all:
+    - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:kernel)["'']+$' } }] } } }
+    - matches: lm-fit
+    - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(bandwidth|optimal_bw)$' } }] } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+utils:
+  # The class names that another library also has count only with proof of the import.
+  lm-class: { any: [{ regex: '(^|\.)(IVGMMCUE)$' }, { all: [{ regex: '(^|\.)(IVGMM)$' }, { matches: from-linearmodels }] }] }
+  from-linearmodels:
+    any:
+      - { kind: attribute, regex: '^linearmodels\.' }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^linearmodels(\.|$)' } }, { has: { field: alias, pattern: $LMMOD } }] } } }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { has: { kind: dotted_name, pattern: $LMMOD } }] } } }
+      - kind: identifier
+        pattern: $LMCLS
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { any: [{ has: { kind: dotted_name, pattern: $LMCLS } }, { has: { kind: wildcard_import } }] }] } }
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^linearmodels(\.|$)' } } }, { has: { kind: dotted_name, pattern: $LMCLS } }] } } }
+  # A call that builds a model: the class itself, or one of its constructors.
+  lm-build:
+    kind: call
+    any:
+      - has: { field: function, matches: lm-class }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: lm-class } }] }
+  lm-from-formula:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^from_formula$' } }, { has: { field: object, matches: lm-class } }] }
+  # A model is a build call, or a name that its function, or the module outside any function,
+  # assigns from build calls and from nothing else. A name that a loop, a with statement, an
+  # except clause, a walrus or a lambda parameter also binds is left alone.
+  lm-model: { any: [{ matches: lm-build }, { kind: identifier, pattern: $LMV, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { has: { field: right, matches: lm-build } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { not: { has: { field: right, matches: lm-build } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMV } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMV } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] }, { kind: named_expression, has: { field: name, pattern: $LMV } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMV } } }] } } }] } }] }
+  lm-fit: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: lm-model } }] } }
+  # A result is a fit call on a model, or a name assigned from such calls and from nothing else.
+  lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
+  expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
