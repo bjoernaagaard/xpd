@@ -7490,6 +7490,95 @@ model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights=data["hours"])
 
 7.1 raised `TypeError: weights must be array_like ... Got str` on `PooledOLS` and on `IV2SLS`, and 7.0 raised `AttributeError: 'str' object has no attribute 'ndim'`.
 
+### Panel models
+
+A panel model takes a frame whose index has two levels, the entity first and the time second.
+`PanelOLS` is the only class with effects, and it has none until it is told to.
+
+#### panel-ols-without-effects
+
+**Severity:** warning. **Fix:** none.
+
+Reports `PanelOLS(...)` with none of `entity_effects`, `time_effects` and `other_effects`, and `PanelOLS.from_formula` with a formula that has no effects term. The name of the class reads like a fixed effects estimator, and without one of the three it fits pooled OLS.
+
+Example:
+
+```python
+fixed = PanelOLS(y, X).fit()
+```
+
+Use instead:
+
+```python
+fixed = PanelOLS(y, X, entity_effects=True).fit()
+pooled = PooledOLS(y, X).fit()
+```
+
+On the wage panel, on 7.1 and 7.0, `PanelOLS(y, X)` and `PooledOLS(y, X)` returned the same coefficients, with `exper` at 0.0349, and `PanelOLS(y, X, entity_effects=True)` returned 0.0698. The rule reports 37 calls in 25 of the 950 real files. Among them are results named `fe_model` and `mod_fe`, and a function whose docstring starts "One- and two-way fixed effects estimator for panel data" and whose body is `PanelOLS(y, exogenous).fit()`. A call that passes any of the three keywords is left alone, also with the value `False`, and so is a call that unpacks its keywords.
+
+#### too-many-effects
+
+**Severity:** error. **Fix:** none.
+
+Reports `PanelOLS` with `entity_effects=True`, `time_effects=True` and `other_effects`, and a formula with both effect terms next to `other_effects`. The model takes two effects at most.
+
+Example:
+
+```python
+model = PanelOLS(y, X, entity_effects=True, time_effects=True, other_effects=data.occupation)
+```
+
+Use instead:
+
+```python
+effects = data.reset_index()[["nr", "year", "occupation"]].astype("category")
+model = AbsorbingLS(y.reset_index(drop=True), X.reset_index(drop=True), absorb=effects)
+```
+
+7.1 and 7.0 raised `ValueError: At most two effects supported.` for both forms. `AbsorbingLS` with the three columns as categories ran on 7.1.
+
+#### time-before-entity-index
+
+**Severity:** warning. **Fix:** unsafe: the two names in the other order.
+
+Reports `set_index([time, entity])` where the first name is a usual name for a time, such as `"year"` or `"date"`, the second is not, and the frame reaches a panel model. Nothing checks which level is which.
+
+Example:
+
+```python
+data = wage.set_index(["year", "nr"])
+model = PanelOLS(data.lwage, data[["hours", "married"]], entity_effects=True)
+```
+
+Use instead:
+
+```python
+data = wage.set_index(["nr", "year"])
+model = PanelOLS(data.lwage, data[["hours", "married"]], entity_effects=True)
+```
+
+With the year first, `PanelOLS` read the wage panel as 8 entities over 545 periods, and `entity_effects=True` gave `married` 0.1622, which is what `time_effects=True` gives on the right index, where the entity effects estimate is 0.2483. No error and no warning was raised. The rule knows the order only by the names. A two level index is also made for other uses, so the frame must reach a panel model: the `set_index` call is an argument of the model, or its result is assigned to a name that a panel model in the same function reads. The first form of the rule read every `set_index` in a file that imports linearmodels, and 2 of its 4 reports on the real files were a table of portfolios by month that no panel model reads. The rule also stays silent when another statement in the function can change the index of the same name, such as `swaplevel`, a second `set_index`, a merge or an assignment to `.index`.
+
+#### use-lsdv
+
+**Severity:** warning. **Fix:** none.
+
+Reports `use_lsdv=True` in `fit` of a `PanelOLS`. It estimates each effect as a dummy column, where the default removes the effects by subtracting group means and gives the same estimates.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(use_lsdv=True)
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+```
+
+On one thread, as the median of 5 fits with entity effects, 3 regressors and 10 periods, LSDV took 0.298 s against 0.017 s for 500 entities, which is 17 times, and 77.1 s against 0.051 s for 3,000 entities, which is 1,508 times. 7.0 gave 18 times and 1,382 times. The coefficients differed by at most 2.2e-16 and the standard errors by at most 1.7e-18, so the estimates are equal and not bit equal, and the rule has no fix. `use_lsmr=True` and `low_memory=True` ran within 10% of the default and are not reported.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
