@@ -373,7 +373,7 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
         let mut entries = RECORDS
             .iter()
             .filter(|e| e.package != index.package || e.kind == Kind::Rule)
-            .map(|e| serde_json::from_str(e.json))
+            .map(Stored::entry)
             .collect::<std::result::Result<Vec<Entry>, _>>()?;
         entries.extend(index.entries);
         Some(entries)
@@ -390,7 +390,7 @@ pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
     RECORDS
         .iter()
         .find(|e| e.name == name)
-        .map(|e| serde_json::from_str(e.json).context("embedded entry"))
+        .map(|e| e.entry().context("embedded entry"))
         .transpose()
 }
 
@@ -409,10 +409,52 @@ struct Stored {
     package: &'static str,
     kind: Kind,
     summary: &'static str,
-    json: &'static str,
+    start: u32,
+    len: u16,
 }
+const DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/entries.bin"));
+const STRINGS: &[&str] = include!(concat!(env!("OUT_DIR"), "/strings.rs"));
+
+impl Stored {
+    fn entry(&self) -> Result<Entry, serde_json::Error> {
+        let start = usize::try_from(self.start).expect("entry offset fits usize");
+        let end = start + usize::from(self.len);
+        serde_json::from_value(decode(&mut &DATA[start..end]))
+    }
+}
+
+fn integer(data: &mut &[u8]) -> usize {
+    let (bytes, rest) = data.split_at(2);
+    *data = rest;
+    usize::from(u16::from_le_bytes(
+        bytes.try_into().expect("build writes u16 IDs"),
+    ))
+}
+
+fn decode(data: &mut &[u8]) -> serde_json::Value {
+    use serde_json::Value;
+    let tag = data[0];
+    *data = &data[1..];
+    match tag {
+        0 => Value::Null,
+        1 => Value::Bool(false),
+        2 => Value::Bool(true),
+        3 => Value::String(STRINGS[integer(data)].to_owned()),
+        4 => Value::Array((0..integer(data)).map(|_| decode(data)).collect()),
+        5 => Value::Object(
+            (0..integer(data))
+                .map(|_| {
+                    let key = STRINGS[integer(data)].to_owned();
+                    (key, decode(data))
+                })
+                .collect(),
+        ),
+        _ => unreachable!("build writes validated entry tags"),
+    }
+}
+
 const POSTINGS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/postings.bin"));
-const TABLE: &[(&str, usize, usize)] = include!(concat!(env!("OUT_DIR"), "/search.rs"));
+const TABLE: &[(&str, u32, u32)] = include!(concat!(env!("OUT_DIR"), "/search.rs"));
 const RECORDS: &[Stored] = include!(concat!(env!("OUT_DIR"), "/records.rs"));
 
 pub(crate) fn find(
@@ -431,19 +473,20 @@ pub(crate) fn find(
     let mut scores = vec![0.0; RECORDS.len()];
     for word in &words {
         if let Ok(i) = TABLE.binary_search_by_key(&word.as_str(), |(w, _, _)| *w) {
-            for posting in POSTINGS[TABLE[i].1..TABLE[i].2].as_chunks::<12>().0 {
-                let entry = usize::try_from(u32::from_le_bytes(
-                    posting[..4]
+            let start = usize::try_from(TABLE[i].1).expect("posting offset fits usize");
+            let end = usize::try_from(TABLE[i].2).expect("posting offset fits usize");
+            for posting in POSTINGS[start..end].as_chunks::<4>().0 {
+                let entry = usize::from(u16::from_le_bytes(
+                    posting[..2]
                         .try_into()
-                        .expect("build writes four byte entry IDs"),
-                ))
-                .expect("entry fits usize");
-                let score = f64::from_le_bytes(
-                    posting[4..]
+                        .expect("build writes two byte entry IDs"),
+                ));
+                let score = u16::from_le_bytes(
+                    posting[2..]
                         .try_into()
-                        .expect("build writes eight byte scores"),
+                        .expect("build writes two byte scores"),
                 );
-                scores[entry] += score;
+                scores[entry] += f64::from(score) / 256.0;
             }
         }
     }
@@ -468,7 +511,7 @@ pub(crate) fn find(
         .into_iter()
         .filter(|(e, _)| keep_recipe(e.kind, kind, &mut recipes))
         .take(5)
-        .map(|(e, _)| serde_json::from_str(e.json).expect("build validated index entry"))
+        .map(|(e, _)| e.entry().expect("build validated index entry"))
         .collect()
 }
 
@@ -539,13 +582,7 @@ fn keep_recipe(entry: Kind, filter: Option<Kind>, recipes: &mut usize) -> bool {
 }
 
 fn search_terms(query: &str) -> Vec<String> {
-    let mut words = tokens(query);
-    let pairs = words
-        .windows(2)
-        .map(|pair| format!("{} {}", pair[0], pair[1]))
-        .collect::<Vec<_>>();
-    words.extend(pairs);
-    words
+    tokens(query)
 }
 
 fn rank_score(

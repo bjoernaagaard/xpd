@@ -325,6 +325,8 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
         }
     }
     let mut records = String::from("&[\n");
+    let mut strings = BTreeMap::new();
+    let mut data = Vec::new();
     for entry in &entries {
         let name = entry["name"].as_str().context("entry name")?;
         let package = entry["package"].as_str().context("entry package")?;
@@ -339,14 +341,28 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
             .as_object_mut()
             .context("entry object")?
             .remove("keywords");
-        let json = serde_json::to_string(&output)?;
+        let start = data.len();
+        encode(&output, &mut strings, &mut data)?;
+        let len = u16::try_from(data.len() - start)?;
         writeln!(
             records,
-            "Stored {{name:{name:?},package:{package:?},kind:Kind::{kind},summary:{summary:?},json:{json:?}}},"
+            "Stored {{name:{name:?},package:{package:?},kind:Kind::{kind},summary:{summary:?},start:0x{:04x}_{:04x},len:{len}}},",
+            start >> 16,
+            start & 0xffff
         )?;
     }
     records.push(']');
+    fs::write(out.join("entries.bin"), data)?;
+    let mut ordered = vec![""; strings.len()];
+    for (text, id) in &strings {
+        ordered[usize::from(*id)] = text;
+    }
+    write(&out.join("strings.rs"), &format!("&{ordered:?}"))?;
     write(&out.join("records.rs"), &records)?;
+    search_source(out, &entries)
+}
+
+fn search_source(out: &Path, entries: &[serde_json::Value]) -> Result<()> {
     let documents = entries
         .iter()
         .map(|e| {
@@ -376,8 +392,9 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
     for (word, postings) in table {
         let start = bytes.len();
         for (i, score) in postings {
-            bytes.extend(u32::try_from(i)?.to_le_bytes());
-            bytes.extend(score.to_le_bytes());
+            bytes.extend(u16::try_from(i)?.to_le_bytes());
+            let quantized = format!("{:.0}", score * 256.0).parse::<u16>()?;
+            bytes.extend(quantized.to_le_bytes());
         }
         let end = bytes.len();
         writeln!(
@@ -392,4 +409,44 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
     source.push(']');
     fs::write(out.join("postings.bin"), bytes)?;
     write(&out.join("search.rs"), &source)
+}
+
+fn intern(text: &str, strings: &mut BTreeMap<String, u16>, data: &mut Vec<u8>) -> Result<()> {
+    let next = u16::try_from(strings.len())?;
+    data.extend(strings.entry(text.to_owned()).or_insert(next).to_le_bytes());
+    Ok(())
+}
+
+fn encode(
+    value: &serde_json::Value,
+    strings: &mut BTreeMap<String, u16>,
+    data: &mut Vec<u8>,
+) -> Result<()> {
+    use serde_json::Value;
+    match value {
+        Value::Null => data.push(0),
+        Value::Bool(false) => data.push(1),
+        Value::Bool(true) => data.push(2),
+        Value::String(text) => {
+            data.push(3);
+            intern(text, strings, data)?;
+        }
+        Value::Array(items) => {
+            data.push(4);
+            data.extend(u16::try_from(items.len())?.to_le_bytes());
+            for item in items {
+                encode(item, strings, data)?;
+            }
+        }
+        Value::Object(fields) => {
+            data.push(5);
+            data.extend(u16::try_from(fields.len())?.to_le_bytes());
+            for (key, value) in fields {
+                intern(key, strings, data)?;
+                encode(value, strings, data)?;
+            }
+        }
+        Value::Number(_) => bail!("discovery entries contain no numeric fields"),
+    }
+    Ok(())
 }

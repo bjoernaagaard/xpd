@@ -53,13 +53,6 @@ pub(crate) fn weights(
             for word in unique {
                 *counts.entry(word.clone()).or_default() += weight;
             }
-            if j == 2 || j == 5 {
-                for pair in field.windows(2) {
-                    *counts
-                        .entry(format!("{} {}", pair[0], pair[1]))
-                        .or_default() += weight;
-                }
-            }
         }
         for (word, tf) in counts {
             table.entry(word).or_default().push((i, tf));
@@ -81,9 +74,6 @@ pub(crate) fn weights(
                     idf
                 }
                 + name_score;
-            if word.contains(' ') {
-                *tf *= 0.5;
-            }
         }
     }
     table
