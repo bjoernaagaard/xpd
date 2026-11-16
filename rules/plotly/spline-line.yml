@@ -17,7 +17,7 @@
 id: spline-line
 language: python
 severity: info
-message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 a go.Scatter at the default size rose to 10.55 and fell to -0.37. Tufte asks above all else to show the data. Use line_shape="linear", which joins the measured points with straight lines.
+message: This setting selects spline interpolation. When the trace draws a line, its curve can pass through values the data does not hold. A markers-only trace draws no curve. For the values 0, 0, 10, 10, 0, 0 a go.Scatter line at the default size rose to 10.55 and fell to -0.37. Tufte asks above all else to show the data. Use line_shape="linear" when a line should join measured points with straight segments.
 rule:
   kind: string
   regex: '^["'']spline["'']$'
@@ -107,7 +107,7 @@ metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { match
 id: spline-line
 language: python
 severity: info
-message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 a go.Scatter at the default size rose to 10.55 and fell to -0.37. Tufte asks above all else to show the data. Use shape="linear", which joins the measured points with straight lines.
+message: This setting selects spline interpolation. When the trace draws a line, its curve can pass through values the data does not hold. A markers-only trace draws no curve. For the values 0, 0, 10, 10, 0, 0 a go.Scatter line at the default size rose to 10.55 and fell to -0.37. Tufte asks above all else to show the data. Use shape="linear" when a line should join measured points with straight segments.
 rule:
   kind: string
   regex: '^["'']spline["'']$'

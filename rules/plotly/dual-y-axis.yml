@@ -15,7 +15,7 @@
 id: dual-y-axis
 language: python
 severity: info
-message: A second y axis gives one plot two free scales, so where the lines cross depends on the ranges and not on the data. The same two series crossed at x=1.67 with the automatic ranges and at x=1.81 with another range. Tufte asks to show data variation, not design variation. Draw the series in two panels with make_subplots(rows=2, shared_xaxes=True), or index both to one base.
+message: This setting configures a second y axis. If traces use both overlaid axes with independent ranges, where the lines cross depends on those ranges. Two measured series crossed at x=1.67 with automatic ranges and at x=1.81 with another range. An unused axis does not draw a second scale. Tufte asks to show data variation, not design variation. For two populated scales, use separate panels with make_subplots(rows=2, shared_xaxes=True), or index both series to one base.
 rule:
   any:
     - kind: pair
@@ -47,7 +47,7 @@ rule:
 id: dual-y-axis
 language: python
 severity: info
-message: An axis with overlaying=$V lies over another one, which gives one plot two free scales, so where the lines cross depends on the ranges and not on the data. The same two series crossed at x=1.67 with the automatic ranges and at x=1.81 with another range. Tufte asks to show data variation, not design variation. Draw the series in two panels with make_subplots(rows=2, shared_xaxes=True), or index both to one base.
+message: This setting configures an axis with overlaying=$V. If traces use both overlaid axes with independent ranges, where the lines cross depends on those ranges. Two measured series crossed at x=1.67 with automatic ranges and at x=1.81 with another range. An unused axis does not draw a second scale. Tufte asks to show data variation, not design variation. For two populated scales, use separate panels with make_subplots(rows=2, shared_xaxes=True), or index both series to one base.
 rule:
   any:
     - kind: keyword_argument

@@ -21,7 +21,7 @@
 id: rainbow-colorscale
 language: python
 severity: warning
-message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, rose from 13.5 to 97.1 and fell back to 25.5 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+message: $S selects a spectrum colorscale. An unused coloraxis does not color any values. If a trace uses this scale for numeric color, its CIELAB lightness, 0 for black and 100 for white, rose from 13.5 to 97.1 and fell back to 25.5 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
 rule:
   pattern: $S
   matches: spectrum-scale
@@ -128,7 +128,7 @@ metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-ty
 id: rainbow-colorscale
 language: python
 severity: warning
-message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, fell from 32.3 to 21.9, rose to 90.6 and fell to 53.2 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+message: $S selects a spectrum colorscale. An unused coloraxis does not color any values. If a trace uses this scale for numeric color, its CIELAB lightness, 0 for black and 100 for white, fell from 32.3 to 21.9, rose to 90.6 and fell to 53.2 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
 rule:
   pattern: $S
   matches: spectrum-scale
@@ -235,7 +235,7 @@ metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-ty
 id: rainbow-colorscale
 language: python
 severity: warning
-message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, rose from 11.8 to 90.7 and fell back to 24.4 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+message: $S selects a spectrum colorscale. An unused coloraxis does not color any values. If a trace uses this scale for numeric color, its CIELAB lightness, 0 for black and 100 for white, rose from 11.8 to 90.7 and fell back to 24.4 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
 rule:
   pattern: $S
   matches: spectrum-scale
@@ -342,7 +342,7 @@ metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-ty
 id: rainbow-colorscale
 language: python
 severity: warning
-message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, rose from 53.2 to 88.2, fell to 34.0 and rose to 53.2 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+message: $S selects a spectrum colorscale. An unused coloraxis does not color any values. If a trace uses this scale for numeric color, its CIELAB lightness, 0 for black and 100 for white, rose from 53.2 to 88.2, fell to 34.0 and rose to 53.2 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
 rule:
   pattern: $S
   matches: spectrum-scale

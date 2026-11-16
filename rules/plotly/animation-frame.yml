@@ -79,7 +79,7 @@ utils:
 id: animation-frame
 language: python
 severity: info
-message: These frames make an animation that shows one frame at a time, so the reader compares the frames from memory. A go.Figure with three frames of one point drew 1 point, where make_subplots(rows=1, cols=3) drew all 3. Tufte's small multiples put the frames side by side. Draw one panel for each frame with make_subplots when the frames are few enough to fit.
+message: This code sets figure frames. If multiple frames display different data, animation asks the reader to compare them from memory. An empty figure or a single frame does not establish that comparison. A measured go.Figure with three frames of one point drew 1 point, where make_subplots(rows=1, cols=3) drew all 3. Tufte's small multiples put comparable frames side by side. Use make_subplots when multiple displayed frames are few enough to fit.
 rule:
   any:
     - kind: keyword_argument

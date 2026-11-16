@@ -9832,6 +9832,10 @@ Recall was 32 of 48. The rule found none of 8 values held in a name. Other measu
 
 Reports a cell with `"secondary_y": True` in the `specs` of `make_subplots`, and an axis with `overlaying="y"` or `overlaying="x"` in `update_layout`, `go.Layout` or `go.Figure`.
 
+The rule reports the axis configuration. It does not prove that traces populate both axes.
+An unused secondary axis draws no second scale. The comparison warning applies when traces
+use both overlaid axes with independent ranges.
+
 Example:
 
 ```python
@@ -10229,6 +10233,10 @@ found.
 
 Reports the color scales Jet, Rainbow, Turbo and HSV, written as a string in any case with or without `_r`, or as `px.colors.sequential.Jet` and the like, when it is given to `colorscale`, `color_continuous_scale` or a setting that ends in `_colorscale` inside a plotly call, or assigned to `px.defaults.color_continuous_scale`.
 
+The rule reports a configured scale, including unused coloraxis settings. Its drawn-color
+warning applies only when a trace uses the scale for numeric color. A scatter without numeric
+color values or a reference to the configured coloraxis does not display that scale.
+
 Example:
 
 ```python
@@ -10351,6 +10359,10 @@ found.
 
 Reports the line shape `"spline"`: `line_shape="spline"` on `px.area`, `px.line`, `px.line_polar` and `px.line_ternary`, on the five go traces whose line takes the shape, which are `go.Scatter`, `go.Scattercarpet`, `go.Scatterpolar`, `go.Scattersmith` and `go.Scatterternary`, and in `update_traces` on a plotly figure, and `line=dict(shape="spline")` or `line={"shape": "spline"}` on the same five traces.
 
+The rule reports the interpolation setting. It does not prove that the trace draws a line.
+A markers-only trace draws no curve, so the interpolation warning applies only when line
+mode is active. The unsafe fix changes the configured shape even if it is currently unused.
+
 Example:
 
 ```python
@@ -10384,6 +10396,10 @@ Recall was 40 of 48. The rule found none of 8 values held in a name. All other p
 found.
 
 Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11. It also reports frames built with `go.Frame`: `frames=` in `go.Figure` or in `update` on a plotly figure, and `fig.frames = ...`.
+
+The rule reports frame configuration. An empty figure or a single frame does not establish
+an animation with different data to compare. The small-multiple advice applies when multiple
+frames display different data, and their panels fit on the page.
 
 Example:
 
