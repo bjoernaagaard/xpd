@@ -401,7 +401,8 @@ impl LocalProject {
                 .flatten()
         });
         let mut others = self.util_dirs.iter().chain(tests);
-        !others.any(|dir| path.starts_with(dir))
+        self.rule_dirs.iter().any(|dir| path.starts_with(dir))
+            && !others.any(|dir| path.starts_with(dir))
             && path != self.config
             && Some(path) != self.manifest.as_deref()
     }

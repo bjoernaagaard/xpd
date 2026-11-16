@@ -237,10 +237,18 @@ fn matched_rules<'p, 'r>(
 #[derive(Debug)]
 pub(crate) struct Found {
     pub(crate) issue: Issue,
+    pub(crate) labels: Vec<Label>,
     /// The bytes of the source that the rule matched.
     pub(crate) range: Range<usize>,
     /// What the rule's fix writes for this match. `None` when the issue has no fix.
     pub(crate) fix: Option<Replacement>,
+}
+
+#[derive(Debug)]
+pub(crate) struct Label {
+    pub(crate) range: Range<usize>,
+    pub(crate) style: ast_grep_config::LabelStyle,
+    pub(crate) message: Option<String>,
 }
 
 /// New text for a range of bytes of the source.
@@ -304,6 +312,16 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
             };
             found.push(Found {
                 issue,
+                labels: rule
+                    .config
+                    .get_labels(&m)
+                    .into_iter()
+                    .map(|label| Label {
+                        range: label.range(),
+                        style: label.style,
+                        message: label.message.map(str::to_owned),
+                    })
+                    .collect(),
                 range: m.range(),
                 fix: edit.map(|edit| Replacement {
                     range: edit.position..edit.position + edit.deleted_length,

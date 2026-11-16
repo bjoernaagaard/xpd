@@ -218,8 +218,12 @@ fn run_case(
                 || format!("{}/{}", found.issue.package, found.issue.rule) == case.id
         });
         let actual = found.map(|found| {
-            let mut result = json!({"labels": [{"source": &source[found.range.clone()],
-            "style": "primary", "start": found.range.start, "end": found.range.end}]});
+            let labels: Vec<_> = found.labels.iter().map(|label| {
+                let mut value = json!({ "source": &source[label.range.clone()], "style": label.style, "start": label.range.start, "end": label.range.end });
+                if let Some(message) = &label.message { value["message"] = json!(message); }
+                value
+            }).collect();
+            let mut result = json!({"labels": labels});
             if let Some(edit) = found.fix {
                 let mut fixed = source.clone();
                 fixed.replace_range(edit.range, &edit.text);

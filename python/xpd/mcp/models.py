@@ -220,7 +220,7 @@ class RuleSummary(Output):
     message: str
     fix: FixSafety | None
     since: str | None = Field(description="The first library version the rule applies to.")
-    url: str = Field(description="The rule's section of the documentation.")
+    url: str | None = Field(description="The rule documentation URL, when supplied.")
 
 
 class Rule(RuleSummary):

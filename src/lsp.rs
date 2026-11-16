@@ -377,6 +377,7 @@ fn lint<'d>(
                 .or_else(|| project.load_error.clone());
             if let Some(message) = error {
                 found.push(Found {
+                    labels: Vec::new(),
                     issue: Issue {
                         package: "xpd".into(),
                         rule: "invalid-rule".into(),
@@ -443,12 +444,43 @@ fn diagnostic(issue: &Issue, range: lsp_types::Range) -> Diagnostic {
     }
 }
 
-fn diagnostics(document: &Document, found: &[Found], encoding: Encoding) -> Vec<Diagnostic> {
+fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<Diagnostic> {
     let lines = Lines::new(&document.text, encoding);
-    found
+    linted
+        .found
         .iter()
-        .map(|found| diagnostic(&found.issue, lsp_range(&lines, &marked(found, &lines))))
+        .map(|found| {
+            let mut diagnostic =
+                diagnostic(&found.issue, lsp_range(&lines, &marked(found, &lines)));
+            diagnostic.code_description = rule_help(&linted.catalog, &found.issue)
+                .and_then(|(_, url)| url)
+                .and_then(|href| href.parse().ok())
+                .map(|href| CodeDescription { href });
+            diagnostic
+        })
         .collect()
+}
+
+fn rule_help<'a>(catalog: &'a Catalog, issue: &Issue) -> Option<(&'a str, Option<String>)> {
+    let pack = catalog
+        .packs
+        .iter()
+        .find(|pack| pack.module == issue.package)?;
+    let rule = pack.rules.iter().find(|rule| rule.id == issue.rule);
+    let doc = pack
+        .doc(&issue.rule)
+        .or_else(|| rule.map(|rule| rule.config.note.as_deref().unwrap_or(&rule.config.message)))?;
+    let url = if pack.is_embedded() {
+        Some(catalog::url(&issue.rule))
+    } else {
+        rule.and_then(|rule| {
+            rule.config
+                .url
+                .clone()
+                .or_else(|| uri::from_path(&rule.source).map(|uri| uri.as_str().to_owned()))
+        })
+    };
+    Some((doc, url))
 }
 
 /// The range of `old` that differs from `new`, with the text `new` has there. The fix-all
@@ -876,7 +908,7 @@ impl<'c> Server<'c> {
         let (document, linted) = lint(&mut self.workspace, document)?;
         let params = PublishDiagnosticsParams::new(
             document.uri.clone(),
-            diagnostics(document, &linted.found, self.client.encoding),
+            diagnostics(document, linted, self.client.encoding),
             document.version,
         );
         self.notify::<PublishDiagnostics>(params);
@@ -946,7 +978,7 @@ impl<'c> Server<'c> {
         let items = match document {
             Some(document) => {
                 let (document, linted) = lint(&mut self.workspace, document)?;
-                diagnostics(document, &linted.found, self.client.encoding)
+                diagnostics(document, linted, self.client.encoding)
             }
             None => Vec::new(),
         };
@@ -979,21 +1011,11 @@ impl<'c> Server<'c> {
                 continue;
             }
             let issue = &found.issue;
-            let Some(doc) = linted
-                .catalog
-                .packs
-                .iter()
-                .find(|pack| pack.module == issue.package)
-                .and_then(|pack| pack.doc(&issue.rule))
-            else {
+            let Some((doc, url)) = rule_help(&linted.catalog, issue) else {
                 continue;
             };
-            let link = format!(
-                "[{}/{}]({})",
-                issue.package,
-                issue.rule,
-                catalog::url(&issue.rule)
-            );
+            let name = format!("{}/{}", issue.package, issue.rule);
+            let link = url.map_or_else(|| name.clone(), |url| format!("[{name}]({url})"));
             let section = format!("{}\n\n{link}", doc.trim_end());
             // Two matches of one rule at the cursor share one section.
             if !sections.contains(&section) {
