@@ -386,6 +386,6 @@ then rerun the command to regenerate both symbols and recipes.
 
 `xpd find --check indexes/questions.json` runs the real discovery questions and exits 2 if an
 expected entry is absent from the top five of its own kind, including five rules or recipes
-regardless of the display defaults. It prints every failure. Lefthook runs this command
+regardless of the display defaults. It prints every failure. A question marked `"open": true` records what a user asked and the answer they expect. It is kept as data for later work on discovery and is not checked. Lefthook runs this command
 before commits with no tolerated misses. Questions that still fail go to a later ranking
 investigation without changing their wording or adding question-specific ranking rules.

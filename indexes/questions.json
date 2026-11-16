@@ -1,7 +1,8 @@
 [
   {
     "query": "time series bootstrap for cross validation",
-    "expected": "mapie.subsample.BlockBootstrap"
+    "expected": "mapie.subsample.BlockBootstrap",
+    "answer": "I simply meant what classes and modules within the rules or packages we support are available."
   },
   {
     "query": "small multiples",
@@ -206,5 +207,52 @@
   {
     "query": "bar chart of amounts by category",
     "expected": "plotly.express.bar"
+  },
+  {
+    "open": true,
+    "query": "I want a grouped regression on my model, which uses a time series model, going from 1 model that uses all data to 24 individual models",
+    "answer": "I just meant scikit-lego's grouped modules.",
+    "expected": [
+      "sklego.meta.GroupedPredictor",
+      "sklego.meta.GroupedClassifier",
+      "sklego.meta.GroupedRegressor",
+      "sklego.meta.GroupedTransformer"
+    ]
+  },
+  {
+    "open": true,
+    "query": "Help me implement a plotly chart from scratch based on our ruleset derived from the book",
+    "answer": "Maybe not as strict, but yeah, basically a way to steer the agent in the right direction."
+  },
+  {
+    "open": true,
+    "query": "I need to try a diverse set of linear models that doesn't require data to be scaled first. Which ones?",
+    "answer": "This is perhaps the most ambiguous one, but it is basically a model that does need scaling. The ambiguous part is that implied in the symbol of the data or code."
+  },
+  {
+    "open": true,
+    "query": "I need to fit a linear model but impose a monotonic constraint",
+    "answer": "Here it could literally be anything. I was more thinking of some kind of a data transformer like scikit-lego IntervalEncoder.",
+    "expected": [
+      "sklego.preprocessing.IntervalEncoder"
+    ]
+  },
+  {
+    "open": true,
+    "query": "I need to come up with an unsupervised solution to determine what group of hours of the day are most similar based on a similarity score",
+    "answer": "This is also a hard one. Unsupervised implies one kind of thing, a type of method, and xpd can at least come with a suggestion. Similarity score is also a thing."
+  },
+  {
+    "open": true,
+    "query": "I need a way to estimate and optimize sample_weights",
+    "answer": "scikit-lego DecayEstimator and its functions.",
+    "expected": [
+      "sklego.meta.DecayEstimator"
+    ]
+  },
+  {
+    "open": true,
+    "query": "I need to come up with a testable way to find the best scaler method",
+    "answer": "At least you could suggest scaling with a diverse set of scalers."
   }
 ]

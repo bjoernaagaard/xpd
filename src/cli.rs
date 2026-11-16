@@ -707,6 +707,11 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
 fn check_ranking(entries: &index::Library, path: &std::path::Path) -> Result<()> {
     let questions: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
     let mut failed = 0;
+    // An open question records what a user asked and the answer they expect. Keyword ranking
+    // cannot answer it yet, so it is kept as data and not checked.
+    let (open, questions): (Vec<_>, Vec<_>) = questions
+        .into_iter()
+        .partition(|question| question["open"] == true);
     for question in &questions {
         let query = question["query"].as_str().context("question needs query")?;
         let expected = question["expected"]
@@ -737,6 +742,7 @@ fn check_ranking(entries: &index::Library, path: &std::path::Path) -> Result<()>
         questions.len() - failed,
         questions.len()
     );
+    println!("{} open questions are recorded and not checked", open.len());
     anyhow::ensure!(failed == 0, "{failed} discovery questions failed");
 
     Ok(())
