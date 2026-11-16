@@ -22,6 +22,8 @@ its result. Every path is relative to the project root.
 
 - Before choosing a library, call `find` with the task, then `api` with a returned name.\
 
+- After choosing and writing code, call `discovery_gate` on its files before `equiv`.\
+
 - After you write or change Python, call `check`. Fix every error. Fix a warning unless you can \
 say why the code is right. `fix` writes xpd's fixes, and asks the user before unsafe ones.
 - To learn why a rule fires and see its before and after code, call `rule`. `rules` lists and \

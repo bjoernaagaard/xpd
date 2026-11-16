@@ -59,7 +59,7 @@ def choice_problems(discovery: Discovery) -> list[str]:
 async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Discovery) -> Gate:
     choice = discovery.choice
     failures = choice_problems(discovery)
-    packages = {name.split(".")[0] for name in choice.symbols}
+    modules = {name.rsplit(".", 1)[0] for name in choice.symbols}
     used = set()
     checked = 0
     for path in paths:
@@ -76,7 +76,7 @@ async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Disco
             if head not in names:
                 continue
             name = ".".join([names[head], *tail])
-            if name.split(".")[0] not in packages:
+            if name.rsplit(".", 1)[0] not in modules:
                 continue
             place = f"{path}:{node.lineno}"
             try:
@@ -101,8 +101,8 @@ async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Disco
         passed=not failures,
         detail=" ".join(failures)
         or (
-            f"{checked} direct imported calls have indexed callable names and literal keyword "
-            "names in api's parameter lists. No code was run."
+            f"Checked {checked} direct imported calls for indexed callable names and literal "
+            "keyword names in api's parameter lists. No code was run."
         ),
     )
 
@@ -112,7 +112,7 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     async def discovery_gate(
         ctx: Context, paths: list[str], discovery: Discovery
     ) -> DiscoveryProof | InputRequiredResult:
-        """Read Python files and check direct imported calls in the chosen symbols' packages.
+        """Read Python files and check direct imported calls in the chosen symbols' modules.
 
         Resolve import aliases and ask the binary's api for each direct call's dotted name.
         Require every chosen symbol to be called and every literal keyword to occur in the
