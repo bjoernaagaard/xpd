@@ -1,0 +1,33 @@
+# pd.IndexSlice builds the tuple of slices that .loc takes for the levels of a MultiIndex, written
+# with the colon that a slice has everywhere else. On pandas 3.1.1, pd.IndexSlice["a", :, 1] was
+# equal to ("a", slice(None), 1), and .loc gave equal frames with the two, on the rows and on the
+# columns (research/modern-pandas/probes/alignment.txt). The fix is safe for that reason. A tuple
+# with a slice that has bounds, as in slice("a", "c"), is reported without a fix.
+id: tuple-slice-on-levels
+language: python
+severity: info
+message: pd.IndexSlice writes a selection over index levels with the colon that a slice has everywhere else. Write pd.IndexSlice[$NEW] in place of the tuple, which is the same object.
+rule:
+  kind: tuple
+  pattern: $T
+  all:
+    - has: { pattern: slice(None) }
+    - not: { has: { kind: call, has: { field: function, regex: ^slice$ }, not: { pattern: slice(None) } } }
+    - inside: { kind: subscript, has: { field: value, kind: attribute, has: { field: attribute, regex: ^loc$ } } }
+transform:
+  INNER:
+    substring: { source: $T, startChar: 1, endChar: -1 }
+  NEW:
+    replace: { source: $INNER, replace: 'slice\(None\)', by: ":" }
+fix: pd.IndexSlice[$NEW]
+metadata: { fix: safe }
+---
+id: tuple-slice-on-levels
+language: python
+severity: info
+message: pd.IndexSlice writes a selection over index levels with the colon that a slice has everywhere else, as in pd.IndexSlice["a":"c", :] for (slice("a", "c"), slice(None)).
+rule:
+  kind: tuple
+  all:
+    - has: { kind: call, has: { field: function, regex: ^slice$ }, not: { pattern: slice(None) } }
+    - inside: { kind: subscript, has: { field: value, kind: attribute, has: { field: attribute, regex: ^loc$ } } }

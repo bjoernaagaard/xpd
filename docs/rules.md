@@ -1555,6 +1555,90 @@ skipna=False preserves missing values from the first row. Without it, first can 
 The replacement is advice. xpd does not apply it automatically.
 
 
+### Index alignment and joins
+
+pandas pairs rows by index label in an assignment, in `concat(axis=1)` and in a join. These
+rules report code that turns the pairing off without saying so, and code that pairs by index
+through a longer form. The measurements used pandas 3.1.1.
+
+#### assign-drops-alignment
+
+**Severity:** warning. **Fix:** none.
+
+Reports `df["m"] = other["m"].values`, `.to_numpy()` and `.tolist()`, also through `df.loc[:, "m"]` and as a keyword of `df.assign`. The index of `other` is dropped, so the rows are paired by position. With the same 4 rows in another order, all 4 values landed on the wrong row. A column of the same frame is left alone, because it has the same index.
+
+Example:
+
+```python
+df["region"] = other["region"].values
+```
+
+Use instead:
+
+```python
+df["region"] = other["region"]
+```
+
+The replacement is advice. xpd does not apply it automatically. When the two indexes share no labels, merge the two frames on a key column instead.
+
+#### concat-columns-unchecked
+
+**Severity:** info. **Fix:** none.
+
+Reports `pd.concat([...], axis=1)` without `join=`. The call pairs rows by index label and keeps every label of every frame. With one label that differed, two frames of 4 rows gave 5 rows, and both `int64` columns became `float64` with a missing value. With `join="inner"` the result had the 3 shared rows and both columns stayed `int64`.
+
+Example:
+
+```python
+both = pd.concat([left, right], axis=1)
+```
+
+Use instead:
+
+```python
+both = pd.concat([left, right], axis=1, join="inner")
+```
+
+The replacement is advice. xpd does not apply it automatically. Write `join="outer"` when the missing values are meant.
+
+#### merge-on-both-indexes
+
+**Severity:** info. **Fix:** unsafe: `left.join(right, how="inner")`. None for a merge with another keyword than `how`, `validate` and `sort`.
+
+Reports `left.merge(right, left_index=True, right_index=True)` and the `pd.merge` form. The merge was equal to `left.join(right, how="inner")`, and the two were equal for `how="left"`, `"right"` and `"outer"` and with `validate="1:1"`. The fix is unsafe, because join raises `ValueError` when the two frames share a column name, where merge adds the suffixes `_x` and `_y`.
+
+Example:
+
+```python
+both = left.merge(right, left_index=True, right_index=True)
+```
+
+Use instead:
+
+```python
+both = left.join(right, how="inner")
+```
+
+#### merge-asof-unsorted
+
+**Severity:** warning. **Fix:** none.
+
+Reports `pd.merge_asof(...)` where nothing sorts: the function that holds the call has no `sort_values` and no `sort_index`, or the module has none for a call at module level. An unsorted left frame raised `ValueError` "left keys must be sorted", and an unsorted right frame raised "right keys must be sorted". A frame that another function sorts is reported too.
+
+Example:
+
+```python
+matched = pd.merge_asof(trades, quotes, on="time")
+```
+
+Use instead:
+
+```python
+matched = pd.merge_asof(trades.sort_values("time"), quotes.sort_values("time"), on="time")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
 ### MultiIndex
 
 #### multiindex-from-tuples
@@ -1600,6 +1684,24 @@ names from the Series it is given, where `from_tuples` left them empty. It leave
 built from a range comes back as a RangeIndex, with the same values, where the old form gave an
 Index. On 1,000,000 rows `from_arrays` ran 27 times faster than `from_tuples` over `zip`,
 `from_product` 118 times faster than the comprehension, and `unique` with a level 22 times faster.
+
+#### tuple-slice-on-levels
+
+**Severity:** info. **Fix:** safe: `pd.IndexSlice["a", :, 1]`. None for a slice with bounds.
+
+Reports a tuple with `slice(None)` inside `.loc[...]`, on the rows or on the columns. `pd.IndexSlice["a", :, 1]` was equal to `("a", slice(None), 1)`, and `.loc` gave equal frames with the two. A tuple with a slice that has bounds, as in `slice("a", "c")`, is reported without a fix.
+
+Example:
+
+```python
+rows = df.loc[("a", slice(None), 1), :]
+```
+
+Use instead:
+
+```python
+rows = df.loc[pd.IndexSlice["a", :, 1], :]
+```
 
 ### Time series
 

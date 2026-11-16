@@ -1,0 +1,43 @@
+# .values, .to_numpy() and .tolist() drop the index of a column, so an assignment pairs its rows
+# with the target by position. On pandas 3.1.1, a frame of 4 rows and the same rows sorted the
+# other way gave all 4 values on the wrong row with .values, with .to_numpy() and with .tolist().
+# Assigning the Series itself paired the rows by index label and put all 4 on the right row
+# (research/modern-pandas/probes/alignment.txt).
+#
+# The rule reports a column of one frame assigned to a column of another. A column of the same
+# frame has the same index, so it is left alone. The rule has no fix: when the two indexes do
+# not share labels, the Series form gives missing values, and a merge on a key is the answer.
+id: assign-drops-alignment
+language: python
+severity: warning
+message: This drops the index of $O, so its rows are paired with $DF by position. With the same rows in another order, all 4 values landed on the wrong row. Assign $O[$B] itself, which pairs the rows by index label, or merge the two frames on a key column.
+rule:
+  any:
+    - pattern: $DF[$A] = $O[$B].values
+    - pattern: $DF[$A] = $O[$B].to_numpy()
+    - pattern: $DF[$A] = $O[$B].tolist()
+    - pattern: $DF.loc[:, $A] = $O[$B].values
+    - pattern: $DF.loc[:, $A] = $O[$B].to_numpy()
+    - pattern: $DF.loc[:, $A] = $O[$B].tolist()
+constraints:
+  DF: { kind: identifier }
+  O: { kind: identifier, not: { pattern: $DF } }
+---
+id: assign-drops-alignment
+language: python
+severity: warning
+message: This drops the index of $O, so its rows are paired with $DF by position. With the same rows in another order, all 4 values landed on the wrong row. Pass $O[$B] itself, which pairs the rows by index label, or merge the two frames on a key column.
+rule:
+  kind: keyword_argument
+  has:
+    field: value
+    any:
+      - pattern: $O[$B].values
+      - pattern: $O[$B].to_numpy()
+      - pattern: $O[$B].tolist()
+  inside:
+    kind: argument_list
+    inside: { kind: call, pattern: $DF.assign($$$ARGS) }
+constraints:
+  DF: { kind: identifier }
+  O: { kind: identifier, not: { pattern: $DF } }

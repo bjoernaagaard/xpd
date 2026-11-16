@@ -1,0 +1,22 @@
+# concat(axis=1) pairs rows by index label and keeps every label of every frame. On pandas
+# 3.1.1, two frames of 4 rows with one label that differs gave 5 rows, and both int64 columns
+# became float64 with one missing value each. With join="inner" the result had the 3 shared
+# rows and both columns stayed int64 (research/modern-pandas/probes/alignment.txt). pandas says
+# nothing in either case, so the rule asks the code to say which of the two it means. It has no
+# fix, because only the author knows.
+id: concat-columns-unchecked
+language: python
+severity: info
+message: concat(axis=1) pairs rows by index label and keeps every label of every frame. With one label that differed, two frames of 4 rows gave 5 rows, and both int64 columns became float64 with a missing value. Pass join="inner" to keep only the labels that every frame has, or join="outer" to say that the missing values are meant.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '^(pd|pandas)\.concat$' }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: ^axis$ }
+            - has: { field: value, regex: '^(1|["'']columns["''])$' }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^join$ } } } }

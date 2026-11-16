@@ -1,0 +1,21 @@
+# merge_asof needs both frames sorted by the key. On pandas 3.1.1 an unsorted left frame raised
+# ValueError "left keys must be sorted" and an unsorted right frame raised "right keys must be
+# sorted" (research/modern-pandas/probes/alignment.txt). xpd cannot see the order of the rows, so
+# the rule reports a merge_asof only where nothing sorts: no sort_values and no sort_index in the
+# function that holds the call, or in the module for a call at module level. A frame that is
+# sorted elsewhere, such as in the function that loads it, is reported too.
+id: merge-asof-unsorted
+language: python
+severity: warning
+message: merge_asof raises ValueError "left keys must be sorted" unless both frames are sorted by the key, and nothing here sorts them. Sort each side first, as in pd.merge_asof(left.sort_values("t"), right.sort_values("t"), on="t").
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '^(pd|pandas)\.merge_asof$' }
+    - any:
+        - inside: { stopBy: { kind: function_definition }, kind: function_definition, not: { has: { stopBy: end, matches: sorts } } }
+        - inside: { stopBy: { kind: function_definition }, kind: module, not: { has: { stopBy: end, matches: sorts } } }
+utils:
+  sorts:
+    kind: attribute
+    has: { field: attribute, regex: ^(sort_values|sort_index)$ }

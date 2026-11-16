@@ -1,0 +1,159 @@
+# A merge with left_index=True and right_index=True pairs rows by index label, which is what join
+# does. On pandas 3.1.1, a.merge(b, left_index=True, right_index=True) was equal to
+# a.join(b, how="inner"), and the two were equal for how="left", "right" and "outer" and with
+# validate="1:1" (research/modern-pandas/probes/alignment.txt). merge keeps the shared labels by
+# default and join keeps the left ones, so the fix writes how="inner" when the merge names none.
+#
+# Unsafe: when the two frames share a column name, merge adds the suffixes _x and _y and join
+# raises ValueError "columns overlap but no suffix specified". A merge with any other keyword
+# than how, validate and sort is reported without a fix.
+id: merge-on-both-indexes
+language: python
+severity: info
+message: A merge on both indexes is a join. Write $A.join(..., how=...), which says that the rows are paired by index label. merge keeps the shared labels unless how= says otherwise, which is how="inner" in join.
+rule:
+  pattern: $A.merge($B, $$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^left_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^right_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^how$ } } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(left_index|right_index|how|validate|sort)$ } } } } }
+constraints:
+  A: { not: { regex: '^(pd|pandas)$' } }
+rewriters:
+  - id: drop-index-flag
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(left_index|right_index)$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^(left_index|right_index)$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-index-flag, keep-argument], joinBy: "" }
+  # The kept arguments, each with its ", ", and how="inner" after the last one.
+  REST:
+    replace: { source: $KEPT, replace: "$", by: 'how="inner"' }
+fix: $A.join($B, $REST)
+metadata: { fix: unsafe }
+---
+id: merge-on-both-indexes
+language: python
+severity: info
+message: A merge on both indexes is a join. Write $A.join(..., how=...), which says that the rows are paired by index label. merge keeps the shared labels unless how= says otherwise, which is how="inner" in join.
+rule:
+  pattern: $A.merge($B, $$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^left_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^right_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^how$ } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(left_index|right_index|how|validate|sort)$ } } } } }
+constraints:
+  A: { not: { regex: '^(pd|pandas)$' } }
+rewriters:
+  - id: drop-index-flag
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(left_index|right_index)$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^(left_index|right_index)$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-index-flag, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $A.join($B, $REST)
+metadata: { fix: unsafe }
+---
+id: merge-on-both-indexes
+language: python
+severity: info
+message: A merge on both indexes is a join. Write $A.join(..., how=...), which says that the rows are paired by index label. merge keeps the shared labels unless how= says otherwise, which is how="inner" in join.
+rule:
+  pattern: $PD.merge($A, $B, $$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^left_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^right_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^how$ } } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(left_index|right_index|how|validate|sort)$ } } } } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+rewriters:
+  - id: drop-index-flag
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(left_index|right_index)$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^(left_index|right_index)$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-index-flag, keep-argument], joinBy: "" }
+  # The kept arguments, each with its ", ", and how="inner" after the last one.
+  REST:
+    replace: { source: $KEPT, replace: "$", by: 'how="inner"' }
+fix: $A.join($B, $REST)
+metadata: { fix: unsafe }
+---
+id: merge-on-both-indexes
+language: python
+severity: info
+message: A merge on both indexes is a join. Write $A.join(..., how=...), which says that the rows are paired by index label. merge keeps the shared labels unless how= says otherwise, which is how="inner" in join.
+rule:
+  pattern: $PD.merge($A, $B, $$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^left_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^right_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^how$ } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(left_index|right_index|how|validate|sort)$ } } } } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+rewriters:
+  - id: drop-index-flag
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(left_index|right_index)$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^(left_index|right_index)$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-index-flag, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $A.join($B, $REST)
+metadata: { fix: unsafe }
+---
+id: merge-on-both-indexes
+language: python
+severity: info
+message: A merge on both indexes is a join. Write $A.join(..., how=...), which says that the rows are paired by index label. merge keeps the shared labels unless how= says otherwise, which is how="inner" in join.
+rule:
+  pattern: $A.merge($B, $$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^left_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^right_index$ } }, { has: { field: value, regex: ^True$ } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(left_index|right_index|how|validate|sort)$ } } } }
+constraints:
+  A: { not: { regex: '^(pd|pandas)$' } }
