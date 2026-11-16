@@ -115,9 +115,11 @@ def mapped_values():
     whole_floats = DictMapper({"a": 1.0, "b": 2.0}, default=0).fit(X)
     mapping = {"a": 0.5}
     unseen = DictMapper(mapping, 0).fit(X)
+    digits = DictMapper({"a": "1", "b": "2"}, default=0).fit(X)
     series = pd.Series(["a", "b", "c"]).map({"a": 0.5, "b": 1.7}).fillna(-1)
     return (floats.transform(X), named.transform(X), negative.transform(X), attempt(lambda: text.transform(X)),
-            attempt(lambda: missing.transform(X)), whole.transform(X), whole_floats.transform(X), unseen.transform(X), series)
+            attempt(lambda: missing.transform(X)), whole.transform(X), whole_floats.transform(X), unseen.transform(X), series,
+            digits.transform(X))
 
 
 @case
@@ -161,8 +163,12 @@ def thresholds():
     default = GMMOutlierDetector(random_state=0).fit(X)
     deviations = GMMOutlierDetector(threshold=2, method="stddev", random_state=0).fit(X)
     small_deviations = GMMOutlierDetector(threshold=0.4, method="stddev", random_state=0).fit(X)
+    method = "stddev"
+    by_name = GMMOutlierDetector(threshold=0.4, method=method, random_state=0).fit(X)
+    half = GMMOutlierDetector(threshold=0.5, random_state=0).fit(X)
     return (no_threshold, no_threshold_umap, searched, second.predict(X), share.predict(X), bayes.predict(X), large, larger,
-            kept.predict(X), default.predict(X), deviations.predict(X), small_deviations.predict(X))
+            kept.predict(X), default.predict(X), deviations.predict(X), small_deviations.predict(X), by_name.predict(X),
+            half.predict(X))
 
 
 @case

@@ -123,6 +123,13 @@ class OwnEstimator:
 
 
 @case
+def own_attributes():
+    own = OwnEstimator()
+    own.fit(np.zeros((4, 3)))
+    return own.dim_, own.n_levels_
+
+
+@case
 def fair_penalty():
     warnings.simplefilter("ignore")
     X, y = data()

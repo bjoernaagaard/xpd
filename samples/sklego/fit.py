@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
+from sklearn.cross_decomposition import PLSCanonical
 from sklearn.datasets import make_regression
 from sklearn.ensemble import IsolationForest, RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
@@ -60,7 +61,9 @@ def lagged_columns():
     rows_before = add_lags(frame, "sales", [-1, -2])
     steps = [-1, -7]
     from_name = add_lags(frame, "sales", steps)
-    return next_row, next_rows, mixed, named, ranged, row_before, rows_before, from_name
+    counted_up = add_lags(frame, "sales", range(3))  # xpd: add-lags-positive
+    counted_down = add_lags(frame, "sales", range(0, -3, -1))
+    return next_row, next_rows, mixed, named, ranged, row_before, rows_before, from_name, counted_up, counted_down
 
 
 @case
@@ -92,9 +95,10 @@ def decayed_models():
     piped = attempt(lambda: DecayEstimator(make_pipeline(StandardScaler(), Ridge())).fit(X, y))  # xpd: decay-without-sample-weight
     named = attempt(lambda: DecayEstimator(model=Pipeline([("scale", StandardScaler()), ("model", Ridge())])).fit(X, y))  # xpd: decay-without-sample-weight
     neighbours = attempt(lambda: DecayEstimator(KNeighborsRegressor()).fit(X, y))  # xpd: decay-without-sample-weight
+    canonical = attempt(lambda: DecayEstimator(PLSCanonical()).fit(X, y))  # xpd: decay-without-sample-weight
     inside = make_pipeline(StandardScaler(), DecayEstimator(Ridge())).fit(X, y)
     weighted = DecayEstimator(RandomForestRegressor(n_estimators=5, random_state=0)).fit(X, y)
-    return piped, named, neighbours, inside.predict(X), weighted.predict(X)
+    return piped, named, neighbours, inside.predict(X), weighted.predict(X), canonical
 
 
 @case
