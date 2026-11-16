@@ -52,6 +52,17 @@ enum Format {
     Json,
 }
 
+#[derive(Debug, clap::Args)]
+struct IndexArgs {
+    source: PathBuf,
+    #[arg(long)]
+    package: String,
+    #[arg(long)]
+    version: Option<String>,
+    #[arg(long)]
+    output: Option<PathBuf>,
+}
+
 #[derive(Debug, Subcommand)]
 enum Cmd {
     /// Find libraries and rules for a task, without importing Python.
@@ -69,9 +80,6 @@ enum Cmd {
         /// Run real discovery questions and fail if an expected entry misses the top five.
         #[arg(long, conflicts_with = "query")]
         check: Option<PathBuf>,
-        /// Allowed ranking misses for an explicit regression baseline. Every miss is printed.
-        #[arg(long, default_value_t = 0, requires = "check")]
-        max_misses: usize,
     },
     /// Show a public symbol's parameters, summary, own members and guarding rules.
     Api {
@@ -82,15 +90,7 @@ enum Cmd {
         index: Option<PathBuf>,
     },
     /// Parse library source into a versioned index. Never imports or runs library code.
-    Index {
-        source: PathBuf,
-        #[arg(long)]
-        package: String,
-        #[arg(long)]
-        version: Option<String>,
-        #[arg(long)]
-        output: Option<PathBuf>,
-    },
+    Index(IndexArgs),
     /// Lint Python files. Exit 0 when clean, 1 on any error-severity issue, 2 if xpd can't run.
     ///
     /// A library's rules run only on files that import it, and the Python rules run on every file.
@@ -213,15 +213,14 @@ pub(crate) fn run() -> ExitCode {
             format,
             index,
             check,
-            max_misses,
         } => discovery((|| {
             let entries = index::load(index.as_deref())?;
             if let Some(path) = check {
-                check_ranking(&entries, &path, max_misses)?;
+                check_ranking(&entries, &path)?;
             } else {
                 let query = query.context("provide a task query or --check")?;
                 let found = index::find(&entries, &query, package.as_deref(), kind);
-                print_entries(&found, format, Detail::Summary)?;
+                print_entries(&found.iter().collect::<Vec<_>>(), format, Detail::Summary)?;
             }
             Ok(())
         })()),
@@ -231,34 +230,11 @@ pub(crate) fn run() -> ExitCode {
             index,
         } => discovery((|| {
             let entries = index::load(index.as_deref())?;
-            let entry = entries
-                .iter()
-                .find(|e| e.name == name)
-                .with_context(|| format!("no entry named {name}"))?;
-            print_entries(&[entry], format, Detail::Full)
+            let entry =
+                index::api(&entries, &name)?.with_context(|| format!("no entry named {name}"))?;
+            print_entries(&[&entry], format, Detail::Full)
         })()),
-        Cmd::Index {
-            source,
-            package,
-            version,
-            output,
-        } => discovery((|| {
-            let version = match version {
-                Some(v) => v,
-                None => index::source_version(&source, &package)?,
-            };
-            let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
-            let index = index::generate(&source, &package, &version)?;
-            std::fs::write(&output, serde_json::to_vec(&index)?)?;
-            println!(
-                "{} {}: {} symbols written to {}",
-                package,
-                version,
-                index.entries.len(),
-                output.display()
-            );
-            Ok(())
-        })()),
+        Cmd::Index(args) => discovery(refresh_index(args)),
         Cmd::Hook => hook(),
         Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
@@ -278,6 +254,25 @@ pub(crate) fn run() -> ExitCode {
 }
 
 /// Prints every rule of every pack, whatever the project's venv holds.
+fn refresh_index(args: IndexArgs) -> Result<()> {
+    let IndexArgs {
+        source,
+        package,
+        version,
+        output,
+    } = args;
+    let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
+    let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
+    let index = index::generate(&source, &package, &version)?;
+    std::fs::write(&output, serde_json::to_vec(&index)?)?;
+    println!(
+        "{package} {version}: {} entries written to {}",
+        index.entries.len(),
+        output.display()
+    );
+    Ok(())
+}
+
 fn rules(format: Format) -> ExitCode {
     let packs = match pack::load(None) {
         Ok(packs) => packs,
@@ -572,10 +567,30 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
         Format::Json => println!("{}", serde_json::to_string(&entries)?),
         Format::Text => {
             for entry in entries {
+                let signature = if entry.kind == Kind::Symbol {
+                    let params = if matches!(detail, Detail::Summary)
+                        && entry.parameters.join(", ").len() > 70
+                    {
+                        format!(
+                            "{}, ...",
+                            entry
+                                .parameters
+                                .iter()
+                                .take(4)
+                                .cloned()
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    } else {
+                        entry.parameters.join(", ")
+                    };
+                    format!("({params})")
+                } else {
+                    String::new()
+                };
                 println!(
-                    "{}({}) [{}]\n{}",
+                    "{}{signature} [{}]\n{}",
                     entry.name,
-                    entry.parameters.join(", "),
                     entry.callable.as_deref().unwrap_or("rule"),
                     entry.summary
                 );
@@ -596,11 +611,7 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
     Ok(())
 }
 
-fn check_ranking(
-    entries: &[index::Entry],
-    path: &std::path::Path,
-    max_misses: usize,
-) -> Result<()> {
+fn check_ranking(entries: &index::Library, path: &std::path::Path) -> Result<()> {
     let questions: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
     let mut failed = 0;
     for question in &questions {
@@ -609,7 +620,7 @@ fn check_ranking(
             .as_str()
             .context("question needs expected")?;
         anyhow::ensure!(
-            entries.iter().any(|e| e.name == expected),
+            index::contains(entries, expected),
             "expected entry {expected} is absent from the index"
         );
         let found = index::find(entries, query, None, None);
@@ -630,10 +641,7 @@ fn check_ranking(
         questions.len() - failed,
         questions.len()
     );
-    anyhow::ensure!(
-        failed <= max_misses,
-        "{failed} discovery questions failed; allowed {max_misses}"
-    );
+    anyhow::ensure!(failed == 0, "{failed} discovery questions failed");
 
     Ok(())
 }

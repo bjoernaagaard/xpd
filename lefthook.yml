@@ -14,7 +14,7 @@ pre-commit:
       run: cargo run --quiet -- check samples/good.py --format text
     - name: discovery ranking
       glob: ["indexes/*.json", "*.rs"]
-      run: cargo run --quiet -- find --check indexes/questions.json --max-misses 3
+      run: cargo run --quiet -- find --check indexes/questions.json
     - name: ruff format
       glob: ["py/*.py", "python/**/*.py"]
       run: ruff format {staged_files}

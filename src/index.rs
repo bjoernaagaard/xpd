@@ -7,7 +7,7 @@ use ast_grep_core::{Node, tree_sitter::StrDoc};
 use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 
-use crate::{catalog, pack, scan};
+use crate::{pack, scan};
 
 type Syntax<'a> = Node<'a, StrDoc<SupportLang>>;
 
@@ -47,8 +47,6 @@ pub(crate) struct Index {
     pub(crate) entries: Vec<Entry>,
 }
 
-const EMBEDDED: &[&str] = include!(concat!(env!("OUT_DIR"), "/indexes.rs"));
-
 fn public(name: &str) -> bool {
     name.split('.').all(|s| !s.starts_with('_'))
 }
@@ -70,10 +68,8 @@ fn parameters(node: &Syntax<'_>) -> Vec<String> {
         .collect()
 }
 
-fn introduction(node: &Syntax<'_>) -> String {
-    let Some(body) = node.field("body") else {
-        return String::new();
-    };
+fn documentation(node: &Syntax<'_>) -> String {
+    let body = node.field("body").unwrap_or_else(|| node.clone());
     let Some(first) = body
         .children()
         .find(|n| n.is_named() && n.kind() != "comment")
@@ -103,6 +99,13 @@ fn introduction(node: &Syntax<'_>) -> String {
         .trim()
         .lines()
         .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn introduction(node: &Syntax<'_>) -> String {
+    documentation(node)
+        .lines()
         .take_while(|s| {
             ![
                 "Parameters",
@@ -171,6 +174,20 @@ fn files(root: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<()> {
             continue;
         }
         if path.is_dir() {
+            let init = std::fs::read_to_string(path.join("__init__.py")).unwrap_or_default();
+            let tree = scan::parse(&init);
+            let description = introduction(&tree.root()).to_lowercase();
+            if [
+                "should be accessed through",
+                "internal use only",
+                "not part of the public api",
+                "vendored",
+            ]
+            .iter()
+            .any(|marker| description.contains(marker))
+            {
+                continue;
+            }
             files(&path, out)?;
         } else if path.extension().is_some_and(|e| e == "py") {
             out.push(path);
@@ -199,6 +216,7 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
     let mut entries = BTreeMap::new();
     let mut bindings = BTreeMap::<String, String>::new();
     let mut stars = Vec::new();
+    let mut classes = BTreeMap::new();
     for path in paths {
         let relative = path.strip_prefix(&root)?.with_extension("");
         let parts: Vec<_> = relative
@@ -216,10 +234,35 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         let tree = scan::parse(&text);
         let top = tree.root();
         read_definitions(&top, &module, package, &mut entries, &mut bindings);
+        for def in definitions(&top)
+            .into_iter()
+            .filter(|d| d.kind() == "class_definition")
+        {
+            let Some(name) = def.field("name") else {
+                continue;
+            };
+            let bases = def
+                .field("superclasses")
+                .map(|b| {
+                    b.children()
+                        .filter(|n| matches!(n.kind().as_ref(), "identifier" | "attribute"))
+                        .map(|n| format!("{module}.{}", n.text()))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let owns_init = def.field("body").is_some_and(|b| {
+                definitions(&b)
+                    .iter()
+                    .any(|m| m.field("name").is_some_and(|n| n.text() == "__init__"))
+            });
+            classes.insert(format!("{module}.{}", name.text()), (bases, owns_init));
+        }
         read_imports(&top, &module, usize::from(init), &mut bindings, &mut stars);
         read_aliases(&top, &module, &mut bindings);
     }
     resolve_exports(&mut bindings, &stars);
+    let inherited = inherit(&mut entries, &classes, &bindings);
+    eprintln!("{package}: {inherited} classes gained constructor parameters");
     let mut names = BTreeMap::<String, String>::new();
     for (alias, target) in bindings {
         if !public(&alias) || !entries.contains_key(&target) {
@@ -254,198 +297,261 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
     })
 }
 
-pub(crate) fn load(extra: Option<&Path>) -> Result<Vec<Entry>> {
-    let mut entries = Vec::new();
-    for text in EMBEDDED {
-        let index: Index = serde_json::from_str(text).context("invalid embedded index")?;
-        entries.extend(index.entries);
-    }
-    if let Some(path) = extra {
-        let index: Index = serde_json::from_str(&std::fs::read_to_string(path)?)?;
-        ensure!(index.schema_version == 1, "unsupported index schema");
-        entries.retain(|e| e.package != index.package);
-        entries.extend(index.entries);
-    }
-    let packs = pack::load(None)?;
-    attach_rules(
-        &mut entries,
-        &packs.iter().map(|p| p.module).collect::<Vec<_>>(),
-    )?;
-    entries.extend(catalog::entries(&packs).iter().map(|r| {
-        let r = r.to_json();
-        Entry {
-            kind: Kind::Rule,
-            package: r["package"].as_str().unwrap_or_default().into(),
-            name: format!(
-                "{}/{}",
-                r["package"].as_str().unwrap_or_default(),
-                r["rule"].as_str().unwrap_or_default()
-            ),
-            callable: None,
-            parameters: Vec::new(),
-            summary: format!(
-                "{}\n\n{}",
-                r["message"].as_str().unwrap_or_default(),
-                r["doc"].as_str().unwrap_or_default()
-            ),
-            keywords: Vec::new(),
-            members: Vec::new(),
-            rules: Vec::new(),
+fn inherit(
+    entries: &mut BTreeMap<String, Entry>,
+    classes: &BTreeMap<String, (Vec<String>, bool)>,
+    bindings: &BTreeMap<String, String>,
+) -> usize {
+    let snapshot = entries.clone();
+    let resolve = |name: &str| {
+        let mut parts: Vec<_> = name.split('.').collect();
+        let mut suffix = Vec::new();
+        while !parts.is_empty() {
+            if let Some(target) = bindings.get(&parts.join(".")) {
+                suffix.reverse();
+                return if suffix.is_empty() {
+                    target.clone()
+                } else {
+                    format!("{target}.{}", suffix.join("."))
+                };
+            }
+            if let Some(part) = parts.pop() {
+                suffix.push(part);
+            }
         }
-    }));
-    Ok(entries)
+        name.to_owned()
+    };
+    let mut gained = 0;
+    for (name, (bases, owns_init)) in classes {
+        let Some(entry) = entries.get_mut(name) else {
+            continue;
+        };
+        let mut queue: std::collections::VecDeque<_> = bases.iter().map(|b| resolve(b)).collect();
+        let mut seen = BTreeSet::new();
+        let mut constructor = *owns_init;
+        while let Some(base) = queue.pop_front() {
+            if !seen.insert(base.clone()) {
+                continue;
+            }
+            let Some(parent) = snapshot.get(&base) else {
+                continue;
+            };
+            let Some((ancestors, parent_init)) = classes.get(&base) else {
+                continue;
+            };
+            if !constructor && *parent_init {
+                entry.parameters.clone_from(&parent.parameters);
+                constructor = true;
+                gained += usize::from(!entry.parameters.is_empty());
+            }
+            for member in &parent.members {
+                if !entry.members.iter().any(|m| m.name == member.name) {
+                    entry.members.push(member.clone());
+                }
+            }
+            queue.extend(ancestors.iter().map(|b| resolve(b)));
+        }
+    }
+    gained
 }
 
-fn tokens(text: &str) -> Vec<String> {
-    let mut split = String::new();
-    let mut previous = false;
-    for ch in text.chars() {
-        if ch.is_uppercase() && previous {
-            split.push(' ');
-        }
-        split.extend(ch.to_lowercase());
-        previous = ch.is_lowercase();
+#[derive(Debug)]
+pub(crate) struct Library {
+    local: Option<Vec<Entry>>,
+}
+
+pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
+    let local = if let Some(path) = extra {
+        let index: Index = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+        ensure!(index.schema_version == 1, "unsupported index schema");
+        let mut entries = RECORDS
+            .iter()
+            .filter(|e| e.package != index.package)
+            .map(|e| serde_json::from_str(e.json))
+            .collect::<std::result::Result<Vec<Entry>, _>>()?;
+        entries.extend(index.entries);
+        Some(entries)
+    } else {
+        None
+    };
+    Ok(Library { local })
+}
+
+pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
+    if let Some(entries) = &library.local {
+        return Ok(entries.iter().find(|e| e.name == name).cloned());
     }
-    split
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|s| s.len() > 1 && !s.chars().all(|c| c.is_ascii_digit()))
-        .filter(|s| {
-            ![
-                "the", "and", "for", "with", "from", "into", "that", "this", "how", "can", "use",
-                "data", "using", "going", "to", "of", "in", "on", "is", "an", "my", "it", "all",
-            ]
-            .contains(s)
-        })
-        .map(|s| {
-            let s = s.strip_suffix("ing").filter(|_| s.len() > 6).unwrap_or(s);
-            let s = s.strip_suffix("ed").filter(|_| s.len() > 5).unwrap_or(s);
-            let s = s
-                .strip_suffix('s')
-                .filter(|_| s.len() > 4 && !s.ends_with("ss"))
-                .unwrap_or(s);
-            match s {
-                "estimator" | "predictor" => "model",
-                "encoding" | "encoder" | "encode" | "cod" | "coding" => "encod",
-                "categorical" | "categorie" | "category" => "categor",
-                "average" => "mean",
-                "transformer" | "transformation" | "transform" => "transform",
-                "builder" | "build" | "construct" | "constructs" => "build",
-                "separately" | "separate" => "separate",
-                "thresholder" | "threshold" => "threshold",
-                "anova" => "variance",
-                "chart" => "plot",
-                "regression" | "regressor" => "regress",
-                "classification" | "classifier" => "classify",
-                "prediction" => "predict",
-                _ => s,
+    RECORDS
+        .iter()
+        .find(|e| e.name == name)
+        .map(|e| serde_json::from_str(e.json).context("embedded entry"))
+        .transpose()
+}
+
+pub(crate) fn contains(library: &Library, name: &str) -> bool {
+    library.local.as_ref().map_or_else(
+        || RECORDS.iter().any(|e| e.name == name),
+        |entries| entries.iter().any(|e| e.name == name),
+    )
+}
+
+use crate::search::tokens;
+
+#[derive(Debug)]
+struct Stored {
+    name: &'static str,
+    package: &'static str,
+    kind: Kind,
+    summary: &'static str,
+    json: &'static str,
+}
+const POSTINGS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/postings.bin"));
+const TABLE: &[(&str, usize, usize)] = include!(concat!(env!("OUT_DIR"), "/search.rs"));
+const RECORDS: &[Stored] = include!(concat!(env!("OUT_DIR"), "/records.rs"));
+
+pub(crate) fn find(
+    library: &Library,
+    query: &str,
+    package: Option<&str>,
+    kind: Option<Kind>,
+) -> Vec<Entry> {
+    if let Some(entries) = &library.local {
+        return find_dynamic(entries, query, package, kind)
+            .into_iter()
+            .cloned()
+            .collect();
+    }
+    let words: BTreeSet<_> = search_terms(query).into_iter().collect();
+    let mut scores = vec![0.0; RECORDS.len()];
+    for word in &words {
+        if let Ok(i) = TABLE.binary_search_by_key(&word.as_str(), |(w, _, _)| *w) {
+            for posting in POSTINGS[TABLE[i].1..TABLE[i].2].as_chunks::<12>().0 {
+                let entry = usize::try_from(u32::from_le_bytes(
+                    posting[..4]
+                        .try_into()
+                        .expect("build writes four byte entry IDs"),
+                ))
+                .expect("entry fits usize");
+                let score = f64::from_le_bytes(
+                    posting[4..]
+                        .try_into()
+                        .expect("build writes eight byte scores"),
+                );
+                scores[entry] += score;
             }
-            .to_owned()
+        }
+    }
+    let mut ranked: Vec<_> = RECORDS
+        .iter()
+        .zip(scores)
+        .filter(|(e, score)| {
+            *score > 0.0
+                && package.is_none_or(|p| e.package == p)
+                && kind.is_none_or(|k| e.kind == k)
         })
+        .map(|(e, score)| {
+            (
+                e,
+                rank_score(e.name, e.summary, e.kind, query, words.len(), score),
+            )
+        })
+        .collect();
+    ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(b.name)));
+    ranked
+        .into_iter()
+        .take(5)
+        .map(|(e, _)| serde_json::from_str(e.json).expect("build validated index entry"))
         .collect()
 }
 
-pub(crate) fn find<'a>(
+fn find_dynamic<'a>(
     entries: &'a [Entry],
     query: &str,
     package: Option<&str>,
     kind: Option<Kind>,
 ) -> Vec<&'a Entry> {
-    let phrase_text = query.to_lowercase();
-    let query: BTreeSet<_> = tokens(query).into_iter().collect();
-    let docs: Vec<_> = entries
+    let documents = entries
         .iter()
         .map(|e| {
-            let leaf = e.name.rsplit('.').next().unwrap_or(&e.name);
-            let mut counts = BTreeMap::<String, f64>::new();
-            let fields = [
-                (leaf.to_owned(), 3.0),
-                (e.name.clone(), 0.3),
-                (e.summary.clone(), 1.0),
-                (e.parameters.join(" "), 0.3),
-                (e.keywords.join(" "), 0.2),
-            ];
-            for (text, weight) in fields {
-                for word in tokens(&text) {
-                    *counts.entry(word).or_default() += weight;
-                }
+            [
+                e.name.rsplit('.').next().unwrap_or(&e.name).to_owned(),
+                e.name.clone(),
+                e.summary.clone(),
+                serde_json::to_string(&e.parameters).unwrap_or_default(),
+                serde_json::to_string(&e.keywords).unwrap_or_default(),
+                e.members
+                    .iter()
+                    .map(|m| m.summary.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let table = crate::search::weights(&documents);
+    let words: BTreeSet<_> = search_terms(query).into_iter().collect();
+    let mut scores = vec![0.0; entries.len()];
+    for word in &words {
+        if let Some(postings) = table.get(word) {
+            for &(i, score) in postings {
+                scores[i] += score;
             }
-            let length = tokens(&e.summary).len() + tokens(leaf).len() * 3;
-            (counts, u32::try_from(length).unwrap_or(u32::MAX))
-        })
-        .collect();
-    let n = f64::from(u32::try_from(docs.len()).unwrap_or(u32::MAX));
-    let avg = docs.iter().map(|(_, len)| f64::from(*len)).sum::<f64>() / n.max(1.0);
-    let weights: BTreeMap<_, _> = query
+        }
+    }
+    let mut ranked = entries
         .iter()
-        .map(|q| {
-            let df = f64::from(
-                u32::try_from(docs.iter().filter(|(d, _)| d.contains_key(q)).count())
-                    .unwrap_or(u32::MAX),
-            );
-            (q, ((n - df + 0.5) / (df + 0.5) + 1.0).ln())
+        .zip(scores)
+        .filter(|(e, score)| {
+            *score > 0.0
+                && package.is_none_or(|p| e.package == p)
+                && kind.is_none_or(|k| e.kind == k)
         })
-        .collect();
-    let mut ranked: Vec<_> = entries
-        .iter()
-        .zip(&docs)
-        .filter(|(e, _)| package.is_none_or(|p| e.package == p) && kind.is_none_or(|k| e.kind == k))
-        .map(|(entry, (counts, len))| {
-            let score = weights
-                .iter()
-                .map(|(q, idf)| {
-                    let tf = counts.get(*q).copied().unwrap_or_default();
-                    idf * tf * 2.2 / (tf + 1.2 * (0.25 + 0.75 * f64::from(*len) / avg.max(1.0)))
-                })
-                .sum::<f64>();
-            let matched = query.iter().filter(|q| counts.contains_key(*q)).count();
-            let matched = f64::from(u32::try_from(matched).unwrap_or(u32::MAX));
-            let names: BTreeSet<_> = tokens(entry.name.rsplit('.').next().unwrap_or(&entry.name))
-                .into_iter()
-                .collect();
-            let name_score = weights
-                .iter()
-                .filter(|(q, _)| names.contains(**q))
-                .map(|(_, idf)| idf * 2.0)
-                .sum::<f64>();
-            let phrase = if query.len() > 1 && entry.summary.to_lowercase().contains(&phrase_text) {
-                12.0
-            } else {
-                0.0
-            };
-            let raw_leaf = entry
-                .name
-                .rsplit('.')
-                .next()
-                .unwrap_or(&entry.name)
-                .to_lowercase();
-            let leaf = entry.name.rsplit('.').next().unwrap_or(&entry.name);
-            let acronym =
-                leaf.len() > 2 && leaf.chars().all(|c| c.is_uppercase() || c.is_ascii_digit());
-            let exact_name = if acronym
-                && phrase_text
-                    .split(|c: char| !c.is_alphanumeric())
-                    .any(|s| s == raw_leaf)
-            {
-                30.0
-            } else {
-                0.0
-            };
-            let depth = u32::try_from(entry.name.split('.').count().saturating_sub(2).max(1))
-                .unwrap_or(u32::MAX);
-            let depth_penalty = if entry.kind == Kind::Symbol {
-                f64::from(depth).sqrt()
-            } else {
-                1.0
-            };
+        .map(|(e, score)| {
             (
-                entry,
-                (score + name_score + 3.0 * matched + phrase + exact_name) / depth_penalty,
+                e,
+                rank_score(&e.name, &e.summary, e.kind, query, words.len(), score),
             )
         })
-        .filter(|(_, s)| *s > 0.0)
-        .collect();
+        .collect::<Vec<_>>();
     ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(&b.name)));
     ranked.into_iter().take(5).map(|(e, _)| e).collect()
+}
+
+fn search_terms(query: &str) -> Vec<String> {
+    let mut words = tokens(query);
+    let pairs = words
+        .windows(2)
+        .map(|pair| format!("{} {}", pair[0], pair[1]))
+        .collect::<Vec<_>>();
+    words.extend(pairs);
+    words
+}
+
+fn rank_score(
+    name: &str,
+    summary: &str,
+    kind: Kind,
+    query: &str,
+    words: usize,
+    mut score: f64,
+) -> f64 {
+    let phrase = query.to_lowercase();
+    if words > 1 && summary.to_lowercase().contains(&phrase) {
+        score += 12.0;
+    }
+    let leaf = name.rsplit('.').next().unwrap_or(name);
+    if leaf.len() > 2
+        && leaf.chars().all(|c| c.is_uppercase() || c.is_ascii_digit())
+        && phrase
+            .split(|c: char| !c.is_alphanumeric())
+            .any(|s| s == leaf.to_lowercase())
+    {
+        score += 30.0;
+    }
+    let depth = u32::try_from(name.split('.').count().saturating_sub(2)).unwrap_or(u32::MAX);
+    if kind == Kind::Symbol {
+        score /= 1.0 + 0.25 * f64::from(depth);
+    }
+    score
 }
 
 /// Reads wheel metadata without executing the distribution.
@@ -485,9 +591,6 @@ fn read_definitions(
             continue;
         };
         let name = name.text();
-        if name.starts_with('_') {
-            continue;
-        }
         let class = def.kind() == "class_definition";
         let methods = def
             .field("body")
@@ -523,11 +626,17 @@ fn read_definitions(
                         doc
                     }
                 },
-                keywords: tokens(&introduction(&def))
-                    .into_iter()
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect(),
+                keywords: tokens(
+                    &documentation(&def)
+                        .lines()
+                        .take_while(|line| *line != "Examples")
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
                 members: methods
                     .iter()
                     .filter_map(|m| {
@@ -555,6 +664,30 @@ fn read_imports(
     bindings: &mut BTreeMap<String, String>,
     stars: &mut Vec<(String, String)>,
 ) {
+    for import in top.dfs().filter(|n| {
+        n.kind() == "import_statement"
+            && !n.ancestors().any(|p| {
+                matches!(
+                    p.kind().as_ref(),
+                    "function_definition" | "class_definition"
+                )
+            })
+    }) {
+        for child in import.children() {
+            if child.kind() == "aliased_import" {
+                if let (Some(name), Some(alias)) = (child.field("name"), child.field("alias")) {
+                    bindings.insert(
+                        format!("{module}.{}", alias.text()),
+                        name.text().into_owned(),
+                    );
+                }
+            } else if child.kind() == "dotted_name" {
+                let text = child.text();
+                let head = text.split('.').next().unwrap_or(&text);
+                bindings.insert(format!("{module}.{head}"), head.to_owned());
+            }
+        }
+    }
     // Imports inside conditionals are also used by libraries for optional exports.
     for import in top.dfs().filter(|n| {
         n.kind() == "import_from_statement"

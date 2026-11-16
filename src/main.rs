@@ -13,6 +13,7 @@ mod package_check;
 mod report;
 mod rule;
 mod scan;
+mod search;
 mod skills;
 mod steps;
 mod venv;

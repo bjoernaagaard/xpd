@@ -10,10 +10,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
+#[path = "src/search.rs"]
+mod search;
 
 /// The file in a pack folder that is the manifest and not a rule.
 const MANIFEST: &str = "pack.yml";
@@ -71,19 +74,10 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed={PLUGIN_MCP}");
     plugin_version()?;
     println!("cargo:rerun-if-changed=indexes");
-    let indexes = sorted_entries(Path::new("indexes"))?
-        .iter()
-        .filter(|p| {
-            p.extension().is_some_and(|e| e == "json")
-                && p.file_name().is_some_and(|n| n != "questions.json")
-        })
-        .map(|p| include(&format!("/{}", p.display())))
-        .collect::<Vec<_>>()
-        .join(",\n");
-    write(&out.join("indexes.rs"), &format!("&[{indexes}]"))?;
     let page =
         fs::read_to_string(RULES_PAGE).with_context(|| format!("cannot read {RULES_PAGE}"))?;
     let mut docs = rule_docs(&page)?;
+    discovery_source(&out, &docs)?;
     let packs = sorted_entries(root)?
         .iter()
         .filter(|path| path.is_dir())
@@ -302,4 +296,100 @@ fn is_module_name(name: &str) -> bool {
         .next()
         .is_some_and(|c| c.is_ascii_lowercase() || c == '_')
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>) -> Result<()> {
+    let mut entries = Vec::<serde_json::Value>::new();
+    for path in sorted_entries(Path::new("indexes"))? {
+        if path.extension().is_none_or(|e| e != "json") || path.ends_with("questions.json") {
+            continue;
+        }
+        let index: serde_json::Value = serde_json::from_str(&fs::read_to_string(path)?)?;
+        entries.extend(
+            index["entries"]
+                .as_array()
+                .context("index entries")?
+                .iter()
+                .cloned(),
+        );
+    }
+    for (package, sections) in docs {
+        for (id, doc) in sections {
+            let prose = doc
+                .lines()
+                .skip(1)
+                .filter(|line| !line.starts_with("**Severity:"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            entries.push(serde_json::json!({"kind":"rule","package":package,"name":format!("{package}/{id}"),"callable":null,"parameters":[],"summary":prose.trim(),"members":[],"rules":[]}));
+        }
+    }
+    let mut records = String::from("&[\n");
+    for entry in &entries {
+        let name = entry["name"].as_str().context("entry name")?;
+        let package = entry["package"].as_str().context("entry package")?;
+        let kind = match entry["kind"].as_str() {
+            Some("rule") => "Rule",
+            Some("recipe") => "Recipe",
+            _ => "Symbol",
+        };
+        let summary = entry["summary"].as_str().unwrap_or_default();
+        let mut output = entry.clone();
+        output
+            .as_object_mut()
+            .context("entry object")?
+            .remove("keywords");
+        let json = serde_json::to_string(&output)?;
+        writeln!(
+            records,
+            "Stored {{name:{name:?},package:{package:?},kind:Kind::{kind},summary:{summary:?},json:{json:?}}},"
+        )?;
+    }
+    records.push(']');
+    write(&out.join("records.rs"), &records)?;
+    let documents = entries
+        .iter()
+        .map(|e| {
+            let name = e["name"].as_str().unwrap_or_default();
+            [
+                name.rsplit('.').next().unwrap_or(name).to_owned(),
+                name.to_owned(),
+                e["summary"].as_str().unwrap_or_default().to_owned(),
+                e["parameters"].to_string(),
+                e["keywords"].to_string(),
+                e["members"]
+                    .as_array()
+                    .map(|members| {
+                        members
+                            .iter()
+                            .filter_map(|m| m["summary"].as_str())
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    })
+                    .unwrap_or_default(),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let table = search::weights(&documents);
+    let mut source = String::from("&[\n");
+    let mut bytes = Vec::new();
+    for (word, postings) in table {
+        let start = bytes.len();
+        for (i, score) in postings {
+            bytes.extend(u32::try_from(i)?.to_le_bytes());
+            bytes.extend(score.to_le_bytes());
+        }
+        let end = bytes.len();
+        writeln!(
+            source,
+            "({word:?}, 0x{:04x}_{:04x}, 0x{:04x}_{:04x}),",
+            start >> 16,
+            start & 0xffff,
+            end >> 16,
+            end & 0xffff
+        )?;
+    }
+    source.push(']');
+    fs::write(out.join("postings.bin"), bytes)?;
+    write(&out.join("search.rs"), &source)
 }
