@@ -314,8 +314,8 @@ xpd api plotly.express.bar --format json
 
 Prints the entry's parameter names, first docstring paragraph, public methods and rule
 links. JSON is a list containing one entry, with the same entry fields as `find`. Missing names exit
-2. Parameter names come from source and do not include defaults or type annotations. Classes inherit constructor parameters and public
-members from the nearest defining base in the same library, following parsed import aliases. Compiled extension functions and dynamically constructed exports may be absent.
+2. Parameter names come from source and do not include defaults or type annotations. Griffe supplies constructor parameters and inherited public
+members from parsed library source and available stubs. Compiled functions without stubs and dynamically constructed exports may be absent.
 
 Rule links are inferred from symbol name tokens in the pack's rule patterns, including regex
 patterns. They are possible guards, rather than proof that every use of the symbol matches.
@@ -328,13 +328,15 @@ null for a source whose license is not recognized as permitting redistribution.
 ## index
 
 ```sh
-xpd index /path/to/site-packages --package sklego
-xpd index /path/to/source/sklego --package sklego --version 0.9.10 --output local.json
+uv run --with griffe==2.4.1 xpd index /path/to/site-packages --package sklego
+uv run --with griffe==2.4.1 xpd index /path/to/source/sklego --package sklego --version 0.9.10 --output local.json
 xpd find "grouped regression" --index local.json
 xpd api sklego.meta.GroupedPredictor --index local.json
 ```
 
-Parses Python source with tree-sitter and never imports or executes library code. The first
+Parses Python source and stubs with Griffe 2.4.1 and never imports or executes library code.
+Griffe is needed only when building an index. It is not an xpd runtime dependency.
+The Python selected by the active environment must have the pinned Griffe version. The first
 command reads the version from wheel metadata and writes `indexes/sklego.json`. For a source
 checkout, pass `--version`. `--output` selects another file. The output directory must exist.
 An explicit local index replaces the embedded index for its package and also supports libraries
@@ -346,18 +348,22 @@ source-derived `keywords`. A recipe adds `recipe`, with `title`, `symbols`, `sou
 `license`, `attribution` and `modified`. An index with harvested examples also records candidate,
 clean, fixed, dropped, capped and retained counts under `recipes`.
 
-Source generation follows explicit and wildcard imports and simple assignment re-exports.
-Each definition uses the path with the fewest parts, then shortest text, then lexical order,
-excluding paths with underscore-prefixed parts. Tests, validators, graph_objs, vendored trees
-and symlinks are skipped. A module whose own documentation marks it for internal use or says
-it should be accessed through another module is also excluded. This removes Plotly's
-matplotlib converter helpers without naming Plotly in the filter.
+Griffe resolves import aliases and inherited members with inspection disabled. Public paths
+retain source exports and public names, including imports within the same library when a
+module has no `__all__`. Paths with private names, test modules and vendored modules are
+excluded. A module whose opening documentation marks it for internal use is also excluded.
+A Griffe extension keeps functions declared only through overloads in stub files.
+
+The `inputs` field records the Python and Griffe versions. `--archive` records the pinned
+wheel URL used for symbols. `--examples-archive` and `--examples-root` record the pinned
+source archive and the relative paths needed to repeat the recipe harvest. Neither option
+downloads or runs the source. CI rebuilds the index from the recorded inputs.
 
 To refresh recipes with symbols, use a pinned library checkout under a new empty `/var/tmp`
 directory. For example, after downloading and unpacking the library source there, run one command.
 
 ```sh
-xpd index /var/tmp/xpd-source/scikit-lego-0.9.10 --package sklego --version 0.9.10 \
+uv run --with griffe==2.4.1 xpd index /var/tmp/xpd-source/scikit-lego-0.9.10 --package sklego --version 0.9.10 \
   --examples /var/tmp/xpd-source/scikit-lego-0.9.10 \
   --source-url https://github.com/koaning/scikit-lego/blob/v0.9.10 \
   --license /var/tmp/xpd-source/scikit-lego-0.9.10/LICENSE

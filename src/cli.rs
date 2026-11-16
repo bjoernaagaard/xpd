@@ -72,6 +72,15 @@ struct IndexArgs {
     license: Option<PathBuf>,
     #[arg(long, requires = "examples")]
     notice: Option<PathBuf>,
+    /// Pinned wheel archive URL used for the source input.
+    #[arg(long)]
+    archive: Option<String>,
+    /// Pinned source archive URL used for examples.
+    #[arg(long, requires = "examples")]
+    examples_archive: Option<String>,
+    /// Root of the unpacked examples archive, for rebuild paths.
+    #[arg(long, requires = "examples_archive")]
+    examples_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -312,10 +321,35 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
         source_url: url,
         license,
         notice,
+        archive,
+        examples_archive,
+        examples_root,
     } = args;
     let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
     let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
     let mut index = index::generate(&source, &package, &version)?;
+    if let Some(inputs) = &mut index.inputs {
+        inputs.archive = archive;
+        if let Some(archive) = examples_archive {
+            let base = examples_root
+                .as_deref()
+                .context("--examples-archive needs --examples-root")?;
+            let relative = |path: &std::path::Path| -> Result<String> {
+                Ok(path
+                    .strip_prefix(base)
+                    .context("example input must be below --examples-root")?
+                    .to_string_lossy()
+                    .replace('\\', "/"))
+            };
+            inputs.examples = Some(index::Examples {
+                archive,
+                path: relative(examples.as_deref().context("--examples")?)?,
+                url: url.clone().context("--source-url")?,
+                license: relative(license.as_deref().context("--license")?)?,
+                notice: notice.as_deref().map(relative).transpose()?,
+            });
+        }
+    }
     if let (Some(root), Some(url), Some(license)) =
         (examples.as_deref(), url.as_deref(), license.as_deref())
     {

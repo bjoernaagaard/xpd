@@ -1,15 +1,11 @@
 //! Source-only library discovery and keyword search.
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use anyhow::{Context, Result, ensure};
-use ast_grep_core::{Node, tree_sitter::StrDoc};
-use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 
-use crate::{pack, scan};
-
-type Syntax<'a> = Node<'a, StrDoc<SupportLang>>;
+use crate::{pack, venv};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "snake_case")]
@@ -50,315 +46,48 @@ pub(crate) struct Index {
     pub(crate) entries: Vec<Entry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) recipes: Option<crate::recipe::Stats>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) inputs: Option<Inputs>,
 }
 
-fn public(name: &str) -> bool {
-    name.split('.').all(|s| !s.starts_with('_'))
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Inputs {
+    pub(crate) griffe: String,
+    pub(crate) python: String,
+    pub(crate) archive: Option<String>,
+    pub(crate) examples: Option<Examples>,
 }
 
-fn parameters(node: &Syntax<'_>) -> Vec<String> {
-    node.field("parameters")
-        .into_iter()
-        .flat_map(|p| p.children().collect::<Vec<_>>())
-        .filter_map(|p| {
-            if p.kind() == "identifier" {
-                Some(p.text().into_owned())
-            } else {
-                p.dfs()
-                    .find(|n| n.kind() == "identifier")
-                    .map(|n| n.text().into_owned())
-            }
-        })
-        .filter(|p| p != "self" && p != "cls")
-        .collect()
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Examples {
+    pub(crate) archive: String,
+    pub(crate) path: String,
+    pub(crate) url: String,
+    pub(crate) license: String,
+    pub(crate) notice: Option<String>,
 }
 
-fn documentation(node: &Syntax<'_>) -> String {
-    let body = node.field("body").unwrap_or_else(|| node.clone());
-    let Some(first) = body
-        .children()
-        .find(|n| n.is_named() && n.kind() != "comment")
-    else {
-        return String::new();
-    };
-    if first.kind() != "expression_statement" {
-        return String::new();
-    }
-    let Some(string) = first.children().find(|n| n.kind() == "string") else {
-        return String::new();
-    };
-    let text = string.text();
-    let Some(start) = text.find(['\'', '"']) else {
-        return String::new();
-    };
-    let quote = &text[start..=start];
-    let width = if text[start..].starts_with(&quote.repeat(3)) {
-        3
-    } else {
-        1
-    };
-    if text.len() < start + width * 2 {
-        return String::new();
-    }
-    text[start + width..text.len() - width]
-        .trim()
-        .lines()
-        .map(str::trim)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn introduction(node: &Syntax<'_>) -> String {
-    documentation(node)
-        .lines()
-        .take_while(|s| {
-            ![
-                "Parameters",
-                "Returns",
-                "Attributes",
-                "Examples",
-                "Notes",
-                "References",
-                "Args:",
-                "Returns:",
-            ]
-            .contains(s)
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn summary(node: &Syntax<'_>) -> String {
-    introduction(node)
-        .lines()
-        .take_while(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn definitions<'a>(node: &Syntax<'a>) -> Vec<Syntax<'a>> {
-    node.children()
-        .filter_map(|n| {
-            if n.kind() == "decorated_definition" {
-                n.field("definition")
-            } else if matches!(
-                n.kind().as_ref(),
-                "class_definition" | "function_definition"
-            ) {
-                Some(n)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-fn files(root: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<()> {
-    for item in std::fs::read_dir(root)? {
-        let item = item?;
-        if item.file_type()?.is_symlink() {
-            continue;
-        }
-        let path = item.path();
-        let name = item.file_name();
-        let name = name.to_string_lossy();
-        if matches!(
-            name.as_ref(),
-            "tests"
-                | "test"
-                | "testing"
-                | "validators"
-                | "graph_objs"
-                | "vendor"
-                | "vendored"
-                | "externals"
-                | "_vendor"
-                | "__pycache__"
-        ) || name.starts_with('.')
-        {
-            continue;
-        }
-        if path.is_dir() {
-            let init = std::fs::read_to_string(path.join("__init__.py")).unwrap_or_default();
-            let tree = scan::parse(&init);
-            let description = introduction(&tree.root()).to_lowercase();
-            if [
-                "should be accessed through",
-                "internal use only",
-                "not part of the public api",
-                "vendored",
-            ]
-            .iter()
-            .any(|marker| description.contains(marker))
-            {
-                continue;
-            }
-            files(&path, out)?;
-        } else if path.extension().is_some_and(|e| e == "py") {
-            out.push(path);
-        }
-    }
-    Ok(())
-}
-
-/// Reads definitions and import edges, then resolves re-exports to a fixed point.
+/// Gets the public API from Griffe without importing the library.
 pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<Index> {
+    let output = std::process::Command::new(venv::project_python())
+        .arg("-I")
+        .arg("-c")
+        .arg(include_str!("../py/index.py"))
+        .arg(source)
+        .arg(package)
+        .arg(version)
+        .output()
+        .context("could not start Python for Griffe")?;
     ensure!(
-        !package.is_empty()
-            && package
-                .split('.')
-                .all(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')),
-        "invalid package name"
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr).trim()
     );
-    let root = if source.join(package).is_dir() {
-        source.join(package)
-    } else {
-        source.to_path_buf()
-    };
-    let mut paths = Vec::new();
-    files(&root, &mut paths)?;
-    paths.sort();
-    let mut entries = BTreeMap::new();
-    let mut bindings = BTreeMap::<String, String>::new();
-    let mut stars = Vec::new();
-    let mut classes = BTreeMap::new();
-    for path in paths {
-        let relative = path.strip_prefix(&root)?.with_extension("");
-        let parts: Vec<_> = relative
-            .iter()
-            .map(|p| p.to_string_lossy().into_owned())
-            .collect();
-        let init = parts.last().is_some_and(|p| p == "__init__");
-        let tail = parts[..parts.len() - usize::from(init)].join(".");
-        let module = if tail.is_empty() {
-            package.to_owned()
-        } else {
-            format!("{package}.{tail}")
-        };
-        let text = std::fs::read_to_string(&path).with_context(|| path.display().to_string())?;
-        let tree = scan::parse(&text);
-        let top = tree.root();
-        read_definitions(&top, &module, package, &mut entries, &mut bindings);
-        for def in definitions(&top)
-            .into_iter()
-            .filter(|d| d.kind() == "class_definition")
-        {
-            let Some(name) = def.field("name") else {
-                continue;
-            };
-            let bases = def
-                .field("superclasses")
-                .map(|b| {
-                    b.children()
-                        .filter(|n| matches!(n.kind().as_ref(), "identifier" | "attribute"))
-                        .map(|n| format!("{module}.{}", n.text()))
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            let owns_init = def.field("body").is_some_and(|b| {
-                definitions(&b)
-                    .iter()
-                    .any(|m| m.field("name").is_some_and(|n| n.text() == "__init__"))
-            });
-            classes.insert(format!("{module}.{}", name.text()), (bases, owns_init));
-        }
-        read_imports(&top, &module, usize::from(init), &mut bindings, &mut stars);
-        read_aliases(&top, &module, &mut bindings);
-    }
-    resolve_exports(&mut bindings, &stars);
-    let inherited = inherit(&mut entries, &classes, &bindings);
-    eprintln!("{package}: {inherited} classes gained constructor parameters");
-    let mut names = BTreeMap::<String, String>::new();
-    for (alias, target) in bindings {
-        if !public(&alias) || !entries.contains_key(&target) {
-            continue;
-        }
-        let best = names.entry(target).or_insert_with(|| alias.clone());
-        if (alias.split('.').count(), alias.len(), &alias)
-            < (best.split('.').count(), best.len(), best)
-        {
-            *best = alias;
-        }
-    }
-    let mut result = Vec::new();
-    for (target, name) in names {
-        if let Some(mut entry) = entries.remove(&target) {
-            entry.name = name;
-            result.push(entry);
-        }
-    }
-    result.sort_by(|a, b| a.name.cmp(&b.name));
-    attach_rules(&mut result, &[package])?;
-    ensure!(
-        !result.is_empty(),
-        "no public symbols found in {}",
-        root.display()
-    );
-    Ok(Index {
-        schema_version: 1,
-        package: package.into(),
-        version: version.into(),
-        entries: result,
-        recipes: None,
-    })
-}
-
-fn inherit(
-    entries: &mut BTreeMap<String, Entry>,
-    classes: &BTreeMap<String, (Vec<String>, bool)>,
-    bindings: &BTreeMap<String, String>,
-) -> usize {
-    let snapshot = entries.clone();
-    let resolve = |name: &str| {
-        let mut parts: Vec<_> = name.split('.').collect();
-        let mut suffix = Vec::new();
-        while !parts.is_empty() {
-            if let Some(target) = bindings.get(&parts.join(".")) {
-                suffix.reverse();
-                return if suffix.is_empty() {
-                    target.clone()
-                } else {
-                    format!("{target}.{}", suffix.join("."))
-                };
-            }
-            if let Some(part) = parts.pop() {
-                suffix.push(part);
-            }
-        }
-        name.to_owned()
-    };
-    let mut gained = 0;
-    for (name, (bases, owns_init)) in classes {
-        let Some(entry) = entries.get_mut(name) else {
-            continue;
-        };
-        let mut queue: std::collections::VecDeque<_> = bases.iter().map(|b| resolve(b)).collect();
-        let mut seen = BTreeSet::new();
-        let mut constructor = *owns_init;
-        while let Some(base) = queue.pop_front() {
-            if !seen.insert(base.clone()) {
-                continue;
-            }
-            let Some(parent) = snapshot.get(&base) else {
-                continue;
-            };
-            let Some((ancestors, parent_init)) = classes.get(&base) else {
-                continue;
-            };
-            if !constructor && *parent_init {
-                entry.parameters.clone_from(&parent.parameters);
-                constructor = true;
-                gained += usize::from(!entry.parameters.is_empty());
-            }
-            for member in &parent.members {
-                if !entry.members.iter().any(|m| m.name == member.name) {
-                    entry.members.push(member.clone());
-                }
-            }
-            queue.extend(ancestors.iter().map(|b| resolve(b)));
-        }
-    }
-    gained
+    let mut index: Index =
+        serde_json::from_slice(&output.stdout).context("invalid Griffe index")?;
+    ensure!(!index.entries.is_empty(), "Griffe found no public symbols");
+    attach_rules(&mut index.entries, &[package])?;
+    Ok(index)
 }
 
 #[derive(Debug)]
@@ -652,231 +381,6 @@ pub(crate) fn source_version(source: &Path, package: &str) -> Result<String> {
         }
     }
     anyhow::bail!("no distribution metadata for {package}; pass --version for a source checkout")
-}
-
-fn read_definitions(
-    top: &Syntax<'_>,
-    module: &str,
-    package: &str,
-    entries: &mut BTreeMap<String, Entry>,
-    bindings: &mut BTreeMap<String, String>,
-) {
-    for def in definitions(top) {
-        let Some(name) = def.field("name") else {
-            continue;
-        };
-        let name = name.text();
-        let class = def.kind() == "class_definition";
-        let methods = def
-            .field("body")
-            .map(|b| definitions(&b))
-            .unwrap_or_default();
-        let params = if class {
-            methods
-                .iter()
-                .find(|m| m.field("name").is_some_and(|n| n.text() == "__init__"))
-                .map(parameters)
-                .unwrap_or_default()
-        } else {
-            parameters(&def)
-        };
-        let full = format!("{module}.{name}");
-        entries.insert(
-            full.clone(),
-            Entry {
-                kind: Kind::Symbol,
-                package: package.to_owned(),
-                name: full.clone(),
-                callable: Some(if class { "class" } else { "function" }.into()),
-                parameters: params,
-                summary: {
-                    let doc = summary(&def);
-                    if doc.is_empty() && class {
-                        methods
-                            .iter()
-                            .find(|m| m.field("name").is_some_and(|n| n.text() == "__init__"))
-                            .map(summary)
-                            .unwrap_or_default()
-                    } else {
-                        doc
-                    }
-                },
-                keywords: vec![
-                    documentation(&def)
-                        .lines()
-                        .take_while(|line| *line != "Examples")
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                ],
-                members: methods
-                    .iter()
-                    .filter_map(|m| {
-                        let name = m.field("name")?.text().into_owned();
-                        if !public(&name) {
-                            return None;
-                        }
-                        Some(Member {
-                            name,
-                            parameters: parameters(m),
-                            summary: summary(m),
-                        })
-                    })
-                    .collect(),
-                rules: Vec::new(),
-                recipe: None,
-            },
-        );
-        bindings.insert(full.clone(), full);
-    }
-}
-fn read_imports(
-    top: &Syntax<'_>,
-    module: &str,
-    package_depth: usize,
-    bindings: &mut BTreeMap<String, String>,
-    stars: &mut Vec<(String, String)>,
-) {
-    for import in top.dfs().filter(|n| {
-        n.kind() == "import_statement"
-            && !n.ancestors().any(|p| {
-                matches!(
-                    p.kind().as_ref(),
-                    "function_definition" | "class_definition"
-                )
-            })
-    }) {
-        for child in import.children() {
-            if child.kind() == "aliased_import" {
-                if let (Some(name), Some(alias)) = (child.field("name"), child.field("alias")) {
-                    bindings.insert(
-                        format!("{module}.{}", alias.text()),
-                        name.text().into_owned(),
-                    );
-                }
-            } else if child.kind() == "dotted_name" {
-                let text = child.text();
-                let head = text.split('.').next().unwrap_or(&text);
-                bindings.insert(format!("{module}.{head}"), head.to_owned());
-            }
-        }
-    }
-    // Imports inside conditionals are also used by libraries for optional exports.
-    for import in top.dfs().filter(|n| {
-        n.kind() == "import_from_statement"
-            && !n.ancestors().any(|p| {
-                matches!(
-                    p.kind().as_ref(),
-                    "function_definition" | "class_definition"
-                )
-            })
-    }) {
-        let Some(from) = import.field("module_name") else {
-            continue;
-        };
-        let from_text = from.text();
-        let dots = from_text.chars().take_while(|c| *c == '.').count();
-        let base = if dots == 0 {
-            from_text.into_owned()
-        } else {
-            let mut parent: Vec<_> = module.split('.').collect();
-            let remove = dots - package_depth;
-            if remove >= parent.len() {
-                continue;
-            }
-            parent.truncate(parent.len() - remove);
-            let suffix = from_text.trim_start_matches('.');
-            if suffix.is_empty() {
-                parent.join(".")
-            } else {
-                format!("{}.{suffix}", parent.join("."))
-            }
-        };
-        for child in import
-            .children()
-            .filter(|n| n.range().start > from.range().end)
-        {
-            match child.kind().as_ref() {
-                "dotted_name" => {
-                    bindings.insert(
-                        format!("{module}.{}", child.text()),
-                        format!("{base}.{}", child.text()),
-                    );
-                }
-                "aliased_import" => {
-                    if let (Some(name), Some(alias)) = (child.field("name"), child.field("alias")) {
-                        bindings.insert(
-                            format!("{module}.{}", alias.text()),
-                            format!("{base}.{}", name.text()),
-                        );
-                    }
-                }
-                "wildcard_import" => stars.push((module.to_owned(), base.clone())),
-                _ => {}
-            }
-        }
-    }
-}
-fn read_aliases(top: &Syntax<'_>, module: &str, bindings: &mut BTreeMap<String, String>) {
-    for assignment in top.dfs().filter(|n| {
-        n.kind() == "assignment"
-            && !n.ancestors().any(|p| {
-                matches!(
-                    p.kind().as_ref(),
-                    "function_definition" | "class_definition"
-                )
-            })
-    }) {
-        let (Some(left), Some(right)) = (assignment.field("left"), assignment.field("right"))
-        else {
-            continue;
-        };
-        if left.kind() != "identifier"
-            || !matches!(right.kind().as_ref(), "identifier" | "attribute")
-        {
-            continue;
-        }
-        let value = right.text();
-        let (head, tail) = value.split_once('.').unwrap_or((&value, ""));
-        let local = format!("{module}.{head}");
-        let target = bindings.get(&local).cloned().unwrap_or(local);
-        let target = if tail.is_empty() {
-            target
-        } else {
-            format!("{target}.{tail}")
-        };
-        bindings.insert(format!("{module}.{}", left.text()), target);
-    }
-}
-
-fn resolve_exports(bindings: &mut BTreeMap<String, String>, stars: &[(String, String)]) {
-    for _ in 0..64 {
-        let mut changes = Vec::new();
-        for (alias, target) in bindings.iter() {
-            if let Some(next) = bindings.get(target)
-                && next != target
-            {
-                changes.push((alias.clone(), next.clone()));
-            }
-        }
-        for (module, base) in stars {
-            let prefix = format!("{base}.");
-            for (name, target) in bindings.iter() {
-                if let Some(leaf) = name.strip_prefix(&prefix)
-                    && !leaf.contains('.')
-                    && public(leaf)
-                {
-                    let alias = format!("{module}.{leaf}");
-                    if !bindings.contains_key(&alias) {
-                        changes.push((alias, target.clone()));
-                    }
-                }
-            }
-        }
-        if changes.is_empty() {
-            break;
-        }
-        bindings.extend(changes);
-    }
 }
 
 fn attach_rules(entries: &mut [Entry], packs: &[&str]) -> Result<()> {
