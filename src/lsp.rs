@@ -17,9 +17,9 @@ use anyhow::{Context, Result};
 use ast_grep_config::Severity;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::{
-    Cancel, DidChangeConfiguration, DidChangeTextDocument, DidChangeWorkspaceFolders,
-    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit,
-    Notification as NotificationType, PublishDiagnostics, ShowMessage,
+    Cancel, DidChangeConfiguration, DidChangeTextDocument, DidChangeWatchedFiles,
+    DidChangeWorkspaceFolders, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
+    Exit, Notification as NotificationType, PublishDiagnostics, ShowMessage,
 };
 use lsp_types::request::{
     CodeActionRequest, DocumentDiagnosticRequest, HoverRequest, Request as RequestType, Shutdown,
@@ -29,12 +29,12 @@ use lsp_types::{
     CancelParams, CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand,
     CodeActionParams, CodeActionProviderCapability, CodeDescription, Diagnostic, DiagnosticOptions,
     DiagnosticServerCapabilities, DiagnosticSeverity, DidChangeConfigurationParams,
-    DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentChanges,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, FullDocumentDiagnosticReport, Hover,
-    HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
-    MarkupContent, MarkupKind, MessageType, NumberOrString, OneOf,
-    OptionalVersionedTextDocumentIdentifier, PublishDiagnosticsParams,
+    DidChangeTextDocumentParams, DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DocumentChanges, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, Hover, HoverContents, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, MarkupContent, MarkupKind, MessageType, NumberOrString,
+    OneOf, OptionalVersionedTextDocumentIdentifier, PublishDiagnosticsParams,
     RelatedFullDocumentDiagnosticReport, SaveOptions, ServerCapabilities, ServerInfo,
     ShowMessageParams, TextDocumentEdit, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TextEdit, Uri, WorkspaceEdit, WorkspaceFoldersServerCapabilities,
@@ -100,6 +100,12 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
     let params: InitializeParams =
         serde_json::from_value(params).context("the initialize request has invalid params")?;
     let mut server = Server::new(connection, &params, refresh);
+    let watches = params
+        .capabilities
+        .workspace
+        .as_ref()
+        .and_then(|workspace| workspace.did_change_watched_files.as_ref())
+        .is_some_and(|watcher| watcher.dynamic_registration == Some(true));
     let options = params.initialization_options.unwrap_or_default();
     let invalid_options = server.settings.update(&options).err();
     let result = InitializeResult {
@@ -112,6 +118,23 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
     connection
         .initialize_finish(id, serde_json::to_value(result)?)
         .context("the client did not confirm the initialize result")?;
+    if watches {
+        server.send(
+            Request::new(
+                RequestId::from("xpd-rule-watchers".to_owned()),
+                "client/registerCapability".to_owned(),
+                serde_json::json!({"registrations": [{
+                    "id": "xpd-rule-watchers",
+                    "method": "workspace/didChangeWatchedFiles",
+                    "registerOptions": {"watchers": [{
+                        "globPattern": "**/*.{yml,yaml}",
+                        "kind": 7,
+                    }]},
+                }]}),
+            )
+            .into(),
+        );
+    }
     if let Some(e) = invalid_options {
         server.show(MessageType::WARNING, format!("xpd: {e:#}"));
     }
@@ -615,6 +638,7 @@ impl<'c> Server<'c> {
             DidSaveTextDocument::METHOD => self.handle(params, Self::did_save),
             DidCloseTextDocument::METHOD => self.handle(params, Self::did_close),
             DidChangeConfiguration::METHOD => self.handle(params, Self::did_change_configuration),
+            DidChangeWatchedFiles::METHOD => self.handle(params, Self::did_change_watched_files),
             DidChangeWorkspaceFolders::METHOD => {
                 self.handle(params, Self::did_change_workspace_folders)
             }
@@ -711,6 +735,22 @@ impl<'c> Server<'c> {
     fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> Result<()> {
         let settings = params.settings;
         self.settings.update(&settings)
+    }
+
+    fn did_change_watched_files(&mut self, params: DidChangeWatchedFilesParams) -> Result<()> {
+        let changed = params.changes.into_iter().any(|change| {
+            uri::to_path(&change.uri).is_some_and(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "yml" || extension == "yaml")
+            })
+        });
+        if !changed {
+            return Ok(());
+        }
+        for root in self.roots() {
+            self.refresh_project(&root)?;
+        }
+        Ok(())
     }
 
     /// A document may now belong to another project, with another venv and another path for

@@ -14,6 +14,18 @@ class Output(BaseModel):
     model_config = ConfigDict(extra="allow", frozen=True)
 
 
+class CaseOutcome(Output):
+    id: str
+    source: str
+    status: str
+    actual: dict[str, object] | None = None
+
+
+class CaseReport(Output):
+    cases: list[CaseOutcome]
+    failed: int
+
+
 class Issue(Output):
     """One finding of `xpd check`. A package warning has no line or column."""
 
@@ -33,6 +45,50 @@ class CheckReport(Output):
     fixed: int = Field(description="Number of fixes written to disk.")
     fixable: int = Field(description="Issues left that the fix tool fixes at the level asked for.")
     issues: list[Issue]
+
+
+class SourcePosition(Output):
+    line: int
+    column: int
+
+
+class ByteRange(Output):
+    start: int
+    end: int
+
+
+class SourceRange(Output):
+    byte_offset: ByteRange = Field(alias="byteOffset")
+    start: SourcePosition
+    end: SourcePosition
+
+
+class CodeMatch(Output):
+    text: str
+    file: str
+    language: str
+    range: SourceRange
+    replacement: str | None = None
+
+
+class OutlineEntry(Output):
+    name: str
+    role: str
+    symbol_type: str = Field(alias="symbolType")
+    range: SourceRange
+    signature: str | None = None
+    members: list["OutlineEntry"] = Field(default_factory=list)
+
+
+class OutlineFile(Output):
+    path: str
+    language: str
+    items: list[OutlineEntry]
+
+
+class CreatedFiles(Output):
+    created_files: list[str] = Field(alias="createdFiles")
+    modified_files: list[str] = Field(default_factory=list, alias="modifiedFiles")
 
 
 class Step(Output):

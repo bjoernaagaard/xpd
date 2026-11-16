@@ -5,14 +5,21 @@ all-features = true
 
 [advisories]
 yanked = "deny"
+# ast-grep 0.51.3 uses ansi_term for terminal colors. This advisory reports discontinued
+# maintenance, not a vulnerability; the upstream CLI has no feature to remove the dependency.
+ignore = [{ id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmaintained-only advisory" }]
 
 [licenses]
 # Permissive licenses only. Read a license's terms before adding it here.
-allow = ["Apache-2.0", "BSD-3-Clause", "MIT", "NCSA", "Unicode-3.0", "Zlib"]
+allow = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-0", "NCSA", "Unicode-3.0", "Zlib"]
 confidence-threshold = 0.8
-# bindgen loads libclang through libloading while llama-cpp-sys-2 builds. ISC is permissive, and
-# libloading is not part of the binary.
-exceptions = [{ crate = "libloading", allow = ["ISC"] }]
+# libloading serves bindgen and ast-grep's optional language loader. The unmodified option-ext
+# dependency comes from ast-grep's project-directory support; its license and complete source
+# archive ship under licenses/ to satisfy MPL's source-availability requirement.
+exceptions = [
+    { crate = "option-ext@0.2.0", allow = ["MPL-2.0"] },
+    { crate = "xpd", allow = ["MPL-2.0"] },
+]
 
 [bans]
 multiple-versions = "warn"

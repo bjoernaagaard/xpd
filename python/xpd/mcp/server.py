@@ -9,7 +9,7 @@ from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
-from xpd.mcp import catalog, discovery, pipeline, prompts, tools, views
+from xpd.mcp import catalog, discovery, pipeline, prompts, structure, tools, views
 from xpd.mcp.binary import RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
@@ -26,6 +26,9 @@ its result. Every path is relative to the project root.
 
 - After you write or change Python, call `check`. Fix every error. Fix a warning unless you can \
 say why the code is right. `fix` writes xpd's fixes, and asks the user before unsafe ones.
+- Use `query` to find code patterns and preview replacements, and `rewrite` to apply them after \
+confirmation. Use `outline` to browse project symbols, imports and members in supported languages.
+- Use `new` to create a local rule project, rule, empty case template or shared utility.
 - To learn why a rule fires and see its before and after code, call `rule`. `rules` lists and \
 filters all of them.
 - After you add, move or rename a step or a Hamilton node, call `graph`, and reuse columns that \
@@ -44,7 +47,7 @@ skill://python-review/SKILL.md hold the style a linter cannot check."""
 def build(settings: Settings) -> FastMCP:
     project = Project(Root.at(settings.root) if settings.root else None)
     xpd = Xpd(find_binary())
-    # The binary's rules and skills do not change while it runs, so the server reads them once.
+    # Project rule requests reload their catalog; pipeline guidance uses the embedded snapshot.
     rules = catalog.Catalog(tuple(xpd.run_now(RULES)))
     skills = [
         Skill.from_files({file.path: file.text for file in skill.files})
@@ -60,9 +63,10 @@ def build(settings: Settings) -> FastMCP:
     )
     mcp.add_extension(TasksExtension())
     tools.register(mcp, xpd, project)
+    structure.register(mcp, xpd, project)
     discovery.register(mcp, xpd, project)
     views.register(mcp, xpd, project)
-    catalog.register(mcp, rules)
+    catalog.register(mcp, rules, xpd, project)
     pipeline.register(mcp, project, rules)
     prompts.register(mcp)
 

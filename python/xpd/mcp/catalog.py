@@ -5,17 +5,20 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import (
     Annotations,
     CompletionArgument,
     CompletionContext,
+    InputRequiredResult,
     PromptReference,
     ResourceTemplateReference,
 )
 
+from xpd.mcp.binary import RULES, Xpd
 from xpd.mcp.models import Rule, RuleList, RuleSummary, Severity
+from xpd.mcp.root import Project
 from xpd.mcp.tools import READS
 
 RULES_URI = "xpd://rules"
@@ -69,9 +72,17 @@ class Catalog:
         return [name for name in names if name.startswith(argument.value)]
 
 
-def register(mcp: FastMCP, catalog: Catalog) -> None:
+async def load(ctx: Context, xpd: Xpd, project: Project, fallback: Catalog) -> Catalog:
+    root = await project.root(ctx)
+    if isinstance(root, InputRequiredResult):
+        return fallback
+    return Catalog(tuple(await xpd.run(RULES, root.path, [])))
+
+
+def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
     @mcp.tool(name="rules", tags={"rules"}, annotations=READS)
-    def list_rules(
+    async def list_rules(
+        ctx: Context,
         package: str | None = None,
         severity: Severity | None = None,
         *,
@@ -89,7 +100,8 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
             query: Only rules whose id, message or documentation contains this text, in any
                 case.
         """
-        rules = catalog.of(package) if package else list(catalog.rules)
+        selected = await load(ctx, xpd, project, catalog)
+        rules = selected.of(package) if package else list(selected.rules)
         needle = query.casefold() if query else None
         return RuleList(
             rules=[
@@ -105,14 +117,14 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
         )
 
     @mcp.tool(name="rule", tags={"rules"}, annotations=READS)
-    def one_rule(package: str, rule: str) -> Rule:
+    async def one_rule(ctx: Context, package: str, rule: str) -> Rule:
         """Read one rule: why it matters, what it reports, and its before and after examples.
 
         Args:
             package: The rule's pack, by module name, such as pandas.
             rule: The rule id, such as chained-assignment.
         """
-        return catalog.find(package, rule)
+        return (await load(ctx, xpd, project, catalog)).find(package, rule)
 
     @mcp.resource(
         RULES_URI,
@@ -121,9 +133,9 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
         tags={"rules"},
         annotations=FOR_AGENT,
     )
-    def all_rules() -> str:
+    async def all_rules(ctx: Context) -> str:
         """Every rule and package check of xpd, without their documentation."""
-        return dumps(summary(rule) for rule in catalog.rules)
+        return dumps(summary(rule) for rule in (await load(ctx, xpd, project, catalog)).rules)
 
     @mcp.resource(
         PACK_URI,
@@ -132,9 +144,9 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
         tags={"rules"},
         annotations=FOR_AGENT,
     )
-    def pack_rules(package: str) -> str:
+    async def pack_rules(ctx: Context, package: str) -> str:
         """The rules of one pack, such as xpd://rules/pandas, without their documentation."""
-        return dumps(summary(rule) for rule in catalog.of(package))
+        return dumps(summary(rule) for rule in (await load(ctx, xpd, project, catalog)).of(package))
 
     @mcp.resource(
         RULE_URI,
@@ -143,21 +155,21 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
         tags={"rules"},
         annotations=FOR_AGENT,
     )
-    def rule_doc(package: str, rule: str) -> str:
+    async def rule_doc(ctx: Context, package: str, rule: str) -> str:
         """One rule's documentation, such as xpd://rules/pandas/chained-assignment."""
-        found = catalog.find(package, rule)
+        found = (await load(ctx, xpd, project, catalog)).find(package, rule)
         return found.doc or f"#### {found.rule}\n\n{found.message}\n"
 
     @mcp.completion
-    def complete(
+    async def complete(
         ref: PromptReference | ResourceTemplateReference,
         argument: CompletionArgument,
         context: CompletionContext | None,
     ) -> list[str] | None:
         if isinstance(ref, ResourceTemplateReference) and ref.uri in {PACK_URI, RULE_URI}:
-            return catalog.complete(argument, context)
+            return (await load(Context(mcp), xpd, project, catalog)).complete(argument, context)
         if isinstance(ref, PromptReference):
-            return catalog.complete(argument, context)
+            return (await load(Context(mcp), xpd, project, catalog)).complete(argument, context)
         return None
 
 

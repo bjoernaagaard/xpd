@@ -15,11 +15,15 @@ from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
 
 from xpd.mcp.models import (
+    CaseReport,
     CheckReport,
+    CodeMatch,
+    CreatedFiles,
     DiscoveryEntry,
     DiscoveryMatches,
     Equivalence,
     GraphReport,
+    OutlineFile,
     Profile,
     Refit,
     Rule,
@@ -46,6 +50,10 @@ class Command(Generic[T]):
 FIND = Command(("find", "--format", "json"), TypeAdapter(DiscoveryMatches), SUCCESS)
 API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
 CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport), FINDINGS)
+QUERY = Command(("run", "--format", "json"), TypeAdapter(list[CodeMatch]), FINDINGS)
+OUTLINE = Command(("outline", "--format", "json"), TypeAdapter(list[OutlineFile]), SUCCESS)
+NEW = Command(("new",), TypeAdapter(CreatedFiles), SUCCESS)
+TEST = Command(("test", "--format", "json"), TypeAdapter(CaseReport), FINDINGS)
 GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport), FINDINGS)
 # profile exits 1 when it cannot read the file, so only 0 carries a profile.
 PROFILE = Command(("profile",), TypeAdapter(Profile), SUCCESS)

@@ -1,0 +1,319 @@
+//! Run rule examples through xpd's scanner, or the upstream structural harness.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::{self, IsTerminal as _, Write as _};
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+use anyhow::{Context as _, Result, ensure};
+use clap::{Args, ValueEnum};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+use crate::{pack, scan};
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub(crate) enum Engine {
+    #[default]
+    Xpd,
+    Structural,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum Format {
+    Text,
+    Json,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct Options {
+    /// Run domain checks with xpd, or raw structural checks with ast-grep.
+    #[arg(long, value_enum, default_value = "xpd")]
+    engine: Engine,
+    #[arg(short, long)]
+    config: Option<PathBuf>,
+    #[arg(short, long)]
+    test_dir: Option<PathBuf>,
+    #[arg(long, default_value = "__snapshots__")]
+    snapshot_dir: PathBuf,
+    #[arg(short, long)]
+    filter: Option<Regex>,
+    #[arg(long, conflicts_with_all = ["update_all", "interactive"])]
+    skip_snapshot_tests: bool,
+    #[arg(short = 'U', long)]
+    update_all: bool,
+    #[arg(short, long, conflicts_with = "format")]
+    interactive: bool,
+    #[arg(long, value_enum, default_value = "text")]
+    format: Format,
+}
+
+#[derive(Debug, Deserialize)]
+struct Case {
+    id: String,
+    #[serde(default)]
+    valid: Vec<String>,
+    #[serde(default)]
+    invalid: Vec<String>,
+    /// A source filename for language inference and rule path filters.
+    path: Option<PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Config {
+    #[serde(default)]
+    test_configs: Vec<TestConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestConfig {
+    test_dir: PathBuf,
+    snapshot_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct Snapshots {
+    id: String,
+    snapshots: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct Outcome {
+    id: String,
+    source: String,
+    status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    actual: Option<Value>,
+}
+
+pub(crate) fn run(options: &Options) -> Result<ExitCode> {
+    if matches!(options.engine, Engine::Structural) {
+        return structural(options);
+    }
+    ensure!(
+        !options.interactive || io::stdin().is_terminal(),
+        "--interactive needs a terminal"
+    );
+    let packs = pack::load(None)?;
+    let directories = directories(options)?;
+    let mut outcomes = Vec::new();
+    for (directory, snapshot_dir) in directories {
+        let mut files = Vec::new();
+        for entry in ignore::WalkBuilder::new(&directory).build() {
+            let entry = entry?;
+            if entry.file_type().is_some_and(|kind| kind.is_file())
+                && entry
+                    .path()
+                    .extension()
+                    .is_some_and(|ext| ext == "yml" || ext == "yaml")
+                && !entry
+                    .path()
+                    .components()
+                    .any(|part| part.as_os_str() == snapshot_dir.as_os_str())
+            {
+                files.push(entry.into_path());
+            }
+        }
+        files.sort();
+        for path in files {
+            let case: Case = serde_saphyr::from_str(&fs::read_to_string(&path)?)
+                .with_context(|| format!("cannot read cases in {}", path.display()))?;
+            if options
+                .filter
+                .as_ref()
+                .is_some_and(|filter| !filter.is_match(&case.id))
+            {
+                continue;
+            }
+            outcomes.extend(run_case(options, &packs, &case, &path, &snapshot_dir)?);
+        }
+    }
+    ensure!(!outcomes.is_empty(), "no cases matched");
+    let failed = outcomes
+        .iter()
+        .filter(|case| !matches!(case.status, "passed" | "updated"))
+        .count();
+    if matches!(options.format, Format::Json) {
+        println!(
+            "{}",
+            serde_json::to_string(&json!({"cases": outcomes, "failed": failed}))?
+        );
+    } else {
+        for case in &outcomes {
+            println!("{}: {}", case.id, case.status);
+        }
+        println!("{} cases, {failed} failed", outcomes.len());
+    }
+    Ok(if failed == 0 {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    })
+}
+
+fn run_case(
+    options: &Options,
+    packs: &[pack::Pack],
+    case: &Case,
+    path: &Path,
+    snapshot_dir: &Path,
+) -> Result<Vec<Outcome>> {
+    let known = packs.iter().any(|pack| {
+        pack.rules.iter().any(|rule| {
+            rule.config.id == case.id || format!("{}/{}", pack.module, rule.config.id) == case.id
+        })
+    });
+    ensure!(known, "no rule matches case id {}", case.id);
+    let snapshot_path = path
+        .parent()
+        .context("case has no parent")?
+        .join(snapshot_dir)
+        .join(format!("{}-snapshot.yml", case.id.replace('/', "-")));
+    let mut snapshots: Snapshots = if snapshot_path.exists() {
+        serde_saphyr::from_str(&fs::read_to_string(&snapshot_path)?)?
+    } else {
+        Snapshots {
+            id: case.id.clone(),
+            ..Snapshots::default()
+        }
+    };
+    ensure!(
+        snapshots.id == case.id,
+        "snapshot id differs from case id {}",
+        case.id
+    );
+    let mut changed = false;
+    let mut outcomes = Vec::new();
+    for (source, invalid) in case
+        .valid
+        .iter()
+        .map(|s| (s, false))
+        .chain(case.invalid.iter().map(|s| (s, true)))
+    {
+        let filename = case.path.as_deref().unwrap_or(Path::new("case.py"));
+        let found = scan::lint_source(
+            scan::File {
+                path: filename,
+                disk: None,
+            },
+            source,
+            packs,
+        )
+        .into_iter()
+        .find(|found| {
+            found.issue.rule == case.id
+                || format!("{}/{}", found.issue.package, found.issue.rule) == case.id
+        });
+        let actual = found.map(|found| {
+            let mut result = json!({"labels": [{"source": &source[found.range.clone()],
+            "style": "primary", "start": found.range.start, "end": found.range.end}]});
+            if let Some(edit) = found.fix {
+                let mut fixed = source.clone();
+                fixed.replace_range(edit.range, &edit.text);
+                result["fixed"] = Value::String(fixed);
+            }
+            result
+        });
+        let status = if !invalid && actual.is_some() {
+            "unexpected finding"
+        } else if invalid && actual.is_none() {
+            "missing finding"
+        } else if !invalid
+            || options.skip_snapshot_tests
+            || snapshots.snapshots.get(source) == actual.as_ref()
+        {
+            "passed"
+        } else if options.update_all
+            || (options.interactive && accept(&case.id, source, actual.as_ref())?)
+        {
+            if let Some(value) = actual.as_ref() {
+                snapshots.snapshots.insert(source.clone(), value.clone());
+                changed = true;
+            }
+            "updated"
+        } else {
+            "snapshot mismatch"
+        };
+        outcomes.push(Outcome {
+            id: case.id.clone(),
+            source: source.clone(),
+            status,
+            actual,
+        });
+    }
+    if changed {
+        fs::create_dir_all(snapshot_path.parent().context("snapshot has no parent")?)?;
+        fs::write(&snapshot_path, serde_saphyr::to_string(&snapshots)?)?;
+    }
+    Ok(outcomes)
+}
+
+fn directories(options: &Options) -> Result<Vec<(PathBuf, PathBuf)>> {
+    if let Some(directory) = &options.test_dir {
+        return Ok(vec![(directory.clone(), options.snapshot_dir.clone())]);
+    }
+    let config = options
+        .config
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("sgconfig.yml"));
+    let parsed: Config = serde_saphyr::from_str(&fs::read_to_string(&config)?)?;
+    let root = config.parent().context("config has no parent")?;
+    Ok(parsed
+        .test_configs
+        .into_iter()
+        .map(|entry| {
+            (
+                root.join(entry.test_dir),
+                entry
+                    .snapshot_dir
+                    .unwrap_or_else(|| options.snapshot_dir.clone()),
+            )
+        })
+        .collect())
+}
+
+fn accept(id: &str, source: &str, actual: Option<&Value>) -> Result<bool> {
+    eprintln!("{id}\n{source}\n{}", serde_json::to_string_pretty(&actual)?);
+    eprint!("Accept snapshot? [y/N] ");
+    io::stderr().flush()?;
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    Ok(answer.trim().eq_ignore_ascii_case("y"))
+}
+
+fn structural(options: &Options) -> Result<ExitCode> {
+    ensure!(
+        matches!(options.format, Format::Text),
+        "--format json is available with --engine xpd"
+    );
+    let mut args = vec!["xpd".to_owned(), "test".to_owned()];
+    for (flag, path) in [
+        ("--config", options.config.as_ref()),
+        ("--test-dir", options.test_dir.as_ref()),
+    ] {
+        if let Some(path) = path {
+            args.extend([flag.to_owned(), path.to_string_lossy().into_owned()]);
+        }
+    }
+    args.extend([
+        "--snapshot-dir".to_owned(),
+        options.snapshot_dir.to_string_lossy().into_owned(),
+    ]);
+    if let Some(filter) = &options.filter {
+        args.extend(["--filter".to_owned(), filter.to_string()]);
+    }
+    for (flag, enabled) in [
+        ("--skip-snapshot-tests", options.skip_snapshot_tests),
+        ("--update-all", options.update_all),
+        ("--interactive", options.interactive),
+    ] {
+        if enabled {
+            args.push(flag.to_owned());
+        }
+    }
+    ast_grep::main_with_args(args.into_iter())
+}

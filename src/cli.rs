@@ -84,6 +84,8 @@ struct IndexArgs {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
+    /// Check rule examples and review diagnostic and fix snapshots.
+    Test(crate::cases::Options),
     /// Find libraries and rules for a task, without importing Python.
     Find {
         query: Option<String>,
@@ -301,6 +303,10 @@ pub(crate) fn run() -> ExitCode {
         }
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
+        Cmd::Test(options) => crate::cases::run(&options).unwrap_or_else(|error| {
+            eprintln!("xpd: {error:#}");
+            ExitCode::from(CHECK_FAILED)
+        }),
         Cmd::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "xpd", &mut io::stdout());
             ExitCode::SUCCESS

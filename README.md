@@ -81,6 +81,11 @@ uv tool install xpd
 ```text
 xpd
 ├── check [paths]          lint files and folders, and rewrite with --fix
+├── scan [paths]           the same lint command as check
+├── run [paths]            find a code pattern or syntax kind, and preview or apply a rewrite
+├── outline [paths]        show symbols, imports, members and source ranges
+├── test                   check rule examples and compare diagnostic and fix snapshots
+├── new                    create a project, rule, empty case template or shared utility
 ├── find "<task>"          find library symbols, rules and worked recipes
 ├── api <dotted.name>       read a full API or recipe with source and attribution
 ├── index <source>         refresh symbols and documentation recipes without running Python
@@ -91,6 +96,7 @@ xpd
 ├── hook                   lint the file that a Claude Code edit touched
 ├── mcp                    start the MCP server
 ├── lsp                    start the language server for editors
+├── completions <shell>    generate completion from the installed command schema
 └── skill                  print the agent skill for this version
 ```
 
@@ -117,6 +123,30 @@ recipes together.
 project's Python and need pandas there. `xpd <command> -h` lists the flags of a command. The
 [commands page](https://bjoernaagaard.github.io/xpd/commands/) explains the output and the exit
 codes.
+
+`xpd run --lang python --pattern '$X.iterrows()' .` finds structural matches without
+running Python. Add `--rewrite '<replacement>'` to preview a replacement, then
+`--interactive` to review edits or `--update-all` to apply every match. `--format json`
+returns matches and their source ranges. `xpd outline src --format json` reads the
+project's symbols, imports and members without executing it.
+
+`check` also accepts `--format sarif` and `--format github`. Use `--fix --review` to
+accept or decline each fix. Unsafe fixes still require `--unsafe-fixes`.
+
+`xpd new project --pack team --yes` creates a portable local rule project. Create a rule
+with `xpd new rule team/no-iterrows --pattern '$DF.iterrows()' --message 'Use column operations.'
+--with-test --yes`. The rule's documentation and optional empty case template are created
+with it. `xpd new rule --help` lists version bounds, value proofs and fix safety options.
+`xpd new util` creates a shared matcher that rules reference with `matches`.
+
+`xpd test` checks valid and invalid examples using xpd's own scanner. It uses the
+project's `testConfigs` directories from `sgconfig.yml`. `--filter` selects rule IDs,
+`--skip-snapshot-tests` checks only whether examples match, `--interactive` reviews
+snapshot changes and `--update-all` accepts them all. `--engine structural` uses the
+upstream ast-grep runner for structural rule suites and their existing snapshots.
+
+`xpd completions bash` prints Bash completion. The other shells are `zsh`, `fish`,
+`powershell` and `elvish`.
 
 ## Use in an editor
 
@@ -204,6 +234,9 @@ xpd mcp
 │   ├── check, fix                 lint, and write fixes after the user confirms unsafe ones
 │   ├── graph, profile, equiv      the commands of the same names
 │   ├── find, api                   discover a library for a task and read its API
+│   ├── query, rewrite              search code, preview replacements and confirm edits
+│   ├── outline                     browse live project symbols and imports
+│   ├── new, test                    create rules and check their examples and snapshots
 │   ├── rules, rule                list the rules, and read one with its examples
 │   ├── contract, gates            judge a run from a data file to a saved model
 │   └── show_issues, show_dataflow, show_columns    tables and a chart, in hosts that draw them
@@ -246,6 +279,10 @@ Harvested recipes keep their source licenses, including MIT, BSD-3-Clause, Apach
 and NCSA. Run `xpd api <recipe-name>` to read the license text, copyright notices,
 source link and modification status with the code. The `licenses/` directory contains
 the upstream license and notice files shipped in the crate, sdist and wheel.
+The unmodified `option-ext` dependency is under MPL-2.0. Its complete source is included
+as `licenses/option-ext-0.2.0-source.tar.gz`, with its license in
+`licenses/option-ext-LICENSE.txt`. The same source is available from
+<https://crates.io/api/v1/crates/option-ext/0.2.0/download>.
 Package metadata lists the combined licenses of the bundled work.
 The embedding model that `find` downloads is not shipped with xpd. It is Gemma, provided under and
 subject to the Gemma Terms of Use at <https://ai.google.dev/gemma/terms>.
