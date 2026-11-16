@@ -1,0 +1,33 @@
+# to_csv writes text, so read_csv has to guess each dtype again. On pandas 3.1.1 with pyarrow
+# 26.0.1 and 1,000,000 rows, a frame with the dtypes int64, float64, str, datetime64[us], an
+# ordered category and Int64 came back from to_csv and read_csv with the datetime and the category
+# as str and the Int64 column as float64. to_parquet and read_parquet returned a frame equal to
+# the one written. The CSV file was 47.5 MB and the Parquet file 14.7 MB, and to_csv took 0.93
+# and 1.04 seconds where to_parquet took 0.09 (research/modern-pandas/probes/storage.txt).
+#
+# The rule reports to_csv on a path that the same file also reads with read_csv. The path must be
+# written the same way in both calls. A path written as a string is the same file anywhere in the
+# module. Any other path, such as a name, must be read in the function that writes it, or at
+# module level for a write at module level, because two functions can each have their own `path`.
+# A file that only writes a CSV is left alone, because another program may read it. The rule has no fix, because it changes two
+# calls and the file on disk.
+id: csv-round-trip
+language: python
+severity: warning
+message: This file writes $P with to_csv and reads it back with read_csv, which guesses every dtype again. A datetime64 column and an ordered category came back as str, and a nullable Int64 column as float64. to_parquet and read_parquet returned a frame equal to the one written, in a file 3.2 times smaller, on 1,000,000 rows.
+rule:
+  all:
+    - any:
+        - pattern: $X.to_csv($P)
+        - pattern: $X.to_csv($P, $$$A)
+    - any:
+        - inside: { stopBy: end, kind: module, has: { stopBy: end, matches: reads-it-back, has: { field: arguments, has: { kind: string, pattern: $P } } } }
+        - inside: { stopBy: { kind: function_definition }, kind: function_definition, has: { stopBy: end, matches: reads-it-back } }
+        - inside: { stopBy: { kind: function_definition }, kind: module, has: { stopBy: end, matches: reads-it-back } }
+constraints:
+  P: { not: { any: [{ kind: keyword_argument }, { kind: none }] } }
+utils:
+  reads-it-back:
+    any:
+      - pattern: $PD.read_csv($P)
+      - pattern: $PD.read_csv($P, $$$B)

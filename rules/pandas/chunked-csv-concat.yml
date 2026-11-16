@@ -1,0 +1,35 @@
+# chunksize makes read_csv return the file in parts, which saves memory only when each part is
+# reduced before the next one is read. A concat of every part holds the whole file again. On
+# pandas 3.1.1 and a CSV of 1,000,000 rows, pd.concat(pd.read_csv(path, chunksize=100_000)) took
+# 3.0 and 3.1 times as long in two runs as one read_csv without chunksize, and the two frames were
+# equal. read_parquet of the same rows was as fast as the one read_csv, and it takes columns= and
+# filters= to read less (research/modern-pandas/probes/storage.txt). The rule has no fix, because
+# pandas guesses the dtypes per chunk, so a column with mixed values can differ.
+id: chunked-csv-concat
+language: python
+severity: warning
+message: This reads the file in chunks and joins every chunk, so the whole file is in memory anyway, and it took 3 times as long as one read_csv without chunksize, which returned an equal frame. Drop chunksize, or reduce each chunk before the concat. To read only some columns or rows, store the data as Parquet and pass columns= or filters= to read_parquet.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '^(pd|pandas)\.concat$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+          any:
+            - matches: chunk-reader
+            - { pattern: list($R), has: { field: arguments, has: { matches: chunk-reader } } }
+            # Every chunk as it is: [part for part in reader], with no condition.
+            - kind: list_comprehension
+              all:
+                - has: { field: body, kind: identifier, pattern: $I }
+                - has: { kind: for_in_clause, all: [{ has: { field: left, pattern: $I } }, { has: { field: right, matches: chunk-reader } }] }
+                - not: { has: { kind: if_clause } }
+utils:
+  # read_csv with chunksize=, which returns the file in parts.
+  chunk-reader:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(pd|pandas)\.read_csv$' }
+      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^chunksize$ } } }

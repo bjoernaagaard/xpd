@@ -2329,6 +2329,117 @@ and 27 times faster than the `json.loads` loop. Its fix is unsafe, because pyarr
 dtype for a column. A call that reads from a `StringIO` is left alone, because the pyarrow engine
 raises on a text buffer.
 
+### Parquet storage
+
+These rules steer a file that stores a frame toward Parquet. The measurements used pandas 3.1.1
+with pyarrow 26.0.1 and a frame of 1,000,000 rows with the dtypes `int64`, `float64`, `str`,
+`datetime64[us]`, an ordered category and `Int64`. `to_parquet` and `read_parquet` returned a
+frame equal to the one written. The Parquet file was 14.7 MB, the CSV file 47.5 MB and the pickle
+file 49.0 MB.
+
+#### csv-round-trip
+
+**Severity:** warning. **Fix:** none.
+
+Reports `df.to_csv(path)` in a file that also calls `pd.read_csv(path)` on the same path, written the same way in both calls. `read_csv` guesses every dtype again: the datetime column and the ordered category came back as `str`, and the `Int64` column as `float64`. `to_csv` took 0.93 seconds and `to_parquet` 0.09. A file that only writes a CSV is left alone, because another program may read it.
+
+Example:
+
+```python
+df.to_csv("clean.csv", index=False)
+again = pd.read_csv("clean.csv")
+```
+
+Use instead:
+
+```python
+df.to_parquet("clean.parquet")
+again = pd.read_parquet("clean.parquet")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### pickle-or-hdf-storage
+
+**Severity:** info. **Fix:** none.
+
+Reports `to_pickle`, `pd.read_pickle`, `to_hdf`, `pd.read_hdf` and `pd.HDFStore`. `read_pickle` runs what the file tells it to call: a file whose pickle named `print` made `pd.read_pickle` print a line. HDF needs the PyTables package, and without it `to_hdf` raised `ImportError`. Parquet holds data only and needs pyarrow.
+
+Example:
+
+```python
+df.to_pickle("clean.pkl")
+again = pd.read_pickle("clean.pkl")
+```
+
+Use instead:
+
+```python
+df.to_parquet("clean.parquet")
+again = pd.read_parquet("clean.parquet")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### read-parquet-all-columns
+
+**Severity:** warning. **Fix:** safe: `columns=["id", "price"]`.
+
+Reports `pd.read_parquet(path)[["id", "price"]]` and `pd.read_parquet(path)["price"]`, which read every column and keep the named ones. The names must be strings. Reading 2 of 50 columns with `columns=` was 8.4 and 12.7 times faster in two runs, and 2 of 6 columns was 1.7 times faster. The two frames were equal, with the columns in the order of the list, and a file with a named index gave the same index both ways.
+
+Example:
+
+```python
+prices = pd.read_parquet(path)[["id", "price"]]
+```
+
+Use instead:
+
+```python
+prices = pd.read_parquet(path, columns=["id", "price"])
+```
+
+#### read-parquet-then-filter
+
+**Severity:** info. **Fix:** none.
+
+Reports `df = pd.read_parquet(path)` followed directly by `df = df[df["id"] >= value]`, with `>`, `>=`, `<`, `<=`, `==`, `!=` or `isin`. With `filters=` pyarrow skips each row group that holds no such row. A file in 10 row groups, filtered to the last tenth of a sorted column, was read 4.4 times faster, and a file in one row group 1.3 to 1.5 times faster. The values were equal. A frame without a stored index came back numbered from 0, where the mask kept the old labels, so the rule has no fix.
+
+Example:
+
+```python
+df = pd.read_parquet(path)
+df = df[df["id"] >= 900_000]
+```
+
+Use instead:
+
+```python
+df = pd.read_parquet(path, filters=[("id", ">=", 900_000)])
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### chunked-csv-concat
+
+**Severity:** warning. **Fix:** none.
+
+Reports `pd.concat(pd.read_csv(path, chunksize=n))`, also with `list(...)` or a comprehension around the reader. Every chunk is joined again, so the whole file is in memory anyway. It took 3.0 and 3.1 times as long in two runs as one `read_csv` without `chunksize`, and the two frames were equal. A loop that reduces each chunk before the concat is left alone.
+
+Example:
+
+```python
+df = pd.concat(pd.read_csv(path, chunksize=100_000))
+```
+
+Use instead:
+
+```python
+df = pd.read_csv(path)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
 ### Packages
 
 `xpd check` also looks at the project's venv once per run. When the venv has pandas, it warns
