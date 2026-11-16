@@ -6,7 +6,8 @@
 
 # GradientBoostingRegressor and HistGradientBoostingRegressor need loss="quantile", and
 # LGBMRegressor needs objective="quantile" and an alpha, without which fit raises "The matching
-# parameter `alpha_name` for estimator does not exist".
+# parameter `alpha_name` for estimator does not exist". A loss or objective that is not written
+# as text, such as loss=loss, may hold "quantile" and is left alone.
 id: quantile-estimator-loss
 language: python
 severity: error
@@ -16,7 +17,7 @@ rule:
   pattern: $E($$$EARGS)
   all:
     - has: { field: function, regex: '(^|\.)(Hist)?GradientBoostingRegressor$|(^|\.)LGBMRegressor$' }
-    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, regex: '^(loss|objective)\s*=\s*["'']quantile["'']$' }, { kind: dictionary_splat }] } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^(loss|objective)$' } }, { not: { has: { field: value, kind: string, not: { regex: '^["'']quantile["'']$' } } } }] }, { kind: dictionary_splat }] } } }
     - matches: quantile-estimator-argument
   not: { matches: expected-to-raise }
 utils:

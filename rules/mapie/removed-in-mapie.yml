@@ -277,7 +277,10 @@ constraints:
 fix: $F(np.column_stack([$LOW, $UP])[:, :, np.newaxis])[0]
 metadata: { fix: unsafe, since: "1.0" }
 ---
-# alpha became confidence_level in these two metrics.
+# alpha became confidence_level in these two metrics. The fix writes 1 - alpha, which is right
+# for a number and for a name that holds one. Any other value, such as a list of levels or a
+# conditional expression, is reported by the next document, without a fix: 1 - [0.05, 0.2]
+# raises TypeError.
 id: removed-in-mapie
 language: python
 severity: error
@@ -286,7 +289,7 @@ rule:
   kind: keyword_argument
   all:
     - has: { field: name, regex: '^alpha$' }
-    - has: { field: value, pattern: $A }
+    - has: { field: value, pattern: $A, any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] }
     - inside:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $F, regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' } }
@@ -295,6 +298,23 @@ utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: $F takes confidence_level since MAPIE 1.0, and alpha raises TypeError. Pass confidence_level, which is 1 minus alpha.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, not: { any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] } }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, pattern: $F, regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.0" }
 ---
 # The constructors of MAPIE 1 take confidence_level, and no method takes alpha.
 id: removed-in-mapie
@@ -305,7 +325,7 @@ rule:
   kind: keyword_argument
   all:
     - has: { field: name, regex: '^alpha$' }
-    - has: { field: value, pattern: $A }
+    - has: { field: value, pattern: $A, any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] }
     - inside:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
@@ -314,6 +334,24 @@ utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
+---
+# A list of alphas becomes a list of levels, one minus each value.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C takes confidence_level since MAPIE 1.0, and alpha raises TypeError. Pass confidence_level, which is 1 minus alpha. For a list of alphas, write 1 minus each value, as in confidence_level=[0.95, 0.8] for alpha=[0.05, 0.2].
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, not: { any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] } }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.0" }
 ---
 id: removed-in-mapie
 language: python
@@ -340,7 +378,7 @@ rule:
   kind: keyword_argument
   all:
     - has: { field: name, regex: '^alpha$' }
-    - has: { field: value, pattern: $A }
+    - has: { field: value, pattern: $A, any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] }
     - inside:
         kind: argument_list
         inside:
@@ -361,6 +399,106 @@ utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
+---
+# predict(X, alpha=[0.05, 0.2]) was the common 0.x form. confidence_level=[0.95, 0.8] gave
+# intervals of shape (3, 2, 2) for 3 rows.
+id: removed-in-mapie
+language: python
+severity: error
+message: TimeSeriesRegressor.predict takes confidence_level since MAPIE 1.0, and alpha raises TypeError. Pass confidence_level, which is 1 minus alpha. For a list of alphas, write 1 minus each value, as in confidence_level=[0.95, 0.8] for alpha=[0.05, 0.2].
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, not: { any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] } }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^predict$' } }, { has: { field: object, pattern: $M } }] }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.0" }
+---
+# predict of the other MAPIE 1 classes takes no alpha and no confidence_level, because the
+# level is set when the object is built. The object is one the file binds to such a class.
+id: removed-in-mapie
+language: python
+severity: error
+message: predict takes no alpha on a MAPIE 1 class, and it raises TypeError. Pass confidence_level, which is 1 minus alpha, to the constructor, and read the intervals from predict_interval or the sets from predict_set.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^predict$' } }, { has: { field: object, pattern: $M } }] }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, regex: '^(\w+\.)*((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.0" }
+---
+# The cross classes and the jackknife class fit and conformalize in one call, so they have no
+# fit: "AttributeError: 'CrossConformalRegressor' object has no attribute 'fit'". The object is
+# a name the file binds to one of the three classes and to nothing else.
+# CrossConformalizedQuantileRegressor has a fit of its own and is left alone.
+id: removed-in-mapie
+language: python
+severity: error
+message: A cross conformal or jackknife class of MAPIE 1 has no fit, and the call raises AttributeError. Call fit_conformalize, which fits on the folds or samples and conformalizes on the rows each one leaves out.
+rule:
+  kind: attribute
+  pattern: $M.fit
+  all:
+    - inside: { kind: call, field: function }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, pattern: $M }
+            - has: { field: right, regex: '^(\w+\.)*(CrossConformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor)\(' }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $M }
+              - not: { has: { field: right, regex: '^(\w+\.)*(CrossConformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor)\(' } }
+  not: { matches: expected-to-raise }
+constraints:
+  M: { kind: identifier }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.0" }
 ---
 # The split classes take prefit and no cv, and the cross classes refuse a string.
 id: removed-in-mapie
@@ -441,7 +579,8 @@ utils:
 fix: 'fit_params={"sample_weight": $W}'
 metadata: { fix: unsafe, since: "1.0" }
 ---
-# The same keyword on fit, where the object is one the file binds to a MAPIE class.
+# The same keyword on fit, where the object is one the file binds to a split class. Their fit
+# raised "got an unexpected keyword argument 'sample_weight'" on 1.0.1.
 id: removed-in-mapie
 language: python
 severity: error
@@ -467,19 +606,54 @@ rule:
                       kind: assignment
                       all:
                         - has: { field: left, pattern: $M }
-                        - has: { field: right, regex: '^(\w+\.)*(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor|TimeSeriesRegressor)\(' }
+                        - has: { field: right, regex: '^(\w+\.)*(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor)\(' }
   not: { matches: expected-to-raise }
 utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: 'fit_params={"sample_weight": $W}'
 metadata: { fix: unsafe, since: "1.0" }
 ---
-# MAPIE 1.1 replaced TimeSeriesRegressor.partial_fit with update, which takes the same X, y and
-# ensemble.
+# TimeSeriesRegressor.fit took sample_weight and used it through 1.3.0, ignored it on 1.4.0, and
+# raises "'sample_weight' must be passed inside 'fit_params'" since 1.4.1. fit_params raised on
+# 1.0.1 to 1.3.0 and ran from 1.4.0, so the document and its fix start at 1.4.1.
 id: removed-in-mapie
 language: python
 severity: error
-message: TimeSeriesRegressor has no partial_fit since MAPIE 1.1, and the call raises AttributeError. Call update, which takes the same rows.
+message: 'TimeSeriesRegressor.fit takes no sample_weight since MAPIE 1.4.1, and it raises TypeError. Pass fit_params={"sample_weight": $W}.'
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^sample_weight$' }
+    - has: { field: value, pattern: $W }
+    - inside:
+        kind: argument_list
+        all:
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: '^fit_params$' } } }
+          - inside:
+              kind: call
+              all:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, pattern: $M } }] }
+                - inside:
+                    kind: module
+                    stopBy: end
+                    has:
+                      stopBy: end
+                      kind: assignment
+                      all:
+                        - has: { field: left, pattern: $M }
+                        - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: 'fit_params={"sample_weight": $W}'
+metadata: { fix: unsafe, since: "1.4.1" }
+---
+# MAPIE 1.2 replaced TimeSeriesRegressor.partial_fit with update, which takes the same X, y and
+# ensemble. HISTORY.md lists the change under 1.1.0, and the 1.1.0 wheel still has partial_fit.
+id: removed-in-mapie
+language: python
+severity: error
+message: TimeSeriesRegressor has no partial_fit since MAPIE 1.2, and the call raises AttributeError. Call update, which takes the same rows.
 rule:
   kind: attribute
   pattern: $M.partial_fit
@@ -498,4 +672,4 @@ rule:
 utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: $M.update
-metadata: { fix: unsafe, since: "1.1" }
+metadata: { fix: unsafe, since: "1.2" }

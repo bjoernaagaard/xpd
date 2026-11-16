@@ -4,7 +4,9 @@
 # object. It reports only where the intervals or sets go into a MAPIE coverage metric: the call
 # is an argument of the metric, or its second result is, by its name, in the function around the
 # call or in the file when the call is outside a function. A prediction for seen rows that is
-# only plotted or checked for its shape misleads nobody. Each number is the mean over 30 seeds
+# only plotted or checked for its shape misleads nobody. An earlier statement is
+# left out when a later one assigns to the variable before the prediction, because the name
+# then holds other rows. Each number is the mean over 30 seeds
 # on MAPIE 1.6.0 with a RandomForestRegressor and confidence_level=0.9.
 #
 # The patterns come first in `all`, so that $M and $X are bound before the earlier statements
@@ -27,12 +29,20 @@ rule:
         follows:
           stopBy: end
           kind: expression_statement
-          has:
-            stopBy: end
-            kind: call
-            all:
-              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fit_conformalize)$' } }, { has: { field: object, pattern: $M } }] }
-              - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+          all:
+            - has:
+                stopBy: end
+                kind: call
+                all:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fit_conformalize)$' } }, { has: { field: object, pattern: $M } }] }
+                  - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+            - not:
+                precedes:
+                  stopBy: end
+                  kind: expression_statement
+                  all:
+                    - has: { any: [{ kind: assignment }, { kind: augmented_assignment }], has: { field: left, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] } }
+                    - precedes: { stopBy: end, kind: expression_statement, has: { stopBy: end, any: [{ pattern: '$M.predict_interval($X, $$$B1)' }, { pattern: '$M.predict_interval($X)' }, { pattern: '$M.predict_set($X, $$$B2)' }, { pattern: '$M.predict_set($X)' }] } }
     - matches: coverage-scored
 constraints:
   X: { kind: identifier }
@@ -72,12 +82,20 @@ rule:
         follows:
           stopBy: end
           kind: expression_statement
-          has:
-            stopBy: end
-            kind: call
-            all:
-              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conformalize$' } }, { has: { field: object, pattern: $M } }] }
-              - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+          all:
+            - has:
+                stopBy: end
+                kind: call
+                all:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conformalize$' } }, { has: { field: object, pattern: $M } }] }
+                  - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+            - not:
+                precedes:
+                  stopBy: end
+                  kind: expression_statement
+                  all:
+                    - has: { any: [{ kind: assignment }, { kind: augmented_assignment }], has: { field: left, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] } }
+                    - precedes: { stopBy: end, kind: expression_statement, has: { stopBy: end, any: [{ pattern: '$M.predict_interval($X, $$$B1)' }, { pattern: '$M.predict_interval($X)' }, { pattern: '$M.predict_set($X, $$$B2)' }, { pattern: '$M.predict_set($X)' }] } }
     - matches: coverage-scored
 constraints:
   X: { kind: identifier }

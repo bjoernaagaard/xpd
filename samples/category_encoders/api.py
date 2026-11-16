@@ -75,6 +75,14 @@ def intercept_column():
 
 
 @case
+def own_intercept_column():
+    X, _ = frame()
+    design = ce.SumEncoder(cols=["city"]).fit_transform(X)
+    design["intercept"] = 1.0
+    return design.drop(columns=["intercept"]).shape, design.shape
+
+
+@case
 def names_are_an_array():
     X, _ = frame()
     encoder = ce.BinaryEncoder(cols=["city"]).fit(X)

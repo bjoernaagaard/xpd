@@ -4,7 +4,9 @@
 
 # An estimator built in the argument list is new, so it cannot be fitted. conformalize then
 # raises NotFittedError for a regressor and AttributeError for a classifier. The conditional
-# classes take feature_map first, so only their estimator keyword is read.
+# classes take feature_map first, so only their estimator keyword is read. A wrapper around a
+# fitted model is fitted: FrozenEstimator(fitted) ran, so that class is left alone, and so is
+# a class that is given a .fit(...) chain.
 id: prefit-estimator-not-fitted
 language: python
 severity: error
@@ -28,13 +30,16 @@ utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   new-estimator:
     kind: call
-    has:
-      field: function
-      any:
-        - kind: identifier
-          regex: '^([A-Z]\w*|make_pipeline)$'
-        - kind: attribute
-          has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+    all:
+      - has:
+          field: function
+          any:
+            - kind: identifier
+              regex: '^([A-Z]\w*|make_pipeline)$'
+            - kind: attribute
+              has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+      - not: { has: { field: function, regex: '(^|\.)FrozenEstimator$' } }
+      - not: { has: { field: arguments, has: { kind: call, not: { kind: keyword_argument }, has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit$' } } } } }
 ---
 # fit on an object with prefit=True raises "The fit method must be skipped when the prefit
 # parameter is set to True", whatever the estimator. The document above already reports an
@@ -96,17 +101,22 @@ utils:
                     - has: { field: value, matches: new-estimator }
   new-estimator:
     kind: call
-    has:
-      field: function
-      any:
-        - kind: identifier
-          regex: '^([A-Z]\w*|make_pipeline)$'
-        - kind: attribute
-          has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+    all:
+      - has:
+          field: function
+          any:
+            - kind: identifier
+              regex: '^([A-Z]\w*|make_pipeline)$'
+            - kind: attribute
+              has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+      - not: { has: { field: function, regex: '(^|\.)FrozenEstimator$' } }
+      - not: { has: { field: arguments, has: { kind: call, not: { kind: keyword_argument }, has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit$' } } } } }
 ---
 # ConformalizedQuantileRegressor with prefit=True needs three fitted estimators, for the lower
 # quantile, the upper quantile and the median, in that order. One estimator raises "Estimator
-# for prefit must be an iterable object".
+# for prefit must be an iterable object". Only a class that is built in the argument list, with
+# or without a fit chained to it, is one estimator for sure. A call of a function may return the
+# list of three.
 id: prefit-estimator-not-fitted
 language: python
 severity: error
@@ -119,12 +129,24 @@ rule:
         field: arguments
         has:
           any:
-            - all: [{ nthChild: 1 }, { kind: call }]
+            - all: [{ nthChild: 1 }, { matches: new-class }]
             - kind: keyword_argument
               all:
                 - has: { field: name, regex: '^estimator$' }
-                - has: { field: value, kind: call }
-
+                - has: { field: value, matches: new-class }
   not: { matches: expected-to-raise }
 utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  new-class:
+    kind: call
+    has:
+      field: function
+      any:
+        - kind: identifier
+          regex: '^([A-Z]\w*|make_pipeline)$'
+        - kind: attribute
+          has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+        - kind: attribute
+          all:
+            - has: { field: attribute, regex: '^fit$' }
+            - has: { field: object, kind: call, has: { field: function, regex: '(^|\.)([A-Z]\w*|make_pipeline)$' } }

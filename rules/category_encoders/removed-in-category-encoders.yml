@@ -71,18 +71,21 @@ metadata: { fix: unsafe, since: "2.8" }
 # Until 2.6 the four contrast encoders added a column named intercept that holds 1 on every
 # row, and code dropped it by name. 2.7 stopped adding it, so the drop raises "KeyError:
 # ['intercept'] not found in axis". The rule needs a contrast encoder named in the same file.
-# A file that makes a column of that name itself, with frame["intercept"] = ..., with
-# assign(intercept=...) or with insert, drops its own column, and the rule leaves it alone.
+# A frame that the file gives a column of that name itself, with frame["intercept"] = ... or
+# frame.insert, holds its own column, and a drop on that frame is left alone. assign returns a
+# new frame under a name the rule cannot follow, so a file with assign(intercept=...) is left
+# alone as a whole.
 id: removed-in-category-encoders
 language: python
 severity: error
 message: The contrast encoders stopped adding the intercept column in category_encoders 2.7, so this drop raises KeyError. Remove the drop.
 rule:
-  any:
-    - pattern: $DF.drop($$$A)
-    - pattern: del $DF["intercept"]
-    - pattern: $DF.pop("intercept")
+  # The patterns come first in `all`, so that $DF is bound before the file is searched for it.
   all:
+    - any:
+        - pattern: $DF.drop($$$A)
+        - pattern: del $DF["intercept"]
+        - pattern: $DF.pop("intercept")
     - any:
         - regex: '^del |\.pop\('
         - has: { field: arguments, has: { stopBy: end, kind: string, regex: '^["'']intercept["'']$' } }
@@ -96,9 +99,9 @@ rule:
           has:
             stopBy: end
             any:
-              - { kind: assignment, has: { field: left, kind: subscript, has: { field: subscript, regex: '^["'']intercept["'']$' } } }
+              - { kind: assignment, has: { field: left, kind: subscript, all: [{ has: { field: value, pattern: $DF } }, { has: { field: subscript, regex: '^["'']intercept["'']$' } }] } }
+              - { kind: call, all: [{ has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $DF } }, { has: { field: attribute, regex: '^insert$' } }] } }, { has: { field: arguments, has: { kind: string, regex: '^["'']intercept["'']$' } } }] }
               - { kind: call, all: [{ has: { field: function, regex: '\.assign$' } }, { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^intercept$' } } } }] }
-              - { kind: call, all: [{ has: { field: function, regex: '\.insert$' } }, { has: { field: arguments, has: { kind: string, regex: '^["'']intercept["'']$' } } }] }
 metadata: { since: "2.7" }
 ---
 # feature_names_out_ was a list until 2.6 and is a NumPy array since 2.7, which has no list

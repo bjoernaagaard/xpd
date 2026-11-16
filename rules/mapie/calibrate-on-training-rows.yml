@@ -6,7 +6,9 @@
 # The first document reads the name of the first argument. The second reads no name: it reports
 # conformalize on the variable that an earlier statement of the same block, or the same chain,
 # gave to a fit with a target. A step fitted without a target, such as a scaler, is left alone,
-# and so is a class that calls fit and conformalize on itself.
+# and so is a class that calls fit and conformalize on itself. A fit is left out when a later
+# statement assigns to the variable before the conformalize, because the name then holds other
+# rows. A stopBy rule cannot do this, because it does not see the variable that $X holds.
 
 id: calibrate-on-training-rows
 language: python
@@ -33,7 +35,15 @@ rule:
         follows:
           stopBy: end
           kind: expression_statement
-          has: { stopBy: end, matches: fit-on-the-rows }
+          all:
+            - has: { stopBy: end, matches: fit-on-the-rows }
+            - not:
+                precedes:
+                  stopBy: end
+                  kind: expression_statement
+                  all:
+                    - has: { any: [{ kind: assignment }, { kind: augmented_assignment }], has: { field: left, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] } }
+                    - precedes: { stopBy: end, kind: expression_statement, has: { stopBy: end, pattern: '$M.conformalize($X, $$$A2)' } }
 utils:
   fit-on-the-rows:
     kind: call
