@@ -7315,6 +7315,99 @@ These habits were looked at and have no rule.
 - `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
   index.
 
+## arch
+
+These rules run on files that import `arch`, the module of
+[arch](https://bashtage.github.io/arch/), which fits ARCH and GARCH volatility models, tests for
+unit roots and cointegration, and runs bootstraps and multiple comparison tests. They report API
+that arch removed, string options that arch refuses, arguments that it accepts and does not read,
+returns in units that the optimizer handles badly, forecasts that raise or that are computed many
+times over, and random draws without a seed. Every number in this section was measured on arch
+9.0.0 with NumPy 2.5.5, pandas 3.1.1, SciPy 1.18.1 and statsmodels 0.15.0, unless another release
+is named. Examples assume that the arch names they use are imported. Names such as `returns`,
+`prices`, `losses` and `x` represent values supplied by your program.
+
+arch 8.0 removed the `RandomState` paths of the bootstraps and the distributions, and arch 9.0
+removed `arch.__future__` and the `type` keyword of `hedgehog_plot`, made some attributes read
+only and started to check every argument. A rule document about such a change carries `since`.
+xpd reads the installed version from the project's venv, as it does for pandas, and skips the
+document on an older release, so a project that still has arch 7.2 gets no report about what 8.0
+removed. When the venv has no arch, or there is no venv, every document runs.
+
+A pattern has no types, so each rule ties its report to a name that the file binds to arch. A
+call is read by the name of its class or function, such as `arch_model` or `IIDBootstrap`. A
+short name that another library may have, such as `SPA`, `MCS` or `Normal`, is read only when the
+file imports it from arch. A method such as `fit`, `forecast` or `conf_int` is read only on a
+model, a result or a bootstrap that the file builds from an arch name and assigns to a variable,
+and the rule is silent when the same variable is assigned anything else anywhere in the file. An
+option or a value is read only when it is written in the call. A variable in its place is never
+taken for the bad value.
+
+### Removed API
+
+Each form below raises on arch 9.0.0. Each was run on the release before the removal and on the
+release that made it, both installed from PyPI, because the release notes of 8.0 do not list what
+8.0 removed. Every fix of a removed form turns code that raises into code that runs, so none of
+those fixes can be compared with the old form and none is safe.
+
+#### removed-in-arch
+
+**Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` on a bootstrap or a distribution, `plot_type=` for `type=` on `hedgehog_plot` of a result that the file gets from an arch model, and `from arch.utility.cov import cov_nw` for the import from `arch.utility` when `cov_nw` is the only name. The other forms have no fix.
+
+Reports `from arch.__future__ import reindexing`, `type=` given to `hedgehog_plot`, `random_state=` given to `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap` or `LocalBlockBootstrap`, `random_state=` or a positional argument given to `Normal`, `StudentsT`, `SkewStudent` or `GeneralizedError`, the methods `seed`, `get_state` and `set_state` and the property `random_state` on a bootstrap, `seed` on an `SPA`, `StepM`, `MCS` or `RealityCheck`, `cov_nw` imported from `arch.utility`, an assignment to `block_size` of a block bootstrap or to `bootstrap` of a multiple comparison test, and `nested=True` with `studentize=False` on `SPA`, `StepM` or `RealityCheck`.
+
+Example:
+
+```python
+from arch.__future__ import reindexing
+
+bs = IIDBootstrap(x, random_state=np.random.RandomState(0))
+bs.seed(1234)
+dist = Normal(random_state=np.random.RandomState(0))
+fig = res.hedgehog_plot(type="mean")
+```
+
+Use instead:
+
+```python
+bs = IIDBootstrap(x, seed=1234)
+dist = Normal(seed=np.random.default_rng(0))
+fig = res.hedgehog_plot(plot_type="mean")
+```
+
+The table gives what each form did on the release before the removal and what it does from that
+release on.
+
+| Form | Before | From | Now |
+| --- | --- | --- | --- |
+| `IIDBootstrap(x, random_state=rs)` | 7.2.0: FutureWarning | 8.0.0 | TypeError, because `random_state` is read as data |
+| `Normal(random_state=rs)`, `Normal(rs)` | 7.2.0: FutureWarning | 8.0.0 | TypeError |
+| `bs.seed(1)`, `bs.get_state()`, `bs.set_state(s)`, `bs.random_state` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
+| `SPA(...).seed(1)`, the same on `StepM` and `MCS` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
+| `from arch.utility import cov_nw` | 7.2.0: runs | 8.0.0 | ImportError |
+| `from arch.__future__ import reindexing` | 8.0.0: runs and does nothing | 9.0.0 | ModuleNotFoundError |
+| `res.hedgehog_plot(type="mean")` | 8.0.0: FutureWarning | 9.0.0 | TypeError |
+| `bs.block_size = 5`, `spa.bootstrap = bs` | 8.0.0: runs | 9.0.0 | AttributeError |
+| `SPA(..., studentize=False, nested=True)` | 8.0.0: runs | 9.0.0 | ValueError |
+
+The bootstraps take their data as keyword arguments, so 8.0.0 and 9.0.0 read `random_state` as
+one more series and raise because a `RandomState` is not an array. `seed` takes the same
+`RandomState`, a `Generator` or an integer, and exists since arch 5.0: on 4.19
+`IIDBootstrap(x, seed=0)` raised TypeError. `IIDBootstrap(x, seed=np.random.RandomState(0))` drew
+the same samples on 6.1.0, 7.2.0, 8.0.0 and 9.0.0. The state of the generator is read and set
+through the `state` property, and `generator` gives the generator itself.
+
+`seed`, `get_state`, `set_state`, `random_state`, `block_size` and `bootstrap` are names that
+other objects have too, such as a NumPy `RandomState`. They are reported only on a variable that
+the file assigns from one of the arch classes and from nothing else. `hedgehog_plot` is reported
+on any object, because no other library that was looked at has a method of that name, and it is
+fixed only on a result that the file gets from `fit` or `fix` of an arch model.
+
+The rule leaves alone an import inside a `try` block that catches the error, code behind a
+version check, and code inside `pytest.raises`. arch 9.0.0 has no deprecation of its own left:
+its source raises no `DeprecationWarning` and no `FutureWarning`, so the pack has no rule for
+deprecated API.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
