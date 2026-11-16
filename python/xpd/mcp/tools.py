@@ -13,7 +13,14 @@ from mcp.types import (
 )
 
 from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, Command, T, Xpd
-from xpd.mcp.models import CheckReport, DiscoveryEntry, Equivalence, GraphReport, Profile
+from xpd.mcp.models import (
+    CheckReport,
+    DiscoveryEntry,
+    DiscoveryMatches,
+    Equivalence,
+    GraphReport,
+    Profile,
+)
 from xpd.mcp.protocol import uses_handshake
 from xpd.mcp.root import Project, Root
 
@@ -213,14 +220,16 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
     @mcp.tool(tags={"discovery"}, annotations=READS)
     async def find(
-        task: str, package: str | None = None, kind: str | None = None
-    ) -> list[DiscoveryEntry]:
-        """Find the top five symbols, rules or recipes for a task in plain words.
+        task: str, package: str | None = None, kind: str | None = None, limit: int | None = None
+    ) -> DiscoveryMatches:
+        """Find up to five symbols, three rules and three recipes, ranked within each kind.
 
         Search offline before choosing a library, even when it is not installed.
         Read the chosen symbol with api before writing code.
         """
         flags = []
+        if limit is not None:
+            flags.extend(["--limit", str(limit)])
         if package:
             flags.extend(["--package", package])
         if kind:

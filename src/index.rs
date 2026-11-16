@@ -394,13 +394,6 @@ pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
         .transpose()
 }
 
-pub(crate) fn contains(library: &Library, name: &str) -> bool {
-    library.local.as_ref().map_or_else(
-        || RECORDS.iter().any(|e| e.name == name),
-        |entries| entries.iter().any(|e| e.name == name),
-    )
-}
-
 use crate::search::tokens;
 
 #[derive(Debug)]
@@ -457,17 +450,44 @@ const POSTINGS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/postings.bin")
 const TABLE: &[(&str, u32, u32)] = include!(concat!(env!("OUT_DIR"), "/search.rs"));
 const RECORDS: &[Stored] = include!(concat!(env!("OUT_DIR"), "/records.rs"));
 
+#[derive(Debug, Default, Serialize)]
+pub(crate) struct Matches {
+    pub(crate) symbols: Vec<Entry>,
+    pub(crate) rules: Vec<Entry>,
+    pub(crate) recipes: Vec<Entry>,
+}
+
+impl Matches {
+    fn collect(entries: impl IntoIterator<Item = Entry>, limit: Option<usize>) -> Self {
+        let mut found = Self::default();
+        for entry in entries {
+            let (group, default) = match entry.kind {
+                Kind::Symbol => (&mut found.symbols, 5),
+                Kind::Rule => (&mut found.rules, 3),
+                Kind::Recipe => (&mut found.recipes, 3),
+            };
+            if group.len() < limit.unwrap_or(default) {
+                group.push(entry);
+            }
+        }
+        found
+    }
+}
+
 pub(crate) fn find(
     library: &Library,
     query: &str,
     package: Option<&str>,
     kind: Option<Kind>,
-) -> Vec<Entry> {
+    limit: Option<usize>,
+) -> Matches {
     if let Some(entries) = &library.local {
-        return find_dynamic(entries, query, package, kind)
-            .into_iter()
-            .cloned()
-            .collect();
+        return Matches::collect(
+            find_dynamic(entries, query, package, kind)
+                .into_iter()
+                .cloned(),
+            limit,
+        );
     }
     let words: BTreeSet<_> = search_terms(query).into_iter().collect();
     let mut scores = vec![0.0; RECORDS.len()];
@@ -506,13 +526,23 @@ pub(crate) fn find(
         })
         .collect();
     ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(b.name)));
-    let mut recipes = 0;
-    ranked
-        .into_iter()
-        .filter(|(e, _)| keep_recipe(e.kind, kind, &mut recipes))
-        .take(5)
-        .map(|(e, _)| e.entry().expect("build validated index entry"))
-        .collect()
+    // Select within each kind before decoding the embedded entries.
+    let mut counts = [0; 3];
+    Matches::collect(
+        ranked
+            .into_iter()
+            .filter(|(e, _)| {
+                let (slot, default) = match e.kind {
+                    Kind::Symbol => (0, 5),
+                    Kind::Rule => (1, 3),
+                    Kind::Recipe => (2, 3),
+                };
+                counts[slot] += 1;
+                counts[slot] <= limit.unwrap_or(default)
+            })
+            .map(|(e, _)| e.entry().expect("build validated index entry")),
+        limit,
+    )
 }
 
 fn find_dynamic<'a>(
@@ -564,21 +594,7 @@ fn find_dynamic<'a>(
         })
         .collect::<Vec<_>>();
     ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(&b.name)));
-    let mut recipes = 0;
-    ranked
-        .into_iter()
-        .filter(|(e, _)| keep_recipe(e.kind, kind, &mut recipes))
-        .take(5)
-        .map(|(e, _)| e)
-        .collect()
-}
-
-fn keep_recipe(entry: Kind, filter: Option<Kind>, recipes: &mut usize) -> bool {
-    if entry == Kind::Recipe && filter.is_none() {
-        *recipes += 1;
-        return *recipes <= 3;
-    }
-    true
+    ranked.into_iter().map(|(e, _)| e).collect()
 }
 
 fn search_terms(query: &str) -> Vec<String> {

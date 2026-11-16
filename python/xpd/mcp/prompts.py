@@ -6,8 +6,10 @@ from fastmcp import FastMCP
 
 DISCOVERY = """\
 found = await call_tool("find", {"task": TASK})
-candidates = found["result"]
-inspected = [await call_tool("api", {"name": item["name"]}) for item in candidates]
+inspected = {
+    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+    for kind in ("symbols", "rules", "recipes")
+}
 discovery = {
     "question": {"task": TASK}, "candidates": inspected,
     "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},

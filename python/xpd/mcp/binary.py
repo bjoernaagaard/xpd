@@ -17,6 +17,7 @@ from pydantic import TypeAdapter
 from xpd.mcp.models import (
     CheckReport,
     DiscoveryEntry,
+    DiscoveryMatches,
     Equivalence,
     GraphReport,
     Profile,
@@ -41,7 +42,7 @@ class Command(Generic[T]):
     results: frozenset[int]
 
 
-FIND = Command(("find", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
+FIND = Command(("find", "--format", "json"), TypeAdapter(DiscoveryMatches), SUCCESS)
 API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
 CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport), FINDINGS)
 GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport), FINDINGS)

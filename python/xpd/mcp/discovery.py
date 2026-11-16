@@ -48,9 +48,11 @@ def keyword_problems(node: ast.Call, entry: DiscoveryEntry, place: str) -> list[
 def choice_problems(discovery: Discovery) -> list[str]:
     choice = discovery.choice
     failures = []
-    if choice.name not in {entry.name for entry in discovery.candidates}:
+    if choice.name not in {entry.name for entry in discovery.candidates.entries()}:
         failures.append(f"{choice.name} is not among the recorded candidates.")
-    selected = next((entry for entry in discovery.candidates if entry.name == choice.name), None)
+    selected = next(
+        (entry for entry in discovery.candidates.entries() if entry.name == choice.name), None
+    )
     if selected is not None and selected.kind == "symbol" and choice.name not in choice.symbols:
         failures.append("The chosen symbol must be listed among the symbols the code calls.")
     return failures

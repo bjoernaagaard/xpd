@@ -12,7 +12,11 @@ Use `xpd` whenever you write or change Python code.
   unless you can state why the pattern is right here. Don't silence rules.
   A `missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
-- `xpd find "<task>"`: discover library symbols and rules before choosing a library.
+- `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
+  Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per
+  kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.
+  In code mode, read these lists directly. Record inspected candidates in the same grouped
+  shape. A symbol read directly through `api` counts as a candidate when recorded there.
   `xpd api <dotted.name>` reads a result with its parameters and guarding rules.
 - `xpd rules --format json`: every rule with its documentation. Read a rule's
   `doc` before you change code it reports.

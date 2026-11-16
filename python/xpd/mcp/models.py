@@ -227,6 +227,17 @@ class DiscoveryEntry(Output):
         return f"{self.name}({', '.join(self.parameters)})"
 
 
+class DiscoveryMatches(Output):
+    """Candidates ranked separately within each kind, including entries read through api."""
+
+    symbols: list[DiscoveryEntry] = Field(default_factory=list)
+    rules: list[DiscoveryEntry] = Field(default_factory=list)
+    recipes: list[DiscoveryEntry] = Field(default_factory=list)
+
+    def entries(self) -> list[DiscoveryEntry]:
+        return [*self.symbols, *self.rules, *self.recipes]
+
+
 class DiscoveryQuestion(Written):
     task: str = Field(min_length=1)
 
@@ -242,7 +253,7 @@ class DiscoveryChoice(Written):
 
 class Discovery(Written):
     question: DiscoveryQuestion
-    candidates: list[DiscoveryEntry] = Field(min_length=1)
+    candidates: DiscoveryMatches
     choice: DiscoveryChoice
 
 

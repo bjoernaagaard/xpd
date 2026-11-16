@@ -82,6 +82,9 @@ enum Cmd {
         package: Option<String>,
         #[arg(long, value_enum)]
         kind: Option<Kind>,
+        /// Maximum results per kind (defaults to 5 symbols, 3 rules and 3 recipes).
+        #[arg(long)]
+        limit: Option<usize>,
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
         /// Additional index generated from local source.
@@ -220,6 +223,7 @@ pub(crate) fn run() -> ExitCode {
             query,
             package,
             kind,
+            limit,
             format,
             index,
             check,
@@ -229,8 +233,38 @@ pub(crate) fn run() -> ExitCode {
                 check_ranking(&entries, &path)?;
             } else {
                 let query = query.context("provide a task query or --check")?;
-                let found = index::find(&entries, &query, package.as_deref(), kind);
-                print_entries(&found.iter().collect::<Vec<_>>(), format, Detail::Summary)?;
+                let mut found = index::find(&entries, &query, package.as_deref(), kind, limit);
+                for group in [&mut found.symbols, &mut found.rules, &mut found.recipes] {
+                    for entry in group {
+                        entry.keywords.clear();
+                        entry.members.clear();
+                        entry.summary = entry
+                            .summary
+                            .split("\n\n")
+                            .next()
+                            .unwrap_or_default()
+                            .to_owned();
+                    }
+                }
+                match format {
+                    Format::Json => println!("{}", serde_json::to_string(&found)?),
+                    Format::Text => {
+                        for (heading, selected, group) in [
+                            ("Symbols", Kind::Symbol, &found.symbols),
+                            ("Rules", Kind::Rule, &found.rules),
+                            ("Recipes", Kind::Recipe, &found.recipes),
+                        ] {
+                            if kind.is_none_or(|k| k == selected) {
+                                println!("{heading}");
+                                print_entries(
+                                    &group.iter().collect::<Vec<_>>(),
+                                    format,
+                                    Detail::Summary,
+                                )?;
+                            }
+                        }
+                    }
+                }
             }
             Ok(())
         })()),
@@ -674,11 +708,14 @@ fn check_ranking(entries: &index::Library, path: &std::path::Path) -> Result<()>
         let expected = question["expected"]
             .as_str()
             .context("question needs expected")?;
-        anyhow::ensure!(
-            index::contains(entries, expected),
-            "expected entry {expected} is absent from the index"
-        );
-        let found = index::find(entries, query, None, None);
+        let entry = index::api(entries, expected)?
+            .with_context(|| format!("expected entry {expected} is absent from the index"))?;
+        let matches = index::find(entries, query, None, Some(entry.kind), Some(5));
+        let found = match entry.kind {
+            Kind::Symbol => matches.symbols,
+            Kind::Rule => matches.rules,
+            Kind::Recipe => matches.recipes,
+        };
         if !found.iter().any(|e| e.name == expected) {
             failed += 1;
             println!(
