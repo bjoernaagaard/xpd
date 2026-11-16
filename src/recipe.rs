@@ -92,20 +92,22 @@ fn dedent(code: &str) -> String {
     result
 }
 
-fn fenced(text: &str) -> Vec<(String, String)> {
+fn fenced(text: &str) -> Vec<(String, String, usize)> {
     let mut title = String::new();
     let mut code = None::<String>;
     let mut found = Vec::new();
-    for line in text.lines() {
+    let mut start = 1;
+    for (number, line) in text.lines().enumerate() {
         let trimmed = line.trim();
         if let Some(block) = &mut code {
             if trimmed.starts_with("```") {
-                found.push((title.clone(), code.take().unwrap_or_default()));
+                found.push((title.clone(), code.take().unwrap_or_default(), start));
             } else {
                 block.push_str(line);
                 block.push('\n');
             }
         } else if trimmed.starts_with("```python") || trimmed == "```py" {
+            start = number + 2;
             code = Some(String::new());
         } else if trimmed.starts_with('#') {
             trimmed
@@ -149,8 +151,8 @@ fn string_content(text: &str) -> &str {
         .unwrap_or_default()
 }
 
-fn notebook(path: &Path, text: &str) -> Vec<(String, String)> {
-    let Ok(notebook) = serde_json::from_str::<serde_json::Value>(text) else {
+fn notebook(path: &Path, source: &str) -> Vec<(String, String, usize)> {
+    let Ok(notebook) = serde_json::from_str::<serde_json::Value>(source) else {
         return Vec::new();
     };
     let Some(cells) = notebook["cells"].as_array() else {
@@ -181,13 +183,20 @@ fn notebook(path: &Path, text: &str) -> Vec<(String, String)> {
                     .clone_into(&mut title);
             }
         } else if cell["cell_type"] == "code" {
-            examples.push((title.clone(), text));
+            let first = text.lines().find(|s| !s.is_empty()).unwrap_or_default();
+            let quoted = serde_json::to_string(first).unwrap_or_default();
+            let line = source
+                .lines()
+                .position(|s| s.contains(quoted.trim_matches('"')))
+                .unwrap_or(0)
+                + 1;
+            examples.push((title.clone(), text, line));
         }
     }
     examples
 }
 
-fn candidates(path: &Path, text: &str) -> Vec<(String, String)> {
+fn candidates(path: &Path, text: &str) -> Vec<(String, String, usize)> {
     if path.extension().is_some_and(|e| e == "ipynb") {
         return notebook(path, text);
     }
@@ -201,6 +210,7 @@ fn candidates(path: &Path, text: &str) -> Vec<(String, String)> {
                 .to_string_lossy()
                 .into_owned(),
             doctest(text),
+            1,
         )];
     }
     let tree = scan::parse(text);
@@ -241,9 +251,9 @@ fn candidates(path: &Path, text: &str) -> Vec<(String, String)> {
             .to_owned();
         let code = doctest(doc);
         if !code.is_empty() {
-            result.push((title.clone(), code));
+            result.push((title.clone(), code, string.start_pos().line() + 1));
         }
-        result.extend(fenced(doc).into_iter().map(|(heading, code)| {
+        result.extend(fenced(doc).into_iter().map(|(heading, code, line)| {
             (
                 if heading.is_empty() {
                     title.clone()
@@ -251,6 +261,7 @@ fn candidates(path: &Path, text: &str) -> Vec<(String, String)> {
                     heading
                 },
                 code,
+                string.start_pos().line() + line,
             )
         }));
     }
@@ -265,9 +276,9 @@ fn candidates(path: &Path, text: &str) -> Vec<(String, String)> {
                     .to_string_lossy()
                     .replace('_', " ")
             },
-            |(t, _)| t.clone(),
+            |(t, _, _)| t.clone(),
         );
-        result.push((title, text.to_owned()));
+        result.push((title, text.to_owned(), 1));
     }
     result
 }
@@ -527,7 +538,7 @@ pub(crate) fn harvest(
             continue;
         }
         let text = std::fs::read_to_string(&path).with_context(|| path.display().to_string())?;
-        for (number, (title, code)) in candidates(&path, &text).into_iter().enumerate() {
+        for (title, code, line) in candidates(&path, &text) {
             let code = dedent(&code);
             if code.trim().is_empty() || !seen.insert(code.clone()) {
                 continue;
@@ -547,8 +558,7 @@ pub(crate) fn harvest(
                 .strip_prefix(source.root)?
                 .to_string_lossy()
                 .replace('\\', "/");
-            let source_url = format!("{}/{}", source.url.trim_end_matches('/'), relative);
-            let name_id = format!("{package}/recipe/{relative}#{}", number + 1);
+            let source_url = format!("{}/{}#L{line}", source.url.trim_end_matches('/'), relative);
             let title = if title.is_empty() {
                 path.file_stem()
                     .unwrap_or_default()
@@ -577,7 +587,7 @@ pub(crate) fn harvest(
             entries.push(Entry {
                 kind: Kind::Recipe,
                 package: package.to_owned(),
-                name: name_id,
+                name: recipe_name(package, &title),
                 callable: None,
                 parameters: Vec::new(),
                 summary: title,
@@ -631,6 +641,7 @@ fn select(entries: &mut Vec<Entry>, first: usize, stats: &mut Stats) {
         )
     });
     let mut chosen = BTreeSet::new();
+    let mut names = BTreeSet::new();
     let mut bytes = 0;
     for entry in accepted {
         let length = entry
@@ -642,6 +653,7 @@ fn select(entries: &mut Vec<Entry>, first: usize, stats: &mut Stats) {
             || length > 8000
             || bytes + length > 96_000
             || !chosen.insert(primary(&entry))
+            || !names.insert(entry.name.clone())
         {
             stats.capped += 1;
             continue;
@@ -650,4 +662,15 @@ fn select(entries: &mut Vec<Entry>, first: usize, stats: &mut Stats) {
         stats.retained += 1;
         bytes += length;
     }
+}
+
+pub(crate) fn recipe_name(package: &str, title: &str) -> String {
+    let slug = title
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .take(8)
+        .collect::<Vec<_>>()
+        .join("-");
+    format!("{package}/recipe/{slug}")
 }

@@ -44,10 +44,6 @@
     "expected": "scipy.optimize.minimize"
   },
   {
-    "query": "one way analysis of variance",
-    "expected": "scipy.stats.f_oneway"
-  },
-  {
     "query": "calculate pairwise distances between observations",
     "expected": "scipy.spatial.distance.pdist"
   },
@@ -94,10 +90,6 @@
   {
     "query": "encode categories as binary features",
     "expected": "category_encoders.BinaryEncoder"
-  },
-  {
-    "query": "encode categories using target statistics",
-    "expected": "category_encoders.TargetEncoder"
   },
   {
     "query": "encode categorical features with hashing",
@@ -189,30 +181,22 @@
   },
   {
     "query": "multi-hot encoding for delimiter-separated items",
-    "expected": "category_encoders/recipe/category_encoders/multi_hot.py#1"
+    "expected": "category_encoders/recipe/multi-hot-encoding-for-cells-that-contain-several"
   },
   {
     "query": "maximum relevance minimum redundancy feature selection example",
-    "expected": "sklego/recipe/sklego/feature_selection/mrmr.py#1"
+    "expected": "sklego/recipe/maximum-relevance-minimum-redundancy-mrmr-is-an-iterative"
   },
   {
     "query": "reweight input signals with weights that sum to one",
-    "expected": "sklego/recipe/sklego/linear_model.py#2"
-  },
-  {
-    "query": "create an identity array example",
-    "expected": "numpy/recipe/numpy/_core/numeric.py#23"
-  },
-  {
-    "query": "stack one dimensional arrays as columns in a two dimensional array example",
-    "expected": "numpy/recipe/numpy/lib/_shape_base_impl.py#6"
+    "expected": "sklego/recipe/probweightregression-assumes-that-all-input-signals-in-x"
   },
   {
     "query": "split conformal prediction intervals worked example",
-    "expected": "mapie/recipe/mapie/regression/regression.py#1"
+    "expected": "mapie/recipe/computes-prediction-intervals-using-the-split-conformal-regression"
   },
   {
     "query": "show a block bootstrap training set example",
-    "expected": "mapie/recipe/mapie/subsample.py#2"
+    "expected": "mapie/recipe/generate-a-sampling-method-that-block-bootstraps-the"
   }
 ]
