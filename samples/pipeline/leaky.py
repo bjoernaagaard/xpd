@@ -5,6 +5,7 @@ for those rows is too high. `xpd check leaky.py` reports the loop as sklearn/tun
 saves its model and contract where train.py does, so run train.py again afterwards.
 """
 
+import inspect
 import json
 import platform
 from pathlib import Path
@@ -110,8 +111,10 @@ contract = {
             "numpy": np.__version__,
             "joblib": joblib.__version__,
         },
+        # joblib saves add_features by its module and name, so the model needs this file.
+        "code": [Path(inspect.getfile(add_features)).relative_to(Path.cwd()).as_posix()],
     },
 }
 CONTRACT.write_text(json.dumps(contract, indent=2) + "\n")
 
-result = pd.Series(model.predict(X_test), index=X_test.index, name=TARGET)
+result = pd.DataFrame(model.predict_proba(X_test), index=X_test.index, columns=model.classes_)

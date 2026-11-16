@@ -1,11 +1,12 @@
 """Trains the penguin species model, from the raw rows to a saved Pipeline and its contract.
 
 Run it in this folder, which is the project root of the code mode draft in docs/code-mode.md.
-It leaves the predictions for the held out rows in `result`, so `xpd equiv train.py train.py`
-shows that two runs agree and `xpd equiv train.py predict.py` shows that the saved model
-predicts what the fitted one did.
+It leaves the class probabilities of the held out rows in `result`, so `xpd equiv train.py
+train.py` shows that two runs agree and `xpd equiv train.py predict.py` shows that the saved
+model, loaded in a new Python process, gives what the fitted one did.
 """
 
+import inspect
 import json
 import platform
 from pathlib import Path
@@ -99,8 +100,10 @@ contract = {
             "numpy": np.__version__,
             "joblib": joblib.__version__,
         },
+        # joblib saves add_features by its module and name, so the model needs this file.
+        "code": [Path(inspect.getfile(add_features)).relative_to(Path.cwd()).as_posix()],
     },
 }
 CONTRACT.write_text(json.dumps(contract, indent=2) + "\n")
 
-result = pd.Series(model.predict(X_test), index=X_test.index, name=TARGET)
+result = pd.DataFrame(model.predict_proba(X_test), index=X_test.index, columns=model.classes_)

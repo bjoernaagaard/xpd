@@ -1,8 +1,10 @@
 """Loads the saved penguin model and predicts the held out rows, as a service would.
 
-It reads only the contract that train.py wrote: where the data and the model are, the input
-columns with their dtypes, the versions, and the split. It leaves the predictions in `result`,
-so `xpd equiv train.py predict.py` compares them with those of the fitted model.
+The contract that train.py wrote says all it needs: where the data and the model are, the
+input columns with their dtypes, the versions, the split, and the code files that the model
+imports when it loads. The saved Pipeline holds add_features by its module and name, so
+features.py has to be beside this script. It leaves the class probabilities in `result`, so
+`xpd equiv train.py predict.py` compares them with those of the fitted model.
 """
 
 import json
@@ -20,6 +22,11 @@ trained_with = contract["model"]["versions"]["scikit-learn"]
 if trained_with != sklearn.__version__:
     msg = f"The model was trained with scikit-learn {trained_with}, not {sklearn.__version__}."
     raise RuntimeError(msg)
+
+missing = [file for file in contract["model"]["code"] if not Path(file).is_file()]
+if missing:
+    msg = f"The model imports {missing}, and no such file is here."
+    raise FileNotFoundError(msg)
 
 penguins = pd.read_csv(contract["data"]["file"])
 expected = {column["column"]: column["dtype"] for column in contract["inputs"]}
@@ -39,4 +46,4 @@ X_train, X_test = train_test_split(
 )
 
 model = joblib.load(contract["model"]["file"])
-result = pd.Series(model.predict(X_test), index=X_test.index, name=target.name)
+result = pd.DataFrame(model.predict_proba(X_test), index=X_test.index, columns=model.classes_)
