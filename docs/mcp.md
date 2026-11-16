@@ -96,6 +96,9 @@ Every path is relative to the project root, and a path outside it is refused.
 
 | Tool | Arguments | What it does | Changes files |
 | --- | --- | --- | --- |
+| `find` | `task`, optional `package`, `kind` | Searches the binary's index, including libraries not installed | No |
+| `api` | `name` | Reads one indexed name, its parameter names and guarding rules | No |
+| `discovery_gate` | `paths`, `discovery` | Checks direct imported calls against `api` before execution | No |
 | `check` | `paths` (default: the root), `unsafe_fixes` (default: `false`) | Lints files and folders, as [`xpd check`](commands.md#check). `unsafe_fixes` counts unsafe fixes in `fixable` too | No |
 | `fix` | `paths` (default: the root), `unsafe` (default: `false`) | Writes the safe fixes, then lints what is left. With `unsafe`, it writes unsafe fixes too, after the user confirms | Yes |
 | `graph` | `paths` | Reads the dataflow of step code and Hamilton modules, as [`xpd graph`](commands.md#graph) | No |
@@ -167,7 +170,7 @@ the package already chosen. Clients that support the Skills extension also list 
 | `review` | `target`, `package`, `rule` | Reviews a path or a git range with the review skill and `check` |
 | `refactor_data_logic` | `path`, `goal` | Refactors a script and proves with `equiv` that its result did not change |
 | `add_to_dataflow` | `path`, `change` | Adds a step or node, with `graph` before and after |
-| `build_pipeline` | `data`, `target` | Builds a scikit-learn model from a data file, saves it with its contract, and runs the stages until `gates` passes |
+| `build_pipeline` | `data`, `target`, optional `task` | Builds a scikit-learn model from a data file, saves it with its contract, and runs the stages until `gates` passes |
 
 `package` and `rule` complete as they do in resource URIs.
 
@@ -210,7 +213,44 @@ fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas
 ## Library discovery
 
 Call `find(task, package=None, kind=None)` before selecting a library, even if the project has
-not installed it. The result holds up to five symbols or rules ranked by keywords. `package`
-is a Python import name and `kind` is `symbol` or `rule`. Call `api(name)` with a returned dotted
+not installed it. The result holds up to five entries ranked by keywords. `package`
+is a Python import name. Read each entry's `kind`, which can include `symbol`, `rule` and
+`recipe`. The server preserves other kinds and fields added by the binary. Call `api(name)` with a returned dotted
 name to read its parameter names, docstring summary, own class members and possible guarding
-rules. Both tools call the installed binary. The server holds no symbol index.
+rules. Both tools call the installed binary. The server holds no symbol index. In code mode, `find` returns its list under `result`.
+`api` returns an object directly. Both include `signature`, a display of indexed parameter
+names only. This display has no defaults, parameter kinds or type annotations, and it is
+null for entries that are not callable symbols.
+
+`DiscoveryQuestion` holds `task`. `DiscoveryEntry` holds each candidate's `kind`, `name`,
+`signature`, `summary`, `parameters`, `members` and guarding `rules`. `DiscoveryChoice`
+holds the chosen `name`, a `reason` and the callable `symbols` the written code must use.
+For a recipe, list the indexed symbols its example uses. `Discovery` combines those three
+parts. It is the planning input for the pipeline stages, and the training script records
+it in `Contract.discovery`. The server neither chooses a candidate nor installs a package.
+
+`discovery_gate` reads the Python files named in `paths` inside the project root. It resolves
+import spellings, including aliases, and asks the binary's `api` about direct calls in the
+modules containing `choice.symbols`. It requires a call to every chosen symbol and checks
+literal keyword names against the index's parameter names. An unknown callable, an unlisted
+keyword or `**` argument fails `indexed-api-calls`. It returns `DiscoveryProof` with the
+record, paths and `Gate`. It imports no library and runs no project code.
+
+This gate checks source spellings. It cannot resolve shadowed imports, instance methods,
+runtime aliases, required arguments, positional binding, argument values or types. An
+indexed name may be absent from the installed library. A valid inherited or variadic
+parameter may be absent from the index. Calls in other modules are outside its scope.
+A recipe's association with its chosen symbols is the agent's account.
+
+Pass `DiscoveryProof` as `Proof.discovery` to `gates`. When either the proof or the contract
+has discovery, `gates` requires both records to match and includes `indexed-api-calls` and
+`discovery-is-recorded`. Contracts and proofs with neither retain the original eleven
+gates. These are supplied results, so `gates` does not prove that the files are unchanged
+or that a supplied report is authentic.
+
+`build_pipeline` tells the agent to find, inspect, choose, explain missing dependencies,
+write files, run `discovery_gate`, run `check`, then run the remaining stages. It tells the
+agent to get permission before adding a missing library through the project's dependency
+manager. The default sandbox only calls tools. The agent writes files before the single
+`execute` call, which repeats discovery and checks the written choice. See the runnable
+[discovery examples](code-mode.md#discovery-before-execution).

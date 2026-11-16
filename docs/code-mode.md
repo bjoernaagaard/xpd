@@ -2,7 +2,8 @@
 
 !!! note "First draft"
 
-    This page is a first draft. It describes one way for an agent to take a data file to a
+    This page is a first draft. Discovery now starts the workflow, and the agent records its
+    choice before the checks. It describes one way for an agent to take a data file to a
     saved scikit-learn model through `xpd mcp --code-mode`, with checks that xpd runs itself.
     The tool names, the contract and the gates may change. The last section lists what is
     open.
@@ -37,7 +38,7 @@ The design follows what FastMCP documents for code mode, and it uses the default
 | `call_tool` returns the tool's structured result | The script hands one tool's result to the next tool as it is |
 | A tool runs in the server, with the same checks as a direct call | A path outside the project root is still refused |
 | The sandbox stops a script after 30 seconds and 100 MB, and the time a tool takes does not count | A long training run does not stop the script |
-| One `execute` call makes at most 50 tool calls | The script below makes 7 |
+| One `execute` call makes at most 50 tool calls | The pipeline script below makes 14 |
 | Prompts and resources are not tools | The agent reads the `build_pipeline` prompt through its client, before it calls `execute` |
 
 ## What worked before this draft
@@ -50,6 +51,7 @@ An agent had to decide for itself whether a run was good.
 
 | Addition | Kind | What it does |
 | --- | --- | --- |
+| `discovery_gate` | Tool | Reads direct imported calls in the chosen modules and compares their names and literal keywords with `api` |
 | The stages of a run | Typed models in `python/xpd/mcp/models.py` | Name what each stage hands to the next |
 | `contract` | Tool | Reads the JSON file that the training script saves beside its model |
 | `gates` | Tool | Takes the results of the other tools and returns one verdict, with one line per requirement |
@@ -62,10 +64,11 @@ project's Python needs pandas and scikit-learn.
 
 ## The stages
 
-A run has eight stages. Each one hands a typed result to the next.
+A run has nine stages when it starts with discovery. Each one hands a typed result to the next.
 
 | Stage | What it hands on | Model | Where it comes from |
 | --- | --- | --- | --- |
+| Discovery | The task, inspected candidates and the choice with its reason | `DiscoveryQuestion`, `DiscoveryEntry`, `DiscoveryChoice`, `Discovery` | `find`, `api` and the agent |
 | Raw data | The file, the target column and the row count | `RawData` | The contract |
 | Profile | Each column's dtype, nulls and distinct values | `Profile` | The `profile` tool |
 | Split | The seed, the share held out and the rows on each side | `Split` | The contract |
@@ -75,7 +78,8 @@ A run has eight stages. Each one hands a typed result to the next.
 | Proof | What `check`, `graph` and `equiv` found | `Proof` | Those three tools |
 | Persisted model | The model file, the class of the saved object, the versions that wrote it and the code files it imports | `SavedModel` | The contract |
 
-The contract is one JSON file with those parts. The training script writes it, and it names
+The contract is one JSON file with those parts. The JSON below shows the model fields;
+the sample also records the discovery object shown in the discovery section. The training script writes it, and it names
 every file that a script needs to serve the model: the data, the model and the code under
 `model.code`. joblib saves the function of a `FunctionTransformer` by its module and name, so
 the sample's model loads only where `features.py` can be imported. This is the contract of the
@@ -121,7 +125,7 @@ sample run.
 
 ## The gates
 
-In this draft, a run is done when it passes the eleven gates below. `gates` returns each one
+In this draft, a run is done when it passes the eleven original gates below and, when discovery is supplied, the two discovery gates. `gates` returns each one
 with `passed` and a `detail`. The last column names the tools whose results decide the gate.
 
 A gate shows only what its column says. No gate shows that a run has no leak:
@@ -130,12 +134,14 @@ out rows by their name. [What is open](#what-is-open) lists leaks that pass ever
 
 | Gate | Stage | The run passes when | Decided by |
 | --- | --- | --- | --- |
+| `indexed-api-calls` | Discovery | `discovery_gate` confirms direct imported callable names and literal keyword names in the chosen modules | `api`, source files |
+| `discovery-is-recorded` | Discovery | The contract and proof have the same discovery record | `contract`, supplied proof |
 | `data-is-profiled` | Raw data | The contract names the profiled file with its row count, and the target has no nulls | `profile`, `contract` |
 | `split-covers-every-row` | Split | The training rows and the held out rows add up to the rows of the file | `profile`, `contract` |
 | `split-is-seeded` | Split | `check` reports no draw without a seed in scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo code, by the rules in the table below | `check`, `contract` |
 | `inputs-are-file-columns` | Preprocessing | Each input of the contract has the name and dtype of a column of the file, and none is the target. The values are not compared | `profile`, `contract` |
 | `dataflow-connects` | Preprocessing | `graph` reports no error or warning, and each feature step reads only input columns and columns of earlier steps | `graph`, `contract` |
-| `one-pipeline` | Model | The saved object is a `sklearn.pipeline.Pipeline` with its steps listed | `contract` |
+| `one-pipeline` | Model | The contract names the saved object as `sklearn.pipeline.Pipeline` and lists its steps | `contract` |
 | `check-reports-no-error` | Proof | `check` reports no error of any pack. The table below names the errors that are leaks | `check` |
 | `cross-validated` | Validation | The contract has one score for each of two or more folds. Which rows the folds hold is not checked | `contract` |
 | `reproducible` | Proof | `equiv` of the training script with itself is equivalent, so two runs in two Python processes leave an equal `result` | `equiv` |
@@ -165,6 +171,11 @@ CC0 license: 344 rows, with nulls in five columns.
 
 ```text
 samples/pipeline/
+├── discovery.json  the inspected planning record copied into the training contract
+├── grouped.py      one fitted model per group, for 24 groups of made up rows
+├── bootstrap.py    arch and MAPIE block resampling, and forward validation
+├── figure.py       a new Plotly scatter figure
+├── invalid_api.py  made up API names that the discovery gate refuses
 ├── penguins.csv     the raw rows
 ├── features.py      two feature steps, as step code that graph reads
 ├── train.py         split, one Pipeline, cross-validation, the saved model and its contract
@@ -191,13 +202,35 @@ FEATURES = "features.py"
 TRAIN = "train.py"
 PREDICT = "predict.py"
 CONTRACT = "model/contract.json"
+TASK = "classify penguin species with a logistic regression pipeline"
+CHOICE = "sklearn.linear_model.LogisticRegression"
+REASON = "Class probabilities for the species target."
+SYMBOLS = [CHOICE]
+found = await call_tool("find", {"task": TASK})
+candidates = found["result"]
+inspected = [await call_tool("api", {"name": item["name"]}) for item in candidates]
+discovery = {
+    "question": {"task": TASK}, "candidates": inspected,
+    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
+}
+api_proof = await call_tool("discovery_gate", {
+    "paths": [TRAIN, PREDICT, FEATURES], "discovery": discovery,
+})
+if not api_proof["gate"]["passed"]:
+    return api_proof
+
 profile = await call_tool("profile", {"file": DATA})
 lint = await call_tool("check", {"paths": [TRAIN, PREDICT, FEATURES]})
+if any(issue["severity"] == "error" for issue in lint["issues"]):
+    return {"passed": False, "lint": lint, "discovery": api_proof}
 dataflow = await call_tool("graph", {"paths": [FEATURES]})
 reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
 served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
 contract = await call_tool("contract", {"file": CONTRACT})
-proof = {"lint": lint, "dataflow": dataflow, "reproducible": reproducible, "served": served}
+proof = {
+    "lint": lint, "dataflow": dataflow, "reproducible": reproducible,
+    "served": served, "discovery": api_proof,
+}
 report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
 return {
     "passed": report["passed"],
@@ -240,7 +273,7 @@ which fits the Pipeline and saves the model and the contract. The second runs `t
     {
       "name": "split-covers-every-row",
       "passed": true,
-      "detail": "258 training rows and 86 held out rows."
+      "detail": "The contract counts 258 training rows and 86 held out rows."
     },
     {
       "name": "split-is-seeded",
@@ -260,7 +293,7 @@ which fits the Pipeline and saves the model and the contract. The second runs `t
     {
       "name": "one-pipeline",
       "passed": true,
-      "detail": "One Pipeline of FunctionTransformer then ColumnTransformer then LogisticRegression."
+      "detail": "The contract lists one Pipeline of FunctionTransformer then ColumnTransformer then LogisticRegression."
     },
     {
       "name": "check-reports-no-error",
@@ -285,7 +318,17 @@ which fits the Pipeline and saves the model and the contract. The second runs `t
     {
       "name": "versions-recorded",
       "passed": true,
-      "detail": "python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, numpy 2.5.5, joblib 1.6.0"
+      "detail": "The contract records python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, numpy 2.5.5, joblib 1.6.0."
+    },
+    {
+      "name": "indexed-api-calls",
+      "passed": true,
+      "detail": "Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run."
+    },
+    {
+      "name": "discovery-is-recorded",
+      "passed": true,
+      "detail": "The contract records the discovery question, candidates and reason of the proof."
     }
   ],
   "validation": {
@@ -335,72 +378,13 @@ copied to an empty folder, `predict.py` stops before it loads the model.
 FileNotFoundError: The model imports ['features.py'], and no such file is here.
 ```
 
-## A leaky script fails a gate
+## A leaky script stops before execution
 
-`leaky.py` is `train.py` with one change. It tries four strengths of regularization and keeps
-the one with the best score on the held out rows, so that score no longer says how the model
-does on rows it has not seen.
-
-```python
-best_score, best_strength = 0.0, 1.0
-for strength in (0.01, 0.1, 1.0, 10.0):  # xpd: tune-on-test
-    candidate = pipeline(strength=strength)
-    candidate.fit(X_train, y_train)
-    score = candidate.score(X_test, y_test)
-    if score > best_score:
-        best_score, best_strength = score, strength
-model = pipeline(strength=best_strength)
-```
-
-The same client with `TRAIN = "leaky.py"` fails `check-reports-no-error`, and the other ten
-gates still pass. This is `diff -u` of the two results. The fold scores differ too, because the
-leak chose another strength.
-
-```diff
-@@ -1,5 +1,5 @@
- {
--  "passed": true,
-+  "passed": false,
-   "gates": [
-     {
-       "name": "data-is-profiled",
-@@ -33,13 +33,13 @@
-     },
-     {
-       "name": "check-reports-no-error",
--      "passed": true,
--      "detail": "check reports no error."
-+      "passed": false,
-+      "detail": "leaky.py:72 sklearn/tune-on-test."
-     },
-     {
-       "name": "cross-validated",
-       "passed": true,
--      "detail": "The contract records accuracy 0.9804 to 1.0 on 5 folds, and 0.9884 as the held out score."
-+      "detail": "The contract records accuracy 0.9423 to 1.0 on 5 folds, and 0.9884 as the held out score."
-     },
-     {
-       "name": "reproducible",
-@@ -61,11 +61,11 @@
-     "scoring": "accuracy",
-     "folds": 5,
-     "cv_scores": [
--      0.9808,
-+      0.9423,
-       0.9808,
-       1.0,
-       1.0,
--      0.9804
-+      1.0
-     ],
-     "test_score": 0.9884
-   },
-```
-
-`leaky.py` saves its model where `train.py` does, so run the first client again afterwards.
-
-The gate fails because `check` has the rule `tune-on-test` and the script names the held out
-rows `X_test`. The same loop with those rows named `X_hold` passes all eleven gates.
+`leaky.py` tries four strengths of regularization and keeps the one with the best score
+on held out rows. The current prompt script stops at `check` when it sees
+`sklearn/tune-on-test`, before either `equiv` call can run that code. To try it, set
+`TRAIN = "leaky.py"` in the pipeline script above. This shows an error that the rule knows.
+The same loop with the held out rows named `X_hold` remains a limit of that rule.
 
 ## Where the other parts plug in
 
@@ -420,7 +404,7 @@ version as this draft.
 | --- | --- |
 | `gates` cannot tell which files a result is about | It trusts the script. A script that lints another file, or hands in an old result, passes. The tools would have to return the paths they ran on, or `gates` would have to run the stages itself |
 | The contract is the training script's own account | `gates` checks the file, the rows, the columns, the dtypes and the pandas version against `profile`. The steps, the seed and the scores are not checked against the saved model. That needs a command that loads the model in the project's Python |
-| No gate finds a leak that `check` has no rule for | Each script below passes all eleven gates. A gate would need the rows that each step was fitted and scored on, from the run itself and not from the script's own account |
+| No gate finds a leak that `check` has no rule for | Each script below passes all pipeline gates. A gate would need the rows that each step was fitted and scored on, from the run itself and not from the script's own account |
 | The held out rows under another name | `leaky.py` with `candidate.score(X_hold, y_hold)`. The rule `tune-on-test` knows the rows by names such as `X_test` |
 | A step fitted on every row before the split | `penguins[MEASURED] = StandardScaler().fit_transform(penguins[MEASURED])`, or the same with the mean and the standard deviation of pandas, and then `train_test_split` |
 | A fit on every row | `cross_val_score(model, X, y, ...)` and `model.fit(X, y)`, and then `model.score(X_test, y_test)`. `cross-validated` reads the scores of the contract and not the rows behind them |
@@ -434,3 +418,454 @@ version as this draft.
 | No time limit on a tool call | The draft sets no `wall_clock_timeout_secs`, so a training script that hangs keeps `execute` open |
 | `fix` in a script | `fix` with `unsafe` asks the user to confirm. How that question travels through `execute` is not tested |
 | The scripts run in the project root | `train.py` imports `features` and reads `penguins.csv` by a relative path, so the server's root has to be the folder of the scripts |
+
+## Discovery before execution
+
+This section extends the first draft. The agent first asks `find` about the task and reads
+`api` for the returned candidates. It chooses a symbol or recipe and states its reason.
+The kinds are data, so the scripts keep each kind rather than assuming two kinds.
+For a recipe, `choice.symbols` names the indexed callable symbols the written example uses.
+The agent says when a required library is missing and asks before adding it through the
+project's dependency manager. Discovery itself works without that library installed.
+
+The agent writes project files with its normal editing tools. FastMCP's default sandbox
+cannot import libraries, write files or ask an LLM to choose. The scripts below repeat
+discovery for an already written choice and check those files before running anything.
+One `execute` call performs each complete check. It does not generate or install code.
+
+```text
+Discovery.question.task
+Discovery.candidates[].kind, name, signature, summary, rules
+Discovery.choice.name, reason, symbols
+Contract.discovery
+Proof.discovery = discovery_gate(paths, discovery)
+```
+
+`signature` displays parameter names from the source index, without defaults or parameter
+kinds. `discovery_gate` reads the files in `paths` and checks direct imported calls in the
+modules containing `choice.symbols`. For example, choosing GroupedPredictor checks direct
+calls in `sklego.meta`. Import aliases are resolved by spelling, without Python scope or
+type resolution. Each chosen symbol must occur as a call. Each literal keyword must occur
+in the indexed parameter names. Unknown callable names and `**` arguments fail the gate.
+
+It does not check instance methods, runtime aliases, shadowing, required arguments,
+positional binding, argument values, dependency installation or calls in other modules.
+Valid APIs absent from the index also fail in the checked modules. The gate does not prove
+that a call will run. `gates` trusts supplied reports and does not check whether source
+files changed after the gate. `discovery-is-recorded` compares the discovery record in the
+contract with `Proof.discovery`; it does not check that the choice was the best one.
+
+`samples/pipeline/discovery.json` is the inspected planning record for the penguin model.
+The training scripts copy it into `model/contract.json`. After changing that choice, save
+the new inspected record before running training. The earlier pipeline script returns
+thirteen gates, including the API gate and the recorded discovery gate. Older contracts
+and proofs with neither discovery field retain the eleven original gates.
+
+### Run the scripts through the server
+
+Build and install the wheel and the sample libraries into a throwaway environment. These
+commands were run from this worktree, without changing the project's dependencies.
+PyArrow and bottleneck satisfy the optional pandas package checks in this environment.
+
+```sh
+cargo build --release
+uv venv /var/tmp/xpd-discovery-venv
+uv pip install --python /var/tmp/xpd-discovery-venv/bin/python maturin
+/var/tmp/xpd-discovery-venv/bin/maturin build --release --out /var/tmp/xpd-discovery-wheels
+uv pip install --python /var/tmp/xpd-discovery-venv/bin/python /var/tmp/xpd-discovery-wheels/*.whl pandas scikit-learn scikit-lego arch mapie plotly pyarrow bottleneck
+```
+
+Paste one complete script below into `CODE` in this client and run it from the repository
+with `/var/tmp/xpd-discovery-venv/bin/python`. `find` returns its list under `result`, as
+FastMCP's output schema specifies. `api` returns an object directly.
+
+```python
+import asyncio
+import json
+from fastmcp import Client
+from fastmcp.client.transports import StdioTransport
+
+CODE = """paste one script below here"""
+
+async def main():
+    transport = StdioTransport(
+        "/var/tmp/xpd-discovery-venv/bin/xpd",
+        ["mcp", "--code-mode", "--root", "samples/pipeline"],
+        env={"VIRTUAL_ENV": "/var/tmp/xpd-discovery-venv"},
+    )
+    async with Client(transport) as client:
+        result = await client.call_tool("execute", {"code": CODE})
+        print(json.dumps(result.structured_content, indent=2))
+
+asyncio.run(main())
+```
+
+The following outputs were returned by the installed wheel's server through a real
+FastMCP 4.2.0 client. `check` selects the Plotly pack because `figure.py` imports Plotly.
+These standalone examples require the API gate, no lint errors, and equal `result` values
+from two processes. They do not claim the saved model gates of the penguin workflow.
+
+### One model per group
+
+```python
+TASK = 'going from one model on all data to one model per group, 24 groups'
+CHOICE = 'sklego.meta.GroupedPredictor'
+REASON = 'Fit one estimator per group instead of 24 handwritten fit loops.'
+SYMBOLS = ['sklego.meta.GroupedPredictor']
+ARCH = False
+FILE = 'grouped.py'
+found = await call_tool("find", {"task": TASK})
+inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+if ARCH:
+    blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
+    for item in blocks["result"]:
+        inspected.append(await call_tool("api", {"name": item["name"]}))
+discovery = {
+    "question": {"task": TASK}, "candidates": inspected,
+    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
+}
+proof = await call_tool("discovery_gate", {"paths": [FILE], "discovery": discovery})
+if not proof["gate"]["passed"]:
+    return {"passed": False, "gate": proof["gate"], "ran": False}
+lint = await call_tool("check", {"paths": [FILE]})
+errors = [issue for issue in lint["issues"] if issue["severity"] == "error"]
+if errors:
+    return {"passed": False, "lint": lint, "ran": False}
+repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
+return {
+    "passed": repeat["equivalent"],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "choice": discovery["choice"], "api_gate": proof["gate"],
+    "lint": lint, "repeat": repeat,
+}
+```
+
+```json
+{
+  "passed": true,
+  "candidates": [
+    {
+      "kind": "symbol",
+      "name": "sklearn.model_selection.LeaveOneGroupOut"
+    },
+    {
+      "kind": "symbol",
+      "name": "sklego.meta.GroupedPredictor"
+    },
+    {
+      "kind": "symbol",
+      "name": "sklego.meta.HierarchicalPredictor"
+    },
+    {
+      "kind": "symbol",
+      "name": "sklego.meta.GroupedTransformer"
+    },
+    {
+      "kind": "symbol",
+      "name": "category_encoders.OneHotEncoder"
+    }
+  ],
+  "choice": {
+    "name": "sklego.meta.GroupedPredictor",
+    "reason": "Fit one estimator per group instead of 24 handwritten fit loops.",
+    "symbols": [
+      "sklego.meta.GroupedPredictor"
+    ]
+  },
+  "api_gate": {
+    "name": "indexed-api-calls",
+    "stage": "discovery",
+    "evidence": [
+      "api",
+      "source"
+    ],
+    "passed": true,
+    "detail": "Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run."
+  },
+  "lint": {
+    "fixed": 0,
+    "fixable": 0,
+    "issues": []
+  },
+  "repeat": {
+    "equivalent": true,
+    "detail": null
+  }
+}
+```
+
+### Time series bootstrap and validation
+
+```python
+TASK = 'time series bootstrap for cross validation'
+CHOICE = 'mapie.subsample.BlockBootstrap'
+REASON = 'Use MAPIE blocks for out of bag validation, arch blocks for sampling uncertainty, and TimeSeriesSplit for forward validation without resampling.'
+SYMBOLS = ['mapie.subsample.BlockBootstrap', 'arch.bootstrap.StationaryBootstrap', 'arch.bootstrap.CircularBlockBootstrap', 'arch.bootstrap.MovingBlockBootstrap', 'sklearn.model_selection.TimeSeriesSplit']
+ARCH = True
+FILE = 'bootstrap.py'
+found = await call_tool("find", {"task": TASK})
+inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+if ARCH:
+    blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
+    for item in blocks["result"]:
+        inspected.append(await call_tool("api", {"name": item["name"]}))
+discovery = {
+    "question": {"task": TASK}, "candidates": inspected,
+    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
+}
+proof = await call_tool("discovery_gate", {"paths": [FILE], "discovery": discovery})
+if not proof["gate"]["passed"]:
+    return {"passed": False, "gate": proof["gate"], "ran": False}
+lint = await call_tool("check", {"paths": [FILE]})
+errors = [issue for issue in lint["issues"] if issue["severity"] == "error"]
+if errors:
+    return {"passed": False, "lint": lint, "ran": False}
+repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
+return {
+    "passed": repeat["equivalent"],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "choice": discovery["choice"], "api_gate": proof["gate"],
+    "lint": lint, "repeat": repeat,
+}
+```
+
+```json
+{
+  "passed": true,
+  "candidates": [
+    {
+      "kind": "symbol",
+      "name": "sklearn.model_selection.TimeSeriesSplit"
+    },
+    {
+      "kind": "symbol",
+      "name": "mapie.regression.TimeSeriesRegressor"
+    },
+    {
+      "kind": "symbol",
+      "name": "sklearn.model_selection.cross_validate"
+    },
+    {
+      "kind": "symbol",
+      "name": "mapie.subsample.BlockBootstrap"
+    },
+    {
+      "kind": "symbol",
+      "name": "sklego.model_selection.TimeGapSplit"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.MovingBlockBootstrap"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.CircularBlockBootstrap"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.LocalBlockBootstrap"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.StationaryBootstrap"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.optimal_block_length"
+    }
+  ],
+  "choice": {
+    "name": "mapie.subsample.BlockBootstrap",
+    "reason": "Use MAPIE blocks for out of bag validation, arch blocks for sampling uncertainty, and TimeSeriesSplit for forward validation without resampling.",
+    "symbols": [
+      "mapie.subsample.BlockBootstrap",
+      "arch.bootstrap.StationaryBootstrap",
+      "arch.bootstrap.CircularBlockBootstrap",
+      "arch.bootstrap.MovingBlockBootstrap",
+      "sklearn.model_selection.TimeSeriesSplit"
+    ]
+  },
+  "api_gate": {
+    "name": "indexed-api-calls",
+    "stage": "discovery",
+    "evidence": [
+      "api",
+      "source"
+    ],
+    "passed": true,
+    "detail": "Checked 5 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run."
+  },
+  "lint": {
+    "fixed": 0,
+    "fixable": 0,
+    "issues": []
+  },
+  "repeat": {
+    "equivalent": true,
+    "detail": null
+  }
+}
+```
+
+### A Plotly figure from scratch
+
+```python
+TASK = 'build a plotly scatter figure from scratch'
+CHOICE = 'plotly.express.scatter'
+REASON = 'Build a new scatter figure from rows and check the Plotly pack before execution.'
+SYMBOLS = ['plotly.express.scatter']
+ARCH = False
+FILE = 'figure.py'
+found = await call_tool("find", {"task": TASK})
+inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+if ARCH:
+    blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
+    for item in blocks["result"]:
+        inspected.append(await call_tool("api", {"name": item["name"]}))
+discovery = {
+    "question": {"task": TASK}, "candidates": inspected,
+    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
+}
+proof = await call_tool("discovery_gate", {"paths": [FILE], "discovery": discovery})
+if not proof["gate"]["passed"]:
+    return {"passed": False, "gate": proof["gate"], "ran": False}
+lint = await call_tool("check", {"paths": [FILE]})
+errors = [issue for issue in lint["issues"] if issue["severity"] == "error"]
+if errors:
+    return {"passed": False, "lint": lint, "ran": False}
+repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
+return {
+    "passed": repeat["equivalent"],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "choice": discovery["choice"], "api_gate": proof["gate"],
+    "lint": lint, "repeat": repeat,
+}
+```
+
+```json
+{
+  "passed": true,
+  "candidates": [
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter_map"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter_geo"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter_3d"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter_polar"
+    }
+  ],
+  "choice": {
+    "name": "plotly.express.scatter",
+    "reason": "Build a new scatter figure from rows and check the Plotly pack before execution.",
+    "symbols": [
+      "plotly.express.scatter"
+    ]
+  },
+  "api_gate": {
+    "name": "indexed-api-calls",
+    "stage": "discovery",
+    "evidence": [
+      "api",
+      "source"
+    ],
+    "passed": true,
+    "detail": "Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run."
+  },
+  "lint": {
+    "fixed": 0,
+    "fixable": 0,
+    "issues": []
+  },
+  "repeat": {
+    "equivalent": true,
+    "detail": null
+  }
+}
+```
+
+### An unknown class and argument
+
+```python
+TASK = 'going from one model on all data to one model per group, 24 groups'
+CHOICE = 'sklego.meta.GroupedPredictor'
+REASON = 'Fit one estimator per group.'
+SYMBOLS = ['sklego.meta.GroupedPredictor']
+ARCH = False
+FILE = 'invalid_api.py'
+found = await call_tool("find", {"task": TASK})
+inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+if ARCH:
+    blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
+    for item in blocks["result"]:
+        inspected.append(await call_tool("api", {"name": item["name"]}))
+discovery = {
+    "question": {"task": TASK}, "candidates": inspected,
+    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
+}
+proof = await call_tool("discovery_gate", {"paths": [FILE], "discovery": discovery})
+if not proof["gate"]["passed"]:
+    return {"passed": False, "gate": proof["gate"], "ran": False}
+lint = await call_tool("check", {"paths": [FILE]})
+errors = [issue for issue in lint["issues"] if issue["severity"] == "error"]
+if errors:
+    return {"passed": False, "lint": lint, "ran": False}
+repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
+return {
+    "passed": repeat["equivalent"],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "choice": discovery["choice"], "api_gate": proof["gate"],
+    "lint": lint, "repeat": repeat,
+}
+```
+
+```json
+{
+  "passed": false,
+  "gate": {
+    "name": "indexed-api-calls",
+    "stage": "discovery",
+    "evidence": [
+      "api",
+      "source"
+    ],
+    "passed": false,
+    "detail": "invalid_api.py:5 sklego.meta.GroupedPredictor has no indexed parameter group_by. invalid_api.py:6 sklego.meta.ImaginaryPredictor is not known to api."
+  },
+  "ran": false
+}
+```
+
+### Output from the project scripts
+
+Running the three files directly in `samples/pipeline` with the throwaway environment's
+Python printed these lines. The rows of these three examples are made up.
+
+```text
+groups=24, models=24, predictions=192, max_error=0.000000
+arch_lengths=[48, 48, 48]
+bootstrap_folds=3, forward_folds=3
+forward_bounds=[(21, 24), (29, 32), (37, 40)]
+traces=1, points=3, title=Daily count
+```
+
+A separate environment at `/var/tmp/xpd-discovery-bare` had only the wheel and its declared
+dependencies. `importlib.util.find_spec("sklego")` was `None`. Its real server still returned
+`sklego.meta.GroupedPredictor` with `estimator`, `groups`, `shrinkage`, `use_global_model`,
+`check_X` and `shrinkage_kwargs` from one code mode `api` call.
+
+The binary used for this draft predates the recipe index additions. Its runs prove symbols
+and rules through code mode. Recipe records are accepted by the server's open `kind` field,
+but a real indexed recipe run remains unverified until that binary is available.
