@@ -9,13 +9,14 @@ rule:
   kind: call
   any:
     - has: { field: function, regex: ^(typing|typing_extensions|t)\.cast$ }
-    - has: { field: function, kind: identifier, regex: ^cast$ }
-      inside:
-        stopBy: end
-        kind: module
-        has:
-          stopBy: end
-          kind: import_from_statement
-          all:
-            - has: { field: module_name, regex: ^(typing|typing_extensions)$ }
-            - has: { stopBy: end, kind: dotted_name, regex: ^cast$ }
+    - all:
+        - has: { field: function, kind: identifier, regex: ^cast$ }
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              kind: import_from_statement
+              all:
+                - has: { field: module_name, regex: ^(typing|typing_extensions)$ }
+                - has: { stopBy: end, kind: dotted_name, regex: ^cast$ }

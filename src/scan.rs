@@ -22,6 +22,30 @@ pub(crate) type Root = AstGrep<StrDoc<SupportLang>>;
 pub(crate) type Node<'t> = ast_grep_core::Node<'t, StrDoc<SupportLang>>;
 
 /// Parses Python source. A syntax error gives a tree with error nodes, not a failure.
+/// The nodes of a parsed file by their kind, each with its place in document order, so every
+/// rule tries only the nodes of its kinds and the tree is walked once.
+pub(crate) struct Candidates<'r> {
+    by_kind: Vec<Vec<(usize, Node<'r>)>>,
+}
+
+impl<'r> Candidates<'r> {
+    pub(crate) fn new(root: &'r Root) -> Self {
+        let mut by_kind: Vec<Vec<(usize, Node<'r>)>> = Vec::new();
+        for (place, node) in root.root().dfs().enumerate() {
+            let kind = usize::from(node.kind_id());
+            if by_kind.len() <= kind {
+                by_kind.resize_with(kind + 1, Vec::new);
+            }
+            by_kind[kind].push((place, node));
+        }
+        Self { by_kind }
+    }
+
+    pub(crate) fn of(&self, kind: usize) -> &[(usize, Node<'r>)] {
+        self.by_kind.get(kind).map_or(&[], Vec::as_slice)
+    }
+}
+
 pub(crate) fn parse(src: &str) -> Root {
     use ast_grep_core::tree_sitter::LanguageExt;
 
@@ -190,11 +214,12 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
     }
     let root = parse(src);
     let imports = aliased_imports(&root);
+    let candidates = Candidates::new(&root);
     let mut found = Vec::new();
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
         for rule in pack.rules.iter().filter(|rule| rule.runs_on(file.path)) {
-            for m in rule.matches(&root, file.disk, pack.library(&root)) {
+            for m in rule.matches(&root, &candidates, file.disk, pack.library(&root)) {
                 let start = m.start_pos();
                 let edit = usable_edit(rule, &m, &unbound, src);
                 let issue = Issue {
@@ -234,6 +259,7 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
     }
     let root = parse(src);
     let imports = aliased_imports(&root);
+    let candidates = Candidates::new(&root);
     let mut edits = Vec::new();
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
@@ -241,7 +267,7 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
             if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(file.path) {
                 continue;
             }
-            for m in rule.matches(&root, file.disk, pack.library(&root)) {
+            for m in rule.matches(&root, &candidates, file.disk, pack.library(&root)) {
                 edits.extend(usable_edit(rule, &m, &unbound, src));
             }
         }

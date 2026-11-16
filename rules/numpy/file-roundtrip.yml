@@ -9,6 +9,9 @@ message: This program writes $FILE as text with np.savetxt and parses it back wi
 rule:
   all:
     - any: [{ pattern: $NP.$LOAD($FILE) }, { pattern: '$NP.$LOAD($FILE, $$$REST)' }]
+    # Checked before the search of the whole file below, which would otherwise run for every
+    # call with one argument.
+    - has: { field: function, regex: '^(np|numpy)\s*\.\s*(loadtxt|genfromtxt)$' }
     - inside:
         kind: module
         stopBy: end

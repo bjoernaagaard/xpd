@@ -6,8 +6,9 @@ use std::path::Path;
 
 use anyhow::{Context, Error, Result, bail, ensure};
 use ast_grep_config::{RuleConfig, SerializableRule};
-use ast_grep_core::NodeMatch;
+use ast_grep_core::matcher::MatcherExt as _;
 use ast_grep_core::tree_sitter::StrDoc;
+use ast_grep_core::{Matcher as _, NodeMatch};
 use ast_grep_language::SupportLang;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
@@ -15,7 +16,7 @@ use serde::Deserialize;
 use crate::imports;
 use crate::names;
 use crate::pack::Library;
-use crate::scan::Root;
+use crate::scan::{Candidates, Root};
 use crate::version::Version;
 
 /// A shape of code that a rule's metadata names, as an ast-grep rule that can use the `utils`
@@ -205,9 +206,11 @@ impl Rule {
     /// `metadata.holds` keeps, or nothing when `metadata.unlessImported` silences the file.
     /// `disk` is where the file is, from which its imports are followed. Without it no import
     /// is read. A value proof starts from the pack's `library` as the file uses it.
+    /// `candidates` holds the file's nodes by kind, so the rule tries only the nodes of its kinds.
     pub(crate) fn matches<'r>(
         &self,
         root: &'r Root,
+        candidates: &Candidates<'r>,
         disk: Option<&Path>,
         library: Library<'_>,
     ) -> Vec<NodeMatch<'r, StrDoc<SupportLang>>> {
@@ -223,7 +226,21 @@ impl Rule {
                         .is_none_or(|usage| names::holds(usage, shape, library))
                 })
         };
-        let found: Vec<_> = (root.root().find_all(&self.config.matcher))
+        let all: Vec<NodeMatch<'r, StrDoc<SupportLang>>> =
+            match self.config.matcher.potential_kinds() {
+                Some(kinds) => {
+                    let mut nodes: Vec<_> =
+                        kinds.iter().flat_map(|kind| candidates.of(kind)).collect();
+                    nodes.sort_by_key(|(place, _)| *place);
+                    nodes
+                        .into_iter()
+                        .filter_map(|(_, node)| self.config.matcher.match_node(node.clone()))
+                        .collect()
+                }
+                None => root.root().find_all(&self.config.matcher).collect(),
+            };
+        let found: Vec<_> = all
+            .into_iter()
             .filter(|found| {
                 proven(found, &self.holds)
                     && (self.unless_holds.is_empty() || !proven(found, &self.unless_holds))
