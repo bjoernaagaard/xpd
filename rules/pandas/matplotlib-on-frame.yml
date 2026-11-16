@@ -1,0 +1,118 @@
+# pyplot draws columns of a frame as a static matplotlib figure, and the plot accessor of pandas
+# draws the same columns with plotly once the backend is set. On pandas 3.1.1 with plotly 7.1.0
+# and matplotlib 3.11.2, plt.scatter(df["score"], df["cost"]) drew 3 points, and
+# df.plot.scatter(x="score", y="cost") with the plotly backend held the same 3 x and y values in
+# one trace. plt.plot against df.plot.line and plt.bar against df.plot.bar held the same values
+# too (research/modern-pandas/probes/matplotlib.txt). plt.barh is left alone: it takes the labels
+# first, and with the plotly backend df.plot.barh takes the values as x.
+#
+# Both columns must come from one frame, each named by a string, so the accessor call can name
+# them. plt must be bound by the import of matplotlib.pyplot. The rule has no fix, because a
+# plotly figure is another object than the matplotlib one, and the later lines of the file may
+# call matplotlib on it.
+id: matplotlib-on-frame
+language: python
+severity: info
+message: This draws two columns of $DF with matplotlib. With pd.options.plotting.backend = "plotly", $DF.plot.$KIND(x=$A, y=$B) draws the same values as a plotly figure, which xpd checks with its plotly rules.
+rule:
+  any:
+    - pattern: $PLT.$F($DF[$A], $DF[$B])
+    - pattern: $PLT.$F($DF[$A], $DF[$B], $$$REST)
+constraints:
+  PLT: { matches: pyplot }
+  F: { regex: ^(plot|scatter|bar)$ }
+  DF: { kind: identifier }
+  A: { kind: string }
+  B: { kind: string }
+utils:
+  # The name the file binds to matplotlib.pyplot.
+  pyplot:
+    kind: identifier
+    pattern: $ALIAS
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        stopBy: end
+        kind: aliased_import
+        all:
+          - has: { field: alias, pattern: $ALIAS }
+          - any:
+              - has: { field: name, regex: '^matplotlib\.pyplot$' }
+              - all: [{ has: { field: name, regex: '^pyplot$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^matplotlib$' } } }]
+transform:
+  KIND:
+    replace: { source: $F, replace: ^plot$, by: line }
+---
+# plt.hist(df["score"]) drew the 3 values of the column in 10 bins, and
+# df.plot.hist(x="score") with the plotly backend held the same 3 values in one histogram trace
+# (research/modern-pandas/probes/matplotlib.txt). plotly chooses its own bins, and bins= of
+# matplotlib is nbins= there.
+id: matplotlib-on-frame
+language: python
+severity: info
+message: This draws a column of $DF with matplotlib. With pd.options.plotting.backend = "plotly", $DF.plot.hist(x=$A) draws the same values as a plotly figure, which xpd checks with its plotly rules. plotly takes nbins= where matplotlib takes bins=.
+rule:
+  any:
+    - pattern: $PLT.hist($DF[$A])
+    - pattern: $PLT.hist($DF[$A], $$$REST)
+constraints:
+  PLT: { matches: pyplot }
+  DF: { kind: identifier }
+  A: { kind: string }
+utils:
+  # The name the file binds to matplotlib.pyplot.
+  pyplot:
+    kind: identifier
+    pattern: $ALIAS
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        stopBy: end
+        kind: aliased_import
+        all:
+          - has: { field: alias, pattern: $ALIAS }
+          - any:
+              - has: { field: name, regex: '^matplotlib\.pyplot$' }
+              - all: [{ has: { field: name, regex: '^pyplot$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^matplotlib$' } } }]
+---
+# seaborn 0.13.2 draws a frame with matplotlib. sns.scatterplot(data=df, x="score", y="cost", hue="team")
+# drew 3 points in 3 colors, and df.plot.scatter(x="score", y="cost", color="team") with the
+# plotly backend held the same 3 points in 3 traces, one per team. sns.histplot against
+# df.plot.hist and sns.boxplot against df.plot.box held the same values too
+# (research/modern-pandas/probes/matplotlib.txt). barplot and lineplot are left alone, because
+# seaborn draws the mean of each group there and plotly draws every row.
+id: matplotlib-on-frame
+language: python
+severity: info
+message: seaborn draws $DF with matplotlib. With pd.options.plotting.backend = "plotly", $DF.plot.$KIND(...) draws the same values as a plotly figure, which xpd checks with its plotly rules. Pass x= and y= as they are, and pass the hue column as color=.
+rule:
+  pattern: $SNS.$F($$$ARGS)
+  has:
+    field: arguments
+    has:
+      kind: keyword_argument
+      all:
+        - has: { field: name, regex: ^data$ }
+        - has: { field: value, kind: identifier, pattern: $DF }
+constraints:
+  SNS: { matches: seaborn }
+  F: { regex: ^(scatterplot|histplot|boxplot)$ }
+utils:
+  # The name the file binds to seaborn.
+  seaborn:
+    kind: identifier
+    pattern: $ALIAS
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        stopBy: end
+        kind: aliased_import
+        all:
+          - has: { field: alias, pattern: $ALIAS }
+          - has: { field: name, regex: '^seaborn$' }
+transform:
+  KIND:
+    replace: { source: $F, replace: plot$, by: "" }

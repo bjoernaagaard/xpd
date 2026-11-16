@@ -15,3 +15,43 @@ aliases:
 
 # The pack has no package check. plotly draws every figure of these rules without a second
 # package.
+
+# pandas draws df.plot with plotly in a file that makes plotly its plotting backend and names no
+# other backend. The pack also runs on such a file, which need not import plotly, and df.plot
+# stands for plotly.express there: df.plot.bar(x="team", y="score") returned the same figure as
+# px.bar(df, x="team", y="score") on pandas 3.1.1 with plotly 7.1.0.
+alsoOn:
+  setting:
+      kind: module
+      all:
+        - has:
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                  - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+              - kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)set_option$' }
+                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+        - not:
+            has:
+              stopBy: end
+              any:
+                - kind: assignment
+                  all:
+                    - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                    - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+                - kind: call
+                  all:
+                    - has: { field: function, regex: '(^|\.)set_option$' }
+                    - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                    - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^backend$' }
+                    - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
+  standIn:
+    kind: attribute
+    has: { field: attribute, regex: '^plot$' }

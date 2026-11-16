@@ -1,0 +1,76 @@
+# pandas draws df.plot with matplotlib unless the plotting backend is set. On pandas 3.1.1 with
+# plotly 7.1.0 and matplotlib installed, df.plot.bar(x="team", y="score") returned a matplotlib
+# Axes. After pd.options.plotting.backend = "plotly" the same call returned a plotly Figure that
+# was equal, as JSON, to px.bar(df, x="team", y="score"), and pd.set_option("plotting.backend",
+# "plotly") did the same (research/modern-pandas/probes/backend.txt). xpd reads such a figure with
+# the rules of its plotly pack.
+#
+# The backend is a choice for the whole file, so the rule reports once, on the first import of
+# pandas. It reports only a file where the setting changes no other line:
+# - The file calls a plot method that plotly draws: line, bar, barh, area, scatter, box or hist.
+#   kde, density, pie and hexbin raised NotImplementedError with plotly, so a file that names one
+#   is left alone.
+# - Every argument of those calls is x, y or title, by name or by position, which plotly takes
+#   too. Any other keyword, such as figsize or ax, belongs to matplotlib.
+# - Each call stands alone as a statement or is returned. An assigned result is a matplotlib Axes
+#   whose methods a plotly Figure does not have.
+# - The file imports neither matplotlib nor seaborn and names no plotting backend.
+# A module that the file imports can set the backend for it, so the rule is also silent when one
+# of them does: the __init__.py of a package the file is in, a module of the project that the
+# file imports, or a module that one of those imports.
+id: plot-without-plotly-backend
+language: python
+severity: info
+message: This file draws with df.plot and sets no plotting backend, so pandas draws with matplotlib and returns an Axes. Set pd.options.plotting.backend = "plotly" once. With it df.plot.bar(x="team", y="score") returned the same figure as px.bar(df, x="team", y="score"), and xpd checks that figure with its plotly rules. The plot calls of this file pass only x, y and title, which plotly takes too.
+rule:
+  any: [{ kind: import_statement }, { kind: import_from_statement }]
+  all:
+    - matches: pandas-import
+    - not: { follows: { stopBy: end, matches: pandas-import } }
+    - inside:
+        kind: module
+        all:
+          - has: { stopBy: end, matches: plot-call }
+          - not: { has: { stopBy: end, matches: sets-backend } }
+          - not: { has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'matplotlib|seaborn' } }
+          - not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^backend$ } } }
+          # A kind that plotly does not draw, as a method or as kind=.
+          - not: { has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: ^(kde|density|pie|hexbin)$ } }, { has: { field: object, matches: accessor } }] } }
+          # A call of the accessor itself, as in df.plot(...), takes any kind and any keyword.
+          - not: { has: { stopBy: end, kind: call, has: { field: function, matches: accessor } } }
+          - not:
+              has:
+                stopBy: end
+                matches: plot-call
+                any:
+                  - has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(x|y|title)$ } } } }
+                  - has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+                  - not: { inside: { any: [{ kind: expression_statement }, { kind: return_statement }] } }
+utils:
+  pandas-import:
+    any:
+      - { kind: import_statement, regex: '^import\s+pandas(\s|\.|,|$)' }
+      - { kind: import_from_statement, has: { field: module_name, regex: '^pandas(\.|$)' } }
+  # df.plot, the accessor.
+  accessor:
+    kind: attribute
+    has: { field: attribute, regex: ^plot$ }
+  # A call of a plot method that plotly draws, as in df.plot.bar(...).
+  plot-call:
+    kind: call
+    has:
+      field: function
+      kind: attribute
+      all:
+        - has: { field: attribute, regex: ^(line|bar|barh|area|scatter|box|hist)$ }
+        - has: { field: object, matches: accessor }
+  # A statement that sets the plotting backend of pandas.
+  sets-backend:
+    any:
+      - kind: assignment
+        has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+      - kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)set_option$' }
+          - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+metadata: { unlessImported: { matches: sets-backend } }

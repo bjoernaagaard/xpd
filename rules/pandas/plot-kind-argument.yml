@@ -1,0 +1,44 @@
+# The plot accessor has one method per kind, and PlotAccessor.bar calls the accessor itself with
+# kind="bar", so the two forms draw the same figure. On pandas 3.1.1 with plotly 7.1.0,
+# df.plot(kind="bar", x="team", y="score", title="t") and df.plot.bar(x="team", y="score",
+# title="t") were equal as JSON (research/modern-pandas/probes/backend.txt). The method form names
+# the kind where an editor completes it, and it is the form xpd reads when pandas draws with
+# plotly. The kinds are the eleven that the accessor has a method for. A kind that only another
+# backend knows, such as "violin" with plotly, has no method and is left alone.
+id: plot-kind-argument
+language: python
+severity: info
+message: The plot accessor has a method for each kind. Write $X.plot.$KIND(...), which draws the same figure.
+rule:
+  pattern: $X.plot($$$ARGS)
+  has:
+    field: arguments
+    has:
+      kind: keyword_argument
+      all:
+        - has: { field: name, regex: ^kind$ }
+        - has: { field: value, kind: string, pattern: $K, regex: '^["''](line|bar|barh|box|hist|kde|density|area|pie|scatter|hexbin)["'']$' }
+# Keep every argument but kind=, each followed by ", ", then trim the last separator. Comments
+# between the arguments are dropped.
+rewriters:
+  - id: drop-kind
+    rule: { kind: keyword_argument, has: { field: name, regex: ^kind$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: keyword_argument
+            has: { field: name, regex: ^kind$ }
+    fix: "$ARG, "
+transform:
+  KIND:
+    substring: { source: $K, startChar: 1, endChar: -1 }
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-kind, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $X.plot.$KIND($REST)
+metadata: { fix: safe }

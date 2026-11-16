@@ -55,10 +55,51 @@ rule:
                 inside: { stopBy: end, matches: layout-call }
           - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(gridcolor|gridwidth)$' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](gridcolor|gridwidth)["'']$' } }] }] } } }
 utils:
-  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  # A file that makes plotly the plotting backend of pandas and names no other backend. There
+  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
+  pandas-draws-with-plotly:
+    kind: module
+    all:
+      - has:
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+            - kind: call
+              all:
+                - has: { field: function, regex: '(^|\.)set_option$' }
+                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+      - not:
+          has:
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+              - kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)set_option$' }
+                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^backend$' }
+                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
+  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
+  # or the plot accessor of pandas in a file that draws with plotly.
   px:
     any:
       - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: attribute
+        all:
+          - has: { field: attribute, regex: '^plot$' }
+          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
+          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
+          # is another argument in the two. Only a call with every argument named is read.
+          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
       - kind: identifier
         pattern: $PX
         inside:
@@ -175,10 +216,51 @@ rule:
               inside: { stopBy: end, matches: layout-call }
         - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
 utils:
-  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  # A file that makes plotly the plotting backend of pandas and names no other backend. There
+  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
+  pandas-draws-with-plotly:
+    kind: module
+    all:
+      - has:
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+            - kind: call
+              all:
+                - has: { field: function, regex: '(^|\.)set_option$' }
+                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+      - not:
+          has:
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+              - kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)set_option$' }
+                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^backend$' }
+                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
+  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
+  # or the plot accessor of pandas in a file that draws with plotly.
   px:
     any:
       - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: attribute
+        all:
+          - has: { field: attribute, regex: '^plot$' }
+          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
+          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
+          # is another argument in the two. Only a call with every argument named is read.
+          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
       - kind: identifier
         pattern: $PX
         inside:

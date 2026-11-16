@@ -46,7 +46,8 @@ An issue has one of three severities, and a fix is either safe or unsafe.
 ## Rules
 
 Each library has one pack of rules, written for the library's current version. A library's pack
-runs only on files that import the library. The Python pack runs on every file.
+runs only on files that import the library. The plotly pack also runs on files that make plotly
+the plotting backend of pandas. The Python pack runs on every file.
 
 | Pack | One of its rules | What the rule reports |
 | --- | --- | --- |

@@ -14,6 +14,7 @@ use serde::Deserialize;
 
 use crate::imports;
 use crate::names;
+use crate::pack::Library;
 use crate::scan::Root;
 use crate::version::Version;
 
@@ -203,12 +204,12 @@ impl Rule {
     /// What the rule reports in the parsed file `root`: the matches of its ast-grep rule that
     /// `metadata.holds` keeps, or nothing when `metadata.unlessImported` silences the file.
     /// `disk` is where the file is, from which its imports are followed. Without it no import
-    /// is read. Value proofs require a current import binding from the pack's `library`.
+    /// is read. A value proof starts from the pack's `library` as the file uses it.
     pub(crate) fn matches<'r>(
         &self,
         root: &'r Root,
         disk: Option<&Path>,
-        library: &str,
+        library: Library<'_>,
     ) -> Vec<NodeMatch<'r, StrDoc<SupportLang>>> {
         let proven = |found: &NodeMatch<'r, StrDoc<SupportLang>>,
                       conditions: &[(String, Shape)]| {

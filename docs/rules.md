@@ -4,7 +4,8 @@ xpd has thirteen rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy)
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
 [Category Encoders](#category-encoders), [linearmodels](#linearmodels), [arch](#arch),
 [pymoo](#pymoo), [plotly](#plotly), [Hamilton](#hamilton) and [Python](#python). A library's rules
-run only on files that import it. The Python rules run on every file.
+run only on files that import it. The plotly rules also run on files that make plotly the
+plotting backend of pandas. The Python rules run on every file.
 
 ## pandas
 
@@ -2130,6 +2131,88 @@ df.to_csv(path, index=False)
 The replacement is advice. xpd does not apply it automatically.
 
 
+### Charts
+
+pandas draws `df.plot` with matplotlib unless the plotting backend is set. These rules steer a
+file toward plotly as that backend, where xpd reads the figure with the rules of its
+[plotly](#plotly) pack. The measurements used pandas 3.1.1 with plotly 7.1.0 and matplotlib
+installed. With `pd.options.plotting.backend = "plotly"`, `df.plot.bar(x="team", y="score")`
+returned a figure equal, as JSON, to `px.bar(df, x="team", y="score")`.
+
+#### plot-without-plotly-backend
+
+**Severity:** info. **Fix:** none.
+
+Reports a file that draws with a plot method of the accessor and sets no plotting backend. The report is on the first import of pandas, once per file. xpd reports only a file where the setting changes no other line:
+
+- The file calls `line`, `bar`, `barh`, `area`, `scatter`, `box` or `hist` on the accessor. `kde`, `density`, `pie` and `hexbin` raised `NotImplementedError` with plotly, so a file that names one is left alone.
+- Every argument of those calls is `x`, `y` or `title`. A file with another keyword, such as `figsize` or `ax`, is left alone, and so is a file that calls `df.plot(...)` itself.
+- Each call stands alone as a statement or is returned. A file that assigns the result is left alone, because the result is a matplotlib Axes there.
+- The file imports neither matplotlib nor seaborn.
+
+The rule is also silent when a module that the file loads sets the backend: the `__init__.py` of a package the file is in, a module of the project that the file imports, or a module that one of those imports.
+
+Example:
+
+```python
+import pandas as pd
+
+df.plot.bar(x="team", y="score")
+```
+
+Use instead:
+
+```python
+import pandas as pd
+
+pd.options.plotting.backend = "plotly"
+
+df.plot.bar(x="team", y="score")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### plot-kind-argument
+
+**Severity:** info. **Fix:** safe: `df.plot.bar(x="team", y="score")`.
+
+Reports `df.plot(kind="bar", ...)` for the eleven kinds that the accessor has a method for: `line`, `bar`, `barh`, `box`, `hist`, `kde`, `density`, `area`, `pie`, `scatter` and `hexbin`. The two forms were equal as JSON with the plotly backend. xpd reads the method form when pandas draws with plotly. A kind that only another backend knows, such as `"violin"` with plotly, is left alone.
+
+Example:
+
+```python
+df.plot(kind="bar", x="team", y="score")
+```
+
+Use instead:
+
+```python
+df.plot.bar(x="team", y="score")
+```
+
+#### matplotlib-on-frame
+
+**Severity:** info. **Fix:** none.
+
+Reports `plt.plot`, `plt.scatter` and `plt.bar` on two columns of one frame, `plt.hist` on one column, and `sns.scatterplot`, `sns.histplot` and `sns.boxplot` with `data=`. The plot accessor drew the same values with the plotly backend. `sns.barplot` and `sns.lineplot` are left alone, because seaborn draws the mean of each group there and plotly draws every row. `plt.barh` is left alone, because it takes the labels first and `df.plot.barh` takes the values as `x` with plotly. `plt` and `sns` must be bound by the import of `matplotlib.pyplot` and of `seaborn`.
+
+Example:
+
+```python
+plt.scatter(df["score"], df["cost"])
+```
+
+Use instead:
+
+```python
+pd.options.plotting.backend = "plotly"
+
+df.plot.scatter(x="score", y="cost")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
 ### Reading and writing files
 
 #### read-csv-slow-option
@@ -2285,6 +2368,22 @@ uv add bottleneck
 
 Add the package to the project environment, not to xpd itself.
 
+#### missing-plotly
+
+**Severity:** warning. **Fix:** none.
+
+Without plotly, `df.plot` returns a static matplotlib Axes. With plotly as the plotting backend, `df.plot.bar(x="team", y="score")` returned the same figure as `px.bar(df, x="team", y="score")`, which xpd checks with its plotly rules.
+
+The warning appears when plotly is not installed, and the project uses matplotlib or seaborn.
+
+For a project managed with uv:
+
+```sh
+uv add plotly
+```
+
+Add the package to the project environment, not to xpd itself.
+
 #### missing-pandas-stubs
 
 **Severity:** warning. **Fix:** none.
@@ -2302,8 +2401,8 @@ uv add --dev pandas-stubs
 Add the package to the project environment, not to xpd itself.
 
 
-A project uses a type checker when the venv has it or `pyproject.toml` has a `[tool.<name>]`
-table for it. numexpr and numba have no check. numexpr changed little in measurements, and numba
+A project uses a type checker, matplotlib or seaborn when the venv has it or `pyproject.toml` has
+a `[tool.<name>]` table for it. numexpr and numba have no check. numexpr changed little in measurements, and numba
 only helps a function passed to `rolling(...).apply`, where the `rolling-apply` message names it.
 
 ## NumPy
@@ -9463,7 +9562,8 @@ j = PseudoWeights(np.array([0.2, 0.8])).do(F)
 
 ## plotly
 
-These rules run on files that import `plotly`. They apply Edward Tufte's book "The Visual
+These rules run on files that import `plotly`, and on files that make plotly the plotting
+backend of pandas. They apply Edward Tufte's book "The Visual
 Display of Quantitative Information", second edition, to plotly figures. Each rule names the
 principle of the book that the figure breaks, says what the reader then sees, and names the
 plotly code to write instead. A page number in this section is a printed page of the book.
@@ -9480,6 +9580,18 @@ proof is an import such as `import plotly.express as px` or
 `from plotly import graph_objects as go`, under any alias, or the full dotted name, as in
 `plotly.express.pie(...)`. A name `px` or `go` that the file binds to something else gives no
 proof.
+
+A file that makes plotly the plotting backend of pandas need not import plotly. The file holds
+`pd.options.plotting.backend = "plotly"` or `pd.set_option("plotting.backend", "plotly")` and
+names no other backend, in an assignment, in `set_option` or as `backend=` of a call. There xpd
+reads `df.plot.bar(...)` as `px.bar(df, ...)`: on pandas 3.1.1 with plotly 7.1.0,
+`df.plot.bar(x="team", y="score")` was equal, as JSON, to `px.bar(df, x="team", y="score")`. The
+method names that pandas and plotly express share are `line`, `bar`, `area`, `scatter` and
+`box`. Every argument of the call must be named, because `px.bar` takes the frame first and
+`df.plot.bar` does not, so an argument given by position is another argument in the two. A
+call of the accessor itself, as in `df.plot(kind="bar")`, is not read, and
+[`plot-kind-argument`](#plot-kind-argument) of the pandas pack rewrites it to the method form.
+A file where another module sets the backend is not read either.
 
 A rule about a method, such as `fig.update_xaxes(...)`, needs proof that the object is a plotly
 figure. The method is called on the call that makes the figure, as in
@@ -9949,7 +10061,7 @@ reason" (page 100).
 Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
 `Figure.update layout template` (8).
 
-Reports two things. The first is a file that draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
+Reports two things. The first is a file that draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. A file that draws through pandas and imports no plotly module is reported on the statement that makes plotly the plotting backend, when it calls `line`, `bar`, `barh`, `area`, `scatter`, `box` or `hist` on the accessor. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
 
 Example:
 
@@ -9982,6 +10094,10 @@ ticks. The book says that "the grid should usually be muted or completely suppre
 
 `"plotly_white"`, `"none"`, `"presentation"`, `"gridon"`, `"xgridoff"` and `"ygridoff"` resolved
 to a white plot area, and `"plotly_dark"` is a dark theme, so these seven are not reported.
+
+Through the plotting backend of pandas, `df.plot.scatter(x="score", y="cost")` was equal, as
+JSON, to `px.scatter(df, x="score", y="cost")`, and with `template="simple_white"` it was equal
+to the px call with that template.
 
 The first form is silent in a file that names `streamlit`, because `st.plotly_chart` draws with
 the theme of Streamlit unless `theme=None` is passed. `hovertemplate` and `texttemplate` are

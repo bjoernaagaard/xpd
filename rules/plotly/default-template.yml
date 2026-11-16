@@ -36,10 +36,51 @@ rule:
           # A figure with no plot area, such as a treemap or a pie, shows neither the tint nor the grid.
           - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: object, matches: px } }, { has: { field: attribute, regex: '^[a-z]', not: { regex: '^(pie|treemap|sunburst|icicle|funnel_area|parallel_coordinates|parallel_categories|get_trendline_results|set_mapbox_access_token)$' } } }] } }
 utils:
-  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  # A file that makes plotly the plotting backend of pandas and names no other backend. There
+  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
+  pandas-draws-with-plotly:
+    kind: module
+    all:
+      - has:
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+            - kind: call
+              all:
+                - has: { field: function, regex: '(^|\.)set_option$' }
+                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+      - not:
+          has:
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+              - kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)set_option$' }
+                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^backend$' }
+                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
+  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
+  # or the plot accessor of pandas in a file that draws with plotly.
   px:
     any:
       - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: attribute
+        all:
+          - has: { field: attribute, regex: '^plot$' }
+          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
+          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
+          # is another argument in the two. Only a call with every argument named is read.
+          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
       - kind: identifier
         pattern: $PX
         inside:
@@ -153,6 +194,121 @@ utils:
         - all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }]
 metadata: { unlessImported: { matches: sets-template } }
 ---
+# The same report for a file that draws through pandas and imports no plotly module. It is
+# reported on the statement that makes plotly the plotting backend, in a file that calls a plot
+# method of the accessor, as in df.plot.bar(...). On pandas 3.1.1 with plotly 7.1.0,
+# df.plot.bar(x="team", y="score") was equal to px.bar(df, x="team", y="score") as JSON, so it
+# carries the same default template, and with template="simple_white" it resolved to the template
+# that px.bar resolved to (research/modern-pandas/probes/backend.txt).
+id: default-template
+language: python
+severity: info
+message: 'pandas draws with plotly in this file and sets no template, and plotly then draws with its default "plotly", which fills the plot area with #E5ECF6 and drew 10 white grid lines on a scatter plot. That ink shows no data, and Tufte asks to erase non-data-ink. Pass template="simple_white" to each call, as in df.plot.bar(x="team", y="score", template="simple_white"), or set plotly.io.templates.default = "simple_white" once.'
+rule:
+  any: [{ kind: assignment }, { kind: call }]
+  all:
+    - any:
+        - all:
+            - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+            - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+        - all:
+            - has: { field: function, regex: '(^|\.)set_option$' }
+            - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+    - inside:
+        stopBy: end
+        kind: module
+        all:
+          - matches: pandas-draws-with-plotly
+          - not: { regex: '(^|[^-a-zA-Z])template|plot_bgcolor|streamlit' }
+          - not: { has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly' } }
+          - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(line|bar|barh|area|scatter|box|hist)$' } }, { has: { field: object, kind: attribute, has: { field: attribute, regex: '^plot$' } } }] } }
+utils:
+  # A file that makes plotly the plotting backend of pandas and names no other backend. There
+  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
+  pandas-draws-with-plotly:
+    kind: module
+    all:
+      - has:
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+            - kind: call
+              all:
+                - has: { field: function, regex: '(^|\.)set_option$' }
+                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+      - not:
+          has:
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+              - kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)set_option$' }
+                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^backend$' }
+                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
+  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
+  # or the plot accessor of pandas in a file that draws with plotly.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: attribute
+        all:
+          - has: { field: attribute, regex: '^plot$' }
+          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
+          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
+          # is another argument in the two. Only a call with every argument named is read.
+          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.io: the dotted module itself, or the alias of its import.
+  pio:
+    any:
+      - { kind: attribute, regex: '^plotly\.io$' }
+      - kind: identifier
+        pattern: $PIO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PIO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.io$' }
+                  - all: [{ has: { field: name, regex: '^io$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A statement that sets the template of the figures that the process draws from then on.
+  sets-template:
+    kind: assignment
+    has:
+      field: left
+      kind: attribute
+      any:
+        - all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }]
+        - all: [{ has: { field: attribute, regex: '^template$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: px } }] } }]
+metadata: { unlessImported: { matches: sets-template } }
+---
 # Three named templates draw the same tinted panel. On plotly 7.1.0 "plotly" resolved to the
 # plot_bgcolor #E5ECF6, "ggplot2" to rgb(237,237,237) and "seaborn" to rgb(234,234,242), each with
 # white grid lines, 10 of them on a scatter plot (runs/behavior.txt). The other eight templates
@@ -187,10 +343,51 @@ rule:
         field: right
         has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }] }
 utils:
-  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  # A file that makes plotly the plotting backend of pandas and names no other backend. There
+  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
+  pandas-draws-with-plotly:
+    kind: module
+    all:
+      - has:
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+            - kind: call
+              all:
+                - has: { field: function, regex: '(^|\.)set_option$' }
+                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+      - not:
+          has:
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+              - kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)set_option$' }
+                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^backend$' }
+                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
+  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
+  # or the plot accessor of pandas in a file that draws with plotly.
   px:
     any:
       - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: attribute
+        all:
+          - has: { field: attribute, regex: '^plot$' }
+          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
+          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
+          # is another argument in the two. Only a call with every argument named is read.
+          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
       - kind: identifier
         pattern: $PX
         inside:

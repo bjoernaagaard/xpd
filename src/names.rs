@@ -13,6 +13,7 @@ use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_core::{Matcher, NodeMatch};
 use ast_grep_language::SupportLang;
 
+use crate::pack::Library;
 use crate::scan::Node;
 
 /// What gives a name its value at the place of one use.
@@ -49,7 +50,7 @@ struct Parameter<'t> {
 /// annotation that `proof` matches, as in `fig: go.Figure`, stands for the value. The variable
 /// is proven when `proof` matches each of them, its constructor or type is bound to an import
 /// of `library`, and there is at least one.
-pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M, library: &str) -> bool {
+pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M, library: Library<'_>) -> bool {
     let mut proven = false;
     // A function that passes its own parameter on to itself adds no value, so a variable that
     // was followed once is not followed again.
@@ -89,15 +90,19 @@ pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M, library: &str) -> b
 }
 
 /// Matches a value only when the imports captured by the shape still bind its aliases.
-fn matches<M: Matcher>(value: &Node<'_>, proof: &M, library: &str) -> bool {
+fn matches<M: Matcher>(value: &Node<'_>, proof: &M, library: Library<'_>) -> bool {
     proof
         .match_node(value.clone())
         .is_some_and(|found| imports_match(&found, value) && library_value(value, library))
 }
 
-/// The constructor or annotation must start at a name currently imported from this library.
-/// Follow method chains to their constructor, without treating data arguments as imports.
-fn library_value(value: &Node<'_>, library: &str) -> bool {
+/// The constructor or annotation must start at a name currently imported from this library, or
+/// at the expression that stands for its module in this file. Follow method chains to their
+/// constructor, without treating data arguments as imports.
+fn library_value(value: &Node<'_>, library: Library<'_>) -> bool {
+    if (library.stand_in).is_some_and(|stand_in| stand_in.match_node(value.clone()).is_some()) {
+        return true;
+    }
     match &*value.kind() {
         "call" => value
             .field("function")
@@ -113,9 +118,9 @@ fn library_value(value: &Node<'_>, library: &str) -> bool {
             bound.kind() == "identifier"
                 && bound.text() == value.text()
                 && import_binding(&bound).is_some_and(|module| {
-                    (module == library
+                    (module == library.module
                         || module
-                            .strip_prefix(library)
+                            .strip_prefix(library.module)
                             .is_some_and(|tail| tail.starts_with('.')))
                         && imported_at(value, &bound)
                 })
