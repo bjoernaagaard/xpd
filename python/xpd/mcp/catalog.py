@@ -83,7 +83,7 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
 
         Args:
             package: Only this pack, by module name, such as pandas, numpy, scipy, sklearn,
-                sklego, mapie or category_encoders.
+                sklego, mapie, category_encoders or arch.
             severity: Only rules of this severity.
             fixable: True for rules with a fix, False for rules without one.
             query: Only rules whose id, message or documentation contains this text, in any

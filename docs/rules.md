@@ -1,8 +1,9 @@
 # Rules
 
-xpd has nine rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+xpd has ten rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
-[Category Encoders](#category-encoders), [Hamilton](#hamilton) and [Python](#python). A library's
+[Category Encoders](#category-encoders), [arch](#arch), [Hamilton](#hamilton) and
+[Python](#python). A library's
 rules run only on files that import it. The Python rules run on every file.
 
 ## pandas
@@ -8441,7 +8442,8 @@ cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --un
 ```
 
 The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
-`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/hamilton/` and
+`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/arch/`,
+`samples/hamilton/` and
 `samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to

@@ -16,7 +16,7 @@ from xpd.mcp.settings import Settings
 
 INSTRUCTIONS = """\
 xpd lints Python for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn, scikit-lego, \
-MAPIE, Category Encoders and Apache Hamilton, reads the dataflow of step code and Hamilton \
+MAPIE, Category Encoders, arch and Apache Hamilton, reads the dataflow of step code and Hamilton \
 modules, profiles data files, and checks that a refactor keeps its result. Every path is relative \
 to the project root.
 
