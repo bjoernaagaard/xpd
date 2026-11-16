@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "xpd",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Lints Python that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly or Apache Hamilton for slow operations and wrong results, after each edit and through MCP tools.",
   "author": {
     "name": "Bjørn Aagaard",
