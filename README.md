@@ -87,7 +87,7 @@ xpd
 ├── test                   check rule examples and compare diagnostic and fix snapshots
 ├── new                    create a project, rule, empty case template or shared utility
 ├── find "<task>"          find library symbols, rules and worked recipes
-├── api <dotted.name>       read a full API or recipe with source and attribution
+├── api <dotted.name>       read a full API or recipe with source and license name
 ├── index <source>         refresh symbols and documentation recipes without running Python
 ├── rules                  list every rule with its documentation
 ├── graph <files>          print the dataflow of step code or Hamilton modules

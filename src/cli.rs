@@ -81,8 +81,6 @@ struct IndexArgs {
     source_url: Option<String>,
     #[arg(long, requires = "examples")]
     license: Option<PathBuf>,
-    #[arg(long, requires = "examples")]
-    notice: Option<PathBuf>,
 }
 
 #[derive(Debug, clap::Args)]
@@ -412,7 +410,6 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
         examples,
         source_url: url,
         license,
-        notice,
     } = args;
     let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
     let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
@@ -421,12 +418,7 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
         (examples.as_deref(), url.as_deref(), license.as_deref())
     {
         let stats = crate::recipe::harvest(
-            &crate::recipe::Source {
-                root,
-                url,
-                license,
-                notice: notice.as_deref(),
-            },
+            &crate::recipe::Source { root, url, license },
             &package,
             &mut index.entries,
         )?;
@@ -855,13 +847,15 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
                     && let Some(recipe) = &entry.recipe
                 {
                     println!(
-                        "Source: {}\nSymbols: {}\nLicense: {}\n{}\nModified by xpd fixes: {}",
+                        "Source: {}\nSymbols: {}\nLicense: {}\nModified by xpd fixes: {}",
                         recipe.source,
                         recipe.symbols.join(", "),
                         recipe.license,
-                        recipe.attribution,
                         recipe.modified
                     );
+                    if !recipe.attribution.is_empty() {
+                        println!("{}", recipe.attribution);
+                    }
                     if let Some(code) = &recipe.code {
                         println!("\n```python\n{code}```");
                     }

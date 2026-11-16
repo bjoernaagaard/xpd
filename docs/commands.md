@@ -525,8 +525,8 @@ Rule links are inferred from symbol name tokens in the pack's rule patterns, inc
 patterns. They are possible guards, rather than proof that every use of the symbol matches.
 The rule entries include the full documentation, so terms such as "small multiples" are searchable.
 A rule prints as `plotly/bar-axis-without-zero [rule]`, without a call signature or raw matcher
-metavariables. A recipe name combines the pack and the first eight words of its title. Recipes with the same name are deduplicated within a pack. The name stays the same when source paths or line numbers change. A recipe prints its title, used symbols, pinned source, license, attribution and
-complete Python snippet. `recipe.modified` records whether xpd applied fixes; `recipe.code` is
+metavariables. A recipe name combines the pack and the first eight words of its title. Recipes with the same name are deduplicated within a pack. The name stays the same when source paths or line numbers change. A recipe prints its title, used symbols, pinned source, license name and
+complete Python snippet. The full license texts ship once, in the package's `licenses` folder. `recipe.modified` records whether xpd applied fixes; `recipe.code` is
 null for a source whose license is not recognized as permitting redistribution.
 
 ## index
@@ -552,7 +552,7 @@ without an xpd rule pack. Both read commands accept `--index`.
 Each file has `schema_version`, `package`, `version` and `entries`. Every entry has a `kind`,
 `package`, `name`, `callable`, `parameters`, `summary`, `members`, `rules` and optional
 source-derived `keywords`. A recipe adds `recipe`, with `title`, `symbols`, `source`, `code`,
-`license`, `attribution` and `modified`. An index with harvested examples also records candidate,
+`license` and `modified`, and `attribution` when the source file states its own copyright. An index with harvested examples also records candidate,
 clean, fixed, dropped, capped and retained counts under `recipes`.
 
 A name is public when Griffe says it is. A module is public when its name has no leading
@@ -599,8 +599,8 @@ Examples, Python files under examples or gallery directories, Markdown Python fe
 doctests and notebook code cells. For Plotly, select the repository's `doc/python` directory
 and include `/doc/python` after the pinned revision in `--source-url`. For scikit-learn, select
 the repository root to include both `examples/` and source docstrings. `--license` supplies the
-source license. Root NOTICE, DISCLAIMER and third-party notices are retained automatically;
-`--notice` adds a notice outside the selected root.
+source license, which names the recipe's license. Copy the license and any NOTICE,
+DISCLAIMER or third-party notices into `licenses/`, which ships with xpd.
 
 The harvester never imports or executes downloaded code. It rejects syntax errors, placeholders,
 snippets without imports, missing names and snippets without calls into the requested library.

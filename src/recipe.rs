@@ -20,6 +20,7 @@ pub(crate) struct Recipe {
     pub(crate) source: String,
     pub(crate) code: Option<String>,
     pub(crate) license: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub(crate) attribution: String,
     pub(crate) modified: bool,
 }
@@ -38,7 +39,6 @@ pub(crate) struct Source<'a> {
     pub(crate) root: &'a Path,
     pub(crate) url: &'a str,
     pub(crate) license: &'a Path,
-    pub(crate) notice: Option<&'a Path>,
 }
 
 fn paths(root: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
@@ -423,53 +423,24 @@ fn complete(code: &str) -> bool {
     true
 }
 
-#[derive(Debug)]
-struct Attribution {
-    name: &'static str,
-    text: String,
-}
-impl Attribution {
-    fn read(source: &Source<'_>) -> Result<Self> {
-        ensure!(
-            source.url.starts_with("https://") && source.url.contains("/blob/"),
-            "--source-url must point to a pinned repository revision, including /blob/<revision>"
-        );
-        let revision = source
-            .url
-            .split("/blob/")
-            .nth(1)
-            .and_then(|tail| tail.split('/').next())
-            .unwrap_or_default();
-        ensure!(
-            !revision.is_empty() && !["main", "master", "HEAD", "latest"].contains(&revision),
-            "pin the source URL to a tag or commit"
-        );
-        let license = std::fs::read_to_string(source.license)?;
-        let mut attribution = license.clone();
-        for name in [
-            "NOTICE",
-            "NOTICE.txt",
-            "NOTICE.md",
-            "DISCLAIMER",
-            "THIRD_PARTY_NOTICES.md",
-        ] {
-            let roots: BTreeSet<_> = [Some(source.root), source.license.parent()]
-                .into_iter()
-                .flatten()
-                .collect();
-            for root in roots {
-                let path = root.join(name);
-                if path.is_file() {
-                    attribution.push('\n');
-                    attribution.push_str(&std::fs::read_to_string(path)?);
-                }
-            }
-        }
-        if let Some(notice) = source.notice {
-            attribution.push('\n');
-            attribution.push_str(&std::fs::read_to_string(notice)?);
-        }
-        let name = if license.contains("Apache License") && license.contains("Version 2.0") {
+fn license_name(source: &Source<'_>) -> Result<&'static str> {
+    ensure!(
+        source.url.starts_with("https://") && source.url.contains("/blob/"),
+        "--source-url must point to a pinned repository revision, including /blob/<revision>"
+    );
+    let revision = source
+        .url
+        .split("/blob/")
+        .nth(1)
+        .and_then(|tail| tail.split('/').next())
+        .unwrap_or_default();
+    ensure!(
+        !revision.is_empty() && !["main", "master", "HEAD", "latest"].contains(&revision),
+        "pin the source URL to a tag or commit"
+    );
+    let license = std::fs::read_to_string(source.license)?;
+    Ok(
+        if license.contains("Apache License") && license.contains("Version 2.0") {
             "Apache-2.0"
         } else if license.contains("Permission is hereby granted")
             && license.contains("Redistributions of source code")
@@ -481,12 +452,8 @@ impl Attribution {
             "BSD-3-Clause"
         } else {
             "pointer only"
-        };
-        Ok(Attribution {
-            name,
-            text: attribution,
-        })
-    }
+        },
+    )
 }
 
 #[derive(Debug)]
@@ -536,7 +503,7 @@ pub(crate) fn harvest(
     package: &str,
     entries: &mut Vec<Entry>,
 ) -> Result<Stats> {
-    let attribution = Attribution::read(source)?;
+    let license = license_name(source)?;
     let packs = Catalog::embedded(None)?.packs;
     let mut files = Vec::new();
     paths(source.root, &mut files)?;
@@ -578,21 +545,19 @@ pub(crate) fn harvest(
             } else {
                 title
             };
-            let mut notice = attribution.text.clone();
-            for line in text
+            let attribution = text
                 .lines()
-                .filter(|line| line.to_lowercase().contains("copyright"))
-            {
-                notice.push('\n');
-                notice.push_str(line);
-            }
+                .map(|line| line.trim_start_matches(['#', ' ', '\t']))
+                .filter(|line| line.starts_with("Copyright"))
+                .collect::<Vec<_>>()
+                .join("\n");
             let recipe = Recipe {
                 title: title.clone(),
                 symbols: verified.symbols,
                 source: source_url,
-                code: (attribution.name != "pointer only").then_some(fixed.clone()),
-                license: attribution.name.to_owned(),
-                attribution: notice,
+                code: (license != "pointer only").then_some(fixed.clone()),
+                license: license.to_owned(),
+                attribution,
                 modified: verified.fixes > 0,
             };
             entries.push(Entry {

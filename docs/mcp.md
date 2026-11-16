@@ -287,4 +287,4 @@ scripts in [code mode](code-mode.md#run-the-scripts-through-the-server) returned
 | Invented API `execute` | `passed: false`, `ran: false`, unknown `group_by` and `ImaginaryPredictor` |
 
 Recipe API output retains `recipe`
-with its title, symbols, source path and line, code, license, attribution and modification flag.
+with its title, symbols, source path and line, code, license name and modification flag.

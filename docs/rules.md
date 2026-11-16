@@ -11725,7 +11725,7 @@ by selecting its repository root. The [index command](commands.md#index) shows t
 
 The harvester parses examples without running them. It applies safe and unsafe fixes with the
 rule engine and ships only snippets with zero remaining issues across applicable library packs
-and the Python pack. It includes the source license, copyright and notices with each recipe;
+and the Python pack. Each recipe names its source license, and the full license texts ship once in `licenses/`;
 an unrecognized license produces a pointer instead of copied code. It reports rejected and
 capped candidates. The cap is 24 recipes and 96,000 code bytes per pack, with 8,000 bytes per
 snippet. Do not hand-write recipes or edit generated entries to improve a question's rank.
