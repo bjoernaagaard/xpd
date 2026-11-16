@@ -21,6 +21,11 @@ jobs:
       # mise.toml routes cargo through mbx. Its action restores target/ and the cargo registry
       # from the cache that pushes to main save.
       - uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
+      # `xpd find --check` ranks with the embedding model, which xpd downloads when it is absent.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/xpd/models
+          key: xpd-models-embeddinggemma-300M-Q8_0
       - run: lefthook run pre-commit --all-files --force --no-auto-install
       # The formatters fix and stage files, so any change from HEAD means a file was not formatted.
       - run: git diff --exit-code HEAD

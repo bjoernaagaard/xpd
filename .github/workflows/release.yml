@@ -50,7 +50,9 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          args: --release --out dist
+          # zig builds on the runner, which has cmake and libclang for llama.cpp. The manylinux
+          # containers have no libclang that bindgen can use.
+          args: --release --out dist --zig
           sccache: 'true'
           manylinux: auto
       # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
@@ -95,7 +97,9 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          args: --release --out dist
+          # zig builds on the runner, which has cmake and libclang for llama.cpp. The manylinux
+          # containers have no libclang that bindgen can use.
+          args: --release --out dist --zig
           sccache: 'true'
           manylinux: musllinux_1_2
       - name: Upload wheels

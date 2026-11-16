@@ -8,16 +8,17 @@ ruff = "0.17.4"
 "pipx:zensical" = "0.1.1"
 "aqua:Kitware/CMake" = "latest"
 
-# Builds every wheel on this machine, to try a build before pushing a tag. zig cross-compiles the
-# C code of tree-sitter and links for every platform. The task adds the Rust targets it needs, so
-# CI and other tasks skip downloading them. A pushed v* tag builds and publishes the release on
-# GitHub's runners.
+# Builds the wheels this machine can build, to try a build before pushing a tag. zig cross-compiles
+# the C and C++ code of tree-sitter and llama.cpp for Linux. llama.cpp links Apple's frameworks on
+# macOS, which only a Mac has, and it does not link for Windows with zig, so GitHub's Windows
+# runner builds that wheel with MSVC. The task adds the Rust targets it needs, so CI and other
+# tasks skip downloading them. A pushed v* tag builds and publishes the release on GitHub's
+# runners.
 [tasks.wheels]
-description = "Build the sdist and a wheel for each of 8 platforms into dist/"
+description = "Build the sdist and the Linux wheels into dist/, and the macOS wheels on a Mac"
 run = """
 rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-unknown-linux-musl \
-  aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu \
-  aarch64-pc-windows-gnullvm
+  aarch64-unknown-linux-musl
 rm -rf dist
 uvx maturin sdist --out dist
 build() { uvx --with ziglang maturin build --release --zig --out dist "$@"; }
@@ -25,9 +26,10 @@ build --compatibility manylinux2014 --target x86_64-unknown-linux-gnu
 build --compatibility manylinux2014 --target aarch64-unknown-linux-gnu
 build --compatibility musllinux_1_2 --target x86_64-unknown-linux-musl
 build --compatibility musllinux_1_2 --target aarch64-unknown-linux-musl
-build --target x86_64-apple-darwin
-build --target aarch64-apple-darwin
-build --target x86_64-pc-windows-gnu
-build --target aarch64-pc-windows-gnullvm
+if [ "$(uname)" = Darwin ]; then
+  rustup target add x86_64-apple-darwin aarch64-apple-darwin
+  build --target x86_64-apple-darwin
+  build --target aarch64-apple-darwin
+fi
 ls dist
 """
