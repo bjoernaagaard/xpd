@@ -76,7 +76,8 @@ def removed_time_series_methods():
     _, y_intervals = series.predict(X[450:], alpha=0.1, ensemble=True)  # xpd: removed-in-mapie
     weighted = TimeSeriesRegressor(RandomForestRegressor(n_estimators=10, random_state=0), random_state=0)
     weighted.fit(X[:400], y[:400], sample_weight=np.ones(400))  # xpd: removed-in-mapie
-    return y_intervals, weighted
+    _, two_levels = series.predict(X[450:], alpha=[0.05, 0.2], ensemble=True)  # xpd: removed-in-mapie
+    return y_intervals, weighted, two_levels
 
 
 @case
@@ -100,4 +101,5 @@ def update_and_adapt():
     _, y_intervals = series.predict(X[450:], confidence_level=1 - 0.1, ensemble=True)
     weighted = TimeSeriesRegressor(RandomForestRegressor(n_estimators=10, random_state=0), random_state=0)
     weighted.fit(X[:400], y[:400], fit_params={"sample_weight": np.ones(400)})
-    return y_intervals, settings, weighted.predict(X[450:])
+    _, two_levels = series.predict(X[450:], confidence_level=[0.95, 0.8], ensemble=True)
+    return y_intervals, settings, weighted.predict(X[450:]), two_levels.shape

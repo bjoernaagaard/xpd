@@ -6097,9 +6097,9 @@ and none is safe.
 
 #### removed-in-mapie
 
-**Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based`, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based` when the value is a number or a name, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. The other forms have no fix.
 
-Reports imports of `MapieRegressor`, `MapieClassifier`, `MapieQuantileRegressor`, `MapieTimeSeriesRegressor`, `MapieCalibrator`, `MapieMultiLabelClassifier`, `PrecisionRecallController`, `MondrianCP` and `ConformityScore`, imports of the modules that are gone, such as `mapie.quantile_regression`, `mapie.control_risk` and `mapie._typing`, and metric functions imported from `mapie.metrics` itself. It also reports `alpha=` on the MAPIE 1 constructors, on `predict_interval` and `predict_set` and on the metrics, `cv=` on the split classes and `cv="prefit"` or `cv="split"` on the cross classes, `method=` on the classifiers and on `TopLabelCalibrator`, `method="naive"`, `sample_weight=` given to `fit` or `fit_conformalize`, `partial_fit` on a `TimeSeriesRegressor`, and the lower and upper bounds given to a metric as two arguments.
+Reports imports of `MapieRegressor`, `MapieClassifier`, `MapieQuantileRegressor`, `MapieTimeSeriesRegressor`, `MapieCalibrator`, `MapieMultiLabelClassifier`, `PrecisionRecallController`, `MondrianCP` and `ConformityScore`, imports of the modules that are gone, such as `mapie.quantile_regression`, `mapie.control_risk` and `mapie._typing`, and metric functions imported from `mapie.metrics` itself. It also reports `alpha=` on the MAPIE 1 constructors, on `predict_interval` and `predict_set`, on `predict` of an object that the file builds from a MAPIE 1 class and on the metrics, `fit` on a `CrossConformalRegressor`, a `CrossConformalClassifier` or a `JackknifeAfterBootstrapRegressor`, `cv=` on the split classes and `cv="prefit"` or `cv="split"` on the cross classes, `method=` on the classifiers and on `TopLabelCalibrator`, `method="naive"`, `sample_weight=` given to `fit` or `fit_conformalize`, `partial_fit` on a `TimeSeriesRegressor`, and the lower and upper bounds given to a metric as two arguments.
 
 Example:
 
@@ -6151,8 +6151,24 @@ series.adapt_conformal_inference(X_new, y_new, gamma=0.05)
 
 `removed-in-mapie` leaves alone an import inside a `try` block that catches the error, code
 behind a version check, and code inside `pytest.raises`. Each of its documents carries the
-release that removed the form: 1.0 for most, 1.1 for `partial_fit` and 1.3 for
-`PrecisionRecallController`. The rule reports an import and does not rename the class, because
+release that removed the form: 1.0 for most, 1.2 for `partial_fit`, 1.3 for
+`PrecisionRecallController` and 1.4.1 for `sample_weight=` on `TimeSeriesRegressor.fit`.
+`TimeSeriesRegressor` still had `partial_fit` in the 1.1.0 wheel and lost it in 1.2.0. Its `fit`
+took `sample_weight` and ran through 1.4.0, and raises TypeError since 1.4.1, and
+`fit_params={"sample_weight": w}` raised on 1.0.1 to 1.3.0 and ran from 1.4.0. The `fit` of the
+split classes raised on `sample_weight` on 1.0.1 already.
+
+The fix `confidence_level=1 - alpha` is written only for a number or a name. `alpha=[0.05, 0.2]`
+was common in 0.x code, and `1 - [0.05, 0.2]` raises TypeError, so a list or another expression
+is reported without a fix, and the message says to write 1 minus each value.
+`confidence_level=[0.95, 0.8]` gave intervals of shape (3, 2, 2) for 3 rows.
+
+`predict(X, alpha=0.1)` raised TypeError on each of the split, cross, jackknife and quantile
+classes. Their level is set in the constructor, so that document has no fix. `fit` raised
+AttributeError on `CrossConformalRegressor`, `CrossConformalClassifier` and
+`JackknifeAfterBootstrapRegressor`, on 1.0.1 and on 1.6.0. It is reported on a name that the file
+assigns from one of the three and from nothing else. `CrossConformalizedQuantileRegressor` has a
+`fit` on 1.6.0 and is left alone. The rule reports an import and does not rename the class, because
 the constructors differ: `MapieRegressor(model, cv="prefit")` becomes
 `SplitConformalRegressor(model, prefit=True)`, and `alpha` moves from `predict` to the
 constructor. Two fixes write `np.` and apply only in a file with `import numpy as np`. On the
@@ -6299,7 +6315,8 @@ The rule reads the name for `train`, `trn`, `tr`, `fit` and `training`, and leav
 with `conf`, `calib`, `cal`, `val`, `hold`, `test` or `res` in it. The form without a name needs
 an earlier `fit` with a target in the same block or the same chain, so a scaler fitted on the
 conformalization rows is left alone, and so is a class that calls `fit` and `conformalize` on
-itself. A model picked from six settings by its score on the conformalization rows covered 0.898
+itself. A `fit` is left out when a statement between it and the `conformalize` assigns to the
+variable, as in `X, y = load("conformalize")`, because the name then holds other rows. A model picked from six settings by its score on the conformalization rows covered 0.898
 against 0.899, so the rule does not report it.
 
 `coverage-on-seen-rows` rests on these: the intervals of a `CrossConformalRegressor` covered
@@ -6310,7 +6327,8 @@ error of 0.000, because `conformalize` picks the quantile that covers them, so t
 nothing and the document is a warning. The rule reports only where the result reaches a coverage
 metric: the call is an argument of `regression_coverage_score`, `classification_coverage_score`,
 the SSC functions, `regression_mwi_score` or `hsic`, or the second name it is assigned to is. A
-prediction for seen rows that is only plotted is left alone.
+prediction for seen rows that is only plotted is left alone, and so is one for a variable that
+a statement in between assigns other rows to.
 
 `shuffled-time-series-split` rests on a random walk of 900 rows. A `TimeSeriesRegressor` covered
 0.923 of a shuffled test part and 0.153 of a test part that came after the training rows. A
@@ -6409,11 +6427,16 @@ With an estimator built in the argument list, `conformalize` raised NotFittedErr
 and "Invalid classifier. Fitted classifier does not contain 'classes_' attribute" for a
 classifier, and `fit` raised "The fit method must be skipped when the prefit parameter is set to
 True". `prefit-estimator-not-fitted` reads a class name or `make_pipeline` as a new estimator, so
-`LinearRegression().fit(X, y)` and a model loaded from a file are left alone. `fit` is reported on
+`LinearRegression().fit(X, y)` and a model loaded from a file are left alone. A wrapper around a
+fitted model is fitted too: `SplitConformalRegressor(FrozenEstimator(fitted))` ran, so
+`FrozenEstimator` is left alone, and so is a class that is given a `.fit(...)` chain. `fit` is reported on
 an object that the file assigns from a split class without `prefit=False` and from nothing else.
 `ConformalizedQuantileRegressor` has `prefit=False` as its default. With `prefit=True` it needs
 three fitted estimators, for the lower quantile, the upper quantile and the median, and one
-estimator raised "Estimator for prefit must be an iterable object". The conditional classes
+estimator raised "Estimator for prefit must be an iterable object". That document reads only a
+class built in the argument list, with or without a `fit` chained to it, as one estimator. A
+call of a function may return the list of three, and
+`ConformalizedQuantileRegressor(fit_three(X, y), prefit=True)` ran. The conditional classes
 `ConditionalSplitConformalRegressor` and `ConditionalSplitConformalClassifier` raised the same
 errors and are read by their `estimator` keyword.
 
@@ -6423,7 +6446,8 @@ another class raised "The base model is not supported". MAPIE sets the quantile 
 `GradientBoostingRegressor(loss="quantile")` and `HistGradientBoostingRegressor(loss="quantile")`
 ran as they are. `LGBMRegressor(objective="quantile")` raised "The matching parameter
 `alpha_name` for estimator does not exist" until it also got an `alpha`. The rule reads only an
-estimator built in the argument list.
+estimator built in the argument list. A `loss` or `objective` that is not written as text, such
+as `loss=loss`, may hold `"quantile"` and is left alone.
 
 With `model.predict`, `calibrate` raised IndexError, "Error when calling the predict_function",
 because the controller reads the probability of the positive class from the second column.
@@ -6542,7 +6566,11 @@ and is reported only with `"aps"` and `"raps"`, which draw a random number for e
 leaves alone a file that calls `np.random.seed`, after which the same objects gave the same
 result twice, a call with `shuffle=False` or `**`, a
 `JackknifeAfterBootstrapRegressor` whose `resampling` is a `Subsample`, which is reported itself,
-and a call whose result is thrown away. The scikit-learn rule
+and a call whose result is thrown away. A splitter that shuffles draws its own seed, and
+`random_state` of the cross class does not reach it:
+`CrossConformalRegressor(model, cv=KFold(5, shuffle=True), random_state=0)` gave other intervals
+in two runs, and the same intervals with `KFold(5, shuffle=True, random_state=0)`. This rule does
+not report that splitter, because the scikit-learn rule
 [`missing-random-state`](#missing-random-state) reports the estimator and a `KFold` with
 `shuffle=True` in the same file.
 ## Category Encoders
@@ -7114,9 +7142,10 @@ Until 2.6 the four contrast encoders, `BackwardDifferenceEncoder`, `HelmertEncod
 `PolynomialEncoder` and `SumEncoder`, added a column named `intercept` that holds 1 on every
 row. 2.7 stopped adding it, so a drop by that name raises `KeyError: "['intercept'] not found
 in axis"`. The rule reports the drop only in a file that names one of the four classes, and it
-leaves a drop with `errors="ignore"` alone. It also leaves a file alone that makes a column of
-that name itself, with `frame["intercept"] = 1.0`, `assign(intercept=...)` or `insert`, because
-that drop takes out the file's own column.
+leaves a drop with `errors="ignore"` alone. It also leaves alone a drop on a frame that the file
+gives a column of that name itself, with `frame["intercept"] = 1.0` or `frame.insert`, and every
+drop in a file that calls `assign(intercept=...)`, because such a drop takes out the file's own
+column.
 
 `feature_names_out_` was a list until 2.6 and is a NumPy array since 2.7. The result of
 `get_feature_names_out` is a NumPy array since 2.6.1. `index`, `remove`, `append`, `extend`,

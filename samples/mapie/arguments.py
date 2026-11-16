@@ -11,6 +11,7 @@ from mapie.conditional_conformal_prediction import ConditionalSplitConformalRegr
 from mapie.regression import ConformalizedQuantileRegressor, CrossConformalizedQuantileRegressor, SplitConformalRegressor
 from mapie.risk_control import BinaryClassificationController, MultiLabelClassificationController
 from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor, RandomForestRegressor
+from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LinearRegression, LogisticRegression, QuantileRegressor
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.pipeline import make_pipeline
@@ -67,7 +68,14 @@ def estimator_fitted_before_or_by_mapie():
     quantiles = [QuantileRegressor(quantile=q, alpha=0.0).fit(X[:300], y[:300]) for q in (0.05, 0.95, 0.5)]
     three = ConformalizedQuantileRegressor(quantiles, confidence_level=0.9, prefit=True).conformalize(X[300:450], y[300:450])
     conditional = ConditionalSplitConformalRegressor(intercept_and_first, model, confidence_level=0.9)
-    return [m.predict_interval(X[450:])[1] for m in (prefit, inline, learner, three)], type(conditional).__name__
+    frozen = SplitConformalRegressor(FrozenEstimator(model), confidence_level=0.9).conformalize(X[300:450], y[300:450])
+    listed = ConformalizedQuantileRegressor(three_quantile_models(X[:300], y[:300]), confidence_level=0.9, prefit=True)
+    listed.conformalize(X[300:450], y[300:450])
+    return [m.predict_interval(X[450:])[1] for m in (prefit, inline, learner, three, frozen, listed)], type(conditional).__name__
+
+
+def three_quantile_models(X, y):
+    return [QuantileRegressor(quantile=q, alpha=0.0).fit(X, y) for q in (0.05, 0.95, 0.5)]
 
 
 def estimator_without_a_quantile_loss():
@@ -86,7 +94,10 @@ def estimator_with_a_quantile_loss():
     linear = ConformalizedQuantileRegressor(QuantileRegressor(alpha=0.0), confidence_level=0.9)
     linear.fit(X[:300], y[:300]).conformalize(X[300:450], y[300:450])
     point = SplitConformalRegressor(GradientBoostingRegressor(n_estimators=20, random_state=0), prefit=False)
-    return boosted.predict_interval(X[450:])[1], linear.predict_interval(X[450:])[1], point
+    loss = "quantile"
+    by_name = ConformalizedQuantileRegressor(GradientBoostingRegressor(loss=loss, n_estimators=20, random_state=0), confidence_level=0.9)
+    by_name.fit(X[:300], y[:300]).conformalize(X[300:450], y[300:450])
+    return boosted.predict_interval(X[450:])[1], linear.predict_interval(X[450:])[1], point, by_name.predict_interval(X[450:])[1]
 
 
 def controller_given_labels():

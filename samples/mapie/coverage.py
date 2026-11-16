@@ -71,6 +71,18 @@ def conformalize_on_the_fitted_rows():
 
 
 @case
+def other_rows_under_the_same_name():
+    X_train, X_conf, X_test, y_train, y_conf, y_test = three_parts()
+    X_part, y_part = X_train, y_train
+    model = RandomForestRegressor(n_estimators=20, random_state=0)
+    model.fit(X_part, y_part)
+    X_part, y_part = X_conf, y_conf
+    held_out = SplitConformalRegressor(model, confidence_level=0.9, prefit=True)
+    held_out.conformalize(X_part, y_part)
+    return coverage(y_test, held_out.predict_interval(X_test)[1])
+
+
+@case
 def search_on_the_conformalize_rows():
     X_train, X_conf, X_test, y_train, y_conf, y_test = three_parts()
     grid = {"max_depth": [2, 4, None]}

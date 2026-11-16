@@ -91,7 +91,11 @@ def removed_keywords():
     weighted = CrossConformalRegressor(LinearRegression(), random_state=0).fit_conformalize(X_train, y_train, sample_weight=weights)  # xpd: removed-in-mapie
     learner = SplitConformalRegressor(LinearRegression(), prefit=False)
     learner.fit(X_train, y_train, sample_weight=weights)  # xpd: removed-in-mapie
-    return split, prefit, cross, naive, scored, y_pred, y_intervals, weighted, learner
+    levels = SplitConformalRegressor(model, alpha=[0.05, 0.2])  # xpd: removed-in-mapie
+    kfolds = CrossConformalRegressor(LinearRegression(), random_state=0)
+    kfolds.fit(X_train, y_train)  # xpd: removed-in-mapie
+    y_old = conformal.predict(X_test, alpha=0.1)  # xpd: removed-in-mapie
+    return split, prefit, cross, naive, scored, y_pred, y_intervals, weighted, learner, levels, kfolds, y_old
 
 
 def removed_metric_arguments():
@@ -121,7 +125,10 @@ def metrics_on_mapie_1():
     winkler = regression_mwi_score(y_test, y_intervals, confidence_level=1 - 0.1)
     criterion = coverage_width_based(y_test, low, up, eta=10, confidence_level=1 - 0.1)
     level = SplitConformalRegressor(model, confidence_level=1 - 0.1).conformalize(X_conf, y_conf)
-    return coverage, stacked, width, stacked_width, winkler, criterion, level.predict_interval(X_test)[1]
+    levels = SplitConformalRegressor(model, confidence_level=[0.95, 0.8]).conformalize(X_conf, y_conf)
+    kfolds = CrossConformalRegressor(LinearRegression(), random_state=0)
+    kfolds.fit_conformalize(X_train, y_train)
+    return coverage, stacked, width, stacked_width, winkler, criterion, level.predict_interval(X_test)[1], levels.predict_interval(X_test)[1].shape, kfolds.predict(X_test)
 
 
 @case
