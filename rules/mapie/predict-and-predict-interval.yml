@@ -1,0 +1,49 @@
+# predict_interval and predict_set return the point predictions as their first value, so a
+# predict on the same rows runs the model a second time. On MAPIE 1.6.0 with a forest of 50
+# trees, on one thread and as the median of 7 runs, the pair took 1.99 times as long as
+# predict_interval alone on 2,000 and on 20,000 rows, and 1.98 and 1.97 times as long as
+# predict_set alone. Both forms returned the same arrays, bit for bit.
+#
+# predict_interval and predict_set are names only MAPIE has, so the rule needs no class. The two
+# calls must be statements of the same block and name the same object and the same rows.
+id: predict-and-predict-interval
+language: python
+severity: warning
+message: $M.predict_interval($X) already returns the point predictions as its first value, so this predict runs the model a second time. The pair measured 1.99 times as long as predict_interval alone. Write y_pred, y_intervals = $M.predict_interval($X), which gives the same arrays.
+rule:
+  pattern: $M.predict($X)
+  inside:
+    stopBy: end
+    kind: expression_statement
+    any:
+      - precedes: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: same-rows } }
+      - follows: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: same-rows } }
+utils:
+  same-rows:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^predict_interval$' } }, { has: { field: object, pattern: $M } }] }
+      - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+constraints:
+  X: { not: { kind: keyword_argument } }
+---
+id: predict-and-predict-interval
+language: python
+severity: warning
+message: $M.predict_set($X) already returns the predicted labels as its first value, so this predict runs the model a second time. The pair measured 1.97 times as long as predict_set alone. Write y_pred, y_sets = $M.predict_set($X), which gives the same arrays.
+rule:
+  pattern: $M.predict($X)
+  inside:
+    stopBy: end
+    kind: expression_statement
+    any:
+      - precedes: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: same-rows } }
+      - follows: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: same-rows } }
+utils:
+  same-rows:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^predict_set$' } }, { has: { field: object, pattern: $M } }] }
+      - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+constraints:
+  X: { not: { kind: keyword_argument } }

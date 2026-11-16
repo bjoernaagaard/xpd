@@ -1,7 +1,7 @@
 # Rules
 
-xpd has six rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
-[scikit-learn](#scikit-learn), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
+xpd has seven rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+[scikit-learn](#scikit-learn), [MAPIE](#mapie), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
 Python rules run on every file.
 
 ## pandas
@@ -5301,6 +5301,541 @@ call with `shuffle=False` or `**`, a `train_test_split` whose result is thrown a
 constructor that only `isinstance` reads. Of 527 held-back reports, 52 were labelled, and each
 reader called 1 wrong. Recall was 79 of 80.
 
+## MAPIE
+
+These rules run on files that import `mapie`, the module of
+[MAPIE](https://mapie.readthedocs.io/), which builds prediction intervals and prediction sets
+around a scikit-learn model. They report the MAPIE 0.x API, which raises on MAPIE 1, code that
+breaks the coverage a conformal method promises, arguments that MAPIE refuses, and code that runs
+the model twice. Every number in this section was measured on MAPIE 1.6.0 with scikit-learn 1.9.1.
+Examples assume that the MAPIE and scikit-learn names they use are imported. Names such as
+`X_train`, `X_conf`, `y_test` and `model` represent values supplied by your program.
+
+MAPIE 1.0 replaced `MapieRegressor` and `MapieClassifier` with one class per method, moved `alpha`
+to the constructor as `confidence_level`, which is `1 - alpha`, and split `fit` into `fit` and
+`conformalize`. A rule document about that change carries `since`. xpd reads the installed
+version from the project's venv, as it does for pandas, and skips the document on an older
+release, so a project that still has MAPIE 0.9 gets no report about the 0.x API. When the venv
+has no MAPIE, or there is no venv, every document runs.
+
+Two rules read the names of variables, such as `X_train`, because a pattern sees nothing else, so
+a name that misleads gives a wrong report. The other rules tie a call to an object by the
+variable the file assigns it to, and to rows by the variable given to an earlier call.
+
+### How a rule earns its place
+
+Every rule document ships on something that was run, and it is one of four kinds:
+
+- A coverage proof runs the old and the new form over 30 seeds with `confidence_level=0.9` and
+  gives the mean share of test rows that the intervals or sets cover.
+- An interpreter proof runs the old form on MAPIE 1.6.0, under `python -W error` for a warning.
+  It passes when the old form raises and the new form runs clean.
+- A speed proof times both forms on one thread, as the median of 5 or 7 runs, at two data sizes,
+  and compares the arrays they return.
+- A rerun proof runs the old form twice in fresh objects. It passes when the two results differ
+  and the new form gives the same result twice.
+
+A document is `error` only on a coverage proof or an interpreter proof, and its message quotes
+what was measured. A document that can also match code that is meant, such as a level below 0.5
+in a plot of coverage against the level, is `warning`.
+
+The rules were then run over MAPIE's own code at the 1.6.0 tag: its 162 Python files, which are
+the library, its tests and its examples, and the Python code of its 21 documentation pages and
+notebooks. Every report was read. A rule that reported correct code there was narrowed, and the
+table gives what is left.
+
+| Rule | Severity | Proof | Reports on MAPIE's own code | Wrong advice | Fix |
+| --- | --- | --- | --- | --- | --- |
+| [`removed-in-mapie`](#removed-in-mapie) | error | interpreter: ImportError, ModuleNotFoundError, TypeError, ValueError, AttributeError | 1 | 0 | unsafe |
+| [`deprecated-in-mapie`](#deprecated-in-mapie) | warning | interpreter: FutureWarning, and intervals equal with and without `gamma` | 2 | 0 | safe |
+| [`alpha-as-confidence-level`](#alpha-as-confidence-level) | warning, error | coverage: 0.101 against 0.905, and interpreter: ValueError | 0 | no reports | none |
+| [`calibrate-on-training-rows`](#calibrate-on-training-rows) | error | coverage: 0.483 against 0.905 | 6 | 1 | none |
+| [`coverage-on-seen-rows`](#coverage-on-seen-rows) | error, warning | coverage: 1.000 against 0.914 | 0 | no reports | none |
+| [`shuffled-time-series-split`](#shuffled-time-series-split) | warning | coverage: 0.923 against 0.153 | 0 | no reports | none |
+| [`prefit-estimator-not-fitted`](#prefit-estimator-not-fitted) | error | interpreter: NotFittedError, AttributeError, ValueError | 0 | no reports | none |
+| [`quantile-estimator-loss`](#quantile-estimator-loss) | error | interpreter: ValueError | 0 | no reports | none |
+| [`predict-function-returns-labels`](#predict-function-returns-labels) | error | interpreter: IndexError | 0 | no reports | unsafe |
+| [`risk-control-method`](#risk-control-method) | error, warning | interpreter: ValueError, UserWarning | 0 | no reports | none |
+| [`predict-and-predict-interval`](#predict-and-predict-interval) | warning | speed: 1.97 times | 3 | 3 | none |
+| [`refit-per-confidence-level`](#refit-per-confidence-level) | warning | speed: 2.87 times | 1 | 1 | none |
+| [`unseeded-resampling`](#unseeded-resampling) | info | rerun: the result differs | 36 | 0 | none |
+
+A coverage proof gives the old form's mean against the new form's mean. A speed proof gives the
+lowest ratio over the forms the rule reports and both sizes. Wrong advice counts the reports
+where following the message would not fix a real problem in that code.
+
+All 5 reports with wrong advice are in MAPIE's tests. Three tests call `predict` beside
+`predict_interval` or `predict_set` to assert that the two agree, one test builds one object per
+level to compare it with the list form, and one test conformalizes on the rows of a
+`DummyRegressor` that predicts a constant, which learns nothing from them. Four more reports of
+`calibrate-on-training-rows` are tests that fit and conformalize on the same rows to check the
+mechanics, where coverage is not the point. The sixth is an example in MAPIE's gallery that
+conformalizes on its training rows. No rule reported the library's own source, and the examples,
+documentation pages and notebooks got 9 reports, none with wrong advice.
+
+Recall was not measured. No set of real MAPIE code was held back, so the table says how often a
+rule is wrong when it reports, and not how often it misses. The pack has no rule for
+`mapie.exchangeability_testing`, `mapie.experimental` and the FWER procedures: their misuse is in
+the data, such as rows shuffled before an exchangeability test, and a pattern cannot see it.
+
+### The 0.x API
+
+Each form below raises or warns on MAPIE 1.6.0. Each was run there, and the messages take each
+replacement from the v1 release notes or from the error text. Every fix of a removed form turns
+code that raises into code that runs, so none of those fixes can be compared with the old form
+and none is safe.
+
+#### removed-in-mapie
+
+**Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based`, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. The other forms have no fix.
+
+Reports imports of `MapieRegressor`, `MapieClassifier`, `MapieQuantileRegressor`, `MapieTimeSeriesRegressor`, `MapieCalibrator`, `MapieMultiLabelClassifier`, `PrecisionRecallController`, `MondrianCP` and `ConformityScore`, imports of the modules that are gone, such as `mapie.quantile_regression`, `mapie.control_risk` and `mapie._typing`, and metric functions imported from `mapie.metrics` itself. It also reports `alpha=` on the MAPIE 1 constructors, on `predict_interval` and `predict_set` and on the metrics, `cv=` on the split classes and `cv="prefit"` or `cv="split"` on the cross classes, `method=` on the classifiers and on `TopLabelCalibrator`, `method="naive"`, `sample_weight=` given to `fit` or `fit_conformalize`, `partial_fit` on a `TimeSeriesRegressor`, and the lower and upper bounds given to a metric as two arguments.
+
+Example:
+
+```python
+from mapie.regression import MapieRegressor
+from mapie.metrics import regression_coverage_score
+
+mapie = MapieRegressor(model, cv="prefit")
+mapie.fit(X_conf, y_conf)
+y_pred, y_pis = mapie.predict(X_test, alpha=0.1)
+coverage = regression_coverage_score(y_test, y_pis[:, 0, 0], y_pis[:, 1, 0])
+```
+
+Use instead:
+
+```python
+from mapie.regression import SplitConformalRegressor
+from mapie.metrics.regression import regression_coverage_score
+
+mapie = SplitConformalRegressor(model, confidence_level=0.9, prefit=True)
+mapie.conformalize(X_conf, y_conf)
+y_pred, y_pis = mapie.predict_interval(X_test)
+coverage = regression_coverage_score(y_test, y_pis)[0]
+```
+
+#### deprecated-in-mapie
+
+**Severity:** warning. **Fix:** safe: `BinaryRisk` for `BinaryClassificationRisk`, and `aggregate_point_predictions=` for `aggregate_predictions=` and for `ensemble=` on a `JackknifeAfterBootstrapRegressor`. `update` has no fix.
+
+Reports `BinaryClassificationRisk`, which MAPIE 1.4 renamed, the `aggregate_predictions=` keyword of `CrossConformalRegressor.predict` and `predict_interval` and the `ensemble=` keyword of the same methods on `JackknifeAfterBootstrapRegressor`, which MAPIE 1.4.1 renamed, and `gamma=`, `confidence_level=` and `optimize_beta=` given to `TimeSeriesRegressor.update`, which has read none of them since MAPIE 1.3.
+
+Example:
+
+```python
+risk = BinaryClassificationRisk(risk_occurrence=missed, risk_condition=positive, higher_is_better=False)
+y_pred, y_pis = cross.predict_interval(X_test, aggregate_predictions="median")
+series.update(X_new, y_new, gamma=0.05)
+```
+
+Use instead:
+
+```python
+risk = BinaryRisk(risk_occurrence=missed, risk_condition=positive, higher_is_better=False)
+y_pred, y_pis = cross.predict_interval(X_test, aggregate_point_predictions="median")
+series.update(X_new, y_new)
+series.adapt_conformal_inference(X_new, y_new, gamma=0.05)
+```
+
+
+`removed-in-mapie` leaves alone an import inside a `try` block that catches the error, code
+behind a version check, and code inside `pytest.raises`. Each of its documents carries the
+release that removed the form: 1.0 for most, 1.1 for `partial_fit` and 1.3 for
+`PrecisionRecallController`. The rule reports an import and does not rename the class, because
+the constructors differ: `MapieRegressor(model, cv="prefit")` becomes
+`SplitConformalRegressor(model, prefit=True)`, and `alpha` moves from `predict` to the
+constructor. Two fixes write `np.` and apply only in a file with `import numpy as np`. On the
+same bounds, the fixed calls of `regression_coverage_score`, `regression_mean_width_score` and
+`coverage_width_based` on MAPIE 1.6.0 returned the value that the old calls returned on MAPIE
+0.9.2, bit for bit, and `regression_mwi_score` returned it to 15 digits.
+
+The fixes of `deprecated-in-mapie` are safe: a controller built with `BinaryRisk` picked the same
+thresholds and gave the same predictions as one built with `BinaryClassificationRisk`, and the
+intervals with the new keywords were bit equal to the ones with the old keywords. A file that
+imports both risk classes ends with `BinaryRisk` twice in its import. `ensemble=` is reported only
+on an object that the file assigns from `JackknifeAfterBootstrapRegressor` and from no other
+class, because `TimeSeriesRegressor.predict` still takes it. With `method="aci"`, the intervals
+after `update(X, y, gamma=0.5)` were bit equal to the ones after `update(X, y)` on MAPIE 1.3.0,
+1.4.0 and 1.6.0, and they differed on MAPIE 1.2.0, so that document carries `since: "1.3"`.
+
+### Coverage that does not hold
+
+A conformal method promises that its intervals cover a share of new rows. The promise needs
+conformity scores from rows the model did not learn from, a level that is the share to cover, and
+test rows that the method has not seen. Each number below is the mean share of test rows covered
+over 30 seeds, with a `RandomForestRegressor` unless another model is named.
+
+#### alpha-as-confidence-level
+
+**Severity:** warning for a level below 0.5 and for a variable named `alpha` or `delta`, and error for a percent. **Fix:** none.
+
+Reports `confidence_level=0.1`, `confidence_level=[0.05, 0.1]` and `confidence_level=alpha`, where the value is the share to miss, the same values given to `regression_mwi_score` and `coverage_width_based` in the place of the level, and `confidence_level=90`.
+
+Example:
+
+```python
+alpha = 0.1
+mapie = SplitConformalRegressor(model, confidence_level=alpha)
+score = regression_mwi_score(y_test, y_pis, alpha)
+```
+
+Use instead:
+
+```python
+alpha = 0.1
+mapie = SplitConformalRegressor(model, confidence_level=1 - alpha)
+score = regression_mwi_score(y_test, y_pis, 1 - alpha)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### calibrate-on-training-rows
+
+**Severity:** error. **Fix:** none.
+
+Reports `conformalize` on the training rows, by the name of its first argument or because an earlier `fit` got the same variable, `calibrate` of a risk controller on the training rows, and `fit` of a `TopLabelCalibrator` or `VennAbersCalibrator` with `cv="prefit"` on the training rows.
+
+Example:
+
+```python
+model.fit(X_train, y_train)
+mapie = SplitConformalRegressor(model, confidence_level=0.9, prefit=True)
+mapie.conformalize(X_train, y_train)
+```
+
+Use instead:
+
+```python
+X_train, X_conf, X_test, y_train, y_conf, y_test = train_conformalize_test_split(
+    X, y, train_size=0.6, conformalize_size=0.2, test_size=0.2, random_state=0
+)
+model.fit(X_train, y_train)
+mapie = SplitConformalRegressor(model, confidence_level=0.9, prefit=True)
+mapie.conformalize(X_conf, y_conf)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### coverage-on-seen-rows
+
+**Severity:** error for rows given to `fit` or `fit_conformalize`, and warning for rows given to `conformalize`. **Fix:** none.
+
+Reports `predict_interval` and `predict_set` on the variable that an earlier statement gave to `fit`, `fit_conformalize` or `conformalize` of the same object, where the result goes into a MAPIE coverage metric.
+
+Example:
+
+```python
+cross.fit_conformalize(X_train, y_train)
+y_pred, y_pis = cross.predict_interval(X_train)
+coverage = regression_coverage_score(y_train, y_pis)[0]
+```
+
+Use instead:
+
+```python
+cross.fit_conformalize(X_train, y_train)
+y_pred, y_pis = cross.predict_interval(X_test)
+coverage = regression_coverage_score(y_test, y_pis)[0]
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### shuffled-time-series-split
+
+**Severity:** warning. **Fix:** none.
+
+Reports `train_test_split` and `train_conformalize_test_split` without `shuffle=False`, where the first result goes into `fit` of a `TimeSeriesRegressor`.
+
+Example:
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+series = TimeSeriesRegressor(model, cv=blocks)
+series.fit(X_train, y_train)
+```
+
+Use instead:
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, shuffle=False)
+series = TimeSeriesRegressor(model, cv=blocks)
+series.fit(X_train, y_train)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`alpha-as-confidence-level` rests on this measurement: with `confidence_level=0.1` the intervals
+covered 0.101 of the test rows and were 0.289 wide, against 0.905 and 3.854 with 0.9. MAPIE runs
+both without a warning. A literal below 0.5 is read on the constructors of the conformal classes
+and on `TimeSeriesRegressor.predict`. A risk controller is left alone, because its level is
+`1 - delta` and a low one is a choice. 0.5 itself and a list with a level of 0.5 or more are left
+alone. A percent raises "Invalid confidence_level or alpha. Allowed values are between 0 and 1",
+but only from `predict_interval` or `predict_set`, after the model is fitted, and a risk
+controller raises "delta must be in (0, 1]".
+
+`calibrate-on-training-rows` rests on four measurements. A regressor conformalized on its
+training rows covered 0.483 of the test rows against 0.905 with held-out rows, and a
+`RandomForestClassifier` covered 0.248 against 0.920. A model fitted on rows that include the
+conformalization rows covered 0.478, and a `GridSearchCV` fitted on the conformalization rows
+covered 0.819 against 0.902. A `BinaryClassificationController` with a target precision of 0.85
+that was calibrated on the training rows gave a precision of 0.666 on test rows and was below the
+target in 30 of 30 runs. With held-out rows it found a threshold in 10 of 30 runs, and none of
+those was below the target. On test rows a `TopLabelCalibrator` with `cv="prefit"` that was
+fitted on the training rows had a top-label calibration error of 0.525, against 0.077 with
+held-out rows and 0.119 without calibration, and a `VennAbersCalibrator` had 0.272 against 0.051.
+The rule reads the name for `train`, `trn`, `tr`, `fit` and `training`, and leaves alone a name
+with `conf`, `calib`, `cal`, `val`, `hold`, `test` or `res` in it. The form without a name needs
+an earlier `fit` with a target in the same block or the same chain, so a scaler fitted on the
+conformalization rows is left alone, and so is a class that calls `fit` and `conformalize` on
+itself. A model picked from six settings by its score on the conformalization rows covered 0.898
+against 0.899, so the rule does not report it.
+
+`coverage-on-seen-rows` rests on these: the intervals of a `CrossConformalRegressor` covered
+1.000 of the rows given to `fit_conformalize` and 0.914 of the test rows, and the ones of a
+`SplitConformalRegressor` covered 1.000 of the rows given to `fit` and 0.905 of the test rows.
+The rows given to `conformalize` were covered at 0.903 in each of the 30 runs, with a standard
+error of 0.000, because `conformalize` picks the quantile that covers them, so that number shows
+nothing and the document is a warning. The rule reports only where the result reaches a coverage
+metric: the call is an argument of `regression_coverage_score`, `classification_coverage_score`,
+the SSC functions, `regression_mwi_score` or `hsic`, or the second name it is assigned to is. A
+prediction for seen rows that is only plotted is left alone.
+
+`shuffled-time-series-split` rests on a random walk of 900 rows. A `TimeSeriesRegressor` covered
+0.923 of a shuffled test part and 0.153 of a test part that came after the training rows. A
+`SplitConformalRegressor` on a shuffled split covered 0.894 of its own test rows and 0.128 of the
+300 rows that came after them. The rule cannot see that the rows are in time order, so it is a
+warning.
+
+### Arguments that raise
+
+Each form below raises when the object is used, on MAPIE 1.6.0. Code inside `pytest.raises` or
+`pytest.warns` is left alone.
+
+#### prefit-estimator-not-fitted
+
+**Severity:** error. **Fix:** none.
+
+Reports `SplitConformalRegressor` and `SplitConformalClassifier` with an estimator built in the argument list and no `prefit=False`, `fit` on such an object without `prefit=False`, and `ConformalizedQuantileRegressor(prefit=True)` with one estimator.
+
+Example:
+
+```python
+mapie = SplitConformalRegressor(RandomForestRegressor(random_state=0), confidence_level=0.9)
+mapie.fit(X_train, y_train)
+```
+
+Use instead:
+
+```python
+mapie = SplitConformalRegressor(RandomForestRegressor(random_state=0), confidence_level=0.9, prefit=False)
+mapie.fit(X_train, y_train)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### quantile-estimator-loss
+
+**Severity:** error. **Fix:** none.
+
+Reports `ConformalizedQuantileRegressor` and `CrossConformalizedQuantileRegressor` with an estimator built in the argument list that has no quantile loss: `GradientBoostingRegressor` or `HistGradientBoostingRegressor` without `loss="quantile"`, `LGBMRegressor` without `objective="quantile"`, or a scikit-learn regressor that has none, such as `RandomForestRegressor`.
+
+Example:
+
+```python
+mapie = ConformalizedQuantileRegressor(GradientBoostingRegressor(random_state=0), confidence_level=0.9)
+```
+
+Use instead:
+
+```python
+mapie = ConformalizedQuantileRegressor(GradientBoostingRegressor(loss="quantile", random_state=0), confidence_level=0.9)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### predict-function-returns-labels
+
+**Severity:** error. **Fix:** unsafe: `model.predict_proba`.
+
+Reports `BinaryClassificationController` with `model.predict` as its `predict_function`.
+
+Example:
+
+```python
+controller = BinaryClassificationController(model.predict, "precision", target_level=0.8)
+```
+
+Use instead:
+
+```python
+controller = BinaryClassificationController(model.predict_proba, "precision", target_level=0.8)
+```
+
+#### risk-control-method
+
+**Severity:** error for a method the risk does not take and for a missing `confidence_level`, and warning for an argument that `"crc"` ignores. **Fix:** none.
+
+Reports `MultiLabelClassificationController` and `SemanticSegmentationController` with `risk="precision"` and `method="crc"` or `"rcps"`, with `method="ltt"` and recall, with `method="rcps"` or `risk="precision"` and no `confidence_level`, and with `method="crc"` beside a `confidence_level` or an `rcps_bound`.
+
+Example:
+
+```python
+controller = MultiLabelClassificationController(model.predict_proba, risk="precision", method="crc")
+```
+
+Use instead:
+
+```python
+controller = MultiLabelClassificationController(model.predict_proba, risk="precision", confidence_level=0.9)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`prefit` is `True` by default on the split classes, which says the estimator is already fitted.
+With an estimator built in the argument list, `conformalize` raised NotFittedError for a regressor
+and "Invalid classifier. Fitted classifier does not contain 'classes_' attribute" for a
+classifier, and `fit` raised "The fit method must be skipped when the prefit parameter is set to
+True". `prefit-estimator-not-fitted` reads a class name or `make_pipeline` as a new estimator, so
+`LinearRegression().fit(X, y)` and a model loaded from a file are left alone. `fit` is reported on
+an object that the file assigns from a split class without `prefit=False` and from nothing else.
+`ConformalizedQuantileRegressor` has `prefit=False` as its default. With `prefit=True` it needs
+three fitted estimators, for the lower quantile, the upper quantile and the median, and one
+estimator raised "Estimator for prefit must be an iterable object". The conditional classes
+`ConditionalSplitConformalRegressor` and `ConditionalSplitConformalClassifier` raised the same
+errors and are read by their `estimator` keyword.
+
+`quantile-estimator-loss` rests on two errors. A boosting model without the quantile loss raised
+"You need to set the loss/objective argument of your base model to `quantile`", and a model of
+another class raised "The base model is not supported". MAPIE sets the quantile itself, so
+`GradientBoostingRegressor(loss="quantile")` and `HistGradientBoostingRegressor(loss="quantile")`
+ran as they are. `LGBMRegressor(objective="quantile")` raised "The matching parameter
+`alpha_name` for estimator does not exist" until it also got an `alpha`. The rule reads only an
+estimator built in the argument list.
+
+With `model.predict`, `calibrate` raised IndexError, "Error when calling the predict_function",
+because the controller reads the probability of the positive class from the second column.
+`MultiLabelClassificationController` ran with `predict`, so `predict-function-returns-labels`
+leaves it alone.
+
+`risk-control-method` rests on these errors from `calibrate`: "Invalid method 'crc' for risk
+'precision'. Valid methods are: ['ltt']", "Invalid method 'ltt' for risk 'recall'. Valid methods
+are: ['crc', 'rcps']", and "Invalid confidence_level. confidence_level cannot be `None` when
+using method 'rcps'", and the same for `'ltt'`. With `method="crc"`, a `confidence_level` or an
+`rcps_bound` raised a UserWarning that it is ignored.
+
+### Work done twice
+
+#### predict-and-predict-interval
+
+**Severity:** warning. **Fix:** none.
+
+Reports `predict` on the same object and the same rows as a `predict_interval` or `predict_set` in the same block.
+
+Example:
+
+```python
+y_pred = mapie.predict(X_test)
+_, y_pis = mapie.predict_interval(X_test)
+```
+
+Use instead:
+
+```python
+y_pred, y_pis = mapie.predict_interval(X_test)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### refit-per-confidence-level
+
+**Severity:** warning. **Fix:** none.
+
+Reports a conformal object built inside a loop or a comprehension with the loop variable as its `confidence_level`.
+
+Example:
+
+```python
+for level in (0.8, 0.9, 0.95):
+    cross = CrossConformalRegressor(model, confidence_level=level, cv=5, random_state=0)
+    cross.fit_conformalize(X_train, y_train)
+    intervals[level] = cross.predict_interval(X_test)[1][:, :, 0]
+```
+
+Use instead:
+
+```python
+levels = [0.8, 0.9, 0.95]
+cross = CrossConformalRegressor(model, confidence_level=levels, cv=5, random_state=0)
+cross.fit_conformalize(X_train, y_train)
+_, y_pis = cross.predict_interval(X_test)
+intervals = {level: y_pis[:, :, i] for i, level in enumerate(levels)}
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`predict_interval` and `predict_set` return the point predictions as their first value. With a
+forest of 50 trees on one thread, `predict` and `predict_interval` together took 1.99 times as
+long as `predict_interval` alone on 2,000 and on 20,000 rows, and `predict` and `predict_set`
+took 1.98 and 1.97 times as long as `predict_set` alone. Both forms returned the same arrays, bit
+for bit. The two calls must be statements of the same block and name the same object and the
+same rows.
+
+`confidence_level` takes a list, and the intervals then have one column per level. With three
+levels, one seeded `CrossConformalRegressor` per level took 2.87 times as long as one for the
+list on 1,000 rows and 2.95 times on 5,000, and `SplitConformalRegressor` took 2.99 and 3.01
+times. The intervals were bit equal in both. Without `random_state` a cross class draws other
+folds for each object, so the per-level intervals then differ from the list form.
+`ConformalizedQuantileRegressor` takes one level only, and `refit-per-confidence-level` leaves it
+alone.
+
+### Reproducible results
+
+#### unseeded-resampling
+
+**Severity:** info. **Fix:** none.
+
+Reports `CrossConformalRegressor`, `CrossConformalClassifier` and `CrossConformalizedQuantileRegressor` with a number of folds, `JackknifeAfterBootstrapRegressor`, `Subsample`, `BlockBootstrap`, `train_conformalize_test_split`, and `SplitConformalClassifier` with the `"aps"` or `"raps"` score, each without `random_state`.
+
+Example:
+
+```python
+cross = CrossConformalRegressor(model, confidence_level=0.9, cv=5)
+X_train, X_conf, X_test, y_train, y_conf, y_test = train_conformalize_test_split(
+    X, y, train_size=0.6, conformalize_size=0.2, test_size=0.2
+)
+```
+
+Use instead:
+
+```python
+cross = CrossConformalRegressor(model, confidence_level=0.9, cv=5, random_state=0)
+X_train, X_conf, X_test, y_train, y_conf, y_test = train_conformalize_test_split(
+    X, y, train_size=0.6, conformalize_size=0.2, test_size=0.2, random_state=0
+)
+```
+
+The value 0 is only the example. Any fixed number makes the run repeatable.
+
+The replacement is advice. xpd does not apply it automatically.
+
+
+`unseeded-resampling` is info, because a seed does not move the expected coverage. Each form it
+names gave another result in two fresh runs and the same result with `random_state`. The cross
+classes shuffle their folds when `cv` is a number, which the default is, and gave the same
+intervals with `cv=KFold(5)` and with `cv=-1`, so a splitter and a negative number are left
+alone. `SplitConformalClassifier` gave the same sets twice with the `"lac"` and `"top_k"` scores
+and is reported only with `"aps"` and `"raps"`, which draw a random number for each row. The rule
+leaves alone a file that calls `np.random.seed`, after which the same objects gave the same
+result twice, a call with `shuffle=False` or `**`, a
+`JackknifeAfterBootstrapRegressor` whose `resampling` is a `Subsample`, which is reported itself,
+and a call whose result is thrown away. The scikit-learn rule
+[`missing-random-state`](#missing-random-state) reports the estimator and a `KFold` with
+`shuffle=True` in the same file.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
@@ -5756,8 +6291,8 @@ target/release/xpd check samples/bad.py
 cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --unsafe-fixes
 ```
 
-The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/hamilton/` and
-`samples/python/` mark each line a rule reports with a comment that names the rules.
+The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/mapie/`,
+`samples/hamilton/` and `samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the

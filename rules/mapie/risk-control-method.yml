@@ -1,0 +1,71 @@
+# MultiLabelClassificationController and SemanticSegmentationController control recall with
+# "crc" or "rcps" and precision with "ltt", and only "rcps" and "ltt" read confidence_level. Each
+# form below was run on MAPIE 1.6.0, where calibrate raised ValueError or warned. Code inside
+# pytest.raises or pytest.warns is meant to raise and stays silent.
+
+id: risk-control-method
+language: python
+severity: error
+message: risk="precision" is controlled with method="ltt" only, and calibrate raises "Invalid method" for $METHOD. Drop method, or pass method="ltt", and pass confidence_level.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(MultiLabelClassificationController|SemanticSegmentationController)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^risk\s*=\s*["'']precision["'']$' } }
+    - has: { field: arguments, has: { kind: keyword_argument, pattern: $METHOD, regex: '^method\s*=\s*["''](crc|rcps)["'']$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: risk-control-method
+language: python
+severity: error
+message: Recall is controlled with method="crc" or "rcps", and calibrate raises "Invalid method 'ltt' for risk 'recall'". Pass one of the two, or risk="precision" to keep "ltt".
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(MultiLabelClassificationController|SemanticSegmentationController)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["'']ltt["'']$' } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^risk$' } }, { not: { regex: '^risk\s*=\s*["'']recall["'']$' } }] }, { kind: dictionary_splat }] } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# "rcps" and "ltt" hold with a probability, so they need confidence_level. Precision uses "ltt"
+# when no method is given.
+id: risk-control-method
+language: python
+severity: error
+message: This method holds with a probability, and calibrate raises "confidence_level cannot be `None`" without one. Pass confidence_level, such as 0.9.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(MultiLabelClassificationController|SemanticSegmentationController)$' }
+    - any:
+        - has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["'']rcps["'']$' } }
+        - all:
+            - has: { field: arguments, has: { kind: keyword_argument, regex: '^risk\s*=\s*["'']precision["'']$' } }
+            - not: { has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["''](crc|rcps)["'']$' } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^confidence_level$' } }, { kind: dictionary_splat }] } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# "crc" controls the risk in expectation and reads no confidence_level and no rcps_bound.
+id: risk-control-method
+language: python
+severity: warning
+message: method="crc" controls the risk in expectation and ignores $K, and calibrate warns that it is ignored. Drop $K, or pass method="rcps" for a risk that holds with that probability.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, pattern: $K, regex: '^(confidence_level|rcps_bound)$' }
+    - not: { has: { field: value, regex: '^None$' } }
+    - inside:
+        kind: argument_list
+        all:
+          - has: { kind: keyword_argument, regex: '^method\s*=\s*["'']crc["'']$' }
+          - inside: { kind: call, has: { field: function, regex: '(^|\.)(MultiLabelClassificationController|SemanticSegmentationController)$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }

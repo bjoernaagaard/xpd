@@ -1,0 +1,501 @@
+# Each document finds a form of the MAPIE 0.x API that raises on MAPIE 1.6.0: a class or module
+# that 1.0 removed, a keyword the new signatures no longer have, or a value they refuse. Each was
+# run on 1.6.0, and the message gives the replacement from the v1 release notes. Every document
+# carries since, so a project that still has MAPIE 0.9 in its venv is left alone. Code inside a
+# try block that catches the error, or behind a version check, is a compatibility path and stays
+# silent, and so does code inside pytest.raises or pytest.warns, which is meant to raise.
+#
+# A fix here turns code that raises into code that runs, so no fix can be compared with the old
+# form and every fix is unsafe.
+
+id: removed-in-mapie
+language: python
+severity: error
+message: MapieRegressor was removed in MAPIE 1.0, and the import raises ImportError. Use SplitConformalRegressor for cv="split" and cv="prefit", CrossConformalRegressor for a number of folds or a splitter, and JackknifeAfterBootstrapRegressor for a Subsample. Pass confidence_level, which is 1 - alpha, to the constructor, and read the intervals from predict_interval.
+rule:
+  any:
+    - kind: import_from_statement
+      regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieRegressor\b'
+    - kind: attribute
+      regex: '^mapie\.regression\.MapieRegressor$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: MapieClassifier was removed in MAPIE 1.0, and the import raises ImportError. Use SplitConformalClassifier for cv="split" and cv="prefit", and CrossConformalClassifier for a number of folds or a splitter. Pass confidence_level, which is 1 - alpha, and conformity_score to the constructor, and read the sets from predict_set.
+rule:
+  any:
+    - kind: import_from_statement
+      regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieClassifier\b'
+    - kind: attribute
+      regex: '^mapie\.classification\.MapieClassifier$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: MapieQuantileRegressor was removed in MAPIE 1.0, and the import raises. Use ConformalizedQuantileRegressor from mapie.regression. Pass confidence_level, which is 1 - alpha, and prefit=True in place of cv="prefit", then call fit, conformalize and predict_interval.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieQuantileRegressor\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: MapieTimeSeriesRegressor was removed in MAPIE 1.0, and the import raises. Use TimeSeriesRegressor from mapie.regression, which takes the same constructor arguments. Its predict takes confidence_level, which is 1 - alpha, and update replaces partial_fit.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieTimeSeriesRegressor\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: MapieCalibrator was removed in MAPIE 1.0, and the import raises ImportError. Use TopLabelCalibrator from mapie.calibration, which no longer takes method.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieCalibrator\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: MapieMultiLabelClassifier and mapie.multi_label_classification were removed in MAPIE 1.0, and the import raises. Use MultiLabelClassificationController from mapie.risk_control. Give it the fitted model's predict_proba as predict_function and the target as target_level, then call calibrate and predict.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieMultiLabelClassifier\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+# MAPIE 1.0 and 1.1 had PrecisionRecallController, and 1.3.0 has only the new name.
+id: removed-in-mapie
+language: python
+severity: error
+message: PrecisionRecallController is gone from mapie.risk_control, and the import raises ImportError. Use MultiLabelClassificationController. Give it the fitted model's predict_proba as predict_function, risk in place of metric_control, and the target as target_level.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bPrecisionRecallController\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.3" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: mapie.mondrian and MondrianCP were removed in MAPIE 1.0, and the import raises ModuleNotFoundError. MAPIE 1 has no Mondrian class. Fit one split conformal object per group, each conformalized on the rows of that group.
+rule:
+  any:
+    - kind: import_from_statement
+      regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMondrianCP\b'
+    - kind: import_statement
+      regex: '\bmapie\.mondrian\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: ConformityScore was removed from mapie.conformity_scores, and the import raises ImportError. Subclass BaseRegressionScore for a regression score and BaseClassificationScore for a classification score.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+mapie\.conformity_scores(\.\w+)*\s+import\b[^#]*\bConformityScore\b'
+  not:
+    any:
+      - regex: '^from\s+mapie\.conformity_scores(\.\w+)*\s+import\s+\(?[\s,]*((Absolute|Gamma|Std|Naive|LAC|APS|RAPS|TopK)ConformityScore(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+      - matches: compat-code
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+# The modules that 1.0 removed or made private. A statement that also names a removed class is
+# reported by the document of that class.
+id: removed-in-mapie
+language: python
+severity: error
+message: $M is not a module of MAPIE 1, and the import raises ModuleNotFoundError. The regression classes are in mapie.regression, the risk controllers in mapie.risk_control, and the conformity scores in mapie.conformity_scores.
+rule:
+  kind: dotted_name
+  pattern: $M
+  regex: '^mapie\.(quantile_regression|time_series_regression|multi_label_classification|control_risk(\.\w+)*|conformity_scores\.residual_conformity_scores|estimator\.estimator)$'
+  any:
+    - inside: { kind: import_from_statement, field: module_name, not: { regex: '\b(Mapie\w+|MondrianCP|ConformityScore)\b' } }
+    - inside: { kind: import_statement }
+    - inside: { kind: aliased_import, inside: { kind: import_statement } }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+# mapie._typing held ArrayLike and NDArray, which it took from numpy.typing.
+id: removed-in-mapie
+language: python
+severity: error
+message: mapie._typing was removed in MAPIE 1.0, and the import raises ModuleNotFoundError. Import ArrayLike and NDArray from numpy.typing.
+rule:
+  kind: dotted_name
+  regex: '^mapie\._typing$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+mapie\._typing\s+import\s+\(?[\s,]*((ArrayLike|NDArray)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: numpy.typing
+metadata: { fix: unsafe, since: "1.0" }
+---
+# mapie.metrics is a package since 1.0, and each function is in one of its modules. The fix
+# writes the module when every imported name is in the same one.
+id: removed-in-mapie
+language: python
+severity: error
+message: mapie.metrics is a package since MAPIE 1.0, and this import raises ImportError. These functions are in mapie.metrics.regression. regression_coverage_score and regression_mean_width_score now take one array of intervals, of shape (rows, 2, levels), and return one value per level.
+rule:
+  kind: dotted_name
+  regex: '^mapie\.metrics$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((coverage_width_based|hsic|regression_coverage_score|regression_mean_width_score|regression_mwi_score|regression_ssc|regression_ssc_score)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: mapie.metrics.regression
+metadata: { fix: unsafe, since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: mapie.metrics is a package since MAPIE 1.0, and this import raises ImportError. These functions are in mapie.metrics.classification, and they return one value per confidence level.
+rule:
+  kind: dotted_name
+  regex: '^mapie\.metrics$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((classification_coverage_score|classification_mean_width_score|classification_ssc|classification_ssc_score)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: mapie.metrics.classification
+metadata: { fix: unsafe, since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: mapie.metrics is a package since MAPIE 1.0, and this import raises ImportError. These functions are in mapie.metrics.calibration.
+rule:
+  kind: dotted_name
+  regex: '^mapie\.metrics$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((add_jitter|cumulative_differences|expected_calibration_error|kolmogorov_smirnov_cdf|kolmogorov_smirnov_p_value|kolmogorov_smirnov_statistic|kuiper_cdf|kuiper_p_value|kuiper_statistic|length_scale|sort_xy_by_y|spiegelhalter_p_value|spiegelhalter_statistic|top_label_ece)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: mapie.metrics.calibration
+metadata: { fix: unsafe, since: "1.0" }
+---
+# The same import with names from more than one module, or with a name that is gone, such as
+# regression_coverage_score_v2. The four modules of the package itself still import.
+id: removed-in-mapie
+language: python
+severity: error
+message: mapie.metrics is a package since MAPIE 1.0, and this import raises ImportError. Import each function from mapie.metrics.regression, mapie.metrics.classification or mapie.metrics.calibration. The _v2 functions are gone, and regression_coverage_score and classification_coverage_score now do what they did.
+rule:
+  any:
+    - kind: import_from_statement
+      regex: '^from\s+mapie\.metrics\s+import\b'
+      not:
+        any:
+          - regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((coverage_width_based|hsic|regression_coverage_score|regression_mean_width_score|regression_mwi_score|regression_ssc|regression_ssc_score)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+          - regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((classification_coverage_score|classification_mean_width_score|classification_ssc|classification_ssc_score)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+          - regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((add_jitter|cumulative_differences|expected_calibration_error|kolmogorov_smirnov_cdf|kolmogorov_smirnov_p_value|kolmogorov_smirnov_statistic|kuiper_cdf|kuiper_p_value|kuiper_statistic|length_scale|sort_xy_by_y|spiegelhalter_p_value|spiegelhalter_statistic|top_label_ece)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+          - regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((regression|classification|calibration|uncertainty|conditional)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+    - kind: import_from_statement
+      regex: '^from\s+mapie\.metrics\.\w+\s+import\b[^#]*\b(regression|classification)_coverage_score_v2\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "1.0" }
+---
+# The 0.x metrics took the two bounds as two arrays. On the same bounds, the fixed call on 1.6.0
+# gave the value that the old call gave on MAPIE 0.9.2.
+id: removed-in-mapie
+language: python
+severity: error
+message: regression_coverage_score takes the intervals as one array since MAPIE 1.0, as predict_interval returns them, and the two bounds as two arguments raise TypeError. Pass the intervals, and read the value of one level with [0].
+rule:
+  pattern: $F($Y, $LOW, $UP)
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+constraints:
+  Y: { not: { kind: keyword_argument } }
+  LOW: { not: { kind: keyword_argument } }
+  UP: { not: { kind: keyword_argument } }
+  F: { regex: '(^|\.)regression_coverage_score$' }
+fix: $F($Y, np.column_stack([$LOW, $UP]))[0]
+metadata: { fix: unsafe, since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: regression_mean_width_score takes the intervals as one array of shape (rows, 2, levels) since MAPIE 1.0, as predict_interval returns them, and the two bounds as two arguments raise TypeError. Pass the intervals, and read the value of one level with [0].
+rule:
+  pattern: $F($LOW, $UP)
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+constraints:
+  LOW: { not: { kind: keyword_argument } }
+  UP: { not: { kind: keyword_argument } }
+  F: { regex: '(^|\.)regression_mean_width_score$' }
+fix: $F(np.column_stack([$LOW, $UP])[:, :, np.newaxis])[0]
+metadata: { fix: unsafe, since: "1.0" }
+---
+# alpha became confidence_level in these two metrics.
+id: removed-in-mapie
+language: python
+severity: error
+message: $F takes confidence_level since MAPIE 1.0, and alpha raises TypeError. Pass confidence_level=1 - $A.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, pattern: $A }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, pattern: $F, regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: confidence_level=1 - $A
+metadata: { fix: unsafe, since: "1.0" }
+---
+# The constructors of MAPIE 1 take confidence_level, and no method takes alpha.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C takes confidence_level since MAPIE 1.0, and alpha raises TypeError. Pass confidence_level=1 - $A.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, pattern: $A }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: confidence_level=1 - $A
+metadata: { fix: unsafe, since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: predict_interval and predict_set take no alpha, and it raises TypeError. Pass confidence_level, which is 1 - alpha, to the constructor. A list of levels there gives one interval or set per level.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: '^alpha$' }
+  inside:
+    kind: argument_list
+    inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(predict_interval|predict_set)$' } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.0" }
+---
+# TimeSeriesRegressor.predict passes alpha on to a method that already has it, so it raises
+# "got multiple values for keyword argument 'alpha'".
+id: removed-in-mapie
+language: python
+severity: error
+message: TimeSeriesRegressor.predict takes confidence_level since MAPIE 1.0, and alpha raises TypeError. Pass confidence_level=1 - $A.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, pattern: $A }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^predict$' } }, { has: { field: object, pattern: $M } }] }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: confidence_level=1 - $A
+metadata: { fix: unsafe, since: "1.0" }
+---
+# The split classes take prefit and no cv, and the cross classes refuse a string.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C has no cv since MAPIE 1.0, and it raises TypeError. Pass prefit=True for a fitted estimator, which is the default, or prefit=False and call fit before conformalize.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cv$' } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+constraints:
+  C: { regex: '(^|\.)(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor)$' }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: $C refuses cv="prefit" and cv="split" since MAPIE 1.0, and fit_conformalize raises ValueError. Use SplitConformalRegressor or SplitConformalClassifier, with prefit=True for a fitted estimator.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^cv\s*=\s*["''](prefit|split)["'']$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+constraints:
+  C: { regex: '(^|\.)(CrossConformal(Regressor|Classifier)|CrossConformalizedQuantileRegressor)$' }
+metadata: { since: "1.0" }
+---
+# The classifiers and the calibrator lost method. MapieClassifier took the score there.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C has no method since MAPIE 1.0, and it raises TypeError. A classifier takes the score as conformity_score, which is "lac", "aps", "raps" or "top_k", and TopLabelCalibrator needs no method.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^method$' } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+constraints:
+  C: { regex: '(^|\.)((Split|Cross)ConformalClassifier|SplitConformalRegressor|TopLabelCalibrator)$' }
+metadata: { since: "1.0" }
+---
+id: removed-in-mapie
+language: python
+severity: error
+message: method="naive" was removed in MAPIE 1.0, and fit_conformalize raises ValueError. $C takes "plus" or "minmax", and CrossConformalRegressor also takes "base".
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["'']naive["'']$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+constraints:
+  C: { regex: '(^|\.)(CrossConformalRegressor|JackknifeAfterBootstrapRegressor|CrossConformalizedQuantileRegressor)$' }
+metadata: { since: "1.0" }
+---
+# sample_weight was a keyword of fit in 0.x. fit_conformalize is a name only MAPIE has.
+id: removed-in-mapie
+language: python
+severity: error
+message: 'fit_conformalize takes no sample_weight, and it raises TypeError. Pass fit_params={"sample_weight": $W}.'
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^sample_weight$' }
+    - has: { field: value, pattern: $W }
+    - inside:
+        kind: argument_list
+        all:
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: '^fit_params$' } } }
+          - inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit_conformalize$' } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: 'fit_params={"sample_weight": $W}'
+metadata: { fix: unsafe, since: "1.0" }
+---
+# The same keyword on fit, where the object is one the file binds to a MAPIE class.
+id: removed-in-mapie
+language: python
+severity: error
+message: 'fit takes no sample_weight on a MAPIE 1 class, and it raises TypeError. Pass fit_params={"sample_weight": $W}.'
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^sample_weight$' }
+    - has: { field: value, pattern: $W }
+    - inside:
+        kind: argument_list
+        all:
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: '^fit_params$' } } }
+          - inside:
+              kind: call
+              all:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, pattern: $M } }] }
+                - inside:
+                    kind: module
+                    stopBy: end
+                    has:
+                      stopBy: end
+                      kind: assignment
+                      all:
+                        - has: { field: left, pattern: $M }
+                        - has: { field: right, regex: '^(\w+\.)*(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor|TimeSeriesRegressor)\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: 'fit_params={"sample_weight": $W}'
+metadata: { fix: unsafe, since: "1.0" }
+---
+# MAPIE 1.1 replaced TimeSeriesRegressor.partial_fit with update, which takes the same X, y and
+# ensemble.
+id: removed-in-mapie
+language: python
+severity: error
+message: TimeSeriesRegressor has no partial_fit since MAPIE 1.1, and the call raises AttributeError. Call update, which takes the same rows.
+rule:
+  kind: attribute
+  pattern: $M.partial_fit
+  all:
+    - inside: { kind: call, field: function }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, pattern: $M }
+            - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: $M.update
+metadata: { fix: unsafe, since: "1.1" }

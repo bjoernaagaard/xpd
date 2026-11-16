@@ -1,0 +1,51 @@
+# A shuffled split puts test rows between the training rows in time, so a model that reads the
+# time or a lagged value scores well on them and badly on what comes later. On a random walk of
+# 900 rows, over 30 seeds on MAPIE 1.6.0, a TimeSeriesRegressor covered 0.923 of a shuffled test
+# part at confidence_level=0.9 and 0.153 of a test part that came after the training rows. A
+# split conformal regressor on a shuffled split covered 0.894 of its test rows and 0.128 of the
+# 300 rows after them.
+#
+# The rule reports a split with no shuffle keyword whose first result, by its name, is the first
+# argument of a fit on a TimeSeriesRegressor in the same file. It cannot see that the rows are a
+# series in time order, so it is a warning.
+id: shuffled-time-series-split
+language: python
+severity: warning
+message: This split shuffles the rows, and $X goes into a TimeSeriesRegressor, so test rows sit between training rows in time. On a random walk the intervals covered 0.923 of a shuffled test part and 0.153 of the rows that came later, at confidence_level=0.9. Pass shuffle=False so that the test rows come after the training rows.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '(^|\.)(train_test_split|train_conformalize_test_split)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^shuffle$' } }, { kind: dictionary_splat }] } } }
+    - inside:
+        kind: assignment
+        has: { field: left, has: { nthChild: 1, kind: identifier, pattern: $X } }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: call
+          all:
+            - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+            - has:
+                field: function
+                kind: attribute
+                all:
+                  - has: { field: attribute, regex: '^fit$' }
+                  - has:
+                      field: object
+                      any:
+                        - kind: call
+                          regex: '^(\w+\.)*TimeSeriesRegressor\('
+                        - pattern: $M
+                          kind: identifier
+                          inside:
+                            kind: module
+                            stopBy: end
+                            has:
+                              stopBy: end
+                              kind: assignment
+                              all:
+                                - has: { field: left, pattern: $M }
+                                - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }

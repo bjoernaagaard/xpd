@@ -1,0 +1,120 @@
+# Each document finds a form that raises FutureWarning on MAPIE 1.6.0, or that MAPIE keeps for
+# old code and no longer acts on. Each was run under `python -W error`, where the old form
+# raised and the new form ran clean. Code inside pytest.raises or pytest.warns is meant to warn
+# and stays silent.
+
+# BinaryClassificationRisk is a subclass of BinaryRisk that only warns, since MAPIE 1.4. A
+# controller built with either class picked the same thresholds and gave the same predictions.
+id: deprecated-in-mapie
+language: python
+severity: warning
+message: BinaryClassificationRisk is deprecated since MAPIE 1.4 and raises FutureWarning. Use BinaryRisk, which takes the same arguments and gives the same result.
+rule:
+  kind: identifier
+  regex: '^BinaryClassificationRisk$'
+  not:
+    any:
+      - inside: { kind: class_definition, field: name }
+      - inside: { kind: aliased_import, field: alias }
+      - matches: expected-to-raise
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: BinaryRisk
+metadata: { fix: safe, since: "1.4" }
+---
+# MAPIE 1.4.1 renamed the keyword of CrossConformalRegressor.predict and predict_interval. No
+# other predict in MAPIE or scikit-learn takes aggregate_predictions.
+id: deprecated-in-mapie
+language: python
+severity: warning
+message: aggregate_predictions is deprecated since MAPIE 1.4.1 and raises FutureWarning. Write aggregate_point_predictions, which takes the same values and gives the same arrays.
+rule:
+  kind: identifier
+  regex: '^aggregate_predictions$'
+  inside:
+    kind: keyword_argument
+    field: name
+    inside:
+      kind: argument_list
+      inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(predict|predict_interval)$' } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: aggregate_point_predictions
+metadata: { fix: safe, since: "1.4.1" }
+---
+# The same rename on JackknifeAfterBootstrapRegressor, where the old keyword was ensemble.
+# TimeSeriesRegressor.predict still takes ensemble, so the object must be one the file binds to
+# JackknifeAfterBootstrapRegressor and to no other class.
+id: deprecated-in-mapie
+language: python
+severity: warning
+message: ensemble is deprecated on JackknifeAfterBootstrapRegressor since MAPIE 1.4.1 and raises FutureWarning. Write aggregate_point_predictions, which takes the same value and gives the same arrays.
+rule:
+  kind: identifier
+  regex: '^ensemble$'
+  inside:
+    kind: keyword_argument
+    field: name
+    inside:
+      kind: argument_list
+      inside:
+        kind: call
+        all:
+          - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(predict|predict_interval)$' } }, { has: { field: object, pattern: $M } }] }
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $M }
+                  - has: { field: right, regex: '^(\w+\.)*JackknifeAfterBootstrapRegressor\(' }
+          - not:
+              inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, regex: '^(\w+\.)*[A-Z]\w*\(' }
+                    - not: { has: { field: right, regex: '^(\w+\.)*JackknifeAfterBootstrapRegressor\(' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: aggregate_point_predictions
+metadata: { fix: safe, since: "1.4.1" }
+---
+# TimeSeriesRegressor.update keeps gamma, confidence_level and optimize_beta in its signature and
+# reads none of them. With method="aci", the intervals after update(X, y, gamma=0.5) were bit
+# equal to the ones after update(X, y), and adapt_conformal_inference changed them.
+id: deprecated-in-mapie
+language: python
+severity: warning
+message: TimeSeriesRegressor.update no longer reads $K, so this call updates the scores and adapts nothing. The intervals after update with gamma=0.5 were equal to the ones without it. Call adapt_conformal_inference(X, y, gamma=...) to adapt the level, and drop $K here.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, pattern: $K, regex: '^(gamma|confidence_level|optimize_beta)$' }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update$' } }, { has: { field: object, pattern: $M } }] }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "1.3" }
