@@ -1,0 +1,44 @@
+# SPA, StepM, MCS and RealityCheck run their bootstrap in compute, and not when they are
+# created. On arch 9.0.0 and 8.0.0 each result below raised RuntimeError on a new object:
+# pvalues, critical_values and better_models of SPA with "compute must be called before pvalues
+# are available", superior_models of StepM, and pvalues, included and excluded of MCS with "Must
+# call compute before accessing results". RealityCheck is another name for SPA.
+#
+# The rule reports a result read straight from the constructor call, and a result read from a
+# name that the file assigns such an object to, and nothing else, when the file never calls
+# compute on that name. The class names are short, so the file must import them from
+# arch.bootstrap.
+id: results-before-compute
+language: python
+severity: error
+message: $A is read here, and this file never calls compute on the object, so reading it raises RuntimeError. Call compute first, which runs the bootstrap.
+rule:
+  kind: attribute
+  all:
+    - has: { field: attribute, pattern: $A, regex: '^(pvalues|critical_values|better_models|superior_models|included|excluded)$' }
+    - has:
+        field: object
+        any:
+          - matches: comparison-call
+          - kind: identifier
+            pattern: $S
+            all:
+              - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $S } }, { has: { field: right, matches: comparison-call } }] } }
+              - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $S } }, { not: { has: { field: right, matches: comparison-call } } }] } } }
+              - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: '^compute$' } }, { has: { field: object, pattern: $S } }] } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  comparison-call:
+    kind: call
+    has:
+      field: function
+      pattern: $C
+      any:
+        - { kind: attribute, regex: '^arch\.bootstrap(\.multiple_comparison)?\.(SPA|StepM|MCS|RealityCheck)$' }
+        - kind: identifier
+          regex: '^(SPA|StepM|MCS|RealityCheck)$'
+          inside:
+            kind: module
+            stopBy: end
+            has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }

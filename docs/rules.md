@@ -7765,6 +7765,132 @@ summary at the end. Twenty fits of a GARCH(1,1) in a loop printed 240 lines, and
 `update_freq=0` alone still prints the summary. All 15 reports on the public code were fits in a
 loop over windows, assets or model orders.
 
+### Bootstraps, tests and covariance estimators
+
+#### arch-unseeded-draws
+
+**Severity:** info. **Fix:** none.
+
+Reports `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap`, `LocalBlockBootstrap`, `SPA`, `StepM`, `MCS` and `RealityCheck` without `seed`, `forecast` with `method="simulation"` and no `rng`, `forecast` with `method="bootstrap"` and no `random_state`, and `simulate` on an arch model, unless the file builds a distribution with a seed.
+
+Example:
+
+```python
+np.random.seed(0)
+bs = StationaryBootstrap(10, returns)
+interval = bs.conf_int(np.mean, 1000)
+```
+
+Use instead:
+
+```python
+bs = StationaryBootstrap(10, returns, seed=0)
+interval = bs.conf_int(np.mean, 1000)
+```
+
+arch draws from generators of its own, which start from a new seed in every process. Each form
+was run twice without a seed and twice with one, on arch 9.0.0 and on 8.0.0. The two runs
+without a seed differed on both releases, and the table gives the numbers of 9.0.0.
+
+| Form | Two runs without a seed | Two runs with a seed | Seeded by |
+| --- | --- | --- | --- |
+| `IIDBootstrap(x).conf_int(np.mean, 200)`, lower bound | -0.15601, -0.15855 | -0.15667 twice | `seed=0` |
+| `StationaryBootstrap(10, x)`, the same | -0.13476, -0.13188 | -0.14428 twice | `seed=0` |
+| `CircularBlockBootstrap(10, x)`, the same | -0.18054, -0.14953 | -0.15445 twice | `seed=0` |
+| `MovingBlockBootstrap(10, x)`, the same | -0.14193, -0.14765 | -0.16665 twice | `seed=0` |
+| `SPA(...)`, lower p-value | 0.7233, 0.6800 | 0.6700 twice | `seed=0` |
+| `MCS(...)`, first p-value | 0.250, 0.283 | 0.297 twice | `seed=0` |
+| `forecast(horizon=5, method="simulation")`, last step | 2.671, 2.601 | 2.571 twice | `Normal(seed=0)` as the model's distribution, or a seeded `rng` |
+| `forecast(horizon=5, method="bootstrap")`, last step | 2.587, 2.578 | 2.595 twice | `random_state=np.random.RandomState(0)` |
+| `arch_model(None).simulate(params, 100)`, last value | -1.24, 0.07 | 0.097 twice | `Normal(seed=0)` as the model's distribution |
+
+`np.random.seed(0)` before each run did not make any of them equal: the bootstrap gave -0.1328
+and -0.15246, the simulated forecast 2.676 and 2.534, the bootstrap forecast 2.468 and 2.737,
+and `simulate` -1.27 and 0.30. arch does not draw from NumPy's global generator. 49 of the 291
+reports in the corpus are in a file that calls `np.random.seed`. One report has wrong advice: a
+base class in arch's own source builds a placeholder bootstrap that it never draws from.
+
+`seed` is a keyword of the bootstraps, the tests and the distributions since arch 5.0, so every
+document carries `since: "5.0"`. A seed does not move what the method estimates, so the rule is
+info. A bootstrap whose `state` the file assigns is left alone. A file that builds a distribution
+with `seed=` anywhere is left alone by the two documents that read the model's distribution,
+because a pattern cannot see which model gets it. `SPA`, `StepM`, `MCS` and `RealityCheck` are
+read only when the file imports them from `arch.bootstrap`.
+
+#### results-before-compute
+
+**Severity:** error. **Fix:** none.
+
+Reports `pvalues`, `critical_values`, `better_models`, `superior_models`, `included` and `excluded` read from an `SPA`, `StepM`, `MCS` or `RealityCheck` in a file that never calls `compute` on that object.
+
+Example:
+
+```python
+mcs = MCS(losses, size=0.1, seed=0)
+kept = mcs.included
+```
+
+Use instead:
+
+```python
+mcs = MCS(losses, size=0.1, seed=0)
+mcs.compute()
+kept = mcs.included
+```
+
+The tests run their bootstrap in `compute` and not when they are created. On a new object,
+`pvalues`, `critical_values()` and `better_models()` of `SPA` raised RuntimeError with "compute
+must be called before pvalues are available", `superior_models` of `StepM` raised it with
+"compute must be called before accessing superior_models", and `pvalues`, `included` and
+`excluded` of `MCS` raised it with "Must call compute before accessing results", on arch 9.0.0
+and on 8.0.0.
+
+The rule reports a result read straight from the constructor call, and a result read from a
+variable that the file assigns from one of the four classes and from nothing else, when no line
+of the file calls `compute` on that variable. It does not follow the order of the lines, so a
+`compute` after the read is not reported. Both reports in the corpus are rows of a table in
+arch's tests that pass a bad `pvalue` to `critical_values` to check the ValueError that comes
+first, so the advice is wrong there.
+
+#### opt-bandwidth-as-bandwidth
+
+**Severity:** warning. **Fix:** none.
+
+Reports `bandwidth=` set to the `opt_bandwidth` of an estimator, on `Bartlett`, `Gallant`, `NeweyWest`, `Parzen`, `ParzenCauchy`, `ParzenGeometric`, `ParzenRiesz`, `TukeyHamming`, `TukeyHanning` and `TukeyParzen`.
+
+Example:
+
+```python
+first = Bartlett(returns)
+again = Bartlett(returns, bandwidth=first.opt_bandwidth)
+```
+
+Use instead:
+
+```python
+first = Bartlett(returns)
+again = Bartlett(returns, bandwidth=first.bandwidth)
+```
+
+A kernel covariance estimator reports the bandwidth it used as `bandwidth` and the optimal
+bandwidth of Newey and West as `opt_bandwidth`. Until arch 9.0 the two were one number. Since
+9.0 a kernel that is 0 beyond a finite lag uses `opt_bandwidth` minus 1, and the release notes
+say that `Bartlett(x, bandwidth=est.opt_bandwidth)` is not the same as `Bartlett(x)`.
+
+| Estimator on 1,500 S&P 500 returns | `bandwidth` | `opt_bandwidth` | Long run variance | With `bandwidth=opt_bandwidth` |
+| --- | --- | --- | --- | --- |
+| `Bartlett`, arch 9.0.0 | 10.943 | 11.943 | 0.52445 | 0.51582 |
+| `Parzen`, arch 9.0.0 | 20.467 | 21.467 | 0.48023 | 0.47335 |
+| `QuadraticSpectral`, arch 9.0.0 | 7.658 | 7.658 | 0.55401 | 0.55401 |
+| `Bartlett`, arch 8.0.0 | 19.221 | 19.221 | 0.45172 | 0.45172 |
+
+A script built every estimator class of `arch.covariance.kernel` on 9.0.0 and compared the two
+attributes. They differ for the ten classes the rule names and are equal for `Andrews`,
+`QuadraticSpectral` and `ZeroLag`, which are left alone. The document carries `since: "9.0"`.
+The corpus had no report. The table also shows that the automatic bandwidth itself changed in
+9.0, from 19.221 to 10.943 for `Bartlett`, so an estimate without `bandwidth` differs between the
+two releases.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of

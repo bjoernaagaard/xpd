@@ -1,0 +1,27 @@
+# A kernel covariance estimator reports the bandwidth it used as bandwidth and the optimal
+# bandwidth of Newey and West as opt_bandwidth. Until arch 9.0 the two were the same number.
+# Since 9.0 a kernel that is 0 beyond a finite lag uses opt_bandwidth minus 1, so that its
+# weights are those of the optimal bandwidth, and the release notes say that
+# Bartlett(x, bandwidth=est.opt_bandwidth) is not the same as Bartlett(x).
+#
+# On 1,500 daily S&P 500 returns with arch 9.0.0, Bartlett used a bandwidth of 10.943 with an
+# opt_bandwidth of 11.943 and gave a long run variance of 0.52445, and 0.51582 with
+# bandwidth=opt_bandwidth. Parzen gave 0.48023 and 0.47335. On 8.0.0 the two bandwidths and the
+# two estimates were equal. The classes are the ten of arch.covariance.kernel whose bandwidth
+# was not their opt_bandwidth on 9.0.0, found by a script. Andrews, QuadraticSpectral and
+# ZeroLag had the two equal and are left alone.
+id: opt-bandwidth-as-bandwidth
+language: python
+severity: warning
+message: Since arch 9.0 $K uses opt_bandwidth minus 1 as its bandwidth, so passing opt_bandwidth back gives another estimate. Bartlett gave a long run variance of 0.5245 on its own and 0.5158 with bandwidth=opt_bandwidth. Pass the bandwidth attribute to repeat the estimate.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^bandwidth$' }
+    - has: { field: value, kind: attribute, has: { field: attribute, regex: '^opt_bandwidth$' } }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has: { field: function, pattern: $K, regex: '(^|\.)(Bartlett|Gallant|NeweyWest|Parzen|ParzenCauchy|ParzenGeometric|ParzenRiesz|TukeyHamming|TukeyHanning|TukeyParzen)$' }
+metadata: { since: "9.0" }
