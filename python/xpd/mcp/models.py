@@ -36,9 +36,11 @@ class CheckReport(Output):
 
 
 class Step(Output):
-    """One step of a pipeline: a function that takes a frame and returns it with columns."""
+    """One step of a pipeline: a function that takes a frame and returns it with columns, or
+    one `.assign(...)` call of a method chain."""
 
-    name: str
+    name: str = Field(description="The function, or the call of a chain link: .assign(gross).")
+    kind: str = Field(default="function", description="function, or link for a chain link.")
     line: int
     reads: list[str] = Field(description="Columns the step reads.")
     columns: list[str] = Field(description="Columns the step adds.")
@@ -57,13 +59,20 @@ class Link(Output):
 
 
 class Pipeline(Output):
-    """A function that runs steps in order, as frame.pipe(a).pipe(b)."""
+    """A function that runs steps in order, as frame.pipe(a).pipe(b), or a method chain."""
 
     name: str
     file: str
     line: int
     steps: list[Step]
     links: list[Link]
+    source: list[str] = Field(
+        default_factory=list,
+        description="Columns the steps read that no earlier step adds: columns= of the read.",
+    )
+    source_complete: bool = Field(
+        default=True, description="False when a step also reads columns named at run time."
+    )
     free: list[str] = Field(description="Steps that share no column with another step.")
 
 

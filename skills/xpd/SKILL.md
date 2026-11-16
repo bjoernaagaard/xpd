@@ -33,8 +33,11 @@ Use `xpd` whenever you write or change Python code.
   running it. Run it after you add, move or rename a step or a node. Fix every
   `error`. Fix `warning`s unless you can state why the code is right.
   - Step code is a function that passes a frame through other functions, as
-    `frame.pipe(a).pipe(b)`. Before you add a column, read `pipelines[].steps`
+    `frame.pipe(a).pipe(b)`, or a method chain, where each `.assign(...)` is a
+    step. Before you add a column, read `pipelines[].steps`
     and reuse a column that exists instead of computing its formula again.
+    Pass `pipelines[].source` as `columns=` to `pd.read_parquet`, so the file
+    is read without the columns that no step uses.
     Return `frame.assign(...)` or `frame.join(...)`, and don't write
     `frame["x"] = ...` on the frame a step was given.
   - Apache Hamilton modules: a `warning` names an input one edit from a node

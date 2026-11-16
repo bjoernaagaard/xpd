@@ -117,7 +117,8 @@ It reads two ways of writing a dataflow, and picks one per file.
 | A function that passes a frame through other functions of the file | [Step code](#step-code) |
 | Anything else | [Hamilton modules](#hamilton-modules) |
 
-A file with a pipeline that also imports `hamilton` is read as both.
+A file with a pipeline that also imports `hamilton` is read as both. So is a file whose only
+pipelines are [method chains](#method-chains).
 
 ### Step code
 
@@ -133,6 +134,7 @@ samples/graph/steps.py:18:   (source columns) -> totals  [2 columns]
 samples/graph/steps.py:28:   totals -> shares  [1 column]
 samples/graph/steps.py:33:   (source columns) -> discounts  [1 column]
 samples/graph/steps.py:41:   totals + discounts -> flags  [3 columns]
+samples/graph/steps.py:51:   reads from its source: columns=["discount","quantity","unit_price"]
 samples/graph/steps.py:35: warning: discounts() computes before_discount with the formula of the column gross_amount from totals(). Read the column gross_amount there.
 samples/graph/steps.py:37: warning: discounts() writes to the frame it was given. Called as discounts(orders), it changes the caller's frame too. Return orders.assign(...) or write to orders.copy().
 samples/graph/steps.py:45: warning: The column over_limit from flags() has the same formula as is_large from flags(), so the result holds one column twice. Keep one of them.
@@ -141,8 +143,12 @@ xpd: 1 pipeline with 4 steps in 1 file, 4 warnings
 ```
 
 The first line names the pipeline. Each line after it is `file:line: steps it reads from ->
-step`, with the number of columns the step adds. `order is free for` lists the steps that share
-no column with another step. Then come the findings:
+step`, with the number of columns the step adds. `reads from its source` lists the columns the
+steps read that no earlier step adds, so the frame the pipeline starts from must have them. The
+list is written as the `columns=` argument of `pd.read_parquet`, which then reads no other
+column. It ends in `and computed names` when a step also reads columns that the file does not
+name. `order is free for` lists the steps that share no column with another step. Then come the
+findings:
 
 | Finding | Severity | What happens |
 | --- | --- | --- |
@@ -153,6 +159,7 @@ no column with another step. Then come the findings:
 | Two steps write out the same formula | warning | As above, with no column to read it from |
 | A column is assigned twice in one step with the same formula | warning | The first assignment is wasted |
 | A step writes to the frame it was given, as `frame["x"] = ...` | warning | Called as `step(frame)`, it changes the caller's frame |
+| An `.assign(...)` of a chain reads a column from the name the chain starts at, as `orders["net"]`, and an earlier `.assign(...)` of the chain adds that column | warning | The name holds the frame from before the chain, so the read raises `KeyError`, or reads old values |
 | The tree in the module docstring differs from the pipeline | warning | The description is out of date |
 | A frame of new columns is not joined to the result | note | The result has no column of those names |
 
@@ -164,6 +171,8 @@ What `graph` reads:
 
 - A column read as `frame["name"]`, where the name is a literal, a constant of the module, or a
   list of those. `frame.name` counts when another step adds a column of that name.
+- A column read as `pd.col("name")`, and as `d["name"]` in a lambda that `.assign(...)` calls
+  with the frame, as in `frame.assign(total=lambda d: d["price"] * d["units"])`.
 - A column added with `frame.assign(name=...)`, with `frame.join(new)` where `new` is
   `pd.DataFrame(index=frame.index).assign(name=...)`, or with `frame["name"] = ...`.
 - A step at module level. A method of a class is not read.
@@ -172,8 +181,38 @@ A step whose column names the file computes, as in `frame[prefix + "_total"]` or
 `pd.get_dummies(...)`, is marked `and computed names`. Its named columns are still read, and it
 is left out of `order is free for`, because not all of its columns are known.
 
-The tree check applies to a file with one pipeline whose module docstring draws its steps as
-`├── step()` lines.
+The tree check applies to a file with one pipeline of functions whose module docstring draws
+its steps as `├── step()` lines.
+
+#### Method chains
+
+A method chain is a pipeline too. Each `.assign(...)` of a chain with two or more steps is a
+step, named by the columns it adds. The chain can stand in a function or in a statement of the
+module, and it can mix `.assign(...)` with `.pipe(step)`. `two formulas are the same` holds
+across the three ways to read a column, so `pd.col("a") * 2` in one step equals `d["a"] * 2` in
+a lambda of another.
+
+```console
+$ xpd graph samples/graph/chain.py
+samples/graph/chain.py:12: features: 4 steps, 5 columns
+samples/graph/chain.py:14:   (source columns) -> .assign(gross_amount)  [1 column]
+samples/graph/chain.py:15:   .assign(gross_amount) -> .assign(net_amount, before_discount)  [2 columns]
+samples/graph/chain.py:19:   .assign(net_amount, before_discount) -> .assign(customer_share)  [1 column]
+samples/graph/chain.py:20:   .assign(net_amount, before_discount) -> .assign(is_large)  [1 column]
+samples/graph/chain.py:12:   reads from its source: columns=["discount","quantity","unit_price"]
+samples/graph/chain.py:28: margins: 2 steps, 2 columns
+samples/graph/chain.py:30:   (source columns) -> .assign(unit_margin)  [1 column]
+samples/graph/chain.py:31:   .assign(unit_margin) -> .assign(margin)  [1 column]
+samples/graph/chain.py:28:   reads from its source: columns=["quantity","unit_cost","unit_price"]
+samples/graph/chain.py:17: warning: The column before_discount from .assign(net_amount, before_discount) has the same formula as gross_amount from .assign(gross_amount), so the result holds one column twice. Keep one of them.
+samples/graph/chain.py:19: warning: .assign(customer_share) reads orders["net_amount"], and orders is the frame from before the chain, without the column net_amount that .assign(net_amount, before_discount) adds. The read raises KeyError, or reads old values when orders has such a column. Read it as pd.col("net_amount").
+```
+
+A pipeline in a statement of the module is named by the variable it is assigned to. A function
+that another pipeline runs as a step is read as that one step, and its own chain is not listed
+as a second pipeline. The functions of a file whose only pipelines are chains are also listed
+as [Hamilton nodes](#hamilton-modules), as they are without the chains, so the lines
+`orders -> features` and `inputs:` follow the pipelines in the full output of the file above.
 
 ### Hamilton modules
 
@@ -222,10 +261,13 @@ nodes.
 ### Output and exit code
 
 Output is text on a terminal and JSON otherwise. The JSON has `pipelines`, each with `name`,
-`file`, `line`, `steps`, `links` and `free`; `nodes`, each with `name`, `file`, `line`,
+`file`, `line`, `steps`, `links`, `source`, `source_complete` and `free`; `nodes`, each with `name`, `file`, `line`,
 `function`, `inputs`, `kind` and `config`; `inputs`, each with `name`, `optional` and `readers`;
 `unread`; and `problems`, each with `file`, `line`, `severity` and `message`. A step has `name`,
-`line`, `reads`, `columns` and `computed`. A link has `from`, `to` and `columns`.
+`kind`, `line`, `reads`, `columns` and `computed`, where `kind` is `function` or `link` for one
+`.assign(...)` of a chain. A link has `from`, `to` and `columns`. `source` holds the columns the
+pipeline reads from the frame it starts from, and `source_complete` is false when a step also
+reads columns that the file does not name.
 
 | Exit code | Meaning |
 | --- | --- |

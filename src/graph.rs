@@ -63,6 +63,62 @@ pub(crate) struct Graph {
     functions: usize,
 }
 
+/// The lines of one pipeline: its name, one line per step, the columns it reads from its
+/// source, and the steps whose order is free.
+fn pipeline_lines(placed: &PlacedPipeline) -> Vec<String> {
+    let mut lines = Vec::new();
+    let pipeline = &placed.pipeline;
+    let columns: usize = pipeline.steps.iter().map(|s| s.writes.len()).sum();
+    lines.push(format!(
+        "{}: {}: {}, {}",
+        place(&placed.file, pipeline.line),
+        pipeline.name,
+        count(pipeline.steps.len(), "step"),
+        count(columns, "column")
+    ));
+    for step in &pipeline.steps {
+        let from: Vec<&str> = pipeline
+            .links
+            .iter()
+            .filter(|link| link.to == step.name)
+            .map(|link| link.from.as_str())
+            .collect();
+        let from = if from.is_empty() {
+            "(source columns)".to_owned()
+        } else {
+            from.join(" + ")
+        };
+        let computed = if step.computed {
+            " and computed names"
+        } else {
+            ""
+        };
+        lines.push(format!(
+            "{}:   {from} -> {}  [{}{computed}]",
+            place(&placed.file, step.line),
+            step.name,
+            count(step.writes.len(), "column")
+        ));
+    }
+    if !pipeline.source.is_empty() {
+        let columns = Value::from(pipeline.source.clone());
+        let computed = if pipeline.source_is_complete() {
+            ""
+        } else {
+            " and computed names"
+        };
+        lines.push(format!(
+            "{}:   reads from its source: columns={columns}{computed}",
+            place(&placed.file, pipeline.line)
+        ));
+    }
+    let free = pipeline.free_steps();
+    if !free.is_empty() {
+        lines.push(format!("order is free for: {}", free.join(", ")));
+    }
+    lines
+}
+
 impl Graph {
     /// Reads `files` as the modules of one dataflow.
     ///
@@ -78,7 +134,7 @@ impl Graph {
             let src = fs::read_to_string(file)
                 .with_context(|| format!("cannot read {}", file.display()))?;
             let found = steps::read(&src);
-            let is_step_code = !found.is_empty();
+            let is_step_code = found.iter().any(Pipeline::runs_functions);
             for mut pipeline in found {
                 problems.extend(pipeline.findings.drain(..).map(|found| Problem {
                     file: file.clone(),
@@ -162,46 +218,7 @@ impl Graph {
 
     /// One line per node, then the inputs, the nodes nobody reads, and the problems.
     pub(crate) fn to_text(&self) -> String {
-        let mut lines = Vec::new();
-        for placed in &self.pipelines {
-            let pipeline = &placed.pipeline;
-            let columns: usize = pipeline.steps.iter().map(|s| s.writes.len()).sum();
-            lines.push(format!(
-                "{}: {}: {}, {}",
-                place(&placed.file, pipeline.line),
-                pipeline.name,
-                count(pipeline.steps.len(), "step"),
-                count(columns, "column")
-            ));
-            for step in &pipeline.steps {
-                let from: Vec<&str> = pipeline
-                    .links
-                    .iter()
-                    .filter(|link| link.to == step.name)
-                    .map(|link| link.from.as_str())
-                    .collect();
-                let from = if from.is_empty() {
-                    "(source columns)".to_owned()
-                } else {
-                    from.join(" + ")
-                };
-                let computed = if step.computed {
-                    " and computed names"
-                } else {
-                    ""
-                };
-                lines.push(format!(
-                    "{}:   {from} -> {}  [{}{computed}]",
-                    place(&placed.file, step.line),
-                    step.name,
-                    count(step.writes.len(), "column")
-                ));
-            }
-            let free = pipeline.free_steps();
-            if !free.is_empty() {
-                lines.push(format!("order is free for: {}", free.join(", ")));
-            }
-        }
+        let mut lines: Vec<String> = self.pipelines.iter().flat_map(pipeline_lines).collect();
         for node in &self.nodes {
             let inputs: Vec<String> = node
                 .def
@@ -309,6 +326,7 @@ impl Graph {
                     .map(|step| {
                         json!({
                             "name": step.name,
+                            "kind": step.kind.as_str(),
                             "line": step.line,
                             "reads": step.reads,
                             "columns": step.writes,
@@ -327,6 +345,8 @@ impl Graph {
                     "line": pipeline.line,
                     "steps": steps,
                     "links": links,
+                    "source": pipeline.source,
+                    "source_complete": pipeline.source_is_complete(),
                     "free": pipeline.free_steps(),
                 })
             })
