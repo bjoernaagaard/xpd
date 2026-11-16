@@ -2637,6 +2637,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "rayon",
+ "regex",
  "serde",
  "serde_json",
 ]

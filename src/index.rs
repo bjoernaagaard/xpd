@@ -1,12 +1,13 @@
 //! Source-only library discovery, and search by keywords and by meaning.
 use std::cell::OnceCell;
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
 use crate::embed::{DIMENSIONS, Model};
+use crate::outline::{self, Callable};
 use crate::{pack, venv};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
@@ -61,7 +62,95 @@ pub(crate) struct Index {
     pub(crate) recipes: Option<crate::recipe::Stats>,
 }
 
-/// Gets the public API from Griffe without importing the library.
+/// A function or method whose parameters an entry takes.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum Definition {
+    /// A definition in the source, by the file and the line where it starts.
+    Source {
+        name: String,
+        file: PathBuf,
+        line: usize,
+    },
+    /// A function that Griffe builds, such as the `__init__` of a dataclass, which has no
+    /// definition to read.
+    Built { parameters: Vec<String> },
+}
+
+/// A member as py/index.py writes it, with the definitions whose parameters it takes.
+#[derive(Debug, Deserialize)]
+struct ResolvedMember {
+    name: String,
+    definitions: Vec<Definition>,
+    summary: String,
+}
+
+/// An entry as py/index.py writes it: Griffe's public name and documentation, and the
+/// definitions whose parameters it takes.
+#[derive(Debug, Deserialize)]
+struct Resolved {
+    kind: Kind,
+    package: String,
+    name: String,
+    callable: Option<String>,
+    definitions: Vec<Definition>,
+    summary: String,
+    keywords: Vec<String>,
+    members: Vec<ResolvedMember>,
+    rules: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResolvedIndex {
+    schema_version: u32,
+    package: String,
+    version: String,
+    entries: Vec<Resolved>,
+}
+
+/// The functions and methods of each source file that an index reads, outlined once.
+#[derive(Debug, Default)]
+struct Sources(HashMap<PathBuf, Vec<Callable>>);
+
+impl Sources {
+    /// The parameters of `name`: those of each of its definitions, each name once, without
+    /// `self` and `cls`.
+    fn parameters(&mut self, name: &str, definitions: &[Definition]) -> Result<Vec<String>> {
+        let mut parameters: Vec<String> = Vec::new();
+        for definition in definitions {
+            let read = match definition {
+                Definition::Source {
+                    name: function,
+                    file,
+                    line,
+                } => {
+                    if !self.0.contains_key(file) {
+                        let src = std::fs::read_to_string(file)
+                            .with_context(|| format!("cannot read {}", file.display()))?;
+                        self.0.insert(file.clone(), outline::python_callables(&src));
+                    }
+                    let callable = (self.0[file].iter())
+                        .find(|c| c.line == *line && c.name == *function)
+                        .with_context(|| {
+                            format!("{name}: no {function} at {}:{line}", file.display())
+                        })?;
+                    &callable.parameters
+                }
+                Definition::Built { parameters } => parameters,
+            };
+            for parameter in read {
+                if !parameters.contains(parameter) {
+                    parameters.push(parameter.clone());
+                }
+            }
+        }
+        parameters.retain(|parameter| parameter != "self" && parameter != "cls");
+        Ok(parameters)
+    }
+}
+
+/// Gets the public API from Griffe without importing the library, and the parameters of each
+/// symbol from its source.
 pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<Index> {
     let output = std::process::Command::new(venv::project_python())
         .arg("-I")
@@ -77,8 +166,40 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         "{}",
         String::from_utf8_lossy(&output.stderr).trim()
     );
-    let mut index: Index =
+    let resolved: ResolvedIndex =
         serde_json::from_slice(&output.stdout).context("invalid Griffe index")?;
+    let mut sources = Sources::default();
+    let mut entries = Vec::with_capacity(resolved.entries.len());
+    for entry in resolved.entries {
+        let mut members = Vec::with_capacity(entry.members.len());
+        for member in entry.members {
+            let name = format!("{}.{}", entry.name, member.name);
+            members.push(Member {
+                parameters: sources.parameters(&name, &member.definitions)?,
+                name: member.name,
+                summary: member.summary,
+            });
+        }
+        entries.push(Entry {
+            parameters: sources.parameters(&entry.name, &entry.definitions)?,
+            kind: entry.kind,
+            package: entry.package,
+            name: entry.name,
+            callable: entry.callable,
+            summary: entry.summary,
+            keywords: entry.keywords,
+            members,
+            rules: entry.rules,
+            recipe: None,
+        });
+    }
+    let mut index = Index {
+        schema_version: resolved.schema_version,
+        package: resolved.package,
+        version: resolved.version,
+        entries,
+        recipes: None,
+    };
     ensure!(!index.entries.is_empty(), "Griffe found no public symbols");
     attach_rules(&mut index.entries, &[package])?;
     Ok(index)

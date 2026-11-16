@@ -1,4 +1,8 @@
-"""Write xpd entries from Griffe's static API model."""
+"""Write xpd entries from Griffe's static API model.
+
+Griffe resolves the public names and reads the documentation. Each entry names the definitions
+whose parameters it lists, by file and line, and xpd reads the parameters there.
+"""
 
 import ast
 import importlib.metadata
@@ -33,9 +37,27 @@ import griffe  # noqa: E402  Name the exact install command before importing the
 Unresolved = (griffe.AliasResolutionError, griffe.CyclicAliasError)
 
 
-class Member(TypedDict):
+class Source(TypedDict):
+    """A function that the source defines, where its definition starts."""
+
+    name: str
+    file: str
+    line: int
+
+
+class Built(TypedDict):
+    """A function that Griffe builds, such as the `__init__` of a dataclass, with its parameters."""
+
     name: str
     parameters: list[str]
+
+
+Definition = Source | Built
+
+
+class Member(TypedDict):
+    name: str
+    definitions: list[Definition]
     summary: str
 
 
@@ -44,7 +66,7 @@ class Entry(TypedDict):
     package: str
     name: str
     callable: str
-    parameters: list[str]
+    definitions: list[Definition]
     summary: str
     keywords: list[str]
     members: list[Member]
@@ -108,6 +130,7 @@ class Callables(griffe.Extension):
                     docstring=first.docstring,
                 )
                 function.overloads = overloads
+                function.extra["xpd"]["merged"] = True
                 obj.set_member(name, function)
 
     def on_attribute_instance(
@@ -133,7 +156,11 @@ class Callables(griffe.Extension):
 
         `plotly.figure_factory.create_hexbin_map` is imported when pandas is installed, and
         is otherwise `def create_hexbin_map(*args, **kwargs)`, which raises.
+
+        Record the file being read, because Griffe moves a function of a stub into the module
+        that the stub describes.
         """
+        func.extra["xpd"]["file"] = str(func.module.filepath)
         if not func.parent.is_module:
             return
         imported = self.imported.get(func.path)
@@ -252,12 +279,26 @@ def summary(obj: griffe.Object | griffe.Alias) -> str:
     return " ".join(paragraphs[0].split())
 
 
-def parameters(obj: griffe.Object | griffe.Alias) -> list[str]:
+def definitions(obj: griffe.Object | griffe.Alias) -> list[Definition]:
+    """The definitions whose parameters are the parameters of `obj`.
+
+    A class takes the parameters of its constructor. A function that only stubs declare, as
+    overloads, takes the parameters of every overload.
+    """
     if obj.is_class:
         obj = constructor(obj)
         if obj is None:
             return []
-    return [p.name for p in obj.parameters if p.name not in {"self", "cls"}]
+    function = obj.final_target if obj.is_alias else obj
+    overloads = function.overloads if function.extra["xpd"].get("merged") else [function]
+    return [definition(f) for f in overloads]
+
+
+def definition(function: griffe.Function) -> Definition:
+    file = function.extra["xpd"].get("file")
+    if file is None:
+        return Built(name=function.name, parameters=[p.name for p in function.parameters])
+    return Source(name=function.name, file=file, line=function.lineno)
 
 
 def members(obj: griffe.Class) -> list[Member]:
@@ -269,10 +310,10 @@ def members(obj: griffe.Class) -> list[Member]:
                 continue
             if member.is_function:
                 result.append(
-                    Member(name=name, parameters=parameters(member), summary=summary(member))
+                    Member(name=name, definitions=definitions(member), summary=summary(member))
                 )
             elif member.is_attribute and member.has_labels("property"):
-                result.append(Member(name=name, parameters=[], summary=summary(member)))
+                result.append(Member(name=name, definitions=[], summary=summary(member)))
         except Unresolved:
             continue
     return result
@@ -419,7 +460,7 @@ def entries(module: griffe.Module, imports: dict[str, tuple[str, bool]]) -> list
             package=package,
             name=path,
             callable="class" if target.is_class else "function",
-            parameters=parameters(target),
+            definitions=definitions(target),
             summary=summary(target),
             keywords=[" ".join(documentation(target).split("\nExamples\n", 1)[0].split())],
             members=members(target) if target.is_class else [],
