@@ -191,16 +191,23 @@ impl Rule {
     /// What the rule reports in the parsed file `root`: the matches of its ast-grep rule that
     /// `metadata.holds` keeps, or nothing when `metadata.unlessImported` silences the file.
     /// `disk` is where the file is, from which its imports are followed. Without it no import
-    /// is read.
+    /// is read. Value proofs require a current import binding from the pack's `library`.
     pub(crate) fn matches<'r>(
         &self,
         root: &'r Root,
         disk: Option<&Path>,
+        library: &str,
     ) -> Vec<NodeMatch<'r, StrDoc<SupportLang>>> {
         let proven = |found: &NodeMatch<'r, StrDoc<SupportLang>>| {
-            self.holds.iter().all(|(variable, shape)| {
-                (found.get_env().get_match(variable)).is_none_or(|usage| names::holds(usage, shape))
-            })
+            let context = found.ancestors().find(|node| {
+                node.parent()
+                    .is_some_and(|parent| matches!(&*parent.kind(), "block" | "module"))
+            });
+            context.is_none_or(|context| names::imports_match(found, &context))
+                && self.holds.iter().all(|(variable, shape)| {
+                    (found.get_env().get_match(variable))
+                        .is_none_or(|usage| names::holds(usage, shape, library))
+                })
         };
         let found: Vec<_> = (root.root().find_all(&self.config.matcher))
             .filter(proven)

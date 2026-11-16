@@ -7,7 +7,11 @@
 
 use std::collections::HashSet;
 
-use ast_grep_core::Matcher;
+use ast_grep_core::matcher::MatcherExt;
+use ast_grep_core::meta_var::MetaVariable;
+use ast_grep_core::tree_sitter::StrDoc;
+use ast_grep_core::{Matcher, NodeMatch};
+use ast_grep_language::SupportLang;
 
 use crate::scan::Node;
 
@@ -43,15 +47,16 @@ struct Parameter<'t> {
 /// A value reaches a variable through its nearest earlier assignment, through another variable
 /// assigned to it, or, for a parameter, through the argument of each call of its function. An
 /// annotation that `proof` matches, as in `fig: go.Figure`, stands for the value. The variable
-/// is proven when `proof` matches each of them, and there is at least one.
-pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M) -> bool {
+/// is proven when `proof` matches each of them, its constructor or type is bound to an import
+/// of `library`, and there is at least one.
+pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M, library: &str) -> bool {
     let mut proven = false;
     // A function that passes its own parameter on to itself adds no value, so a variable that
     // was followed once is not followed again.
     let mut followed = HashSet::new();
     let mut open = vec![usage.clone()];
     while let Some(value) = open.pop() {
-        if value.matches(proof) {
+        if matches(&value, proof, library) {
             proven = true;
             continue;
         }
@@ -66,7 +71,7 @@ pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M) -> bool {
         };
         if origin
             .annotation
-            .is_some_and(|annotation| annotation.matches(proof))
+            .is_some_and(|annotation| matches(&annotation, proof, library))
         {
             proven = true;
             continue;
@@ -81,6 +86,187 @@ pub(crate) fn holds<M: Matcher>(usage: &Node<'_>, proof: &M) -> bool {
         open.extend(values);
     }
     proven
+}
+
+/// Matches a value only when the imports captured by the shape still bind its aliases.
+fn matches<M: Matcher>(value: &Node<'_>, proof: &M, library: &str) -> bool {
+    proof
+        .match_node(value.clone())
+        .is_some_and(|found| imports_match(&found, value) && library_value(value, library))
+}
+
+/// The constructor or annotation must start at a name currently imported from this library.
+/// Follow method chains to their constructor, without treating data arguments as imports.
+fn library_value(value: &Node<'_>, library: &str) -> bool {
+    match &*value.kind() {
+        "call" => value
+            .field("function")
+            .is_some_and(|function| library_value(&function, library)),
+        "attribute" => value
+            .field("object")
+            .is_some_and(|object| library_value(&object, library)),
+        "type" => value
+            .named_children()
+            .next()
+            .is_some_and(|child| library_value(&child, library)),
+        "identifier" => value.root().root().dfs().any(|bound| {
+            bound.kind() == "identifier"
+                && bound.text() == value.text()
+                && import_binding(&bound).is_some_and(|module| {
+                    (module == library
+                        || module
+                            .strip_prefix(library)
+                            .is_some_and(|tail| tail.starts_with('.')))
+                        && imported_at(value, &bound)
+                })
+        }),
+        _ => false,
+    }
+}
+
+/// The module or member an import binds to this identifier, including `from` imports.
+fn import_binding(bound: &Node<'_>) -> Option<String> {
+    let item = bound.parent()?;
+    let (name, import, aliased) = match &*item.kind() {
+        "aliased_import" if field_is(&item, "alias", bound) => {
+            (item.field("name")?, item.parent()?, true)
+        }
+        "dotted_name" if item.child(0)?.node_id() == bound.node_id() => {
+            (item.clone(), item.parent()?, false)
+        }
+        _ => return None,
+    };
+    match &*import.kind() {
+        "import_statement" => Some(if aliased {
+            name.text().into_owned()
+        } else {
+            bound.text().into_owned()
+        }),
+        "import_from_statement" if !field_is(&import, "module_name", &name) => Some(format!(
+            "{}.{}",
+            import.field("module_name")?.text(),
+            name.text()
+        )),
+        _ => None,
+    }
+}
+
+/// Checks the import aliases a syntactic match used, at their references in `context`.
+/// ast-grep unifies repeated captures by text, so the capture can point at the import rather
+/// than the reference. Both must refer to the same binding, not merely spell the same name.
+pub(crate) fn imports_match(
+    found: &NodeMatch<'_, StrDoc<SupportLang>>,
+    context: &Node<'_>,
+) -> bool {
+    let env = found.get_env();
+    env.get_matched_variables().all(|variable| {
+        let MetaVariable::Capture(name, _) = variable else {
+            return true;
+        };
+        let Some(alias) = env.get_match(&name) else {
+            return true;
+        };
+        let Some(import) = alias.parent().filter(|p| p.kind() == "aliased_import") else {
+            return true;
+        };
+        if !field_is(&import, "alias", alias) {
+            return true;
+        }
+        context
+            .dfs()
+            .filter(|node| {
+                node.kind() == "identifier"
+                    && node.text() == alias.text()
+                    && !is_bound(node)
+                    && !node.parent().is_some_and(|parent| {
+                        (parent.kind() == "attribute" && field_is(&parent, "attribute", node))
+                            || (parent.kind() == "keyword_argument"
+                                && field_is(&parent, "name", node))
+                    })
+            })
+            .all(|usage| imported_at(&usage, alias))
+    })
+}
+
+/// Whether an alias still comes from this import at a reference. Uncertain control flow ends
+/// the proof. Function locals shadow outer names throughout their scope, even before a write.
+fn imported_at(usage: &Node<'_>, alias: &Node<'_>) -> bool {
+    let name = usage.text();
+    let Some(mut statement) = statement_around(usage.clone()) else {
+        return false;
+    };
+    loop {
+        if scope_binds(&statement, &name) {
+            return false;
+        }
+        if let Some(binder) = statement
+            .prev_all()
+            .find(|earlier| scope_binds(earlier, &name))
+        {
+            return matches!(
+                &*binder.kind(),
+                "import_statement" | "import_from_statement"
+            ) && binder
+                .dfs()
+                .filter(|node| node.kind() == "identifier" && node.text() == name && is_bound(node))
+                .last()
+                .is_some_and(|bound| {
+                    import_binding(&bound)
+                        .zip(import_binding(alias))
+                        .is_some_and(|(actual, expected)| actual == expected)
+                });
+        }
+        let Some(owner) = statement.parent().and_then(|parent| parent.parent()) else {
+            return false;
+        };
+        if owner.kind() == "function_definition"
+            && (parameter(&owner, &name).is_some()
+                || owner.field("parameters").is_some_and(|parameters| {
+                    parameters
+                        .dfs()
+                        .filter(|node| {
+                            matches!(
+                                &*node.kind(),
+                                "list_splat_pattern" | "dictionary_splat_pattern"
+                            )
+                        })
+                        .any(|node| {
+                            node.named_children()
+                                .any(|bound| bound.kind() == "identifier" && bound.text() == name)
+                        })
+                })
+                || owner
+                    .field("body")
+                    .is_some_and(|body| scope_binds(&body, &name)))
+        {
+            return false;
+        }
+        let Some(outer) = statement_around(owner) else {
+            return false;
+        };
+        // A free name is read when the function runs, which can be after a later rebinding.
+        if statement
+            .ancestors()
+            .any(|node| node.kind() == "function_definition")
+            && outer.next_all().any(|later| scope_binds(&later, &name))
+        {
+            return false;
+        }
+        statement = outer;
+    }
+}
+
+/// Bindings visible to the surrounding scope, excluding the bodies of nested definitions.
+fn scope_binds(node: &Node<'_>, name: &str) -> bool {
+    if matches!(&*node.kind(), "function_definition" | "class_definition") {
+        return node.field("name").is_some_and(|bound| bound.text() == name)
+            || node
+                .named_children()
+                .filter(|child| child.kind() != "block")
+                .any(|child| scope_binds(&child, name));
+    }
+    (node.kind() == "identifier" && node.text() == name && is_bound(node))
+        || node.named_children().any(|child| scope_binds(&child, name))
 }
 
 /// What gives the name at `usage` its value there. `None` when something other than a plain

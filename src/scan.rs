@@ -194,7 +194,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
         for rule in pack.rules.iter().filter(|rule| rule.runs_on(file.path)) {
-            for m in rule.matches(&root, file.disk) {
+            for m in rule.matches(&root, file.disk, pack.module) {
                 let start = m.start_pos();
                 let edit = usable_edit(rule, &m, &unbound, src);
                 let issue = Issue {
@@ -241,7 +241,7 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
             if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(file.path) {
                 continue;
             }
-            for m in rule.matches(&root, file.disk) {
+            for m in rule.matches(&root, file.disk, pack.module) {
                 edits.extend(usable_edit(rule, &m, &unbound, src));
             }
         }
