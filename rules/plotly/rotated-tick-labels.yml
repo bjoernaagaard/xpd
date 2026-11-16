@@ -1,0 +1,149 @@
+# Tufte, vdqi.md line 7970, printed page 183, lists as friendly "words run from left to right, the
+# usual direction for reading occidental languages" and as unfriendly "words run vertically,
+# particularly along the Y-axis; words run in several different directions". Line 4001, printed
+# page 105, turns a vertical label "to read from left to right rather than bottom to top".
+#
+# plotly 7.1.0 keeps a tickangle as written: update_xaxes(tickangle=-90) resolved to -90 and the
+# two category labels of a bar chart were drawn rotated, where px.bar(orientation="h") with the
+# categories on y drew every tick label level (runs/behavior.txt). The rule reads a number other
+# than 0 on an x or y axis of a plotly figure. It is info and has no fix, because tickangle=0 can
+# make long labels run into each other, and the level layout swaps x and y.
+id: rotated-tick-labels
+language: python
+severity: info
+message: tickangle=$A turns the tick labels away from the horizontal. Tufte lists words that run from left to right as friendly and words that run vertically as unfriendly. For long category names, put the categories on y, as px.bar(orientation="h") does, and the labels stay level.
+rule:
+  any:
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^(tickangle)$' }
+        - has: { field: value, pattern: $A, matches: tilted }
+        - inside:
+            kind: argument_list
+            inside:
+              kind: call
+              any:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_[xy]axes$' } }, { has: { field: object, matches: figure } }] }
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^[XY]Axis$' } }, { has: { field: object, kind: attribute, has: { field: object, matches: go } } }] }
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^[xy]axis[0-9]*_(tickangle)$' }
+        - has: { field: value, pattern: $A, matches: tilted }
+        - inside:
+            kind: argument_list
+            inside:
+              kind: call
+              any:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Layout$' } }, { has: { field: object, matches: go } }] }
+    - any: [{ kind: keyword_argument, has: { field: name, regex: '^(tickangle)$' } }, { kind: pair, has: { field: key, regex: '^["''](tickangle)["'']$' } }]
+      all:
+        - has: { field: value, pattern: $A, matches: tilted }
+        - inside:
+            any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+            inside:
+              stopBy: { kind: argument_list }
+              any: [{ kind: keyword_argument, has: { field: name, regex: '^[xy]axis[0-9]*$' } }, { kind: pair, has: { field: key, regex: '^["''][xy]axis[0-9]*["'']$' } }]
+              inside: { stopBy: end, matches: layout-call }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that sets layout: update_layout on a plotly figure, go.Layout or go.Figure.
+  layout-call:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+  # A written angle that is not level: any number but 0, 180 and 360, with or without a sign.
+  tilted:
+    any:
+      - any: [{ kind: integer }, { kind: float }]
+      - { kind: unary_operator, has: { field: argument, any: [{ kind: integer }, { kind: float }] } }
+    not: { regex: '^[-+]?(0+|180|360)(\.0*)?$' }

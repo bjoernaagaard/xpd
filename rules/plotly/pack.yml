@@ -1,0 +1,17 @@
+# The plotly pack. Every other .yml file in this folder is a rule.
+#
+# The rules apply Edward Tufte's "The Visual Display of Quantitative Information", second
+# edition, to plotly figures. Each rule file quotes the book with the line of the quote in the
+# Markdown copy of the book that the research used, vdqi.md.
+
+# The short names the plotly documentation imports its modules by. A fix that writes `px.`,
+# `go.` or `pio.` applies only in a file that imports the module under that name, and elsewhere
+# the issue has no fix. No fix of this pack writes one of them, because each fix rewrites one
+# value the code already has.
+aliases:
+  px: plotly.express
+  go: plotly.graph_objects
+  pio: plotly.io
+
+# The pack has no package check. plotly draws every figure of these rules without a second
+# package.

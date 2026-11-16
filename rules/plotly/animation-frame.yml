@@ -1,0 +1,39 @@
+# Tufte on small multiples, vdqi.md line 6842, printed page 170: "Small multiples resemble the
+# frames of a movie: a series of graphics, showing the same combination of variables, indexed by
+# changes in another variable." Line 7041, printed page 175, lists them as "inevitably
+# comparative". Line 6797, printed page 168: "Maximize data density and the size of the data
+# matrix, within reason."
+#
+# animation_frame shows one frame at a time. On plotly 7.1.0, px.scatter of the gapminder data
+# with animation_frame="year" made 12 frames and drew 142 of the 1,704 rows at once. The same call
+# with facet_col="year" and facet_col_wrap=4 drew 12 panels with all 1,704 rows
+# (runs/behavior.txt). The 28 px functions are the ones whose signature has animation_frame
+# (runs/lists.txt). The rule is info and has no fix, because the panels need room, and with many
+# frames an animation can be the better choice.
+id: animation-frame
+language: python
+severity: info
+message: $F shows one frame at a time, so the reader compares the frames from memory. On the gapminder data it drew 142 of 1,704 rows at once, where facet_col with facet_col_wrap=4 drew all of them in 12 panels. Tufte's small multiples put the frames side by side. Use facet_col when the frames are few enough to fit.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|bar_polar|box|choropleth|choropleth_map|density_contour|density_heatmap|density_map|ecdf|funnel|histogram|imshow|line|line_3d|line_geo|line_map|line_polar|line_ternary|scatter|scatter_3d|scatter_geo|scatter_map|scatter_polar|scatter_ternary|strip|timeline|violin)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, pattern: $F, all: [{ has: { field: name, regex: '^animation_frame$' } }, { has: { field: value, kind: string } }] } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

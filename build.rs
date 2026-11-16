@@ -37,6 +37,7 @@ const PACK_HEADINGS: &[(&str, &str)] = &[
     ("linearmodels", "linearmodels"),
     ("arch", "arch"),
     ("pymoo", "pymoo"),
+    ("plotly", "plotly"),
     ("Hamilton", "hamilton"),
     ("Python", "python"),
 ];

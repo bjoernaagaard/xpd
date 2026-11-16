@@ -1,0 +1,37 @@
+# Tufte, vdqi.md line 3877, printed page 100: "Erase redundant data-ink, within reason."
+#
+# color= with the column that x= or y= already shows encodes one variable twice. On plotly 7.1.0,
+# px.bar(x="day", y="tip") drew one trace and no legend. With color="day" as well it drew four
+# traces and a legend of four entries, Fri, Sat, Sun and Thur, the same four words as the tick
+# labels of the x axis. With color="tip" it drew a colorbar for the numbers that the bar heights
+# show (runs/behavior.txt). The rule compares the two column names as written strings. The 13 px
+# functions are the ones whose signature has color, x and y (runs/lists.txt). The rule is info and
+# has no fix, because one color for each category can be meant to match another chart.
+id: redundant-color
+language: python
+severity: info
+message: color=$C repeats the column that $A already shows, so the chart encodes one variable twice and adds a legend or a colorbar for it. With x="day" and color="day" the legend held the same four names as the axis. Tufte asks to erase redundant data-ink. Drop color, or use it for another variable.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|density_contour|ecdf|funnel|histogram|line|line_3d|scatter|scatter_3d|strip|violin)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(color)$' } }, { has: { field: value, kind: string, pattern: $C } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, pattern: $A, regex: '^[xy]$' } }, { has: { field: value, kind: string, pattern: $C } }] } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

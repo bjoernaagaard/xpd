@@ -1,0 +1,62 @@
+# Tufte, vdqi.md line 7884, printed page 180: "integrate the caption and legend into the design so
+# that the eye is not required to dart back and forth between textual material and the graphic."
+# Line 7978, printed page 183, on friendly graphics: "labels are placed on the graphic itself; no
+# legend is required".
+#
+# A go.Figure with two named traces resolved to showlegend=True on plotly 7.1.0 and drew a legend
+# of two entries. The same two lines with mode="lines+text", a text label at the last point and
+# showlegend=False drew no legend and the names beside the lines (runs/behavior.txt).
+#
+# The rule cannot count traces at run time, so it reads the one form where the code shows the
+# count: a go.Figure whose data is a written list of two to four go.Scatter calls, each with a
+# name. It is silent when the file names showlegend, an annotation or a text mode anywhere,
+# because the labels may then be on the graphic. It is info and has no fix, because where a label
+# fits depends on the data.
+id: legend-instead-of-labels
+language: python
+severity: info
+message: This figure names its few lines in a legend, so the reader looks back and forth between the legend and the lines. Tufte asks for labels on the graphic itself, with no legend required. Write each name at the end of its line with mode="lines+text" and text, or with fig.add_annotation, and set showlegend=False.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+    - has:
+        field: arguments
+        any:
+          - has: { nthChild: 1, matches: named-lines }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^data$' } }, { has: { field: value, matches: named-lines } }] }
+    - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A list of two to four go.Scatter calls, each with a name and none drawn as markers alone.
+  named-lines:
+    kind: list
+    all:
+      - has: { nthChild: 1, matches: named-line }
+      - has: { nthChild: 2, matches: named-line }
+      - not: { has: { nthChild: 3, not: { matches: named-line } } }
+      - not: { has: { nthChild: 4, not: { matches: named-line } } }
+      - not: { has: { nthChild: 5 } }
+  named-line:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(name)$' } } }
+      - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } } }
+      - not: { has: { field: arguments, has: { kind: dictionary_splat } } }

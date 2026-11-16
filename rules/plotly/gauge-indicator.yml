@@ -1,0 +1,38 @@
+# Tufte, vdqi.md line 6797, printed page 168: "Maximize data density and the size of the data
+# matrix, within reason." Line 4588, printed page 116, names the graphic that "purveys Graphical
+# Style rather than quantitative information" a duck.
+#
+# A gauge shows one number. On plotly 7.1.0, go.Indicator(mode="gauge+number", value=270) drew 8
+# paths and 7 text elements for it, and the same value with the default mode "number" drew 0 paths
+# and 2 text elements (runs/behavior.txt). The gauge is drawn only when mode names it: a gauge
+# argument with the default mode drew no dial, so the rule reads the mode string. A gauge with the
+# shape "bullet" is a bar and not a dial, so it is left alone. The rule has no fix, because a
+# gauge may carry a threshold that the number alone does not show.
+id: gauge-indicator
+language: python
+severity: info
+message: A gauge spends a dial on one number. mode="gauge+number" drew 8 shapes and 7 labels for a value that mode="number" shows with 2 labels. Tufte asks for more data in the same space, and calls a graphic that sells style a duck. Show the number with mode="number+delta", or put a series of values in one small chart.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Indicator)$' } }, { has: { field: object, matches: go } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, kind: string, regex: 'gauge'  } }] } }
+    - not: { has: { stopBy: end, kind: string, regex: 'bullet' } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

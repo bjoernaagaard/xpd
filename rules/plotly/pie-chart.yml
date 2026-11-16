@@ -1,0 +1,84 @@
+# Tufte, vdqi.md line 7166, printed page 178: "A table is nearly always better than a dumb pie
+# chart; the only worse design than a pie chart is several of them, for then the viewer is asked
+# to compare quantities located in spatial disarray both within and between pies ... Given their
+# low data-density and failure to order numbers along a visual dimension, pie charts should never
+# be used."
+#
+# px.pie and go.Pie resolve to a trace of type "pie" on plotly 7.1.0, with or without hole
+# (runs/behavior.txt). The rule has no fix, because a bar chart or a table is another figure.
+id: pie-chart
+language: python
+severity: warning
+message: A pie chart puts no numbers along a common scale, so the reader compares angles. Tufte writes that pie charts should never be used and that a table is nearly always better. Show the shares as a sorted px.bar, or as a go.Table when they are few.
+rule:
+  kind: call
+  any:
+    - all:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(pie)$' } }, { has: { field: object, matches: px } }] }
+        - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(facet_col|facet_row)$' } }, { not: { has: { field: value, kind: none } } }] } } }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# Several pies. px.pie with facet_col="sex" drew two pie traces side by side, and four with
+# facet_row as well (runs/behavior.txt). A facet given as None is left to the first document.
+id: pie-chart
+language: python
+severity: warning
+message: px.pie with $F draws one pie for each group, and Tufte calls several pies the only design worse than one pie, because shares must be compared within and between them. Draw px.bar with the same facet, where every panel shares one scale.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(pie)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, pattern: $F, all: [{ has: { field: name, regex: '^(facet_col|facet_row)$' } }, { not: { has: { field: value, kind: none } } }] } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
