@@ -336,7 +336,12 @@ fn lint<'d>(
 ) -> Result<(&'d Document, &'d Linted)> {
     if document.linted.is_none() {
         let packs = Rc::clone(&workspace.project(&document.place.root)?.packs);
-        let found = scan::lint_source(&document.place.path, &document.text, &packs);
+        let disk = document.place.disk();
+        let file = scan::File {
+            path: &document.place.path,
+            disk: Some(&disk),
+        };
+        let found = scan::lint_source(file, &document.text, &packs);
         document.linted = Some(Linted { packs, found });
     }
     let document: &'d Document = document;
@@ -667,14 +672,19 @@ impl<'c> Server<'c> {
     }
 
     /// A save is when the project may have changed too, for example after `uv add`, so the
-    /// server reads the venv again.
+    /// server reads the venv again. The saved file can also be a module that another open
+    /// document imports, which a rule reads from disk, so the documents of the project are
+    /// linted again.
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> Result<()> {
         let uri = params.text_document.uri;
         let Some(document) = self.documents.get(uri.as_str()) else {
             return Ok(());
         };
         let root = document.place.root.clone();
-        self.refresh_project(&root)
+        self.workspace.refresh(&root)?;
+        self.publish_package_issues(&root)?;
+        self.lint_again(&root);
+        Ok(())
     }
 
     #[expect(
@@ -750,9 +760,15 @@ impl<'c> Server<'c> {
     fn refresh_project(&mut self, root: &Path) -> Result<()> {
         let rules_changed = self.workspace.refresh(root)?;
         self.publish_package_issues(root)?;
-        if !rules_changed {
-            return Ok(());
+        if rules_changed {
+            self.lint_again(root);
         }
+        Ok(())
+    }
+
+    /// Drops the issues of every open document of the project in `root`, and has the client
+    /// show the new ones.
+    fn lint_again(&mut self, root: &Path) {
         let documents = self.documents.iter_mut();
         for (key, document) in documents.filter(|(_, document)| document.place.root == root) {
             document.linted = None;
@@ -763,7 +779,6 @@ impl<'c> Server<'c> {
         if self.client.delivery == Delivery::Pull(Refresh::Supported) {
             self.ask_to_pull_again();
         }
-        Ok(())
     }
 
     /// Takes back the package warnings of the project in `root`, after its last document
@@ -985,12 +1000,13 @@ impl<'c> Server<'c> {
         // Without an issue that has a fix of the allowed level, the pass below changes nothing.
         let fixable = |found: &Found| found.issue.fix.is_some_and(|level| level <= allowed);
         if wants(only, &FIX_ALL) && linted.found.iter().any(fixable) {
-            let (fixed, count) = scan::fix_source(
-                &document.place.path,
-                document.text.clone(),
-                &linted.packs,
-                allowed,
-            );
+            let disk = document.place.disk();
+            let file = scan::File {
+                path: &document.place.path,
+                disk: Some(&disk),
+            };
+            let (fixed, count) =
+                scan::fix_source(file, document.text.clone(), &linted.packs, allowed);
             if count > 0 {
                 let change = changed_part(&document.text, &fixed);
                 actions.push(CodeAction {

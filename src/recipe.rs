@@ -504,10 +504,14 @@ fn validate(code: String, package: &str, packs: &[pack::Pack]) -> Option<Verifie
     {
         return None;
     }
-    let path = Path::new("recipe.py");
-    let clean = scan::lint_source(path, &code, packs).is_empty();
-    let (code, fixes) = scan::fix_source(path, code, packs, Applicability::Unsafe);
-    if !complete(&code) || !scan::lint_source(path, &code, packs).is_empty() {
+    // A recipe is in no file, so no import of it is followed.
+    let file = scan::File {
+        path: Path::new("recipe.py"),
+        disk: None,
+    };
+    let clean = scan::lint_source(file, &code, packs).is_empty();
+    let (code, fixes) = scan::fix_source(file, code, packs, Applicability::Unsafe);
+    if !complete(&code) || !scan::lint_source(file, &code, packs).is_empty() {
         return None;
     }
     let symbols = symbols(&code, package);

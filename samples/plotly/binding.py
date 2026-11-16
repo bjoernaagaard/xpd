@@ -78,7 +78,7 @@ def figure_variables():
 
 
 def tilt(fig):
-    # The rule cannot see what a caller passes in, so a parameter is left alone.
+    # One call below passes a Drawing, so the parameter is left alone.
     return fig.update_xaxes(tickangle=-90)
 
 

@@ -1,15 +1,25 @@
 //! One lint rule: an ast-grep rule, plus the settings xpd reads from its `metadata`.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
-use anyhow::{Context, Error, Result, bail};
-use ast_grep_config::RuleConfig;
+use anyhow::{Context, Error, Result, bail, ensure};
+use ast_grep_config::{RuleConfig, SerializableRule};
+use ast_grep_core::NodeMatch;
+use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_language::SupportLang;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
+use crate::imports;
+use crate::names;
+use crate::scan::Root;
 use crate::version::Version;
+
+/// A shape of code that a rule's metadata names, as an ast-grep rule that can use the `utils`
+/// of its document.
+type Shape = ast_grep_config::Rule;
 
 /// Whether a fix keeps the code's behavior. `xpd check --fix` applies safe fixes, and
 /// `--unsafe-fixes` adds the unsafe ones. The order matters: a fix applies when its
@@ -31,12 +41,19 @@ impl Applicability {
 }
 
 /// What a rule's `metadata` may hold, such as `metadata: { fix: unsafe, since: "3.1" }`.
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Metadata {
     fix: Option<Applicability>,
     since: Option<Version>,
     until: Option<Version>,
+    /// `holds: { FIG: <rule> }` keeps a match only when the variable that `$FIG` matched holds
+    /// a value of the rule's shape.
+    #[serde(default)]
+    holds: BTreeMap<String, SerializableRule>,
+    /// `unlessImported: <rule>` drops the matches in a file that imports a module of its
+    /// project with a node of the rule's shape.
+    unless_imported: Option<SerializableRule>,
 }
 
 /// One rule document of a pack.
@@ -53,6 +70,14 @@ pub(crate) struct Rule {
     files: Option<GlobSet>,
     /// The rule's `ignores:` globs. The rule skips a path that matches one.
     ignores: Option<GlobSet>,
+    /// From `metadata.holds`: each variable of the rule that must hold a value of a shape,
+    /// which `names::holds` proves from the file. A match that does not bind the variable is
+    /// kept, so a rule can match `px.bar(...).update_xaxes(...)` and `fig.update_xaxes(...)`
+    /// in one `any`.
+    holds: Vec<(String, Shape)>,
+    /// From `metadata.unlessImported`: a shape that silences the rule on a file when a module
+    /// the file loads has it, such as a module that sets a default for the whole process.
+    unless_imported: Option<Shape>,
 }
 
 /// One entry of a rule's `files:` or `ignores:`, as ast-grep writes it.
@@ -97,7 +122,7 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
             Some(metadata) => serde_json::to_value(metadata)
                 .and_then(serde_json::from_value)
                 .context(
-                    "metadata may hold fix: safe or unsafe, since: \"<version>\" and until: \"<version>\"",
+                    "metadata may hold fix: safe or unsafe, since: \"<version>\", until: \"<version>\", holds: { <VARIABLE>: <rule> } and unlessImported: <rule>",
                 )?,
             None => Metadata::default(),
         };
@@ -110,6 +135,25 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
         };
         let files = config.files.as_ref().map(glob_set).transpose()?;
         let ignores = config.ignores.as_ref().map(glob_set).transpose()?;
+        // The document's own environment, so that a shape can say `matches: <one of its utils>`.
+        let env = config.matcher.get_env(config.language);
+        let shape = |rule: SerializableRule| -> Result<Shape> {
+            let shape = env.deserialize_rule(rule)?;
+            shape.verify_util()?;
+            Ok(shape)
+        };
+        let holds = (metadata.holds.into_iter())
+            .map(|(variable, rule)| {
+                ensure!(
+                    config.matcher.defined_vars().contains(variable.as_str()),
+                    "metadata.holds names ${variable}, which the rule does not match"
+                );
+                let shape = shape(rule).with_context(|| format!("metadata.holds.{variable}"))?;
+                Ok((variable, shape))
+            })
+            .collect::<Result<_>>()?;
+        let unless_imported =
+            (metadata.unless_imported.map(shape).transpose()).context("metadata.unlessImported")?;
         Ok(Self {
             config,
             fix,
@@ -117,6 +161,8 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
             until: metadata.until,
             files,
             ignores,
+            holds,
+            unless_imported,
         })
     }
 }
@@ -140,6 +186,30 @@ impl Rule {
     pub(crate) fn runs_on(&self, path: &Path) -> bool {
         !self.ignores.as_ref().is_some_and(|set| set.is_match(path))
             && self.files.as_ref().is_none_or(|set| set.is_match(path))
+    }
+
+    /// What the rule reports in the parsed file `root`: the matches of its ast-grep rule that
+    /// `metadata.holds` keeps, or nothing when `metadata.unlessImported` silences the file.
+    /// `disk` is where the file is, from which its imports are followed. Without it no import
+    /// is read.
+    pub(crate) fn matches<'r>(
+        &self,
+        root: &'r Root,
+        disk: Option<&Path>,
+    ) -> Vec<NodeMatch<'r, StrDoc<SupportLang>>> {
+        let proven = |found: &NodeMatch<'r, StrDoc<SupportLang>>| {
+            self.holds.iter().all(|(variable, shape)| {
+                (found.get_env().get_match(variable)).is_none_or(|usage| names::holds(usage, shape))
+            })
+        };
+        let found: Vec<_> = (root.root().find_all(&self.config.matcher))
+            .filter(proven)
+            .collect();
+        let silenced = !found.is_empty()
+            && (self.unless_imported.as_ref().zip(disk)).is_some_and(|(setting, disk)| {
+                imports::any_loaded(disk, root, |module| module.root().find(setting).is_some())
+            });
+        if silenced { Vec::new() } else { found }
     }
 }
 

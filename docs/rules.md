@@ -9483,13 +9483,31 @@ proof.
 
 A rule about a method, such as `fig.update_xaxes(...)`, needs proof that the object is a plotly
 figure. The method is called on the call that makes the figure, as in
-`px.bar(...).update_xaxes(...)`, or on a variable that was assigned from such a call at most 12
-statements earlier in the same block. A second assignment to the variable, a loop variable or
-a `with ... as` of the same name between the two ends the proof, and so does a parameter. A
-figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure.
+`px.bar(...).update_xaxes(...)`, or on a variable that holds one. xpd follows the variable to
+its value in three ways:
+
+- The nearest earlier statement that binds the variable is an assignment from such a call,
+  however many statements lie between the two. The statement is in the same block as the
+  method call or in a block around it, up to the start of the function. A variable assigned
+  from another variable, as in `chart = fig`, holds what that one held.
+- The variable is a parameter with the annotation `go.Figure` or `go.FigureWidget`, or an
+  assignment gives it that annotation, as in `fig: go.Figure = load()`.
+- The variable is a parameter without that annotation, and every call of its function in the
+  file passes a plotly figure. The function must be called at least once, by its name alone.
+  A method, a function with a decorator, a function that is passed on as a value and a call
+  with `*args` or `**kwargs` give no proof, because the file does not show every argument.
+
+Any other binding of the name on the way ends the proof: a second assignment that is not a
+figure, a loop variable, a `with ... as`, an import, a `def` or a `del` of the same name, and an
+assignment inside an `if` or a loop that stands before the method call or around it. A function
+that is defined in one module and called from another is not followed, so its parameter needs
+the annotation.
+
+A figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure.
 What it holds is proved by the statements after the assignment: an `add_trace` of a `go.Bar`
 makes it a bar chart for [`bar-axis-without-zero`](#bar-axis-without-zero), when no second
 assignment of the name comes between the two.
+The annotation `go.Figure` alone does not prove a bar chart.
 
 A rule reads a value only where it is written in the call: a number, a string, `True` or
 `None`. A name in that place may hold any value, so the rule is silent.
@@ -9568,6 +9586,13 @@ them. Every new report of a rule with 20 or fewer was read, and 20 of each form 
   `marker-size-diameter` reads `go.scatter.Marker(size=...)` and a column read as
   `df.pop_total`. Neither form is in this code with a value the rule reads.
 
+xpd then began to follow a variable to its value itself, where the rules had walked back at
+most 12 statements, and the table gives the counts after that too. It adds 10 reports of
+`boxed-axis-frame` and 4 of `rotated-tick-labels`, and takes none away. All 14 were read: each
+is on a figure that `go.Figure()` or `make_subplots(...)` made 58 to 133 lines before the
+method call. The code holds 27 functions that call a figure method on a parameter, and none of
+them holds a setting that a rule reports, so no report comes from a parameter.
+
 | Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Fix |
 | --- | --- | --- | --- | --- | --- |
 | [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 1, 0, 6 | none |
@@ -9579,7 +9604,7 @@ them. Every new report of a rule with 20 or fewer was read, and 20 of each form 
 | [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel. Drawn: bars of 5 and 10 equally tall | 2, 0, 2 | none |
 | [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 102, 18, 231 | unsafe |
 | [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | unsafe |
-| [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 2, 1, 13 | none |
+| [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 7, 1, 18 | none |
 | [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels. Drawn: 3 shades for 3 bar lengths | 16, 0, 87 | none |
 | [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
 | [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
@@ -9591,7 +9616,7 @@ them. Every new report of a rule with 20 or fewer was read, and 20 of each form 
 | [`heatmap-smoothing`](#heatmap-smoothing) | info | 92 | drawn: 252 colors for a grid of two values | 2, 0, 0 | unsafe |
 | [`table-for-small-data`](#table-for-small-data) | info | 56 | drawn: 0 of 4 values written, 4 of 4 in `go.Table` | 31, 0, 1 | none |
 | [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 7, 3, 71 | none |
-| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
+| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 90 | none |
 | [`all-caps-title`](#all-caps-title) | info | 183 | drawn: a title 1.31 times as wide in capitals | 3, 0, 1 | none |
 | [`axis-title-column-name`](#axis-title-column-name) | info | 183 | resolved: axis title `gdpPercap` | 68, 1, 107 | none |
 
@@ -9981,9 +10006,18 @@ resolved to `#E5ECF6`. A file whose only figures have no plot area is left alone
 `px.treemap`, `px.sunburst`, `px.icicle`, `px.funnel_area`, `px.parallel_coordinates` and
 `px.parallel_categories`, and `go.Pie`, `go.Treemap`, `go.Sunburst`, `go.Icicle`,
 `go.Funnelarea`, `go.Parcoords`, `go.Parcats`, `go.Sankey`, `go.Table` and `go.Indicator`, drew
-no tint and no grid line with the default template. Another module can set
-`pio.templates.default` for the file, which the rule does not see. The fix is unsafe, because
-`"simple_white"` also changes the colors of the marks.
+no tint and no grid line with the default template.
+
+The first form is also silent when a module that the file imports sets the template for it,
+with `pio.templates.default = ...` or `px.defaults.template = ...`. xpd reads the `__init__.py`
+of each package the file is in, each module of the project that the file imports, and what
+those import in turn. A scatter plot in a module of a package whose `__init__.py` assigns
+`pio.templates.default = "simple_white"` resolved to a white plot area with no grid, and so
+did one in a script that imports the module with the assignment. `px.defaults.template`
+changed the px figure and left a `go.Figure` at `#E5ECF6`, so it silences a file of px figures
+only. A module that imports the file, such as the script that starts the program, is not
+read, and a file beside the one with the assignment that does not import it is still
+reported. The fix is unsafe, because `"simple_white"` also changes the colors of the marks.
 
 #### explicit-grid
 

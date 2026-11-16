@@ -4,9 +4,11 @@
 mod catalog;
 mod cli;
 mod graph;
+mod imports;
 mod index;
 mod lsp;
 mod mcp;
+mod names;
 mod nodes;
 mod pack;
 mod package_check;

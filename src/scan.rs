@@ -18,6 +18,9 @@ use crate::rule::{Applicability, Rule};
 /// A parsed Python file.
 pub(crate) type Root = AstGrep<StrDoc<SupportLang>>;
 
+/// One node of a parsed Python file.
+pub(crate) type Node<'t> = ast_grep_core::Node<'t, StrDoc<SupportLang>>;
+
 /// Parses Python source. A syntax error gives a tree with error nodes, not a failure.
 pub(crate) fn parse(src: &str) -> Root {
     use ast_grep_core::tree_sitter::LanguageExt;
@@ -30,6 +33,27 @@ pub(crate) fn parse(src: &str) -> Root {
 struct AliasedImport {
     module: String,
     alias: String,
+}
+
+/// One Python file, as a lint run names it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct File<'a> {
+    /// The path that the `files` and `ignores` globs of a rule match, which selects the rules
+    /// that run.
+    pub(crate) path: &'a Path,
+    /// Where the file is on disk, from which a rule follows its imports. `None` for code that
+    /// is in no file, such as a recipe.
+    pub(crate) disk: Option<&'a Path>,
+}
+
+impl<'a> File<'a> {
+    /// A file that is on disk at the path its rules match.
+    pub(crate) fn on_disk(path: &'a Path) -> Self {
+        Self {
+            path,
+            disk: Some(path),
+        }
+    }
 }
 
 /// Whether `path` has the `.py` extension.
@@ -94,14 +118,15 @@ pub(crate) fn scan(
         .map(|path| {
             let mut src = fs::read_to_string(path).with_context(|| cannot_read(path))?;
             let mut fixed = 0;
+            let file = File::on_disk(path);
             if let Some(allowed) = fix {
-                (src, fixed) = fix_source(path, src, packs, allowed);
+                (src, fixed) = fix_source(file, src, packs, allowed);
                 if fixed > 0 {
                     fs::write(path, &src)
                         .with_context(|| format!("cannot write {}", path.display()))?;
                 }
             }
-            let issues = lint_source(path, &src, packs)
+            let issues = lint_source(file, &src, packs)
                 .into_iter()
                 .map(|found| found.issue)
                 .collect();
@@ -137,17 +162,17 @@ pub(crate) struct Replacement {
     pub(crate) text: String,
 }
 
-/// `src` after every fix up to `allowed`, with the number of fixes applied. `path` is the file
-/// the source belongs to, which selects the rules that run.
+/// `src` after every fix up to `allowed`, with the number of fixes applied. `file` is the file
+/// the source belongs to.
 pub(crate) fn fix_source(
-    path: &Path,
+    file: File<'_>,
     mut src: String,
     packs: &[Pack],
     allowed: Applicability,
 ) -> (String, usize) {
     let mut fixed = 0;
     for _ in 0..MAX_FIX_PASSES {
-        let (next, applied) = fix_pass(path, &src, packs, allowed);
+        let (next, applied) = fix_pass(file, &src, packs, allowed);
         if applied == 0 {
             break;
         }
@@ -157,9 +182,9 @@ pub(crate) fn fix_source(
     (src, fixed)
 }
 
-/// The issues in one file's source, in the order of their positions. `path` is the file the
-/// source belongs to, which selects the rules that run.
-pub(crate) fn lint_source(path: &Path, src: &str, packs: &[Pack]) -> Vec<Found> {
+/// The issues in one file's source, in the order of their positions. `file` is the file the
+/// source belongs to.
+pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Found> {
     if !packs.iter().any(|pack| pack.may_apply(src)) {
         return Vec::new();
     }
@@ -168,14 +193,14 @@ pub(crate) fn lint_source(path: &Path, src: &str, packs: &[Pack]) -> Vec<Found> 
     let mut found = Vec::new();
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
-        for rule in pack.rules.iter().filter(|rule| rule.runs_on(path)) {
-            for m in root.root().find_all(&rule.config.matcher) {
+        for rule in pack.rules.iter().filter(|rule| rule.runs_on(file.path)) {
+            for m in rule.matches(&root, file.disk) {
                 let start = m.start_pos();
                 let edit = usable_edit(rule, &m, &unbound, src);
                 let issue = Issue {
                     package: pack.module,
                     rule: rule.config.id.clone(),
-                    file: path.to_path_buf(),
+                    file: file.path.to_path_buf(),
                     position: Some(Position {
                         line: start.line() + 1,
                         column: start.column(&m) + 1,
@@ -203,7 +228,7 @@ pub(crate) fn lint_source(path: &Path, src: &str, packs: &[Pack]) -> Vec<Found> 
 
 /// Applies every fix up to `allowed` that does not overlap an earlier one, and returns the new
 /// source with the number of fixes applied. Overlapping fixes wait for the next pass.
-fn fix_pass(path: &Path, src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize) {
+fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize) {
     if !packs.iter().any(|pack| pack.may_apply(src)) {
         return (src.to_owned(), 0);
     }
@@ -213,10 +238,10 @@ fn fix_pass(path: &Path, src: &str, packs: &[Pack], allowed: Applicability) -> (
     for pack in applying(&root, src, packs) {
         let unbound = unbound_aliases(pack, &imports);
         for rule in &pack.rules {
-            if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(path) {
+            if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(file.path) {
                 continue;
             }
-            for m in root.root().find_all(&rule.config.matcher) {
+            for m in rule.matches(&root, file.disk) {
                 edits.extend(usable_edit(rule, &m, &unbound, src));
             }
         }

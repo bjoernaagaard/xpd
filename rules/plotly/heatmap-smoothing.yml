@@ -148,6 +148,10 @@ utils:
       - all:
           - has: { field: function, regex: '(^|\.)make_subplots$' }
           - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
+  figure-type:
+    kind: type
+    has: { kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
@@ -156,43 +160,15 @@ utils:
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
           - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
-  # What a method is called on: the figure itself, or a variable that holds it. The variable
-  # counts when the statement around the call, or a block around that statement, comes at most
-  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
-  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
-  # same name ends the proof, so the rule is silent there.
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
   figure:
     any:
       - matches: figure-expr
-      - kind: identifier
-        pattern: $FIG
-        inside:
-          stopBy: { kind: block, inside: { kind: function_definition } }
-          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
-  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
-  fig-target:
-    any:
-      - pattern: $FIG
-      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
-        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
-  binder:
-    any:
-      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
-        has: { field: left, matches: fig-target }
-      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
-      - { kind: named_expression, has: { field: name, pattern: $FIG } }
-  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
-  back-1: { follows: { matches: fig-assigned } }
-  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
-  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
-  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
-  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
-  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
-  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
-  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
-  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
-  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
-  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
-  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+      - { kind: identifier, pattern: $FIG }
 fix: 'False'
-metadata: { fix: unsafe }
+metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
