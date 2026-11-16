@@ -1,0 +1,186 @@
+# Tufte, vdqi.md line 1521, printed page 56: "Tables usually outperform graphics in reporting on
+# small data sets of 20 numbers or less." Line 7166, printed page 178: "Tables are clearly the
+# best way to show exact numerical values ... Tables are preferable to graphics for many small
+# data sets."
+#
+# A chart of a few numbers draws them as lengths or angles and does not write them. On plotly
+# 7.1.0, px.bar of the four values 41.3, 37.8, 12.6 and 8.3 drew 15 text elements, the four names
+# and the ticks 0 to 40, and none of the four values. go.Table with the same names and values
+# wrote all four (runs/v2/B1/probe.txt).
+#
+# ast-grep cannot count the rows of a data frame or the traces of a figure, so the rule reads the
+# one form where the code shows the whole data: a px call, or a go.Figure whose data is this one
+# trace, with the values written as a list or tuple of 1 to 20 numbers. A trace added with
+# add_trace is left alone, because the figure may hold more traces and more numbers. The rule is
+# info and has no fix, because go.Table is another figure.
+#
+# A chart that writes its values, with text, texttemplate, textinfo or text_auto in the call, or
+# with textinfo, texttemplate, text_auto or textposition anywhere in the file, is left alone. One
+# page of the plotly documentation set textinfo="value" on a pie in the next statement.
+#
+# This document reads px.bar and go.Bar. The values are y, or x with orientation="h". A bar
+# without orientation draws x as positions, such as the ratings 1 to 5, so that x is left alone.
+id: table-for-small-data
+language: python
+severity: info
+message: This bar chart shows $V, a few numbers written in the code, as bar lengths and writes none of them. Four values drawn with px.bar got tick labels from 0 to 40 and no value, where go.Table wrote all four. Tufte writes that tables usually beat graphics for small data sets of 20 numbers or less. Show them with go.Table(cells=dict(values=[names, values])).
+rule:
+  kind: call
+  all:
+    - any:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: px } }] }
+        - all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: go } }] } }, { matches: only-trace }]
+    - any:
+        - all: [{ has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(y)$' } }, { has: { field: value, pattern: $V, matches: few-numbers } }] } } }, { not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(orientation)$' } }, { has: { field: value, regex: '^["'']h["'']$'  } }] } } } }]
+        - all: [{ has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(x)$' } }, { has: { field: value, pattern: $V, matches: few-numbers } }] } } }, { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(orientation)$' } }, { has: { field: value, regex: '^["'']h["'']$'  } }] } } }]
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { any: [{ has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(text|texttemplate|textinfo|text_auto)$' } } } }, { inside: { stopBy: end, kind: module, regex: 'textinfo|texttemplate|text_auto|textposition' } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A list or tuple of 1 to 20 written numbers, counted without comments.
+  few-numbers:
+    any: [{ kind: list }, { kind: tuple }]
+    all:
+      - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: number }
+      - not: { has: { nthChild: { position: 21, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+      - not: { has: { nthChild: { position: 1, ofRule: { not: { any: [{ matches: number }, { kind: comment }, { kind: line_continuation }] } } } } }
+  number:
+    any:
+      - any: [{ kind: integer }, { kind: float }]
+      - { kind: unary_operator, has: { field: argument, any: [{ kind: integer }, { kind: float }] } }
+  # The only trace of a go.Figure: its first positional argument or its data, alone or as the
+  # one item of a list or tuple.
+  only-trace:
+    any:
+      - matches: figure-data
+      - inside: { any: [{ kind: list }, { kind: tuple }], not: { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }, matches: figure-data }
+  figure-data:
+    any:
+      - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }
+      - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }] }
+---
+# Tufte, vdqi.md line 1521, printed page 56: "Tables usually outperform graphics in reporting on
+# small data sets of 20 numbers or less." Line 7166, printed page 178: "Tables are clearly the
+# best way to show exact numerical values ... Tables are preferable to graphics for many small
+# data sets."
+#
+# A chart of a few numbers draws them as lengths or angles and does not write them. On plotly
+# 7.1.0, px.bar of the four values 41.3, 37.8, 12.6 and 8.3 drew 15 text elements, the four names
+# and the ticks 0 to 40, and none of the four values. go.Table with the same names and values
+# wrote all four (runs/v2/B1/probe.txt).
+#
+# ast-grep cannot count the rows of a data frame or the traces of a figure, so the rule reads the
+# one form where the code shows the whole data: a px call, or a go.Figure whose data is this one
+# trace, with the values written as a list or tuple of 1 to 20 numbers. A trace added with
+# add_trace is left alone, because the figure may hold more traces and more numbers. The rule is
+# info and has no fix, because go.Table is another figure.
+#
+# A chart that writes its values, with text, texttemplate, textinfo or text_auto in the call, or
+# with textinfo, texttemplate, text_auto or textposition anywhere in the file, is left alone. One
+# page of the plotly documentation set textinfo="value" on a pie in the next statement.
+#
+# This document reads px.pie and go.Pie whose values is such a list. pie-chart reports the same
+# call for the form. This document reports the count. go.Pie of the values 413, 378, 126 and 83
+# wrote the four shares as percentages and none of the values.
+id: table-for-small-data
+language: python
+severity: info
+message: This pie shows $V, a few numbers written in the code, as angles and writes them as percentages at most. Four values drawn with go.Pie wrote their shares and none of the values, where go.Table wrote all four. Tufte writes that tables usually beat graphics for small data sets of 20 numbers or less. Show them with go.Table(cells=dict(values=[names, values])).
+rule:
+  kind: call
+  all:
+    - any:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(pie)$' } }, { has: { field: object, matches: px } }] }
+        - all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] } }, { matches: only-trace }]
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(values)$' } }, { has: { field: value, pattern: $V, matches: few-numbers } }] } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { any: [{ has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(text|texttemplate|textinfo|text_auto)$' } } } }, { inside: { stopBy: end, kind: module, regex: 'textinfo|texttemplate|text_auto|textposition' } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A list or tuple of 1 to 20 written numbers, counted without comments.
+  few-numbers:
+    any: [{ kind: list }, { kind: tuple }]
+    all:
+      - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: number }
+      - not: { has: { nthChild: { position: 21, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+      - not: { has: { nthChild: { position: 1, ofRule: { not: { any: [{ matches: number }, { kind: comment }, { kind: line_continuation }] } } } } }
+  number:
+    any:
+      - any: [{ kind: integer }, { kind: float }]
+      - { kind: unary_operator, has: { field: argument, any: [{ kind: integer }, { kind: float }] } }
+  # The only trace of a go.Figure: its first positional argument or its data, alone or as the
+  # one item of a list or tuple.
+  only-trace:
+    any:
+      - matches: figure-data
+      - inside: { any: [{ kind: list }, { kind: tuple }], not: { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }, matches: figure-data }
+  figure-data:
+    any:
+      - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }
+      - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }] }

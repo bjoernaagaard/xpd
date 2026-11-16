@@ -1,0 +1,538 @@
+# Tufte, vdqi.md line 5939, printed page 154: "the mind's eye does not readily give a visual
+# ordering to colors, except possibly for red to reflect higher levels than other colors". Line
+# 5943, printed page 154: "Because they do have a natural visual hierarchy, varying shades of gray
+# show varying quantities better than color."
+#
+# The test of order is lightness. Each of the 94 named scales of plotly 7.1.0 was resolved by
+# plotly.js on a go.Heatmap and sampled at 21 even steps, and the CIELAB lightness of each step
+# was computed (runs/v2/B1/probe.txt). 61 of the scales, such as "Greys", "Blues" and "Viridis",
+# never changed direction. Jet changed direction 3 times, Rainbow 2 times, HSV 3 times and Turbo
+# once, with its lightest color in the middle, so a low and a high value come out equally dark.
+# The rule reads these four spectrum scales. Earth, mrybm and mygbm change direction too and
+# appear in no file of the corpus. Blackbody, Bluered, Portland and Picnic change once, near one
+# end or at a midpoint as the two-sided RdBu does, and are left alone.
+#
+# The rule reads the name as a string in any case, with or without "_r", and as the attribute of
+# px.colors.sequential, px.colors.cyclical or px.colors.plotlyjs, given to colorscale,
+# color_continuous_scale or a setting that ends in _colorscale, inside a plotly call, and assigned
+# to px.defaults.color_continuous_scale. A px.imshow with "jet", a go.Scatter marker with "Jet"
+# and update_layout with coloraxis_colorscale="Jet" all resolved to the same six stops of Jet. The
+# rule has no fix, because the scale to use depends on whether the data has a midpoint.
+id: rainbow-colorscale
+language: python
+severity: warning
+message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, rose from 13.5 to 97.1 and fell back to 25.5 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+rule:
+  pattern: $S
+  matches: spectrum-scale
+  any:
+    - inside:
+        kind: keyword_argument
+        field: value
+        all:
+          - has: { field: name, regex: '^(color_continuous_scale|([a-z0-9]+_)*colorscale(_(sequential|sequentialminus|diverging))?)$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: pair
+        field: value
+        all:
+          - has: { field: key, regex: '^["'']colorscale["'']$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^color_continuous_scale$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: px } }] } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that proves plotly: a px function, a go class at any depth such as go.layout.XAxis,
+  # make_subplots, or a method of a plotly figure.
+  plotly-call:
+    kind: call
+    any:
+      - matches: new-figure
+      - has: { field: function, kind: attribute, has: { field: object, any: [{ matches: go }, { kind: attribute, has: { field: object, matches: go } }] } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(update_|add_|for_each_)' } }, { has: { field: object, matches: figure } }] }
+  # A spectrum scale written by name: a string in any case, with or without _r, or the attribute
+  # of a px.colors module that holds it.
+  spectrum-scale:
+    any:
+      - { kind: string, regex: '^[rRuU]?["''](?i:jet)(_r)?["'']$' }
+      - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(Jet)(_r)?$' }
+---
+# The same test for Rainbow.
+id: rainbow-colorscale
+language: python
+severity: warning
+message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, fell from 32.3 to 21.9, rose to 90.6 and fell to 53.2 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+rule:
+  pattern: $S
+  matches: spectrum-scale
+  any:
+    - inside:
+        kind: keyword_argument
+        field: value
+        all:
+          - has: { field: name, regex: '^(color_continuous_scale|([a-z0-9]+_)*colorscale(_(sequential|sequentialminus|diverging))?)$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: pair
+        field: value
+        all:
+          - has: { field: key, regex: '^["'']colorscale["'']$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^color_continuous_scale$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: px } }] } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that proves plotly: a px function, a go class at any depth such as go.layout.XAxis,
+  # make_subplots, or a method of a plotly figure.
+  plotly-call:
+    kind: call
+    any:
+      - matches: new-figure
+      - has: { field: function, kind: attribute, has: { field: object, any: [{ matches: go }, { kind: attribute, has: { field: object, matches: go } }] } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(update_|add_|for_each_)' } }, { has: { field: object, matches: figure } }] }
+  # A spectrum scale written by name: a string in any case, with or without _r, or the attribute
+  # of a px.colors module that holds it.
+  spectrum-scale:
+    any:
+      - { kind: string, regex: '^[rRuU]?["''](?i:rainbow)(_r)?["'']$' }
+      - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(Rainbow)(_r)?$' }
+---
+# The same test for Turbo.
+id: rainbow-colorscale
+language: python
+severity: warning
+message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, rose from 11.8 to 90.7 and fell back to 24.4 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+rule:
+  pattern: $S
+  matches: spectrum-scale
+  any:
+    - inside:
+        kind: keyword_argument
+        field: value
+        all:
+          - has: { field: name, regex: '^(color_continuous_scale|([a-z0-9]+_)*colorscale(_(sequential|sequentialminus|diverging))?)$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: pair
+        field: value
+        all:
+          - has: { field: key, regex: '^["'']colorscale["'']$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^color_continuous_scale$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: px } }] } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that proves plotly: a px function, a go class at any depth such as go.layout.XAxis,
+  # make_subplots, or a method of a plotly figure.
+  plotly-call:
+    kind: call
+    any:
+      - matches: new-figure
+      - has: { field: function, kind: attribute, has: { field: object, any: [{ matches: go }, { kind: attribute, has: { field: object, matches: go } }] } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(update_|add_|for_each_)' } }, { has: { field: object, matches: figure } }] }
+  # A spectrum scale written by name: a string in any case, with or without _r, or the attribute
+  # of a px.colors module that holds it.
+  spectrum-scale:
+    any:
+      - { kind: string, regex: '^[rRuU]?["''](?i:turbo)(_r)?["'']$' }
+      - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(Turbo)(_r)?$' }
+---
+# The same test for HSV.
+id: rainbow-colorscale
+language: python
+severity: warning
+message: $S colors the values with the hues of the spectrum, and its CIELAB lightness, 0 for black and 100 for white, rose from 53.2 to 88.2, fell to 34.0 and rose to 53.2 along the scale, so the reader cannot tell a high value from a low one by how dark it is. Tufte writes that the mind's eye gives colors no visual order and that shades of gray show quantities better. Use "Greys", or a scale that gets darker with the value such as "Blues" or "Viridis". When the numbers name groups, such as clusters, color them as categories instead.
+rule:
+  pattern: $S
+  matches: spectrum-scale
+  any:
+    - inside:
+        kind: keyword_argument
+        field: value
+        all:
+          - has: { field: name, regex: '^(color_continuous_scale|([a-z0-9]+_)*colorscale(_(sequential|sequentialminus|diverging))?)$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: pair
+        field: value
+        all:
+          - has: { field: key, regex: '^["'']colorscale["'']$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^color_continuous_scale$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: px } }] } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that proves plotly: a px function, a go class at any depth such as go.layout.XAxis,
+  # make_subplots, or a method of a plotly figure.
+  plotly-call:
+    kind: call
+    any:
+      - matches: new-figure
+      - has: { field: function, kind: attribute, has: { field: object, any: [{ matches: go }, { kind: attribute, has: { field: object, matches: go } }] } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(update_|add_|for_each_)' } }, { has: { field: object, matches: figure } }] }
+  # A spectrum scale written by name: a string in any case, with or without _r, or the attribute
+  # of a px.colors module that holds it.
+  spectrum-scale:
+    any:
+      - { kind: string, regex: '^[rRuU]?["''](?i:hsv)(_r)?["'']$' }
+      - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(HSV)(_r)?$' }
