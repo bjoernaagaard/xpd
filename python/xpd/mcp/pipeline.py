@@ -246,6 +246,23 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
         ),
         versions_recorded(profile, contract),
     ]
+    if contract.discovery is not None or proof.discovery is not None:
+        failures = []
+        if proof.discovery is None:
+            failures.append("No discovery_gate result was supplied.")
+        else:
+            gates.append(proof.discovery.gate)
+            if contract.discovery != proof.discovery.discovery:
+                failures.append("The contract and proof record different discovery choices.")
+        gates.append(
+            gate(
+                "discovery-is-recorded",
+                "discovery",
+                ["contract"],
+                failures,
+                "The contract records the discovery question, candidates and reason of the proof.",
+            )
+        )
     failed = [gate.name for gate in gates if not gate.passed]
     return GateReport(passed=not failed, failed=failed, gates=gates)
 

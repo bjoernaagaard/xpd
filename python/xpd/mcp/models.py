@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 Severity = Literal["error", "warning", "info", "hint"]
 FixSafety = Literal["safe", "unsafe"]
@@ -182,6 +182,7 @@ class SkillSource(Output):
 #   persisted model   SavedModel    the file, the versions that wrote it and the code it imports
 #   verdict           GateReport    one Gate per requirement
 Stage = Literal[
+    "discovery",
     "raw data",
     "profile",
     "split",
@@ -191,7 +192,7 @@ Stage = Literal[
     "proof",
     "persisted model",
 ]
-Evidence = Literal["profile", "check", "graph", "equiv", "contract"]
+Evidence = Literal["profile", "check", "graph", "equiv", "contract", "api", "source"]
 
 
 class Written(BaseModel):
@@ -199,6 +200,50 @@ class Written(BaseModel):
     pack asks for, is kept."""
 
     model_config = ConfigDict(extra="allow", frozen=True)
+
+
+class ApiMember(Output):
+    name: str
+    parameters: list[str]
+    summary: str
+
+
+class DiscoveryEntry(Output):
+    kind: str
+    package: str
+    name: str
+    callable: Literal["class", "function"] | None
+    parameters: list[str]
+    summary: str
+    members: list[ApiMember]
+    rules: list[str]
+
+    @computed_field
+    @property
+    def signature(self) -> str | None:
+        """Return indexed parameter names without inventing defaults or parameter kinds."""
+        if self.kind != "symbol" or self.callable is None:
+            return None
+        return f"{self.name}({', '.join(self.parameters)})"
+
+
+class DiscoveryQuestion(Written):
+    task: str = Field(min_length=1)
+
+
+class DiscoveryChoice(Written):
+    name: str = Field(description="The selected candidate's exact name.", min_length=1)
+    reason: str = Field(min_length=1)
+    symbols: list[str] = Field(
+        min_length=1,
+        description="Indexed callable symbols the code must call, including a recipe's symbols.",
+    )
+
+
+class Discovery(Written):
+    question: DiscoveryQuestion
+    candidates: list[DiscoveryEntry] = Field(min_length=1)
+    choice: DiscoveryChoice
 
 
 class RawData(Written):
@@ -254,25 +299,13 @@ class Contract(Written):
     """What a training script saves beside its model: all that a later run needs to load the
     model, check its input and repeat the split."""
 
+    discovery: Discovery | None = None
     data: RawData
     split: Split
     inputs: list[InputColumn]
     steps: list[FittedStep]
     validation: Validation
     model: SavedModel
-
-
-class Proof(BaseModel):
-    """What xpd's tools found about the scripts of a pipeline run."""
-
-    model_config = ConfigDict(frozen=True)
-
-    lint: CheckReport = Field(description="`check` on the training, prediction and step files.")
-    dataflow: GraphReport = Field(description="`graph` on the file with the feature steps.")
-    reproducible: Equivalence = Field(description="`equiv` of the training script with itself.")
-    served: Equivalence = Field(
-        description="`equiv` of the training script with the script that loads the saved model."
-    )
 
 
 class Gate(BaseModel):
@@ -295,18 +328,23 @@ class GateReport(BaseModel):
     gates: list[Gate]
 
 
-class ApiMember(Output):
-    name: str
-    parameters: list[str]
-    summary: str
+class DiscoveryProof(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    discovery: Discovery
+    paths: list[str]
+    gate: Gate
 
 
-class DiscoveryEntry(Output):
-    kind: str
-    package: str
-    name: str
-    callable: Literal["class", "function"] | None
-    parameters: list[str]
-    summary: str
-    members: list[ApiMember]
-    rules: list[str]
+class Proof(BaseModel):
+    """What xpd's tools found about the scripts of a pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    discovery: DiscoveryProof | None = None
+    lint: CheckReport = Field(description="`check` on the training, prediction and step files.")
+    dataflow: GraphReport = Field(description="`graph` on the file with the feature steps.")
+    reproducible: Equivalence = Field(description="`equiv` of the training script with itself.")
+    served: Equivalence = Field(
+        description="`equiv` of the training script with the script that loads the saved model."
+    )

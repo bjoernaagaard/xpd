@@ -9,7 +9,7 @@ from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
-from xpd.mcp import catalog, pipeline, prompts, tools, views
+from xpd.mcp import catalog, discovery, pipeline, prompts, tools, views
 from xpd.mcp.binary import RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
@@ -58,6 +58,7 @@ def build(settings: Settings) -> FastMCP:
     )
     mcp.add_extension(TasksExtension())
     tools.register(mcp, xpd, project)
+    discovery.register(mcp, xpd, project)
     views.register(mcp, xpd, project)
     catalog.register(mcp, rules)
     pipeline.register(mcp, project, rules)

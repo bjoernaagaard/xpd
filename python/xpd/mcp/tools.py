@@ -215,7 +215,7 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
     async def find(
         task: str, package: str | None = None, kind: str | None = None
     ) -> list[DiscoveryEntry]:
-        """Find the top five library symbols and rules for a task in plain words.
+        """Find the top five symbols, rules or recipes for a task in plain words.
 
         Search offline before choosing a library, even when it is not installed.
         Read the chosen symbol with api before writing code.

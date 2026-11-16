@@ -4,15 +4,35 @@ import json
 
 from fastmcp import FastMCP
 
+DISCOVERY = """\
+found = await call_tool("find", {"task": TASK})
+candidates = found["result"]
+inspected = [await call_tool("api", {"name": item["name"]}) for item in candidates]
+discovery = {
+    "question": {"task": TASK}, "candidates": inspected,
+    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
+}
+api_proof = await call_tool("discovery_gate", {
+    "paths": [TRAIN, PREDICT, FEATURES], "discovery": discovery,
+})
+if not api_proof["gate"]["passed"]:
+    return api_proof
+"""
+
 # The stages of a pipeline run as one code mode script. Each result is handed to `gates`.
 STAGES = """\
 profile = await call_tool("profile", {"file": DATA})
 lint = await call_tool("check", {"paths": [TRAIN, PREDICT, FEATURES]})
+if any(issue["severity"] == "error" for issue in lint["issues"]):
+    return {"passed": False, "lint": lint, "discovery": api_proof}
 dataflow = await call_tool("graph", {"paths": [FEATURES]})
 reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
 served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
 contract = await call_tool("contract", {"file": CONTRACT})
-proof = {"lint": lint, "dataflow": dataflow, "reproducible": reproducible, "served": served}
+proof = {
+    "lint": lint, "dataflow": dataflow, "reproducible": reproducible,
+    "served": served, "discovery": api_proof,
+}
 report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
 return {
     "passed": report["passed"],
@@ -25,7 +45,7 @@ return {
 }"""
 
 
-def stages_script(data: str) -> str:
+def stages_script(data: str, task: str = "") -> str:
     """The script for one project: the paths as constants, then the stages."""
     paths = {
         "DATA": data,
@@ -33,9 +53,12 @@ def stages_script(data: str) -> str:
         "TRAIN": "train.py",
         "PREDICT": "predict.py",
         "CONTRACT": "model/contract.json",
+        "TASK": task or "classify penguin species with a logistic regression pipeline",
+        "CHOICE": "sklearn.linear_model.LogisticRegression",
+        "REASON": "Class probabilities for the species target.",
     }
     constants = [f"{name} = {json.dumps(path)}" for name, path in paths.items()]
-    return "\n".join([*constants, STAGES])
+    return "\n".join([*constants, "SYMBOLS = [CHOICE]", DISCOVERY, STAGES])
 
 
 def register(mcp: FastMCP) -> None:
@@ -131,7 +154,7 @@ def register(mcp: FastMCP) -> None:
 5. Call the `check` tool on {path} and fix what it reports."""
 
     @mcp.prompt(tags={"pipeline"})
-    def build_pipeline(data: str, target: str) -> str:
+    def build_pipeline(data: str, target: str, task: str = "") -> str:
         """Build a scikit-learn model from a data file, save it with its contract, and show
         with `gates` that `check` reports no error, that the run repeats, and that a new Python
         process predicts from the saved file.
@@ -139,10 +162,23 @@ def register(mcp: FastMCP) -> None:
         Args:
             data: The data file, inside the project root.
             target: The column the model predicts.
+            task: The task in plain words, before choosing a library.
         """
-        script = stages_script(data)
+        script = stages_script(data, task)
         return f"""Build a model that predicts {target} from {data}. Write three scripts in the \
 project root, which is where each of them runs, and save the model in the folder model.
+
+First call `find` with the task {task or "predict " + target}, then `api` on the candidates.
+Keep each candidate's kind, name, signature, summary and guarding rules. Kinds may include
+recipes as well as symbols and rules. Choose a candidate and state why. For a recipe, name
+its indexed callable symbols too. Set TASK, CHOICE, REASON and SYMBOLS in the script to those
+values. The LogisticRegression values below are an example, not a choice for every task.
+Check the project's dependency declaration and environment. Say when a chosen library is
+not installed. Get permission before adding it through the project's dependency manager.
+Never install silently, and do not treat successful discovery as proof of installation.
+The sandbox cannot write files or ask an LLM to choose. Write the files with the agent's
+normal editing tools before execute. One execute call repeats discovery and checks that
+written choice, then checks code and runs the pipeline stages. It does not generate code.
 
 1. Call the `profile` tool on {data}. Choose the steps from the real dtypes, nulls and distinct
    values. The target must have no nulls.
@@ -156,6 +192,9 @@ project root, which is where each of them runs, and save the model in the folder
      columns of {data}.
    - Score it with cross-validation on the training rows, with a seeded splitter. Then fit it
      on the training rows and score the held out rows once. Choose no setting by that score.
+   - Record the full discovery question, inspected candidates and choice with its reason
+     as `discovery` in the contract. Use the same values passed to discovery_gate. They are
+     the planning input for the split, preprocessing and model stages.
    - Save the Pipeline with joblib to model/model.joblib, and save model/contract.json in
      the shape below.
    - List features.py under `code` in the contract's `model`. The saved Pipeline holds the
@@ -170,7 +209,8 @@ project root, which is where each of them runs, and save the model in the folder
    scikit-learn is another version, or when a file under `code` is missing. It repeats the
    split from the contract, loads the model, and leaves the same in `result` as train.py
    does.
-5. Run the stages. With code mode on, call `execute` once with the script below. Without it,
+5. Run discovery_gate and check before any equiv call. Stop on a failed gate or lint error.
+   Run the stages. With code mode on, call `execute` once with the script below. Without it,
    call the same tools in the same order.
 6. The run is done when `passed` is true. For a gate that failed, read its `detail`, fix the
    scripts and run the stages again. Never edit the contract by hand.
