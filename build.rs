@@ -34,6 +34,7 @@ const PACK_HEADINGS: &[(&str, &str)] = &[
     ("scikit-lego", "sklego"),
     ("MAPIE", "mapie"),
     ("Category Encoders", "category_encoders"),
+    ("linearmodels", "linearmodels"),
     ("Hamilton", "hamilton"),
     ("Python", "python"),
 ];

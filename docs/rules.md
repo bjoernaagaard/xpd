@@ -7315,6 +7315,181 @@ These habits were looked at and have no rule.
 - `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
   index.
 
+## linearmodels
+
+These rules run on files that import `linearmodels`, the module of
+[linearmodels](https://bashtage.github.io/linearmodels/), which fits panel models, instrument
+models, systems of equations and factor models of asset prices. They report formulas and
+arguments that fit another model than the code reads as, covariance options that give other
+standard errors than the code asks for, code that raises on linearmodels 7.1, names of
+statsmodels results read on linearmodels results, and forms that a release removed or
+deprecated. Every number in this section was measured on linearmodels 7.1 with pandas 3.1.1,
+NumPy 2.5.5, SciPy 1.18.1, statsmodels 0.15.0 and formulaic 1.2.2 on Python 3.13, and a number
+for another release names it. The data sets `wage_panel`, `mroz` and `french` are the ones in
+`linearmodels.datasets`. Examples assume that the linearmodels names they use are imported and
+that `sm` is `statsmodels.api`. Names such as `data`, `y`, `X` and `instruments` represent
+values supplied by your program.
+
+Most of the pack is about one fact: linearmodels looks like statsmodels and differs from it in
+small ways. It adds no intercept to a formula, it names its covariances and its results in
+another way, its `IV2SLS` takes other arguments in another order, and `summary` is a property.
+Code written from the memory of statsmodels runs into each of these.
+
+Four class names exist in statsmodels as well: `OLS`, `IV2SLS`, `IVGMM` and `SUR`. A rule about
+one of them reports a call only with proof that the class comes from linearmodels. The proof is
+the module in front of the name, as in `linearmodels.IV2SLS` or `lm.IV2SLS` after
+`import linearmodels as lm`, or an import of the name from `linearmodels` in the same file. A
+file that imports the same name from two libraries gives no proof, so those rules stay silent
+there. The other 15 model classes of `linearmodels.__all__` have names of their own and need no
+proof.
+
+A rule about `fit` or about a result reads only an object it can follow to a linearmodels
+class: a call on the class itself, such as `PanelOLS(y, X).fit(...)`, or a name that its
+function, or the module outside any function, assigns from such calls and from nothing else. A
+name that is also assigned from anything else, that a loop or a `with` statement binds, or that
+comes in as an argument is left alone. A statsmodels model in the same file is therefore never
+reported: the 950 real files hold 700 `cov_type=` strings of statsmodels, such as `"HC3"` and
+`"cluster"`, on statsmodels models, and no rule reports one of them.
+
+A rule reads an argument only when it is written out. A `cov_type`, a formula or a flag that is
+a name, an f-string or a value unpacked from a dictionary is left alone.
+
+A rule document whose advice needs a newer release carries `since`. xpd reads the installed
+version from the project's venv, as it does for pandas, and skips that document on an older
+release. When the venv has no linearmodels, or there is no venv, every document runs. Each
+`since` was checked by installing the release before it and the release at it from PyPI and
+running the form on both: 4.14 and 4.15, 4.17 and 4.18, 4.31 and 5.0, and 7.0 and 7.1.
+
+### Formulas
+
+linearmodels parses formulas with formulaic, and every model has a `from_formula`. The rules in
+this group read a formula only when it is a string in the `from_formula` call: the first
+argument, the `formula` keyword, or a value of the dictionary that a system model takes.
+
+#### formula-without-constant
+
+**Severity:** warning. **Fix:** none.
+
+Reports a formula with no `1` term in `from_formula` of `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FamaMacBeth`, `PanelOLS`, the instrument models and the system models. linearmodels adds no intercept to a formula. statsmodels and R add one, so `"y ~ x"` is a regression through the origin here and a regression with an intercept there.
+
+Example:
+
+```python
+model = PooledOLS.from_formula("lwage ~ exper", data)
+iv = IV2SLS.from_formula("lwage ~ exper + [educ ~ fatheduc + motheduc]", data)
+```
+
+Use instead:
+
+```python
+model = PooledOLS.from_formula("lwage ~ 1 + exper", data)
+iv = IV2SLS.from_formula("lwage ~ 1 + exper + [educ ~ fatheduc + motheduc]", data)
+```
+
+On the wage panel, on 7.1 and on 7.0, `PooledOLS` gave `exper` a coefficient of 0.2184 for `"lwage ~ exper"` and 0.0338, with an intercept of 1.4289, for `"lwage ~ 1 + exper"`. `RandomEffects` gave 0.1119 against 0.0589, `BetweenOLS` 0.2364 against -0.0229, and `IV2SLS` on the mroz data gave `educ` 0.0769 against 0.0664. The rule stays silent when the formula says `- 1` or `0 +`, which states that no intercept is meant, when it names a column that looks like a constant, such as `const`, when it has a `C()` term, whose dummies span the intercept, and when a `PanelOLS` formula has effects or the call has `other_effects`, which absorb it. A no-intercept model can be meant, so this is a warning.
+
+#### effects-outside-panel-ols
+
+**Severity:** error. **Fix:** none.
+
+Reports `EntityEffects`, `FixedEffects` or `TimeEffects` in a formula given to `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FirstDifferenceOLS` or `FamaMacBeth`. Every panel model takes the three terms out of the formula, and only `PanelOLS` then uses them.
+
+Example:
+
+```python
+model = RandomEffects.from_formula("lwage ~ 1 + hours + EntityEffects", data)
+```
+
+Use instead:
+
+```python
+model = PanelOLS.from_formula("lwage ~ 1 + hours + EntityEffects", data)
+```
+
+On 7.1 and 7.0, each of the five classes returned the same coefficients for `"lwage ~ 1 + hours"` with and without each of the three terms, and raised no error and no warning. The reader of the formula sees fixed effects that the model does not have.
+
+#### effects-keyword-with-formula
+
+**Severity:** error. **Fix:** none.
+
+Reports `entity_effects=` or `time_effects=` given to `PanelOLS.from_formula`. The constructor takes the two keywords, and `from_formula` reads the effects from the formula.
+
+Example:
+
+```python
+model = PanelOLS.from_formula("lwage ~ 1 + exper", data, entity_effects=True)
+```
+
+Use instead:
+
+```python
+model = PanelOLS.from_formula("lwage ~ 1 + exper + EntityEffects", data)
+```
+
+7.1 and 7.0 raised `TypeError: PanelOLS.from_formula() got an unexpected keyword argument 'entity_effects'`. Three of the 950 real files have the form.
+
+#### formula-power-term
+
+**Severity:** error. **Fix:** none.
+
+Reports a term that is a name, `**` and a number, such as `exper**2`, in a formula of any model. A formula reads `**` as a power of interactions, so `exper**2` is `exper`. The squared values need `I(exper**2)`.
+
+Example:
+
+```python
+model = IV2SLS.from_formula("lwage ~ 1 + exper + exper**2", data)
+```
+
+Use instead:
+
+```python
+model = IV2SLS.from_formula("lwage ~ 1 + exper + I(exper**2)", data)
+```
+
+On 7.1 and 7.0 the first formula gave a model with the columns `Intercept` and `exper` on `IV2SLS` and on `PooledOLS`, with no error, and the second gave three columns. The README of linearmodels itself has `exper + exper ** 2` in its first example, which fits a model with the columns `Intercept`, `exper` and `educ`. `(a + b)**2`, which is the use the operator is for, is left alone.
+
+#### first-difference-constant
+
+**Severity:** error. **Fix:** none.
+
+Reports a `1` term in a formula of `FirstDifferenceOLS`, and `add_constant(...)` as its `exog`. A first difference removes everything that is constant over time, so the model refuses a constant.
+
+Example:
+
+```python
+model = FirstDifferenceOLS.from_formula("lwage ~ 1 + hours", data)
+model = FirstDifferenceOLS(y, sm.add_constant(X))
+```
+
+Use instead:
+
+```python
+model = FirstDifferenceOLS.from_formula("lwage ~ hours", data)
+model = FirstDifferenceOLS(y, X)
+```
+
+Both forms raised `ValueError: Constants are not allowed in first difference regressions.` on 7.1 and 7.0.
+
+#### weights-column-name
+
+**Severity:** error. **Fix:** none.
+
+Reports `weights="name"` on a model or on its `from_formula`. statsmodels and R take the weights of a formula model as the name of a column. linearmodels takes the values.
+
+Example:
+
+```python
+model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights="hours")
+```
+
+Use instead:
+
+```python
+model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights=data["hours"])
+```
+
+7.1 raised `TypeError: weights must be array_like ... Got str` on `PooledOLS` and on `IV2SLS`, and 7.0 raised `AttributeError: 'str' object has no attribute 'ndim'`.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
