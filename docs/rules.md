@@ -7701,6 +7701,113 @@ result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_e
 
 Over 1,000 draws of 200 entities and 8 periods, with an AR(1) regressor and an AR(1) error within each entity, both with coefficient 0.8, and a true slope of 0, `PanelOLS` with entity effects gave p below 0.05 in 17.3% of the draws with the default, 16.4% with `cov_type="robust"` and 5.7% with `cov_type="clustered"` and `cluster_entity=True`. In a second simulation with 300 entities, 3 periods and errors that are heteroskedastic and unrelated over time, the shares were 22.4%, 7.1% and 5.0%. Those are two simulations, and how far the default is off depends on the data, so the rule is info. It is the rule with the most reports: 372 in 142 of the 950 real files. `BetweenOLS` has one row for each entity and `FamaMacBeth` has its own covariance, so both are left alone, and a call that states `cov_type`, also as `"unadjusted"`, has made its choice.
 
+### Instruments and absorbed effects
+
+`IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE` and `IVJIVE` take four arrays in the order dependent,
+exog, endog, instruments. None of the four has a default, and none of the models adds a
+constant.
+
+#### iv-missing-arguments
+
+**Severity:** error. **Fix:** none.
+
+Reports an instrument model called with two or three arguments, and the keyword `instrument=`. statsmodels has an `IV2SLS` of its own, in `statsmodels.sandbox.regression.gmm`, with the signature `(endog, exog, instrument=None)`, where `endog` is the dependent variable.
+
+Example:
+
+```python
+model = IV2SLS(y, X, Z)
+```
+
+Use instead:
+
+```python
+model = IV2SLS(y, exog, endog, instruments)
+```
+
+7.1 and 7.0 raised `TypeError: IV2SLS.__init__() missing 1 required positional argument: 'instruments'`, and `TypeError: ... got an unexpected keyword argument 'instrument'. Did you mean 'instruments'?` for the keyword. Two of the 950 real files call `IV2SLS(Y, X, Z)` on the class they import from linearmodels. A call that names one of the four as a keyword, or that unpacks its arguments, is left alone.
+
+#### iv-arguments-swapped
+
+**Severity:** warning. **Fix:** none.
+
+Reports an instrument model whose second argument has `endog` in its name and whose third has `exog`. The order of linearmodels is exog and then endog, and nothing checks the roles.
+
+Example:
+
+```python
+model = IV2SLS(dependent, endog, exog, instruments)
+```
+
+Use instead:
+
+```python
+model = IV2SLS(dependent, exog, endog, instruments)
+```
+
+On the mroz data, `IV2SLS(lwage, educ, [const, exper], [fatheduc, motheduc])` ran without an error and gave `educ` 0.2021, where the right order gave 0.0664. The rule knows the roles only from the names, and reports no other case.
+
+#### iv-without-exog
+
+**Severity:** warning. **Fix:** none.
+
+Reports `None` written as the `exog` of an instrument model that has an endogenous regressor. The model then has no intercept.
+
+Example:
+
+```python
+model = IV2SLS(y, None, x, z)
+```
+
+Use instead:
+
+```python
+model = IV2SLS(y, sm.add_constant(controls), x, z)
+```
+
+Over 2,000 draws of 500 rows from `y = 2 + x + error` with one instrument, the mean estimate of the coefficient on `x` was 2.002 without `exog` and 0.990 with a constant column as `exog`. On the mroz data the coefficient on `educ` was 0.0928 without `exog` and 0.0664 with a constant and `exper`. Data with mean zero needs no intercept, so this is a warning.
+
+#### manual-two-stage
+
+**Severity:** warning. **Fix:** none.
+
+Reports a model whose `exog` holds `.fitted_values` of another fit. That is two stage least squares by hand: the coefficient is right, and the standard errors come from residuals that use the fitted values in place of the regressor.
+
+Example:
+
+```python
+first = OLS(data.educ, data[["const", "exper", "fatheduc", "motheduc"]]).fit()
+second = OLS(data.lwage, pd.concat([data[["const", "exper"]], first.fitted_values], axis=1)).fit()
+```
+
+Use instead:
+
+```python
+result = IV2SLS(data.lwage, data[["const", "exper"]], data.educ, data[["fatheduc", "motheduc"]]).fit()
+```
+
+On the mroz data both ways gave `educ` 0.0664, with an unadjusted standard error of 0.0327 by hand and 0.0311 from `IV2SLS`. Over 2,000 draws of 500 rows with one instrument, the 95% interval of the hand-made second stage covered the true coefficient in 99.6% of the draws and the interval of `IV2SLS` in 95.7%, and the hand-made standard error was 1.37 times the other on average. Which way the error goes depends on the data. The rule sees only the form where the fitted values are written in the call. A second stage that reads them from a column it stored earlier is not seen, and neither corpus has the form the rule reads.
+
+#### absorb-not-categorical
+
+**Severity:** info. **Fix:** none.
+
+Reports `AbsorbingLS(..., absorb=...)` in a file that never says `category`, `Categorical` or `cut(`. `absorb` reads the dtype of each column: a categorical column is absorbed as one effect for each category, and any other column as one continuous regressor.
+
+Example:
+
+```python
+model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]])
+```
+
+Use instead:
+
+```python
+model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]].astype("category"))
+```
+
+With 200 firms, a firm effect in the regressor and a true coefficient of 1.0, `absorb` with the integer firm id gave 3.397, where no `absorb` at all gave 3.398, and the same column as a category gave 1.022. No error and no warning was raised. A text column raises `TypeError` on 7.1, and 7.0 took it like the integers. One of the 4 real files that the rule reports turns its columns into text with `astype(str)` right before the call. The code does not show a dtype, so the rule is info, and data that is categorical when it is loaded is reported without need.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
