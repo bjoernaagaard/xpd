@@ -358,12 +358,13 @@ clean, fixed, dropped, capped and retained counts under `recipes`.
 A name is public when Griffe says it is. A module is public when its name has no leading
 underscore. Another name is public when its module lists it in `__all__`. In a module without
 `__all__`, a name is public when it has no leading underscore and the module defines it.
-The index adds three rules, and each one comes from a named symbol.
+The index adds four rules, and each one comes from a named symbol.
 
 | Rule | Symbol that needs it |
 | --- | --- |
-| A folder named `tests` is skipped. | `pandas.tests.frame.test_api.TestDataFrameMisc` is in the wheel and is not library API. |
-| A name from `from module import *` is public, even when `__all__` leaves it out. | `pandas.api.types.is_numeric_dtype` |
+| Names in a folder named `tests` are left out. | `pandas.tests.frame.test_api.TestDataFrameMisc` is in the wheel and is not library API. |
+| A class or function that a module defines under a public name is public, even when `__all__` leaves it out. | `pandas.tseries.holiday.USFederalHolidayCalendar` |
+| A name from `from module import *` is public, even when the importing module's `__all__` leaves it out. The module that the import reads must give the name. | `pandas.api.types.is_numeric_dtype` is public. `scipy.stats.interp1d` is not a name. |
 | An import into a module without a readable `__all__` is public, when the name is defined in that module's package or below it. | `numpy.lib.stride_tricks.as_strided` is public. `pymoo.vendor.vendor_scipy.LocalSearch` is imported from another package and stays private. |
 
 Each definition gets one entry for each public name it has. When several public paths reach
@@ -377,7 +378,7 @@ extension and a Griffe loader subclass in `py/index.py`. Each case names its sym
 | Case | Symbol |
 | --- | --- |
 | A function that exists only as overloads in a stub file | `numpy.zeros` |
-| A plain assignment to another callable | `numpy.concat`, `pandas.io.pytables.Term` |
+| A plain assignment to another callable | `numpy.concat`, `pandas.io.pytables.Term`, `numpy.int64` |
 | A function that its stub declares as an attribute | `numpy.polynomial.hermite.hermadd` |
 | A class or function with the same name as the submodule that defines it | `numpy.memmap`, `scipy.optimize.least_squares` |
 | An `__all__` that is computed and cannot be read | `scipy.signal.butter` |

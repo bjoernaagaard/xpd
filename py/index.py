@@ -4,6 +4,7 @@ import ast
 import importlib.metadata
 import json
 import logging
+import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -123,7 +124,7 @@ class Callables(griffe.Extension):
                 if attr.parent.filepath.suffix == ".pyi":
                     self.stub_exports.add(attr.parent.path)
         elif str(attr.annotation or "TypeAlias").endswith("TypeAlias") and isinstance(
-            attr.value, (griffe.ExprName, griffe.ExprAttribute)
+            attr.value, (griffe.ExprName, griffe.ExprAttribute, griffe.ExprSubscript)
         ):
             self.assignments.append(attr)
 
@@ -169,10 +170,16 @@ class Callables(griffe.Extension):
 
         `pandas.io.pytables.Term` is `Term: TypeAlias = PyTablesExpr`.
         `hamilton.function_modifiers.configuration` is assigned over a submodule of that name.
+        `numpy.int64` is `int64 = signedinteger[_64Bit]` in `__init__.pyi`.
         """
         module = self.module(pkg, assigned.parent.path)
         current = module.members.get(assigned.name) if module else None
-        target = assigned.value.canonical_path
+        value = assigned.value
+        if isinstance(value, griffe.ExprSubscript):
+            value = value.left
+        if not isinstance(value, (griffe.ExprName, griffe.ExprAttribute)):
+            return
+        target = value.canonical_path
         if current is None or current.is_alias or target.split(".")[0] != pkg.name:
             return
         if current.is_module:
@@ -275,18 +282,50 @@ def package_of(module: griffe.Module) -> str:
     return module.path if module.is_init_module else module.path.rsplit(".", 1)[0]
 
 
+def below(target: griffe.Object, module: griffe.Module) -> bool:
+    """Whether `target` is defined in the package of `module` or below it."""
+    return f"{package_of(target.module)}.".startswith(f"{package_of(module)}.")
+
+
+def from_wildcard(member: griffe.Alias, target: griffe.Object) -> bool:
+    """Whether the module that a wildcard import reads gives `member` to its importers.
+
+    A readable `__all__` decides. Without one, the module gives what it defines and what it
+    imports from its own package. `scipy.stats._discrete_distns` computes `__all__` and
+    imports `interp1d` from `scipy.interpolate` for its own use, so `scipy.stats.interp1d`
+    is not a name.
+    """
+    source = member.target
+    module = source.parent
+    if module.exports:
+        return member.name in module.exports
+    if not source.is_alias:
+        return True
+    if source.wildcard_imported:
+        return from_wildcard(source, target)
+    return below(target, module)
+
+
 def is_public(member: griffe.Object | griffe.Alias, target: griffe.Object) -> bool:
-    """Apply Griffe's rules, with two exceptions that named symbols prove.
+    """Apply Griffe's rules, with three exceptions that named symbols prove.
 
     `pandas.tests.frame.test_api.TestDataFrameMisc` is in a test folder that the wheel ships,
     which Griffe treats as public.
+
+    `pandas.tseries.holiday.USFederalHolidayCalendar` is defined in its module, has a public
+    name and is in the pandas user guide, but `__all__` leaves it out, which Griffe treats
+    as private. A module's own class or function with a public name is public.
 
     `pandas.api.types.is_numeric_dtype` comes from a wildcard import and is not in `__all__`,
     which Griffe treats as private. Griffe names this convention public wildcard imports.
     """
     if target.is_module:
         return member.name != "tests" and (member.is_exported or not member.is_alias)
-    return member.is_public or (member.is_alias and member.wildcard_imported)
+    if not member.is_alias:
+        return True
+    if member.wildcard_imported:
+        return member.is_exported or from_wildcard(member, target)
+    return member.is_public
 
 
 def is_reexport(
@@ -298,8 +337,7 @@ def is_reexport(
     the module's package or below it. `scipy.io.loadmat` is such an import, and
     `pymoo.vendor.vendor_scipy.LocalSearch` is an import from another package.
     """
-    below = f"{package_of(target.module)}.".startswith(f"{package_of(module)}.")
-    return member.is_alias and not module.exports and below
+    return member.is_alias and not module.exports and below(target, module)
 
 
 def shadowing(
@@ -399,6 +437,13 @@ def main() -> None:
         root /= package
     elif (root / "src" / package).is_dir():
         root /= f"src/{package}"
+    # Griffe follows directory links and does not stop at one that points back up.
+    for folder, names, _files in os.walk(root):
+        for name in names:
+            if (Path(folder) / name).is_symlink():
+                sys.exit(
+                    f"Index building does not follow the directory link {Path(folder) / name}."
+                )
     callables = Callables()
     loader = Loader(callables, search_paths=[root.parent], allow_inspection=False)
     module = loader.load(root)
