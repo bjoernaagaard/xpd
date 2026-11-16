@@ -156,8 +156,7 @@ pub(in crate::author) struct Changes {
 }
 
 impl Changes {
-    /// Writes `text` to a new file, or over the file whose text was `previous`.
-    fn write(&mut self, path: PathBuf, text: String, previous: Option<&String>) {
+    fn stage(&mut self, path: PathBuf, text: String, previous: Option<&String>) {
         match previous {
             Some(_) => self.replace.push((path, text)),
             None => self.create.push((path, text)),
@@ -307,8 +306,8 @@ impl Project {
             "the new {XPD_CONFIG} does not keep its packs"
         );
         let mut changes = Changes::default();
-        changes.write(inside(dir, SGCONFIG)?, sgconfig, None);
-        changes.write(inside(dir, XPD_CONFIG)?, xpd_config, None);
+        changes.stage(inside(dir, SGCONFIG)?, sgconfig, None);
+        changes.stage(inside(dir, XPD_CONFIG)?, xpd_config, None);
         let folders = [RULES, TESTS, UTILS]
             .map(str::to_owned)
             .into_iter()
@@ -316,7 +315,7 @@ impl Project {
         for folder in folders {
             let keep = inside(dir, &format!("{folder}/.gitkeep"))?;
             if fs::symlink_metadata(&keep).is_err() {
-                changes.write(keep, String::new(), None);
+                changes.stage(keep, String::new(), None);
             }
         }
         Ok(changes)
@@ -456,10 +455,10 @@ impl Project {
             None => format!("{SGCONFIG} has no ruleDirs"),
         })?;
         let path = self.inside(&format!("{dir}/{}.yml", doc.id.name))?;
-        changes.write(path, text, None);
+        changes.stage(path, text, None);
         if let Some(pack) = pack.filter(|pack| !pack.declared) {
             let text = with_pack(self.xpd_config.as_deref(), pack)?;
-            changes.write(self.inside(XPD_CONFIG)?, text, self.xpd_config.as_ref());
+            changes.stage(self.inside(XPD_CONFIG)?, text, self.xpd_config.as_ref());
         }
         let docs = self.inside(DOCS)?;
         let existing = docs
@@ -472,7 +471,7 @@ impl Project {
             &doc.docs_heading(),
             &doc.docs_section(),
         )?;
-        changes.write(docs, text, existing.as_ref());
+        changes.stage(docs, text, existing.as_ref());
         Ok(())
     }
 
@@ -488,7 +487,7 @@ impl Project {
             .or(dirs.first().map(String::as_str))
             .with_context(|| format!("{SGCONFIG} has no testConfigs"))?;
         let path = self.inside(&format!("{dir}/{id}-test.yml"))?;
-        changes.write(path, document::empty_test(id)?, None);
+        changes.stage(path, document::empty_test(id)?, None);
         Ok(())
     }
 
@@ -521,13 +520,13 @@ impl Project {
         }
         let text = document::checked_util(name, language, language_name, pattern, &others)?;
         let path = self.inside(&format!("{dir}/{name}.yml"))?;
-        changes.write(path, text, None);
+        changes.stage(path, text, None);
         Ok(())
     }
 }
 
 /// `relative` in the folder `root`. Fails when it leads outside the folder, by `..`, an absolute
-/// path or a link. A folder that does not exist yet has no links in it.
+/// path or a link.
 fn inside(root: &Path, relative: &str) -> Result<PathBuf> {
     let path = Path::new(relative);
     ensure!(
@@ -560,9 +559,7 @@ fn inside(root: &Path, relative: &str) -> Result<PathBuf> {
     Ok(full)
 }
 
-/// The text of `xpd.yml` with the pack added, and every other line of the file kept. Tries
-/// each way to append the entry, and keeps the first that reads back as the file's packs with
-/// the new one at the end.
+/// The text of `xpd.yml` with the pack added, and every other line of the file kept.
 fn with_pack(text: Option<&str>, pack: &Pack) -> Result<String> {
     let entry = pack.entry();
     let Some(text) = text else {

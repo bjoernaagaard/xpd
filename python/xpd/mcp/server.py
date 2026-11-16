@@ -47,8 +47,7 @@ skill://python-review/SKILL.md hold the style a linter cannot check."""
 def build(settings: Settings) -> FastMCP:
     project = Project(Root.at(settings.root) if settings.root else None)
     xpd = Xpd(find_binary())
-    # Project rule requests reload their catalog; pipeline guidance uses the embedded snapshot.
-    rules = catalog.Catalog(tuple(xpd.run_now(RULES)))
+    fallback_rules = catalog.Catalog(tuple(xpd.run_now(RULES)))
     skills = [
         Skill.from_files({file.path: file.text for file in skill.files})
         for skill in xpd.run_now(SKILLS)
@@ -66,8 +65,8 @@ def build(settings: Settings) -> FastMCP:
     structure.register(mcp, xpd, project)
     discovery.register(mcp, xpd, project)
     views.register(mcp, xpd, project)
-    catalog.register(mcp, rules, xpd, project)
-    pipeline.register(mcp, project, rules)
+    catalog.register(mcp, fallback_rules, xpd, project)
+    pipeline.register(mcp, project, fallback_rules)
     prompts.register(mcp)
 
     @mcp.resource(

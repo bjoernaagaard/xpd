@@ -13,8 +13,8 @@ ignore = [{ id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmain
 # Permissive licenses only. Read a license's terms before adding it here.
 allow = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-0", "NCSA", "Unicode-3.0", "Zlib"]
 confidence-threshold = 0.8
-# libloading serves bindgen and ast-grep's optional language loader. The unmodified option-ext
-# dependency comes from ast-grep's project-directory support; its license and complete source
+# The unmodified option-ext dependency comes from ast-grep's project-directory support.
+# Its license and complete source
 # archive ship under licenses/ to satisfy MPL's source-availability requirement.
 exceptions = [
     { crate = "option-ext@0.2.0", allow = ["MPL-2.0"] },

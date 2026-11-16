@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, IsTerminal as _, Write as _};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context as _, Result, ensure};
@@ -102,6 +102,13 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
     let directories = directories(options)?;
     let mut outcomes = Vec::new();
     for (directory, snapshot_dir) in directories {
+        ensure!(
+            !snapshot_dir.as_os_str().is_empty()
+                && snapshot_dir
+                    .components()
+                    .all(|part| matches!(part, Component::Normal(_))),
+            "snapshot directory must be a relative folder without parent components"
+        );
         let mut files = Vec::new();
         for entry in ignore::WalkBuilder::new(&directory).build() {
             let entry = entry?;
@@ -112,8 +119,8 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
                     .is_some_and(|ext| ext == "yml" || ext == "yaml")
                 && !entry
                     .path()
-                    .components()
-                    .any(|part| part.as_os_str() == snapshot_dir.as_os_str())
+                    .ancestors()
+                    .any(|parent| parent.ends_with(&snapshot_dir))
             {
                 files.push(entry.into_path());
             }
@@ -162,17 +169,8 @@ fn run_case(
     path: &Path,
     snapshot_dir: &Path,
 ) -> Result<Vec<Outcome>> {
-    let known = packs.iter().any(|pack| {
-        pack.rules.iter().any(|rule| {
-            rule.config.id == case.id || format!("{}/{}", pack.module, rule.config.id) == case.id
-        })
-    });
-    ensure!(known, "no rule matches case id {}", case.id);
-    let snapshot_path = path
-        .parent()
-        .context("case has no parent")?
-        .join(snapshot_dir)
-        .join(format!("{}-snapshot.yml", case.id.replace('/', "-")));
+    let filename = source_path(packs, case)?;
+    let snapshot_path = snapshot_file(path, snapshot_dir, &case.id)?;
     let mut snapshots: Snapshots = if snapshot_path.exists() {
         serde_saphyr::from_str(&fs::read_to_string(&snapshot_path)?)?
     } else {
@@ -194,10 +192,9 @@ fn run_case(
         .map(|s| (s, false))
         .chain(case.invalid.iter().map(|s| (s, true)))
     {
-        let filename = case.path.as_deref().unwrap_or(Path::new("case.py"));
         let found = scan::lint_source(
             scan::File {
-                path: filename,
+                path: &filename,
                 disk: None,
             },
             source,
@@ -250,6 +247,53 @@ fn run_case(
         fs::write(&snapshot_path, serde_saphyr::to_string(&snapshots)?)?;
     }
     Ok(outcomes)
+}
+
+fn source_path(packs: &[pack::Pack], case: &Case) -> Result<PathBuf> {
+    let rule = packs
+        .iter()
+        .find_map(|pack| {
+            pack.rules.iter().find(|rule| {
+                rule.config.id == case.id
+                    || format!("{}/{}", pack.module, rule.config.id) == case.id
+            })
+        })
+        .with_context(|| format!("no rule matches case id {}", case.id))?;
+    let file_types = rule.config.language.file_types();
+    let extension = file_types
+        .definitions()
+        .iter()
+        .flat_map(ignore::types::FileTypeDef::globs)
+        .find_map(|glob| glob.strip_prefix("*."))
+        .context("rule language has no default extension; supply a case path")?;
+    Ok(case
+        .path
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(format!("case.{extension}"))))
+}
+
+fn snapshot_file(path: &Path, snapshot_dir: &Path, id: &str) -> Result<PathBuf> {
+    let snapshot_path = path
+        .parent()
+        .context("case has no parent")?
+        .join(snapshot_dir)
+        .join(format!(
+            "{}-snapshot.yml",
+            id.replace(['/', '\\', ':'], "-")
+        ));
+    let case_root = path
+        .parent()
+        .context("case has no parent")?
+        .canonicalize()?;
+    let existing = snapshot_path
+        .ancestors()
+        .find(|path| fs::symlink_metadata(path).is_ok())
+        .context("snapshot path has no existing parent")?;
+    ensure!(
+        existing.canonicalize()?.starts_with(&case_root),
+        "snapshot path leaves the case directory"
+    );
+    Ok(snapshot_path)
 }
 
 fn directories(options: &Options) -> Result<Vec<(PathBuf, PathBuf)>> {

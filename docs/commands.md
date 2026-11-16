@@ -5,7 +5,7 @@
 ## check
 
 ```sh
-xpd check [PATHS]... [--format text|json] [--fix] [--unsafe-fixes]
+xpd check [PATHS]... [--format text|json|sarif|github] [--fix] [--unsafe-fixes]
 ```
 
 Lints files and folders. Folders respect `.gitignore`. A library's rules run only on files
@@ -22,6 +22,8 @@ fix may change it, for example because another name still points at the old obje
 | `--fix` | Write the safe fixes, then lint what is left |
 | `--unsafe-fixes` | Lint. `[*]` also marks an issue with an unsafe fix |
 | `--fix --unsafe-fixes` | Write every fix, then lint what is left |
+| `--fix --review` | Review each safe fix before writing it |
+| `--fix --review --unsafe-fixes` | Review safe and unsafe fixes before writing them |
 
 Output is text on a terminal and JSON otherwise. The JSON has `fixed`, the number of fixes
 written, `fixable`, the number of issues that `--fix` fixes with the same `--unsafe-fixes`
@@ -34,6 +36,110 @@ about a place in a file, so its `line` and `column` are `null`.
 | 0 | No error-severity issue, after fixes |
 | 1 | At least one error |
 | 2 | xpd could not run, for example an unreadable path |
+
+`scan` is an alias for `check`. SARIF output uses version 2.1.0 and includes rule descriptions,
+source locations and proposed fixes. GitHub output uses workflow annotations. Neither format
+changes the exit code or which rules run.
+
+## run
+
+```sh
+xpd run --lang python --pattern '$X.iterrows()' src --format json
+xpd run --lang rust --kind function_item src
+xpd run --pattern '$S.tz_convert("UTC").tz_localize(None)' --rewrite '$S.tz_convert(None)' analysis.py
+```
+
+Finds syntax patterns or node kinds without executing the source. The language comes from
+`--lang` or each file's extension. Use `--selector` to select the matched part of a larger
+pattern. `query` is an alias for `run`.
+
+Without a write flag, a replacement is a preview. Use `--interactive` to accept individual
+rewrites or `--update-all` to write every replacement. Structural rewrites have no xpd value
+proof or safe-fix classification, so inspect the proposed changes before applying them.
+
+JSON contains each match's file, text, byte range, line and column range, language and captured
+variables. Positions in the structural JSON count from zero. Exit 0 means a match was found,
+1 means no match and 2 means the command could not run.
+
+## outline
+
+```sh
+xpd outline src --format json
+xpd outline analysis.py --items all
+xpd outline src --type function,class --match '^Data'
+```
+
+Reads symbols, imports, members, signatures and source ranges. Python outlines retain full
+parameters, decorators and private names. The same extraction supplies xpd's Hamilton and step
+analysis, while their dependency and column interpretation remains in xpd. Source indexing
+also uses the extraction and keeps public alias and documentation resolution.
+
+`--items structure`, `imports`, `exports` or `all` selects the entries. `--pub-members` keeps
+public members. `--outline-rules` adds a YAML extraction file in ast-grep's outline schema.
+`--no-default-outline-rules` uses only the supplied rules. No source code is run.
+
+## new
+
+```sh
+xpd new
+xpd new project --pack team --yes
+xpd new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes
+xpd new test team/no-print --yes
+xpd new util print-call --lang python --pattern 'print($X)' --yes
+```
+
+Without an item, `new` guides you through project, rule, case or utility creation. `--yes`
+turns prompts off and requires the needed flags. `--directory` selects the project root.
+`--format json` reports `createdFiles` and `modifiedFiles` as absolute paths. Existing rule
+files are never overwritten.
+
+A project has `sgconfig.yml`, `xpd.yml`, and rule, case and utility directories. Its configured
+paths are relative. Rules belonging to a library pack use Python and run on files importing
+that library, unless the pack has `--every-file`. Rules outside a pack can use any supported
+language and do not have a library import gate.
+
+A rule needs a valid `--pattern` and a `--message`. `--fix` also needs `--fix-safety safe` or
+`unsafe`. `--since` and `--until` bound its library versions. `--holds VAR=RULE`,
+`--unless-holds VAR=RULE` and `--unless-imported RULE` supply value proofs as YAML rules.
+`--public-id` lets variants keep one reported name. The creator writes a documentation section
+with the rule, and `--with-test` adds an empty case template. It does not invent expected cases.
+
+Utilities are shared rules referenced by `matches: <name>`. `new help rule` and
+`new rule --help` show the same command help.
+
+## test
+
+```sh
+xpd test
+xpd test --filter '^team/' --skip-snapshot-tests
+xpd test --interactive
+xpd test --engine structural --config sgconfig.yml
+```
+
+Reads the upstream suite shape with `id`, `valid` and `invalid` fields. The default xpd engine
+runs examples through the same scanner as linting, including import gates, value proofs and
+version selection. A case can supply `path` for path filters and source-language selection.
+Valid examples must have no finding from their rule. Invalid examples must have a finding.
+
+Snapshots record diagnostic ranges and proposed fixes. `--skip-snapshot-tests` checks only
+validity. `--interactive` reviews changed snapshots, while `--update-all` accepts them.
+Snapshots are stored in `__snapshots__` beside the suite, or the configured `snapshotDir`.
+`--test-dir` overrides the directories in `sgconfig.yml`. `--format json` returns the outcomes
+and failed count. Exit 0 means every example passed, 1 means an expectation failed and 2 means
+the command could not run.
+
+`--engine structural` uses ast-grep's upstream runner, suite format and snapshots. It checks
+raw structural rules and does not apply xpd's library import gates or value proofs. Use the
+default engine for rules whose expectations depend on xpd metadata.
+
+## completions
+
+```sh
+xpd completions bash
+```
+
+Prints completion for the installed command schema, including `run`, `outline`, `new` and
+`test`. Supported shells are `bash`, `zsh`, `fish`, `powershell` and `elvish`.
 
 ## profile
 

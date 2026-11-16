@@ -16,12 +16,20 @@ xpd mcp
 
 ## How a call runs
 
-The server holds no rules and no results of its own. It loads the rules and the skills from the
-xpd binary when it starts. A tool that reads project files first checks its paths, and then runs
+The server holds no rules and no results of its own. It loads built-in rules and skills from the
+xpd binary when it starts, and reloads project rules for catalog calls and completions.
+A tool that reads project files first checks its paths, and then runs
 the binary in the project root. The data tools return the JSON that the binary prints as a typed
 result, and the `show_` tools also return a table or a chart. `contract` and `gates` are the
 exception. They run no binary: `contract` reads a JSON file of the project, and `gates` holds
 its own requirements and judges results that the other tools returned.
+
+The structural tools operate inside the project root. `query` finds a pattern or node kind
+and previews a replacement. `rewrite` presents the matches and asks for confirmation before
+writing. `outline` returns live symbols, imports and members, including projects that have no
+saved index. `new` creates a rule project, rule, empty case template or shared utility using
+the same options as the CLI. `test` compares rule examples and snapshots through xpd's scanner;
+it writes snapshots only when `update_snapshots` is true.
 
 ```mermaid
 sequenceDiagram
