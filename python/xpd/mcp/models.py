@@ -11,7 +11,7 @@ FixSafety = Literal["safe", "unsafe"]
 class Output(BaseModel):
     """A shape the binary owns, so a field it adds later is kept, not refused."""
 
-    model_config = ConfigDict(extra="allow", frozen=True)
+    model_config = ConfigDict(extra="allow", frozen=True, serialize_by_alias=True)
 
 
 class CaseOutcome(Output):

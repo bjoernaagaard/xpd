@@ -238,6 +238,7 @@ fn matched_rules<'p, 'r>(
 pub(crate) struct Found {
     pub(crate) issue: Issue,
     pub(crate) labels: Vec<Label>,
+    pub(crate) variant: Option<crate::rule::VariantId>,
     /// The bytes of the source that the rule matched.
     pub(crate) range: Range<usize>,
     /// What the rule's fix writes for this match. `None` when the issue has no fix.
@@ -311,6 +312,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
                 fix: rule.fix.filter(|_| edit.is_some()),
             };
             found.push(Found {
+                variant: Some(rule.variant.clone()),
                 issue,
                 labels: rule
                     .config

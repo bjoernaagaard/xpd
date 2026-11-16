@@ -378,6 +378,7 @@ fn lint<'d>(
             if let Some(message) = error {
                 found.push(Found {
                     labels: Vec::new(),
+                    variant: None,
                     issue: Issue {
                         package: "xpd".into(),
                         rule: "invalid-rule".into(),

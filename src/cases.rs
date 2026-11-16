@@ -180,7 +180,21 @@ fn run_case(
     snapshot_dir: &Path,
     root: &Path,
 ) -> Result<Vec<Outcome>> {
-    let filename = source_path(packs, case)?;
+    let selected: Vec<_> = packs
+        .iter()
+        .flat_map(|pack| &pack.rules)
+        .filter(|rule| {
+            rule.id == case.id
+                || rule.config.id == case.id
+                || rule.declared_id == case.id
+                || (!case.id.contains('/')
+                    && rule.declared_id.rsplit('/').next() == Some(case.id.as_str()))
+        })
+        .collect();
+    let rule = selected
+        .first()
+        .with_context(|| format!("no rule matches case id {}", case.id))?;
+    let filename = source_path(rule, case)?;
     let disk = root.join(&filename);
     let snapshot_path = snapshot_file(path, snapshot_dir, &case.id)?;
     let mut snapshots: Snapshots = if snapshot_path.exists() {
@@ -214,8 +228,10 @@ fn run_case(
         )
         .into_iter()
         .find(|found| {
-            found.issue.rule == case.id
-                || format!("{}/{}", found.issue.package, found.issue.rule) == case.id
+            found
+                .variant
+                .as_ref()
+                .is_some_and(|variant| selected.iter().any(|rule| rule.variant == *variant))
         });
         let actual = found.map(|found| {
             let labels: Vec<_> = found.labels.iter().map(|label| {
@@ -265,15 +281,7 @@ fn run_case(
     Ok(outcomes)
 }
 
-fn source_path(packs: &[pack::Pack], case: &Case) -> Result<PathBuf> {
-    let rule = packs
-        .iter()
-        .find_map(|pack| {
-            pack.rules
-                .iter()
-                .find(|rule| rule.id == case.id || rule.config.id == case.id)
-        })
-        .with_context(|| format!("no rule matches case id {}", case.id))?;
+fn source_path(rule: &crate::rule::Rule, case: &Case) -> Result<PathBuf> {
     let file_types = rule.config.language.file_types();
     let extension = file_types
         .definitions()
