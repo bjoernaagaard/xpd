@@ -13,8 +13,8 @@ pub(crate) fn tokens(text: &str) -> Vec<String> {
         .filter(|s| s.len() > 1 && !s.chars().all(|c| c.is_ascii_digit()))
         .filter(|s| {
             ![
-                "the", "and", "for", "with", "from", "into", "that", "this", "how", "can", "use",
-                "to", "of", "in", "on", "is", "an", "my", "it", "all",
+                "the", "and", "for", "with", "from", "into", "that", "this", "how", "can", "to",
+                "of", "in", "on", "is", "an", "my", "it", "all",
             ]
             .contains(s)
         })

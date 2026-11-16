@@ -452,10 +452,16 @@ impl Attribution {
             "DISCLAIMER",
             "THIRD_PARTY_NOTICES.md",
         ] {
-            let path = source.root.join(name);
-            if path.is_file() {
-                attribution.push('\n');
-                attribution.push_str(&std::fs::read_to_string(path)?);
+            let roots: BTreeSet<_> = [Some(source.root), source.license.parent()]
+                .into_iter()
+                .flatten()
+                .collect();
+            for root in roots {
+                let path = root.join(name);
+                if path.is_file() {
+                    attribution.push('\n');
+                    attribution.push_str(&std::fs::read_to_string(path)?);
+                }
             }
         }
         if let Some(notice) = source.notice {
@@ -591,11 +597,7 @@ pub(crate) fn harvest(
                 callable: None,
                 parameters: Vec::new(),
                 summary: title,
-                keywords: crate::search::tokens(&fixed)
-                    .into_iter()
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect(),
+                keywords: vec![fixed],
                 members: Vec::new(),
                 rules: Vec::new(),
                 recipe: Some(recipe),

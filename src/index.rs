@@ -685,17 +685,13 @@ fn read_definitions(
                         doc
                     }
                 },
-                keywords: tokens(
-                    &documentation(&def)
+                keywords: vec![
+                    documentation(&def)
                         .lines()
                         .take_while(|line| *line != "Examples")
                         .collect::<Vec<_>>()
                         .join(" "),
-                )
-                .into_iter()
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect(),
+                ],
                 members: methods
                     .iter()
                     .filter_map(|m| {
