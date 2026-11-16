@@ -470,12 +470,12 @@ commands were run from this worktree, without changing the project's dependencie
 PyArrow and bottleneck satisfy the optional pandas package checks in this environment.
 
 ```sh
-cargo package --list
 uv venv /var/tmp/xpd-library-verification/venv
 uv pip install --python /var/tmp/xpd-library-verification/venv/bin/python maturin
 /var/tmp/xpd-library-verification/venv/bin/maturin sdist --out /var/tmp/xpd-library-verification/final-sdist
 mkdir -p /var/tmp/xpd-library-verification/final-clean
 tar -xzf /var/tmp/xpd-library-verification/final-sdist/xpd-0.16.0.tar.gz -C /var/tmp/xpd-library-verification/final-clean
+cargo package --list --manifest-path /var/tmp/xpd-library-verification/final-clean/xpd-0.16.0/Cargo.toml
 /var/tmp/xpd-library-verification/venv/bin/maturin build --release --manifest-path /var/tmp/xpd-library-verification/final-clean/xpd-0.16.0/Cargo.toml --out /var/tmp/xpd-library-verification/final-wheels
 uv pip install --python /var/tmp/xpd-library-verification/venv/bin/python /var/tmp/xpd-library-verification/final-wheels/*.whl pandas scikit-learn scikit-lego arch mapie plotly pyarrow bottleneck
 ```
