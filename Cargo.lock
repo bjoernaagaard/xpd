@@ -2633,6 +2633,7 @@ dependencies = [
  "clap_complete",
  "globset",
  "ignore",
+ "inquire",
  "llama-cpp-2",
  "lsp-server",
  "lsp-types",

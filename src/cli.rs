@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
+use crate::author;
 use crate::catalog;
 use crate::graph::Graph;
 use crate::index::{self, Kind};
@@ -220,6 +221,8 @@ enum Cmd {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+    /// Create a rule project, or a rule, test case or utility in one.
+    New(author::NewArgs),
 }
 
 /// Runs the command the arguments name.
@@ -311,6 +314,10 @@ pub(crate) fn run() -> ExitCode {
             clap_complete::generate(shell, &mut Cli::command(), "xpd", &mut io::stdout());
             ExitCode::SUCCESS
         }
+        Cmd::New(args) => author::run(args).unwrap_or_else(|e| {
+            eprintln!("xpd: {e:#}");
+            ExitCode::from(CHECK_FAILED)
+        }),
     }
 }
 
