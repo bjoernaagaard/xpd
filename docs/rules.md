@@ -7350,6 +7350,90 @@ A rule reads a value only where it is written in the call: a number, a string, `
 The names the messages tell you to write exist on plotly 5.0.0, 5.24.1, 6.0.0 and 7.1.0, where
 each was run, so no document of the pack carries `since`.
 
+### How a rule earns its place
+
+Every rule ships on a measurement that was run, and the message quotes what it measured. A
+measurement is one of two kinds:
+
+- A resolved value is what plotly.js made of the figure, read from
+  `full_figure_for_development`, such as `sizemode="diameter"` for a `go.Scatter` that sets no
+  size mode.
+- A drawn size is read from the SVG that plotly renders, such as the radius of a marker, the
+  visible length of a bar, or the highest point of a curve.
+
+A rule is `error` when the figure is wrong for every reader, `warning` when the drawn sizes do
+not follow the numbers or the book rejects the form outright, and `info` when the form is a
+choice that the book argues against.
+
+The rules were run over 1,087 files of plotly code: the Python blocks of 151 pages of the
+plotly documentation, 117 files of the Dash sample apps that name plotly, and 819 files from
+819 public repositories, 326 of them notebooks. Up to 20 reports of each rule were read. Five
+rules were narrowed after the first run, and the table gives the reports that are left:
+
+- `marker-size-diameter` reported `size=[12, 15]` on two highlighted points and
+  `layer["size"] + 11` in a glow effect. It now reads a size only when it takes a column from
+  the object that the same trace reads a coordinate from.
+- `bar-axis-without-zero` reported `update_yaxes(range=[1, 100])` on a rating scale, which cuts
+  a hundredth off the longest bar. It now reads a range only when its lower end has as many
+  digits as its upper end, or one fewer.
+- `gauge-indicator` reported gauges with `shape="bullet"`, which are bars and not dials.
+- `explicit-grid` reported the graticule of a map, a black `gridcolor` beside `showgrid=False`,
+  and a white grid of width 2. It now reads only the x and y axes, and only black.
+- `default-template` reported every `import plotly.express` of a file, and files that show
+  their figures through Streamlit, which draws with its own theme. It now reports the first
+  import, and no file that names `streamlit`.
+
+| Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Fix |
+| --- | --- | --- | --- | --- | --- |
+| [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 0, 0, 7 | none |
+| [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | none |
+| [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | none |
+| [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | none |
+| [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | none |
+| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel | 2, 0, 0 | none |
+| [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 96, 18, 236 | unsafe |
+| [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | unsafe |
+| [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 2, 1, 13 | none |
+| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels | 14, 0, 82 | none |
+| [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
+| [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
+| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet | 28, 7, 128 | none |
+| [`spline-line`](#spline-line) | info | 92 | drawn: 10.8 where the data ends at 10 | 4, 0, 7 | unsafe |
+| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once | 8, 1, 18 | none |
+| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 1, 1, 2 | none |
+| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
+
+`default-template` reports a file once, so its 350 reports are 350 of the 1,087 files.
+`bar-axis-without-zero` and `three-d-for-two-d` have no report on this code. They are kept for
+the figures they catch, which the samples in `samples/plotly/` show.
+
+None of the reports that were read after the narrowing names a line where the rule's claim is
+false. Whether the advice fits is a choice for the `info` rules: a wind rose is the usual chart
+in meteorology and `polar-bar-area` still reports it, and all 28 reports of `pie-chart` on the
+plotly documentation are the pages that teach pie charts. Recall was not measured.
+
+No fix of the pack is safe, because every fix changes what the reader sees. `--fix` alone
+writes nothing for this pack, and `--fix --unsafe-fixes` writes three rewrites: a tinted
+template becomes `"simple_white"`, `showgrid=True` becomes `showgrid=False`, and `"spline"`
+becomes `"linear"`.
+
+### What the pack does not check
+
+The book states principles that the code of a figure does not show, so no rule covers them:
+
+- "In time-series displays of money, deflated and standardized units of monetary measurement
+  are nearly always better than nominal units" (page 68). The code does not say that a column
+  is money.
+- "Graphics must not quote data out of context" (page 74). The rows that were left out are not
+  in the code.
+- The range-frame and the dot-dash-plot (page 130 and 133). plotly has no axis line that ends
+  at the lowest and highest value, and `marginal_x="rug"` is a choice xpd cannot ask for from a
+  missing argument.
+- The Shrink Principle (page 169). The right size of a figure depends on how many values it
+  shows, which the code does not say.
+- A pie made of several `go.Pie` traces, or bars added to an empty `go.Figure()` with
+  `add_trace`. xpd does not follow a figure through its statements.
+
 ### Sizes that do not follow the numbers
 
 The first principle of graphical integrity in the book is "The representation of numbers, as
