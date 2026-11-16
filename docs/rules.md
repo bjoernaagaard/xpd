@@ -9764,6 +9764,7 @@ as bars given to `go.Figure` itself, and 288.8 and 304.0 pixels long without the
 added to the same variable after its assignment and before the range, in the statement itself
 or in a loop or a condition, with no second assignment of the name in between. A bar with
 `orientation`, `base` or `yaxis` is left alone.
+
 #### area-axis-without-zero
 
 **Severity:** warning. **Fix:** none.

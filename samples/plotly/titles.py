@@ -29,5 +29,5 @@ def column_titles():
     labelled = px.scatter(gap, x="gdpPercap", y="lifeExp", log_x=True, labels={"gdpPercap": "GDP per person", "lifeExp": "Life expectancy"})
     words = px.bar(tips, x="day", y="tip")
     by_name = px.scatter(gap, x=COLUMN, y="pop")
-    wide = px.line(gap.head(5), y=["lifeExp", "gdpPercap"])
+    wide = px.line(gap.head(5), y=["lifeExp", "gdpPercap"])  # xpd: legend-instead-of-labels
     return camel, snake, on_y, labelled, words, by_name, wide

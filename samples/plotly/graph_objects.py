@@ -93,7 +93,7 @@ def several_pies():
     looped = make_subplots(rows=1, cols=2, specs=DOMAINS)
     for i, values in enumerate(([1, 2], [2, 1])):
         looped.add_trace(go.Pie(labels=LABELS, values=values), row=1, col=i + 1)  # xpd: pie-chart
-    one = go.Figure(go.Pie(labels=LABELS, values=[1, 2]))  # xpd: pie-chart
+    one = go.Figure(go.Pie(labels=LABELS, values=[1, 2]))  # xpd: pie-chart, table-for-small-data
     pie_and_bar = make_subplots(rows=1, cols=2, specs=[[{"type": "domain"}, {"type": "xy"}]])
     pie_and_bar.add_trace(go.Pie(labels=LABELS, values=[1, 2]), row=1, col=1)  # xpd: pie-chart
     pie_and_bar.add_trace(go.Bar(x=LABELS, y=[1, 2]), row=1, col=2)
