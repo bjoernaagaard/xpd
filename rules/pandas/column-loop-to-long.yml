@@ -1,0 +1,44 @@
+# A loop that selects one column at a time, renames it to a shared name, and stacks the parts
+# turns a wide frame into a long one. melt does it in one call. On pandas 3.1.1 and a frame of
+# 100,000 rows with 20 year columns, the loop with concat and melt gave the same 2,000,000 rows
+# in the same order, and melt ran 1.4 times faster (research/modern-pandas/probes/tidy.txt). The
+# speed is not the point: melt names the id columns, the columns to stack and the two new
+# columns in one place. The rule has no fix, because the names are spread over the loop.
+id: column-loop-to-long
+language: python
+severity: info
+message: This builds one frame per column and stacks them. melt does that in one call, as in df.melt(id_vars=["id"], value_vars=columns, var_name="year", value_name="sales"). For 20 columns it gave the same rows in the same order and ran 1.4 times faster.
+rule:
+  kind: list_comprehension
+  all:
+    - has: { kind: for_in_clause, has: { field: left, kind: identifier, pattern: $C } }
+    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.concat$' } } }
+    # The loop variable names a column: it is a key of rename(columns={...}) and it selects from
+    # a frame, alone or in a list.
+    - has:
+        stopBy: end
+        kind: pair
+        all:
+          - has: { field: key, pattern: $C }
+          - inside: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: ^rename$ } } }
+    - has: { stopBy: end, kind: subscript, has: { field: subscript, any: [{ pattern: $C }, { kind: list, has: { pattern: $C } }] } }
+---
+# The same loop written as a for statement that appends each part to a list.
+id: column-loop-to-long
+language: python
+severity: info
+message: This builds one frame per column and stacks them. melt does that in one call, as in df.melt(id_vars=["id"], value_vars=columns, var_name="year", value_name="sales"). For 20 columns it gave the same rows in the same order and ran 1.4 times faster.
+rule:
+  kind: for_statement
+  all:
+    - has: { field: left, kind: identifier, pattern: $C }
+    - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: ^append$ } } }
+    # The loop variable names a column: it is a key of rename(columns={...}) and it selects from
+    # a frame, alone or in a list.
+    - has:
+        stopBy: end
+        kind: pair
+        all:
+          - has: { field: key, pattern: $C }
+          - inside: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: ^rename$ } } }
+    - has: { stopBy: end, kind: subscript, has: { field: subscript, any: [{ pattern: $C }, { kind: list, has: { pattern: $C } }] } }

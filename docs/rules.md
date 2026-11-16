@@ -1555,6 +1555,111 @@ skipna=False preserves missing values from the first row. Without it, first can 
 The replacement is advice. xpd does not apply it automatically.
 
 
+### Tidy data
+
+A tidy frame has one row per observation and one column per variable. These rules report the
+longer ways to reshape a frame, and the defaults of the reshaping methods that change values
+without saying so. The measurements used pandas 3.1.1.
+
+#### column-loop-to-long
+
+**Severity:** info. **Fix:** none.
+
+Reports a loop over column names that selects one column at a time, renames it to a shared name and stacks the parts with `pd.concat`, as a list comprehension or as a `for` statement that appends. For 100,000 rows and 20 columns, `melt` gave the same 2,000,000 rows in the same order and ran 1.4 times faster.
+
+Example:
+
+```python
+parts = [df[["id", year]].rename(columns={year: "sales"}).assign(year=year) for year in years]
+long = pd.concat(parts, ignore_index=True)
+```
+
+Use instead:
+
+```python
+long = df.melt(id_vars="id", value_vars=years, var_name="year", value_name="sales")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### stack-then-reset-index
+
+**Severity:** info. **Fix:** none.
+
+Reports `df.set_index(keys).stack().reset_index()`, which builds a long frame whose new columns are named `level_1` and `0`. `melt` gave the same values under the names `variable` and `value`, or under the names passed to it, and ran 2.9 times faster on 100,000 rows with 20 columns. `stack` lists the values row by row and `melt` column by column.
+
+Example:
+
+```python
+long = df.set_index("id").stack().reset_index()
+```
+
+Use instead:
+
+```python
+long = df.melt(id_vars="id", var_name="year", value_name="sales")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### melt-default-names
+
+**Severity:** info. **Fix:** none.
+
+Reports `melt` without `var_name`. The column of old column names is then called `variable`, and the column of their values `value` unless `value_name` is passed.
+
+Example:
+
+```python
+long = df.melt(id_vars="id")
+```
+
+Use instead:
+
+```python
+long = df.melt(id_vars="id", var_name="year", value_name="sales")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### pivot-table-default-mean
+
+**Severity:** warning. **Fix:** none.
+
+Reports `pivot_table` without `aggfunc`, which takes the mean of the rows that share a cell. Two rows of 10 and 30 for one city and one year came back as 20.0, with no warning. With `aggfunc="sum"` the cell was 40, and `pivot` raised `ValueError` "Index contains duplicate entries, cannot reshape".
+
+Example:
+
+```python
+table = df.pivot_table(index="city", columns="year", values="sold")
+```
+
+Use instead:
+
+```python
+table = df.pivot_table(index="city", columns="year", values="sold", aggfunc="sum")
+```
+
+The replacement is advice. xpd does not apply it automatically. Write `aggfunc="mean"` when the mean is meant.
+
+#### unstack-without-fill
+
+**Severity:** warning. **Fix:** unsafe: `fill_value=0`.
+
+Reports `unstack` right after `size`, `count`, `value_counts` or `nunique` without `fill_value`. A pair without rows came back as a missing value, which turned the `int64` counts into `float64`. With `fill_value=0` the columns stayed `int64`. The fix is unsafe, because the missing values become 0, which changes a mean over them. An `unstack` with more than one argument is left alone.
+
+Example:
+
+```python
+table = df.groupby(["city", "grade"]).size().unstack()
+```
+
+Use instead:
+
+```python
+table = df.groupby(["city", "grade"]).size().unstack(fill_value=0)
+```
+
 ### Index alignment and joins
 
 pandas pairs rows by index label in an assignment, in `concat(axis=1)` and in a join. These

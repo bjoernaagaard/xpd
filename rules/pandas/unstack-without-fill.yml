@@ -1,0 +1,34 @@
+# unstack puts a missing value in each cell whose pair has no row. For a count that turns the
+# column into floats, though a pair with no row has the count 0. On pandas 3.1.1,
+# groupby(["city", "grade"]).size().unstack() gave float64 columns with NaN for the pair without
+# rows, and with fill_value=0 it gave int64 columns with 0. count, value_counts and nunique did
+# the same (research/modern-pandas/probes/tidy.txt). The rule reports unstack right after one of
+# those four, where 0 is the count of an absent pair.
+#
+# An unstack with more than one argument is left alone, because the second argument by position
+# is the fill value.
+#
+# Unsafe: the missing values become 0 and the columns become integers, which changes a mean over
+# them.
+id: unstack-without-fill
+language: python
+severity: warning
+message: A pair without rows comes back as a missing value, which turns the int64 counts into float64. The count of such a pair is 0. Pass fill_value=0, which kept the columns int64.
+rule:
+  pattern: $G.$AGG($$$A).unstack()
+constraints:
+  AGG: { regex: ^(size|count|value_counts|nunique)$ }
+fix: $G.$AGG($$$A).unstack(fill_value=0)
+metadata: { fix: unsafe }
+---
+id: unstack-without-fill
+language: python
+severity: warning
+message: A pair without rows comes back as a missing value, which turns the int64 counts into float64. The count of such a pair is 0. Pass fill_value=0, which kept the columns int64.
+rule:
+  pattern: $G.$AGG($$$A).unstack($U)
+constraints:
+  AGG: { regex: ^(size|count|value_counts|nunique)$ }
+  U: { not: { any: [{ kind: keyword_argument, has: { field: name, regex: ^fill_value$ } }, { kind: dictionary_splat }, { kind: list_splat }] } }
+fix: $G.$AGG($$$A).unstack($U, fill_value=0)
+metadata: { fix: unsafe }

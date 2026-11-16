@@ -1,0 +1,16 @@
+# pivot_table takes the mean of the rows that share a cell unless aggfunc says otherwise. On
+# pandas 3.1.1, two rows of 10 and 30 for one city and one year came back as 20.0, with no
+# warning. With aggfunc="sum" the cell was 40, and pivot, which takes no aggregation, raised
+# ValueError "Index contains duplicate entries, cannot reshape"
+# (research/modern-pandas/probes/tidy.txt). The rule has no fix, because only the author knows
+# whether the mean is meant.
+id: pivot-table-default-mean
+language: python
+severity: warning
+message: pivot_table without aggfunc takes the mean of the rows that share a cell and says nothing. Two rows of 10 and 30 came back as 20.0. Name the aggregation, as in aggfunc="sum" or aggfunc="mean", or call pivot, which raises ValueError when a cell has more than one row.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, has: { field: attribute, regex: ^pivot_table$ } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^aggfunc$ } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }

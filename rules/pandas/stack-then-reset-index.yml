@@ -1,0 +1,13 @@
+# set_index, stack and reset_index turn a wide frame into a long one whose new columns are
+# named level_1 and 0. melt names them. On pandas 3.1.1, df.set_index("id").stack().reset_index()
+# gave the columns id, level_1 and 0, and df.melt(id_vars="id") gave id, variable and value with
+# the same values. stack lists the values row by row and melt column by column, so the two were
+# equal after a sort. On 100,000 rows with 20 columns melt ran 2.9 times faster
+# (research/modern-pandas/probes/tidy.txt). The rule has no fix, because of the row order and
+# the column names.
+id: stack-then-reset-index
+language: python
+severity: info
+message: This builds a long frame whose new columns are named level_1 and 0. melt names them, as in $X.melt(id_vars=$K, var_name="year", value_name="sales"), and ran 2.9 times faster. It lists the values column by column, where stack lists them row by row.
+rule:
+  pattern: $X.set_index($K).stack($$$S).reset_index($$$R)

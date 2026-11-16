@@ -1,0 +1,15 @@
+# melt names the column of old column names "variable" and the column of their values "value"
+# unless var_name and value_name say otherwise. On pandas 3.1.1, df.melt(id_vars="id") gave the
+# columns id, variable and value, and with var_name="product" and value_name="sold" it gave id,
+# product and sold (research/modern-pandas/probes/tidy.txt). The rule reports a melt without
+# var_name. It has no fix, because xpd does not know what the columns stand for.
+id: melt-default-names
+language: python
+severity: info
+message: melt without var_name calls the column of old column names "variable", which does not say what they are. Name it, as in var_name="year", and name the values with value_name=.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, has: { field: attribute, regex: ^melt$ } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^var_name$ } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
