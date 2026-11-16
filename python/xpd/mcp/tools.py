@@ -239,7 +239,8 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
     ) -> DiscoveryMatches:
         """Find up to five symbols, three rules and three recipes, ranked within each kind.
 
-        Search offline before choosing a library, even when it is not installed.
+        Search before choosing a library, even when it is not installed. Describe the task in
+        your own words, because search ranks by meaning as well as by keywords.
         Read the chosen symbol with api before writing code.
         """
         flags = []

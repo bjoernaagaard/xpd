@@ -95,8 +95,14 @@ xpd
 ```
 
 `find` and `api` search indexes shipped in the binary, including libraries you have not
-installed. Search is offline and uses keywords. For example, run `xpd find "time series bootstrap
-for cross validation"`, then `xpd api mapie.subsample.BlockBootstrap`.
+installed. For example, run `xpd find "time series bootstrap for cross validation"`, then
+`xpd api mapie.subsample.BlockBootstrap`.
+`find` ranks by keywords and by meaning, so a task in your own words also finds an entry whose
+documentation uses other words. The meaning comes from the EmbeddingGemma model. The first `find`
+downloads it once, 333 MB, with the Python that xpd finds, to `~/.cache/xpd/models`. On macOS the
+folder is `~/Library/Caches/xpd/models`, on Windows `%LOCALAPPDATA%\xpd\models`, and with
+`XDG_CACHE_HOME` set it is `$XDG_CACHE_HOME/xpd/models`. After that, search runs offline. When the
+model cannot be downloaded or loaded, `find` says so on stderr and searches by keywords only.
 `find` ranks symbols, rules and recipes separately, returning up to five, three and three.
 JSON is `{"symbols": [...], "rules": [...], "recipes": [...]}`. `--limit` sets the maximum
 per kind and `--kind` selects one kind.
@@ -241,3 +247,5 @@ and NCSA. Run `xpd api <recipe-name>` to read the license text, copyright notice
 source link and modification status with the code. The `licenses/` directory contains
 the upstream license and notice files shipped in the crate, sdist and wheel.
 Package metadata lists the combined licenses of the bundled work.
+The embedding model that `find` downloads is not shipped with xpd. It is Gemma, provided under and
+subject to the Gemma Terms of Use at <https://ai.google.dev/gemma/terms>.

@@ -349,17 +349,32 @@ to that group. `--package` takes the Python import name. JSON always has the sha
 `{"symbols": [...], "rules": [...], "recipes": [...]}`, with empty lists for excluded or
 unmatched kinds. Empty matches exit 0. Each entry has a summary and rule links. Class
 members are returned by `api`. The binary includes source indexes for all library packs,
-worked recipes and rule documentation. No library installation, network or Python
-execution is needed.
+worked recipes and rule documentation. No library installation is needed.
 
-Discovery ranks the words in names, signatures, docstring summaries, rule texts and recipe titles. It answers "what is the thing called that does X" but does not yet answer questions about a method's properties, such as which linear models need no scaling.
+Discovery ranks the words in names, signatures, docstring summaries, rule texts and recipe titles. It also ranks by meaning, so "make the bars have soft corners" finds the recipe for rounded bars. It answers "what is the thing called that does X" but does not yet answer questions about a method's properties, such as which linear models need no scaling.
+
+The ranking by meaning uses the EmbeddingGemma 300M model. The first `find` downloads it once,
+333 MB, and prints a line on stderr before it starts. The download runs with the project's
+Python, or else `python3` on `PATH`, and writes the file under a temporary name before it moves
+it into place. The model is kept in `$XDG_CACHE_HOME/xpd/models` when `XDG_CACHE_HOME` is set.
+Otherwise it is kept in `~/.cache/xpd/models` on Linux, `~/Library/Caches/xpd/models` on macOS
+and `%LOCALAPPDATA%\xpd\models` on Windows. Later searches run offline, and loading the model and
+embedding the query add about a quarter to half a second. When there is no Python, the download fails, or the model does not
+load, `find` prints one line on stderr and ranks by keywords only. Search with `--index` ranks by
+keywords only.
 
 Names are split at underscores and camel case. Name tokens get weight three in BM25, with
 uniform suffix stemming shared by queries and entries. Parameter names and
 source documentation and class member summaries get lower weights. Exact acronym names and phrases get
 bonuses, and shorter public paths rank higher. The build prepares the search table, and queries decode only the returned entries. Long signatures
-are shortened in text search results; JSON and `api` retain every parameter. Results are keyword matches, not a judgment
-that a library suits every requirement. Read the chosen API and its rules before using it.
+are shortened in text search results; JSON and `api` retain every parameter.
+
+With the model, the query is embedded and compared with a stored vector for each entry. The
+vectors are the first 256 of the model's 768 values, which the model is trained to allow, and
+`indexes/vectors.bin` holds them by entry name. Within each kind, the keyword ranking and the
+ranking by meaning are combined by reciprocal rank fusion, and the top keyword matches get a bonus
+so an exact match keeps its place. Results are matches, not a judgment that a library suits every
+requirement. Read the chosen API and its rules before using it.
 
 ## api
 
@@ -473,6 +488,10 @@ then rerun the command to regenerate both symbols and recipes.
 
 `xpd find --check indexes/questions.json` runs the real discovery questions and exits 2 if an
 expected entry is absent from the top five of its own kind, including five rules or recipes
-regardless of the display defaults. It prints every failure. A question marked `"open": true` records what a user asked and the answer they expect. It is kept as data for later work on discovery and is not checked. Lefthook runs this command
+regardless of the display defaults. It asks each question with keyword search, which is what
+runs without the model, and again with the model when the model is there. A question marked
+`"needs_model": true` is asked only with the model. An `expected` list names entries that each answer the question, and one of them in the top five passes. It prints every failure. A question marked `"open": true` records what a user asked and the answer they expect. It is kept as data for later work on discovery and is not checked. The check also exits 2 when an
+index entry has no vector. After a change to `indexes/`, write the vectors again with
+`xpd find --write-vectors indexes/vectors.bin`, which embeds every entry in about ten minutes. Lefthook runs this command
 before commits with no tolerated misses. Questions that still fail go to a later ranking
 investigation without changing their wording or adding question-specific ranking rules.

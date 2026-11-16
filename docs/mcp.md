@@ -220,7 +220,9 @@ unmatched kinds have empty lists. `package`
 is a Python import name. Read each entry's `kind`, which can include `symbol`, `rule` and
 `recipe`. The server preserves entry fields added by the binary. Call `api(name)` with a returned
 name to read its parameter names, docstring summary, own class members and possible guarding
-rules. Both tools call the installed binary. The server holds no symbol index. In code mode, `find` returns this object directly.
+rules. Both tools call the installed binary. The server holds no symbol index. The first `find`
+downloads the 333 MB embedding model that ranks by meaning, as the [commands page](commands.md#find)
+explains, so that one call can take a few minutes. In code mode, `find` returns this object directly.
 `api` returns an object directly. Both include `signature`, a display of indexed parameter
 names only. This display has no defaults, parameter kinds or type annotations, and it is
 null for entries that are not callable symbols.
