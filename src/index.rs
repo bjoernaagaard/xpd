@@ -383,34 +383,51 @@ pub(crate) fn records_without_vector() -> Vec<&'static str> {
         .collect()
 }
 
-/// Writes the vector of every embedded record to `path`, as build.rs reads it. Each vector is
-/// scaled so its largest value is 127. Search compares directions, so the scale drops out.
+/// Writes the vector of every embedded record to `path`, as build.rs reads it. A record keeps
+/// the vector that this build holds for it, and only the records without one are embedded, so
+/// a new rule costs one text. Each vector is scaled so its largest value is 127. Search
+/// compares directions, so the scale drops out.
 pub(crate) fn write_vectors(path: &Path) -> Result<()> {
-    let model = Model::open().context("the embedding model is needed to write vectors")?;
-    let mut data = VECTORS_HEADER.to_vec();
-    for (done, chunk) in RECORDS.chunks(500).enumerate() {
-        let documents: Vec<_> = chunk.iter().map(|e| (e.name, e.summary)).collect();
-        for (record, vector) in chunk.iter().zip(model.documents(&documents)?) {
-            let largest = vector.iter().fold(f32::EPSILON, |m, v| m.max(v.abs()));
-            data.extend(u16::try_from(record.name.len())?.to_le_bytes());
-            data.extend(record.name.as_bytes());
-            data.extend(vector.iter().map(|v| {
-                // The value is rounded and within -127..=127, so the cast loses nothing.
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    clippy::as_conversions,
-                    reason = "rounded value within -127..=127"
-                )]
-                let byte = (v / largest * 127.0).round() as i8;
-                byte.cast_unsigned()
-            }));
-        }
-        eprintln!(
-            "xpd: embedded {} of {} records",
-            (done * 500 + chunk.len()),
-            RECORDS.len()
-        );
+    let stored = VECTORS.as_chunks::<DIMENSIONS>().0;
+    let missing: Vec<_> = (RECORDS.iter().zip(stored))
+        .filter(|(_, vector)| vector.iter().all(|&v| v == 0))
+        .map(|(e, _)| (e.name, e.summary))
+        .collect();
+    let mut embedded = if missing.is_empty() {
+        Vec::new()
+    } else {
+        let model = Model::open().context("the embedding model is needed to write vectors")?;
+        model.documents(&missing)?
     }
+    .into_iter();
+    let mut data = VECTORS_HEADER.to_vec();
+    for (record, vector) in RECORDS.iter().zip(stored) {
+        data.extend(u16::try_from(record.name.len())?.to_le_bytes());
+        data.extend(record.name.as_bytes());
+        if vector.iter().any(|&v| v != 0) {
+            data.extend(vector);
+            continue;
+        }
+        let vector = embedded
+            .next()
+            .context("every missing record was embedded")?;
+        let largest = vector.iter().fold(f32::EPSILON, |m, v| m.max(v.abs()));
+        data.extend(vector.iter().map(|v| {
+            // The value is rounded and within -127..=127, so the cast loses nothing.
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::as_conversions,
+                reason = "rounded value within -127..=127"
+            )]
+            let byte = (v / largest * 127.0).round() as i8;
+            byte.cast_unsigned()
+        }));
+    }
+    eprintln!(
+        "xpd: embedded {} records and kept {}",
+        missing.len(),
+        RECORDS.len() - missing.len()
+    );
     std::fs::write(path, data).with_context(|| format!("cannot write {}", path.display()))
 }
 

@@ -94,8 +94,9 @@ enum Cmd {
         /// Run real discovery questions and fail if an expected entry misses the top five.
         #[arg(long, conflicts_with = "query")]
         check: Option<PathBuf>,
-        /// Embed every index record with the model and write the vectors to this file, which
-        /// is indexes/vectors.bin in the repository.
+        /// Embed the index records that have no vector yet and write all vectors to this file,
+        /// which is indexes/vectors.bin in the repository. Remove the file and build again to
+        /// embed every record.
         #[arg(long, hide = true, conflicts_with_all = ["query", "check", "index"])]
         write_vectors: Option<PathBuf>,
     },
