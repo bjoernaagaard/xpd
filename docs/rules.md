@@ -1,38 +1,71 @@
 # Rules
 
-xpd has thirteen rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
-[scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
-[Category Encoders](#category-encoders), [linearmodels](#linearmodels), [arch](#arch),
-[pymoo](#pymoo), [plotly](#plotly), [Hamilton](#hamilton) and [Python](#python). A library's rules
-run only on files that import it. The plotly rules also run on files that make plotly the
-plotting backend of pandas. The Python rules run on every file.
+Look up any xpd rule on this page to see what it reports, how severe it is, whether xpd can fix
+it, and the code to write instead. A library's rules run only on files that import that library,
+and the table lists the thirteen rule packs with the number of rules and package checks that
+`xpd rules --format json` lists for each.
+
+| Pack | Rules | Runs on |
+| --- | --- | --- |
+| [pandas](#pandas) | 124 | files that import pandas |
+| [NumPy](#numpy) | 59 | files that import NumPy |
+| [SciPy](#scipy) | 30 | files that import SciPy |
+| [scikit-learn](#scikit-learn) | 32 | files that import scikit-learn |
+| [scikit-lego](#scikit-lego) | 23 | files that import scikit-lego |
+| [MAPIE](#mapie) | 13 | files that import MAPIE |
+| [Category Encoders](#category-encoders) | 16 | files that import Category Encoders |
+| [linearmodels](#linearmodels) | 25 | files that import linearmodels |
+| [arch](#arch) | 13 | files that import arch |
+| [pymoo](#pymoo) | 23 | files that import pymoo |
+| [plotly](#plotly) | 25 | files that import plotly, and files that make plotly the plotting backend of pandas |
+| [Hamilton](#hamilton) | 1 | files that import Hamilton |
+| [Python](#python) | 9 | every file |
+
+Each rule section has the same parts:
+
+```text
+#### <rule id>                 the heading, which the url of the rule points to
+**Severity:** ... **Fix:** ...  error, warning or info, and whether xpd can fix it, safe or unsafe
+Reports ...                    the code that the rule finds, and the code it leaves alone
+Example: and Use instead:      the reported code and the code to write instead
+notes                          measurements, and what an unsafe fix can change
+```
+
+`xpd rules --format json` prints each section as the `doc` field of its rule.
 
 ## pandas
 
-Every rule below has a direct heading link, its severity, fix safety, and before and after code.
-Examples assume `import pandas as pd` and `import numpy as np`. Names such as `df`,
-`output_columns` and `mapping` represent values supplied by your program. The replacement may
-change behavior when repairing a bug or using an unsafe fix. Read the notes before applying it.
+The pandas rules find code that is wrong on pandas 3 and code that has a shorter or faster form.
+Examples assume `import pandas as pd` and `import numpy as np`, and names such as `df`,
+`output_columns` and `mapping` stand for values in your program. A safe fix gives the same result.
+An unsafe fix or a replacement that xpd gives as advice can change the result, so read the notes of
+the rule before you apply it.
 
 The rules follow pandas 3, where copy-on-write is always on. A fix that writes `pd.` or `np.`
-applies only in a file with `import pandas as pd` or `import numpy as np`. In any other file xpd
-reports the issue without a fix.
+applies only in a file with `import pandas as pd` or `import numpy as np`, and in any other file
+xpd reports the code without a fix.
 
-One rule asks for an API that pandas 3.1 added, `concat-then-category`. xpd reads the installed
-pandas version from the name of the `pandas-<version>.dist-info` folder in the project's venv,
-which is `$VIRTUAL_ENV` or the nearest `.venv` above the working directory, without starting
-Python. On pandas 3.0 it skips that rule. When the venv has no pandas, or there is no venv, every
-rule runs.
+xpd skips a rule that asks for a newer API than the installed pandas has. xpd reads the version
+from the name of the `pandas-<version>.dist-info` folder in the project's venv, which is
+`$VIRTUAL_ENV` or else the nearest `.venv` in or above the working directory. When the venv has no
+pandas, or there is no venv, every rule runs.
+
+| Rule | Runs on |
+| --- | --- |
+| [`lambda-in-assign`](#lambda-in-assign) | pandas 3.0 and later |
+| [`concat-then-category`](#concat-then-category) | pandas 3.1 and later |
+| every other pandas rule | every pandas version |
 
 ### Code that is wrong or broken on pandas 3
 
-Each old form gives a wrong result, raises, or warns on pandas 3.0 and 3.1.
+Each rule in this group finds code that gives a wrong result, raises, or warns on pandas 3.0 and
+3.1.
 
 #### chained-assignment
 
 **Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`. A write through `.iloc` or `.iat` on a column, and `update` on a column, have no fix.
 
-Reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy. Also reports `df[col][mask] = v` with the column named by a variable. A dict, list or set assigned to `x["a"][key]` is a nested dict being filled and is left alone.
+Reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy, so the frame keeps its old values. It also reports `df[col][mask] = v`, where a variable names the column.
 
 Example:
 
@@ -46,11 +79,34 @@ Use instead:
 df.loc[row, "load"] = value
 ```
 
+The fix is unsafe, because xpd cannot see whether the value on the left is a frame. The table shows
+which forms get a fix.
+
+| Reported form | Fix |
+| --- | --- |
+| `df["a"][i] = v` and `df[col][mask] = v` | `df.loc[i, "a"] = v` and `df.loc[mask, col] = v` |
+| `df[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
+| `df.loc[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
+| any other chain with a text label, such as `df.iloc[0]["a"] = v` | none |
+| `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)` | none |
+
+A mask held in a name gets the fix when the enclosing function assigns that name only masks, such
+as a comparison or a call to `isin`. The rule reports `df.a[mask] = v` only when the mask reads the
+same frame, so `self.items[i > 3] = v` is left alone. It reports `update` only on a name such as
+`df` or `frame`, because `state["seen"].update(extra)` is how code updates a dict of dicts.
+
+The rule leaves alone code that more often fills a list or a dict, as the table shows.
+
+| Left alone | Reason |
+| --- | --- |
+| a dict, list or set assigned to `x["a"][key]` | the code fills a nested dict |
+| two plain keys, as in `rows[0]["name"] = v` | the value is more often a list or a dict |
+
 #### inplace-on-column
 
 **Severity:** error. **Fix:** unsafe: `df["b"] = df["b"].fillna(0)`.
 
-Reports `df["b"].fillna(0, inplace=True)`, which changes a copy. Also reports a column named by a variable, `df[column].fillna(0, inplace=True)`.
+Reports `df["b"].fillna(0, inplace=True)`, which changes a copy, so the frame keeps its old values. It also reports `df[column].fillna(0, inplace=True)`, where a variable names the column.
 
 Example:
 
@@ -64,11 +120,13 @@ Use instead:
 df["load"] = df["load"].fillna(0)
 ```
 
+The fix is unsafe, because xpd cannot tell a column from a value in a dict, so the call can be on a dict. The fix drops comments between the arguments of the call.
+
 #### inplace-result-assigned
 
 **Severity:** error. **Fix:** unsafe: `df = df.dropna()`.
 
-Reports `df = df.dropna(inplace=True)`, which leaves `df` as None.
+Reports `df = df.dropna(inplace=True)`, which sets `df` to None.
 
 Example:
 
@@ -82,11 +140,13 @@ Use instead:
 df = df.dropna()
 ```
 
+The fix drops comments between the arguments of the call.
+
 #### no-inplace
 
 **Severity:** info. **Fix:** unsafe: `df = df.dropna()`.
 
-Reports any other `inplace=True`, which gives no speedup and blocks chaining.
+Reports any other `inplace=True`, which gives no speedup and keeps the call out of a method chain.
 
 Example:
 
@@ -100,11 +160,13 @@ Use instead:
 df = df.dropna()
 ```
 
+The fix applies only to a call that stands alone as a statement, on a name, an attribute or a subscript. It drops comments between the arguments of the call.
+
 #### epoch-from-int-cast
 
 **Severity:** error. **Fix:** none.
 
-Reports `df["d"].astype("int64") // 10**9`, `index.asi8 // 10**9` and `df["d"].values.astype("float64") / 1e9`, which are off by 1,000 now that datetimes default to microseconds. Also reports `.view(np.int64)` divided the same way.
+Reports `df["d"].astype("int64") // 10**9`, `index.asi8 // 10**9` and `df["d"].values.astype("float64") / 1e9`, which are off by a factor of 1,000 now that datetimes default to microseconds. It also reports `.view(np.int64)` divided the same way.
 
 Example:
 
@@ -118,7 +180,7 @@ Use instead:
 seconds = (df["time"] - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s")
 ```
 
-The epoch example assumes dates without a time zone. For dates with a time zone, use a UTC epoch. Missing timestamps remain missing.
+The replacement assumes dates without a time zone, and for dates with a time zone you subtract `pd.Timestamp("1970-01-01", tz="UTC")` instead. A missing timestamp stays missing.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -126,7 +188,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** unsafe: `df["b"].isna()`.
 
-Reports `df["b"] == np.nan`, `df["k"].astype(str) == "nan"` and `df[df["b"] == None]`, which are never true.
+Reports `df["b"] == np.nan`, `df["k"].astype(str) == "nan"` and `df[df["b"] == None]`, which are never true. It reports `None` only inside a subscript, because `config["mode"] == None` on a dict is valid Python.
 
 Example:
 
@@ -144,7 +206,7 @@ missing = df["load"].isna()
 
 **Severity:** error. **Fix:** unsafe: `(df["a"] == 2).any()`.
 
-Reports `2 in df["a"]`, which checks the index labels. The receiver must be named like a frame: `df`, `frame`, or a name with one of them as a word. In real code `key in data["k"]` is far more often a test on a nested dict or a string.
+Reports `2 in df["a"]`, which looks for 2 among the index labels and not among the values. The value before `[` must be named like a frame, which means `df`, `frame`, or a name with one of them as a word, because `key in data["k"]` is more often a test on a nested dict or a string.
 
 Example:
 
@@ -158,11 +220,13 @@ Use instead:
 found = (df["load"] == 2).any()
 ```
 
+The fix is unsafe, because xpd cannot tell a frame from a dict, so it can report `"x" in data["names"]` on a dict.
+
 #### mask-precedence
 
 **Severity:** error. **Fix:** none.
 
-Reports `df["a"] > 1 & df["b"] < 3`, where `&` binds first.
+Reports `df["a"] > 1 & df["b"] < 3`, where Python applies `&` before the comparisons, so the code compares `df["a"]` with `1 & df["b"]`.
 
 Example:
 
@@ -182,7 +246,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports `df["a"].values[0] = 9`, which raises because the array is read-only.
+Reports `df["a"].values[0] = 9`, which raises ValueError, because the array is read-only under copy-on-write.
 
 Example:
 
@@ -202,7 +266,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** unsafe: `pd.api.types.is_string_dtype(df["k"])`. `is_object_dtype`, a test with `in`, `dtype.name` and `select_dtypes` have no fix: `"str"` alone leaves out object columns that hold other Python objects, so write `["object", "str"]` to keep both.
 
-Reports `df["k"].dtype == object`, `select_dtypes(include="object")`, `is_object_dtype(df["k"])`, `df["k"].dtype in ("object", "category")` and `df["k"].dtype.name == "object"`, which miss the new str dtype.
+Reports `df["k"].dtype == object`, `select_dtypes(include="object")`, `is_object_dtype(df["k"])`, `df["k"].dtype in ("object", "category")` and `df["k"].dtype.name == "object"`, which are False for a text column, because pandas 3 stores text in the `str` dtype. It leaves `dtype.kind == "O"` alone, which is still True for a text column.
 
 Example:
 
@@ -220,7 +284,7 @@ is_text = pd.api.types.is_string_dtype(df["name"])
 
 **Severity:** error. **Fix:** unsafe: `pd.api.types.is_datetime64_dtype(df["d"])` and `select_dtypes("datetime64")`, which are True for every unit. A dtype with a time zone, `str(dtype)`, `dtype.name`, `dtypes` and `is_datetime64_ns_dtype` have no fix.
 
-Reports `df["d"].dtype == "datetime64[ns]"`, `df["d"].dtype == "datetime64[ns, UTC]"`, `select_dtypes("datetime64[ns]")` and `is_datetime64_ns_dtype(df["d"])`. Datetimes default to microseconds in pandas 3, so on pandas 3.1 each comparison was False for a column parsed from text and `select_dtypes` selected no column.
+Reports `df["d"].dtype == "datetime64[ns]"`, `df["d"].dtype == "datetime64[ns, UTC]"`, `select_dtypes("datetime64[ns]")` and `is_datetime64_ns_dtype(df["d"])`. Datetimes default to microseconds in pandas 3, so on pandas 3.1 each comparison was False for a column parsed from text, and `select_dtypes` selected no column.
 
 Example:
 
@@ -237,6 +301,8 @@ times = df.select_dtypes("datetime64")
 ```
 
 For a column with a time zone, write `isinstance(df["time"].dtype, pd.DatetimeTZDtype)` and `select_dtypes("datetimetz")`.
+
+The rule leaves a file alone that calls `as_unit("ns")` or `astype("datetime64[ns]")`, because the file makes nanosecond columns itself. It compares a dtype only on a column taken by a label, as in `df["time"].dtype`, or on a name such as `series`, `col` or `index`, because a NumPy array keeps the unit it was made with. A column made from a nanosecond source, such as a NumPy array of `datetime64[ns]`, keeps that unit, and there the old comparison is still True.
 
 #### groupby-apply-reads-key
 
@@ -256,7 +322,7 @@ Use instead:
 keys = df.groupby("region").apply(lambda group: group.name)
 ```
 
-Read group.name only inside the function passed to apply. Multiple group keys give a tuple.
+`group.name` exists only inside the function passed to `apply`, and with more than one group key it holds a tuple.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -280,11 +346,37 @@ filled = df["load"].ffill()
 months = df.resample("ME", on="time")["load"].sum()
 ```
 
+The rule also reports the code in the table, and each form raises on pandas 3.1.
+
+| Kind | Reported code |
+| --- | --- |
+| Arguments of `read_csv` | `error_bad_lines`, `warn_bad_lines`, `squeeze`, `verbose`, `keep_date_col`, `infer_datetime_format`, `mangle_dupe_cols`, `prefix`, `date_parser`, and a separator passed by position. For bad lines, pass `on_bad_lines="skip"`. |
+| Writing | `to_csv(line_terminator=)`, a separator passed to `to_csv` by position, `to_excel(encoding=)`, `read_excel(squeeze=)`, and `writer.save()` on a name that holds the word writer |
+| Names | `pd.value_counts`, `is_monotonic`, `mad`, `as_matrix`, `ix`, `pd.np`, `pd.datetime`, `pd.Int64Index`, `pd.UInt64Index`, `pd.Float64Index`, `pd.io.json.json_normalize`, `pandas.util.testing`, `SettingWithCopyWarning`, the option `mode.use_inf_as_na`, and `pd.to_numeric(errors="ignore")` |
+| Time series | `tshift`, `pad()`, `first("3D")`, `last("3D")`, `resample(loffset=, base=, kind=)`, `date_range(closed=)`, `to_datetime(infer_datetime_format=)`, `to_datetime(errors="ignore")`, `pct_change(fill_method="pad")`, `between_time(include_start=, include_end=)`, `pd.Timestamp(freq=)` and `astype("timedelta64[D]")` |
+| Timedelta units | `"T"`, `"L"`, `"U"` and `"N"` in `pd.Timedelta("5T")`, `pd.Timedelta(1, unit="T")`, `pd.to_timedelta(x, unit="T")` and `resample(offset="30T")` |
+| Error handlers | a handler for `pytz.exceptions.AmbiguousTimeError` or `NonExistentTimeError`, because pandas 3 raises ValueError for a time that is repeated or missing, also with a pytz zone, and the pytz errors are not ValueErrors |
+| Frequency comparisons | an old alias compared with `pd.infer_freq(index)` or `index.freqstr`, as in `pd.infer_freq(index) == "H"`, which is never equal, because pandas returns `"h"` |
+| Other methods | `iteritems()`, `is_lexsorted()`, `lexsort_depth` and `groupby(axis=1)` |
+
+The rule fixes a frequency alias by what the call takes, because `"M"`, `"Q"` and `"Y"` stay valid for periods.
+
+| Call | What the rule does |
+| --- | --- |
+| a call that takes only datetimes, such as `date_range`, `timedelta_range`, `interval_range`, `to_offset`, `Grouper`, `floor`, `snap` and `rolling` | rewrites the alias |
+| `resample`, `shift` and `pct_change` | rewrites `"M"`, `"Q"` and `"Y"` with an unsafe fix, and reports `"A"` without a fix, because the new alias is `"YE"` for datetimes and `"Y"` for periods |
+| `asfreq` | leaves `"M"` alone, and reports `"A"` without a fix |
+| `to_period`, `period_range`, `pd.Period` and `pd.PeriodIndex`, which take periods | rewrites `"H"`, `"T"`, `"S"`, `"L"`, `"U"` and `"N"`, writes `"Y"` for `"A"`, and leaves `"M"`, `"Q"` and `"Y"` alone |
+
+The rule reports a handler for a pytz error only when its `try` block holds a pandas call, such as `tz_localize`, `.dt.`, `pd.` or `floor`. It leaves the handler alone when the handler also names ValueError or Exception, and when the block calls the `localize` of pytz, which still raises the pytz errors.
+
+The fix for an alias compared with `infer_freq` or `freqstr` is unsafe, because the comparison can then be equal. The rule compares `"M"` only with `infer_freq`, because the `freqstr` of a monthly PeriodIndex is still `"M"`. The `writer.close()` fix is unsafe, because xpd knows the writer only by its name. pandas 3 also removed `DataFrame.lookup`, and the rule doesn't report it, because other libraries have a method of that name.
+
 #### reduction-level-argument
 
 **Severity:** error. **Fix:** unsafe: `df.groupby(level=0).sum()`.
 
-Reports `df.sum(level=0)` and the other reductions with `level=`, which raise TypeError.
+Reports `df.sum(level=0)` and the other reductions with `level=`, which raise TypeError. The fix applies when `level=` is the only argument, and it is unsafe, because the old form does not run on pandas 3, so xpd could not compare the two results.
 
 Example:
 
@@ -302,7 +394,7 @@ totals = df["load"].groupby(level="region").sum()
 
 **Severity:** error, or warning for `future_stack=False`. **Fix:** none.
 
-Reports `df.stack(dropna=False)`, which raises ValueError, and `df.stack(future_stack=False)`, which is deprecated.
+Reports `df.stack(dropna=...)` with either value, which raises ValueError, and `df.stack(future_stack=False)`, which is deprecated. The rule has no fix, because the replacement depends on the value of `dropna`.
 
 Example:
 
@@ -316,7 +408,7 @@ Use instead:
 long = wide.stack().dropna(how="all")
 ```
 
-For dropna=False, write stack() alone. The new stack keeps the rows that are all missing, which the old default dropped.
+For `dropna=False`, write `stack()` alone. The new `stack` keeps the rows that are all missing, which the old default dropped.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -324,7 +416,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports `df = df.append(row)` and `df.append(row, ignore_index=True)`, which raise AttributeError. A module named like NumPy, such as `np`, `_np` or `anp`, is left alone.
+Reports `df = df.append(row)` and `df.append(row, ignore_index=True)`, which raise AttributeError, because pandas 2.0 removed `DataFrame.append`.
 
 Example:
 
@@ -340,7 +432,17 @@ Use instead:
 out = pd.concat(parts)
 ```
 
-The example assumes parts is not empty. For single rows, collect them in a list and build the frame once.
+The replacement assumes that `parts` is not empty. For single rows, collect the rows in a list and build the frame once.
+
+The rule tells a frame from a list by the way the code uses the result, because `list.append` returns None and takes no keywords. The table shows what it reports.
+
+| Code | Reported |
+| --- | --- |
+| an `append` whose result is assigned, returned, passed on or read | yes |
+| an `append` that passes `ignore_index`, `verify_integrity` or `sort` | yes |
+| an `append` on a module named like NumPy, such as `np`, `_np` or `anp` | no |
+| `df.index.append(x)` and `df.columns.append(x)` | no, because `Index.append` still exists |
+| `labels = labels.append(more)` on an Index held in a plain name | yes, by mistake |
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -348,7 +450,12 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** unsafe: `regex=True`.
 
-Reports `df["s"].str.replace(r"\d+", "")`, which replaces nothing, because `str.replace` reads its pattern as plain text since pandas 2.0.
+Reports `df["s"].str.replace(r"\d+", "")`, which replaces nothing, because `str.replace` reads its pattern as plain text since pandas 2.0. The rule reports only a pattern that can't be meant as plain text, as the table shows.
+
+| Pattern | Reported |
+| --- | --- |
+| a class such as `\d`, a set in brackets, `.*` or `.+`, a `^` at the start, or two choices joined by a pipe | yes |
+| `"."`, `"$"` and `"("` | no |
 
 Example:
 
@@ -362,11 +469,13 @@ Use instead:
 digits = df["phone"].str.replace(r"\D", "", regex=True)
 ```
 
+The fix is unsafe, because the code can mean a set in brackets as plain text.
+
 #### positional-key-on-labels
 
 **Severity:** error. **Fix:** unsafe: `.iloc[0]`.
 
-Reports `df["k"].value_counts()[0]` and `df.iloc[0][0]`, which raise KeyError, because an integer key on a Series is a label on pandas 3. A negative key, as in `mean()[-1]`, is reported too.
+Reports `df["k"].value_counts()[0]`, `df.iloc[i][0]`, `df.dtypes[0]` and a frame reduction such as `df.isna().sum()[0]`, which raise KeyError, because an integer key on a Series is a label on pandas 3. It also reports a negative key, as in `mean()[-1]`.
 
 Example:
 
@@ -382,13 +491,20 @@ top = df["region"].value_counts().iloc[0]
 first = df.iloc[0, 0]
 ```
 
+The fix is unsafe, because on labels that are whole numbers the old form still works, and there `value_counts()[0]` is the count of the value 0. The frame reductions have no fix.
+
 #### day-frequency-with-time-zone
 
 **Severity:** warning. **Fix:** unsafe: `"24h"` for `"D"` and `"1D"` in `shift` and `pct_change`. Several days, the `Day` offset, `resample` and `Grouper` have no fix.
 
-Reports `ts.shift(freq="D")`, `ts.index + pd.offsets.Day(1)` and `ts.resample("D", offset="6h")` in a file that names a time zone. `"D"` was 24 hours on pandas 2 and is a calendar day on pandas 3.
+Reports `ts.shift(freq="D")`, `ts.index + pd.offsets.Day(1)` and `ts.resample("D", offset="6h")` in a file that names a time zone. `"D"` was 24 hours on pandas 2 and is a calendar day on pandas 3, so the same code gives another result, as the table shows for quarter-hourly data in `Europe/Copenhagen`.
 
-On quarter-hourly data in `Europe/Copenhagen`, pandas 2.3 shifted by 24 hours. pandas 3.1 raised ValueError when the data held 31 March or 27 October 2024, because a shifted time fell in the daylight saving change. With `resample("D", offset="6h")`, pandas 2.3 started each bin at 06:00. pandas 3.1 started it at 00:00 and gave only a RuntimeWarning, also on an index in UTC. `origin=` and a frequency of several days, such as `"7D"`, are ignored in the same way.
+| Code | pandas 2.3 | pandas 3.1 |
+| --- | --- | --- |
+| `ts.shift(freq="D")` | shifted by 24 hours | raised ValueError when the data held 31 March or 27 October 2024, because a shifted time fell in the daylight saving change |
+| `ts.resample("D", offset="6h")` | started each bin at 06:00 | started each bin at 00:00 with only a RuntimeWarning, also on an index in UTC |
+
+pandas 3.1 ignores `origin=` and a frequency of several days, such as `"7D"`, in the same way as `offset=`.
 
 Example:
 
@@ -406,14 +522,18 @@ day_before = ts.shift(freq="24h")
 
 `"24h"` gives the pandas 2 result on both versions. It reads the value 24 hours earlier, which is one hour off by the clock on the day after a daylight saving change. In `resample`, bins of `"24h"` keep the offset, and they start an hour later by the clock after a change to summer time.
 
-xpd cannot see whether an index has a time zone. It reports only in a file that holds `tz_localize`, `tz_convert`, `tz=` or `utc=True`, so it misses a frame that got its time zone in another file. On an index without a time zone both versions give the same result. A PeriodIndex of days in such a file is reported by mistake, unless
-its name holds the word period, and there `"24h"` raises.
+xpd can't see whether an index has a time zone, so it reports only in a file that holds `tz_localize`, `tz_convert`, `tz=` or `utc=True`. It misses a frame that got its time zone in another file. On an index without a time zone both versions give the same result. In such a file the rule reports a PeriodIndex of days by mistake, unless the name of the index holds the word period, and on a PeriodIndex `"24h"` raises.
 
 #### mixed-offsets-without-utc
 
 **Severity:** warning. **Fix:** none.
 
-Reports `pd.to_datetime(s, format="%Y-%m-%d %H:%M%z")` without `utc=`. Local times across a daylight saving change carry two offsets, such as `+0100` and `+0200`. For them pandas 2.3 returned an object Index with a FutureWarning, and pandas 3.1 raises ValueError.
+Reports `pd.to_datetime(s, format="%Y-%m-%d %H:%M%z")` without `utc=`, which raises ValueError on pandas 3.1 when the text holds more than one offset. Local times across a daylight saving change hold two offsets, such as `+0100` and `+0200`.
+
+| Text with offsets `+0100` and `+0200` | Result |
+| --- | --- |
+| pandas 2.3 | an object Index and a FutureWarning |
+| pandas 3.1 | ValueError |
 
 Example:
 
@@ -427,13 +547,13 @@ Use instead:
 times = pd.to_datetime(df["time"], format="%Y-%m-%d %H:%M%z", utc=True).dt.tz_convert("Europe/Copenhagen")
 ```
 
-The replacement is advice. xpd does not apply it automatically, because `utc=True` changes the result of a column that holds one offset, from that offset to UTC.
+The replacement is advice. xpd does not apply it automatically, because on a column that holds one offset, `utc=True` changes the result from that offset to UTC.
 
 #### deprecated-in-pandas-3
 
 **Severity:** warning. **Fix:** safe: `pd.Timestamp.now("UTC")`, `pd.Timestamp.fromtimestamp(t, "UTC")`, `"h"` and `"s"` for the Timedelta units `"H"` and `"S"`, drop `copy=`. unsafe: delete the copy-on-write option line, because `pd.get_option` reads the value back, and drop `copy=` from `astype`.
 
-Reports `pd.set_option("mode.copy_on_write", True)`, `copy=False`, `pd.Timestamp.utcnow()`, `pd.Timestamp.utcfromtimestamp(t)`, and the units `"H"` and `"S"` in `pd.Timedelta("1H")`, `pd.to_timedelta(x, unit="H")` and `resample(offset="1H")`. `astype(copy=)` is reported on a column taken by a label or a receiver named like a frame, because NumPy's `astype` has the same keyword.
+Reports `pd.set_option("mode.copy_on_write", True)`, `copy=False`, `pd.Timestamp.utcnow()`, `pd.Timestamp.utcfromtimestamp(t)`, and the units `"H"` and `"S"` in `pd.Timedelta("1H")`, `pd.to_timedelta(x, unit="H")` and `resample(offset="1H")`. Each form warns on pandas 3.1.
 
 Example:
 
@@ -447,96 +567,12 @@ Use instead:
 now = pd.Timestamp.now("UTC")
 ```
 
+The rule reports `astype(copy=)` only on a column taken by a label or on a value named like a frame, because NumPy's `astype` has the same keyword. Dropping `copy=` from `astype` is unsafe, because on a NumPy array `astype(copy=False)` can return the same array. The rule deletes the copy-on-write option line only at the top level of a file, and inside a function or another block it reports the line without a fix.
 
-`removed-in-pandas-3` also reports these, each of which raises on pandas 3.1:
-
-- Arguments of `read_csv`: `error_bad_lines`, `warn_bad_lines`, `squeeze`, `verbose`, `keep_date_col`,
-  `infer_datetime_format`, `mangle_dupe_cols`, `prefix`, `date_parser`, and a separator passed by position.
-  For bad lines, pass `on_bad_lines="skip"`.
-- Writing: `to_csv(line_terminator=)`, a separator passed to `to_csv` by position, `to_excel(encoding=)`,
-  `read_excel(squeeze=)` and `writer.save()` on a name that holds the word writer.
-- Names: `pd.value_counts`, `is_monotonic`, `mad`, `as_matrix`, `ix`, `pd.np`, `pd.datetime`,
-  `pd.Int64Index`, `pd.UInt64Index`, `pd.Float64Index`, `pd.io.json.json_normalize`, `pandas.util.testing`,
-  `SettingWithCopyWarning`, the option `mode.use_inf_as_na` and `pd.to_numeric(errors="ignore")`.
-- Time series: `tshift`, `pad()`, `first("3D")` and `last("3D")`, `resample(loffset=, base=, kind=)`,
-  `date_range(closed=)`, `to_datetime(infer_datetime_format=)` and `to_datetime(errors="ignore")`,
-  `pct_change(fill_method="pad")`, `between_time(include_start=, include_end=)`, `pd.Timestamp(freq=)`,
-  and `astype("timedelta64[D]")`.
-- Timedelta units: `"T"`, `"L"`, `"U"` and `"N"` in `pd.Timedelta("5T")`, `pd.Timedelta(1, unit="T")`,
-  `pd.to_timedelta(x, unit="T")` and `resample(offset="30T")`.
-- A handler for `pytz.exceptions.AmbiguousTimeError` or `NonExistentTimeError`. pandas 3 raises ValueError for
-  those times, also when the zone is a pytz object, and the pytz errors are not ValueErrors.
-- An old alias compared with `pd.infer_freq(index)` or `index.freqstr`, as in `pd.infer_freq(index) == "H"`,
-  which is never equal, because pandas returns `"h"`.
-- `iteritems()`, `is_lexsorted()`, `lexsort_depth` and `groupby(axis=1)`.
-
-The `writer.close()` fix is unsafe, because xpd knows the writer only by its name. `DataFrame.lookup`
-was removed too and is not reported, because other libraries have a method of that name.
-
-The new `chained-assignment` shapes: `df.a[mask] = v` is reported when the mask reads the same
-frame, which tells it from `self.items[i > 3] = v`. `df["a"].update(other)` is reported only on a name such as `df` or
-`frame`, because `state["seen"].update(extra)` is how a dict of dicts is updated. `compare-to-missing` reports `None` only
-inside a subscript, because `config["mode"] == None` on a dict is valid Python. `object-dtype-check`
-leaves `dtype.kind == "O"` alone, which is still true for a text column.
-
-`str-replace-regex-default` reports only a pattern that cannot be meant as plain text: a class such
-as `\d`, a set in brackets, `.*` or `.+`, a `^` at the start, or `a|b`. It leaves `"."`, `"$"` and
-`"("` alone. Its fix is unsafe, because a set in brackets can be meant as text.
-`positional-key-on-labels` reports `value_counts()[0]`, `df.iloc[i][0]`, `df.dtypes[0]` and a frame
-reduction such as `df.isna().sum()[0]`. Its fix is unsafe: on labels that are whole numbers the old
-form still works, and there `value_counts()[0]` is the count of the value 0. The frame reductions have no fix.
-
-The `reduction-level-argument` fix applies when `level=` is the only argument, and it is unsafe
-because the old form does not run on pandas 3, so the two cannot be compared. `stack-dropna` has no
-fix, because the replacement depends on the value of `dropna`. `frame-append` reports an `append`
-whose result is assigned, returned, passed on or read, or that passes `ignore_index`,
-`verify_integrity` or `sort`, because `list.append` returns None and takes no keywords. It leaves
-`df.index.append(x)` and `df.columns.append(x)` alone, because `Index.append` still exists. An
-Index held in a plain name, as in `labels = labels.append(more)`, is reported by mistake.
-
-The `chained-assignment` fix covers the three shapes above. A mask held in a name is fixed when
-the enclosing function assigns that name only masks, such as a comparison or a call to `isin`.
-Any other chain, such as `df.iloc[0]["a"] = v`, is reported without a fix. Two plain keys, as in
-`rows[0]["name"] = v`, are left alone, because they are more often a list or a dict.
-
-`in-column` and `inplace-on-column` can report a dict, such as `"x" in data["names"]`, because xpd
-cannot tell it from a frame. Their fixes are unsafe for that reason.
-
-`removed-in-pandas-3` rewrites a frequency where the call takes only datetimes, such as
-`date_range`, `timedelta_range`, `interval_range`, `to_offset`, `Grouper`, `floor`, `snap` and
-`rolling`. Inside `resample`, `shift` and `pct_change` the fix for `"M"`, `"Q"` and `"Y"` is
-unsafe, because those aliases stay valid when the index holds periods. It leaves `asfreq("M")`
-alone, and it reports `"A"` inside `resample`, `asfreq`, `shift` and `pct_change` without a fix,
-because the new alias is `"YE"` for datetimes and `"Y"` for periods. Where the call takes
-periods, in `to_period`, `period_range`, `pd.Period` and `pd.PeriodIndex`, it rewrites `"H"`,
-`"T"`, `"S"`, `"L"`, `"U"` and `"N"`, writes `"Y"` for `"A"`, and leaves `"M"`, `"Q"` and `"Y"`
-alone.
-
-The handler for a pytz error is reported when its try block holds a pandas call, such as
-`tz_localize`, `.dt.`, `pd.` or `floor`. It is left alone when it also names ValueError or
-Exception, and when the block calls pytz's own `localize`, which still raises the pytz errors. The fix for an
-alias compared with `infer_freq` or `freqstr` is unsafe, because the comparison can then be
-equal. `"M"` is compared only with `infer_freq`, because the `freqstr` of a monthly PeriodIndex
-is still `"M"`.
-
-`datetime-unit-check` leaves a file alone that calls `as_unit("ns")` or
-`astype("datetime64[ns]")`, because that file makes nanosecond columns itself. It compares a dtype
-only on a column taken by a label, as in `df["time"].dtype`, or on a name such as `series`, `col`
-or `index`, because a NumPy array keeps the unit it was made with. A column read
-from a nanosecond source, such as a NumPy array of `datetime64[ns]`, keeps that unit, and there
-the old comparison is still True.
-
-`deprecated-in-pandas-3` deletes the copy-on-write option only at the top level of a file, and
-reports it without a fix inside a function or another block. Dropping `copy=` from `astype` is
-unsafe, because a numpy array also has `astype(copy=False)`, and there it can return the same
-array.
-
-The `no-inplace` fix applies only to a call that stands alone as a statement, on a name, attribute
-or subscript. The inplace fixes drop comments between the call's arguments.
 
 ### Shorter forms, including the pandas 3.0 and 3.1 API
 
-These rules are warnings, apart from those marked info. Most of them make code shorter and do not change its speed.
+Each rule in this group names a shorter way to write the same code, often with an API that pandas 3.0 or 3.1 added. Most of the rules are warnings, and the rest are info.
 
 #### sort-then-reset-index
 
@@ -560,7 +596,7 @@ ordered = df.sort_values("load", ignore_index=True)
 
 **Severity:** warning. **Fix:** unsafe: `df.resample("D", on="d").sum()`, which raises on an empty frame where the indexed form returned.
 
-Reports `df.set_index("d").resample("D").sum()`.
+Reports `df.set_index("d").resample("D").sum()`. The rule reports only a chain that ends in a named aggregation such as `sum` or `mean`, because `asfreq` raises with `on=`, and a function passed to `agg` sees other data.
 
 Example:
 
@@ -578,7 +614,7 @@ daily = df.resample("D", on="time")["load"].sum()
 
 **Severity:** warning. **Fix:** unsafe: `df["b"].diff()`.
 
-Reports `df["b"] - df["b"].shift()`.
+Reports `df["b"] - df["b"].shift()`. The fix is unsafe, because `diff` wraps around on a column of unsigned integers and returns booleans for a boolean column.
 
 Example:
 
@@ -596,7 +632,7 @@ change = df["load"].diff()
 
 **Severity:** warning. **Fix:** unsafe: `df["a"].between(10, 20)`.
 
-Reports `(df["a"] >= 10) & (df["a"] <= 20)`.
+Reports `(df["a"] >= 10) & (df["a"] <= 20)`. The fix is unsafe, because the value can be a NumPy array, which has no `between`.
 
 Example:
 
@@ -610,15 +646,15 @@ Use instead:
 inside = df["load"].between(10, 20)
 ```
 
-`between` is a method of a Series. An index and a NumPy array have none, so comparisons on
-`df.index`, `df.index.hour`, `df.columns`, `df["load"].values` and `df["load"].array` are left
-alone.
+`between` is a method of a Series, and an index or a NumPy array has none. So the rule leaves
+comparisons alone on `df.index`, `df.index.hour`, `df.columns`, `df["load"].values` and
+`df["load"].array`.
 
 #### groupby-then-reset-index
 
 **Severity:** warning. **Fix:** unsafe: `df.groupby("k", as_index=False)[["a", "b"]].sum()`.
 
-Reports `df.groupby("k")[["a", "b"]].sum().reset_index()`.
+Reports `df.groupby("k")[["a", "b"]].sum().reset_index()`. The fix is unsafe, because a key that is not a column comes back in another place.
 
 Example:
 
@@ -671,7 +707,7 @@ Use instead:
 unmatched = left.merge(right, on="key", how="left_anti")
 ```
 
-The anti join returns the left columns, without the indicator or the right-hand columns. Use it when the result needs unmatched left rows rather than the full merged schema.
+The anti join returns only the columns of the left frame, without the indicator and without the columns of the right frame. Use it when you need the unmatched rows of the left frame and not every merged column.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -679,7 +715,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `df["k"].value_counts(normalize=True)`.
 
-Reports `df["k"].value_counts() / len(df["k"])`.
+Reports `df["k"].value_counts() / len(df["k"])`. The fix is unsafe, because it names the result `proportion` instead of `count`, and it leaves missing values out of the total.
 
 Example:
 
@@ -714,7 +750,7 @@ band = pd.Series("high", index=df.index).case_when([
 ])
 ```
 
-case_when uses the first matching condition. It returns a Series rather than a NumPy array.
+`case_when` uses the first condition that matches, and it returns a Series instead of a NumPy array.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -722,7 +758,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** info. **Fix:** none.
 
-Reports `df.query("a > 50 and b < 0")`.
+Reports `df.query("a > 50 and b < 0")`, because editors, type checkers and xpd can't read the column names in a string, and they can read `pd.col("a")`. The rule leaves a string that reads like SQL alone, such as `conn.query("SELECT ...")`.
 
 Example:
 
@@ -756,13 +792,20 @@ Use instead:
 selected = df[output_columns]
 ```
 
-The replacement raises when a requested column is absent. filter silently skips it, which is why the fix is unsafe.
+The fix is unsafe, because `df[cols]` raises KeyError on a label that is absent, where `filter` skipped the label.
 
 #### inline-column-list
 
 **Severity:** info. **Fix:** none.
 
-Reports `df[["k", "a", "b"]]` and `df.groupby(["k", "s", "raw"])`, three or more names written inside the expression.
+Reports a list of three or more text literals written inside the call, as in `df[["k", "a", "b"]]` and `df.groupby(["k", "s", "raw"])`, and asks for a named list passed by name. The table shows where the rule looks.
+
+| Place | Reported |
+| --- | --- |
+| `df[[...]]` and `df.loc[rows, [...]]` | yes |
+| an argument of `groupby`, `sort_values`, `set_index`, `select` or `drop_duplicates` | yes |
+| `by=`, `subset=`, `on=`, `left_on=`, `right_on=`, `columns=`, `id_vars=`, `value_vars=` or `usecols=` | yes |
+| `pd.DataFrame(data, columns=[...])` | no, because the list there defines the frame |
 
 Example:
 
@@ -783,7 +826,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `pd.concat(parts, union_categories=True)`.
 
-Reports `pd.concat(parts).astype("category")`, on pandas 3.1.
+Reports `pd.concat(parts).astype("category")` on pandas 3.1 and later.
 
 Example:
 
@@ -797,34 +840,29 @@ Use instead:
 combined = pd.concat(parts, union_categories=True)
 ```
 
+The fix is unsafe, because the order of the categories differs, and parts that are not categorical stay that way.
 
-xpd has no rule for or against a lambda in `assign`. A lambda and `pd.col` gave the same result
-at the same speed, and a lambda also works with `np.where` and with calculations across columns.
-`set-index-then-resample` applies only when a named aggregation such as `sum` or `mean` follows,
-because upsampling with `asfreq` raises with `on=`, and a function passed to `agg` sees other
-data. The `range-mask` fix is unsafe, because the operand may be a numpy array, which has no
-`between`. The `subtract-shift` fix is unsafe, because `diff` wraps around on an unsigned integer
-column and returns booleans for a boolean column. The `groupby-then-reset-index` fix is unsafe,
-because a key that is not a column comes back in another place. The `value-counts-share` fix names
-the result proportion instead of count and leaves missing values out of the total.
-`query-string` leaves a string that reads like SQL alone, such as `conn.query("SELECT ...")`, and
-it asks for `df.loc[pd.col("a") > 50]`, which type checkers accept. The `filter-items` fix is
-unsafe, because `df[cols]` raises on a label that is absent, where `filter` skipped it.
-`inline-column-list` reports a list of three or more text literals in `df[[...]]`, in
-`df.loc[rows, [...]]`, as an argument of `groupby`, `sort_values`, `set_index`, `select` or
-`drop_duplicates`, and in `by=`, `subset=`, `on=`, `left_on=`, `right_on=`, `columns=`,
-`id_vars=`, `value_vars=` or `usecols=`. It leaves `pd.DataFrame(data, columns=[...])` alone,
-because the list there defines the frame. It asks for a named list, such as
-`output_columns = ["k", "a", "b"]`, passed by name. The `concat-then-category`
-fix is unsafe, because the category order differs, and parts that are not categorical stay so.
 
 ### Python work per row or per value
+
+Each rule in this group finds code that calls a Python function once per row or once per value,
+and names the pandas method that works on the whole column at once. Several rules don't run on
+test files, because a test builds its expected value row by row on purpose.
 
 #### apply-known-function
 
 **Severity:** warning. **Fix:** unsafe: `df["s"].str.len()`, which raises on a column that is not text, `df["b"].isna()`, `pd.to_datetime(df["raw"])`, `df["b"].round(2)`.
 
-Reports `df["s"].apply(len)`, `df["b"].apply(pd.isna)`, `df["raw"].apply(pd.to_datetime)` and `df["b"].apply(lambda v: round(v, 2))`.
+Reports `df["s"].apply(len)`, `df["b"].apply(pd.isna)`, `df["raw"].apply(pd.to_datetime)` and `df["b"].apply(lambda v: round(v, 2))`. It reports only a column taken by a text label, because on a frame `apply` works per column.
+
+Each fix is unsafe, and the table gives the reason.
+
+| Fix | What can differ |
+| --- | --- |
+| `pd.to_datetime(df["raw"])` | a call per value parses each text on its own, and the whole column must share one format |
+| `df["b"].isna()` | on a column of lists, `pd.isna` per value returned an array per cell |
+| `df["b"].round(2)` | Python and NumPy round some halfway values differently |
+| `df["s"].str.len()` | it raises on a column that is not text |
 
 Example:
 
@@ -842,7 +880,7 @@ lengths = df["name"].str.len()
 
 **Severity:** warning. **Fix:** unsafe: `str.contains("ta_", regex=False)`. On a column of Python objects, a value that is not text gives NaN with a pattern and False with `regex=False`.
 
-Reports `df["s"].str.contains("ta_")`, a pattern with no regex character.
+Reports `df["s"].str.contains("ta_")`, where the pattern has no regular expression character, so `regex=False` gives the same match faster.
 
 Example:
 
@@ -860,7 +898,7 @@ matches = df["name"].str.contains("load_", regex=False)
 
 **Severity:** warning. **Fix:** unsafe: drop `.copy()`. Without the copy, `.values` and `.to_numpy()` of the result give an array that is read-only or shares memory with the source.
 
-Reports `df[["a", "b"]].copy()`, `df[mask].copy()` and `df.loc[...].copy()`.
+Reports `df[["a", "b"]].copy()`, `df[mask].copy()` and `df.loc[...].copy()`, because under copy-on-write the selection already behaves as a copy. It leaves a single text label and a slice alone, because on a dict or a NumPy array the copy keeps a later write away from the original.
 
 Example:
 
@@ -878,7 +916,12 @@ part = df[["load", "wind"]]
 
 **Severity:** warning. **Fix:** unsafe: `df["k"].map(table["v"])`, and `df["k"].map(codes)` for `codes.get(key)` per value. A lookup through a mask has no fix.
 
-Reports `df["k"].apply(lambda key: table.loc[key, "v"])` and `lambda key: table[table["k"] == key]["v"].iloc[0]`, which read another frame once per row.
+Reports `df["k"].apply(lambda key: table.loc[key, "v"])` and `lambda key: table[table["k"] == key]["v"].iloc[0]`, which read another frame once per row. `map` with a Series looks up the whole column at once.
+
+| Form | Rows | `map` with a Series was faster by |
+| --- | --- | --- |
+| the `.loc` lambda | 100,000 | 50 to 64 times |
+| the mask lambda | 20,000 | 777 to 848 times |
 
 Example:
 
@@ -892,11 +935,13 @@ Use instead:
 df["price"] = df["item"].map(prices["price"])
 ```
 
+The fix is unsafe, because a key that is absent gives a missing value where the lambda raised.
+
 #### apply-recomputes-aggregate
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["b"].apply(lambda v: v - df["b"].mean())`, which computes the mean of the whole column again for every row.
+Reports `df["b"].apply(lambda v: v - df["b"].mean())`, which computes the mean of the whole column again for every row, so the time grows with the square of the row count. On 20,000 rows the lambda took 0.34 seconds and the column form took 0.2 milliseconds. The rule reports a reduction of a column taken by a text label, and it leaves `lambda v: v["scores"].mean()` alone, which reads the row's own value.
 
 Example:
 
@@ -916,7 +961,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["k"].map({v: i for i, v in enumerate(df["k"].unique())})`, a dict of codes built by hand.
+Reports `df["k"].map({v: i for i, v in enumerate(df["k"].unique())})`, a dict of codes built by hand, which was 7 to 17 times slower than `pd.factorize`.
 
 Example:
 
@@ -930,7 +975,7 @@ Use instead:
 codes = pd.factorize(df["region"])[0]
 ```
 
-factorize numbers the values in the order they first appear, as the dict does. It returns a NumPy array, and it gives a missing value the code -1 where the dict gave it a code of its own. Pass `sort=True` for the order of `sorted`.
+`factorize` numbers the values in the order they first appear, as the dict does. It returns a NumPy array, and it gives a missing value the code -1 where the dict gave it a code of its own. Pass `sort=True` for the order of `sorted`.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -938,7 +983,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: drop `.copy()`. Without the copy, `.values` and `.to_numpy()` of the result give an array that is read-only or shares memory with the source.
 
-Reports `df.copy().rename(...)` and `df.rename(...).copy()`, also with `assign`, `reset_index`, `set_index`, `astype`, `fillna`, `drop(columns=)` and `pd.concat`. Also reports `drop(name, axis=1).copy()`.
+Reports `df.copy().rename(...)` and `df.rename(...).copy()`, also with `assign`, `reset_index`, `set_index`, `astype`, `fillna`, `drop(columns=)` and `pd.concat`, and it reports `drop(name, axis=1).copy()`. Under copy-on-write each of these methods returns a new frame, so the copy does the work twice. Each copy cost 4 to 10 milliseconds on 6 columns, and dropping it was 3 to 118 times faster.
 
 Example:
 
@@ -953,6 +998,8 @@ Use instead:
 clean = df.rename(columns=names)
 tidy = df.reset_index(drop=True)
 ```
+
+The rule leaves a copy next to a slow method such as `sort_values` or `merge` alone, because dropping the copy gained under 2 times. It leaves `df.copy().pipe(f)` alone, because `f` may write to its argument.
 
 #### row-loop
 
@@ -972,14 +1019,9 @@ Use instead:
 total = (df["load"] * df["weight"]).sum()
 ```
 
-The example sums numeric columns without missing values. Check missing values and floating point rounding when replacing a Python reduction. Keep a loop when its work cannot be expressed on columns.
+The replacement sums numeric columns without missing values. When you replace a Python reduction, check the missing values and the floating point rounding, and keep a loop when its work can't be written on columns.
 
-A loop over `itertuples()` or `to_dict("records")` that hands the row or its values to a function,
-as in `orders = [Order(id=row["id"], total=row["total"]) for row in df.to_dict("records")]`, turns
-rows into Python objects. Columns cannot do that, so it is left alone. A cast such as
-`int(row["a"])` and a list method such as `out.append(...)` do not count as a function here.
-`iterrows()` is reported in every loop, because it builds a Series for each row: use
-`itertuples()` or `to_dict("records")` when each row has to become an object.
+The rule leaves alone a loop over `itertuples()` or `to_dict("records")` that hands the row or its values to a function, as in `orders = [Order(id=row["id"], total=row["total"]) for row in df.to_dict("records")]`, because the loop turns rows into Python objects. A cast such as `int(row["a"])` and a list method such as `out.append(...)` don't count as a function here. The rule reports `iterrows()` in every loop, because it builds a Series for each row, so use `itertuples()` or `to_dict("records")` when each row has to become an object.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -987,7 +1029,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.apply(f, axis=1)`, and `agg` and `transform` with `axis=1` and a lambda or a `"_".join`.
+Reports `df.apply(f, axis=1)`, and `agg` and `transform` with `axis=1` and a lambda or a `"_".join`, which call a function once per row. On 100,000 rows the `agg` and `transform` forms were 327 to 2,735 times slower than whole columns. A named method, as in `agg("sum", axis=1)`, runs on whole columns and is left alone.
 
 Example:
 
@@ -1007,7 +1049,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `df["s"].str.startswith("A")`.
 
-Reports `df["s"].map(lambda v: v.startswith("A"))`.
+Reports `df["s"].map(lambda v: v.startswith("A"))`, which calls Python once per value where the `str` accessor works on the whole column. The fix is unsafe, because a column method returns a missing value where the lambda raised, and the dtype can change, as when `dt.year` gives int32 where the lambda gave int64.
 
 Example:
 
@@ -1025,7 +1067,7 @@ names = df["name"].str.upper()
 
 **Severity:** warning. **Fix:** unsafe: `df["d"].dt.year`.
 
-Reports `df["d"].apply(lambda t: t.year)`.
+Reports `df["d"].apply(lambda t: t.year)`, which calls Python once per value where the `dt` accessor works on the whole column. The fix is unsafe, because a column method returns a missing value where the lambda raised, and the dtype can change, as when `dt.year` gives int32 where the lambda gave int64.
 
 Example:
 
@@ -1043,7 +1085,7 @@ years = df["time"].dt.year
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["a"].apply(lambda v: 1 if v > 50 else 0)` and `lambda v: min(v, 1.0)`. A lambda that reduces its argument, as in `x.isnull().all()`, receives a whole Series per group and is left alone.
+Reports `df["a"].apply(lambda v: 1 if v > 50 else 0)` and `lambda v: min(v, 1.0)`. The rule leaves alone a lambda that reduces its argument, as in `x.isnull().all()`, because the lambda gets a whole Series per group.
 
 Example:
 
@@ -1057,7 +1099,7 @@ Use instead:
 flag = pd.Series(np.where(df["load"] > 50, 1, 0), index=df.index)
 ```
 
-The explicit Series constructor preserves the row labels. Check the result name, dtype and missing-value behavior.
+`pd.Series(..., index=df.index)` keeps the row labels. Check the name, the dtype and the missing values of the result.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1065,7 +1107,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `df["b"] * 2 + 1`.
 
-Reports `df["b"].apply(lambda v: v * 2 + 1)`.
+Reports `df["b"].apply(lambda v: v * 2 + 1)`, which calls Python once per value where the same arithmetic on the column runs once. The fix is unsafe, because a column method returns a missing value where the lambda raised, and the dtype can change, as when `dt.year` gives int32 where the lambda gave int64.
 
 Example:
 
@@ -1083,7 +1125,7 @@ scaled = df["load"] * 2 + 1
 
 **Severity:** warning. **Fix:** unsafe: `df["a"].sum()`, `df["k"].nunique()`, `df["k"].nunique(dropna=False)` for `len(df["k"].unique())`, `(df["a"] > 50).sum()`, `set(df["k"].unique())`, `df["a"].tolist()`, `df["a"].to_numpy()`. `Counter` has no fix.
 
-Reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])` and `np.array(df["a"].tolist())`. Also reports `len(df["k"].unique())` and `set(df["k"].values)`. For `set` and `list` the receiver must be named like a frame, because both are also how a dict's value is copied. It does not run on test files.
+Reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])`, `np.array(df["a"].tolist())`, `len(df["k"].unique())` and `set(df["k"].values)`, which were 2.6 to 483 times slower than the column method. For `set` and `list` the value before `[` must be named like a frame, because both are also how code copies a value of a dict. Even so, the rule can report a dict of lists, such as `list(config["names"])`. The rule doesn't run on test files.
 
 Example:
 
@@ -1097,11 +1139,13 @@ Use instead:
 total = df["load"].sum()
 ```
 
+The fix is unsafe, because the column methods skip missing values and the builtins did not.
+
 #### list-over-column
 
 **Severity:** warning. **Fix:** none.
 
-Reports `[v.upper() for v in df["s"]]`, and a `for` loop over a column that appends to a list. The receiver must be named like a frame: `df`, `frame`, or a name with one of them as a word. `x["key"]` in a for clause is more often a list inside a dict. It does not run on test files.
+Reports `[v.upper() for v in df["s"]]`, and a `for` loop over a column that appends to a list, which was 13 to 19 times slower than the column method. The value before `[` must be named like a frame, which means `df`, `frame`, or a name with one of them as a word, because `x["key"]` in a `for` clause is more often a list inside a dict. The rule doesn't run on test files.
 
 Example:
 
@@ -1115,7 +1159,7 @@ Use instead:
 names = df["name"].str.upper()
 ```
 
-The result is a labeled Series rather than a Python list. Use tolist only at a boundary that needs a list.
+The result is a Series with row labels instead of a Python list. Call `tolist` only where the next step needs a list.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1123,7 +1167,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `out.loc[len(out)] = row` inside a loop.
+Reports `out.loc[len(out)] = row` inside a loop, which grows the frame by one row at a time.
 
 Example:
 
@@ -1145,7 +1189,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `int((df["a"] > 50).sum())`.
 
-Reports `len(df[df["a"] > 50])`. The frame must be a plain name. It does not run on test files.
+Reports `len(df[df["a"] > 50])`, which builds a filtered frame only to count its rows. The frame must be a plain name, and the rule doesn't run on test files.
 
 Example:
 
@@ -1163,7 +1207,7 @@ count = int((df["load"] > 50).sum())
 
 **Severity:** warning. **Fix:** unsafe: `df.nsmallest(10, "b")`, `df.iloc[df["b"].argmin()]`, `df["b"].min()`, `df["b"].max()`, `df["b"].idxmin()`. The last rows of a frame, `iloc[-1]` on a sorted column and `sorted(df["b"])[0]` have no fix.
 
-Reports `df.sort_values("b").head(10)`, `df.sort_values("b").iloc[0]`, `df["b"].sort_values().iloc[0]`, `df.sort_values("b").tail(10)` and `sorted(df["b"])[0]`. A negative count, `head(-3)`, is left alone: it keeps all but the last rows, and `nsmallest(-3)` returns none.
+Reports `df.sort_values("b").head(10)`, `df.sort_values("b").iloc[0]`, `df["b"].sort_values().iloc[0]`, `df.sort_values("b").tail(10)` and `sorted(df["b"])[0]`, which sort every row to keep a few. It leaves a negative count alone, because `head(-3)` keeps all but the last 3 rows and `nsmallest(-3)` returns no rows.
 
 Example:
 
@@ -1177,11 +1221,21 @@ Use instead:
 largest = df.nlargest(10, "load")
 ```
 
+The fix is unsafe, and the table gives the reason for each form.
+
+| Fix | What can differ |
+| --- | --- |
+| `nsmallest` and `nlargest` | they raise on a text column, and they order ties differently |
+| `df.iloc[df["b"].argmin()]` | `argmin` raises when every value is missing, where the sort returned the first row |
+| `idxmin` | it can name another row when the lowest value appears twice |
+
+The rule reports `sort_values().iloc[-1]` without a fix, because the sort puts missing values last, so the old form returns NaN where `max()` skips them.
+
 #### replace-with-mapping
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["k"].replace(mapping)` with a mapping held in a name.
+Reports `df["k"].replace(mapping)` with a mapping held in a name, and asks for `map` with `mapping.get(v, v)`, which keeps the values that the mapping lacks and keeps the dtype.
 
 Example:
 
@@ -1195,7 +1249,7 @@ Use instead:
 names = df["name"].map(lambda value: mapping.get(value, value))
 ```
 
-The example uses an ordinary dictionary and scalar values. A short mapping can be faster with replace. map does not reproduce regex replacement or every special mapping behavior.
+The replacement assumes a plain dict of single values. `replace` can be faster with a short mapping, and `map` doesn't replace by regular expression.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1203,7 +1257,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports a frame that grows inside a loop, as in `out = pd.concat([out, part])`. Each pass copies every earlier row. A concat with `axis=1` is left alone: on pandas 3 it shares the columns it already has.
+Reports a frame that grows inside a loop, as in `out = pd.concat([out, part])`, because each pass copies every earlier row. The rule leaves a concat with `axis=1` alone, because on pandas 3 it shares the columns it already has.
 
 Example:
 
@@ -1220,10 +1274,9 @@ frames = [pd.read_csv(path) for path in paths]
 out = pd.concat(frames)
 ```
 
-The example assumes paths is not empty and the starting frame has no schema to preserve. A single concat avoids repeatedly copying the growing result.
+The replacement assumes that `paths` is not empty and that the empty starting frame set no columns or dtypes. One `concat` at the end copies each row once.
 
-A `pd.concat` inside a loop that builds a frame from other objects, such as
-`panel = pd.concat(parts_of_this_month)`, copies each row once and is left alone.
+The rule leaves alone a `pd.concat` inside a loop that builds a frame from other objects, such as `panel = pd.concat(parts_of_this_month)`, because it copies each row once.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1231,7 +1284,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `np.sqrt(df["w"])`, `df["b"].abs()`.
 
-Reports `df["w"].map(np.sqrt)`, `df["w"].apply(lambda v: np.log(v))`, `df["w"].apply(math.sqrt)` and `df["b"].apply(abs)`.
+Reports `df["w"].map(np.sqrt)`, `df["w"].apply(lambda v: np.log(v))`, `df["w"].apply(math.sqrt)` and `df["b"].apply(abs)`, which call the function once per value. With a bare function name it reports `apply` only on a column taken by a text label, because on a frame `apply` works per column. It leaves `df["w"].apply(np.sqrt)` alone, because `Series.apply` already hands a NumPy function the whole column, and `map` doesn't.
 
 Example:
 
@@ -1245,11 +1298,13 @@ Use instead:
 root = np.sqrt(df["wind"])
 ```
 
+The fix is unsafe, because `math.sqrt` and `math.log` raise on a value outside their domain, where NumPy returns NaN.
+
 #### apply-cast
 
 **Severity:** warning. **Fix:** unsafe: `df["b"].astype(int)`.
 
-Reports `df["b"].apply(int)`, `df["raw"].map(float)` and `df["b"].apply(lambda v: int(v))`.
+Reports `df["b"].apply(int)`, `df["raw"].map(float)` and `df["b"].apply(lambda v: int(v))`, which cast one value at a time. With a bare function name it reports `apply` only on a column taken by a text label. The rule covers `int` and `float` only, because on floats with missing values `astype(str)` was slower than `apply(str)` and kept the missing values.
 
 Example:
 
@@ -1267,7 +1322,7 @@ whole = df["load"].astype(int)
 
 **Severity:** warning. **Fix:** unsafe: `df["a"] > 50`, `df["a"].isin(wanted)`.
 
-Reports `df["a"].apply(lambda v: v > 50)` and `df["a"].apply(lambda v: v in wanted)`.
+Reports `df["a"].apply(lambda v: v > 50)` and `df["a"].apply(lambda v: v in wanted)`, which compare one value at a time. It leaves a chain such as `0 < v < 5` alone, and a test on text such as `"ta" in v` or `v in "abc"`.
 
 Example:
 
@@ -1281,11 +1336,13 @@ Use instead:
 high = df["load"] > 50
 ```
 
+The `isin` fix is unsafe, because `in` asks the container, and a dict, a range or a custom container can answer differently.
+
 #### apply-pd-series
 
 **Severity:** warning. **Fix:** unsafe: `pd.DataFrame(df["pair"].tolist(), index=df["pair"].index)`.
 
-Reports `df["pair"].apply(pd.Series)`, which builds one Series per row to split a column of lists or dicts.
+Reports `df["pair"].apply(pd.Series)`, which builds one Series per row to split a column of lists or dicts. It reports only a column taken by a text label, because on a frame `apply` works per column.
 
 Example:
 
@@ -1299,11 +1356,13 @@ Use instead:
 parts = pd.DataFrame(df["pair"].tolist(), index=df["pair"].index)
 ```
 
+The fix is unsafe, because the old form turned whole numbers into floats when a row also held floats, and the fix keeps them whole.
+
 #### index-loop
 
 **Severity:** warning. **Fix:** none.
 
-Reports `for label in df.index` with `df.loc[label, "a"]` or `df.at[label, "a"]` in the body, also as a comprehension. It does not run on test files.
+Reports `for label in df.index` with `df.loc[label, "a"]` or `df.at[label, "a"]` in the body, also as a comprehension, which reads the frame one label at a time. It leaves a loop alone that never reads the frame by its label, and it doesn't run on test files.
 
 Example:
 
@@ -1325,7 +1384,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports a loop or comprehension over `zip(df["a"], df["w"])`. It does not run on test files.
+Reports a loop or comprehension over `zip(df["a"], df["w"])`, which works on one pair of values at a time. It reports only when every argument of `zip` is a column taken by a text label, or a `.values`, `.to_numpy()` or `.tolist()`. It leaves `dict(zip(...))` alone, which isn't a loop, and it doesn't run on test files.
 
 Example:
 
@@ -1339,60 +1398,9 @@ Use instead:
 out = (df["load"] * df["weight"]).tolist()
 ```
 
-Keep the result as a Series when the next step takes one. Use tolist only at a boundary that needs a list.
+Keep the result as a Series when the next step takes one, and call `tolist` only where the next step needs a list.
 
 The replacement is advice. xpd does not apply it automatically.
-
-On 1,000,000 rows `map` with a Series ran 50 to 64 times faster than the `.loc` lambda of
-`lookup-per-row`, measured on 100,000 rows, and 777 to 848 times faster than the mask form, measured
-on 20,000. Its fix is unsafe, because a key that is absent gives a missing value where the lambda
-raised. `apply-recomputes-aggregate` grows with the square of the row count: 20,000 rows took 0.34
-seconds against 0.2 milliseconds. It reports a reduction of a column taken by a text label, and
-leaves `lambda v: v["scores"].mean()` alone, which reads the row's own value.
-`enumerate-map-encoding` was 7 to 17 times slower than `pd.factorize`. `copy-in-chain` names only
-methods that return a new frame at once: each copy cost 4 to 10 milliseconds on 6 columns, and
-dropping it was 3 to 118 times faster. A copy next to a slow method such as `sort_values` or `merge`
-is as wasted and is not reported, because it gained under 2 times. `df.copy().pipe(f)` is left
-alone, because `f` may write to its argument.
-
-The `apply-axis-1` shapes with `agg` and `transform` were 327 to 2,735 times slower than whole
-columns on 100,000 rows. A named method, as in `agg("sum", axis=1)`, is left alone. The new
-`builtin-on-column` shapes were 2.6 to 483 times slower, and `list` and `set` can report a dict of
-lists, such as `list(config["names"])`, because xpd cannot tell it from a frame. The `for` loop of
-`list-over-column` was 13 to 19 times slower. `sort-then-head` reports `sort_values().iloc[-1]`
-without a fix, because the sort puts missing values last, so the old form returns NaN where `max()`
-skips them. Its `idxmin` fix can name another row when the lowest value appears twice.
-
-`apply-known-function` reports only a column taken by a text label, because on a frame `apply`
-works per column. Its `pd.to_datetime` fix is unsafe, because a call per value parses each text
-on its own, and the whole column must share one format. The `isna` fix is unsafe, because on a
-column of lists `pd.isna` per value returned an array per cell. The `round` fix is unsafe, because
-Python and numpy round some halfway values differently. `copy-after-indexing` leaves a single text
-label and a slice alone, because on a dict or a numpy array the copy keeps a later write away
-from the original.
-
-`apply-math-function` leaves `df["w"].apply(np.sqrt)` alone, because `Series.apply` already hands
-a NumPy function the whole column, and `map` does not. Its fix is unsafe, because `math.sqrt` and
-`math.log` raise on a value outside their domain, where NumPy returns NaN. `apply-cast` covers
-`int` and `float` only: on floats with missing values `astype(str)` was slower than `apply(str)`
-and kept the missing values. `apply-comparison` leaves a chain such as `0 < v < 5` alone, and a
-test on text such as `"ta" in v` or `v in "abc"`. Its `isin` fix is unsafe, because `in` asks the
-container, and a dict, a range or a custom container can answer differently. The
-`apply-pd-series` fix is unsafe, because the old form turned whole numbers into floats when a row
-also held floats, and the fix keeps them whole. With a bare function name, `apply-math-function`,
-`apply-cast` and `apply-pd-series` report `apply` only on a column taken by a text label, because
-on a frame `apply` works per column. `index-loop` leaves a loop that never reads the frame by its
-label alone. `zip-over-columns` reports only when every argument of `zip` is a column taken by a
-text label, or a `.values`, `.to_numpy()` or `.tolist()`. It leaves `dict(zip(...))` alone, which
-is not a loop.
-
-`row-loop` replaces the `no-iterrows` rule of xpd 0.1.0. The fixes of `apply-text-method`,
-`apply-date-part` and `apply-arithmetic` are unsafe, because a column method returns a missing
-value where the lambda raised, and the dtype can change: `dt.year` is int32 where the lambda gave
-int64. `builtin-on-column` skips missing values after the fix. `sort-then-head` is unsafe, because
-`nsmallest` raises on a text column and orders ties differently, and `argmin` raises when every
-value is missing. `replace-with-mapping` asks for
-`df["k"].map(lambda v: mapping.get(v, v))`, which keeps the values and the dtype.
 
 ### groupby, agg and transform
 
@@ -1400,7 +1408,7 @@ value is missing. `replace-with-mapping` asks for
 
 **Severity:** warning. **Fix:** unsafe: `"max"` for min, max, median, count and nunique, `"sum"`, `"mean"`. The named method can give another dtype, and it raises on a column the lambda could reduce. A reduction with arguments, a count of a condition and `resample` have no fix.
 
-Reports `g["b"].agg(lambda v: v.max())`, `g.agg(np.sum)`, `pivot_table(aggfunc=np.mean)`, `g.agg(lambda v: v.quantile(0.9))`, `g.agg(lambda v: (v > 0).sum())` and a lambda or NumPy function on `resample`.
+Reports `g["b"].agg(lambda v: v.max())`, `g.agg(np.sum)`, `pivot_table(aggfunc=np.mean)`, `g.agg(lambda v: v.quantile(0.9))`, `g.agg(lambda v: (v > 0).sum())` and a lambda or NumPy function on `resample`, which run Python once per group. The rule leaves a lambda inside a list alone, because the result column would get a new name. It leaves `np.median`, `np.std` and `np.var` alone, because they treat missing values and degrees of freedom differently from the named methods.
 
 Example:
 
@@ -1414,11 +1422,21 @@ Use instead:
 maximum = df.groupby("region")["load"].agg("max")
 ```
 
+The forms without a fix have a replacement, and the table shows how much faster it was.
+
+| Reported code | Write instead | Faster by |
+| --- | --- | --- |
+| `g.agg(lambda v: v.quantile(0.9))` | `g.quantile(0.9)` | 4.8 times with 1,000 groups, 345 times with 100,000 |
+| `g.agg(lambda v: (v > 0).sum())` | `(df["b"] > 0).groupby(df["k"]).sum()` | not measured |
+| a lambda on a resampler | the named method | 3.4 to 82 times |
+
+The fixes for `sum`, `mean`, `std`, `var` and `prod` are unsafe, because pandas adds up each group with compensated summation and the lambda didn't. On the values 1e16, 1, 1 and -1e16 the sum changes from 0 to 2.
+
 #### groupby-lambda-window
 
 **Severity:** warning. **Fix:** unsafe: `g["b"].shift(1)`, `g["b"].cumsum()`. The method can give another dtype or index type on an empty or all-missing group.
 
-Reports `g["b"].transform(lambda v: v.shift(1))`.
+Reports `g["b"].transform(lambda v: v.shift(1))`, which runs Python once per group where the groupby method runs on all groups at once.
 
 Example:
 
@@ -1433,23 +1451,13 @@ previous = df.groupby("region")["load"].shift(1)
 ```
 
 
-`groupby-lambda` leaves a lambda inside a list alone, because the result column would get a new
-name. For `g.agg(lambda v: v.quantile(0.9))` write `g.quantile(0.9)`, which was 4.8 times faster
-with 1,000 groups and 345 times with 100,000. For a count of a condition write
-`(df["b"] > 0).groupby(df["k"]).sum()`. On a resampler the named method was 3.4 to 82 times faster.
-The `groupby-lambda-arithmetic` shapes `v - v.mean()` and `v / v.max()` were 6 times slower than
-`transform` with a name with 1,000 groups and 390 times slower with 100,000. Min-max scaling has no
-fix. It also leaves `np.median`, `np.std` and `np.var` alone, because they treat missing values
-and degrees of freedom differently from the named methods. The fixes for sum, mean, std, var, prod,
-cumsum and cumprod are unsafe, because pandas adds up each group with compensated summation. On
-values such as 1e16, 1, 1 and -1e16 the sum changes from 0 to 2. `groupby-lambda-window` leaves
-`shift(freq=)` alone, because it moves the index.
+The fixes for `cumsum` and `cumprod` are unsafe, because the groupby methods add up a running total with compensated summation, so a total over values far apart in size can change. The rule leaves `shift(freq=)` alone, because it moves the index.
 
 #### groupby-lambda-arithmetic
 
 **Severity:** warning. **Fix:** unsafe: `df["w"] / df.groupby("k")["w"].transform("sum")`.
 
-Reports `g["w"].transform(lambda v: v / v.sum())`, `v - v.mean()`, `v / v.max()`, the z-score, min-max scaling and `v.fillna(v.mean())`.
+Reports `g["w"].transform(lambda v: v / v.sum())`, `v - v.mean()`, `v / v.max()`, the z-score, min-max scaling and `v.fillna(v.mean())`. The lambdas `v - v.mean()` and `v / v.max()` were 6 times slower than `transform` with a name with 1,000 groups, and 390 times slower with 100,000. Min-max scaling has no fix.
 
 Example:
 
@@ -1463,11 +1471,13 @@ Use instead:
 share = df["load"] / df.groupby("region")["load"].transform("sum")
 ```
 
+The fix is unsafe, because the sums use compensated summation and the name of the result can change.
+
 #### groupby-filter-lambda
 
 **Severity:** warning. **Fix:** unsafe: `df[df.groupby("k")["k"].transform("size") > 10]`.
 
-Reports `df.groupby("k").filter(lambda g: len(g) > 10)`.
+Reports `df.groupby("k").filter(lambda g: len(g) > 10)`, which runs Python once per group to count its rows.
 
 Example:
 
@@ -1481,13 +1491,13 @@ Use instead:
 selected = df[df.groupby("region")["region"].transform("size") > 10]
 ```
 
-The example assumes the group keys are not missing. Check dropna and missing-key behavior before rewriting a filter.
+The replacement assumes that no group key is missing. Check how each form treats a missing key before you rewrite a filter.
 
 #### groupby-apply
 
 **Severity:** warning. **Fix:** none.
 
-Reports any `groupby(...).apply` with a lambda. A lambda that sorts each group, or builds a dict, a list or a joined text per group, is left alone.
+Reports any `groupby(...).apply` with a lambda, which runs Python once per group. The rule leaves alone a lambda that sorts each group, or that builds a dict, a list or a joined text per group.
 
 Example:
 
@@ -1501,7 +1511,7 @@ Use instead:
 totals = df.groupby("region")["load"].sum()
 ```
 
-The built-in reduction can change the index name, the dtype and floating point rounding. Check the result before replacing a general apply.
+The named reduction can change the name of the index, the dtype and the floating point rounding, so check the result before you replace `apply`.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1509,7 +1519,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.merge(df.groupby("k")["b"].sum()...)` and `df["k"].map(df.groupby("k")["b"].sum())`.
+Reports `df.merge(df.groupby("k")["b"].sum()...)` and `df["k"].map(df.groupby("k")["b"].sum())`, where `transform` gives each row the aggregate of its group in one step. The rule reports an aggregation written inside the call on the same frame, and it misses an aggregate stored in a variable.
 
 Example:
 
@@ -1528,7 +1538,7 @@ Use instead:
 result = df.assign(total=lambda frame: frame.groupby("region")["load"].transform("sum"))
 ```
 
-transform keeps the original index and row order. A merge can instead create a fresh index. The report covers an inline aggregation on the same frame, as well as mapping an aggregate back to its source column. An aggregate stored in a separate variable is not detected.
+`transform` keeps the index and the order of the rows, where a merge can give the result a new index.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1536,7 +1546,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.groupby("k").first()` and `last()`. A group of one selected column, `df.groupby("k")["b"].last()`, is left alone, because one column cannot mix rows.
+Reports `df.groupby("k").first()` and `last()`, which skip missing values per column, so one result row can mix values from different rows. The rule leaves `df.groupby("k")["b"].last()` alone, because one column can't mix rows.
 
 Example:
 
@@ -1550,22 +1560,22 @@ Use instead:
 first = df.groupby("region").first(skipna=False)
 ```
 
-skipna=False preserves missing values from the first row. Without it, first can combine values from different rows.
+`skipna=False` keeps the missing values of the first row.
 
 The replacement is advice. xpd does not apply it automatically.
 
 
 ### Tidy data
 
-A tidy frame has one row per observation and one column per variable. These rules report the
-longer ways to reshape a frame, and the defaults of the reshaping methods that change values
-without saying so. The measurements used pandas 3.1.1.
+Each rule in this group finds a longer way to reshape a frame, or a default of a reshaping method
+that changes values without a warning. A tidy frame has one row per observation and one column per
+variable. The measurements used pandas 3.1.1.
 
 #### column-loop-to-long
 
 **Severity:** info. **Fix:** none.
 
-Reports a loop over column names that selects one column at a time, renames it to a shared name and stacks the parts with `pd.concat`, as a list comprehension or as a `for` statement that appends. For 100,000 rows and 20 columns, `melt` gave the same 2,000,000 rows in the same order and ran 1.4 times faster.
+Reports a loop over column names that selects one column at a time, renames it to a shared name and stacks the parts with `pd.concat`. The loop can be a list comprehension or a `for` statement that appends. For 100,000 rows and 20 columns, `melt` gave the same 2,000,000 rows in the same order and ran 1.4 times faster.
 
 Example:
 
@@ -1586,7 +1596,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** info. **Fix:** none.
 
-Reports `df.set_index(keys).stack().reset_index()`, which builds a long frame whose new columns are named `level_1` and `0`. `melt` gave the same values under the names `variable` and `value`, or under the names passed to it, and ran 2.9 times faster on 100,000 rows with 20 columns. `stack` lists the values row by row and `melt` column by column.
+Reports `df.set_index(keys).stack().reset_index()`, which builds a long frame whose new columns are named `level_1` and `0`. On 100,000 rows with 20 columns, `melt` gave the same values and ran 2.9 times faster. `melt` names the new columns `variable` and `value`, or the names passed to it, and it lists the values column by column where `stack` lists them row by row.
 
 Example:
 
@@ -1606,7 +1616,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** info. **Fix:** none.
 
-Reports `melt` without `var_name`. The column of old column names is then called `variable`, and the column of their values `value` unless `value_name` is passed.
+Reports `melt` without `var_name`, which names the column of old column names `variable`. The column of their values is named `value` unless the call passes `value_name`.
 
 Example:
 
@@ -1626,7 +1636,13 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `pivot_table` without `aggfunc`, which takes the mean of the rows that share a cell. Two rows of 10 and 30 for one city and one year came back as 20.0, with no warning. With `aggfunc="sum"` the cell was 40, and `pivot` raised `ValueError` "Index contains duplicate entries, cannot reshape".
+Reports `pivot_table` without `aggfunc`, which takes the mean of the rows that share a cell without a warning. The table shows the cell for two rows of 10 and 30 with one city and one year.
+
+| Call | Cell |
+| --- | --- |
+| `pivot_table` without `aggfunc` | 20.0 |
+| `pivot_table(aggfunc="sum")` | 40 |
+| `pivot` | ValueError "Index contains duplicate entries, cannot reshape" |
 
 Example:
 
@@ -1640,13 +1656,13 @@ Use instead:
 table = df.pivot_table(index="city", columns="year", values="sold", aggfunc="sum")
 ```
 
-The replacement is advice. xpd does not apply it automatically. Write `aggfunc="mean"` when the mean is meant.
+The replacement is advice. xpd does not apply it automatically. Write `aggfunc="mean"` when you want the mean.
 
 #### unstack-without-fill
 
 **Severity:** warning. **Fix:** unsafe: `fill_value=0`.
 
-Reports `unstack` right after `size`, `count`, `value_counts` or `nunique` without `fill_value`. A pair without rows came back as a missing value, which turned the `int64` counts into `float64`. With `fill_value=0` the columns stayed `int64`. The fix is unsafe, because the missing values become 0, which changes a mean over them. An `unstack` with more than one argument is left alone.
+Reports `unstack` right after `size`, `count`, `value_counts` or `nunique` without `fill_value`. A pair without rows comes back as a missing value, which turned the `int64` counts into `float64`, and with `fill_value=0` the columns stayed `int64`. The fix is unsafe, because the missing values become 0, which changes a mean over them. The rule leaves an `unstack` with more than one argument alone.
 
 Example:
 
@@ -1662,15 +1678,15 @@ table = df.groupby(["city", "grade"]).size().unstack(fill_value=0)
 
 ### Index alignment and joins
 
-pandas pairs rows by index label in an assignment, in `concat(axis=1)` and in a join. These
-rules report code that turns the pairing off without saying so, and code that pairs by index
-through a longer form. The measurements used pandas 3.1.1.
+Each rule in this group finds code that turns off the pairing of rows by index label without a
+warning, or code that pairs by index through a longer form. pandas pairs rows by index label in an
+assignment, in `concat(axis=1)` and in a join. The measurements used pandas 3.1.1.
 
 #### assign-drops-alignment
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["m"] = other["m"].values`, `.to_numpy()` and `.tolist()`, also through `df.loc[:, "m"]` and as a keyword of `df.assign`. The index of `other` is dropped, so the rows are paired by position. With the same 4 rows in another order, all 4 values landed on the wrong row. A column of the same frame is left alone, because it has the same index.
+Reports `df["m"] = other["m"].values`, `.to_numpy()` and `.tolist()`, also through `df.loc[:, "m"]` and as a keyword of `df.assign`. The array has no index, so pandas pairs the rows by position. With the same 4 rows in another order, all 4 values landed on the wrong row. The rule leaves a column of the same frame alone, because it has the same index.
 
 Example:
 
@@ -1690,7 +1706,12 @@ The replacement is advice. xpd does not apply it automatically. When the two ind
 
 **Severity:** info. **Fix:** none.
 
-Reports `pd.concat([...], axis=1)` without `join=`. The call pairs rows by index label and keeps every label of every frame. With one label that differed, two frames of 4 rows gave 5 rows, and both `int64` columns became `float64` with a missing value. With `join="inner"` the result had the 3 shared rows and both columns stayed `int64`.
+Reports `pd.concat([...], axis=1)` without `join=`, which pairs rows by index label and keeps every label of every frame. The table shows two frames of 4 rows whose labels differ in one row.
+
+| Call | Rows | Dtype of both columns |
+| --- | --- | --- |
+| `pd.concat([left, right], axis=1)` | 5, with a missing value | `float64` |
+| `pd.concat([left, right], axis=1, join="inner")` | 3 shared rows | `int64` |
 
 Example:
 
@@ -1704,13 +1725,13 @@ Use instead:
 both = pd.concat([left, right], axis=1, join="inner")
 ```
 
-The replacement is advice. xpd does not apply it automatically. Write `join="outer"` when the missing values are meant.
+The replacement is advice. xpd does not apply it automatically. Write `join="outer"` when you want the missing values.
 
 #### merge-on-both-indexes
 
 **Severity:** info. **Fix:** unsafe: `left.join(right, how="inner")`. None for a merge with another keyword than `how`, `validate` and `sort`.
 
-Reports `left.merge(right, left_index=True, right_index=True)` and the `pd.merge` form. The merge was equal to `left.join(right, how="inner")`, and the two were equal for `how="left"`, `"right"` and `"outer"` and with `validate="1:1"`. The fix is unsafe, because join raises `ValueError` when the two frames share a column name, where merge adds the suffixes `_x` and `_y`.
+Reports `left.merge(right, left_index=True, right_index=True)` and the `pd.merge` form. The merge gave a frame equal to `left.join(right, how="inner")`, and the two were also equal for `how="left"`, `"right"` and `"outer"` and with `validate="1:1"`. The fix is unsafe, because `join` raises ValueError when the two frames share a column name, where `merge` adds the suffixes `_x` and `_y`.
 
 Example:
 
@@ -1728,7 +1749,7 @@ both = left.join(right, how="inner")
 
 **Severity:** warning. **Fix:** none.
 
-Reports `pd.merge_asof(...)` where nothing sorts: the function that holds the call has no `sort_values` and no `sort_index`, or the module has none for a call at module level. An unsorted left frame raised `ValueError` "left keys must be sorted", and an unsorted right frame raised "right keys must be sorted". A frame that another function sorts is reported too.
+Reports `pd.merge_asof(...)` in a function that has no `sort_values` and no `sort_index`, and at module level in a module that has none. An unsorted left frame raised ValueError "left keys must be sorted", and an unsorted right frame raised "right keys must be sorted". The rule also reports a frame that another function sorts, by mistake.
 
 Example:
 
@@ -1745,6 +1766,9 @@ matched = pd.merge_asof(trades.sort_values("time"), quotes.sort_values("time"), 
 The replacement is advice. xpd does not apply it automatically.
 
 ### MultiIndex
+
+Each rule in this group finds a MultiIndex that the code builds or reads one row at a time, and
+names the method that works on whole levels.
 
 #### multiindex-from-tuples
 
@@ -1764,11 +1788,20 @@ Use instead:
 index = pd.MultiIndex.from_arrays([df["region"], df["year"]], names=["region", "year"])
 ```
 
+On 1,000,000 rows the whole level methods ran faster, as the table shows.
+
+| Reported code | Write instead | Faster by |
+| --- | --- | --- |
+| `from_tuples` over `zip` | `from_arrays` | 27 times |
+| `from_tuples` over a comprehension | `from_product` | 118 times |
+
+The fix is unsafe, because without `names=` the method `from_arrays` takes the level names from the Series it gets, where `from_tuples` left them empty. The rule leaves `itertools.product(keys, repeat=2)` alone.
+
 #### level-values-unique
 
 **Severity:** warning. **Fix:** unsafe: `df.index.unique("k")`, `df.index.unique("k").nunique()`.
 
-Reports `df.index.get_level_values("k").unique()` and `.nunique()`, which build one value per row first. It does not run on test files.
+Reports `df.index.get_level_values("k").unique()` and `.nunique()`, which build one value per row first. On 1,000,000 rows `unique` with a level ran 22 times faster. The rule doesn't run on test files.
 
 Example:
 
@@ -1783,18 +1816,13 @@ regions = df.index.unique("region")
 ```
 
 
-The `multiindex-from-tuples` fix is unsafe, because without `names=` `from_arrays` takes the level
-names from the Series it is given, where `from_tuples` left them empty. It leaves
-`itertools.product(keys, repeat=2)` alone. The `level-values-unique` fix is unsafe, because a level
-built from a range comes back as a RangeIndex, with the same values, where the old form gave an
-Index. On 1,000,000 rows `from_arrays` ran 27 times faster than `from_tuples` over `zip`,
-`from_product` 118 times faster than the comprehension, and `unique` with a level 22 times faster.
+The fix is unsafe, because a level built from a range comes back as a RangeIndex with the same values, where the old form gave an Index.
 
 #### tuple-slice-on-levels
 
 **Severity:** info. **Fix:** safe: `pd.IndexSlice["a", :, 1]`. None for a slice with bounds.
 
-Reports a tuple with `slice(None)` inside `.loc[...]`, on the rows or on the columns. `pd.IndexSlice["a", :, 1]` was equal to `("a", slice(None), 1)`, and `.loc` gave equal frames with the two. A tuple with a slice that has bounds, as in `slice("a", "c")`, is reported without a fix.
+Reports a tuple with `slice(None)` inside `.loc[...]`, on the rows or on the columns. `pd.IndexSlice["a", :, 1]` was equal to `("a", slice(None), 1)`, and `.loc` gave equal frames with the two. The rule reports a tuple with a slice that has bounds, as in `slice("a", "c")`, without a fix.
 
 Example:
 
@@ -1810,11 +1838,15 @@ rows = df.loc[pd.IndexSlice["a", :, 1], :]
 
 ### Time series
 
+Each rule in this group finds date and time code that works one value at a time, goes through
+text, or breaks across a daylight saving change. The time zone rules were run on pandas 2.3.3 and
+3.1.1 with quarter-hourly data in `Europe/Copenhagen`.
+
 #### rolling-apply
 
 **Severity:** warning. **Fix:** safe: `rolling(20).max()` for min, max and median. unsafe: sum, mean, std and var. The `raw=True` case, which reports as info, and a NumPy function have no fix.
 
-Reports `rolling(20).apply(lambda w: w.max())`, `rolling(20).apply(f)` without `raw=True`, `rolling(20).agg(np.max)` and `rolling(20).apply(np.mean, raw=True)`.
+Reports `rolling(20).apply(lambda w: w.max())`, `rolling(20).apply(f)` without `raw=True`, `rolling(20).agg(np.max)` and `rolling(20).apply(np.mean, raw=True)`, which call Python once per window. On 200,000 rows `rolling(60).agg(np.max)` was 1,031 times slower than `rolling(60).max()`.
 
 Example:
 
@@ -1828,11 +1860,13 @@ Use instead:
 average = df["load"].rolling(20).mean()
 ```
 
+The fixes for sum, mean, std and var are unsafe, because the window methods keep running totals, so values far apart in size can give another result. For a function with no window method, the message names `raw=True` and `engine="numba"`.
+
 #### text-time-key
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.groupby(df["d"].dt.strftime("%Y-%m"))`.
+Reports `df.groupby(df["d"].dt.strftime("%Y-%m"))`, which turns every date into text to build the group key.
 
 Example:
 
@@ -1846,7 +1880,7 @@ Use instead:
 monthly = df.groupby(df["time"].dt.to_period("M"))["load"].sum()
 ```
 
-The result has a PeriodIndex instead of text labels. On a column with a time zone, `to_period` drops the zone and gives a UserWarning, so group on `pd.Grouper(key="time", freq="MS")` there.
+The result has a PeriodIndex instead of text labels. On a column with a time zone, `to_period` drops the zone and gives a UserWarning, so group on `pd.Grouper(key="time", freq="MS")` instead.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1854,7 +1888,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["d"].dt.date` and `dt.time`. A `dt.date` that is one side of a comparison is left alone: `dt.normalize()` keeps datetime64, and datetime64 compared with a Python `date` raises TypeError.
+Reports `df["d"].dt.date` and `dt.time`, which turn a datetime64 column into a column of Python objects. The rule leaves a `dt.date` alone that is one side of a comparison, because `dt.normalize()` keeps datetime64, and datetime64 compared with a Python `date` raises TypeError.
 
 Example:
 
@@ -1868,7 +1902,7 @@ Use instead:
 days = df["time"].dt.normalize()
 ```
 
-normalize returns timestamps at midnight, not Python date objects. Keep dt.date when an external interface needs Python dates. For dt.time, choose the required datetime representation rather than normalizing away the time.
+`normalize` returns timestamps at midnight and not Python dates, so keep `dt.date` when another library needs Python dates. For `dt.time`, `normalize` drops the time you want to keep, so keep a time as the time since midnight, `df["time"] - df["time"].dt.normalize()`.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1876,7 +1910,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `df["d"] + pd.Timedelta(days=7)`.
 
-Reports `df["d"].apply(lambda t: t + pd.Timedelta(days=7))`, `t.replace(day=1)` and `t.strftime(...)`.
+Reports `df["d"].apply(lambda t: t + pd.Timedelta(days=7))`, `t.replace(day=1)` and `t.strftime(...)`, which call Python once per date. For `replace(day=1)` the fix writes `df["d"] - pd.to_timedelta(df["d"].dt.day - 1, unit="D")`, which keeps the time of day.
 
 Example:
 
@@ -1890,11 +1924,13 @@ Use instead:
 next_week = df["time"] + pd.Timedelta(days=7)
 ```
 
+The fixes are unsafe, because a missing date gives a missing result where the lambda raised.
+
 #### strftime-date-part
 
 **Severity:** warning. **Fix:** unsafe: `df["d"].dt.year`, `df["d"].dt.day_name()`.
 
-Reports `df["d"].dt.strftime("%Y").astype(int)`, the same with `%m`, `%H` and `%j`, and `dt.strftime("%A")` and `"%B"`.
+Reports `df["d"].dt.strftime("%Y").astype(int)`, the same with `%m`, `%H` and `%j`, and `dt.strftime("%A")` and `"%B"`, which were 33 to 198 times slower than the date part on 1,000,000 rows.
 
 Example:
 
@@ -1910,11 +1946,13 @@ year = df["time"].dt.year
 weekday = df["time"].dt.day_name()
 ```
 
+The fixes are unsafe, because a date part is int32 where `astype(int)` gave int64, and `day_name` is English where `strftime` follows the locale.
+
 #### apply-date-expression
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["d"].apply(lambda t: t.weekday() >= 5)` and `lambda t: t.hour * 60 + t.minute`, a lambda that compares a date part or computes with parts.
+Reports `df["d"].apply(lambda t: t.weekday() >= 5)` and `lambda t: t.hour * 60 + t.minute`, a lambda that compares a date part or computes with parts, which was 22 to 94 times slower than the column form. The rule has no fix, because the rewrite depends on the operator.
 
 Example:
 
@@ -1934,7 +1972,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `df["d"].dt.normalize()`, `df["d"].dt.floor("h")`. The comparison has no fix.
 
-Reports `pd.to_datetime(df["d"].dt.strftime("%Y-%m-%d"))` and `df["d"].dt.strftime("%Y-%m-%d") == "2023-06-01"`, which turn dates into text to drop the time.
+Reports `pd.to_datetime(df["d"].dt.strftime("%Y-%m-%d"))` and `df["d"].dt.strftime("%Y-%m-%d") == "2023-06-01"`, which turn dates into text to drop the time and were 18 to 202 times slower than `normalize`.
 
 Example:
 
@@ -1948,11 +1986,13 @@ Use instead:
 day = df["time"].dt.normalize()
 ```
 
+The fix is unsafe, because on dates with a time zone the round trip through text drops the zone.
+
 #### index-year-mask
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df[df.index.year == 2023]`.
+Reports `df[df.index.year == 2023]`, which computes the year of every row to build a mask.
 
 Example:
 
@@ -1966,7 +2006,7 @@ Use instead:
 year = df.loc["2023"]
 ```
 
-Use the label example on a sorted DatetimeIndex. It is a label selection, not a rewrite for every kind of index.
+`df.loc["2023"]` selects by label and needs a sorted DatetimeIndex.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -1974,7 +2014,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `df["d"].dt.floor("h")`, `df["d"].dt.weekday`, `df["d"].dt.date`, `df["d"].dt.isocalendar().week`, `df["d"].dt.tz_localize(None)` for `replace(tzinfo=None)` and `df["d"].dt.tz_convert(zone)` for `astimezone(zone)`. `timestamp` and `toordinal` have no fix.
 
-Reports `df["d"].apply(lambda t: t.floor("h"))`, and the same with `ceil`, `normalize`, `tz_localize`, `tz_convert`, `day_name`, `month_name`, `to_period`, `total_seconds`, `weekday`, `date`, `isocalendar`, `timestamp`, `toordinal`, `replace(tzinfo=None)` and `astimezone`.
+Reports `df["d"].apply(lambda t: t.floor("h"))`, and the same with `ceil`, `normalize`, `tz_localize`, `tz_convert`, `day_name`, `month_name`, `to_period`, `total_seconds`, `weekday`, `date`, `isocalendar`, `timestamp`, `toordinal`, `replace(tzinfo=None)` and `astimezone`, which call Python once per date. It leaves `round` alone, because `lambda v: v.round(2)` is more often a number, and it leaves `replace(tzinfo=zone)` alone, because `replace` skips the daylight saving check that `tz_localize` makes.
 
 Example:
 
@@ -1988,11 +2028,21 @@ Use instead:
 hours = df["time"].dt.floor("h")
 ```
 
+The table shows the measured speed of the column forms.
+
+| Lambda | Column form | Rows | Speed |
+| --- | --- | --- | --- |
+| `t.floor("h")` | `dt.floor("h")` | 1,000,000 | 1,354 times faster |
+| `t.replace(tzinfo=None)` | `dt.tz_localize(None)` | 200,000 | 2.3 ms against 746 ms |
+| `t.timestamp()` | `(df["d"] - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s")` | not stated | 229 times faster |
+
+The fix is unsafe, because the dtype can change. `dt.weekday` is int32 where the lambda gave int64, and `isocalendar().week` is UInt32 where the lambda gave int64.
+
 #### apply-parse-date
 
 **Severity:** warning. **Fix:** unsafe: `pd.to_datetime(df["raw"], format="%Y-%m-%d")`.
 
-Reports `df["raw"].apply(lambda v: datetime.strptime(v, "%Y-%m-%d"))`, and a lambda or `map` that calls `pd.to_datetime`, `pd.Timestamp` or `parser.parse` per value.
+Reports `df["raw"].apply(lambda v: datetime.strptime(v, "%Y-%m-%d"))`, and a lambda or `map` that calls `pd.to_datetime`, `pd.Timestamp` or `parser.parse` per value. On 1,000,000 rows `pd.to_datetime` with a format ran 24 times faster than `strptime`. The rule reports `strptime` only on `datetime`, because `time.strptime` returns another type.
 
 Example:
 
@@ -2006,11 +2056,13 @@ Use instead:
 when = pd.to_datetime(df["raw"], format="%Y-%m-%d")
 ```
 
+The fix is unsafe, because a call per value parses each text on its own while the whole column must share one format, and because `strptime` raises on a missing value where `pd.to_datetime` returns NaT.
+
 #### timedelta-per-value
 
 **Severity:** warning. **Fix:** unsafe: `pd.to_timedelta(df["n"], unit="D")` for `pd.Timedelta(v, unit="D")`. The other shapes have no fix.
 
-Reports `df["n"].apply(lambda v: pd.Timedelta(days=v))`, the same with `timedelta` and `pd.DateOffset`, and `pd.to_timedelta(df["n"].astype(str) + " days")`.
+Reports `df["n"].apply(lambda v: pd.Timedelta(days=v))`, the same with `timedelta` and `pd.DateOffset`, and `pd.to_timedelta(df["n"].astype(str) + " days")`. On 1,000,000 rows `pd.to_timedelta` ran 1,549 times faster. A keyword such as `days=v` has no fix, because the keyword must become a unit. The rule leaves `pd.DateOffset(months=v)` alone, because a month has no fixed length.
 
 Example:
 
@@ -2024,13 +2076,20 @@ Use instead:
 shift = pd.to_timedelta(df["days"], unit="D")
 ```
 
-The units are "W", "D", "h", "min", "s", "ms" and "us". On fractional values the two forms can differ in the last digits.
+`unit=` takes `"W"`, `"D"`, `"h"`, `"min"`, `"s"`, `"ms"` and `"us"`. On fractions the two forms can differ in the last digits.
 
 #### tz-localize-without-dst
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df["d"].dt.tz_localize("Europe/Copenhagen")` without `ambiguous=` or without `nonexistent=`. A zone with daylight saving has a stretch each year that happens twice and one that never happens, an hour in most zones. `tz_localize` raises on a time in either stretch unless the call says what to do.
+Reports `df["d"].dt.tz_localize("Europe/Copenhagen")` without `ambiguous=` or without `nonexistent=`. A zone with daylight saving has an hour each year that happens twice and an hour that never happens, and `tz_localize` raises on a time in either hour unless the call says what to do. On half-hourly data for 2024 in `Europe/Copenhagen` the call raised.
+
+| Zone | Reported |
+| --- | --- |
+| a zone with daylight saving, such as `"Europe/Copenhagen"` | yes |
+| `"UTC"`, `"GMT"`, a zone under `Etc/`, or an offset such as `"+01:00"` | no, because they did not raise |
+| a zone held in a name | no |
+| a zone without daylight saving, such as `"Asia/Tokyo"` | yes, by mistake |
 
 Example:
 
@@ -2044,7 +2103,14 @@ Use instead:
 local = df["time"].dt.tz_localize("Europe/Copenhagen", ambiguous="infer", nonexistent="shift_forward")
 ```
 
-`ambiguous="infer"` reads the order of the rows and needs both copies of the repeated hour. `"NaT"` makes the time missing, and a boolean array says which rows are summer time. `nonexistent=` takes `"shift_forward"`, `"shift_backward"`, `"NaT"` or a Timedelta.
+The table lists the values that the two arguments take.
+
+| Argument | Value | Result |
+| --- | --- | --- |
+| `ambiguous=` | `"infer"` | reads the order of the rows, and needs both copies of the repeated hour |
+| `ambiguous=` | `"NaT"` | makes the time missing |
+| `ambiguous=` | a boolean array | says which rows are summer time |
+| `nonexistent=` | `"shift_forward"`, `"shift_backward"`, `"NaT"` or a Timedelta | moves the time out of the missing hour, or makes it missing |
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -2052,7 +2118,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `pd.date_range(start, end, freq="h", tz=zone)`.
 
-Reports `pd.date_range(start, end, freq="h").tz_localize(zone)`.
+Reports `pd.date_range(start, end, freq="h").tz_localize(zone)`, which builds the steps in local clock time and then fails on the daylight saving change.
 
 Example:
 
@@ -2066,11 +2132,13 @@ Use instead:
 hours = pd.date_range("2024-10-26", "2024-10-28", freq="h", tz="Europe/Copenhagen")
 ```
 
+The fix is unsafe, because the two forms differ across a daylight saving change. Hourly steps from 26 to 28 October 2024 raised when localized, and gave 50 hours with `tz=`. Without a daylight saving change in the range, the two forms gave an equal index. The fix adds an argument after the last one, so the rule leaves a call alone that ends in a trailing comma or holds a comment.
+
 #### to-datetime-then-localize
 
 **Severity:** warning. **Fix:** unsafe: `pd.to_datetime(df["raw"], utc=True)`.
 
-Reports `pd.to_datetime(df["raw"]).dt.tz_localize("UTC")`.
+Reports `pd.to_datetime(df["raw"]).dt.tz_localize("UTC")`, where `utc=True` sets the zone in the same call.
 
 Example:
 
@@ -2084,11 +2152,13 @@ Use instead:
 when = pd.to_datetime(df["raw"], utc=True)
 ```
 
+The fix is unsafe, because on text that holds an offset `utc=True` converts to UTC where `tz_localize` raised TypeError. The fix adds an argument after the last one, so the rule leaves a call alone that ends in a trailing comma or holds a comment.
+
 #### convert-then-drop-zone
 
 **Severity:** warning. **Fix:** safe: `df["d"].dt.tz_convert(None)`.
 
-Reports `df["d"].dt.tz_convert("UTC").dt.tz_localize(None)`, and the same on an index or a frame.
+Reports `df["d"].dt.tz_convert("UTC").dt.tz_localize(None)`, and the same on an index or a frame, where `tz_convert(None)` gives the same UTC times in one step.
 
 Example:
 
@@ -2106,7 +2176,7 @@ plain = df["time"].dt.tz_convert(None)
 
 **Severity:** warning. **Fix:** unsafe: `ts = ts.shift(freq=pd.Timedelta(hours=6))`.
 
-Reports `ts.index = ts.index + pd.Timedelta(hours=6)` and `ts.index += timedelta(days=1)`.
+Reports `ts.index = ts.index + pd.Timedelta(hours=6)` and `ts.index += timedelta(days=1)`, where `shift(freq=)` moves the index in one call.
 
 Example:
 
@@ -2120,11 +2190,13 @@ Use instead:
 ts = ts.shift(freq=pd.Timedelta(hours=6))
 ```
 
+The fix is unsafe, because the assignment changes the object in place and `shift` returns a new one.
+
 #### date-range-slice
 
 **Severity:** warning. **Fix:** unsafe: `pd.date_range(start, end, freq="15min", inclusive="left")`.
 
-Reports `pd.date_range(start, end, freq="15min")[:-1]`.
+Reports `pd.date_range(start, end, freq="15min")[:-1]`, which drops the end with a slice where `inclusive="left"` leaves it out. The rule leaves a range with `periods=` alone.
 
 Example:
 
@@ -2138,11 +2210,18 @@ Use instead:
 steps = pd.date_range("2024-03-30", "2024-04-01", freq="15min", inclusive="left")
 ```
 
+The fix is unsafe, because when the end isn't a step of the range, the slice drops the last real step and `inclusive="left"` keeps it. The fix adds an argument after the last one, so the rule leaves a call alone that ends in a trailing comma or holds a comment.
+
 #### index-time-mask
 
 **Severity:** warning. **Fix:** safe: `ts.at_time(time(12))`. unsafe: `ts.between_time("8:00", "16:00", inclusive="left")`.
 
-Reports `ts[ts.index.time == time(12)]` and `ts[(ts.index.hour >= 8) & (ts.index.hour < 16)]`.
+Reports `ts[ts.index.time == time(12)]` and `ts[(ts.index.hour >= 8) & (ts.index.hour < 16)]`, which build a Python time or an hour for every row. The table shows the times on 2,000,000 rows.
+
+| Mask | Time | Replacement | Time |
+| --- | --- | --- | --- |
+| `ts.index.time == time(12)` | 241 ms | `at_time` | 25 ms |
+| the two hour masks | 51 ms | `between_time` | 28 ms |
 
 Example:
 
@@ -2158,11 +2237,13 @@ noon = ts.at_time(time(12))
 working = ts.between_time("8:00", "16:00", inclusive="left")
 ```
 
+The `at_time` fix applies to a time object, such as `time(12)`. The rule leaves a comparison with text alone, because text never equals a time. The `between_time` fix applies to whole hours written as numbers, and it is unsafe, because when the first hour is later than the second the masks select nothing and `between_time` selects the hours across midnight.
+
 #### reindex-to-date-range
 
 **Severity:** warning. **Fix:** unsafe: `ts.asfreq("15min")`.
 
-Reports `ts.reindex(pd.date_range(ts.index.min(), ts.index.max(), freq="15min"))`.
+Reports `ts.reindex(pd.date_range(ts.index.min(), ts.index.max(), freq="15min"))`, where `asfreq` fills in the missing steps in one call.
 
 Example:
 
@@ -2176,11 +2257,13 @@ Use instead:
 full = ts.asfreq("15min")
 ```
 
+The fix is unsafe, because `asfreq` keeps the name of the index and the reindex dropped it.
+
 #### divide-by-shift
 
 **Severity:** warning. **Fix:** unsafe: `df["load"].pct_change(96)`.
 
-Reports `df["load"] / df["load"].shift(96) - 1` and `(df["load"] - df["load"].shift(96)) / df["load"].shift(96)`.
+Reports `df["load"] / df["load"].shift(96) - 1` and `(df["load"] - df["load"].shift(96)) / df["load"].shift(96)`, which `pct_change` computes in one call.
 
 Example:
 
@@ -2194,11 +2277,13 @@ Use instead:
 change = df["load"].pct_change(96)
 ```
 
+The fix is unsafe, because `(s - s.shift(n)) / s.shift(n)` rounds differently, so the result is close to the old one and not equal bit for bit. On pandas 2 `pct_change` also filled missing values forward first.
+
 #### date-part-key
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.groupby([df["d"].dt.year, df["d"].dt.month])`, and the same with `index.year` and `index.month`.
+Reports `df.groupby([df["d"].dt.year, df["d"].dt.month])`, and the same with `index.year` and `index.month`. On 2,000,000 rows the two keys took 25 ms and one monthly key took 6 ms.
 
 Example:
 
@@ -2216,66 +2301,18 @@ The result has one timestamp per month in place of a year and a month, and it al
 
 The replacement is advice. xpd does not apply it automatically.
 
-The `rolling-apply` fixes for sum, mean, std and var are unsafe, because the window methods keep
-running totals, so values far apart in size can give another result. For a function with no
-window method the message names `raw=True` and `engine="numba"`. `apply-on-dates` writes
-`df["d"] - pd.to_timedelta(df["d"].dt.day - 1, unit="D")` for `replace(day=1)`, which keeps the
-time of day. Its fixes are unsafe, because a missing date gives a missing result where the
-lambda raised.
-
-`strftime-date-part` was 33 to 198 times slower than the part on 1,000,000 rows. Its fixes are
-unsafe: a part is int32 where `astype(int)` gave int64, and `day_name` is English where `strftime`
-follows the locale. `apply-date-expression` was 22 to 94 times slower. It has no fix, because the
-rewrite depends on the operator. `strftime-round-trip` was 18 to 202 times slower. Its fix is
-unsafe, because on dates with a time zone the round trip drops the zone. For `timestamp` in a
-lambda write `(df["d"] - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s")`, which was 229 times
-faster. `isocalendar().week` is UInt32 where the lambda gave int64. `rolling(60).agg(np.max)` was
-1,031 times slower than `rolling(60).max()` on 200,000 rows.
-
-The `apply-date-method` fix is unsafe, because the dtype can change: `dt.weekday` is int32 where
-the lambda gave int64. It leaves `round` alone, because `lambda v: v.round(2)` is more often a
-number. The `apply-parse-date` fix is unsafe for the reason `apply-known-function` gives, and
-because `strptime` raises on a missing value where `pd.to_datetime` returns NaT. It reports
-`strptime` only on `datetime`, because `time.strptime` returns another type. `timedelta-per-value`
-has no fix for a keyword such as `days=v`, because the keyword must become a unit. It leaves
-`pd.DateOffset(months=v)` alone, because a month has no fixed length. On 1,000,000 rows `dt.floor`
-ran 1,354 times faster than the lambda, `pd.to_datetime` with a format 24 times faster than
-`strptime`, and `pd.to_timedelta` 1,549 times faster.
-
-The time zone rules were run on pandas 2.3.3 and 3.1.1 with quarter-hourly data in
-`Europe/Copenhagen`. `tz-localize-without-dst` raised on half-hourly data for 2024 in that zone.
-It leaves `"UTC"`, `"GMT"`, a zone under `Etc/` and an offset such as `"+01:00"` alone, which did
-not raise. It also leaves a zone held in a name alone, and it reports a zone without daylight
-saving, such as `"Asia/Tokyo"`, by mistake. `date-range-then-localize` is unsafe, because hourly
-steps from 26 to 28 October 2024 raised when localized and gave 50 hours with `tz=`. Without a
-daylight saving change in the range the two forms gave an equal index.
-`to-datetime-then-localize` is unsafe, because on text that carries an offset `utc=True` converts
-to UTC where `tz_localize` raised TypeError. `index-plus-offset` is unsafe, because the
-assignment changes the object in place and `shift` returns a new one. `date-range-slice` is
-unsafe: when the end is not a step of the range, the slice drops the last real step and
-`inclusive="left"` keeps it. It leaves a range with periods alone. These three rules also leave
-a call alone that ends in a trailing comma or holds a comment, because the fix adds an argument
-after the last one.
-
-`index-time-mask` took 241 ms as a mask on `index.time` and 25 ms as `at_time` on 2,000,000 rows.
-The two hour masks took 51 ms and `between_time` took 28 ms. The `between_time` fix applies to
-whole hours written as numbers, and it is unsafe: when the first hour is later than the second,
-the masks select nothing and `between_time` selects the hours across midnight. The `at_time` fix
-applies to a time object, such as `time(12)`, and a comparison with text is left alone, because
-text never equals a time.
-`reindex-to-date-range` is unsafe, because `asfreq` keeps the name of the index and the reindex
-dropped it. `divide-by-shift` is unsafe: `(s - s.shift(n)) / s.shift(n)` rounds differently, so
-the result is close and not bit equal, with or without a number of rows, and on pandas 2 `pct_change` filled missing values forward
-first. `date-part-key` took 25 ms with two keys and 6 ms with one monthly key on 2,000,000 rows.
-For `replace(tzinfo=None)` in a lambda, `dt.tz_localize(None)` took 2.3 ms where the lambda took
-746 ms on 200,000 rows. `apply-date-method` leaves `replace(tzinfo=zone)` alone, because `replace`
-skips the daylight saving check that `tz_localize` makes.
-
 #### row-window-on-uneven-times
 
 **Severity:** warning. **Fix:** none.
 
-Reports `rolling` with an integer window and `on=`. A window given as a number counts rows, also when `on=` names a time column. On six days with gaps, `rolling(3, on="day").sum()` gave 14.0 for 2024-01-10, the sum of three rows that reach back 8 days, and `rolling("3D", on="day").sum()` gave 8.0, the one row of the last 3 days. `rolling(3)` without `on=` gave the same numbers as with it. A row window on a frame whose index holds the times is not reported, because xpd cannot see that the index is one of times.
+Reports `rolling` with an integer window and `on=`. A window given as a number counts rows, also when `on=` names a time column, and `rolling(3)` without `on=` gave the same numbers as with it. The table shows the sum for 2024-01-10 on six days with gaps.
+
+| Call | Sum for 2024-01-10 | Rows in the window |
+| --- | --- | --- |
+| `rolling(3, on="day").sum()` | 14.0 | three rows that reach back 8 days |
+| `rolling("3D", on="day").sum()` | 8.0 | the one row of the last 3 days |
+
+The rule doesn't report a row window on a frame whose index holds the times, because xpd can't see that the index holds times.
 
 Example:
 
@@ -2293,11 +2330,14 @@ The replacement is advice. xpd does not apply it automatically. A time window st
 
 ### Stated intent
 
+Each rule in this group asks for an argument that states what the code expects, so that pandas
+raises when the data doesn't match instead of giving a wrong result.
+
 #### merge-without-validate
 
 **Severity:** warning. **Fix:** none.
 
-Reports `merge` without `validate=`, which can duplicate rows. A merge with `how="cross"` is left alone, because it pairs every row on purpose.
+Reports `merge` without `validate=`, which duplicates rows without a warning when a key repeats. The rule leaves a merge with `how="cross"` alone, because it pairs every row on purpose.
 
 Example:
 
@@ -2311,7 +2351,7 @@ Use instead:
 joined = left.merge(right, on="key", validate="many_to_one")
 ```
 
-Choose validate to match the data relationship. many_to_one is only the example, not a default xpd inserts. many_to_many does not check key uniqueness.
+Pick the `validate` value that matches your data, because `"many_to_one"` is only the example. `"many_to_many"` checks nothing.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -2333,7 +2373,7 @@ Use instead:
 joined = left.merge(right, on="key", validate="many_to_one")
 ```
 
-Choose the actual join keys. Omitting on makes every shared column name a key.
+Name the key columns that you mean to join on.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -2341,7 +2381,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.to_csv(path)` without `index=`. A call with no argument and a call that forwards `**options` are left alone. A named index is written under its name, so the message applies to an index with no name.
+Reports `df.to_csv(path)` without `index=`, which writes the index as an extra column without a name. The rule leaves alone a call with no argument and a call that forwards `**options`. A named index is written under its name.
 
 Example:
 
@@ -2360,15 +2400,24 @@ The replacement is advice. xpd does not apply it automatically.
 
 ### Method chains
 
-These rules ask for one chain of methods where the code builds a frame in separate steps. A
-chain names the frame once, lists the steps in the order they run, and leaves no half-built
-frame under a name.
+Each rule in this group asks for one chain of methods where the code builds a frame in separate
+steps. A chain names the frame once and lists the steps in the order they run, and no variable
+holds a frame that is half done.
 
 #### lambda-in-assign
 
 **Severity:** info. **Fix:** safe: `pd.col("a") * 2`. The rule runs on pandas 3.0 and later.
 
-Reports a lambda in `df.assign(name=lambda d: d["a"] * 2)`, `df.loc[lambda d: d["a"] > 2]` and `df[lambda d: d["a"] > 2]` that reads its frame only as `d["name"]`. On pandas 3.1.1, `pd.col` gave an equal frame for arithmetic, comparisons, the mask operators, a method, a reduction, the `str` accessor, a method that takes another column, an earlier keyword of the same `assign` and a frame renamed earlier in the chain. A lambda that uses the frame in another way, as `d.a` or `len(d)`, is left alone. So is one that passes a column to a function, as in `f(d["a"])`, and one that reads another frame by name, as in `other["x"]`.
+Reports a lambda in `df.assign(name=lambda d: d["a"] * 2)`, `df.loc[lambda d: d["a"] > 2]` and `df[lambda d: d["a"] > 2]` that reads its frame only as `d["name"]`. On pandas 3.1.1, `pd.col` gave an equal frame for each kind of lambda body that the rule reports, as the table shows.
+
+| Lambda body | Reported |
+| --- | --- |
+| arithmetic, a comparison, a mask operator such as `&` or `~`, a method, a reduction, or the `str` accessor | yes |
+| a method that takes another column, or an earlier keyword of the same `assign` | yes |
+| a column of a frame renamed earlier in the chain | yes |
+| the frame used in another way, as in `d.a` or `len(d)` | no |
+| a column passed to a function, as in `f(d["a"])` | no |
+| another frame read by name, as in `other["x"]` | no |
 
 Example:
 
@@ -2386,7 +2435,7 @@ df = df.assign(total=pd.col("price") * pd.col("units"))
 
 **Severity:** info. **Fix:** none.
 
-Reports the first of three or more statements in a row that each assign one name from a method of itself, as in `df = df.dropna()`. The methods are ones that return a frame or a Series, such as `assign`, `rename`, `dropna`, `merge` and `sort_values`, so a ladder of `str` methods is left alone. The chain gave a frame equal to the three statements. Another statement between two of the lines ends the ladder.
+Reports the first of three or more statements in a row that each assign one name from a method of itself, as in `df = df.dropna()`. The rule counts only methods that return a frame or a Series, such as `assign`, `rename`, `dropna`, `merge` and `sort_values`, so it leaves a ladder of `str` methods alone. Another statement between two of the lines ends the ladder. The chain gave a frame equal to the three statements.
 
 Example:
 
@@ -2412,7 +2461,13 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** info. **Fix:** unsafe: `df.pipe(clean).pipe(add_totals).pipe(add_shares)`.
 
-Reports three functions called one inside the other on a frame, as in `add_shares(add_totals(clean(df)))`. xpd must know that the innermost argument is a frame: it is a call such as `pd.read_csv(...)` or `pd.DataFrame(...)`, a variable whose nearest earlier assignment is one, or a parameter annotated `pd.DataFrame`. The three functions are plain names and no Python builtin. `DataFrame.pipe(f)` calls `f(frame)`, and the two forms gave equal frames. The fix is unsafe, because the chain raises `AttributeError` when the first or the second function returns something without `pipe`, such as a dict. [`xpd graph`](commands.md#graph) reads the pipe form as a pipeline of steps.
+Reports three functions called one inside the other on a frame, as in `add_shares(add_totals(clean(df)))`. `DataFrame.pipe(f)` calls `f(frame)`, and the two forms gave equal frames. The three functions must be plain names and not Python builtins, and xpd must know that the innermost argument is a frame, which means one of these:
+
+- a call such as `pd.read_csv(...)` or `pd.DataFrame(...)`
+- a variable whose nearest earlier assignment is such a call
+- a parameter annotated `pd.DataFrame`
+
+The fix is unsafe, because the chain raises AttributeError when the first or the second function returns something without `pipe`, such as a dict. [`xpd graph`](commands.md#graph) reads the pipe form as a pipeline of steps.
 
 Example:
 
@@ -2428,11 +2483,12 @@ result = df.pipe(clean).pipe(add_totals).pipe(add_shares)
 
 ### Charts
 
-pandas draws `df.plot` with matplotlib unless the plotting backend is set. These rules steer a
-file toward plotly as that backend, where xpd reads the figure with the rules of its
-[plotly](#plotly) pack. The measurements used pandas 3.1.1 with plotly 7.1.0 and matplotlib
-installed. With `pd.options.plotting.backend = "plotly"`, `df.plot.bar(x="team", y="score")`
-returned a figure equal, as JSON, to `px.bar(df, x="team", y="score")`.
+Each rule in this group asks a file to draw with plotly as the plotting backend of pandas, so that
+xpd can check the figure with the rules of its [plotly](#plotly) pack. pandas draws `df.plot` with
+matplotlib unless the plotting backend is set. With `pd.options.plotting.backend = "plotly"`,
+`df.plot.bar(x="team", y="score")` returned a figure equal, as JSON, to
+`px.bar(df, x="team", y="score")`. The measurements used pandas 3.1.1 with plotly 7.1.0 and
+matplotlib installed.
 
 #### plot-without-plotly-backend
 
@@ -2445,7 +2501,11 @@ Reports a file that draws with a plot method of the accessor and sets no plottin
 - Each call stands alone as a statement or is returned. A file that assigns the result is left alone, because the result is a matplotlib Axes there.
 - The file imports neither matplotlib nor seaborn.
 
-The rule is also silent when a module that the file loads sets the backend: the `__init__.py` of a package the file is in, a module of the project that the file imports, or a module that one of those imports.
+The rule is also silent when one of these modules sets the backend:
+
+- the `__init__.py` of a package that the file is in
+- a module of the project that the file imports
+- a module that one of those modules imports
 
 Example:
 
@@ -2471,7 +2531,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** info. **Fix:** safe: `df.plot.bar(x="team", y="score")`.
 
-Reports `df.plot(kind="bar", ...)` for the eleven kinds that the accessor has a method for: `line`, `bar`, `barh`, `box`, `hist`, `kde`, `density`, `area`, `pie`, `scatter` and `hexbin`. The two forms were equal as JSON with the plotly backend. xpd reads the method form when pandas draws with plotly. A kind that only another backend knows, such as `"violin"` with plotly, is left alone.
+Reports `df.plot(kind="bar", ...)` for the eleven kinds that the accessor has a method for: `line`, `bar`, `barh`, `box`, `hist`, `kde`, `density`, `area`, `pie`, `scatter` and `hexbin`. The two forms were equal as JSON with the plotly backend, and xpd reads the method form when pandas draws with plotly. The rule leaves alone a kind that only another backend knows, such as `"violin"` with plotly.
 
 Example:
 
@@ -2489,7 +2549,12 @@ df.plot.bar(x="team", y="score")
 
 **Severity:** info. **Fix:** none.
 
-Reports `plt.plot`, `plt.scatter` and `plt.bar` on two columns of one frame, `plt.hist` on one column, and `sns.scatterplot`, `sns.histplot` and `sns.boxplot` with `data=`. The plot accessor drew the same values with the plotly backend. `sns.barplot` and `sns.lineplot` are left alone, because seaborn draws the mean of each group there and plotly draws every row. `plt.barh` is left alone, because it takes the labels first and `df.plot.barh` takes the values as `x` with plotly. `plt` and `sns` must be bound by the import of `matplotlib.pyplot` and of `seaborn`.
+Reports `plt.plot`, `plt.scatter` and `plt.bar` on two columns of one frame, `plt.hist` on one column, and `sns.scatterplot`, `sns.histplot` and `sns.boxplot` with `data=`. The plot accessor drew the same values with the plotly backend. `plt` and `sns` must come from the import of `matplotlib.pyplot` and of `seaborn`.
+
+| Left alone | Reason |
+| --- | --- |
+| `sns.barplot` and `sns.lineplot` | seaborn draws the mean of each group, and plotly draws every row |
+| `plt.barh` | it takes the labels first, and with plotly `df.plot.barh` takes the values as `x` |
 
 Example:
 
@@ -2510,11 +2575,14 @@ The replacement is advice. xpd does not apply it automatically.
 
 ### Reading and writing files
 
+Each rule in this group finds a call that reads or writes a file in a slower way than it needs to,
+or that writes a CSV file that reads back wrong.
+
 #### read-csv-slow-option
 
 **Severity:** warning. **Fix:** none.
 
-Reports `read_csv(..., engine="python")`, `sep=None` and `low_memory=False`, which turn off reading on several threads.
+Reports `read_csv(..., engine="python")`, `sep=None` and `low_memory=False`, which turn off the fast C reader. On 1,000,000 rows `sep=None` was 54 times slower than a named separator. The rule leaves `engine="python"` alone when the call needs it, which is for `skipfooter` or for a separator of several characters other than `\s+`.
 
 Example:
 
@@ -2528,7 +2596,7 @@ Use instead:
 df = pd.read_csv(path)
 ```
 
-The example needs no Python-engine-only options. Keep engine="python" when the separator or skipfooter requires it. For low_memory=False, specify the required column dtypes rather than dropping it blindly.
+The replacement assumes that the call uses no option that only the Python engine has. In place of `low_memory=False`, pass the dtypes of the columns with `dtype=`.
 
 The replacement is advice. xpd does not apply it automatically.
 
@@ -2538,7 +2606,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `nrows=1000`.
 
-Reports `pd.read_csv(path).head(1000)` and `.iloc[:1000]`, which parse the whole file to keep the first rows.
+Reports `pd.read_csv(path).head(1000)` and `.iloc[:1000]`, which parse the whole file to keep the first rows. `nrows` was 58 times faster than `head`.
 
 Example:
 
@@ -2552,11 +2620,13 @@ Use instead:
 sample = pd.read_csv(path, nrows=1000)
 ```
 
+The fix is unsafe, because pandas guesses the dtypes from the rows it reads, so a column can get another dtype.
+
 #### read-csv-converters
 
 **Severity:** warning. **Fix:** none.
 
-Reports `read_csv(..., converters=...)`, which calls a Python function once per value.
+Reports `read_csv(..., converters=...)`, which calls a Python function once per value and was 3.9 to 7.8 times slower than `dtype` or a column method after the read.
 
 Example:
 
@@ -2577,7 +2647,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `engine="pyarrow"`. The `json.loads` loop has no fix.
 
-Reports `pd.read_json(path, lines=True)` without an engine, and `pd.DataFrame([json.loads(line) for line in f])`.
+Reports `pd.read_json(path, lines=True)` without an engine, and `pd.DataFrame([json.loads(line) for line in f])`. `read_json` with the pyarrow engine was 18 times faster than without an engine, and 27 times faster than the `json.loads` loop. The rule leaves a call alone that reads from a `StringIO`, because the pyarrow engine raises on a text buffer.
 
 Example:
 
@@ -2590,6 +2660,8 @@ Use instead:
 ```python
 df = pd.read_json(path, lines=True, engine="pyarrow")
 ```
+
+The fix is unsafe, because pyarrow can pick another dtype for a column.
 
 #### to-csv-append-header
 
@@ -2615,28 +2687,33 @@ The repeated header rows are read back as data, so every number in the file come
 
 The replacement is advice. xpd does not apply it automatically.
 
-`read-csv-slow-option` leaves `engine="python"` alone when the call needs it, for `skipfooter` or
-a separator of several characters other than `\s+`. `sep=None` was 54 times slower than a named
-separator on 1,000,000 rows. `nrows` was 58 times faster than `head`. Its fix is unsafe, because
-pandas guesses the dtypes from the rows it reads. `converters` was 3.9 to 7.8 times slower than
-`dtype` or a column method after the read. `read_json` with the pyarrow engine was 18 times faster,
-and 27 times faster than the `json.loads` loop. Its fix is unsafe, because pyarrow can pick another
-dtype for a column. A call that reads from a `StringIO` is left alone, because the pyarrow engine
-raises on a text buffer.
-
 ### Parquet storage
 
-These rules steer a file that stores a frame toward Parquet. The measurements used pandas 3.1.1
-with pyarrow 26.0.1 and a frame of 1,000,000 rows with the dtypes `int64`, `float64`, `str`,
-`datetime64[us]`, an ordered category and `Int64`. `to_parquet` and `read_parquet` returned a
-frame equal to the one written. The Parquet file was 14.7 MB, the CSV file 47.5 MB and the pickle
-file 49.0 MB.
+Each rule in this group asks a file that stores a frame to use Parquet, or to read only the
+columns and rows it needs from a Parquet file. `to_parquet` and `read_parquet` returned a frame
+equal to the one written. The measurements used pandas 3.1.1 with pyarrow 26.0.1 and a frame of
+1,000,000 rows with the dtypes `int64`, `float64`, `str`, `datetime64[us]`, an ordered category
+and `Int64`.
+
+| Format | File size |
+| --- | --- |
+| Parquet | 14.7 MB |
+| CSV | 47.5 MB |
+| pickle | 49.0 MB |
 
 #### csv-round-trip
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.to_csv(path)` in a file that also calls `pd.read_csv(path)` on the same path, written the same way in both calls. `read_csv` guesses every dtype again: the datetime column and the ordered category came back as `str`, and the `Int64` column as `float64`. `to_csv` took 0.93 seconds and `to_parquet` 0.09. A file that only writes a CSV is left alone, because another program may read it. So is `to_csv` with `mode=`, which appends to a file.
+Reports `df.to_csv(path)` in a file that also calls `pd.read_csv(path)` on the same path, written the same way in both calls. `read_csv` guesses every dtype again, so the dtypes change, as the table shows. `to_csv` took 0.93 seconds and `to_parquet` took 0.09 seconds.
+
+| Column written | Read back from CSV |
+| --- | --- |
+| `datetime64[us]` | `str` |
+| ordered category | `str` |
+| `Int64` | `float64` |
+
+The rule leaves a file alone that only writes a CSV, because another program may read it. It also leaves `to_csv` with `mode=` alone, which appends to a file.
 
 Example:
 
@@ -2658,7 +2735,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** info. **Fix:** none.
 
-Reports `to_pickle`, `pd.read_pickle`, `to_hdf`, `pd.read_hdf` and `pd.HDFStore`. `read_pickle` runs what the file tells it to call: a file whose pickle named `print` made `pd.read_pickle` print a line. HDF needs the PyTables package, and without it `to_hdf` raised `ImportError`. Parquet holds data only and needs pyarrow.
+Reports `to_pickle`, `pd.read_pickle`, `to_hdf`, `pd.read_hdf` and `pd.HDFStore`. `read_pickle` runs the function that the file names, and a pickle that named `print` made `pd.read_pickle` print a line. HDF needs the PyTables package, and without it `to_hdf` raised ImportError. Parquet holds data only, and it needs pyarrow.
 
 Example:
 
@@ -2680,7 +2757,12 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** safe: `columns=["id", "price"]`.
 
-Reports `pd.read_parquet(path)[["id", "price"]]` and `pd.read_parquet(path)["price"]`, which read every column and keep the named ones. The names must be strings. Reading 2 of 50 columns with `columns=` was 8.4 and 12.7 times faster in two runs, and 2 of 6 columns was 1.7 times faster. The two frames were equal, with the columns in the order of the list, and a file with a named index gave the same index both ways.
+Reports `pd.read_parquet(path)[["id", "price"]]` and `pd.read_parquet(path)["price"]`, which read every column and keep the named ones. The names must be strings. The two frames were equal, with the columns in the order of the list, and a file with a named index gave the same index both ways.
+
+| Columns read with `columns=` | Faster by |
+| --- | --- |
+| 2 of 50 | 8.4 and 12.7 times in two runs |
+| 2 of 6 | 1.7 times |
 
 Example:
 
@@ -2698,7 +2780,12 @@ prices = pd.read_parquet(path, columns=["id", "price"])
 
 **Severity:** info. **Fix:** none.
 
-Reports `df = pd.read_parquet(path)` followed directly by `df = df[df["id"] >= value]`, with `>`, `>=`, `<`, `<=`, `==`, `!=` or `isin`. With `filters=` pyarrow skips each row group that holds no such row. A file in 10 row groups, filtered to the last tenth of a sorted column, was read 4.4 times faster, and a file in one row group 1.3 to 1.5 times faster. The values were equal. A frame without a stored index came back numbered from 0, where the mask kept the old labels, so the rule has no fix.
+Reports `df = pd.read_parquet(path)` followed directly by `df = df[df["id"] >= value]`, with `>`, `>=`, `<`, `<=`, `==`, `!=` or `isin`. With `filters=` pyarrow skips each row group that holds no such row, and the values were equal. The rule has no fix, because a frame without a stored index came back numbered from 0, where the mask kept the old labels.
+
+| File, filtered to the last tenth of a sorted column | Faster by |
+| --- | --- |
+| 10 row groups | 4.4 times |
+| 1 row group | 1.3 to 1.5 times |
 
 Example:
 
@@ -2719,7 +2806,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `pd.concat(pd.read_csv(path, chunksize=n))`, also with `list(...)` or a comprehension around the reader. Every chunk is joined again, so the whole file is in memory anyway. It took 3.0 and 3.1 times as long in two runs as one `read_csv` without `chunksize`, and the two frames were equal. A loop that reduces each chunk before the concat is left alone.
+Reports `pd.concat(pd.read_csv(path, chunksize=n))`, also with `list(...)` or a comprehension around the reader. The code joins every chunk again, so the whole file is in memory anyway. It took 3.0 and 3.1 times as long in two runs as one `read_csv` without `chunksize`, and the two frames were equal. The rule leaves a loop alone that reduces each chunk before the concat.
 
 Example:
 
@@ -2737,16 +2824,27 @@ The replacement is advice. xpd does not apply it automatically.
 
 ### Packages
 
-`xpd check` also looks at the project's venv once per run. When the venv has pandas, it warns
-about each package below that the venv lacks. The warning points at the project's
-`pyproject.toml`, or at the venv when there is none. A project without a venv gets no package
-warning, and `xpd hook` never gives one.
+`xpd check` warns once per run about each package in the table that the project's venv lacks,
+when the venv has pandas. The warning points at the nearest `pyproject.toml`, or at the venv
+when there is none. A project without a venv gets no package warning, and `xpd hook` never gives
+one.
+
+| Check | Package | Extra condition |
+| --- | --- | --- |
+| [`missing-pyarrow`](#missing-pyarrow) | pyarrow | none |
+| [`missing-bottleneck`](#missing-bottleneck) | bottleneck | none |
+| [`missing-plotly`](#missing-plotly) | plotly | the project uses matplotlib or seaborn |
+| [`missing-pandas-stubs`](#missing-pandas-stubs) | pandas-stubs | the project uses mypy, pyright, basedpyright, ty or pyrefly |
+
+A project uses a tool when the venv has it or `pyproject.toml` has a `[tool.<name>]` table for it.
+numexpr and numba have no check. numexpr changed little in the measurements, and numba helps only
+a function passed to `rolling(...).apply`, where the `rolling-apply` message names it.
 
 #### missing-pyarrow
 
 **Severity:** warning. **Fix:** none.
 
-Text columns are stored as Python strings without it. The `.str` methods ran 3 to 11 times faster with it on 1,000,000 rows.
+Without pyarrow, pandas stores text columns as Python strings. With pyarrow the `.str` methods ran 3 to 11 times faster on 1,000,000 rows.
 
 The warning appears when pyarrow is not installed.
 
@@ -2762,7 +2860,7 @@ Add the package to the project environment, not to xpd itself.
 
 **Severity:** warning. **Fix:** none.
 
-`std` ran 4 times faster and `median` 1.7 times faster with it on 10,000,000 rows.
+With bottleneck, `std` ran 4 times faster and `median` 1.7 times faster on 10,000,000 rows.
 
 The warning appears when bottleneck is not installed.
 
@@ -2794,7 +2892,7 @@ Add the package to the project environment, not to xpd itself.
 
 **Severity:** warning. **Fix:** none.
 
-Without the stubs a type checker does not check calls to pandas.
+Without pandas-stubs, a type checker doesn't check calls to pandas.
 
 The warning appears when pandas-stubs is not installed, and the project uses mypy, pyright, basedpyright, ty or pyrefly.
 
@@ -2807,26 +2905,37 @@ uv add --dev pandas-stubs
 Add the package to the project environment, not to xpd itself.
 
 
-A project uses a type checker, matplotlib or seaborn when the venv has it or `pyproject.toml` has
-a `[tool.<name>]` table for it. numexpr and numba have no check. numexpr changed little in measurements, and numba
-only helps a function passed to `rolling(...).apply`, where the `rolling-apply` message names it.
 
 ## NumPy
 
-These rules run on files that import `numpy`. Examples assume `import numpy as np`. The rules
-follow NumPy 2.5. Every claim was run on NumPy 2.5.4: a form that is called removed raises there, a
-form that is called wrong gives the wrong value there, and each speedup is the median of 7 runs on
-one core, at 1,000,000 values unless the entry says otherwise.
+The NumPy rules find code that gives a wrong result or raises on NumPy 2.5, and code that has a
+faster or more exact form. They run on files that import `numpy`, and examples assume
+`import numpy as np`. Every claim was run on NumPy 2.5.4, as the table shows.
 
-A fix that writes `np.` applies only in a file with `import numpy as np`. A safe fix returns a bit
-equal value of the same dtype. An unsafe fix names what can differ. A rule that asks for an API
-added in NumPy 2.0 or later is skipped when the project's venv holds an older NumPy.
+| Claim | What it means on NumPy 2.5.4 |
+| --- | --- |
+| a form is removed | it raises |
+| a form is wrong | it gives the wrong value |
+| a form is faster | the median of 7 runs on one core, at 1,000,000 values unless the rule says otherwise |
+
+A fix that writes `np.` applies only in a file with `import numpy as np`. A safe fix returns a
+value of the same dtype that is equal bit for bit, and an unsafe fix names what can differ.
+
+xpd skips a rule, or one form of a rule, that asks for an API newer than the NumPy in the
+project's venv. When the venv has no NumPy, or there is no venv, every rule runs.
+
+| Rule | Runs on |
+| --- | --- |
+| [`char-module`](#char-module), [`log-of-det`](#log-of-det), [`unpackbits-popcount`](#unpackbits-popcount) and [`vecdot`](#vecdot) | NumPy 2.0 and later |
+| some forms of [`removed-in-numpy-2`](#removed-in-numpy-2) | NumPy 1.22, 1.25 or 2.0 and later, by form |
+| some forms of [`deprecated-in-numpy-2`](#deprecated-in-numpy-2) | NumPy 2.0 and later |
+| every other NumPy rule | every NumPy version |
 
 ### Code that gives a wrong result or raises on NumPy 2.5
 
-Each old form gives a wrong value without an error, or raises on every input in a way the text
-already shows. Examples assume `import numpy as np`. Every fix in this group changes the result to
-the one the code meant, so each one is unsafe. Read the notes before applying it.
+Each rule in this group finds code that gives a wrong value without an error, or that raises on
+every input. Every fix in this group changes the result to the one the code meant, so each fix is
+unsafe, and the notes of each rule say what changes.
 
 #### compare-to-nan
 
@@ -2846,13 +2955,13 @@ Use instead:
 missing = np.isnan(x)
 ```
 
-A file that imports pandas is left to the pandas rule `compare-to-missing`. A comparison passed to an assert function is left alone, because a test may check how a comparison with NaN behaves.
+In a file that imports pandas, the pandas rule [`compare-to-missing`](#compare-to-missing) reports the code instead. The rule leaves a comparison alone that is passed to an assert function, because a test may check how a comparison with NaN behaves.
 
 #### argument-in-wrong-slot
 
 **Severity:** error. **Fix:** unsafe: `np.zeros((3, 4))`. The linspace form and a quantile call with more arguments have no fix.
 
-Reports `np.zeros(3, 4)`, `np.full(3, 4, 0)`, `np.reshape(a, 2, 3)`, `np.vstack(a, b)`, `np.concatenate(a, [4, 5])`, `np.random.rand((3, 4))`, `np.random.random(3, 4)`, `np.linspace(0, 1, 0.1)` and `np.quantile(x, 95)`, which raise because an argument sits in the slot of another parameter.
+Reports `np.zeros(3, 4)`, `np.full(3, 4, 0)`, `np.reshape(a, 2, 3)`, `np.vstack(a, b)`, `np.concatenate(a, [4, 5])`, `np.random.rand((3, 4))`, `np.random.random(3, 4)`, `np.linspace(0, 1, 0.1)` and `np.quantile(x, 95)`, which raise, because an argument sits in the place of another parameter.
 
 Example:
 
@@ -2870,7 +2979,7 @@ grid = np.zeros((3, 4))
 
 **Severity:** warning. **Fix:** unsafe: `np.quantile(x, 0.95)`.
 
-Reports `np.percentile(x, 0.95)` and `np.percentile(x, [0.25, 0.75])`, which ask for percentiles near the minimum, because np.percentile takes percents from 0 to 100.
+Reports `np.percentile(x, 0.95)` and `np.percentile(x, [0.25, 0.75])`, which ask for percentiles near the minimum, because `np.percentile` takes percents from 0 to 100.
 
 Example:
 
@@ -2884,13 +2993,13 @@ Use instead:
 upper = np.quantile(x, 0.95)
 ```
 
-A list such as `[0.5, 99.5]`, where one number is a percent, is left alone.
+The rule leaves a list such as `[0.5, 99.5]` alone, where one number is a percent.
 
 #### positional-tolerance
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.isclose(a, b, 1e-3)` and `np.allclose(a, b, 1e-3)`, where the third argument is rtol and atol stays 1e-8.
+Reports `np.isclose(a, b, 1e-3)` and `np.allclose(a, b, 1e-3)`, where the third argument is `rtol` and `atol` stays 1e-8.
 
 Example:
 
@@ -2904,13 +3013,13 @@ Use instead:
 same = np.isclose(a, b, atol=1e-3)
 ```
 
-A call that also passes atol, or a value named like rtol, is left alone. The replacement is advice. xpd does not apply it automatically.
+The rule leaves a call alone that also passes `atol`, or that passes a value named like `rtol`. The replacement is advice. xpd does not apply it automatically.
 
 #### arange-float-step
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.arange(0, 1, 0.1)`, whose length depends on rounding, so `np.arange(1, 1.3, 0.1)` ends with 1.3000000000000003. The [NumPy docs for arange](https://numpy.org/doc/stable/reference/generated/numpy.arange.html) recommend np.linspace for a step that is not whole.
+Reports `np.arange(0, 1, 0.1)`, whose length depends on rounding, so `np.arange(1, 1.3, 0.1)` ends with 1.3000000000000003. The [NumPy docs for arange](https://numpy.org/doc/stable/reference/generated/numpy.arange.html) recommend `np.linspace` for a step that is not whole.
 
 Example:
 
@@ -2924,13 +3033,13 @@ Use instead:
 ticks = np.linspace(0, 0.9, 10)
 ```
 
-A step that is a multiple of 1/64, such as 0.5 or 0.25, is exact and left alone. The replacement is advice. xpd does not apply it automatically.
+The rule leaves a step alone that is a multiple of 1/64, such as 0.5 or 0.25, because such a step is exact. The replacement is advice. xpd does not apply it automatically.
 
 #### randint-single-value
 
 **Severity:** error. **Fix:** none.
 
-Reports `np.random.randint(0, 1, n)`, `np.random.randint(1)` and `rng.integers(0, 1)`, which always return 0, because the high end is exclusive.
+Reports `np.random.randint(0, 1, n)`, `np.random.randint(1)` and `rng.integers(0, 1)`, which always return 0, because the upper bound is excluded.
 
 Example:
 
@@ -2950,7 +3059,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** unsafe: `x.sort()`. A result assigned to another name, or returned, has no fix.
 
-Reports `x = x.sort()`, `m = np.fill_diagonal(m, 0)`, `y = rng.shuffle(y)`, `w = w.fill(0)` and `return v.sort()`, which leave None, because these calls change the array in place.
+Reports `x = x.sort()`, `m = np.fill_diagonal(m, 0)`, `y = rng.shuffle(y)`, `w = w.fill(0)` and `return v.sort()`, which set the name to None, because the calls change the array in place and return None.
 
 Example:
 
@@ -2964,13 +3073,13 @@ Use instead:
 values.sort()
 ```
 
-A sort with an argument other than an axis, such as `xp.sort(x)` in the array API, returns a value and is left alone.
+The rule leaves a sort alone that has an argument other than an axis, such as `xp.sort(x)` in the array API, because such a sort returns a value.
 
 #### result-discarded
 
 **Severity:** error. **Fix:** unsafe: `x = np.sort(x)`.
 
-Reports `np.sort(x)`, `np.append(x, 4)`, `np.clip(x, 0, 1)`, `x.astype(float)` and `m.reshape(3, 2)` standing alone as a statement, which do nothing, because they return a new array.
+Reports `np.sort(x)`, `np.append(x, 4)`, `np.clip(x, 0, 1)`, `x.astype(float)` and `m.reshape(3, 2)` standing alone as a statement, which do nothing, because they return a new array and the code drops it.
 
 Example:
 
@@ -2984,7 +3093,7 @@ Use instead:
 lengths = np.append(lengths, 1)
 ```
 
-A call with `out=`, a call in a try block or in a `with pytest.raises` block, and a call in an asv benchmark method are left alone. Other names bound to the old array keep its old values after the fix.
+The rule leaves alone a call with `out=`, a call in a `try` block or in a `with pytest.raises` block, and a call in an asv benchmark method. After the fix, other names bound to the old array keep its old values.
 
 #### write-to-copy
 
@@ -3004,13 +3113,13 @@ Use instead:
 x[np.flatnonzero(x > 2)[0]] = -1
 ```
 
-A slice or a whole number returns a view, so `x[1:4][0] = v` and `m[0][mask] = v` are left alone. The replacement is advice. xpd does not apply it automatically.
+The rule leaves `x[1:4][0] = v` and `m[0][mask] = v` alone, because a slice or a whole number returns a view. The replacement is advice. xpd does not apply it automatically.
 
 #### array-truth-value
 
 **Severity:** error. **Fix:** none.
 
-Reports `x[(x > 2) and (x < 8)]`, `x[not (x > 2)]` and `x[2 < x < 8]`, which raise ValueError, because and, or, not and a chained comparison ask for the truth of a whole array.
+Reports `x[(x > 2) and (x < 8)]`, `x[not (x > 2)]` and `x[2 < x < 8]`, which raise ValueError, because `and`, `or`, `not` and a chained comparison ask for the truth of a whole array.
 
 Example:
 
@@ -3030,7 +3139,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports `x > 2 & x < 8`, where & binds first, so Python compares x with `2 & x`.
+Reports `x > 2 & x < 8`, where Python applies `&` before the comparisons, so it compares `x` with `2 & x`.
 
 Example:
 
@@ -3044,7 +3153,7 @@ Use instead:
 inside = x[(x > 2) & (x < 8)]
 ```
 
-A file that imports pandas is left to the pandas rule `mask-precedence`. The replacement is advice. xpd does not apply it automatically.
+In a file that imports pandas, the pandas rule [`mask-precedence`](#mask-precedence) reports the code instead. The replacement is advice. xpd does not apply it automatically.
 
 #### int-mask-as-index
 
@@ -3064,13 +3173,20 @@ Use instead:
 large = y[y > 15]
 ```
 
-A lookup such as `labels[(score > t).astype(int)]`, where the mask comes from another array, maps each value to one of two labels and is left alone.
+The rule leaves a lookup alone such as `labels[(score > t).astype(int)]`, where the mask comes from another array, because it maps each value to one of two labels.
 
 #### iterator-to-array
 
 **Severity:** error. **Fix:** unsafe: `np.array([v * 2 for v in y])`. A set has no fix.
 
-Reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy does not consume an iterator. np.array wraps it in a zero dimensional object array, np.max returns the iterator itself, np.any returns True, and np.sum of a generator raises TypeError.
+Reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy doesn't read the values out of an iterator. The table shows what each call returned on NumPy 2.5.5.
+
+| Call on a generator | Result |
+| --- | --- |
+| `np.array(v for v in y)` | an object array with no dimensions that holds the generator |
+| `np.max(v for v in y)` | the generator itself |
+| `np.any(v for v in [0, 0])` | True |
+| `np.sum(v for v in y)` | TypeError "Calling np.sum(generator) is deprecated" |
 
 Example:
 
@@ -3084,7 +3200,7 @@ Use instead:
 doubled = np.array([v * 2 for v in values])
 ```
 
-`np.fromiter` consumes an iterator and is left alone.
+The rule leaves `np.fromiter` alone, because it reads the values out of an iterator.
 
 #### nan-to-int
 
@@ -3124,7 +3240,7 @@ Use instead:
 total = np.zeros(n) + offset
 ```
 
-`np.empty(n) * np.nan` gives NaN everywhere and is left alone. The replacement is advice. xpd does not apply it automatically.
+The rule leaves `np.empty(n) * np.nan` alone, because it gives NaN everywhere. The replacement is advice. xpd does not apply it automatically.
 
 #### array-default-argument
 
@@ -3155,7 +3271,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports `np.append(m, [[5, 5]])` and `np.insert(m, 0, [[5, 5]])` without axis, which flatten the array, so the row becomes loose values.
+Reports `np.append(m, [[5, 5]])` and `np.insert(m, 0, [[5, 5]])` without `axis`, which flatten the array, so the row becomes separate values in one dimension.
 
 Example:
 
@@ -3175,7 +3291,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** unsafe: `np.array_equal(a, b)`.
 
-Reports `a.all() == b.all()` and `np.any(a) == np.any(b)`, which compare two single booleans, not the arrays.
+Reports `a.all() == b.all()` and `np.any(a) == np.any(b)`, which compare two single booleans and not the arrays.
 
 Example:
 
@@ -3193,7 +3309,7 @@ assert np.array_equal(a, b)
 
 **Severity:** error. **Fix:** unsafe: `np.count_nonzero(z > 0)`.
 
-Reports `len(np.where(z > 0))`, `len(np.nonzero(z))` and `if np.where(z > 9):`, because np.where with one argument returns a tuple with one array per dimension. Its length is the number of dimensions, and it is always true.
+Reports `len(np.where(z > 0))`, `len(np.nonzero(z))` and `if np.where(z > 9):`, because `np.where` with one argument returns a tuple with one array per dimension. The length of the tuple is the number of dimensions, and the tuple is always true.
 
 Example:
 
@@ -3209,11 +3325,14 @@ matches = np.count_nonzero(z > 0)
 
 ### Code that raises or warns on NumPy 2.5
 
+Each rule in this group finds a name, method, module or keyword that NumPy removed or deprecated,
+and names what to write instead.
+
 #### removed-in-numpy-2
 
 **Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, a shape by position for `newshape=`, `method=` for `interpolation=` and `minlength=0`. unsafe: `"S"` for the dtype code `"a"`, because a `dtype=` keyword of another library can give the text another meaning, deleting `fix_imports=`, `bias=` and `ddof=`, because a call in the deleted value no longer runs, `np.ptp(a)`, `a.tobytes()` and `a[i, j] = v` for `a.itemset`, because the pattern cannot tell an array from another object with a method of that name, `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`. The other forms have no fix.
 
-Reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, each with what to write instead. Code under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches `ImportError` or `AttributeError` is left alone, because it exists for old NumPy.
+Reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, each with what to write instead. The rule leaves code alone under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches ImportError or AttributeError, because the code exists for old NumPy.
 
 Example:
 
@@ -3261,14 +3380,24 @@ grid = grid.reshape((2, 3))
 
 ### Python work per value on arrays
 
-Each old form calls Python once per value, or copies the whole array once per pass. Speedups are
-medians of 7 runs on one core with NumPy 2.5.4, on float64 and int64.
+Each rule in this group finds code that calls Python once per value, or that copies the whole
+array once per pass, and the message of each rule names the whole array form. The table shows the
+speed that each message reports, as medians of 7 runs on one core with NumPy 2.5.4, on float64
+and int64.
+
+| Rule | Write instead | Faster by |
+| --- | --- | --- |
+| [`element-loop`](#element-loop) | one expression on whole arrays | 70 to 530 times on 1,000,000 values |
+| [`growth-in-loop`](#growth-in-loop) | a list, and one `np.concatenate` after the loop | 130 to 170 times for 1,000 passes over 1,000,000 values |
+| [`per-value-comprehension`](#per-value-comprehension) | the expression on `np.asarray(...)` | 60 to 470 times on an array of 1,000,000 values, and 2 to 24 times on a list |
+| [`builtin-on-array`](#builtin-on-array) | the method, such as `.sum(axis=0)` | 37 to 47 times on 1,000,000 values |
+| [`np-vectorize`](#np-vectorize) | code on whole arrays, such as `np.where` or `np.select` | not measured |
 
 #### element-loop
 
 **Severity:** warning. **Fix:** none.
 
-Reports a `for` loop over `range`, `np.arange` or `np.ndindex`, and a `while i < n` loop with `i += 1`, whose only statement writes one element of a NumPy array from arithmetic on the loop position, and a loop over `np.nditer` or `np.ndenumerate` without `external_loop`. A body that calls another function, reads the array it writes, or writes a slice is left alone.
+Reports a `for` loop over `range`, `np.arange` or `np.ndindex`, and a `while i < n` loop with `i += 1`, whose only statement writes one element of a NumPy array from arithmetic on the loop position. It also reports a loop over `np.nditer` or `np.ndenumerate` without `external_loop`. The rule leaves a loop alone whose body calls another function, reads the array it writes, or writes a slice.
 
 Example:
 
@@ -3288,7 +3417,7 @@ out = a * 2 + np.sqrt(b)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `out = np.append(out, x)`, `out = np.concatenate((out, x))` and the same with `vstack`, `hstack`, `column_stack`, `dstack` and `stack` inside a loop, when the loop does not reset `out` or read it elsewhere.
+Reports `out = np.append(out, x)`, `out = np.concatenate((out, x))` and the same with `vstack`, `hstack`, `column_stack`, `dstack` and `stack` inside a loop, when the loop doesn't reset `out` or read it elsewhere, because each call copies every earlier value.
 
 Example:
 
@@ -3363,11 +3492,21 @@ def clipped(x):
 
 ### Arrays built, copied and stored the slow way
 
+Each rule in this group finds an array that the code builds, copies or stores in a slower way
+than NumPy offers. The table shows the speed that the message of each rule reports, on 1,000,000
+values.
+
+| Rule | Write instead | Faster by |
+| --- | --- | --- |
+| [`array-construction`](#array-construction) | `np.arange`, `np.zeros` or `np.full` | 150 times for `np.arange` |
+| [`needless-copy`](#needless-copy) | `.ravel()` | 1.6 to 1.8 times |
+| [`file-roundtrip`](#file-roundtrip) | `np.save` and `np.load` | 27 to 880 times to read, and 420 to 510 times to write |
+
 #### array-construction
 
 **Severity:** warning. **Fix:** safe: `np.zeros(n, dtype=np.float32)`. unsafe: `np.full(n, 3, dtype=np.float64)`, which gives a zero dimensional array where the product of an empty shape gave a scalar, `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
 
-Reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`.
+Reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`, which build the values once and then build them again, or build a Python int for every value.
 
 Example:
 
@@ -3385,7 +3524,7 @@ weights = np.full(n, 0.5, dtype=np.float64)
 
 **Severity:** warning. **Fix:** unsafe: `np.abs(m).ravel()`, `x.astype(np.float32)`, `np.array(x)`. ravel can return a view of an output array that was passed by position, and the other two can change the memory order.
 
-Reports `.flatten()` on the result of a NumPy call that returns a new array, `x.copy().astype(t)` and `np.array(x).copy()`.
+Reports `.flatten()` on the result of a NumPy call that returns a new array, `x.copy().astype(t)` and `np.array(x).copy()`, which copy an array that is already new.
 
 Example:
 
@@ -3403,7 +3542,7 @@ flat = np.concatenate([a, b]).ravel()
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.loadtxt(f)` and `np.genfromtxt(f)` in a file that also calls `np.savetxt(f, ...)`, and `np.fromfile(f)` in a file that also calls `x.tofile(f)`, with the same file argument.
+Reports `np.loadtxt(f)` and `np.genfromtxt(f)` in a file that also calls `np.savetxt(f, ...)`, and `np.fromfile(f)` in a file that also calls `x.tofile(f)`, with the same file argument. `np.save` and `np.load` keep the dtype and the shape.
 
 Example:
 
@@ -3421,9 +3560,26 @@ data = np.load("cache.npy")
 
 ### Whole-array math with a faster or more exact function
 
-These rules are warnings. Each one names the NumPy function that does the same work without a
-full sort, a temporary array or a step that loses digits. The speedups were measured on one core
-with BLAS and LAPACK on one thread, NumPy 2.5.4.
+Each rule in this group names the NumPy function that does the same work without a full sort, a
+temporary array or a step that loses digits, and every rule is a warning. The table shows the
+speed that the message of each rule reports, measured on one core with BLAS and LAPACK on one
+thread and NumPy 2.5.4. The other rules in the group give a more exact result and have no
+measured speed.
+
+| Rule | Reported form | Size |
+| --- | --- | --- |
+| [`sort-then-select`](#sort-then-select) | 39 times slower than `np.min` | 1,000,000 values |
+| [`count-nonzero`](#count-nonzero) | 1.7 times slower than `np.count_nonzero` | 1,000,000 values |
+| [`where-shortcut`](#where-shortcut) | 17 times slower than `np.asarray` | 1,000,000 values |
+| [`reduce-last`](#reduce-last) | 8 times slower than `np.sum` | 1,000,000 values |
+| [`power-half`](#power-half) | 2 times slower than `np.sqrt` | 1,000,000 values |
+| [`sum-of-products`](#sum-of-products) | 2.4 times slower than `np.vdot` | 1,000,000 values |
+| [`norm-by-hand`](#norm-by-hand) | 3.9 times slower than `np.linalg.norm` | 1,000,000 values |
+| [`vecdot`](#vecdot) | 2 to 3.5 times slower than `np.vecdot` | 1,000,000 values |
+| [`inv-then-multiply`](#inv-then-multiply) | 3.8 times slower than `np.linalg.solve` for a vector | a 1,000 by 1,000 matrix |
+| [`eig-on-symmetric`](#eig-on-symmetric) | 3.6 times slower than `np.linalg.eigh` | not stated |
+| [`matmul-diagonal`](#matmul-diagonal) | 34 times slower than `np.einsum` | 1,000 by 1,000 matrices |
+| [`einsum-optimize`](#einsum-optimize) | 339 times slower than `optimize=True` | three 100 by 100 matrices |
 
 #### sort-then-select
 
@@ -3715,13 +3871,24 @@ chain = np.einsum("ij,jk,kl->il", a, b, c, optimize=True)
 
 ### The API that NumPy's docs prefer on NumPy 2.5
 
-Each old form still runs without a warning on NumPy 2.5.4. NumPy's docs call it legacy, not recommended or kept for backwards compatibility, or the newer form measured at least 1.5 times faster. The rules that state only a documented preference report as info, below the warnings. The rules that name an API added in NumPy 2.0 are skipped on an older NumPy.
+Each rule in this group finds an old form that still runs without a warning on NumPy 2.5.4, and
+names the form that NumPy's docs prefer. The docs call the old form legacy, not recommended, or
+kept for backwards compatibility, or the newer form measured at least 1.5 times faster. A rule
+that states only a preference of the docs is info, and the rest are warnings. xpd skips the rules
+that name an API added in NumPy 2.0 on an older NumPy.
 
 #### legacy-random
 
 **Severity:** warning. **Fix:** none. A Generator draws a different stream from the same seed, and `np.random.seed` elsewhere would no longer reach the rewritten call.
 
-Reports `np.random.seed`, `np.random.rand`, `np.random.randint`, `np.random.randn`, `np.random.choice`, every other distribution function in `np.random`, `np.random.get_state`, `np.random.RandomState(...)` outside files that import scikit-learn, and imports of these names from `numpy.random`. The message gives the Generator method, such as `integers` for `randint`, and its measured speed where it was at least 1.5 times faster: `random` 2 times, `integers` 2.5 times, `exponential` 2.4 times, and `choice(..., replace=False)` 280 times.
+Reports `np.random.seed`, `np.random.rand`, `np.random.randint`, `np.random.randn`, `np.random.choice`, every other distribution function in `np.random`, `np.random.get_state`, `np.random.RandomState(...)` outside files that import scikit-learn, and imports of these names from `numpy.random`. The message gives the Generator method, such as `integers` for `randint`, and its measured speed where it was at least 1.5 times faster, as the table shows.
+
+| Generator method | Faster by |
+| --- | --- |
+| `random` | 2 times |
+| `integers` | 2.5 times |
+| `exponential` | 2.4 times |
+| `choice(..., replace=False)` | 280 times |
 
 Example:
 
@@ -3741,7 +3908,7 @@ idx = rng.choice(len(x), 100, replace=False)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.random.default_rng()` without a seed inside a `for` or `while` body or a comprehension. Each call gathers entropy from the operating system, about 5 microseconds. A loop that seeds each pass from its loop variable is left alone.
+Reports `np.random.default_rng()` without a seed inside a `for` or `while` body or a comprehension. Each call gathers entropy from the operating system, which takes about 5 microseconds. The rule leaves a loop alone that seeds each pass from its loop variable.
 
 Example:
 
@@ -3760,7 +3927,7 @@ noise = rng.normal(size=n)
 
 **Severity:** warning. **Fix:** unsafe: `np.random.default_rng()`, `np.random.seed()`, `np.random.RandomState()`, `np.random.SeedSequence()`. The numbers change, and a seed recovered from a logged start time no longer repeats the run.
 
-Reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick get the same numbers, and NumPy recommends entropy from the operating system, logged when a run must be repeatable.
+Reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick of the clock get the same numbers. NumPy recommends entropy from the operating system, and a log of the seed when a run must be repeatable.
 
 Example:
 
@@ -3815,7 +3982,7 @@ np.testing.assert_allclose(result, expected, rtol=0, atol=1.5e-4)
 
 **Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)` and `np.testing.assert_array_equal(a, b)`. assert_allclose fails on shapes that `np.allclose` broadcasts, assert_array_equal treats NaN in the same place as equal, and both still run under `python -O`. An assert with a message, or `np.allclose` with more arguments, has no fix.
 
-Reports `assert np.allclose(a, b)`, `assert np.array_equal(a, b)`, `assert np.all(a == b)` and `assert (a == b).all()`. A failed assert shows only False, and the testing functions show the differing elements.
+Reports `assert np.allclose(a, b)`, `assert np.array_equal(a, b)`, `assert np.all(a == b)` and `assert (a == b).all()`. A failed assert shows only False, where the testing functions show the elements that differ.
 
 Example:
 
@@ -3833,7 +4000,7 @@ np.testing.assert_allclose(weights, expected, rtol=1e-05, atol=1e-08)
 
 **Severity:** info. **Fix:** unsafe: `assert x` and `assert x, msg`. The statement is skipped under `python -O`, and its message is built only on failure. `assert_raises` has no fix.
 
-Reports `numpy.testing.assert_`, which NumPy's testing guidelines call the legacy form of the assert statement, and `numpy.testing.assert_raises` and `assert_raises_regex`, where they prefer `pytest.raises`. A bare `assert_raises` counts only in a file that imports it from `numpy.testing`, because SciPy imports `pytest.raises` under that name.
+Reports `numpy.testing.assert_`, which NumPy's testing guidelines call the legacy form of the assert statement, and `numpy.testing.assert_raises` and `assert_raises_regex`, where they prefer `pytest.raises`. The rule reports a bare `assert_raises` only in a file that imports it from `numpy.testing`, because SciPy imports `pytest.raises` under that name.
 
 Example:
 
@@ -3851,7 +4018,7 @@ assert res.success, res.message
 
 **Severity:** info. **Fix:** safe: `np.strings.upper` and every other name that is the same function in both modules. Unsafe: the comparisons, such as `np.strings.equal`, which do not strip trailing whitespace, and `np.strings.multiply`, which raises a different error on bad input. `partition` and `rpartition` have no fix, because `np.strings` returns a tuple of three arrays.
 
-Reports `np.char` functions, which NumPy's docs call legacy, where `np.strings` from NumPy 2.0 has the same name.
+Reports a function of `np.char`, which NumPy's docs call legacy, when `np.strings` from NumPy 2.0 has a function of the same name.
 
 Example:
 
@@ -3869,7 +4036,7 @@ names = np.strings.upper(names)
 
 **Severity:** info. **Fix:** unsafe: `a @ b` when both operands are names, attributes, subscripts, calls or parenthesized. `@` raises on a scalar and on two Python lists, and on arrays of more than two dimensions it works on stacks of matrices, where `np.dot` does not.
 
-Reports `np.dot(a, b)`. The np.dot docs prefer `matmul` or `a @ b` for two 2-D arrays.
+Reports `np.dot(a, b)`, because the docs of `np.dot` prefer `matmul` or `a @ b` for two 2-D arrays.
 
 Example:
 
@@ -3887,7 +4054,7 @@ cov = X.T @ X / n
 
 **Severity:** info. **Fix:** safe: `kind="stable"` in `np.sort` and `np.argsort`. unsafe: the same in a `sort` or `argsort` method, because the pattern cannot tell an array from another object.
 
-Reports `kind="mergesort"` in `np.sort`, `np.argsort` and the `sort` and `argsort` methods. The docs keep "mergesort" only for backwards compatibility, and both names select the same stable sort.
+Reports `kind="mergesort"` in `np.sort`, `np.argsort` and the `sort` and `argsort` methods. The docs keep `"mergesort"` only for backwards compatibility, and both names select the same stable sort.
 
 Example:
 
@@ -3905,7 +4072,7 @@ order = np.argsort(scores, kind="stable")
 
 **Severity:** info. **Fix:** none, because the code between the two calls has to move into the `with` block.
 
-Reports `np.set_printoptions(**saved)`, which restores options changed for a while. The docs say to use `np.printoptions` as a context manager for that, which also restores the options when an error is raised.
+Reports `np.set_printoptions(**saved)`, which restores options that the code changed for a while. The docs ask for `np.printoptions` as a context manager, which also restores the options when an error is raised.
 
 Example:
 
@@ -3927,7 +4094,7 @@ with np.printoptions(precision=3):
 
 **Severity:** info. **Fix:** none, because the shape and strides decide which safe function fits.
 
-Reports `as_strided(...)`. Its docs ask for extreme care, because a wrong shape or stride reads memory outside the array, and point to `sliding_window_view`, `broadcast_to` and `reshape`.
+Reports `as_strided(...)`, because a wrong shape or stride reads memory outside the array. Its docs ask for extreme care and point to `sliding_window_view`, `broadcast_to` and `reshape`.
 
 Example:
 
@@ -3963,7 +4130,7 @@ import numpy as np
 
 **Severity:** warning. **Fix:** none, because the view, reshape and axis around unpackbits vary.
 
-Reports `np.unpackbits(...).sum()`, `np.sum(np.unpackbits(...))` and `np.count_nonzero(np.unpackbits(...))`. np.bitwise_count, added in NumPy 2.0, counts the set bits of each value, and ran 37 times faster on 1,000,000 uint64 values.
+Reports `np.unpackbits(...).sum()`, `np.sum(np.unpackbits(...))` and `np.count_nonzero(np.unpackbits(...))`. `np.bitwise_count`, added in NumPy 2.0, counts the set bits of each value, and ran 37 times faster on 1,000,000 uint64 values.
 
 Example:
 
