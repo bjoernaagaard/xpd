@@ -1,0 +1,5 @@
+# llama.cpp runs the embedding model on the processor. Its Metal backend needs clang's runtime
+# library on macOS, which rustc does not link, and llama-cpp-sys-2 forwards GGML_ variables to
+# CMake so that a build can switch such a backend off.
+[env]
+GGML_METAL = "OFF"

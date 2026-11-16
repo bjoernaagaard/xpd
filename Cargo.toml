@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["pandas", "python", "linter", "ast-grep", "agents"]
 categories = ["command-line-utilities", "development-tools"]
 # Only what the build needs; samples/ and the dev tool configs stay out of the package.
-include = ["/src", "/indexes", "/licenses", "/python/**/*.py", "/rules", "/py", "/build.rs", "/docs/rules.md", "/skills", "/plugin.json", "/mcp.json", "/LICENSE-*", "/README.md", "/pyproject.toml"]
+include = ["/src", "/.cargo/config.toml", "/indexes", "/licenses", "/python/**/*.py", "/rules", "/py", "/build.rs", "/docs/rules.md", "/skills", "/plugin.json", "/mcp.json", "/LICENSE-*", "/README.md", "/pyproject.toml"]
 
 [[bin]]
 name = "xpd"
