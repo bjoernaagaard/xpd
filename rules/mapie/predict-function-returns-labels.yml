@@ -1,0 +1,29 @@
+# BinaryClassificationController thresholds the probability of the positive class, which it
+# reads from the second column of what predict_function returns. predict returns one column of
+# labels, so calibrate raises IndexError on MAPIE 1.6.0: "Error when calling the
+# predict_function". Code inside pytest.raises or pytest.warns is meant to raise and stays silent.
+# Unsafe: the old form raises, so there is nothing to compare the fixed form with.
+id: predict-function-returns-labels
+language: python
+severity: error
+message: BinaryClassificationController needs a function that returns the probability of each class, and $M.predict returns labels, so calibrate raises IndexError. Pass $M.predict_proba.
+rule:
+  kind: attribute
+  pattern: $M.predict
+  any:
+    - nthChild: 1
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '(^|\.)BinaryClassificationController$' } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^predict_function$' }
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(^|\.)BinaryClassificationController$' } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+fix: $M.predict_proba
+metadata: { fix: unsafe }

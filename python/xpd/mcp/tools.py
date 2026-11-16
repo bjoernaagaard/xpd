@@ -110,7 +110,7 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         ctx: Context, paths: list[str] | None = None, *, unsafe_fixes: bool = False
     ) -> CheckReport | InputRequiredResult:
         """Lint Python files for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn,
-        scikit-lego, Apache Hamilton and Python itself. Changes no file.
+        scikit-lego, MAPIE, Apache Hamilton and Python itself. Changes no file.
 
         Run it after you write or change Python. Fix every `error`. Fix a `warning` unless you
         can say why the code is right here, and don't silence rules. An issue whose `fix` is set

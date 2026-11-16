@@ -1,0 +1,74 @@
+# Without random_state these draw from a new seed on every run, so the intervals or sets cannot
+# be reproduced. Each form listed gave other output in two fresh runs on MAPIE 1.6.0, and the
+# same output with random_state. A seed does not move the expected coverage, so the rule is info.
+# A file that seeds NumPy's global generator is left alone, because MAPIE then draws from it.
+
+# The cross classes shuffle their folds when cv is a number, which the default is. A splitter
+# given as cv, such as KFold(5), keeps its own order and is left alone.
+id: unseeded-resampling
+language: python
+severity: info
+message: $C shuffles its folds with a new seed on every run when cv is a number, so the intervals or sets change from run to run. Pass random_state.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(CrossConformal(Regressor|Classifier)|CrossConformalizedQuantileRegressor)$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { not: { has: { field: value, kind: integer, regex: '^([2-9]|\d\d+)$' } } }] } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+---
+# JackknifeAfterBootstrapRegressor draws its bootstrap samples, Subsample and BlockBootstrap draw
+# theirs, and train_conformalize_test_split shuffles the rows.
+id: unseeded-resampling
+language: python
+severity: info
+message: $C draws its samples with a new seed on every run, so the result changes from run to run. Pass random_state.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(JackknifeAfterBootstrapRegressor|Subsample|BlockBootstrap|train_conformalize_test_split)$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*False$' } }
+          - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^resampling$' } }, { not: { has: { field: value, kind: integer } } }] } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: expression_statement }
+          - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }
+---
+# The "aps" and "raps" scores of SplitConformalClassifier draw a random number per row to decide
+# whether the last label goes into the set. "lac" and "top_k" draw none.
+id: unseeded-resampling
+language: python
+severity: info
+message: The "aps" and "raps" scores draw a random number for each row with a new seed on every run, so the sets change from run to run. Pass random_state.
+rule:
+  pattern: SplitConformalClassifier($$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^conformity_score\s*=\s*["''](aps|raps)["'']$' } }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - matches: seeded-file
+utils:
+  seeded-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, pattern: '$NP.random.seed($$$S)' }

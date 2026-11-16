@@ -110,7 +110,7 @@ The first two groups are where real bugs live.
 
 **Library habits**
 
-- For pandas, NumPy, SciPy, scikit-learn, scikit-lego and Hamilton code, report what `xpd check`
+- For pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE and Hamilton code, report what `xpd check`
   finds, and use `xpd profile` and `xpd equiv` when a finding depends on the data or a rewrite
   has to give the same result.
 

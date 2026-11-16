@@ -1,0 +1,64 @@
+# ConformalizedQuantileRegressor and CrossConformalizedQuantileRegressor fit the estimator once
+# per quantile, so it must be a quantile regressor. On MAPIE 1.6.0 fit raises ValueError for the
+# forms below. The rule reads an estimator that is built in the argument list, where the class
+# and its loss are in view. Code inside pytest.raises or pytest.warns is meant to raise and stays
+# silent.
+
+# GradientBoostingRegressor and HistGradientBoostingRegressor need loss="quantile", and
+# LGBMRegressor needs objective="quantile" and an alpha, without which fit raises "The matching
+# parameter `alpha_name` for estimator does not exist".
+id: quantile-estimator-loss
+language: python
+severity: error
+message: $E is built without the quantile loss, and fit raises "You need to set the loss/objective argument of your base model to `quantile`". Pass loss="quantile" to GradientBoostingRegressor and HistGradientBoostingRegressor, and objective="quantile" with an alpha to LGBMRegressor. MAPIE then sets the quantile itself.
+rule:
+  kind: call
+  pattern: $E($$$EARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(Hist)?GradientBoostingRegressor$|(^|\.)LGBMRegressor$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, regex: '^(loss|objective)\s*=\s*["'']quantile["'']$' }, { kind: dictionary_splat }] } } }
+    - matches: quantile-estimator-argument
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  quantile-estimator-argument:
+    any:
+      - nthChild: 1
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }
+      - inside:
+          kind: keyword_argument
+          field: value
+          has: { field: name, regex: '^estimator$' }
+          inside:
+            kind: argument_list
+            inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }
+---
+# A scikit-learn regressor with no quantile loss raises "The base model is not supported".
+id: quantile-estimator-loss
+language: python
+severity: error
+message: $E has no quantile loss, and fit raises ValueError, because MAPIE knows only QuantileRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor and LGBMRegressor as quantile estimators. Use one of them, with loss="quantile" or objective="quantile" on the last three.
+rule:
+  kind: call
+  pattern: $E($$$EARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(LinearRegression|Ridge|RidgeCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|SGDRegressor|HuberRegressor|RandomForestRegressor|ExtraTreesRegressor|DecisionTreeRegressor|AdaBoostRegressor|BaggingRegressor|KNeighborsRegressor|SVR|MLPRegressor|GaussianProcessRegressor)$' }
+    - matches: quantile-estimator-argument
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  quantile-estimator-argument:
+    any:
+      - nthChild: 1
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }
+      - inside:
+          kind: keyword_argument
+          field: value
+          has: { field: name, regex: '^estimator$' }
+          inside:
+            kind: argument_list
+            inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }

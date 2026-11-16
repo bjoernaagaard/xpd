@@ -1,0 +1,108 @@
+# The conformity scores must come from rows the model did not learn from. A model's errors on
+# its own training rows are smaller than on new rows, so the quantile of those errors is too
+# small and the intervals and sets are too narrow. Each number is the mean coverage on test rows
+# over 30 seeds on MAPIE 1.6.0, with confidence_level=0.9.
+#
+# The first document reads the name of the first argument. The second reads no name: it reports
+# conformalize on the variable that an earlier statement of the same block, or the same chain,
+# gave to a fit with a target. A step fitted without a target, such as a scaler, is left alone,
+# and so is a class that calls fit and conformalize on itself.
+
+id: calibrate-on-training-rows
+language: python
+severity: error
+message: This conformalizes on the training rows, where the model's errors are smaller than on new rows. A RandomForestRegressor conformalized this way covered 0.483 of the test rows at confidence_level=0.9, against 0.905 with rows held out, and a classifier covered 0.248 against 0.920. Conformalize on rows the model was not fitted on, as train_conformalize_test_split gives them, or use a cross conformal class and fit_conformalize.
+rule:
+  any:
+    - pattern: $M.conformalize($X, $$$A1)
+    - pattern: $M.conformalize($X)
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(train|trn|tr|fit)([^a-z]|$)|(?i)training', not: { regex: '(?i)conf|calib|(^|_)cal(_|$)|val|hold|test|res|=|\[' } }
+---
+id: calibrate-on-training-rows
+language: python
+severity: error
+message: This conformalizes on $X, the rows a model was fitted on above, where its errors are smaller than on new rows. A RandomForestRegressor conformalized on its training rows covered 0.483 of the test rows at confidence_level=0.9, against 0.905 with rows held out, and a search fitted on the conformalization rows covered 0.819. Conformalize on rows that no fit and no search has seen.
+rule:
+  pattern: $M.conformalize($X, $$$A1)
+  any:
+    - has: { stopBy: end, matches: fit-on-the-rows }
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows:
+          stopBy: end
+          kind: expression_statement
+          has: { stopBy: end, matches: fit-on-the-rows }
+utils:
+  fit-on-the-rows:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit$' } }
+      - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+      - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } }
+constraints:
+  X: { kind: identifier, not: { regex: '(?i)(^|[^a-z])(train|trn|tr|fit)([^a-z]|$)|(?i)training' } }
+  # A class that calls its own fit and conformalize splits the rows itself.
+  M: { not: { regex: '^(self|cls)$' } }
+---
+# A risk controller picks its threshold on the rows given to calibrate. The file must name a
+# controller class, because other libraries have a calibrate method too.
+id: calibrate-on-training-rows
+language: python
+severity: error
+message: This calibrates the risk controller on the training rows, where the model looks better than it is. A BinaryClassificationController with a target precision of 0.85 that was calibrated this way gave a precision of 0.666 on test rows, below the target in 30 of 30 runs. Calibrate on rows the model was not fitted on.
+rule:
+  pattern: $C.calibrate($X, $$$A1)
+  inside:
+    kind: module
+    stopBy: end
+    has: { stopBy: end, kind: identifier, regex: '^(BinaryClassificationController|MultiLabelClassificationController|MultiClassificationLTTController|SemanticSegmentationController)$' }
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(train|trn|tr|fit)([^a-z]|$)|(?i)training', not: { regex: '(?i)conf|calib|(^|_)cal(_|$)|val|hold|test|res|=|\[' } }
+---
+# TopLabelCalibrator and VennAbersCalibrator with cv="prefit" fit the calibrator on the rows
+# given to fit, and the estimator is already fitted.
+id: calibrate-on-training-rows
+language: python
+severity: error
+message: With cv="prefit" this fits the calibrator on the rows given here, and these are the training rows, where the estimator's probabilities are too sure. On test rows a TopLabelCalibrator fitted this way had a top-label calibration error of 0.525, against 0.077 fitted on held-out rows and 0.119 with no calibration at all, and a VennAbersCalibrator had 0.272 against 0.051. Fit the calibrator on rows the estimator was not fitted on.
+rule:
+  pattern: $C.fit($X, $$$A1)
+  has:
+    field: function
+    has:
+      field: object
+      any:
+        - matches: prefit-calibrator
+        - pattern: $M
+          kind: identifier
+          all:
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, matches: prefit-calibrator }
+            # A name the file also binds to another object is left alone.
+            - not:
+                inside:
+                  kind: module
+                  stopBy: end
+                  has:
+                    stopBy: end
+                    kind: assignment
+                    all:
+                      - has: { field: left, pattern: $M }
+                      - not: { has: { field: right, matches: prefit-calibrator } }
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(train|trn|tr|fit)([^a-z]|$)|(?i)training', not: { regex: '(?i)conf|calib|(^|_)cal(_|$)|val|hold|test|res|=|\[' } }
+utils:
+  prefit-calibrator:
+    kind: call
+    all:
+      - has: { field: function, regex: '(^|\.)(TopLabelCalibrator|VennAbersCalibrator)$' }
+      - has: { field: arguments, has: { kind: keyword_argument, regex: '^cv\s*=\s*["'']prefit["'']$' } }

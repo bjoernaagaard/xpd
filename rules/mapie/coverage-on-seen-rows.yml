@@ -1,0 +1,99 @@
+# Intervals and sets predicted for rows the object has already seen say nothing about new rows.
+# The rule reads no name: it reports predict_interval and predict_set on the variable that an
+# earlier statement of the same block gave to fit, fit_conformalize or conformalize of the same
+# object. It reports only where the intervals or sets go into a MAPIE coverage metric: the call
+# is an argument of the metric, or its second result is, by its name, in the function around the
+# call or in the file when the call is outside a function. A prediction for seen rows that is
+# only plotted or checked for its shape misleads nobody. Each number is the mean over 30 seeds
+# on MAPIE 1.6.0 with a RandomForestRegressor and confidence_level=0.9.
+#
+# The patterns come first in `all`, so that $M and $X are bound before the earlier statements
+# are searched for them. A rule object with `any` beside `inside` searches first.
+
+id: coverage-on-seen-rows
+language: python
+severity: error
+message: $M was fitted on $X, so its intervals or sets for these rows are too good. With confidence_level=0.9 the intervals covered 1.000 of the rows given to fit_conformalize and 0.914 of the test rows, and 1.000 of the rows given to fit against 0.905. Predict for rows that were held out from fit, fit_conformalize and conformalize, and measure coverage there.
+rule:
+  all:
+    - any:
+        - pattern: $M.predict_interval($X)
+        - pattern: $M.predict_interval($X, $$$A1)
+        - pattern: $M.predict_set($X)
+        - pattern: $M.predict_set($X, $$$A2)
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows:
+          stopBy: end
+          kind: expression_statement
+          has:
+            stopBy: end
+            kind: call
+            all:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fit_conformalize)$' } }, { has: { field: object, pattern: $M } }] }
+              - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+    - matches: coverage-scored
+constraints:
+  X: { kind: identifier }
+  M: { kind: identifier }
+utils:
+  coverage-scored:
+    any:
+      - inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)((regression|classification)_(coverage_score|ssc|ssc_score)|regression_mwi_score|hsic)$' } }
+      - all:
+          - inside: { kind: assignment, has: { field: left, has: { nthChild: 2, kind: identifier, pattern: $P } } }
+          - inside:
+              any: [{ kind: function_definition }, { kind: module }]
+              stopBy: { kind: function_definition }
+              has:
+                stopBy: end
+                kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)((regression|classification)_(coverage_score|ssc|ssc_score)|regression_mwi_score|hsic)$' }
+                  - has: { field: arguments, has: { stopBy: end, pattern: $P } }
+---
+# conformalize picks the quantile that covers its own rows, so their coverage is the level by
+# construction: it was 0.903 in each of 30 runs, with a standard error of 0.000.
+id: coverage-on-seen-rows
+language: python
+severity: warning
+message: $M was conformalized on $X, and conformalize picks the quantile that covers these rows. Their coverage was 0.903 in each of 30 runs at confidence_level=0.9, whatever the model, so it shows nothing about new rows. Predict for test rows that were held out from fit and conformalize.
+rule:
+  all:
+    - any:
+        - pattern: $M.predict_interval($X)
+        - pattern: $M.predict_interval($X, $$$A1)
+        - pattern: $M.predict_set($X)
+        - pattern: $M.predict_set($X, $$$A2)
+    - inside:
+        stopBy: end
+        kind: expression_statement
+        follows:
+          stopBy: end
+          kind: expression_statement
+          has:
+            stopBy: end
+            kind: call
+            all:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conformalize$' } }, { has: { field: object, pattern: $M } }] }
+              - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+    - matches: coverage-scored
+constraints:
+  X: { kind: identifier }
+  M: { kind: identifier }
+utils:
+  coverage-scored:
+    any:
+      - inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)((regression|classification)_(coverage_score|ssc|ssc_score)|regression_mwi_score|hsic)$' } }
+      - all:
+          - inside: { kind: assignment, has: { field: left, has: { nthChild: 2, kind: identifier, pattern: $P } } }
+          - inside:
+              any: [{ kind: function_definition }, { kind: module }]
+              stopBy: { kind: function_definition }
+              has:
+                stopBy: end
+                kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)((regression|classification)_(coverage_score|ssc|ssc_score)|regression_mwi_score|hsic)$' }
+                  - has: { field: arguments, has: { stopBy: end, pattern: $P } }

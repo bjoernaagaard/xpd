@@ -1,0 +1,130 @@
+# SplitConformalRegressor and SplitConformalClassifier have prefit=True as their default, which
+# says the estimator is already fitted. Each form below raises on MAPIE 1.6.0. Code inside
+# pytest.raises or pytest.warns is meant to raise and stays silent.
+
+# An estimator built in the argument list is new, so it cannot be fitted. conformalize then
+# raises NotFittedError for a regressor and AttributeError for a classifier. The conditional
+# classes take feature_map first, so only their estimator keyword is read.
+id: prefit-estimator-not-fitted
+language: python
+severity: error
+message: $C has prefit=True as its default, and this estimator is built here, so it is not fitted. conformalize then raises NotFittedError for a regressor and AttributeError for a classifier, and fit raises ValueError. Pass prefit=False and call fit before conformalize, or fit the estimator first and pass the fitted one.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(Conditional)?SplitConformal(Regressor|Classifier)$' }
+    - has:
+        field: arguments
+        has:
+          any:
+            - all: [{ nthChild: 1 }, { matches: new-estimator }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)SplitConformal(Regressor|Classifier)$' } } } }]
+            - kind: keyword_argument
+              all:
+                - has: { field: name, regex: '^estimator$' }
+                - has: { field: value, matches: new-estimator }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^prefit$' } }, { not: { has: { field: value, regex: '^True$' } } }] }, { kind: dictionary_splat }] } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  new-estimator:
+    kind: call
+    has:
+      field: function
+      any:
+        - kind: identifier
+          regex: '^([A-Z]\w*|make_pipeline)$'
+        - kind: attribute
+          has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+---
+# fit on an object with prefit=True raises "The fit method must be skipped when the prefit
+# parameter is set to True", whatever the estimator. The document above already reports an
+# estimator built in the argument list.
+id: prefit-estimator-not-fitted
+language: python
+severity: error
+message: This object has prefit=True, which is the default, and fit then raises ValueError. Pass prefit=False to let fit train the estimator, or drop this fit and call conformalize with an estimator that is already fitted.
+rule:
+  kind: call
+  has:
+    field: function
+    kind: attribute
+    all:
+      - has: { field: attribute, regex: '^fit$' }
+      - has:
+          field: object
+          any:
+            - matches: prefit-split
+            - pattern: $M
+              kind: identifier
+              all:
+                - inside:
+                    kind: module
+                    stopBy: end
+                    has:
+                      stopBy: end
+                      kind: assignment
+                      all:
+                        - has: { field: left, pattern: $M }
+                        - has: { field: right, matches: prefit-split }
+                - not:
+                    inside:
+                      kind: module
+                      stopBy: end
+                      has:
+                        stopBy: end
+                        kind: assignment
+                        all:
+                          - has: { field: left, pattern: $M }
+                          - not: { has: { field: right, matches: prefit-split } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  prefit-split:
+    kind: call
+    all:
+      - has: { field: function, regex: '(^|\.)(Conditional)?SplitConformal(Regressor|Classifier)$' }
+      - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^prefit$' } }, { not: { has: { field: value, regex: '^True$' } } }] }, { kind: dictionary_splat }] } } }
+      - not:
+          has:
+            field: arguments
+            has:
+              any:
+                - all: [{ nthChild: 1 }, { matches: new-estimator }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)SplitConformal(Regressor|Classifier)$' } } } }]
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^estimator$' }
+                    - has: { field: value, matches: new-estimator }
+  new-estimator:
+    kind: call
+    has:
+      field: function
+      any:
+        - kind: identifier
+          regex: '^([A-Z]\w*|make_pipeline)$'
+        - kind: attribute
+          has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+---
+# ConformalizedQuantileRegressor with prefit=True needs three fitted estimators, for the lower
+# quantile, the upper quantile and the median, in that order. One estimator raises "Estimator
+# for prefit must be an iterable object".
+id: prefit-estimator-not-fitted
+language: python
+severity: error
+message: ConformalizedQuantileRegressor with prefit=True needs a list of three fitted estimators, for the lower quantile, the upper quantile and the median, and one estimator raises ValueError. Pass the three, or pass prefit=False and call fit.
+rule:
+  pattern: ConformalizedQuantileRegressor($$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^prefit\s*=\s*True$' } }
+    - has:
+        field: arguments
+        has:
+          any:
+            - all: [{ nthChild: 1 }, { kind: call }]
+            - kind: keyword_argument
+              all:
+                - has: { field: name, regex: '^estimator$' }
+                - has: { field: value, kind: call }
+
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }

@@ -1,7 +1,7 @@
 # xpd
 
 xpd checks Python code for slow operations and wrong results. It checks code that uses pandas,
-NumPy, SciPy, scikit-learn, scikit-lego or Apache Hamilton. xpd can rewrite many of the lines it
+NumPy, SciPy, scikit-learn, scikit-lego, MAPIE or Apache Hamilton. xpd can rewrite many of the lines it
 reports.
 
 xpd reads files in parallel and parses each file once with

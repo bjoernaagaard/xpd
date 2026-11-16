@@ -15,7 +15,7 @@ from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
 
 INSTRUCTIONS = """\
-xpd lints Python for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn, scikit-lego \
+xpd lints Python for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE \
 and Apache Hamilton, reads the dataflow of step code and Hamilton modules, profiles data files, \
 and checks that a refactor keeps its result. Every path is relative to the project root.
 
