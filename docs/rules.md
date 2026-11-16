@@ -7360,6 +7360,89 @@ release. When the venv has no linearmodels, or there is no venv, every document 
 `since` was checked by installing the release before it and the release at it from PyPI and
 running the form on both: 4.14 and 4.15, 4.17 and 4.18, 4.31 and 5.0, and 7.0 and 7.1.
 
+### How a rule earns its place
+
+Every `error` and `warning` document ships on a proof that was run, and the message quotes what
+the proof measured. A proof is one of four kinds:
+
+- A result proof runs the old and the new form on the same data and prints what each returns.
+  It passes when the old form gives another number than the code reads as, with no error and
+  no warning, such as a coefficient of 0.2184 where 0.0338 is the one with an intercept.
+- An interpreter proof runs the old form under `python -W error`. It passes when the old form
+  raises an exception or a warning and the new form runs clean. Old releases warn about their
+  own dependencies, so on those only a warning from linearmodels counted.
+- A simulation proof draws data whose true coefficient is known, at least 1,000 times, and
+  counts how often the 95% interval covers it or how often a true null is rejected at 5%.
+- A speed proof times both forms on one thread, as the median of 5 fits, at two sizes. It
+  passes when the new form is at least 1.5 times faster at both.
+
+A document is `info` when its advice depends on something the code does not show, such as the
+dtype of a column or how the errors are related. A form that was run on 7.1 and on 7.0 gave the
+same result on both unless the text says otherwise.
+
+The rules were run over two sets of code. The first is the library's own code at 7.1, 258
+files: the 229 Python files of the repository, of which 165 are tests, the code cells of its 12
+notebooks, the code blocks of 9 `.rst` and `.md` pages, and the doctest lines of 8 modules. The
+second is 950 files from 623 public repositories that mention `linearmodels`, found through the
+GitHub code search, at most 4 from one repository, with notebooks turned into their code cells.
+Four rules were narrowed after these runs, and the table gives the reports that are left:
+
+- `time-before-entity-index` reported 2 frames that no panel model reads, and one frame indexed
+  by date and hour on purpose. The frame must now reach a panel model, and `hour` is a time.
+- `statsmodels-result-name` reported `res.tvalues` behind `hasattr(res, "tstats")`. Code under a
+  `hasattr` check is now left alone by every rule about a form that raises.
+- `hand-written-hausman` reported a test of OLS against instruments, which the method of 7.1
+  does not do. Its message now names `wu_hausman()` as well.
+- `absorb-not-categorical` matched its own name in a comment. It now looks for `category`.
+
+| Rule | Severity | Proof | Reports on the library | Reports on 950 real files | Fix |
+| --- | --- | --- | --- | --- | --- |
+| [`formula-without-constant`](#formula-without-constant) | warning | result: 0.2184 against 0.0338 | 3 | 17 | none |
+| [`effects-outside-panel-ols`](#effects-outside-panel-ols) | error | result: equal coefficients with and without the term | 0 | 0 | none |
+| [`effects-keyword-with-formula`](#effects-keyword-with-formula) | error | interpreter: TypeError | 0 | 3 | none |
+| [`formula-power-term`](#formula-power-term) | error | result: 2 columns where 3 were written | 1 | 1 | none |
+| [`first-difference-constant`](#first-difference-constant) | error | interpreter: ValueError | 0 | 0 | none |
+| [`weights-column-name`](#weights-column-name) | error | interpreter: TypeError | 0 | 0 | none |
+| [`panel-ols-without-effects`](#panel-ols-without-effects) | warning | result: 0.0349 against 0.0698 | 42 | 37 | none |
+| [`too-many-effects`](#too-many-effects) | error | interpreter: ValueError | 0 | 0 | none |
+| [`time-before-entity-index`](#time-before-entity-index) | warning | result: 0.1622 against 0.2483 | 1 | 1 | unsafe |
+| [`use-lsdv`](#use-lsdv) | warning | speed: 17 times at the lowest | 2 | 2 | none |
+| [`clustered-without-clusters`](#clustered-without-clusters) | error | result: 0.0413 against 0.0494. Interpreter: TypeError | 4 | 31 | none |
+| [`cov-option-without-cov-type`](#cov-option-without-cov-type) | error | interpreter: ValueError, TypeError. Result: 0.2037 against 0.3002 | 0 | 0 | none |
+| [`unknown-cov-type`](#unknown-cov-type) | error | interpreter: UnknownOptionError | 2 | 0 | none |
+| [`kernel-default-bandwidth`](#kernel-default-bandwidth) | warning | result: 0.8022 on 7.0 against 0.3794 on 7.1 | 22 | 1 | none |
+| [`panel-default-covariance`](#panel-default-covariance) | info | simulation: 17.3% against 5.7% rejections | 325 | 372 | none |
+| [`iv-missing-arguments`](#iv-missing-arguments) | error | interpreter: TypeError | 0 | 2 | none |
+| [`iv-arguments-swapped`](#iv-arguments-swapped) | warning | result: 0.2021 against 0.0664 | 0 | 0 | none |
+| [`iv-without-exog`](#iv-without-exog) | warning | simulation: 2.002 against 0.990 for a true 1.0 | 4 | 2 | none |
+| [`manual-two-stage`](#manual-two-stage) | warning | simulation: 99.6% against 95.7% coverage | 0 | 0 | none |
+| [`absorb-not-categorical`](#absorb-not-categorical) | info | result: 3.397 against 1.022 for a true 1.0 | 0 | 5 | none |
+| [`statsmodels-result-name`](#statsmodels-result-name) | error | interpreter: TypeError, AttributeError | 0 | 15 | unsafe |
+| [`invalid-compare-precision`](#invalid-compare-precision) | error | interpreter: ValueError | 0 | 0 | none |
+| [`hand-written-hausman`](#hand-written-hausman) | info | none: the method runs on 7.1 and is absent on 7.0 | 6 | 27 | none |
+| [`removed-in-linearmodels`](#removed-in-linearmodels) | error | interpreter: ModuleNotFoundError, AttributeError | 0 | 0 | unsafe |
+| [`deprecated-in-linearmodels`](#deprecated-in-linearmodels) | warning | interpreter: FutureWarning. Result: equal order | 12 | 0 | safe |
+
+A result proof gives the old form's number against the new form's number.
+
+Of the 424 reports on the library, 401 are in its tests, which call the forms on purpose: 308
+fits with the default covariance, 42 `PanelOLS` models without effects that are compared with
+`PooledOLS`, 22 kernel estimators with the default bandwidth, and 11 uses of the deprecated
+names inside the tests of the deprecations. One report names a line where the advice is wrong: a
+documentation page shows `set_index(['year','firm'])` for the `PanelOLS` that pandas had in
+2017, which took the time first. One report is a defect of the library's own README, whose
+first example writes `exper + exper ** 2` and fits a model without the squared term.
+
+Of the 516 reports on the 950 real files, 112 are errors or warnings, and each was read. None
+names a line where the rule's claim is false. The 404 others are `info`: 20 of the 372
+`panel-default-covariance` reports, 14 of the 27 `hand-written-hausman` reports and all 5
+`absorb-not-categorical` reports were read,
+and each is a fit or a model of the kind the rule describes. The files hold 583 `cov_type=`
+strings with a statsmodels name, such as `"HC3"` and `"cluster"`, and `unknown-cov-type` reports
+none of them. The 20 that were read are calls on statsmodels models. Recall was not measured, so
+nothing here says how often a rule misses the form it describes. With the pack, xpd took 7%
+more processor time on the 950 files than without it, 744 s against 696 s.
+
 ### Formulas
 
 linearmodels parses formulas with formulaic, and every model has a `from_formula`. The rules in
@@ -7893,6 +7976,88 @@ test = random_effects_result.hausman(fixed_effects_result)
 ```
 
 On 7.1 the method returned a `HausmanTestResults` with the fields `statistic` and `estimates`, and 7.0 has no such method. The rule reports 27 functions in 27 of the 950 real files. It cannot see what a function tests, so it is info, and the message names both tests.
+
+### Removed and deprecated forms
+
+Each form below was run on the release before and the release at the version the rule names,
+both installed from PyPI.
+
+#### removed-in-linearmodels
+
+**Severity:** error. **Fix:** unsafe: `wald_test` for `test_linear_constraint`. The import has no fix.
+
+Reports an import of `linearmodels.utility`, which 4.18 split into the modules of `linearmodels.shared`, and `test_linear_constraint` on a result of `OLS`, `IV2SLS`, `IVLIML` or `IVGMM`, which 4.15 removed after 4.12 renamed it `wald_test`.
+
+Example:
+
+```python
+from linearmodels.utility import MissingValueWarning, WaldTestStatistic
+
+test = result.test_linear_constraint(restriction, value)
+```
+
+Use instead:
+
+```python
+from linearmodels.shared.exceptions import MissingValueWarning
+from linearmodels.shared.hypotheses import WaldTestStatistic
+
+test = result.wald_test(restriction, value)
+```
+
+The import ran on 4.17 and raised `ModuleNotFoundError: No module named 'linearmodels.utility'` on 4.18 and on 7.1. `test_linear_constraint` returned a `WaldTestStatistic` on 4.14 and raised `AttributeError` on 4.15, and `wald_test` ran on both. The 22 public names of the old module were looked up in the 7.1 source:
+
+| Names of `linearmodels.utility` | Module on 7.1 |
+| --- | --- |
+| `MissingValueWarning`, `MemoryWarning`, `InferenceUnavailableWarning`, `SingletonWarning`, `missing_warning` | `linearmodels.shared.exceptions` |
+| `AttrDict`, `ensure_unique_column`, `panel_to_frame` | `linearmodels.shared.utility` |
+| `WaldTestStatistic`, `InvalidTestStatistic`, `InapplicableTestStatistic`, `InvalidTestWarning`, `quadratic_form_test` | `linearmodels.shared.hypotheses` |
+| `has_constant`, `inv_sqrth` | `linearmodels.shared.linalg` |
+| `pval_format`, `param_table`, `format_wide` | `linearmodels.shared.io` |
+| `get_string`, `get_float`, `get_bool`, `get_array_like` | `linearmodels.shared.typed_getters` |
+
+Code inside a try block with an except clause is a compatibility path and stays silent.
+
+#### deprecated-in-linearmodels
+
+**Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module. The other forms have no fix.
+
+Reports `from linearmodels.__future__ import ordering`, the `lsmr_options` keyword of `AbsorbingLS.fit`, and `linearmodels.DROP_MISSING`. 7.1 gives `FutureWarning` for each, and 8.0 removes them.
+
+Example:
+
+```python
+from linearmodels.__future__ import ordering
+
+result = model.fit(method="lsmr", lsmr_options={"atol": 1e-10})
+```
+
+Use instead:
+
+```python
+result = model.fit(method="lsmr", absorb_options={"atol": 1e-10})
+```
+
+The import turned off the sorting of formula variables in 4.31, and 5.0 made that the default. With `"y ~ 1 + z + x + w"`, 4.31 gave the order `Intercept, w, x, z` without the import and `Intercept, z, x, w` with it, and 5.0, 7.0 and 7.1 gave `Intercept, z, x, w` both ways. The fix deletes a line that does nothing from 5.0 on, the cases of `samples/linearmodels/migration.py` returned equal values before and after it, and `since` keeps the document away from a project on 4.31. Inside a function or a block the import has no fix, because it may be the only statement there. `absorb_options` ran on 4.18 and raised `TypeError` on 4.17, and `lsmr_options` gave `FutureWarning` on 4.31, 5.0, 7.0 and 7.1. The new form needs `method="lsmr"` next to the options, since the default method may pick an algorithm that does not take them, so it has no fix. Reading `DROP_MISSING` ran clean on 7.0 and gave `FutureWarning: linearmodels.DROP_MISSING has no effect` on 7.1.
+
+### What the pack leaves out
+
+- `check_rank=False`. On columns that are exactly collinear, 7.1 raised `LinAlgError: Singular
+  matrix`, so the flag did not give wrong numbers in silence where it was tried.
+- Inputs whose labels do not match. 7.1 raises `ValueError` where 7.0 paired them by position,
+  and a pattern cannot see an index.
+- A frame without a two level index, a time level of text, and regressors that the effects
+  absorb. Each raises with a clear message, and none shows in the code.
+- The changes of 7.1 to weighted models, to `FamaMacBeth` p-values and to the Hausman and
+  specification tests. The code is the same on both releases, so a rule would report every use.
+- Patsy functions that formulaic lacks. `te()` raised, and `cr()` and `cc()` raised a rank
+  error next to an intercept. `Q()`, `center()`, `standardize()`, `bs()` and
+  `C(x, Treatment(reference=...))` all ran. No use of the three was found in the real files.
+- `SUR`, `IV3SLS`, `IVSystemGMM` and the factor models have no rule of their own. The formula,
+  covariance and result rules read them.
+- xxhash, which `AbsorbingLS` uses for its cache when it is installed. A fit with two absorbed
+  columns took 0.345 s with it and 0.361 s without on 100,000 rows, and 1.418 s against 1.289 s
+  on 1,000,000, so the pack has no package check.
 
 ## Hamilton
 
