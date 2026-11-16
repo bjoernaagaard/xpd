@@ -7560,6 +7560,210 @@ was drawn at 0.70 of the height of one panel and at 0.45 of the other. A reader 
 heights across the panels reads a difference that the data does not have. Free scales are
 right when the panels hold different units, which is why the rule is info.
 
+### Ink that shows no data
+
+The book defines the data-ink ratio as the share of a graphic's ink that shows data, and
+asks to "erase non-data-ink, within reason" (page 96) and to "erase redundant data-ink, within
+reason" (page 100).
+
+#### default-template
+
+**Severity:** info. **Fix:** unsafe for a named template: `"simple_white"`. None for a file that sets no template.
+
+Reports two things. The first is a file that draws px or go figures and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
+
+Example:
+
+```python
+import plotly.express as px
+
+fig = px.scatter(df, x="day", y="tip")
+gray = px.scatter(df, x="day", y="tip", template="ggplot2")
+```
+
+Use instead:
+
+```python
+import plotly.express as px
+import plotly.io as pio
+
+pio.templates.default = "simple_white"
+
+fig = px.scatter(df, x="day", y="tip")
+gray = px.scatter(df, x="day", y="tip", template="simple_white")
+```
+
+plotly draws with the template `"plotly"` unless it is told otherwise. A scatter plot resolved
+to the plot background `#E5ECF6` with white grid lines on both axes, 10 lines in the drawn
+figure, and no axis lines. `"ggplot2"` resolved to `rgb(237,237,237)` and `"seaborn"` to
+`rgb(234,234,242)`, each with the same 10 white lines. With `"simple_white"` the same plot
+resolved to a white plot area with `showgrid=False`, 0 grid lines, axis lines and outside
+ticks. The book says that "the grid should usually be muted or completely suppressed"
+(page 112).
+
+`"plotly_white"`, `"none"`, `"presentation"`, `"gridon"`, `"xgridoff"` and `"ygridoff"` resolved
+to a white plot area, and `"plotly_dark"` is a dark theme, so these seven are not reported.
+
+The first form is silent in a file that names `streamlit`, because `st.plotly_chart` draws with
+the theme of Streamlit unless `theme=None` is passed. Another module can set
+`pio.templates.default` for the file, which the rule does not see. The fix is unsafe, because
+`"simple_white"` also changes the colors of the marks.
+
+#### explicit-grid
+
+**Severity:** info. **Fix:** unsafe for `showgrid=True`: `showgrid=False`. None for a black grid.
+
+Reports `showgrid=True` without `gridcolor` and `gridwidth` beside it, and `gridcolor` set to black, on an x or y axis of a plotly figure. It reads the keyword in `update_xaxes`, `update_yaxes`, `go.layout.XAxis` and `go.layout.YAxis`, the underscore form such as `xaxis_showgrid` in `update_layout` and `go.Layout`, and `xaxis=dict(showgrid=True)` or `xaxis={"showgrid": True}` in `update_layout`, `go.Layout` and `go.Figure`.
+
+Example:
+
+```python
+fig = px.scatter(df, x="day", y="tip")
+fig.update_xaxes(showgrid=True)
+fig.update_yaxes(gridcolor="black")
+```
+
+Use instead:
+
+```python
+fig = px.scatter(df, x="day", y="tip")
+fig.update_yaxes(showgrid=True, gridcolor="#eee")
+```
+
+"The grid should usually be muted or completely suppressed so that its presence is only
+implicit" (page 112), and "dark grid lines are chartjunk" (page 113). Under the templates `"plotly"` and
+`"none"` a scatter plot had 10 grid lines with and without `showgrid=True`, so the argument did
+nothing. Under `"simple_white"`, which has no grid, it added 10 lines in `rgb(232,232,232)`.
+So the argument either does nothing or brings back the ink that the template left out.
+
+A call that sets `gridcolor` or `gridwidth` beside `showgrid=True` has chosen its grid and is
+left alone. Black is read as `"black"`, `"#000"`, `"#000000"` and `"rgb(0,0,0)"`, in any case.
+How dark another color is against the background cannot be read from the code. A black
+`gridcolor` beside `showgrid=False` draws nothing and is left alone, and so is the graticule
+of a map. The fix is unsafe, because it removes grid lines from a figure drawn with
+`"simple_white"`.
+
+#### boxed-axis-frame
+
+**Severity:** info. **Fix:** none.
+
+Reports `mirror=True`, `mirror="all"`, `mirror="ticks"` or `mirror="allticks"` beside `showline=True` on an x or y axis of a plotly figure, in `update_xaxes`, `update_yaxes`, `go.layout.XAxis`, `go.layout.YAxis`, and in `xaxis=dict(...)` or `xaxis={...}` in `update_layout`, `go.Layout` and `go.Figure`.
+
+Example:
+
+```python
+fig = px.scatter(df, x="day", y="tip")
+fig.update_xaxes(showline=True, mirror=True)
+fig.update_yaxes(showline=True, mirror=True)
+```
+
+Use instead:
+
+```python
+fig = px.scatter(df, x="day", y="tip")
+fig.update_xaxes(showline=True)
+fig.update_yaxes(showline=True)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book redraws a chart until it has "only the frame lines remaining as pure non-information"
+(page 103), and says that a frame which shows the range of the data "should replace the
+non-data-bearing frame" (page 131). `mirror=True` draws each axis line a second time on the
+far side of the plot, which closes a box around the data: the x axis line had one segment
+with `showline=True` alone and two with `mirror=True`. Under the default template `mirror=True`
+without `showline` drew no line, so the rule reads the two together.
+
+#### redundant-color
+
+**Severity:** info. **Fix:** none.
+
+Reports a px call whose `color` is the same column name as its `x` or its `y`, both written as strings. It covers the 13 px functions that take `color`, `x` and `y`: `px.area`, `px.bar`, `px.box`, `px.density_contour`, `px.ecdf`, `px.funnel`, `px.histogram`, `px.line`, `px.line_3d`, `px.scatter`, `px.scatter_3d`, `px.strip` and `px.violin`.
+
+Example:
+
+```python
+fig = px.bar(df, x="day", y="tip", color="day")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df, x="day", y="tip")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"Erase redundant data-ink, within reason" (page 100). `px.bar(x="day", y="tip")` drew one trace
+and no legend. With `color="day"` it drew four traces and a legend with the entries Fri, Sat,
+Sun and Thur, the same four words as the tick labels under the bars. With `color="tip"` it
+drew a colorbar for the numbers that the heights of the bars already show.
+
+One color for each category is sometimes meant, to match the colors of another chart of the
+same categories, which is why the rule is info. A column given by a name, as in
+`color=column`, is left alone.
+
+#### pattern-fill
+
+**Severity:** warning. **Fix:** none.
+
+Reports hatching: `pattern_shape="column"` on `px.area`, `px.bar`, `px.bar_polar`, `px.histogram` and `px.timeline`, a pattern shape on the eight go traces that have `marker.pattern`, which are `go.Bar`, `go.Barpolar`, `go.Funnelarea`, `go.Histogram`, `go.Icicle`, `go.Pie`, `go.Sunburst` and `go.Treemap`, and `fillpattern` on `go.Scatter`.
+
+Example:
+
+```python
+fig = px.bar(df, x="day", y="tip", pattern_shape="shop")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df, x="day", y="tip", color="shop", color_discrete_sequence=["#555", "#aaa"])
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"This moiré vibration, probably the most common form of graphical clutter, is inevitably bad
+art and bad data graphics" (page 108), and "cross-hatching should be replaced with tint screens
+of shades of gray" (page 111). `px.bar(pattern_shape="sex")` resolved the pattern shapes of its
+two traces to `""` and `"/"`, and the drawn figure held two pattern images, where the same
+chart without the argument held none. `go.Bar(marker_pattern_shape="/")` and
+`go.Scatter(fillpattern=dict(shape="x"))` each drew one.
+
+On a go trace the rule reads `marker_pattern_shape=`, `marker=dict(pattern=dict(shape=...))`,
+`fillpattern_shape=` and `fillpattern=dict(shape=...)`, with `dict(...)` or `{...}`. A shape of
+`""` draws no pattern and is left alone, and so is a shape given by a name.
+
+#### gauge-indicator
+
+**Severity:** info. **Fix:** none.
+
+Reports `go.Indicator` whose `mode` is a string that names `gauge`, such as `mode="gauge+number"`.
+
+Example:
+
+```python
+fig = go.Figure(go.Indicator(mode="gauge+number", value=270, gauge=dict(axis=dict(range=[0, 500]))))
+```
+
+Use instead:
+
+```python
+fig = go.Figure(go.Indicator(mode="number+delta", value=270, delta=dict(reference=250)))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"Maximize data density and the size of the data matrix, within reason" (page 168). A gauge
+shows one number. `mode="gauge+number"` drew 8 shapes and 7 labels for it, and the default
+`mode="number"` drew the same value with no shape and 2 labels. The book calls a graphic that
+"purveys Graphical Style rather than quantitative information" a duck (page 116).
+
+The dial is drawn only when `mode` names it: a `gauge` argument with the default mode drew no
+shape, so it is not reported. A gauge with `shape="bullet"` is a bar and not a dial, and is
+left alone. The rule has no fix, because a gauge can carry a threshold that the number alone
+does not show.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of

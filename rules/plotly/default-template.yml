@@ -1,0 +1,230 @@
+# Tufte, vdqi.md line 3829, printed page 96: "Erase non-data-ink, within reason." Line 4531,
+# printed page 112: "the grid should usually be muted or completely suppressed so that its
+# presence is only implicit".
+#
+# plotly 7.1.0 draws with the template "plotly" unless told otherwise. A scatter plot resolved to
+# plot_bgcolor #E5ECF6 with white grid lines on both axes, 10 lines in the drawn figure, no axis
+# lines and no ticks. With template="simple_white" the same plot resolved to a white plot area,
+# showgrid=False, 0 grid lines, axis lines and outside ticks (runs/behavior.txt).
+#
+# The template is a choice for the whole file, so the rule reports once, on the first import of
+# plotly.express, in a file that calls a px function and never names a template or a plot_bgcolor.
+# A file that names streamlit is left alone, because st.plotly_chart draws with the theme of
+# Streamlit unless it is told not to. Another module can still set the default for this file,
+# which the rule cannot see, so the message says what the file itself does. The rule has no fix,
+# because the template changes how every figure looks.
+id: default-template
+language: python
+severity: info
+message: 'This file sets no template, and plotly then draws with its default "plotly", which fills the plot area with #E5ECF6 and drew 10 white grid lines on a scatter plot. That ink shows no data, and Tufte asks to erase non-data-ink. Set pio.templates.default = "simple_white" once, which drew a white plot area with axis lines and no grid, or pass template="simple_white" to each figure.'
+rule:
+  any: [{ kind: import_statement }, { kind: import_from_statement }]
+  all:
+    - any:
+        - has: { stopBy: end, kind: dotted_name, regex: '^plotly\.express$' }
+        - all: [{ has: { field: module_name, regex: '^plotly$' } }, { has: { stopBy: end, kind: dotted_name, regex: '^express$' } }]
+    - not: { follows: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.express|from plotly import [^\n]*express' } }
+    - inside:
+        kind: module
+        all:
+          - not: { regex: '(^|[^-])template|plot_bgcolor|streamlit' }
+          - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: object, matches: px } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# The same report for a file that builds its figures with go.Figure and does not import
+# plotly.express. It is reported on the import of plotly.graph_objects.
+id: default-template
+language: python
+severity: info
+message: 'This file sets no template, and plotly then draws with its default "plotly", which fills the plot area with #E5ECF6 and drew 10 white grid lines on a scatter plot. That ink shows no data, and Tufte asks to erase non-data-ink. Set pio.templates.default = "simple_white" once, which drew a white plot area with axis lines and no grid, or pass layout_template="simple_white" to each go.Figure.'
+rule:
+  any: [{ kind: import_statement }, { kind: import_from_statement }]
+  all:
+    - any:
+        - has: { stopBy: end, kind: dotted_name, regex: '^plotly\.graph_obj(ect)?s$' }
+        - all: [{ has: { field: module_name, regex: '^plotly$' } }, { has: { stopBy: end, kind: dotted_name, regex: '^graph_obj(ect)?s$' } }]
+    - not: { follows: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.graph_obj(ect)?s|from plotly import [^\n]*graph_obj(ect)?s' } }
+    - inside:
+        kind: module
+        all:
+          - not: { regex: '(^|[^-])template|plot_bgcolor|streamlit' }
+          - not: { has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.express|from plotly import [^\n]*express' } }
+          - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# Three named templates draw the same tinted panel. On plotly 7.1.0 "plotly" resolved to the
+# plot_bgcolor #E5ECF6, "ggplot2" to rgb(237,237,237) and "seaborn" to rgb(234,234,242), each with
+# white grid lines, 10 of them on a scatter plot (runs/behavior.txt). The other eight templates
+# resolved to a white or a dark plot area and are left alone. The rule reads the template only as
+# a string, in a px call, in go.Layout, in update_layout on a plotly figure and in
+# pio.templates.default.
+#
+# The fix is unsafe: "simple_white" also changes the colors of the marks and adds axis lines.
+id: default-template
+language: python
+severity: info
+message: The template $T fills the plot area with a tint and drew 10 white grid lines on a scatter plot. That ink shows no data, and Tufte asks to erase non-data-ink. template="simple_white" drew the same plot on a white plot area with axis lines and no grid.
+rule:
+  kind: string
+  pattern: $T
+  regex: '^["''](plotly|ggplot2|seaborn)["'']$'
+  any:
+    - inside:
+        kind: keyword_argument
+        all:
+          - has: { field: name, regex: '^(layout_)?template$' }
+          - inside:
+              kind: argument_list
+              inside:
+                kind: call
+                any:
+                  - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+    - inside:
+        kind: assignment
+        field: right
+        has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.io: the dotted module itself, or the alias of its import.
+  pio:
+    any:
+      - { kind: attribute, regex: '^plotly\.io$' }
+      - kind: identifier
+        pattern: $PIO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PIO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.io$' }
+                  - all: [{ has: { field: name, regex: '^io$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+fix: '"simple_white"'
+metadata: { fix: unsafe }

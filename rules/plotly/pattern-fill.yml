@@ -1,0 +1,126 @@
+# Tufte, vdqi.md line 4092, printed page 108: "This moiré vibration, probably the most common form
+# of graphical clutter, is inevitably bad art and bad data graphics." Line 4430, printed page 111:
+# "Cross-hatching should be replaced with tint screens of shades of gray. Specific areas on a
+# graphic should be labeled with words rather than encoded with hatching."
+#
+# px.bar(pattern_shape="sex") resolved the marker.pattern.shape of its two traces to "" and "/" on
+# plotly 7.1.0, and the drawn figure held two pattern images, where the same chart without
+# pattern_shape held none (runs/behavior.txt). The five px functions are the ones whose signature
+# has pattern_shape (runs/lists.txt). The rule reads a column name written as a string. It has no
+# fix, because dropping the argument drops a variable from the chart.
+id: pattern-fill
+language: python
+severity: warning
+message: pattern_shape=$P tells the groups apart by hatching. Tufte calls this moiré vibration the most common form of graphical clutter. Tell the groups apart with shades of one color, or label them on the chart.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|bar_polar|histogram|timeline)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(pattern_shape)$' } }, { has: { field: value, kind: string, pattern: $P } }] } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# The same hatching on a go trace: marker_pattern_shape, or shape inside marker.pattern. The eight
+# trace types are the ones with marker.pattern on plotly 7.1.0 (runs/lists.txt).
+# go.Bar(marker_pattern_shape="/") resolved to the shape "/" with one pattern image drawn, and the
+# shape "" drew none, so an empty string is left alone, and so is a name.
+id: pattern-fill
+language: python
+severity: warning
+message: The pattern shape $P fills the marks with hatching. Tufte calls this moiré vibration the most common form of graphical clutter. Tell the groups apart with shades of one color, or label them on the chart.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar|Barpolar|Funnelarea|Histogram|Icicle|Pie|Sunburst|Treemap)$' } }, { has: { field: object, matches: go } }] }
+    - any:
+        - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_pattern_shape)$' } }, { has: { field: value, pattern: $P, any: [{ kind: string, not: { regex: '^["'']{2}$' } }, { kind: list, has: { kind: string, not: { regex: '^["'']{2}$' } } }] } }] } }
+        - has:
+            stopBy: end
+            any: [{ kind: keyword_argument, has: { field: name, regex: '^shape$' } }, { kind: pair, has: { field: key, regex: '^["'']shape["'']$' } }]
+            all:
+              - has: { field: value, pattern: $P, any: [{ kind: string, not: { regex: '^["'']{2}$' } }, { kind: list, has: { kind: string, not: { regex: '^["'']{2}$' } } }] }
+              - inside:
+                  any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+                  inside:
+                    stopBy: { kind: argument_list }
+                    any: [{ kind: keyword_argument, has: { field: name, regex: '^(pattern|marker_pattern)$' } }, { kind: pair, has: { field: key, regex: '^["'']pattern["'']$' } }]
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# A filled go.Scatter takes the hatching as fillpattern. go.Scatter(fillpattern=dict(shape="x"))
+# resolved to the shape "x" with one pattern image drawn (runs/behavior.txt).
+id: pattern-fill
+language: python
+severity: warning
+message: The fill pattern $P fills the area with hatching. Tufte calls this moiré vibration the most common form of graphical clutter. Tell the groups apart with shades of one color, or label them on the chart.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: go } }] }
+    - any:
+        - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(fillpattern_shape)$' } }, { has: { field: value, pattern: $P, any: [{ kind: string, not: { regex: '^["'']{2}$' } }, { kind: list, has: { kind: string, not: { regex: '^["'']{2}$' } } }] } }] } }
+        - has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              all:
+                - has: { field: name, regex: '^fillpattern$' }
+                - has:
+                    field: value
+                    any:
+                      - kind: call
+                        all:
+                          - has: { field: function, regex: '^dict$' }
+                          - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(shape)$' } }, { has: { field: value, pattern: $P, any: [{ kind: string, not: { regex: '^["'']{2}$' } }, { kind: list, has: { kind: string, not: { regex: '^["'']{2}$' } } }] } }] } }
+                      - kind: dictionary
+                        has: { kind: pair, all: [{ has: { field: key, regex: '^["'']shape["'']$' } }, { has: { field: value, pattern: $P, any: [{ kind: string, not: { regex: '^["'']{2}$' } }, { kind: list, has: { kind: string, not: { regex: '^["'']{2}$' } } }] } }] }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

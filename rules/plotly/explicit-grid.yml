@@ -1,0 +1,296 @@
+# Tufte, vdqi.md line 4531, printed page 112: "the grid should usually be muted or completely
+# suppressed so that its presence is only implicit". Line 4535, printed page 113: "Dark grid lines
+# are chartjunk. They carry no information, clutter up the graphic, and generate graphic activity
+# unrelated to data information."
+#
+# showgrid=True asks for a grid line at every tick. On plotly 7.1.0 the templates "plotly" and
+# "none" draw that grid already: a scatter plot had 10 grid lines with and without the argument.
+# Under "simple_white", which has no grid, the argument added 10 lines in rgb(232,232,232)
+# (runs/behavior.txt). So the argument either does nothing or brings back the ink that the
+# template erased. A call that also sets gridcolor or gridwidth has muted the grid on purpose and
+# is left alone. The rule reads the literal True on an x or y axis of a plotly figure, so the
+# graticule of a map is left alone.
+#
+# The fix is unsafe: showgrid=False removes the grid lines from the figure.
+id: explicit-grid
+language: python
+severity: info
+message: showgrid=True draws a grid line at every tick. A scatter plot got 10 of them under template="simple_white", and under the default template the grid is drawn already. Tufte asks that the grid be muted or left out so that it does not compete with the data. Drop the argument, or keep a pale grid with gridcolor.
+rule:
+  kind: 'true'
+  inside:
+    any:
+      - kind: keyword_argument
+        all:
+          - has: { field: name, regex: '^(showgrid)$' }
+          - has: { field: value, kind: 'true' }
+          - inside:
+              kind: argument_list
+              inside:
+                kind: call
+                any:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_[xy]axes$' } }, { has: { field: object, matches: figure } }] }
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^[XY]Axis$' } }, { has: { field: object, kind: attribute, has: { field: object, matches: go } } }] }
+          - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(gridcolor|gridwidth)$' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](gridcolor|gridwidth)["'']$' } }] }] } } }
+      - kind: keyword_argument
+        all:
+          - has: { field: name, regex: '^[xy]axis[0-9]*_(showgrid)$' }
+          - has: { field: value, kind: 'true' }
+          - inside:
+              kind: argument_list
+              inside:
+                kind: call
+                any:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Layout$' } }, { has: { field: object, matches: go } }] }
+          - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(gridcolor|gridwidth)$' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](gridcolor|gridwidth)["'']$' } }] }] } } }
+      - any: [{ kind: keyword_argument, has: { field: name, regex: '^(showgrid)$' } }, { kind: pair, has: { field: key, regex: '^["''](showgrid)["'']$' } }]
+        all:
+          - has: { field: value, kind: 'true' }
+          - inside:
+              any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+              inside:
+                stopBy: { kind: argument_list }
+                any: [{ kind: keyword_argument, has: { field: name, regex: '^[xy]axis[0-9]*$' } }, { kind: pair, has: { field: key, regex: '^["''][xy]axis[0-9]*["'']$' } }]
+                inside: { stopBy: end, matches: layout-call }
+          - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(gridcolor|gridwidth)$' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](gridcolor|gridwidth)["'']$' } }] }] } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that sets layout: update_layout on a plotly figure, go.Layout or go.Figure.
+  layout-call:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+fix: 'False'
+metadata: { fix: unsafe }
+---
+# A grid in black is the dark grid the book names. plotly 7.1.0 kept gridcolor="black" as written
+# (runs/behavior.txt). The rule reads black in its four spellings, on an x or y axis of a plotly
+# figure. How dark another color is against the background cannot be read from the code, so every
+# other color is left alone. A call that also sets showgrid=False draws no grid and is left alone.
+# The rule has no fix, because the pale color to use depends on the background.
+id: explicit-grid
+language: python
+severity: info
+message: gridcolor=$V draws the grid in black. Tufte calls dark grid lines chartjunk, because they carry no data and compete with it. Use a pale gridcolor such as "#eee", or leave the grid out.
+rule:
+  any:
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^(gridcolor)$' }
+        - has: { field: value, pattern: $V, kind: string, regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$' }
+        - inside:
+            kind: argument_list
+            inside:
+              kind: call
+              any:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_[xy]axes$' } }, { has: { field: object, matches: figure } }] }
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^[XY]Axis$' } }, { has: { field: object, kind: attribute, has: { field: object, matches: go } } }] }
+        - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^[xy]axis[0-9]*_(gridcolor)$' }
+        - has: { field: value, pattern: $V, kind: string, regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$' }
+        - inside:
+            kind: argument_list
+            inside:
+              kind: call
+              any:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Layout$' } }, { has: { field: object, matches: go } }] }
+        - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
+    - any: [{ kind: keyword_argument, has: { field: name, regex: '^(gridcolor)$' } }, { kind: pair, has: { field: key, regex: '^["''](gridcolor)["'']$' } }]
+      all:
+        - has: { field: value, pattern: $V, kind: string, regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$' }
+        - inside:
+            any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+            inside:
+              stopBy: { kind: argument_list }
+              any: [{ kind: keyword_argument, has: { field: name, regex: '^[xy]axis[0-9]*$' } }, { kind: pair, has: { field: key, regex: '^["''][xy]axis[0-9]*["'']$' } }]
+              inside: { stopBy: end, matches: layout-call }
+        - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that sets layout: update_layout on a plotly figure, go.Layout or go.Figure.
+  layout-call:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
