@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
+use crate::author;
 use crate::catalog;
 use crate::graph::Graph;
 use crate::index::{self, Kind};
@@ -201,6 +202,8 @@ enum Cmd {
     /// holds, saved or not. Exit 0 after `shutdown` and `exit`, 1 when the client goes away
     /// without them.
     Lsp,
+    /// Create a rule project, or a rule, test case or utility in one.
+    New(author::NewArgs),
 }
 
 /// Runs the command the arguments name.
@@ -275,6 +278,10 @@ pub(crate) fn run() -> ExitCode {
         }
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
+        Cmd::New(args) => author::run(args).unwrap_or_else(|e| {
+            eprintln!("xpd: {e:#}");
+            ExitCode::from(CHECK_FAILED)
+        }),
     }
 }
 
