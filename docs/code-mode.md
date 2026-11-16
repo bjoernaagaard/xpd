@@ -470,14 +470,12 @@ FileNotFoundError: The model imports ['features.py'], and no such file is here.
 on held out rows. The current prompt script stops at `check` when it sees
 `sklearn/tune-on-test`, before the `equiv` call can run that code. To try it, set
 `TRAIN = "leaky.py"` in the pipeline script above. This shows an error that the rule knows.
-The same loop with `X_hold` fails too when that name is a held out target of an earlier
-`train_test_split` unpack in the same scope.
+The same loop with the held out rows named `X_hold` remains a limit of that rule.
 
 ## Refit results from the sample
 
-The wheel built from this worktree was installed with pandas and scikit-learn in
-`/var/tmp/xpd-refit-venv`. Each copy below ran the documented `execute` script through
-`xpd mcp --code-mode --root`. The clean copy passed all 15 gates. The refit read 344 raw
+Each copy of the sample below ran the documented `execute` script through
+`xpd mcp --code-mode --root`, with xpd, pandas and scikit-learn installed from a wheel. The clean copy passed all 15 gates. The refit read 344 raw
 rows, fitted on 258 and compared the 86 held out rows. The fold scores of its clone were
 `[0.9807692307692307, 0.9807692307692307, 1.0, 1.0, 0.9803921568627451]`.
 
@@ -489,11 +487,6 @@ rows, fitted on 258 and compared the 86 held out rows. The fold scores of its cl
 | Target copied into body_mass_g | `refit-matches-model`, `refit-matches-scores`, `saved-model-predicts` | 0.9989810090351536 | 1.0 | 0.9883720930232558 |
 | Unseeded NumPy noise in inputs | `reproducible`, `refit-matches-model`, `refit-matches-scores`, `saved-model-predicts` | 0.04555828298731365 | 0.9883720930232558 | 0.9883720930232558 |
 | Unseeded NumPy noise in C | `reproducible` | 0.0 | 0.9883720930232558 | 0.9883720930232558 |
-
-The `X_hold` copy stopped at lint with `sklearn/tune-on-test`. For the gate report only,
-a second diagnostic script removed the early return after lint. The server returned
-`check-reports-no-error` as false with `detail` equal to
-`train.py:72 sklearn/tune-on-test.`.
 
 The complete sample took 6.528 seconds before the change and 7.568 seconds after it.
 Each number is one wall time measurement from starting the client through its returned
@@ -537,7 +530,7 @@ Discovery ranks the words in names, signatures, docstring summaries, rule texts 
 | Choosing a model over several separate runs | No check of one run can see choices made over other runs |
 | A raw column that stands in for the target | Refitting preserves the raw column, so judging it needs domain knowledge |
 | Held out outputs can agree while fitted attributes differ | Refit compares outputs on the held out rows, not all internal values or all possible inputs |
-| A validation split can be a legitimate place to choose | The split rule recognizes second and fourth targets, but does not establish the purpose of each split |
+| The held out rows under another name | `leaky.py` with `candidate.score(X_hold, y_hold)` passes. The rule `tune-on-test` knows the rows by names such as `X_test`. Reading the name from the second and fourth targets of a `train_test_split` unpack was tried and removed, because all 9 new reports on real code were validation splits, where choosing a setting is correct. Code alone does not show whether a split holds validation rows or the rows of the final score |
 
 ## Discovery before execution
 

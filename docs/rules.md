@@ -4255,7 +4255,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** error. **Fix:** none.
 
-Reports a loop that builds one model per setting, scores each model on held out rows and keeps the best score. It keeps the existing names containing `test`. It also recognizes a scored name in the second or fourth target of an earlier `train_test_split` unpack in the same scope, such as `X_hold` or `y_hold`. It does not follow aliases or assignments across scopes.
+Reports a loop that builds one model per setting, scores each model on the test rows and keeps the best score.
 
 Example:
 
@@ -4275,17 +4275,6 @@ test_score = search.score(X_test, y_test)
 ```
 
 The replacement is advice. xpd does not apply it automatically.
-
-On the readable `sklearn-depth/corpus/tune` files, the rule reports 19 loops where the
-previous rule reported 10. All nine new loops are in
-`yalchinalasgar__Imbalanced-Churn-Classification-Beta-Bank/churn-prediction-imbalanced-ml.ipynb.py`,
-at lines 265, 301, 336, 394, 429, 464, 519, 554 and 589. They choose settings on `X_valid`
-after a separate test split, so all nine are wrong advice. The unpack proves which rows
-were held out, but cannot prove that the author meant a final test set. The locked `held`
-folder was not read. In corpus copies with 30 planted loops using other names, the rule
-found 30 of 30 with no missed form. Those forms cover the second and fourth targets,
-qualified split calls, tuple and list unpacking, and `score`, `predict` and `predict_proba`.
-
 
 #### stateful-function-transformer
 
@@ -4363,8 +4352,7 @@ pass the proof, so the rule leaves the three alone. The frozen rule gave wrong a
 11 labelled reports.
 
 `tune-on-test` needs the loop variable as a keyword of the call that built the scored model, a
-`score`, `predict` or `predict_proba` on a name with `test` in it or a held out target of
-`train_test_split` earlier in the same scope, and a pick. A pick is a `>`
+`score`, `predict` or `predict_proba` on a name with `test` in it, and a pick. A pick is a `>`
 comparison that reads or sets a name with `best` or `max` in it, or whose branch reads the
 setting, or a later `max`, `argmax` or `idxmax` of the list the loop appends to. A keyword named
 like `random_state`, `seed`, `method` or `model` is left alone, because such a loop compares or

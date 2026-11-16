@@ -110,9 +110,9 @@ def check_reports_no_error(lint: CheckReport) -> Gate:
     `transform-with-test-target` of category_encoders. sklego has no rule about a leak, and its
     errors fail the gate as wrong results.
 
-    The gate does not show that a run has no leak. Some rules know held out rows by names
-    such as `X_test`, and tune-on-test also reads targets of an earlier split unpack.
-    A rule can still miss a leak that it does not describe."""
+    The gate does not show that a run has no leak. A rule reads the code and knows the held out
+    rows by names such as `X_test`, so it misses a leak under another name and a leak that no
+    rule describes."""
     failures = [
         f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
         for issue in lint.issues
