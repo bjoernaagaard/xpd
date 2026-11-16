@@ -7764,6 +7764,173 @@ shape, so it is not reported. A gauge with `shape="bullet"` is a bar and not a d
 left alone. The rule has no fix, because a gauge can carry a threshold that the number alone
 does not show.
 
+### Chart forms the book argues against
+
+#### pie-chart
+
+**Severity:** warning. **Fix:** none.
+
+Reports `px.pie(...)` and `go.Pie(...)`, and with a second message `px.pie` with `facet_col` or `facet_row`, which draws several pies.
+
+Example:
+
+```python
+fig = px.pie(df, names="day", values="tip")
+several = px.pie(df, names="day", values="tip", facet_col="shop")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df.sort_values("tip"), x="tip", y="day", orientation="h")
+several = px.bar(df, x="tip", y="day", orientation="h", facet_col="shop")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"A table is nearly always better than a dumb pie chart; the only worse design than a pie chart
+is several of them, for then the viewer is asked to compare quantities located in spatial
+disarray both within and between pies. Given their low data-density and failure to order
+numbers along a visual dimension, pie charts should never be used" (page 178). `px.pie` and
+`go.Pie` resolved to a trace of type `pie`, with and without `hole`.
+`px.pie(facet_col="sex")` drew two pies side by side, and four with `facet_row` as well. For a
+few shares, `go.Table` shows the exact numbers.
+
+A facet given as `None` draws one pie and gets the first message. `px.sunburst` and
+`px.funnel_area` are not reported, because the book names the pie chart alone.
+
+#### spline-line
+
+**Severity:** info. **Fix:** unsafe: `"linear"`.
+
+Reports the line shape `"spline"`: `line_shape="spline"` on `px.area`, `px.line`, `px.line_polar` and `px.line_ternary`, on the five go traces whose line takes the shape, which are `go.Scatter`, `go.Scattercarpet`, `go.Scatterpolar`, `go.Scattersmith` and `go.Scatterternary`, and in `update_traces` on a plotly figure, and `line=dict(shape="spline")` or `line={"shape": "spline"}` on the same five traces.
+
+Example:
+
+```python
+fig = px.line(df, x="hour", y="reading", line_shape="spline")
+```
+
+Use instead:
+
+```python
+fig = px.line(df, x="hour", y="reading", line_shape="linear")
+```
+
+"Above all else show the data" (page 92). A spline draws a smooth curve through the points,
+and the curve passes through values that the data does not hold. The readings 0, 0, 10, 10, 0
+and 0 drawn with `go.Scatter(line_shape="spline")` reached 10.8 at the top and -0.53 at the
+bottom, and `px.line(line_shape="spline")` reached 10.75 and -0.5. The straight line stayed
+between 0 and 10. How far the curve leaves the data depends on the data, so the rule is info.
+
+The fix is unsafe, because straight segments make the figure look different. It leaves a
+`smoothing` argument in place, which plotly ignores for a straight line. A shape given by a
+name is left alone.
+
+#### animation-frame
+
+**Severity:** info. **Fix:** none.
+
+Reports `animation_frame="column"` on the 28 px functions that take it.
+
+Example:
+
+```python
+fig = px.scatter(gap, x="gdpPercap", y="lifeExp", animation_frame="year")
+```
+
+Use instead:
+
+```python
+fig = px.scatter(gap, x="gdpPercap", y="lifeExp", facet_col="year", facet_col_wrap=4)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"Small multiples resemble the frames of a movie: a series of graphics, showing the same
+combination of variables, indexed by changes in another variable" (page 170). The book lists
+them as "inevitably comparative" (page 175). An animation shows one frame at a time, so the reader
+compares the frames from memory. On the gapminder data, `animation_frame="year"` made 12
+frames and drew 142 of the 1,704 rows at once, and `facet_col="year"` with `facet_col_wrap=4`
+drew all 1,704 rows in 12 panels.
+
+Panels need room, and with many frames an animation can be the better choice, which is why
+the rule is info and has no fix. `px.pie`, `px.treemap` and the other px functions without
+`facet_col` are not among the 28.
+
+### Words on the figure
+
+#### legend-instead-of-labels
+
+**Severity:** info. **Fix:** none.
+
+Reports a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`, in a file that names no `showlegend`, no annotation and no text mode.
+
+Example:
+
+```python
+fig = go.Figure(data=[
+    go.Scatter(x=years, y=north, name="north"),
+    go.Scatter(x=years, y=south, name="south"),
+])
+```
+
+Use instead:
+
+```python
+fig = go.Figure(data=[
+    go.Scatter(x=years, y=north, mode="lines+text", text=["", "", "north"], textposition="middle right"),
+    go.Scatter(x=years, y=south, mode="lines+text", text=["", "", "south"], textposition="middle right"),
+])
+fig.update_layout(showlegend=False)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book asks "to integrate the caption and legend into the design so that the eye is not
+required to dart back and forth between textual material and the graphic" (page 180), and lists
+as friendly: "labels are placed on the graphic itself; no legend is required" (page 183). A
+`go.Figure` with two named traces resolved to `showlegend=True` and drew a legend of two
+entries. With `mode="lines+text"`, a label at the last point of each line and
+`showlegend=False`, it drew no legend and the names beside the lines.
+
+xpd cannot count the traces of a figure at run time, so the rule reads the one form where the
+code shows the count. A `px.line(color=...)` and traces added with `add_trace` are not
+reported. A trace with `mode="markers"` is left alone, and so is a list with a fifth trace,
+because many lines have no room for a label each.
+
+#### rotated-tick-labels
+
+**Severity:** info. **Fix:** none.
+
+Reports a `tickangle` written as a number other than 0, 180 and 360, on an x or y axis of a plotly figure. It reads the keyword in `update_xaxes`, `update_yaxes`, `go.layout.XAxis` and `go.layout.YAxis`, the underscore form such as `xaxis_tickangle` in `update_layout` and `go.Layout`, and `xaxis=dict(tickangle=...)` or `xaxis={"tickangle": ...}` in `update_layout`, `go.Layout` and `go.Figure`.
+
+Example:
+
+```python
+fig = px.bar(df, x="answer", y="share")
+fig.update_xaxes(tickangle=-90)
+```
+
+Use instead:
+
+```python
+fig = px.bar(df, x="share", y="answer", orientation="h")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book lists as friendly "words run from left to right, the usual direction for reading
+occidental languages", and as unfriendly "words run vertically, particularly along the Y-axis;
+words run in several different directions" (page 183). plotly keeps a `tickangle` as written:
+`update_xaxes(tickangle=-90)` resolved to -90, and both category labels of a bar chart were
+drawn rotated. With the categories on y, as in `px.bar(orientation="h")`, every tick label was
+drawn level.
+
+The rule has no fix, because `tickangle=0` can make long labels run into each other, and the
+level layout swaps x and y. An angle given by a name is left alone, and so is the `tickangle`
+of a colorbar.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of

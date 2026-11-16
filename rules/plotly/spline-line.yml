@@ -1,0 +1,165 @@
+# Tufte, vdqi.md line 3707, printed page 92: "Above all else show the data."
+#
+# A spline draws a smooth curve through the points, and the curve passes through values that the
+# data does not hold. On plotly 7.1.0, the values 0, 0, 10, 10, 0, 0 drawn with
+# go.Scatter(line_shape="spline") reached 10.8 at the top and -0.53 at the bottom, and
+# px.line(line_shape="spline") reached 10.75 and -0.5, read from the drawn path. The straight line
+# stayed between 0 and 10 (runs/behavior.txt). How far the curve leaves the data depends on the
+# data, so the rule is info.
+#
+# The fix is unsafe: "linear" draws straight segments between the same points, so the figure looks
+# different.
+#
+# This document reads line_shape="spline" in the four px functions that take line_shape and the
+# five go traces whose line.shape takes "spline" (runs/lists.txt).
+id: spline-line
+language: python
+severity: info
+message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 it rose to 10.8 and fell to -0.5. Tufte asks above all else to show the data. Use line_shape="linear", which joins the measured points with straight lines.
+rule:
+  kind: string
+  regex: '^["'']spline["'']$'
+  inside:
+    kind: keyword_argument
+    all:
+      - has: { field: name, regex: '^line_shape$' }
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            any:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|line|line_polar|line_ternary)$' } }, { has: { field: object, matches: px } }] }
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scattercarpet|Scatterpolar|Scattersmith|Scatterternary)$' } }, { has: { field: object, matches: go } }] }
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_traces$' } }, { has: { field: object, matches: figure } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+fix: '"linear"'
+metadata: { fix: unsafe }
+---
+# The same shape inside the line argument of a go trace: line=dict(shape="spline") or
+# line={"shape": "spline"}.
+id: spline-line
+language: python
+severity: info
+message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 it rose to 10.8 and fell to -0.5. Tufte asks above all else to show the data. Use shape="linear", which joins the measured points with straight lines.
+rule:
+  kind: string
+  regex: '^["'']spline["'']$'
+  inside:
+    any: [{ kind: keyword_argument, has: { field: name, regex: '^shape$' } }, { kind: pair, has: { field: key, regex: '^["'']shape["'']$' } }]
+    inside:
+      any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+      inside:
+        stopBy: { kind: argument_list }
+        kind: keyword_argument
+        all:
+          - has: { field: name, regex: '^line$' }
+          - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scattercarpet|Scatterpolar|Scattersmith|Scatterternary)$' } }, { has: { field: object, matches: go } }] } } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+fix: '"linear"'
+metadata: { fix: unsafe }
