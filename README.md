@@ -78,6 +78,7 @@ xpd
 ├── equiv old.py new.py    run two scripts and compare the `result` each one leaves
 ├── hook                   lint the file that a Claude Code edit touched
 ├── mcp                    start the MCP server
+├── lsp                    start the language server for editors
 └── skill                  print the agent skill for this version
 ```
 
@@ -85,6 +86,13 @@ xpd
 project's Python and need pandas there. `xpd <command> -h` lists the flags of a command. The
 [commands page](https://bjoernaagaard.github.io/xpd/commands/) explains the output and the exit
 codes.
+
+## Use in an editor
+
+`xpd lsp` starts a language server, so an editor shows the issues while you type, with a
+quick fix for each fixable one and the rule's documentation on hover. The
+[language server page](https://bjoernaagaard.github.io/xpd/lsp/) has the setup for Neovim,
+Helix, Zed and VS Code.
 
 ## Use with a coding agent
 
