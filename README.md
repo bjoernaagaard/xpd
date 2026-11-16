@@ -1,8 +1,8 @@
 # xpd
 
 xpd checks Python code for slow operations and wrong results. It checks code that uses pandas,
-NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders or Apache Hamilton. xpd can
-rewrite many of the lines it reports, and a coding agent can run it after every edit.
+NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, pymoo or Apache Hamilton. xpd
+can rewrite many of the lines it reports, and a coding agent can run it after every edit.
 
 ## What xpd reports
 
@@ -56,6 +56,7 @@ runs only on files that import the library. The Python pack runs on every file.
 | scikit-lego | `thresholder-score` | `Thresholder.score` ignores `threshold`, so a search scores every threshold the same |
 | MAPIE | `calibrate-on-training-rows` | `conformalize` on the training rows gives intervals that covered 0.48 of new rows where 0.90 was asked |
 | Category Encoders | `ordinal-mapping-pairs` | An `OrdinalEncoder` mapping given as a list of pairs codes every row as -1.0 |
+| pymoo | `objectives-stacked-by-row` | `out["F"] = np.array([f1, f2])` in a `Problem` gives each solution the wrong values, and a least `f2` of 0.003 came back where the true least is 10 |
 | Hamilton | `node-mutates-input` | A node writes to one of its parameters, and Hamilton hands the same object to other nodes |
 | Python | `dict-str-any` | `dict[str, Any]` in a signature hides the keys the function uses |
 
