@@ -1,7 +1,7 @@
 # xpd
 
 xpd checks Python code for slow operations and wrong results. It checks code that uses pandas,
-NumPy, SciPy, scikit-learn or Apache Hamilton. xpd can rewrite many of the lines it reports.
+NumPy, SciPy, scikit-learn, MAPIE or Apache Hamilton. xpd can rewrite many of the lines it reports.
 
 xpd reads files in parallel and parses each file once with
 [ast-grep](https://ast-grep.github.io/). Linting starts no Python, so a coding agent can run xpd
