@@ -53,6 +53,25 @@ def read_after_compute():
 
 
 @case
+def compute_through_another_name():
+    loss = losses()
+    looped = SPA(loss[:, 0], loss[:, 1:], reps=100, seed=0)
+    kept = MCS(loss, 0.1, reps=100, seed=0)
+    # The loop and the helper call compute, and neither does it on the name that is read.
+    for test in (looped, kept):
+        test.compute()
+    helped = computed(StepM(loss[:, 0], loss[:, 1:], reps=100, seed=0))
+    passed = StepM(loss[:, 0], loss[:, 1:], reps=100, seed=0)
+    computed(passed)
+    return looped.pvalues.tolist(), kept.included, list(helped.superior_models), list(passed.superior_models)
+
+
+def computed(test):
+    test.compute()
+    return test
+
+
+@case
 def bandwidth_passed_back():
     y = returns()
     first = Bartlett(y)

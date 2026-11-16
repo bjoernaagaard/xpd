@@ -7855,7 +7855,7 @@ Over 2,000 draws of 500 rows from `y = 2 + x + error` with one instrument, the m
 
 **Severity:** warning. **Fix:** none.
 
-Reports a model whose `exog` holds `.fitted_values` of another fit. That is two stage least squares by hand: the coefficient is right, and the standard errors come from residuals that use the fitted values in place of the regressor.
+Reports a model whose `exog` holds `.fitted_values` of another fit: `OLS` or a panel class, or `IV2SLS`, `IVLIML` or `IVGMM` with `None` for `endog` and for `instruments`, which is least squares. That is two stage least squares by hand: the coefficient is right, and the standard errors come from residuals that use the fitted values in place of the regressor.
 
 Example:
 
@@ -7959,7 +7959,7 @@ On 7.1 and 7.0 both functions took the four strings in any case, and raised `Val
 
 **Severity:** info. **Fix:** none. Needs linearmodels 7.1.
 
-Reports a function whose name starts with `hausman`. 7.1 added the Hausman test of random effects against fixed effects as a method of the random effects result, and the instrument results have had `wu_hausman()` for longer.
+Reports a function whose name starts with `hausman`, apart from `hausman_taylor`, which is the Hausman and Taylor estimator, and names such as `hausman_table` or `hausman_data`, which show results or prepare data. 7.1 added the Hausman test of random effects against fixed effects as a method of the random effects result, and the instrument results have had `wu_hausman()` for longer.
 
 Example:
 
@@ -8122,6 +8122,7 @@ correct code there was narrowed or dropped, and the table gives what is left.
 | [`removed-in-arch`](#removed-in-arch) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, AttributeError, ValueError | 1 | 34 | 0 | unsafe |
 | [`arch-unknown-option`](#arch-unknown-option) | error | interpreter: ValueError | 0 | 13 | 0 | none |
 | [`arch-ignored-argument`](#arch-ignored-argument) | warning | same result, and rerun for the two seeds | 10 | 21 | 1 | none |
+| [`arch-rejected-number`](#arch-rejected-number) | error | interpreter: TypeError, ValueError | not run | not run | not run | none |
 | [`unscaled-returns`](#unscaled-returns) | warning | numbers: mu 4.02 against 0.056, with optimizer code 4 | 0 | 21 | 0 | none |
 | [`rescaled-units`](#rescaled-units) | warning | numbers: a variance forecast 10,000 times the data's | 4 | 14 | 7 | none |
 | [`analytic-forecast-horizon`](#analytic-forecast-horizon) | error | interpreter: ValueError | 0 | 0 | no reports | none |
@@ -8222,7 +8223,8 @@ deprecated API.
 arch 9.0 checks every argument when a function is called, and it still ignores an argument that
 does not apply to the model that was asked for. The first rule reports a string that the check
 refuses. The second reports an argument that is accepted and never read, so the code runs and
-describes another model or test than the one it estimates.
+describes another model or test than the one it estimates. The third reports a number that the
+check refuses.
 
 #### arch-unknown-option
 
@@ -8363,6 +8365,55 @@ beside `lags=8`. Of the 10 reports on arch's own code, one is a test that passes
 check that it raises, where the advice is beside the point. The other nine are tests and the
 documentation page above.
 
+#### arch-rejected-number
+
+**Severity:** error. **Fix:** none.
+
+Reports a number written in the call that arch refuses: a float where arch counts something, a `size` of `conf_int` of 1 or more, and `vol="ngarch"` with `o` left at 0.
+
+Example:
+
+```python
+test = ADF(prices, lags=5.0)
+model = arch_model(returns, vol="ngarch")
+interval = IIDBootstrap(returns, seed=0).conf_int(np.mean, reps=1000, size=95)
+```
+
+Use instead:
+
+```python
+test = ADF(prices, lags=5)
+model = arch_model(returns, vol="ngarch", o=1)
+interval = IIDBootstrap(returns, seed=0).conf_int(np.mean, reps=1000, size=0.95)
+```
+
+Each form was run on arch 9.0.0 and on 8.0.0.
+
+| Form | arch 9.0.0 | arch 8.0.0 |
+| --- | --- | --- |
+| `p=1.0`, `o=1.0` or `q=1.0` in `GARCH`, `EGARCH` or `APARCH`, and in `arch_model` with no `vol` or with `vol` `"garch"`, `"egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"` | TypeError: p must be an integer >= 0; got 1.0 (float) | the classes ran, and `arch_model(p=1.0)` raised AssertionError |
+| `p=1.0` in `ARCH` or `FIGARCH` | TypeError: p must be an integer >= 1; got 1.0 (float) | ran |
+| `lags=5.0` in `ADF`, `DFGLS`, `KPSS`, `PhillipsPerron`, `ZivotAndrews`, `VarianceRatio` or `ARX` | TypeError: lags must be an integer >= 0 or None; got 5.0 (float) | ran, apart from `PhillipsPerron` |
+| `max_lags=5.0` in `ADF`, `DFGLS` or `ZivotAndrews` | TypeError: max_lags must be an integer >= 0 or None | TypeError: expected a sequence of integers or a single integer |
+| `reps=10.0` in `conf_int`, `var`, `cov`, `apply`, `bootstrap`, `SPA`, `StepM` or `MCS` | TypeError: reps must be an integer >= 1; got 10.0 (float) | TypeError: 'float' object cannot be interpreted as an integer |
+| `forecast(horizon=2.0)` and `hedgehog_plot(horizon=2.0)` | TypeError: horizon must be an integer >= 1; got 2.0 (float) | ValueError: horizon must be an integer >= 1. |
+| `forecast(..., method="simulation", simulations=100.0)` | TypeError: simulations must be an integer >= 1 | TypeError: 'float' object cannot be interpreted as an integer |
+| `conf_int(size=95)`, `size=90.0`, `size=1` | ValueError: size must be a finite float in (0, 1); got 95 (int) | ValueError: size must be strictly between 0 and 1 |
+| `arch_model(vol="ngarch")` with no `o` or with `o=0` | ValueError: o must be at least 1 when vol='ngarch' | ValueError: Unknown model type in vol, for every `o` |
+
+The first three rows and the last carry `since: "9.0"`, because 8.0.0 took the float in the
+classes and has no `"ngarch"`. `arch_model` does not check an order that the process does not
+have: `o=1.0` and `q=1.0` ran with `vol="arch"` and `"harch"`, `o=1.0` with `"figarch"`, and all
+three with `"constant"`, so the rule reads `arch_model` only with the `vol` values of the first
+row. `arch_model(vol="ngarch", o=1)` ran on 9.0.0, and `o=2` raised
+because `o` may not be above `p`. `horizon` and `simulations` are read only on a result that the
+file gets from `arch_model`, since other libraries have a `forecast` with a horizon. `reps` and
+`size` are read by the name of the method, since no other library that was looked at has those
+keywords on `conf_int`, `var`, `cov`, `apply` or `bootstrap`. A number that is a variable is not
+read, and neither is a positional argument. The rule was added after a review and was not run
+over the public code, which is no longer on disk. Over the 189 Python files of arch's repository it made one
+report, on `conf_int(mean_fn, 20, size=1.5)` in a test that checks this error.
+
 ### The units of the data
 
 arch estimates by maximum likelihood, and the optimizer works badly when the variance of the data
@@ -8405,9 +8456,12 @@ optimizer reported success with a mean of the wrong sign. `rescale=False` turns 
 and gave the same failed fit.
 
 The rule reads how the series is built and not its values. It reports the expression in the
-call, and a name or a column that every assignment in the file builds that way. A series that is
-multiplied anywhere, such as `100 * prices.pct_change()` or `returns = returns * 100`, is left
-alone, and so is a call that says `rescale`, in either way. Returns that come from a file or a
+call, and a name or a column that every assignment in the file builds that way: `pct_change`,
+the difference of a log, or the log of a price over its lag, followed by nothing but `dropna`,
+`fillna`, `copy`, `squeeze`, `to_numpy`, `iloc`, `loc` or `values`. A series that is multiplied
+anywhere, such as `100 * prices.pct_change()` or `returns = returns * 100`, is left alone. So
+are returns divided by their standard deviation, which have a variance of 1, returns that a
+helper takes as an argument, and a call that says `rescale`, in either way. Returns that come from a file or a
 function are not seen.
 
 All 21 reports on the public code were returns as decimals: each series was a `pct_change` or a
@@ -8457,7 +8511,7 @@ optimizer unless `disp="off"`.
 
 **Severity:** error. **Fix:** none.
 
-Reports `forecast` with a `horizon` above 1 and the analytic method on a result of `arch_model` with `vol` `"egarch"`, `"aparch"` or `"fiaparch"`, or with a `power` that is not 2 and `vol` `"garch"`, `"figarch"` or no `vol`.
+Reports `forecast` with a `horizon` above 1 and the analytic method on a result of `arch_model` with `vol` `"egarch"`, `"aparch"` or `"fiaparch"`, or with a `power` that is not 2 and `vol` `"garch"`, `"figarch"` or no `vol`. Reports `hedgehog_plot` on such a result as well, unless the call says `horizon=1` or another method.
 
 Example:
 
@@ -8485,7 +8539,11 @@ A volatility model that does not evolve in squares has no closed form beyond one
 The rule follows the model through the file: the call is `forecast` on a variable that the file
 assigns from `fit` or `fix` of a variable that it assigns from such an `arch_model` call, and
 each of the two names is assigned from nothing else. A `horizon` or a `method` that is a
-variable is not read, and `power` is read only where `arch_model` reads it. A model that is
+variable is not read, and `power` is read only where `arch_model` reads it. A model whose
+`volatility` the file assigns, as in `am.volatility = GARCH(1, 0, 1)`, is left alone.
+`hedgehog_plot` forecasts 10 steps with `method="analytic"` unless the call says otherwise. On
+9.0.0 and on 8.0.0 it raised the same ValueError for `vol="egarch"`, and it ran with `horizon=1`
+and with `method="simulation"`. It is read only when every argument is a keyword. A model that is
 built from the classes, such as `ConstantMean(y, volatility=EGARCH())`, is not seen. The corpus
 had no report.
 
@@ -8515,7 +8573,9 @@ loop computes the same rows many times over and keeps one. On the 5,030 S&P 500 
 seconds, with equal values. On arch 8.0.0 it was 0.329 against 0.0056 seconds.
 
 A loop that fits inside is a rolling estimate, where each origin has its own parameters, and is
-left alone. So is a loop over a few chosen origins, such as a tuple. The one report in the
+left alone. So is a loop over a few chosen origins, such as a tuple, and a call whose object or
+whose other arguments hold the loop variable, as in `fits[i].forecast(start=i)`, where each
+origin has its own result. The one report in the
 corpus is a test in arch that steps through the origins of a hedgehog plot.
 
 #### reindex-is-default
@@ -8527,12 +8587,14 @@ Reports `reindex=False` given to `forecast` of an arch model or result.
 Example:
 
 ```python
+res = arch_model(returns).fit(disp="off")
 forecasts = res.forecast(horizon=5, reindex=False)
 ```
 
 Use instead:
 
 ```python
+res = arch_model(returns).fit(disp="off")
 forecasts = res.forecast(horizon=5)
 ```
 
@@ -8621,9 +8683,10 @@ base class in arch's own source builds a placeholder bootstrap that it never dra
 
 `seed` is a keyword of the bootstraps, the tests and the distributions since arch 5.0, so every
 document carries `since: "5.0"`. A seed does not move what the method estimates, so the rule is
-info. A bootstrap whose `state` the file assigns is left alone. A file that builds a distribution
-with `seed=` anywhere is left alone by the two documents that read the model's distribution,
-because a pattern cannot see which model gets it. `SPA`, `StepM`, `MCS` and `RealityCheck` are
+info. A bootstrap whose `state` or `generator` the file assigns is left alone: on arch 9.0.0,
+8.0.0 and 5.0, `bs.generator = np.random.default_rng(0)` gave the same interval as `seed=0`. A
+file that builds a distribution with `seed=` anywhere is left alone by the two documents that
+read the model's distribution, because a pattern cannot see which model gets it. `SPA`, `StepM`, `MCS` and `RealityCheck` are
 read only when the file imports them from `arch.bootstrap`.
 
 #### results-before-compute
@@ -8731,9 +8794,8 @@ These habits were looked at and have no rule.
   mistakes in the data or in the reading of the result. On 1,000 log prices of the S&P 500,
   `ADF` gave a p-value of 0.648 and `KPSS` gave 0.0001, because the null of `ADF` is a unit root
   and the null of `KPSS` is no unit root. A pattern sees neither the series nor the reading.
-- A whole number given as a float, such as `horizon=5.0` or `lags=2.0`, raises TypeError on
-  9.0.0. The public code had no such number written for `horizon`, `simulations`, `reps`,
-  `max_lags` or `block_size`.
+- A `block_size` given as a float is a variable in the code that was read, as described above,
+  so `arch-rejected-number` does not read it.
 
 ## pymoo
 

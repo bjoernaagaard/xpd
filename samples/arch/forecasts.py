@@ -11,6 +11,7 @@ import io
 import numpy as np
 from arch import arch_model
 from arch.data import sp500
+from arch.univariate import GARCH
 
 CASES = {}
 
@@ -34,7 +35,11 @@ def no_analytic_forecast(horizon, method):
     third = tarch.forecast(horizon=5)  # xpd: analytic-forecast-horizon
     fourth = egarch_res.forecast(horizon=horizon)
     fifth = egarch_res.forecast(horizon=5, method=method)
-    return first, second, third, fourth, fifth
+    # hedgehog_plot forecasts 10 steps with the analytic method unless the call says otherwise.
+    sixth = egarch_res.hedgehog_plot()  # xpd: analytic-forecast-horizon
+    seventh = egarch_res.hedgehog_plot(horizon=1)
+    eighth = egarch_res.hedgehog_plot(method="simulation", simulations=50)
+    return first, second, third, fourth, fifth, sixth, seventh, eighth
 
 
 @case
@@ -48,7 +53,13 @@ def forecasts_these_models_have():
     # power is not read with vol="arch", so this model has an analytic forecast. arch-ignored-argument reports the power.
     arch_only = arch_model(y, vol="ARCH", p=2, power=1.0).fit(disp="off")  # xpd: arch-ignored-argument
     also_analytic = arch_only.forecast(horizon=5)
-    return one_step.variance.values.tolist(), simulated.variance.shape, analytic.variance.values.tolist(), also_analytic.variance.values.tolist()
+    # The file gives this model another volatility process than the call wrote.
+    replaced = arch_model(y, vol="EGARCH")
+    replaced.volatility = GARCH(1, 0, 1)
+    replaced_res = replaced.fit(disp="off")
+    from_garch = replaced_res.forecast(horizon=5)
+    values = [f.variance.values.tolist() for f in (one_step, analytic, also_analytic, from_garch)]
+    return values, simulated.variance.shape
 
 
 @case
@@ -72,6 +83,18 @@ def rolling_estimate():
     for origin in range(1400, 1405):
         window_res = am.fit(disp="off", last_obs=origin)
         rows.append(window_res.forecast(horizon=3, start=origin).variance.iloc[0].tolist())
+    return rows
+
+
+@case
+def one_result_per_origin():
+    y = returns()
+    am = arch_model(y)
+    # Each origin has its own result, so one call would not return these rows.
+    fits = {origin: am.fit(disp="off", last_obs=origin) for origin in range(1400, 1403)}
+    rows = []
+    for origin in range(1400, 1403):
+        rows.append(fits[origin].forecast(horizon=3, start=origin).variance.iloc[0].tolist())
     return rows
 
 

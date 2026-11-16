@@ -7,6 +7,7 @@ what the code computes.
 
 import linearmodels.panel as lmp
 import numpy as np
+import pandas as pd
 import statsmodels.api as sm
 from linearmodels import IV2SLS, PanelOLS, PooledOLS, RandomEffects
 from linearmodels.datasets import mroz, wage_panel
@@ -67,7 +68,14 @@ def random_against_fixed():
     def difference(fe, re):
         return fe.params - re.params
 
-    return hausman(fixed, random), difference(fixed, random), random.hausman(fixed)
+    # The Hausman and Taylor estimator is not a test, and a table of the test is not one either.
+    def hausman_taylor(fe, re):
+        return (fe.params + re.params) / 2
+
+    def hausman_table(fe, re):
+        return pd.concat([fe.params, re.params], axis=1)
+
+    return hausman(fixed, random), difference(fixed, random), random.hausman(fixed), hausman_taylor(fixed, random), hausman_table(fixed, random).shape
 
 
 def raises_on_7_1():

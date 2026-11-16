@@ -1,0 +1,159 @@
+# A number written in the call that arch refuses. arch 9.0 checks every argument when the object
+# is made, and the older releases refused some of the same values later, in NumPy. Each form
+# below was run on arch 9.0.0 and on 8.0.0. A value that is a variable is not read.
+
+# An option that counts something must be an int. On arch 9.0.0, p=1.0, o=1.0 and q=1.0 raised
+# TypeError, "p must be an integer >= 0; got 1.0 (float)", in GARCH, EGARCH and APARCH, and in
+# arch_model with no vol or with vol "garch", "egarch", "aparch", "fiaparch" or "ngarch". p=1.0
+# raised in ARCH and FIGARCH. arch_model does not check an order that the process does not have:
+# o=1.0 and q=1.0 ran with vol="arch" and "harch", o=1.0 with "figarch", and all three with
+# "constant". lags=5.0 raised in ADF, DFGLS, KPSS, PhillipsPerron, ZivotAndrews,
+# VarianceRatio and ARX, and so did max_lags=5.0 in ADF, DFGLS and ZivotAndrews. On 8.0.0 the
+# classes took the float, apart from PhillipsPerron and max_lags, so the document carries since.
+id: arch-rejected-number
+language: python
+severity: error
+message: $K counts something, so arch 9.0 takes only an int for it, and $V is a float. arch 9.0.0 raises TypeError, "$K must be an integer". Write the number without the decimal point.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: value, kind: float, pattern: $V }
+    - any:
+        - all:
+            - has: { field: name, pattern: $K, regex: '^(p|o|q)$' }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(GARCH|EGARCH|APARCH)$' } } }
+        - all:
+            - has: { field: name, pattern: $K, regex: '^p$' }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(ARCH|FIGARCH)$' } } }
+        # arch_model checks an order only for a process that has it, so vol must be written, or
+        # left at its default with too few positional arguments to reach it.
+        - all:
+            - has: { field: name, pattern: $K, regex: '^(p|o|q)$' }
+            - inside:
+                kind: argument_list
+                all:
+                  - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+                  - not: { has: { kind: dictionary_splat } }
+                  - not: { has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
+                  - not: { has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^vol$' } }, { not: { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(garch|egarch|aparch|fiaparch|ngarch)(''|")$' } } }] } }
+        - all:
+            - has: { field: name, pattern: $K, regex: '^lags$' }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(ADF|DFGLS|KPSS|PhillipsPerron|ZivotAndrews|VarianceRatio|ARX)$' } } }
+        - all:
+            - has: { field: name, pattern: $K, regex: '^max_lags$' }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(ADF|DFGLS|ZivotAndrews)$' } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "9.0" }
+---
+# reps is the number of bootstrap draws. reps=10.0 raised TypeError in conf_int, var, cov, apply
+# and bootstrap of a bootstrap, and in SPA, StepM and MCS: "reps must be an integer >= 1; got
+# 10.0 (float)" on arch 9.0.0 and "'float' object cannot be interpreted as an integer" on 8.0.0.
+# No other library that was looked at has a reps keyword on these names.
+id: arch-rejected-number
+language: python
+severity: error
+message: reps is the number of bootstrap draws, so arch takes only an int for it, and $V is a float. arch 9.0.0 raises TypeError, "reps must be an integer >= 1", and 8.0.0 raised TypeError as well. Write the number without the decimal point.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^reps$' }
+    - has: { field: value, kind: float, pattern: $V }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          any:
+            - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(conf_int|var|cov|apply|bootstrap)$' } }
+            - has: { field: function, regex: '(^|\.)(SPA|StepM|MCS|RealityCheck)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# horizon and simulations of forecast, and horizon of hedgehog_plot. On arch 9.0.0,
+# forecast(horizon=2.0) raised TypeError, "horizon must be an integer >= 1; got 2.0 (float)", and
+# on 8.0.0 it raised ValueError, "horizon must be an integer >= 1.". simulations=100.0 with
+# method="simulation" raised TypeError on both. Other libraries have a forecast with a horizon,
+# so the call is read only on a result that the file gets from arch_model.
+id: arch-rejected-number
+language: python
+severity: error
+message: $K counts something, so arch takes only an int for it, and $V is a float. arch 9.0.0 raises TypeError, "$K must be an integer >= 1", and 8.0.0 raised as well. Write the number without the decimal point.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, pattern: $K, regex: '^(horizon|simulations)$' }
+    - has: { field: value, kind: float, pattern: $V }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(forecast|hedgehog_plot)$' } }, { has: { field: object, matches: result } }] } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          # am.volatility = GARCH(...) gives the model another volatility process than the call wrote.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^volatility$' } }, { has: { field: object, pattern: $M } }] } } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $R } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $R } }, { kind: named_expression, has: { field: name, pattern: $R } }] } } }
+---
+# size of conf_int is the coverage as a fraction. On arch 9.0.0, size=95, size=90.0 and size=1
+# raised ValueError, "size must be a finite float in (0, 1); got 95 (int)", and on 8.0.0
+# "size must be strictly between 0 and 1". No conf_int of another library that was looked at has
+# a size keyword.
+id: arch-rejected-number
+language: python
+severity: error
+message: size is the coverage of the interval as a fraction between 0 and 1, and $V is not. arch 9.0.0 raises ValueError, "size must be a finite float in (0, 1)". Write 0.95 for a 95% interval.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^size$' }
+    - has: { field: value, any: [{ kind: integer }, { kind: float }], pattern: $V, regex: '^[1-9][0-9]*(\.[0-9]*)?$' }
+    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^conf_int$' } } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# vol="ngarch" is new in arch 9.0, and o is its number of shifted innovations. arch_model has
+# o=0 as its default, and 9.0.0 raised ValueError, "o must be at least 1 when vol='ngarch'", for
+# the call without o and with o=0, in either case of the name. o=1 ran. On 8.0.0 every
+# vol="ngarch" raised "Unknown model type in vol", so the document carries since.
+id: arch-rejected-number
+language: python
+severity: error
+message: arch_model needs o of at least 1 with vol="ngarch", where o is the number of shifted innovations, and o is 0 here, which is its default. arch 9.0.0 raises ValueError, "o must be at least 1 when vol='ngarch'". Pass o=1.
+rule:
+  kind: string
+  regex: '(?i)^[rbu]{0,2}(''|")ngarch(''|")$'
+  inside:
+    kind: keyword_argument
+    has: { field: name, regex: '^vol$' }
+    inside:
+      kind: argument_list
+      all:
+        - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+        - not: { has: { kind: dictionary_splat } }
+        - not: { has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^o$' } }, { not: { has: { field: value, kind: integer, regex: '^0$' } } }] } }
+        - not: { has: { nthChild: { position: 7, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+metadata: { since: "9.0" }

@@ -24,6 +24,10 @@ def prices(rows=1500):
     return sp500.load()["Adj Close"].iloc[-rows:]
 
 
+def to_percent(series):
+    return series * 100
+
+
 def fitted(model):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -69,7 +73,12 @@ def percent_returns():
     grown = close.pct_change().dropna()
     grown *= 100
     in_place = arch_model(grown)
-    return [fitted(m) for m in (in_call, by_method, by_name, reassigned, in_place)]
+    # Returns over their standard deviation have a variance of 1, and a helper may convert them.
+    standardized = close.pct_change().dropna() / close.pct_change().std()
+    unit_variance = arch_model(standardized)
+    converted = to_percent(close.pct_change().dropna())
+    through_helper = arch_model(converted)
+    return [fitted(m) for m in (in_call, by_method, by_name, reassigned, in_place, unit_variance, through_helper)]
 
 
 @case

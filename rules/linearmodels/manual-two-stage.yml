@@ -8,7 +8,8 @@
 # other on average. Which way the error goes depends on the data.
 #
 # The rule reports a model whose exog argument holds .fitted_values, the name linearmodels gives
-# them. A second stage that reads the fitted values from a column it stored earlier is not seen.
+# them. The model is OLS or a panel class, or IV2SLS, IVLIML or IVGMM with None for endog and for
+# instruments, which is how linearmodels itself runs least squares. A second stage that reads the fitted values from a column it stored earlier is not seen.
 id: manual-two-stage
 language: python
 severity: warning
@@ -16,7 +17,13 @@ message: This regression takes the fitted values of another one as a regressor, 
 rule:
   kind: call
   all:
-    - has: { field: function, matches: lm-class }
+    - any:
+        - has: { field: function, matches: lm-class }
+        # An instrument model with None for endog and for instruments is least squares.
+        - all:
+            - has: { field: function, matches: iv-class }
+            - has: { field: arguments, any: [{ has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, regex: '^None$' } }, { has: { kind: keyword_argument, regex: '^endog\s*=\s*None$' } }] }
+            - has: { field: arguments, any: [{ has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, regex: '^None$' } }, { has: { kind: keyword_argument, regex: '^instruments\s*=\s*None$' } }] }
     - has:
         field: arguments
         has:
@@ -25,6 +32,7 @@ rule:
             - { kind: keyword_argument, has: { field: name, regex: '^exog$' } }
           has: { stopBy: end, kind: attribute, has: { field: attribute, regex: '^fitted_values$' } }
 utils:
+  iv-class: { any: [{ regex: '(^|\.)(IVLIML)$' }, { all: [{ regex: '(^|\.)(IV2SLS|IVGMM)$' }, { matches: from-linearmodels }] }] }
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PooledOLS|PanelOLS|RandomEffects|FirstDifferenceOLS|BetweenOLS)$' }, { all: [{ regex: '(^|\.)(OLS)$' }, { matches: from-linearmodels }] }] }
   from-linearmodels:

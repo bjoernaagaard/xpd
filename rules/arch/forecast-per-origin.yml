@@ -7,7 +7,8 @@
 # The rule reports forecast with start set to the variable of a for loop or a comprehension
 # over range(...) around it. A loop over a few chosen origins, such as a tuple, is left alone.
 # A loop that also calls fit or fix is a rolling estimate, where each origin has its own
-# parameters, and is left alone too. No forecast of another library that was looked at takes
+# parameters, and is left alone too. So is a call whose object or whose other arguments hold the
+# loop variable, as in fits[i].forecast(start=i), where each origin has its own result. No forecast of another library that was looked at takes
 # start, so the call is read on any object.
 id: forecast-per-origin
 language: python
@@ -18,6 +19,10 @@ rule:
   all:
     - has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^start$' } }, { has: { field: value, kind: identifier, pattern: $I } }] } }
+    # A result or an argument picked by the loop variable, as in fits[i].forecast(start=i), differs
+    # from origin to origin, so one call does not return the same values.
+    - not: { has: { field: function, has: { field: object, any: [{ pattern: $I }, { has: { stopBy: end, kind: identifier, pattern: $I } }] } } }
+    - not: { has: { field: arguments, has: { not: { kind: keyword_argument, has: { field: name, regex: '^start$' } }, any: [{ pattern: $I }, { has: { stopBy: end, kind: identifier, pattern: $I } }] } } }
     - inside:
         stopBy: end
         any:

@@ -77,6 +77,9 @@ def with_a_seed(seed=0):
     # A bootstrap that is given the state of a seeded one draws the same samples.
     restored = StationaryBootstrap(10, x)
     restored.state = stationary.state
+    # So does a bootstrap that is given a seeded generator.
+    given = IIDBootstrap(x)
+    given.generator = np.random.default_rng(seed)
     spa = SPA(loss[:, 0], loss[:, 1:], reps=100, seed=0)
     spa.compute()
     mcs = MCS(loss, 0.1, reps=100, seed=0)

@@ -8,7 +8,9 @@
 #
 # The rule reads how the series is built and not its values. It reports a series that the call,
 # or every assignment to the name in the file, builds with pct_change or with log and diff or
-# shift, and that nothing multiplies. A name that is also assigned something else, such as the
+# shift, followed by nothing but dropna, fillna, copy, squeeze, to_numpy, iloc, loc or values.
+# Returns times 100, returns divided by their standard deviation, and returns passed through a
+# helper may be on another scale, so each is left alone. A name that is also assigned something else, such as the
 # same returns times 100, is left alone, and so is a call that says rescale, in either way.
 id: unscaled-returns
 language: python
@@ -29,13 +31,41 @@ rule:
                 - has: { field: name, regex: '^y$' }
                 - has: { field: value, matches: unscaled }
 utils:
+  # The expression that makes the returns: pct_change, the difference of a log, the log of a
+  # price over its lag, or one log minus the log of the lag.
+  returns-core:
+    any:
+      - { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^pct_change$' } } }
+      - kind: call
+        has:
+          field: function
+          kind: attribute
+          all:
+            - has: { field: attribute, regex: '^diff$' }
+            - has: { field: object, kind: call, any: [{ has: { field: function, regex: '(^|\.)log$' } }, { regex: '\.(apply|transform|pipe)\((np|numpy|math)\.log\)$' }] }
+      - kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)log$' }
+          - has: { field: arguments, has: { kind: binary_operator, all: [{ has: { field: operator, regex: '^/$' } }, { has: { field: right, regex: '\.shift\(' } }] } }
+      - kind: binary_operator
+        all:
+          - has: { field: operator, regex: '^-$' }
+          - has: { field: left, kind: call, regex: '^[\w.]*log\(' }
+          - has: { field: right, kind: call, all: [{ regex: '^[\w.]*log\(' }, { regex: '\.shift\(' }] }
+  # Decimal returns are that expression, or a chain on it that only drops, fills, copies or
+  # slices. Any other step may rescale the series: a product, a division by the standard
+  # deviation, or a helper that takes the returns as an argument. The search stops at the first
+  # argument list, so it reads the chain itself and not what a call is given.
   decimal-returns:
-    all:
-      - any:
-          - regex: '\.pct_change\('
-          - all: [{ regex: '\blog\(' }, { regex: '\.(diff|shift)\(' }]
-      - not: { regex: '\*|\.(mul|multiply|rmul)\(|/\s*0?\.0+1\b' }
-      - not: { kind: keyword_argument }
+    any:
+      - matches: returns-core
+      - any: [{ kind: call }, { kind: subscript }, { kind: parenthesized_expression }]
+        all:
+          - not: { kind: call, has: { field: function, not: { kind: attribute } } }
+          - not: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, not: { regex: '^(dropna|fillna|copy|squeeze|to_numpy|iloc|loc|values)$' } } } }
+          - has: { stopBy: { kind: argument_list }, matches: returns-core }
+          - not: { has: { stopBy: { kind: argument_list }, kind: attribute, all: [{ has: { field: attribute, not: { regex: '^(dropna|fillna|copy|squeeze|to_numpy|iloc|loc|values)$' } } }, { has: { stopBy: { kind: argument_list }, matches: returns-core } }] } }
+          - not: { has: { stopBy: { kind: argument_list }, not: { any: [{ kind: call }, { kind: attribute }, { kind: subscript }, { kind: parenthesized_expression }, { matches: returns-core }] }, has: { stopBy: { kind: argument_list }, matches: returns-core } } }
   returns-name:
     any: [{ kind: identifier }, { kind: subscript }]
     pattern: $R

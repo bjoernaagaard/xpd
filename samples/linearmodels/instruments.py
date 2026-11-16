@@ -52,10 +52,12 @@ def second_stage_by_hand():
     first = OLS(data.educ, data[first_stage]).fit()
     by_hand = OLS(data.lwage, pd.concat([data[["const", "exper"]], first.fitted_values], axis=1)).fit()  # xpd: manual-two-stage
     by_keyword = OLS(data.lwage, exog=first.fitted_values.assign(const=1.0)).fit()  # xpd: manual-two-stage
+    # IV2SLS with None for endog and for instruments is least squares, so this is the same second stage.
+    by_iv_class = IV2SLS(data.lwage, pd.concat([data[["const", "exper"]], first.fitted_values], axis=1), None, None).fit()  # xpd: manual-two-stage
     one_step = IV2SLS(data.lwage, data[["const", "exper"]], data.educ, data[["fatheduc", "motheduc"]]).fit()
     # The fitted values as the dependent variable are another regression, not a second stage.
     of_the_fit = OLS(first.fitted_values, data[["const", "exper"]]).fit()
-    return by_hand.std_errors, by_keyword.std_errors, one_step.std_errors, of_the_fit.params
+    return by_hand.std_errors, by_keyword.std_errors, by_iv_class.std_errors, one_step.std_errors, of_the_fit.params
 
 
 @case

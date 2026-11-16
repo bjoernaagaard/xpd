@@ -12,6 +12,7 @@ from arch.bootstrap import MCS, SPA, IIDBootstrap
 from arch.data import sp500
 from arch.unitroot import ADF, DFGLS, KPSS, PhillipsPerron, VarianceRatio, ZivotAndrews, auto_bandwidth
 from arch.unitroot.cointegration import DynamicOLS, engle_granger, phillips_ouliaris
+from arch.univariate import GARCH
 
 CASES = {}
 
@@ -83,6 +84,33 @@ def unknown_bootstrap_options(x, other):
     second = bs.conf_int(np.mean, 100, tail="both")  # xpd: arch-unknown-option
     third = other.conf_int(np.mean, 100, method="percentile-t")
     return mcs, spa, first, second, third
+
+
+def numbers_arch_refuses(x, y, p, losses):
+    counted = arch_model(y, p=1.0)  # xpd: arch-rejected-number
+    process = GARCH(p=1, o=1.0, q=1)  # xpd: arch-rejected-number
+    adf = ADF(p, lags=5.0)  # xpd: arch-rejected-number
+    res = arch_model(y).fit(disp="off")
+    steps = res.forecast(horizon=5.0)  # xpd: arch-rejected-number
+    bs = IIDBootstrap(x, seed=0)
+    draws = bs.conf_int(np.mean, reps=100.0)  # xpd: arch-rejected-number
+    percent = bs.conf_int(np.mean, reps=100, size=95)  # xpd: arch-rejected-number
+    mcs = MCS(losses, 0.1, reps=100.0, seed=0)  # xpd: arch-rejected-number
+    shifted = arch_model(y, vol="ngarch")  # xpd: arch-rejected-number
+    return counted, process, adf, steps, draws, percent, mcs, shifted
+
+
+@case
+def numbers_arch_takes():
+    y = returns()
+    # arch_model checks an order only for a process that has it, so o=1.0 is not read with vol="arch".
+    arch_only = arch_model(y, vol="arch", p=2, o=1.0).fit(disp="off")
+    shifted = arch_model(y, vol="ngarch", o=1).fit(disp="off")
+    process = GARCH(p=1, o=1, q=1)
+    adf = ADF(prices(), lags=5)
+    steps = shifted.forecast(horizon=5)
+    interval = IIDBootstrap(y.to_numpy(), seed=0).conf_int(np.mean, reps=100, size=0.95)
+    return arch_only.params.tolist(), shifted.params.tolist(), process.num_params, float(adf.stat), steps.variance.shape, interval.ravel().tolist()
 
 
 @case

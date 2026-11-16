@@ -3,14 +3,15 @@
 # coefficient vectors and covariances, and such a function often leaves out the degrees of
 # freedom or takes a covariance that is not positive definite. The rule reports a function whose
 # name starts with hausman in a file that imports linearmodels, and only when the venv has 7.1 or
-# later. It cannot see what the function tests, so it is info.
+# later. hausman_taylor is the Hausman and Taylor estimator and not a test, and a name such as
+# hausman_table or hausman_data prepares data or shows results, so both are left alone. It cannot see what the function tests, so it is info.
 id: hand-written-hausman
 language: python
 severity: info
 message: linearmodels has both Hausman tests, so $NAME need not be written by hand. For random effects against fixed effects, 7.1 added random_effects_result.hausman(fixed_effects_result), which returns the statistic and the table of estimates. For OLS against instruments, the result of IV2SLS has wu_hausman().
 rule:
   kind: function_definition
-  has: { field: name, pattern: $NAME, regex: '(?i)^_?hausman' }
+  has: { field: name, pattern: $NAME, all: [{ regex: '(?i)^_?hausman' }, { not: { regex: '(?i)taylor|(^|_)(data|sample|frame|table|plot|print|report|format|summary|result|results|output|load|read|save|write)(_|$)' } }] }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth|IVLIML|IVGMMCUE|IVJIVE|AbsorbingLS|IV3SLS|IVSystemGMM|TradedFactorModel|LinearFactorModel|LinearFactorModelGMM)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM|SUR)$' }, { matches: from-linearmodels }] }] }

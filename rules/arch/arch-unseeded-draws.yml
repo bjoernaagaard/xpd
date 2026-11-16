@@ -10,8 +10,9 @@
 # IIDBootstrap(x, seed=0) raised TypeError and on 5.0 it ran. Every document carries since.
 
 # The bootstraps. A file that still calls seed on the object, which arch removed in 8.0, is
-# reported by removed-in-arch and not here, and a file that assigns the object's state has set
-# the generator and is left alone.
+# reported by removed-in-arch and not here, and a file that assigns the object's state or its
+# generator has set the generator and is left alone. On arch 9.0.0, 8.0.0 and 5.0, bs.generator =
+# np.random.default_rng(0) gave the same interval as seed=0.
 id: arch-unseeded-draws
 language: python
 severity: info
@@ -36,7 +37,7 @@ utils:
               stopBy: end
               any:
                 - { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^seed$' } }, { has: { field: object, pattern: $B } }] } }
-                - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^state$' } }, { has: { field: object, pattern: $B } }] } }
+                - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^(state|generator)$' } }, { has: { field: object, pattern: $B } }] } }
 metadata: { since: "5.0" }
 ---
 # SPA, StepM, MCS and RealityCheck run a bootstrap of their own. The names are short, so the
@@ -74,7 +75,7 @@ utils:
               stopBy: end
               any:
                 - { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^seed$' } }, { has: { field: object, pattern: $B } }] } }
-                - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^state$' } }, { has: { field: object, pattern: $B } }] } }
+                - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^(state|generator)$' } }, { has: { field: object, pattern: $B } }] } }
 metadata: { since: "5.0" }
 ---
 # forecast with method="simulation" draws from the model's distribution. Two calls gave 2.671
