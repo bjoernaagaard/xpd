@@ -1,0 +1,20 @@
+id: compat-code
+language: python
+rule:
+  any:
+  - inside:
+      kind: if_statement
+      stopBy: end
+      has:
+        field: condition
+        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+  - inside:
+      kind: conditional_expression
+      stopBy: end
+      regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
+  - inside:
+      kind: try_statement
+      stopBy: end
+      has:
+        kind: except_clause
+        regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)

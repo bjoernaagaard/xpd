@@ -16,10 +16,3 @@ rule:
         not: { any: [{ nthChild: 1 }, { nthChild: { position: 1, reverse: true } }] }
     - not: { has: { field: operators, regex: ^(in|not in|is|is not)$ } }
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
-utils:
-  pandas-import:
-    any:
-      - kind: import_statement
-        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
-      - kind: import_from_statement
-        has: { field: module_name, regex: '^pandas(\.|$)' }

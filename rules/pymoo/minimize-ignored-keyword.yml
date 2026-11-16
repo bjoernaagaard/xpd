@@ -15,17 +15,6 @@ rule:
   all:
     - has: { field: name, pattern: $K }
     - inside: { kind: argument_list, inside: { matches: pymoo-minimize } }
-utils:
-  pymoo-minimize:
-    kind: call
-    all:
-      - has: { field: function, regex: '^minimize$' }
-      - inside:
-          kind: module
-          stopBy: end
-          all:
-            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
-            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
 ---
 # random_state and random_seed are the names other libraries use for the seed. Two runs with
 # each of them set to 1 returned different fronts, and two runs with seed=1 the same front.
@@ -45,17 +34,6 @@ rule:
       all:
         - not: { has: { kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
         - inside: { matches: pymoo-minimize }
-utils:
-  pymoo-minimize:
-    kind: call
-    all:
-      - has: { field: function, regex: '^minimize$' }
-      - inside:
-          kind: module
-          stopBy: end
-          all:
-            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
-            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
 # Unsafe: the fixed run is seeded, so it returns another front than the unseeded one did.
 fix: seed
 metadata: { fix: unsafe }

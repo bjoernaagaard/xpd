@@ -16,12 +16,6 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
 utils:
   in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
-  pandas-import:
-    any:
-      - kind: import_statement
-        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
-      - kind: import_from_statement
-        has: { field: module_name, regex: '^pandas(\.|$)' }
   in-assert-call:
     inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
 fix: $NP.isnan($X)
@@ -40,12 +34,6 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
 utils:
   in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
-  pandas-import:
-    any:
-      - kind: import_statement
-        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
-      - kind: import_from_statement
-        has: { field: module_name, regex: '^pandas(\.|$)' }
   in-assert-call:
     inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
 fix: ~$NP.isnan($X)
@@ -64,12 +52,6 @@ rule:
 utils:
   other-nan: { regex: '^(math\.nan|float\(\s*["''](nan|NaN|NAN)["'']\s*\))$' }
   in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
-  pandas-import:
-    any:
-      - kind: import_statement
-        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
-      - kind: import_from_statement
-        has: { field: module_name, regex: '^pandas(\.|$)' }
   in-assert-call:
     inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
 fix: np.isnan($X)
@@ -87,12 +69,6 @@ rule:
 utils:
   other-nan: { regex: '^(math\.nan|float\(\s*["''](nan|NaN|NAN)["'']\s*\))$' }
   in-pandas-file: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
-  pandas-import:
-    any:
-      - kind: import_statement
-        has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
-      - kind: import_from_statement
-        has: { field: module_name, regex: '^pandas(\.|$)' }
   in-assert-call:
     inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)assert\w*$' } }
 fix: ~np.isnan($X)

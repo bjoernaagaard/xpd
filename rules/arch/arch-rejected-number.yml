@@ -43,8 +43,6 @@ rule:
             - has: { field: name, pattern: $K, regex: '^max_lags$' }
             - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(ADF|DFGLS|ZivotAndrews)$' } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "9.0" }
 ---
 # reps is the number of bootstrap draws. reps=10.0 raised TypeError in conf_int, var, cov, apply
@@ -68,8 +66,6 @@ rule:
             - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(conf_int|var|cov|apply|bootstrap)$' } }
             - has: { field: function, regex: '(^|\.)(SPA|StepM|MCS|RealityCheck)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # horizon and simulations of forecast, and horizon of hedgehog_plot. On arch 9.0.0,
 # forecast(horizon=2.0) raised TypeError, "horizon must be an integer >= 1; got 2.0 (float)", and
@@ -90,7 +86,6 @@ rule:
         inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(forecast|hedgehog_plot)$' } }, { has: { field: object, matches: result } }] } }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
   model:
     any:
@@ -129,8 +124,6 @@ rule:
     - has: { field: value, any: [{ kind: integer }, { kind: float }], pattern: $V, regex: '^[1-9][0-9]*(\.[0-9]*)?$' }
     - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^conf_int$' } } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # vol="ngarch" is new in arch 9.0, and o is its number of shifted innovations. arch_model has
 # o=0 as its default, and 9.0.0 raised ValueError, "o must be at least 1 when vol='ngarch'", for
@@ -154,6 +147,4 @@ rule:
         - not: { has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^o$' } }, { not: { has: { field: value, kind: integer, regex: '^0$' } } }] } }
         - not: { has: { nthChild: { position: 7, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "9.0" }

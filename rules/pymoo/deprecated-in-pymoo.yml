@@ -57,16 +57,6 @@ rule:
     - inside: { kind: argument_list, inside: { matches: get-on-a-result } }
     - not: { matches: expected-to-warn }
 utils:
-  pymoo-minimize:
-    kind: call
-    all:
-      - has: { field: function, regex: '^minimize$' }
-      - inside:
-          kind: module
-          stopBy: end
-          all:
-            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
-            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
   expected-to-warn: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   get-on-a-result:
     kind: call
@@ -148,16 +138,6 @@ rule:
                               - has: { field: right, any: [{ kind: dictionary }, { kind: dictionary_comprehension }, { kind: call, has: { field: function, regex: '^(dict|defaultdict|OrderedDict|collections\.\w+|json\.loads?)$' } }] }
     - not: { matches: expected-to-warn }
 utils:
-  pymoo-minimize:
-    kind: call
-    all:
-      - has: { field: function, regex: '^minimize$' }
-      - inside:
-          kind: module
-          stopBy: end
-          all:
-            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
-            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
   expected-to-warn: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   get-on-a-result:
     kind: call

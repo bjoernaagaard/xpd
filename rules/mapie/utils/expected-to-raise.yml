@@ -1,0 +1,3 @@
+id: expected-to-raise
+language: python
+rule: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }

@@ -18,7 +18,7 @@ pub(crate) struct Position {
 #[derive(Debug)]
 pub(crate) struct Issue {
     /// Module name of the pack the rule belongs to.
-    pub(crate) package: &'static str,
+    pub(crate) package: String,
     pub(crate) rule: String,
     pub(crate) file: PathBuf,
     /// `None` for an issue about the project as a whole, such as a missing package.
@@ -37,6 +37,19 @@ pub(crate) fn severity_name(severity: &Severity) -> &'static str {
         Severity::Hint => "hint",
         Severity::Off => "off",
     }
+}
+
+/// The severity that `name` names, as a rule file writes it. `off` is no severity to ask for.
+pub(crate) fn parse_severity(name: &str) -> Result<Severity, String> {
+    [
+        Severity::Error,
+        Severity::Warning,
+        Severity::Info,
+        Severity::Hint,
+    ]
+    .into_iter()
+    .find(|severity| severity_name(severity) == name)
+    .ok_or_else(|| format!("{name} is not error, warning, info or hint"))
 }
 
 impl Issue {

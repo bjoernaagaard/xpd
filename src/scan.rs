@@ -1,4 +1,4 @@
-//! Walks paths, fixes and lints each Python file with the rule packs that apply to it.
+//! Walks paths, fixes and lints each file with the rule packs that apply to it.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -9,24 +9,35 @@ use anyhow::{Context, Result};
 use ast_grep_config::CombinedScan;
 use ast_grep_core::source::Edit;
 use ast_grep_core::tree_sitter::StrDoc;
-use ast_grep_core::{AstGrep, NodeMatch};
+use ast_grep_core::{AstGrep, Language, NodeMatch};
 use ast_grep_language::SupportLang;
 
 use crate::pack::Pack;
 use crate::report::{Issue, Position};
 use crate::rule::{Applicability, Rule};
 
-/// A parsed Python file.
+/// A parsed file.
 pub(crate) type Root = AstGrep<StrDoc<SupportLang>>;
 
-/// One node of a parsed Python file.
+/// One node of a parsed file.
 pub(crate) type Node<'t> = ast_grep_core::Node<'t, StrDoc<SupportLang>>;
 
 /// Parses Python source. A syntax error gives a tree with error nodes, not a failure.
 pub(crate) fn parse(src: &str) -> Root {
+    parse_as(src, SupportLang::Python)
+}
+
+/// Parses source of `language`.
+fn parse_as(src: &str, language: SupportLang) -> Root {
     use ast_grep_core::tree_sitter::LanguageExt;
 
-    SupportLang::Python.ast_grep(src)
+    language.ast_grep(src)
+}
+
+/// The language of the file at `path`, by its name. A file that names no language is read as
+/// Python, so that a script without an extension is linted.
+fn language_of(path: &Path) -> SupportLang {
+    SupportLang::from_path(path).unwrap_or(SupportLang::Python)
 }
 
 /// One `import <module> as <alias>` in a file.
@@ -36,7 +47,7 @@ struct AliasedImport {
     alias: String,
 }
 
-/// One Python file, as a lint run names it.
+/// One file, as a lint run names it.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct File<'a> {
     /// The path that the `files` and `ignores` globs of a rule match, which selects the rules
@@ -63,12 +74,36 @@ pub(crate) fn is_python(path: &Path) -> bool {
         .is_some_and(|x| x.eq_ignore_ascii_case("py"))
 }
 
+/// Whether the name of `path` tells its language.
+pub(crate) fn names_language(path: &Path) -> bool {
+    SupportLang::from_path(path).is_some()
+}
+
 fn cannot_read(path: &Path) -> String {
     format!("cannot read {}", path.display())
 }
 
+/// The files under `paths` that `packs` have rules for, each once: the Python files, and the
+/// files of each other language that a rule names. A path that is a file is always taken.
+/// Folders respect `.gitignore`.
+pub(crate) fn collect_files(paths: &[PathBuf], packs: &[Pack]) -> Result<Vec<PathBuf>> {
+    let languages: HashSet<SupportLang> = (packs.iter())
+        .flat_map(|pack| pack.rules.iter().map(|rule| rule.config.language))
+        .filter(|language| *language != SupportLang::Python)
+        .collect();
+    files_under(paths, |path| {
+        is_python(path) || SupportLang::from_path(path).is_some_and(|l| languages.contains(&l))
+    })
+}
+
 /// The Python files under `paths`, each once. Folders respect `.gitignore`.
-pub(crate) fn collect_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+pub(crate) fn python_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    files_under(paths, is_python)
+}
+
+/// The files under `paths` that `wanted` keeps, each once. A path that is a file is always
+/// taken.
+fn files_under(paths: &[PathBuf], wanted: impl Fn(&Path) -> bool) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let mut seen = HashSet::new();
     let mut add = |path: &Path| -> Result<()> {
@@ -86,7 +121,7 @@ pub(crate) fn collect_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
         }
         for entry in ignore::WalkBuilder::new(p).build() {
             let entry = entry.with_context(|| cannot_read(p))?;
-            if entry.file_type().is_some_and(|t| t.is_file()) && is_python(entry.path()) {
+            if entry.file_type().is_some_and(|t| t.is_file()) && wanted(entry.path()) {
                 add(entry.path())?;
             }
         }
@@ -146,23 +181,35 @@ struct MatchedRule<'p, 'r> {
     matches: Vec<NodeMatch<'r, StrDoc<SupportLang>>>,
 }
 
+/// The rules of `packs` that report in the parsed file `root` of `language`, each with its
+/// matches. One walk of the tree, in ast-grep's scanner, matches every selected rule and drops
+/// the matches that a suppression comment names.
 fn matched_rules<'p, 'r>(
     root: &'r Root,
     src: &str,
     file: File<'_>,
+    language: SupportLang,
     packs: &'p [Pack],
 ) -> Vec<MatchedRule<'p, 'r>> {
-    let selected: Vec<_> = packs
+    let mut selected: Vec<_> = packs
         .iter()
-        .filter(|pack| pack.applies(root, src))
+        .filter(|pack| pack.applies(root, src, language))
         .flat_map(|pack| {
+            let path = pack.glob_path(file);
             pack.rules
                 .iter()
-                .filter(|rule| rule.runs_on(file.path))
+                .filter(move |rule| rule.config.language == language && rule.runs_on(&path))
                 .map(move |rule| (pack, rule))
         })
         .collect();
-    let combined = CombinedScan::new(selected.iter().map(|(_, rule)| &rule.config).collect());
+    let mut combined = CombinedScan::new(selected.iter().map(|(_, rule)| &rule.config).collect());
+    let unused = packs
+        .iter()
+        .find_map(|pack| pack.unused_suppression().map(|rule| (pack, rule)));
+    if let Some((_, rule)) = unused {
+        combined.set_unused_suppression_rule(&rule.config);
+    }
+    selected.extend(unused);
     let mut matches: HashMap<_, _> = combined
         .scan(root, false)
         .matches
@@ -175,7 +222,7 @@ fn matched_rules<'p, 'r>(
             let raw = matches
                 .remove(&std::ptr::from_ref(&rule.config))
                 .unwrap_or_default();
-            let matches = rule.retain_matches(root, raw, file.disk, pack.library(root));
+            let matches = rule.retain_matches(root, raw, file.disk, pack.library_in(root));
             (!matches.is_empty()).then_some(MatchedRule {
                 pack,
                 rule,
@@ -226,25 +273,26 @@ pub(crate) fn fix_source(
 /// The issues in one file's source, in the order of their positions. `file` is the file the
 /// source belongs to.
 pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Found> {
-    if !packs.iter().any(|pack| pack.may_apply(src)) {
+    let language = language_of(file.path);
+    if !packs.iter().any(|pack| pack.may_apply(src, language)) {
         return Vec::new();
     }
-    let root = parse(src);
-    let imports = aliased_imports(&root);
+    let root = parse_as(src, language);
+    let imports = aliased_imports(&root, language);
     let mut found = Vec::new();
     for MatchedRule {
         pack,
         rule,
         matches,
-    } in matched_rules(&root, src, file, packs)
+    } in matched_rules(&root, src, file, language, packs)
     {
-        let unbound = unbound_aliases(pack, &imports);
+        let unbound = unbound_aliases(pack, imports.as_deref());
         for m in matches {
             let start = m.start_pos();
             let edit = usable_edit(rule, &m, &unbound, src);
             let issue = Issue {
-                package: pack.module,
-                rule: rule.config.id.clone(),
+                package: pack.module.clone(),
+                rule: rule.id.clone(),
                 file: file.path.to_path_buf(),
                 position: Some(Position {
                     line: start.line() + 1,
@@ -272,20 +320,21 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
 /// Applies every fix up to `allowed` that does not overlap an earlier one, and returns the new
 /// source with the number of fixes applied. Overlapping fixes wait for the next pass.
 fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize) {
-    if !packs.iter().any(|pack| pack.may_apply(src)) {
+    let language = language_of(file.path);
+    if !packs.iter().any(|pack| pack.may_apply(src, language)) {
         return (src.to_owned(), 0);
     }
-    let root = parse(src);
-    let imports = aliased_imports(&root);
+    let root = parse_as(src, language);
+    let imports = aliased_imports(&root, language);
     let mut edits = Vec::new();
     for MatchedRule {
         pack,
         rule,
         matches,
-    } in matched_rules(&root, src, file, packs)
+    } in matched_rules(&root, src, file, language, packs)
     {
-        let unbound = unbound_aliases(pack, &imports);
-        if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(file.path) {
+        let unbound = unbound_aliases(pack, imports.as_deref());
+        if rule.fix.is_none_or(|a| a > allowed) {
             continue;
         }
         for m in matches {
@@ -310,9 +359,14 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
     (out, applied)
 }
 
-/// Every aliased import in the file, at any depth.
-fn aliased_imports(root: &Root) -> Vec<AliasedImport> {
-    root.root()
+/// Every aliased import in the file, at any depth. `None` for a file that is not Python, where
+/// no alias of a pack needs an import.
+fn aliased_imports(root: &Root, language: SupportLang) -> Option<Vec<AliasedImport>> {
+    if language != SupportLang::Python {
+        return None;
+    }
+    let imports = root
+        .root()
         .dfs()
         .filter(|node| node.kind() == "aliased_import")
         .filter_map(|node| {
@@ -321,12 +375,16 @@ fn aliased_imports(root: &Root) -> Vec<AliasedImport> {
                 alias: node.field("alias")?.text().into_owned(),
             })
         })
-        .collect()
+        .collect();
+    Some(imports)
 }
 
 /// The pack's aliases that the file does not bind to their module. A fix that writes `pd.`
 /// applies only in a file with `import pandas as pd`.
-fn unbound_aliases<'p>(pack: &'p Pack, imports: &[AliasedImport]) -> Vec<&'p str> {
+fn unbound_aliases<'p>(pack: &'p Pack, imports: Option<&[AliasedImport]>) -> Vec<&'p str> {
+    let Some(imports) = imports else {
+        return Vec::new();
+    };
     pack.aliases
         .iter()
         .filter(|(alias, module)| {

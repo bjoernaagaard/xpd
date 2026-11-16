@@ -2703,16 +2703,6 @@ rule:
           - inside: { kind: keyword_argument, has: { field: name, regex: '^termination$' }, inside: { kind: argument_list, inside: { matches: pymoo-minimize } } }
   not: { matches: compat-code }
 utils:
-  pymoo-minimize:
-    kind: call
-    all:
-      - has: { field: function, regex: '^minimize$' }
-      - inside:
-          kind: module
-          stopBy: end
-          all:
-            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
-            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---

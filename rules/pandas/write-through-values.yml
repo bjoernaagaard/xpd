@@ -7,8 +7,3 @@ rule:
     - pattern: $X.values[$$$I]
     - pattern: $X.to_numpy()[$$$I]
   matches: assignment-target
-utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }

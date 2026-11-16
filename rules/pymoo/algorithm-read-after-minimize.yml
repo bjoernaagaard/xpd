@@ -58,16 +58,6 @@ rule:
     # A walrus binds the name again, as in (algorithm := res.algorithm).
     - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: named_expression, has: { field: name, pattern: $ALG } } } }
 utils:
-  pymoo-minimize:
-    kind: call
-    all:
-      - has: { field: function, regex: '^minimize$' }
-      - inside:
-          kind: module
-          stopBy: end
-          all:
-            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
-            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
   run-of-alg:
     kind: assignment
     all:

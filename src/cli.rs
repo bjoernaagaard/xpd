@@ -6,17 +6,17 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 use anyhow::{Context, Result};
+use ast_grep_config::Severity;
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
-use crate::catalog;
+use crate::catalog::{self, Catalog, Filters};
 use crate::graph::Graph;
 use crate::index::{self, Kind};
 use crate::lsp;
 use crate::mcp;
-use crate::pack;
 use crate::package_check;
-use crate::report::Report;
+use crate::report::{self, Report};
 use crate::rule::Applicability;
 use crate::scan;
 use crate::skills;
@@ -113,6 +113,9 @@ enum Cmd {
     /// Lint Python files. Exit 0 when clean, 1 on any error-severity issue, 2 if xpd can't run.
     ///
     /// A library's rules run only on files that import it, and the Python rules run on every file.
+    /// A project with an sgconfig.yml adds its own ast-grep rules, and its xpd.yml can make a
+    /// rule folder a pack. `# ast-grep-ignore: pandas/chained-assignment` silences one rule on
+    /// the next line.
     /// `[*]` marks an issue `--fix` fixes.
     #[command(after_long_help = "Examples:
   xpd check src/
@@ -133,8 +136,17 @@ enum Cmd {
         /// them as fixable without it.
         #[arg(long)]
         unsafe_fixes: bool,
+        /// Run only this package or rule, as `pandas`, `chained-assignment` or
+        /// `pandas/chained-assignment`. Repeat it to name several.
+        #[arg(long = "rule", value_name = "NAME")]
+        rules: Vec<String>,
+        /// Run only the rules of this severity and above: error, warning, info or hint.
+        #[arg(long, value_parser = report::parse_severity)]
+        severity: Option<Severity>,
     },
     /// `PostToolUse` hook: reads the event JSON on stdin and lints the .py files it changed.
+    ///
+    /// In a project with an sgconfig.yml it also lints the files its own rules are for.
     ///
     /// A file with a pipeline of steps also gets the errors and warnings of `xpd graph`.
     ///
@@ -218,6 +230,8 @@ pub(crate) fn run() -> ExitCode {
             format,
             fix,
             unsafe_fixes,
+            rules,
+            severity,
         } => {
             let format = format.unwrap_or(default_format);
             let allowed = if unsafe_fixes {
@@ -225,7 +239,8 @@ pub(crate) fn run() -> ExitCode {
             } else {
                 Applicability::Safe
             };
-            check(&paths, format, fix.then_some(allowed), allowed)
+            let filters = Filters { rules, severity };
+            check(&paths, format, fix.then_some(allowed), allowed, &filters)
         }
         Cmd::Find {
             query,
@@ -367,14 +382,16 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
 }
 
 fn rules(format: Format) -> ExitCode {
-    let packs = match pack::load(None) {
-        Ok(packs) => packs,
+    // Without a working directory there is no project folder, so only the embedded rules.
+    let project = std::env::current_dir().unwrap_or_default();
+    let catalog = match Catalog::load(&project, None) {
+        Ok(catalog) => catalog,
         Err(e) => {
-            eprintln!("xpd: invalid embedded rules: {e:#}");
+            eprintln!("xpd: {e:#}");
             return ExitCode::from(CHECK_FAILED);
         }
     };
-    let entries = catalog::entries(&packs);
+    let entries = catalog.entries();
     match format {
         Format::Json => {
             let rules: Vec<Value> = entries.iter().map(catalog::Entry::to_json).collect();
@@ -391,17 +408,35 @@ fn rules(format: Format) -> ExitCode {
 
 /// Lints `paths` with the rules for the library versions in the project's venv, after writing
 /// fixes up to `fix` when it is set.
-fn lint(paths: &[PathBuf], fix: Option<Applicability>, scope: Scope) -> Result<Report> {
+fn lint(
+    paths: &[PathBuf],
+    fix: Option<Applicability>,
+    scope: Scope,
+    filters: &Filters,
+) -> Result<Report> {
     let venv = Venv::find();
     let installed = venv.as_ref().map(Venv::distributions);
-    let packs = pack::load(installed.as_ref()).context("invalid embedded rules")?;
-    let files = scan::collect_files(paths)?;
-    let scanned = scan::scan(&files, &packs, fix)?;
+    // Without a working directory there is no project folder to look in.
+    let project = std::env::current_dir().unwrap_or_default();
+    let mut catalog = Catalog::load(&project, installed.as_ref())?;
+    catalog.select(filters)?;
+    let files = scan::collect_files(paths, &catalog.packs)?;
+    let scanned = scan::scan(&files, &catalog.packs, fix)?;
     let mut issues = scanned.issues;
     if let (Scope::Project, Some(venv), Some(installed)) = (scope, &venv, &installed) {
-        // Without a working directory there is no project folder to look in.
-        let project = std::env::current_dir().unwrap_or_default();
-        issues.extend(package_check::missing(&packs, venv, installed, &project));
+        issues.extend(package_check::missing(
+            &catalog.packs,
+            venv,
+            installed,
+            &project,
+        ));
+        for warning in catalog
+            .project
+            .iter()
+            .flat_map(catalog::LocalProject::warnings)
+        {
+            eprintln!("xpd: {warning}");
+        }
     }
     Ok(Report {
         issues,
@@ -424,8 +459,9 @@ fn check(
     format: Format,
     fix: Option<Applicability>,
     allowed: Applicability,
+    filters: &Filters,
 ) -> ExitCode {
-    let report = match lint(paths, fix, Scope::Project) {
+    let report = match lint(paths, fix, Scope::Project, filters) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("xpd: {e:#}");
@@ -450,7 +486,7 @@ fn check(
 
 /// Prints the dataflow of the files under `paths`.
 fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
-    let graph = match scan::collect_files(paths).and_then(|files| Graph::read(&files)) {
+    let graph = match scan::python_files(paths).and_then(|files| Graph::read(&files)) {
         Ok(graph) => graph,
         Err(e) => {
             eprintln!("xpd: {e:#}");
@@ -523,7 +559,7 @@ impl HookEvent {
     }
 }
 
-/// Lints the Python files that the hook event on stdin changed, and hands the issues to the
+/// Lints the files that the hook event on stdin changed, and hands the issues to the
 /// client the way that client reads them.
 fn hook() -> ExitCode {
     use std::io::Read;
@@ -544,14 +580,21 @@ fn hook() -> ExitCode {
         HookEvent::AgentPlugin { cwd, files } => (cwd.as_ref(), files),
         HookEvent::ClaudeCode { files } => (None, files),
     };
-    let files: Vec<&PathBuf> = files.iter().filter(|file| scan::is_python(file)).collect();
-    if files.is_empty() {
-        return ExitCode::SUCCESS;
-    }
-    // The project's venv is found from the working directory, as in a user's run.
+    // The project's venv and its own rules are found from the working directory, as in a
+    // user's run.
     if let Some(Err(e)) = cwd.map(std::env::set_current_dir) {
         eprintln!("xpd hook: cannot enter the agent's working directory: {e}");
         return ExitCode::from(HOOK_FAILED);
+    }
+    // Only a project with its own rules can have rules for a file that is not Python.
+    let project = std::env::current_dir().unwrap_or_default();
+    let has_rules = matches!(catalog::LocalProject::find(&project), Ok(Some(_)));
+    let files: Vec<&PathBuf> = files
+        .iter()
+        .filter(|file| scan::is_python(file) || (has_rules && scan::names_language(file)))
+        .collect();
+    if files.is_empty() {
+        return ExitCode::SUCCESS;
     }
     let lines = match hook_lines(&files) {
         Ok(lines) => lines,
@@ -578,7 +621,7 @@ fn hook() -> ExitCode {
     }
 }
 
-/// The issues of the Python files in `files`. A file with a pipeline of steps also gets the
+/// The issues of the files in `files`. A Python file with a pipeline of steps also gets the
 /// errors and warnings of `xpd graph`.
 fn hook_lines(files: &[&PathBuf]) -> Result<Vec<String>> {
     // One call can edit a file and then move or delete it, so a named file may be gone.
@@ -590,12 +633,13 @@ fn hook_lines(files: &[&PathBuf]) -> Result<Vec<String>> {
     if files.is_empty() {
         return Ok(Vec::new());
     }
-    let report = lint(&files, None, Scope::Files)?;
+    let report = lint(&files, None, Scope::Files, &Filters::default())?;
     let issues = report
         .issues
         .iter()
         .map(|issue| issue.line(Applicability::Safe));
-    let steps = files.iter().flat_map(|file| {
+    let python = files.iter().filter(|file| scan::is_python(file));
+    let steps = python.flat_map(|file| {
         std::fs::read_to_string(file)
             .map(|src| Graph::step_lines(file, &src))
             .unwrap_or_default()

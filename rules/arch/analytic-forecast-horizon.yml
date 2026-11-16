@@ -32,7 +32,6 @@ rule:
               - kind: dictionary_splat
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call:
     kind: call
     all:
@@ -84,7 +83,6 @@ rule:
     - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { not: { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")analytic(''|")$' } } }] } } }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call:
     kind: call
     all:

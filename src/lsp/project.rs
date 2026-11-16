@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use lsp_types::Uri;
 
 use super::uri;
+use crate::catalog::{Catalog, LocalProject};
 use crate::pack::{self, Pack};
 use crate::package_check;
 use crate::report::Issue;
@@ -101,12 +102,16 @@ impl Workspace {
         let venv = Venv::find_from(root);
         let installed = venv.as_ref().map(Venv::distributions);
         let versions = pack::installed_versions(installed.as_ref());
-        let packs = if let Some(packs) = self.loaded.get(&versions) {
+        // A project with its own rules reads them again each time, and the others share the
+        // embedded rules for their versions.
+        let packs = if let Some(config) = LocalProject::find(root)? {
+            Catalog::load_config(&config, installed.as_ref())?
+                .packs
+                .into()
+        } else if let Some(packs) = self.loaded.get(&versions) {
             Rc::clone(packs)
         } else {
-            let packs: Rc<[Pack]> = pack::load(installed.as_ref())
-                .context("invalid embedded rules")?
-                .into();
+            let packs: Rc<[Pack]> = Catalog::embedded(installed.as_ref())?.packs.into();
             self.loaded.insert(versions, Rc::clone(&packs));
             packs
         };

@@ -1,0 +1,19 @@
+# The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+id: go
+language: python
+rule:
+  any:
+    - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+    - kind: identifier
+      pattern: $GO
+      inside:
+        stopBy: end
+        kind: module
+        has:
+          stopBy: end
+          kind: aliased_import
+          all:
+            - has: { field: alias, pattern: $GO }
+            - any:
+                - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

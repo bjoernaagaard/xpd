@@ -84,5 +84,3 @@ rule:
             regex: '^([2-9]|[1-9]\d+)\.\d*$'
 
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }

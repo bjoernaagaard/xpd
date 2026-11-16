@@ -1,20 +1,183 @@
-//! The rule catalog that `xpd rules` prints: every rule and package check of every pack.
+//! The rule catalog of one project: the packs that ship with xpd, the project's own rules, and
+//! xpd's rule about suppression comments. `xpd check`, `xpd rules`, the hook and the language
+//! server all read their rules from it.
 
-use ast_grep_config::Severity;
+mod local;
+
+use std::collections::HashMap;
+use std::path::Path;
+
+use anyhow::{Context, Result, bail, ensure};
+use ast_grep_config::{GlobalRules, Severity};
 use serde_json::{Value, json};
 
-use crate::pack::Pack;
+pub(crate) use self::local::LocalProject;
+use crate::pack::{self, Pack};
 use crate::package_check;
 use crate::report::severity_name;
-use crate::rule::Applicability;
+use crate::rule::{Applicability, Origin, Rule};
+use crate::venv::Distributions;
 use crate::version::Version;
 
-/// The page whose `#<rule id>` anchors document each rule.
+/// The page whose `#<rule id>` anchors document each embedded rule.
 const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules/");
 
-/// The address of the section about the rule or package check `id` on the rules page.
+/// The address of the section about the embedded rule or package check `id` on the rules page.
 pub(crate) fn url(id: &str) -> String {
     format!("{RULES_URL}#{id}")
+}
+
+/// The rules of one project for one set of installed libraries.
+#[derive(Debug)]
+pub(crate) struct Catalog {
+    /// The embedded packs in name order, then the project's packs, then xpd's own pack. A
+    /// scan reports the issues at one place in this order.
+    pub(crate) packs: Vec<Pack>,
+    /// The project whose rules the catalog holds beside the embedded ones. Its `inputs` are
+    /// the files to watch, and loading again reads them again.
+    pub(crate) project: Option<LocalProject>,
+}
+
+/// Which rules of a catalog a run uses.
+#[derive(Debug, Default)]
+pub(crate) struct Filters {
+    /// When not empty, only the rules and package checks that one entry names: a package such
+    /// as `pandas`, a rule such as `chained-assignment`, or both as
+    /// `pandas/chained-assignment`.
+    pub(crate) rules: Vec<String>,
+    /// The lowest severity that still runs.
+    pub(crate) severity: Option<Severity>,
+}
+
+impl Filters {
+    fn keeps(&self, package: &str, id: &str, severity: &Severity) -> bool {
+        let named = |selector: &String| match selector.split_once('/') {
+            Some((in_package, rule)) => in_package == package && rule == id,
+            None => selector == package || selector == id,
+        };
+        (self.rules.is_empty() || self.rules.iter().any(named))
+            && (self.severity.as_ref()).is_none_or(|lowest| rank(severity) >= rank(lowest))
+    }
+}
+
+impl Catalog {
+    /// The catalog for the project that `from` is in, which is the nearest folder at or above
+    /// it with an `sgconfig.yml`. Without such a folder the catalog holds the embedded rules.
+    /// `installed` selects the rules for the library versions of the project's venv.
+    pub(crate) fn load(from: &Path, installed: Option<&Distributions>) -> Result<Self> {
+        match LocalProject::find(from)? {
+            Some(config) => Self::load_config(&config, installed),
+            None => Self::embedded(installed),
+        }
+    }
+
+    /// The catalog for the project of the project file `config`.
+    pub(crate) fn load_config(config: &Path, installed: Option<&Distributions>) -> Result<Self> {
+        let (project, packs) = LocalProject::read(config)?;
+        Self::assemble(packs, Some(project), installed)
+    }
+
+    /// The catalog of the rules that ship with xpd, whatever project the run is in.
+    pub(crate) fn embedded(installed: Option<&Distributions>) -> Result<Self> {
+        Self::assemble(Vec::new(), None, installed)
+    }
+
+    fn assemble(
+        local: Vec<Pack>,
+        project: Option<LocalProject>,
+        installed: Option<&Distributions>,
+    ) -> Result<Self> {
+        let mut packs = pack::embedded().context("invalid embedded rules")?;
+        packs.extend(local);
+        packs.push(Pack::suppressions()?);
+        // One rule may have several documents, and they must be in one file. Two files with
+        // one name would be two rules that no report and no suppression can tell apart.
+        let mut sources: HashMap<&str, &Path> = HashMap::new();
+        for rule in packs.iter().flat_map(|pack| &pack.rules) {
+            let first = sources.entry(&rule.config.id).or_insert(&rule.source);
+            ensure!(
+                *first == rule.source,
+                "the rule {} is in {} and in {}",
+                rule.config.id,
+                first.display(),
+                rule.source.display()
+            );
+        }
+        for pack in &mut packs {
+            pack.keep_rules_for(installed);
+        }
+        Ok(Self { packs, project })
+    }
+
+    /// Keeps the rules and package checks that `filters` select. A filtered catalog no longer
+    /// reports unused suppression comments, because a comment may be for a rule that is left
+    /// out of the run.
+    pub(crate) fn select(&mut self, filters: &Filters) -> Result<()> {
+        if filters.rules.is_empty() && filters.severity.is_none() {
+            return Ok(());
+        }
+        self.packs
+            .retain(|pack| pack.unused_suppression().is_none());
+        for selector in &filters.rules {
+            let only = Filters {
+                rules: vec![selector.clone()],
+                severity: None,
+            };
+            let known = self.packs.iter().any(|pack| {
+                let checks = pack.package_checks.iter().map(|check| &check.id);
+                let mut ids = pack.rules.iter().map(|rule| &rule.id).chain(checks);
+                ids.any(|id| only.keeps(&pack.module, id, &Severity::Error))
+            });
+            if !known {
+                bail!("no rule or package is named {selector}. `xpd rules` lists them");
+            }
+        }
+        for pack in &mut self.packs {
+            let Pack {
+                module,
+                rules,
+                package_checks,
+                ..
+            } = pack;
+            rules.retain(|rule| filters.keeps(module, &rule.id, &rule.config.severity));
+            package_checks
+                .retain(|check| filters.keeps(module, &check.id, &package_check::SEVERITY));
+        }
+        Ok(())
+    }
+
+    /// Checks `text` as the content of the YAML file at `path`, which need not be saved, the
+    /// way the catalog would load it: a rule file compiles against the project's utility
+    /// rules, with the pack that `xpd.yml` gives its folder, and none of its rules may have
+    /// the name of a rule in another file.
+    #[expect(
+        dead_code,
+        reason = "the language server calls it for a rule file that is open in the editor"
+    )]
+    pub(crate) fn validate_document(&self, path: &Path, text: &str) -> Result<()> {
+        let rules = if let Some(project) = &self.project {
+            project.check_document(path, text)?
+        } else {
+            let globals = GlobalRules::default();
+            pack::compile_rules(path, text, &globals, Origin::Structural, None)
+                .with_context(|| path.display().to_string())?
+        };
+        let known = || self.packs.iter().flat_map(|pack| &pack.rules);
+        for rule in &rules {
+            let same_name = |other: &&Rule| other.config.id == rule.config.id;
+            if let Some(other) =
+                known().find(|other| same_name(other) && other.source != rule.source)
+            {
+                bail!(
+                    "{}: the rule {} is also in {}",
+                    rule.source.display(),
+                    rule.config.id,
+                    other.source.display()
+                );
+            }
+        }
+        Ok(())
+    }
 }
 
 /// One rule as the catalog lists it. A rule file may hold several documents with the same id,
@@ -24,14 +187,17 @@ pub(crate) fn url(id: &str) -> String {
 #[derive(Debug)]
 pub(crate) struct Entry<'a> {
     /// Module name of the pack the rule belongs to.
-    package: &'static str,
+    package: &'a str,
     rule: &'a str,
     severity: &'a Severity,
     message: &'a str,
     /// `None` when no document of the rule has a fix.
     fix: Option<Applicability>,
     since: Option<&'a Version>,
-    doc: Option<&'static str>,
+    /// The page about the rule. `None` for a local rule without `url`.
+    url: Option<String>,
+    /// The rule's section of the rules page, or the `note` of a local rule.
+    doc: Option<&'a str>,
 }
 
 impl Entry<'_> {
@@ -63,7 +229,7 @@ impl Entry<'_> {
             "message": self.message,
             "fix": self.fix.map(Applicability::as_str),
             "since": self.since.map(ToString::to_string),
-            "url": url(self.rule),
+            "url": self.url,
             "doc": self.doc,
         })
     }
@@ -80,13 +246,20 @@ fn rank(severity: &Severity) -> u8 {
     }
 }
 
-/// Every rule of `packs` and then every package check, pack by pack in name order.
-pub(crate) fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
+impl Catalog {
+    /// Every rule of each pack and then its package checks, pack by pack.
+    pub(crate) fn entries(&self) -> Vec<Entry<'_>> {
+        entries(&self.packs)
+    }
+}
+
+fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
     let mut entries: Vec<Entry<'_>> = Vec::new();
     for pack in packs {
         let first = entries.len();
+        let page = |id: &str| pack.is_embedded().then(|| url(id));
         for rule in &pack.rules {
-            let id = rule.config.id.as_str();
+            let id = rule.id.as_str();
             let since = rule.since.as_ref();
             match entries[first..].iter_mut().find(|entry| entry.rule == id) {
                 Some(entry) => {
@@ -97,23 +270,25 @@ pub(crate) fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
                     entry.since = entry.since.zip(since).map(|(a, b)| a.min(b));
                 }
                 None => entries.push(Entry {
-                    package: pack.module,
+                    package: &pack.module,
                     rule: id,
                     severity: &rule.config.severity,
                     message: &rule.config.message,
                     fix: rule.fix,
                     since,
-                    doc: pack.doc(id),
+                    url: page(id).or_else(|| rule.config.url.clone()),
+                    doc: pack.doc(id).or(rule.config.note.as_deref()),
                 }),
             }
         }
         entries.extend(pack.package_checks.iter().map(|check| Entry {
-            package: pack.module,
+            package: &pack.module,
             rule: &check.id,
             severity: &package_check::SEVERITY,
             message: &check.message,
             fix: None,
             since: None,
+            url: page(&check.id),
             doc: pack.doc(&check.id),
         }));
     }

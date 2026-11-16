@@ -1,0 +1,35 @@
+# A file that makes plotly the plotting backend of pandas and names no other backend. There
+# df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
+id: pandas-draws-with-plotly
+language: python
+rule:
+  kind: module
+  all:
+    - has:
+        stopBy: end
+        any:
+          - kind: assignment
+            all:
+              - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+              - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
+          - kind: call
+            all:
+              - has: { field: function, regex: '(^|\.)set_option$' }
+              - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
+    - not:
+        has:
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+                - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
+            - kind: call
+              all:
+                - has: { field: function, regex: '(^|\.)set_option$' }
+                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+                - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
+            - kind: keyword_argument
+              all:
+                - has: { field: name, regex: '^backend$' }
+                - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }

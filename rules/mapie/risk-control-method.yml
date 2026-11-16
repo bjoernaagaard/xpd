@@ -14,8 +14,6 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, regex: '^risk\s*=\s*["'']precision["'']$' } }
     - has: { field: arguments, has: { kind: keyword_argument, pattern: $METHOD, regex: '^method\s*=\s*["''](crc|rcps)["'']$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: risk-control-method
 language: python
@@ -28,8 +26,6 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["'']ltt["'']$' } }
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^risk$' } }, { not: { regex: '^risk\s*=\s*["'']recall["'']$' } }] }, { kind: dictionary_splat }] } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # "rcps" and "ltt" hold with a probability, so they need confidence_level. Precision uses "ltt"
 # when no method is given.
@@ -48,8 +44,6 @@ rule:
             - not: { has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["''](crc|rcps)["'']$' } } }
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^confidence_level$' } }, { kind: dictionary_splat }] } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # "crc" controls the risk in expectation and reads no confidence_level and no rcps_bound.
 id: risk-control-method
@@ -67,5 +61,3 @@ rule:
           - has: { kind: keyword_argument, regex: '^method\s*=\s*["'']crc["'']$' }
           - inside: { kind: call, has: { field: function, regex: '(^|\.)(MultiLabelClassificationController|SemanticSegmentationController)$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
