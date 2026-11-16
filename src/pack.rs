@@ -182,7 +182,16 @@ pub(crate) fn load(installed: Option<&Distributions>) -> Result<Vec<Pack>> {
         .collect()
 }
 
-/// An ast-grep rule matching `import <module>`, `import <module>.sub as x` and
+/// The `installed` version of each pack's library, in the order of the packs. `load` gives the
+/// same rules for two venvs with the same answer.
+pub(crate) fn installed_versions(installed: Option<&Distributions>) -> Vec<Option<Version>> {
+    SOURCES
+        .iter()
+        .map(|source| installed.and_then(|found| found.version(source.module).cloned()))
+        .collect()
+}
+
+/// An ast-grep rule matching `import <module>`,`import <module>.sub as x` and
 /// `from <module> import x`. It checks only the imported module, so `from other import <module>`
 /// and `import os as <module>` don't match.
 fn gate_yaml(module: &str) -> String {

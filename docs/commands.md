@@ -233,3 +233,18 @@ xpd mcp [ARGS]...
 
 Starts the [MCP server](mcp.md), which installs with xpd. The arguments go to the server, so
 `xpd mcp -h` lists its flags.
+
+## lsp
+
+```sh
+xpd lsp
+```
+
+Starts the [language server](lsp.md) on stdin and stdout, for an editor to run. It lints the
+text the editor holds, saved or not, and reports what `check` reports for that text. It takes no
+flags, and reads its one setting from the editor.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | The editor sent `shutdown` and then `exit` |
+| 1 | The editor went away without them, or never sent `initialize` |

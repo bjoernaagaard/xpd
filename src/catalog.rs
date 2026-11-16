@@ -12,6 +12,11 @@ use crate::version::Version;
 /// The page whose `#<rule id>` anchors document each rule.
 const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules/");
 
+/// The address of the section about the rule or package check `id` on the rules page.
+pub(crate) fn url(id: &str) -> String {
+    format!("{RULES_URL}#{id}")
+}
+
 /// One rule as the catalog lists it. A rule file may hold several documents with the same id,
 /// one for each form the rule matches, and the catalog lists them as one rule: the highest
 /// severity of its documents, the message of its first, the least safe fix, and the lowest
@@ -58,7 +63,7 @@ impl Entry<'_> {
             "message": self.message,
             "fix": self.fix.map(Applicability::as_str),
             "since": self.since.map(ToString::to_string),
-            "url": format!("{RULES_URL}#{}", self.rule),
+            "url": url(self.rule),
             "doc": self.doc,
         })
     }

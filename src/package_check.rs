@@ -1,7 +1,6 @@
 //! Package checks: packages a library works better with, reported once per project when the
 //! project's venv has the library but not the package.
 
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -39,14 +38,21 @@ impl PackageCheck {
 pub(crate) const SEVERITY: Severity = Severity::Warning;
 
 /// One warning for each package that a pack asks for and the venv lacks. A pack is checked only
-/// when the venv has its library. `installed` is what `venv` holds.
-pub(crate) fn missing(packs: &[Pack], venv: &Venv, installed: &Distributions) -> Vec<Issue> {
-    let pyproject = nearest_pyproject()
+/// when the venv has its library. `installed` is what `venv` holds, and `project` is the folder
+/// the run starts in, which is the working directory for the command line.
+pub(crate) fn missing(
+    packs: &[Pack],
+    venv: &Venv,
+    installed: &Distributions,
+    project: &Path,
+) -> Vec<Issue> {
+    let pyproject = nearest_pyproject(project)
         .and_then(|path| fs::read_to_string(&path).ok().map(|text| (path, text)));
     let configured = pyproject.as_ref().map(|(_, text)| configured_tools(text));
     let configured = configured.as_deref().unwrap_or_default();
     // The issue points at the file where the dependency is added, or else at the venv.
-    let file = shown(pyproject.as_ref().map_or(venv.root(), |(path, _)| path));
+    let file = pyproject.as_ref().map_or(venv.root(), |(path, _)| path);
+    let file = shown(file, project);
     packs
         .iter()
         .filter(|pack| installed.version(pack.module).is_some())
@@ -64,11 +70,11 @@ pub(crate) fn missing(packs: &[Pack], venv: &Venv, installed: &Distributions) ->
         .collect()
 }
 
-/// The nearest `pyproject.toml` at or above the working directory, where `Venv::find` also
+/// The nearest `pyproject.toml` in or above `project`, where the search for the venv also
 /// starts. The venv may live elsewhere, such as in `$VIRTUAL_ENV`.
-fn nearest_pyproject() -> Option<PathBuf> {
-    let cwd = env::current_dir().ok()?;
-    cwd.ancestors()
+fn nearest_pyproject(project: &Path) -> Option<PathBuf> {
+    project
+        .ancestors()
         .map(|dir| dir.join("pyproject.toml"))
         .find(|path| path.is_file())
 }
@@ -83,11 +89,7 @@ fn configured_tools(pyproject: &str) -> Vec<&str> {
         .collect()
 }
 
-/// `path` relative to the working directory when it is inside it, as the other issues show
-/// their files.
-fn shown(path: &Path) -> PathBuf {
-    env::current_dir()
-        .ok()
-        .and_then(|cwd| path.strip_prefix(cwd).ok().map(Path::to_path_buf))
-        .unwrap_or_else(|| path.to_path_buf())
+/// `path` relative to `project` when it is inside it, as the other issues show their files.
+fn shown(path: &Path, project: &Path) -> PathBuf {
+    path.strip_prefix(project).unwrap_or(path).to_path_buf()
 }
