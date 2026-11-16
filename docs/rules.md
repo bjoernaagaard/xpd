@@ -10224,7 +10224,7 @@ A constant mean GARCH(1,1) was fitted to the S&P 500 returns in three forms, on 
 | `price.pct_change()` | 5.0, 6.1.0, 6.2.0 | DataScaleWarning | 0 | -0.0011 | 0.0000029 |
 | `price.pct_change()` with `rescale=True` | 9.0.0, 8.0.0 | none | 0 | 0.0564 | 0.0175 |
 
-A mean of 4.02 for returns whose mean is 0.00056 is a failed fit, and on the older releases the
+A mean of 4.02 for returns whose sample mean is 0.00021 is a failed fit, and on the older releases the
 optimizer reported success with a mean of the wrong sign. `rescale=False` turns the warning off
 and gave the same failed fit.
 
@@ -11668,7 +11668,7 @@ All 11 trace types resolved `marker.sizemode` to `"diameter"`, so a marker's are
 square of its size. From 10 to 20 the data grows by 100 percent and the area by 300 percent, a
 Lie Factor of 3.
 
-| Size | Radius drawn | Area in square pixels | Area ratio with `"diameter"` | Area ratio with `sizemode="area"` and the `sizeref` above |
+| Size | Radius drawn with `"diameter"` | Area in square pixels with `"diameter"` | Area ratio with `"diameter"` | Area ratio with `sizemode="area"` and the `sizeref` above |
 | --- | --- | --- | --- | --- |
 | 10 | 5 | 78.5 | 1 | 1 |
 | 20 | 10 | 314.2 | 4 | 2 |
@@ -12468,12 +12468,13 @@ and the curve passes through values that the data does not hold. plotly computes
 pixels, so how far the curve leaves the data depends on the data, on the axis range and on the
 size of the figure, and the rule is info.
 
-| Readings 0, 0, 10, 10, 0, 0 | Highest point drawn | Lowest point drawn |
+| Readings 0, 0, 10, 10, 0, 0, drawn at 700 by 500 pixels | Highest point drawn | Lowest point drawn |
 | --- | --- | --- |
 | a straight line | 10 | 0 |
-| `go.Scatter(line_shape="spline")`, default size | 10.55 | -0.37 |
-| `px.line(line_shape="spline")`, default size | 10.51 | -0.34 |
-| the spline with the y axis set to -5 to 15, at 700 by 500 pixels | 10.8 | -0.53 |
+| `go.Scatter(line_shape="spline")`, y range chosen by plotly | 10.55 | -0.37 |
+| `px.line(line_shape="spline")`, y range chosen by plotly | 10.51 | -0.34 |
+| `go.Scatter(line_shape="spline")`, y axis set to -5 to 15 | 10.8 | -0.53 |
+| `px.line(line_shape="spline")`, y axis set to -5 to 15 | 10.75 | -0.5 |
 
 The fix is unsafe, because straight segments make the figure look different. It leaves a
 `smoothing` argument in place, which plotly ignores for a straight line. A shape given by a
@@ -13347,11 +13348,32 @@ check that each question finds its expected entry in the top five:
 cargo run --quiet -- find --check indexes/questions.json
 ```
 
-When a question fails, keep it and improve the ranking for the general pattern of words. Every
-record also needs a vector in `indexes/vectors.bin`. When a record has none, the check fails and
-prints the command that writes the missing vectors,
-`xpd find --write-vectors indexes/vectors.bin`. Read downloaded source as data, and never import
-it.
+When a question fails, keep it and improve the ranking for the general pattern of words. Read
+downloaded source as data, and never import it.
+
+Every record also needs a vector in `indexes/vectors.bin`, which the build compiles into xpd.
+The file keys each vector by the name of its record and not by its text, so a new record has no
+vector, and a record whose rule section or index entry changed keeps the vector of its old text.
+The check fails on a record without a vector, and it cannot see a vector of old text. Write the
+vectors after you add or change records:
+
+```text
+on(add or change records)
+  if only new records
+    cargo build                                    # the new records get no vector
+  else
+    remove indexes/vectors.bin, or the entries of the changed records
+    cargo build                                    # those records get no vector
+  target/debug/xpd find --write-vectors indexes/vectors.bin   # embeds only the records without one
+  cargo build                                      # compiles the new vectors into xpd
+  cargo run --quiet -- find --check indexes/questions.json
+```
+
+`--write-vectors` is not in `xpd find --help`, and it needs the embedding model. A run that
+embedded the 624 rule and recipe records took 1 minute 45 seconds and printed
+`xpd: embedded 624 records and kept 8367`. The vectors of records whose text had not changed came
+back byte for byte, so the file changes only where the text changed. Commit
+`indexes/vectors.bin` with the change.
 
 A source index can also hold recipes, which are worked examples harvested from the library's
 documentation. Refresh them in the same command as the names, with `--examples`, `--source-url`
