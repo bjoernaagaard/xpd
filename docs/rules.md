@@ -10303,6 +10303,10 @@ numbers along a visual dimension, pie charts should never be used" (page 178). `
 `px.pie(facet_col="sex")` drew two pies side by side, and four with `facet_row` as well. For a
 few shares, `go.Table` shows the exact numbers.
 
+Each `go.Pie` constructor is reported once. When several pies share a receiver whose
+figure type cannot be proved, each constructor keeps the single-pie message. A proved
+figure receiver or a written `go.Figure` data list gets the several-pies message.
+
 A facet given as `None` draws one pie and gets the first message. `px.sunburst` has its own
 rule, [`sunburst-as-pie`](#sunburst-as-pie). `px.funnel_area` is not reported: its sections
 were drawn with areas in the ratio of the values, stacked from top to bottom.
