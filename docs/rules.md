@@ -7104,20 +7104,27 @@ encoder = ce.OneHotEncoder(handle_missing="value")
 | --- | --- | --- | --- |
 | `impute_missing=` on any encoder | 2.0 | TypeError | `handle_missing="value"`, the default |
 | `LeaveOneOutEncoder(randomized=True, sigma=0.05)` | 2.0 | TypeError | `LeaveOneOutEncoder(sigma=0.05)` |
-| `utils.get_obj_cols(df)` | 2.6 | AttributeError | `utils.get_categorical_cols(df)` |
+| `utils.get_obj_cols(df)` | 2.6.3 | AttributeError | `utils.get_categorical_cols(df)` |
 | `utils.TransformerWithTargetMixin` | 2.8 | AttributeError | `utils.SupervisedTransformerMixin` |
 | `encoded.drop(columns=["intercept"])` after a contrast encoder | 2.7 | KeyError | remove the drop |
 | `encoder.feature_names_out_.index("a")` | 2.7 | AttributeError | `list(encoder.feature_names_out_).index("a")` |
+| `encoder.get_feature_names_out().index("a")` | 2.6.1 | AttributeError | `list(encoder.get_feature_names_out()).index("a")` |
 
 Until 2.6 the four contrast encoders, `BackwardDifferenceEncoder`, `HelmertEncoder`,
 `PolynomialEncoder` and `SumEncoder`, added a column named `intercept` that holds 1 on every
 row. 2.7 stopped adding it, so a drop by that name raises `KeyError: "['intercept'] not found
 in axis"`. The rule reports the drop only in a file that names one of the four classes, and it
-leaves a drop with `errors="ignore"` alone.
+leaves a drop with `errors="ignore"` alone. It also leaves a file alone that makes a column of
+that name itself, with `frame["intercept"] = 1.0`, `assign(intercept=...)` or `insert`, because
+that drop takes out the file's own column.
 
-`feature_names_out_` and the result of `get_feature_names_out` were lists until 2.6 and are
-NumPy arrays since 2.7, so `index`, `remove`, `append`, `extend`, `insert`, `count` and `pop`
-raise `AttributeError` on them. `feature_names_in_` is still a list.
+`feature_names_out_` was a list until 2.6 and is a NumPy array since 2.7. The result of
+`get_feature_names_out` is a NumPy array since 2.6.1. `index`, `remove`, `append`, `extend`,
+`insert`, `count` and `pop` raise `AttributeError` on an array. `feature_names_in_` is still a
+list.
+
+`get_obj_cols` is still in the wheels of 2.6.0, 2.6.1 and 2.6.2 and went away in 2.6.3, so its
+document carries `since: "2.6.3"`.
 
 The two fixes are unsafe. `get_obj_cols` named the columns of the object dtype, and
 `get_categorical_cols` also names the columns of the category and string dtypes. A file that
