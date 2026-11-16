@@ -1,0 +1,159 @@
+# Tufte, vdqi.md line 1863, printed page 61: "Show data variation, not design variation." The book
+# opens its account of bad graphics, at line 299, with a chart of solar radiation and stock prices
+# drawn on three scales.
+#
+# Two y axes in one plot have two free scales, and where the lines cross depends on the two
+# ranges. On plotly 7.1.0 a figure from make_subplots(specs=[[{"secondary_y": True}]]) resolved
+# yaxis2 to overlaying="y", side="right" and no matches, with the ranges (8.6, 31.4) and (393,
+# 507) for the two traces. The lines crossed at x=1.67. After update_yaxes(range=[0, 1000],
+# secondary_y=True) the same data crossed at x=1.81 (runs/behavior.txt). The crossing is design,
+# not data, so the rule is info and names the choice. It has no fix, because the two panels or the
+# common index are another figure.
+#
+# This document reads "secondary_y": True in the specs of make_subplots. It reports the cell and
+# not each add_trace, so one figure gets one report for each cell with two axes.
+id: dual-y-axis
+language: python
+severity: info
+message: A second y axis gives one plot two free scales, so where the lines cross depends on the ranges and not on the data. The same two series crossed at x=1.67 with the automatic ranges and at x=1.81 with another range. Tufte asks to show data variation, not design variation. Draw the series in two panels with make_subplots(rows=2, shared_xaxes=True), or index both to one base.
+rule:
+  any:
+    - kind: pair
+      all:
+        - has: { field: key, regex: '^["'']secondary_y["'']$' }
+        - has: { field: value, kind: 'true' }
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^secondary_y$' }
+        - has: { field: value, kind: 'true' }
+        - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }
+  inside:
+    stopBy: end
+    kind: keyword_argument
+    all:
+      - has: { field: name, regex: '^specs$' }
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            all:
+              - has: { field: function, regex: '(^|\.)make_subplots$' }
+              - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+---
+# The same two scales written by hand: an axis with overlaying="y" or overlaying="x". With
+# yaxis2=dict(overlaying="y", side="right") the two axes resolved to the ranges (0.93, 2.07) and
+# (46.5, 103.5). An axis that also sets matches shares its range with the first axis, as measured,
+# so it is left alone.
+id: dual-y-axis
+language: python
+severity: info
+message: An axis with overlaying=$V lies over another one, which gives one plot two free scales, so where the lines cross depends on the ranges and not on the data. The same two series crossed at x=1.67 with the automatic ranges and at x=1.81 with another range. Tufte asks to show data variation, not design variation. Draw the series in two panels with make_subplots(rows=2, shared_xaxes=True), or index both to one base.
+rule:
+  any:
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^overlaying$' }
+        - has: { field: value, pattern: $V, regex: '^["''][xy][0-9]*["'']$' }
+        - not: { inside: { kind: argument_list, has: { kind: keyword_argument, has: { field: name, regex: '^matches$' } } } }
+    - kind: pair
+      all:
+        - has: { field: key, regex: '^["'']overlaying["'']$' }
+        - has: { field: value, pattern: $V, regex: '^["''][xy][0-9]*["'']$' }
+        - not: { inside: { kind: dictionary, has: { kind: pair, has: { field: key, regex: '^["'']matches["'']$' } } } }
+  inside: { stopBy: end, matches: layout-call }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that sets layout: update_layout on a plotly figure, go.Layout or go.Figure.
+  layout-call:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }

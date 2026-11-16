@@ -1,0 +1,135 @@
+# Tufte, vdqi.md line 1527, printed page 56: "The representation of numbers, as physically
+# measured on the surface of the graphic itself, should be directly proportional to the numerical
+# quantities represented." Line 1533, printed page 57, defines the Lie Factor as the size of the
+# effect shown over the size of the effect in the data, and line 1535 calls a factor above 1.05 a
+# substantial distortion.
+#
+# A go trace resolves marker.sizemode to "diameter": measured on plotly 7.1.0 for all 11 trace
+# types that have the attribute (runs/behavior.txt). Sizes 10, 20 and 40 were drawn with radii of
+# 5, 10 and 20 pixels, so with areas in the ratio 1, 4 and 16. From 10 to 20 the data grows by 100
+# percent and the area by 300 percent, a Lie Factor of 3. With sizemode="area" and the sizeref
+# that the plotly page on bubble charts gives, the areas came out as 1, 2 and 4.
+# px.scatter(size=...) sets sizemode="area" itself, so the px functions are left alone.
+#
+# The rule reads the size only where the code shows that it comes from data. It is silent in a
+# file that names sizemode anywhere, because the mode may be set on the figure afterwards. It has
+# no fix, because sizemode="area" alone redraws size 10 with a radius of 2.24 pixels, and the
+# sizeref that keeps the markers visible depends on the data.
+id: marker-size-diameter
+language: python
+severity: error
+message: plotly reads $SIZE as the diameter of each marker, so the area grows with the square of the value. Markers of size 10 and 20 were drawn with areas of 78.5 and 314.2 square pixels, which is a Lie Factor of 3 in Tufte's terms. Add sizemode="area" and sizeref=2 * max(size) / largest_diameter ** 2 to the marker.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scatter3d|Scattercarpet|Scattergeo|Scattergl|Scattermap|Scatterpolar|Scatterpolargl|Scattersmith|Scatterternary|Splom)$' } }, { has: { field: object, matches: go } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^marker$' }
+            - has:
+                field: value
+                any:
+                  - kind: call
+                    all:
+                      - has: { field: function, regex: '^dict$' }
+                      - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(size)$' } }, { has: { field: value, pattern: $SIZE, matches: data-values } }] } }
+                  - kind: dictionary
+                    has: { kind: pair, all: [{ has: { field: key, regex: '^["'']size["'']$' } }, { has: { field: value, pattern: $SIZE, matches: data-values } }] }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { inside: { stopBy: end, kind: module, regex: 'sizemode' } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A size that is read from the data of the trace: an expression that takes a column by name,
+  # as df["pop"] and df["pop"] / 1e5 do, from an object that the same trace reads a coordinate
+  # from. A number, a bare name, a written list and a column of some other object may be a
+  # design choice, such as two sizes for two highlighted points, so they are left alone. So is a
+  # size chosen by a condition.
+  data-values:
+    all:
+      - any: [{ matches: column }, { has: { stopBy: end, matches: column } }]
+      - not: { any: [{ kind: list }, { kind: list_comprehension }, { kind: tuple }, { kind: dictionary }] }
+      - not: { has: { stopBy: end, any: [{ kind: conditional_expression }, { kind: attribute, has: { field: attribute, regex: '^(where|select|map|apply)$' } }] } }
+  column:
+    kind: subscript
+    all:
+      - has: { field: subscript, kind: string }
+      - has:
+          stopBy: end
+          kind: identifier
+          pattern: $D
+          inside:
+            stopBy: end
+            kind: call
+            has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(x|y|z|lon|lat|r|theta|a|b|c|real|imag|locations)$' } }, { has: { field: value, any: [{ pattern: $D }, { has: { stopBy: end, kind: identifier, pattern: $D } }] } }] } }
+---
+# The same size written with the underscore form, marker_size=.
+id: marker-size-diameter
+language: python
+severity: error
+message: plotly reads $SIZE as the diameter of each marker, so the area grows with the square of the value. Markers of size 10 and 20 were drawn with areas of 78.5 and 314.2 square pixels, which is a Lie Factor of 3 in Tufte's terms. Add sizemode="area" and sizeref=2 * max(size) / largest_diameter ** 2 to the marker.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scatter3d|Scattercarpet|Scattergeo|Scattergl|Scattermap|Scatterpolar|Scatterpolargl|Scattersmith|Scatterternary|Splom)$' } }, { has: { field: object, matches: go } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_size)$' } }, { has: { field: value, pattern: $SIZE, matches: data-values } }] } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { inside: { stopBy: end, kind: module, regex: 'sizemode' } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A size that is read from the data of the trace: an expression that takes a column by name,
+  # as df["pop"] and df["pop"] / 1e5 do, from an object that the same trace reads a coordinate
+  # from. A number, a bare name, a written list and a column of some other object may be a
+  # design choice, such as two sizes for two highlighted points, so they are left alone. So is a
+  # size chosen by a condition.
+  data-values:
+    all:
+      - any: [{ matches: column }, { has: { stopBy: end, matches: column } }]
+      - not: { any: [{ kind: list }, { kind: list_comprehension }, { kind: tuple }, { kind: dictionary }] }
+      - not: { has: { stopBy: end, any: [{ kind: conditional_expression }, { kind: attribute, has: { field: attribute, regex: '^(where|select|map|apply)$' } }] } }
+  column:
+    kind: subscript
+    all:
+      - has: { field: subscript, kind: string }
+      - has:
+          stopBy: end
+          kind: identifier
+          pattern: $D
+          inside:
+            stopBy: end
+            kind: call
+            has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(x|y|z|lon|lat|r|theta|a|b|c|real|imag|locations)$' } }, { has: { field: value, any: [{ pattern: $D }, { has: { stopBy: end, kind: identifier, pattern: $D } }] } }] } }

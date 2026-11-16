@@ -1,0 +1,129 @@
+# Tufte, vdqi.md line 2816, printed page 71: "The number of information-carrying (variable)
+# dimensions depicted should not exceed the number of dimensions in the data."
+#
+# A 3D scatter without z has data for two axes only. plotly 7.1.0 does not draw it at all:
+# px.scatter_3d, px.line_3d and go.Scatter3d with x and y resolved to visible=False, with an empty
+# scene whose z axis runs from -1 to 1 (runs/behavior.txt). The figure is empty, so the rule is an
+# error. A call with a ** argument, or with z as the fourth positional argument of the px
+# functions, is left alone.
+id: three-d-for-two-d
+language: python
+severity: error
+message: This 3D trace has x and y but no z, and plotly draws nothing for it. The trace resolved to visible=False in an empty scene. Tufte asks that a chart show no more dimensions than the data has. Draw two variables with px.scatter or px.line.
+rule:
+  kind: call
+  all:
+    - any:
+        - all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(scatter_3d|line_3d)$' } }, { has: { field: object, matches: px } }] }
+            - not: { has: { field: arguments, has: { nthChild: 4, not: { kind: keyword_argument } } } }
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter3d)$' } }, { has: { field: object, matches: go } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(z)$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# A z that is written as one constant, such as [0] * n or np.zeros(n), puts every point on one
+# plane. go.Scatter3d with z=[0, 0, 0] drew the points in a scene whose z axis ran from -1 to 1
+# (runs/behavior.txt), so the third axis and the perspective carry no data. The rule reads only
+# constants it can see in the call.
+id: three-d-for-two-d
+language: python
+severity: warning
+message: $A=$Z is the same for every point, so the points lie on one plane and the third axis shows no data. Tufte asks that a chart show no more dimensions than the data has. Draw the two variables with px.scatter or go.Scatter.
+rule:
+  kind: call
+  all:
+    - any:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(scatter_3d|line_3d)$' } }, { has: { field: object, matches: px } }] }
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter3d)$' } }, { has: { field: object, matches: go } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^[xyz]$', pattern: $A }
+            - has:
+                field: value
+                pattern: $Z
+                any:
+                  - pattern: '[$N] * $M'
+                  - pattern: '$M * [$N]'
+                  - pattern: $NP.zeros($$$)
+                  - pattern: $NP.ones($$$)
+                  - pattern: $NP.zeros_like($$$)
+                  - pattern: $NP.ones_like($$$)
+                  - pattern: $NP.full($$$)
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { any: [{ kind: integer }, { kind: float }] }

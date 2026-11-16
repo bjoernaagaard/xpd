@@ -7315,6 +7315,251 @@ These habits were looked at and have no rule.
 - `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
   index.
 
+## plotly
+
+These rules run on files that import `plotly`. They apply Edward Tufte's book "The Visual
+Display of Quantitative Information", second edition, to plotly figures. Each rule names the
+principle of the book that the figure breaks, says what the reader then sees, and names the
+plotly code to write instead. A page number in this section is a printed page of the book.
+
+Every number in this section was measured on plotly 7.1.0 with pandas 3.1.1 on Python 3.14.
+Each figure was resolved by plotly.js through `full_figure_for_development`, which fills in
+every default, and where a rule is about a drawn size the figure was rendered to SVG and the
+size was read from the drawn path. Examples assume `import plotly.express as px`,
+`import plotly.graph_objects as go` and `import plotly.io as pio`. Names such as `df` and
+`fig` represent values supplied by your program.
+
+A rule reports a call only when the file binds the name in front of it to a plotly module. The
+proof is an import such as `import plotly.express as px` or
+`from plotly import graph_objects as go`, under any alias, or the full dotted name, as in
+`plotly.express.pie(...)`. A name `px` or `go` that the file binds to something else gives no
+proof.
+
+A rule about a method, such as `fig.update_xaxes(...)`, needs proof that the object is a plotly
+figure. The method is called on the call that makes the figure, as in
+`px.bar(...).update_xaxes(...)`, or on a variable that was assigned from such a call at most 12
+statements earlier in the same block. A second assignment to the variable, a loop variable or
+a `with ... as` of the same name between the two ends the proof, and so does a parameter. A
+figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure,
+and it does not prove a bar chart, so [`bar-axis-without-zero`](#bar-axis-without-zero) is
+silent there.
+
+A rule reads a value only where it is written in the call: a number, a string, `True` or
+`None`. A name in that place may hold any value, so the rule is silent.
+
+The names the messages tell you to write exist on plotly 5.0.0, 5.24.1, 6.0.0 and 7.1.0, where
+each was run, so no document of the pack carries `since`.
+
+### Sizes that do not follow the numbers
+
+The first principle of graphical integrity in the book is "The representation of numbers, as
+physically measured on the surface of the graphic itself, should be directly proportional to
+the numerical quantities represented" (page 56). The book measures a break of it with the Lie
+Factor, the size of the effect shown in the graphic over the size of the effect in the data,
+and calls a factor above 1.05 or below 0.95 a substantial distortion (page 57).
+
+#### marker-size-diameter
+
+**Severity:** error. **Fix:** none.
+
+Reports a go trace whose marker size is read from the data and whose size mode is left at the default. It covers `marker=dict(size=...)`, `marker={"size": ...}` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
+
+Example:
+
+```python
+fig = go.Figure(go.Scatter(x=df["area"], y=df["rain"], mode="markers", marker=dict(size=df["pop"])))
+```
+
+Use instead:
+
+```python
+sizeref = 2 * df["pop"].max() / 40**2
+fig = go.Figure(go.Scatter(
+    x=df["area"], y=df["rain"], mode="markers",
+    marker=dict(size=df["pop"], sizemode="area", sizeref=sizeref),
+))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+All 11 trace types resolved `marker.sizemode` to `"diameter"`. Sizes 10, 20 and 40 were drawn
+with radii of 5, 10 and 20 pixels, so with areas of 78.5, 314.2 and 1,256.6 square pixels, in
+the ratio 1, 4 and 16. From 10 to 20 the data grows by 100 percent and the area by 300 percent,
+a Lie Factor of 3. With `sizemode="area"` and the `sizeref` above, where 40 is the diameter in
+pixels of the largest marker, the areas came out in the ratio 1, 2 and 4. The formula is the
+one on the plotly page about bubble charts.
+
+`px.scatter(size=...)` and the six other px functions that take `size` set `sizemode="area"`
+themselves, so they are not reported.
+
+The rule reads a size only when it takes a column by name, as `df["pop"]` and `df["pop"] / 10`
+do, from an object that the same trace reads `x`, `y` or another coordinate from. A number, a
+bare name, a written list, a column of another object and a size chosen with `np.where` or a
+condition may be a design choice, so they are left alone. The rule is silent in a file that
+names `sizemode` anywhere, because the mode can be set on the figure afterwards. It has no
+fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, and the
+`sizeref` that keeps the markers visible depends on the data.
+
+#### bar-axis-without-zero
+
+**Severity:** warning. **Fix:** none.
+
+Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, and on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`.
+
+Example:
+
+```python
+fig = px.bar(df, x="team", y="score", range_y=[90, 101])
+```
+
+Use instead:
+
+```python
+fig = px.bar(df, x="team", y="score")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+A bar shows its value by its length. plotly starts a bar axis at zero by itself: bars for 95
+and 100 got the range 0 to 105.26 and were drawn 324.9 and 342.0 pixels long, the ratio of the
+values. An explicit range is kept as written. With `[90, 101]` the same bars were 163.6 and
+327.3 pixels long. The data grows by 5.3 percent and the bar by 100 percent, a Lie Factor of
+19. `px.histogram` drew the same lengths for counts of 95 and 100, and lying bars with
+`range_x=[90, 101]` were 245.4 and 490.9 pixels long. When the differences are the message,
+`px.scatter` shows each value by its position, which needs no zero.
+
+The rule reads a range only when both ends are written numbers above zero and the lower end
+has as many digits before the point as the upper end, or one fewer. So `[90, 101]` and `[2, 5]`
+are read, and `[1, 100]`, `[0, 101]`, `[-10, 101]` and `[low, high]` are not. A call with
+`log_y` is left alone, and a range set on the figure afterwards is left alone in a file that
+names a log axis. A figure of upright bars is `px.bar` or `px.histogram` without `orientation`,
+or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `orientation` and `base`.
+
+#### polar-bar-area
+
+**Severity:** warning. **Fix:** none.
+
+Reports `px.bar_polar(...)` and `go.Barpolar(...)`.
+
+Example:
+
+```python
+fig = px.bar_polar(wind, r="hours", theta="direction")
+```
+
+Use instead:
+
+```python
+fig = px.bar(wind, x="direction", y="hours")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+A polar bar is a wedge, and plotly scales its radius with the value. Wedges of equal angle for
+1, 2, 3 and 4 were drawn with outer radii of 42.75, 85.5, 128.25 and 171 pixels, so their areas
+are in the ratio 1, 4, 9 and 16. From 1 to 2 the data grows by 100 percent and the area by 300
+percent, a Lie Factor of 3. The book adds that "the number of information-carrying (variable)
+dimensions depicted should not exceed the number of dimensions in the data" (page 71), and a
+wedge varies in two. The radial axis takes the types linear, log, date and category, so no
+axis type draws the area in proportion.
+
+#### three-d-for-two-d
+
+**Severity:** error for a 3D trace without `z`, and warning for a `z` that is one constant. **Fix:** none.
+
+Reports `px.scatter_3d`, `px.line_3d` and `go.Scatter3d` with `x` and `y` and no `z`, and the same three with an `x`, `y` or `z` written as one constant: `[0] * n`, `np.zeros(n)`, `np.ones(n)`, `np.zeros_like(a)`, `np.ones_like(a)` or `np.full(n, v)`.
+
+Example:
+
+```python
+fig = px.scatter_3d(df, x="area", y="rain")
+flat = go.Figure(go.Scatter3d(x=df["area"], y=df["rain"], z=np.zeros(len(df)), mode="markers"))
+```
+
+Use instead:
+
+```python
+fig = px.scatter(df, x="area", y="rain")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"The number of information-carrying (variable) dimensions depicted should not exceed the
+number of dimensions in the data" (page 71). Without `z`, plotly draws nothing: all three
+resolved the trace to `visible=False` in an empty scene, so the first form is an error. With
+`z=[0, 0, 0]` the points were drawn on one plane of a scene whose z axis ran from -1 to 1, so
+the third axis and the perspective show no data.
+
+A call with a `**` argument is left alone, and so is a px call with `z` as its fourth
+positional argument. The second form reads only a constant it can see in the call, and
+`np.` or `numpy.` in front of the function name.
+
+#### dual-y-axis
+
+**Severity:** info. **Fix:** none.
+
+Reports a cell with `"secondary_y": True` in the `specs` of `make_subplots`, and an axis with `overlaying="y"` or `overlaying="x"` in `update_layout`, `go.Layout` or `go.Figure`.
+
+Example:
+
+```python
+fig = make_subplots(specs=[[{"secondary_y": True}]])
+fig.add_trace(go.Scatter(x=months, y=sales, name="sales"), secondary_y=False)
+fig.add_trace(go.Scatter(x=months, y=visits, name="visits"), secondary_y=True)
+```
+
+Use instead:
+
+```python
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True)
+fig.add_trace(go.Scatter(x=months, y=sales, name="sales"), row=1, col=1)
+fig.add_trace(go.Scatter(x=months, y=visits, name="visits"), row=2, col=1)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"Show data variation, not design variation" (page 61). Two y axes in one plot have two free
+scales. The figure above resolved the second axis to `overlaying="y"` on the right with no
+`matches`, and the two traces got the ranges 8.6 to 31.4 and 393 to 507. The lines crossed at
+x=1.67. After `update_yaxes(range=[0, 1000], secondary_y=True)` the same data crossed at
+x=1.81. Where the lines cross, and which one looks steeper, is set by the ranges and not by the
+data.
+
+The rule reports the cell of `specs` and not each `add_trace`, so a figure gets one report for
+each cell with two axes. An axis that sets `overlaying` together with `matches` shares its
+range with the first axis: both resolved to -6 to 107. It is left alone. The underscore form
+`yaxis2_overlaying="y"` raised `ValueError` in `update_layout` on a `go.Figure`, so the rule
+does not read it.
+
+#### free-facet-scales
+
+**Severity:** info. **Fix:** none.
+
+Reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`.
+
+Example:
+
+```python
+fig = px.scatter(tips, x="total_bill", y="tip", facet_col="sex")
+fig.update_yaxes(matches=None)
+```
+
+Use instead:
+
+```python
+fig = px.scatter(tips, x="total_bill", y="tip", facet_col="sex")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book says of small multiples: "The design remains constant through all the frames, so that
+attention is devoted entirely to shifts in the data" (page 170). px draws facets on one scale:
+the second y axis resolved to `matches="y"`, and both panels got the range 0.38 to 10.62.
+`matches=None` frees them. The panels then got 0.62 to 6.88 and 0.38 to 10.62, and a tip of 5
+was drawn at 0.70 of the height of one panel and at 0.45 of the other. A reader who compares
+heights across the panels reads a difference that the data does not have. Free scales are
+right when the panels hold different units, which is why the rule is info.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of

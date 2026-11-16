@@ -1,0 +1,55 @@
+# Tufte, vdqi.md line 1527, printed page 56: "The representation of numbers, as physically
+# measured on the surface of the graphic itself, should be directly proportional to the numerical
+# quantities represented." Line 2816, printed page 71, adds that "the number of information-
+# carrying (variable) dimensions depicted should not exceed the number of dimensions in the data".
+#
+# A polar bar is a wedge, and plotly 7.1.0 scales its radius with the value on a linear radial
+# axis. Wedges for 1, 2, 3 and 4 of equal angle were drawn with outer radii of 42.75, 85.5, 128.25
+# and 171 pixels (runs/behavior.txt), so their areas are in the ratio 1, 4, 9 and 16. From 1 to 2
+# the data grows by 100 percent and the area by 300 percent, a Lie Factor of 3. The radial axis
+# takes the types linear, log, date and category, so no axis type draws area in proportion. The
+# rule has no fix, because the honest chart is another chart type.
+id: polar-bar-area
+language: python
+severity: warning
+message: A polar bar is a wedge whose radius follows the value, so its area grows with the square. Wedges for 1, 2, 3 and 4 were drawn with areas in the ratio 1, 4, 9 and 16, which is a Lie Factor of 3 in Tufte's terms. Draw the same values with px.bar, where the length of a bar follows the value.
+rule:
+  kind: call
+  any:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar_polar)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Barpolar)$' } }, { has: { field: object, matches: go } }] }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
