@@ -1,0 +1,290 @@
+"""The tools that judge a pipeline run, from raw rows to a saved model: `contract` reads what the
+training script saved, and `gates` turns the results of the other tools into one verdict.
+
+Neither tool runs Python or loads a model. Each gate reads results that `profile`, `check`,
+`graph` and `equiv` returned for the same run, which a code mode script hands on."""
+
+from collections.abc import Sequence
+
+from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
+from mcp.types import InputRequiredResult
+from pydantic import ValidationError
+
+from xpd.mcp.catalog import Catalog
+from xpd.mcp.models import (
+    CheckReport,
+    Contract,
+    Equivalence,
+    Evidence,
+    Gate,
+    GateReport,
+    GraphReport,
+    Profile,
+    Proof,
+    Stage,
+)
+from xpd.mcp.root import Project
+from xpd.mcp.tools import READS
+
+SKLEARN = "sklearn"
+# The scikit-learn rules that report a split or an estimator that draws without a seed.
+SEED_RULES = ("missing-random-state", "random-state-without-shuffle")
+PIPELINE = "sklearn.pipeline.Pipeline"
+# What a later run needs to rebuild the environment that wrote the model.
+VERSIONS = ("python", "scikit-learn", "pandas")
+MIN_FOLDS = 2
+
+
+def gate(
+    name: str, stage: Stage, evidence: Sequence[Evidence], failures: Sequence[str], found: str
+) -> Gate:
+    return Gate(
+        name=name,
+        stage=stage,
+        evidence=list(evidence),
+        passed=not failures,
+        detail=" ".join(failures) or found,
+    )
+
+
+def data_is_profiled(profile: Profile, contract: Contract) -> Gate:
+    data = contract.data
+    failures = []
+    if data.file != profile.file:
+        failures.append(f"The contract names {data.file}, and the profile is of {profile.file}.")
+    if data.rows != profile.rows:
+        failures.append(f"The contract counts {data.rows} rows, and the file has {profile.rows}.")
+    target = next((column for column in profile.columns if column.column == data.target), None)
+    if target is None:
+        failures.append(f"{profile.file} has no column {data.target}.")
+    elif target.nulls:
+        failures.append(f"The target {data.target} has {target.nulls} nulls.")
+    found = f"{data.file} has {data.rows} rows, and the target {data.target} has no nulls."
+    return gate("data-is-profiled", "raw data", ["profile", "contract"], failures, found)
+
+
+def split_covers_every_row(profile: Profile, contract: Contract) -> Gate:
+    split = contract.split
+    failures = []
+    if min(split.train_rows, split.test_rows) < 1:
+        failures.append("The split leaves no rows on one side.")
+    if split.train_rows + split.test_rows != profile.rows:
+        failures.append(
+            f"{split.train_rows} training rows and {split.test_rows} held out rows are not the "
+            f"{profile.rows} rows of the file."
+        )
+    found = f"{split.train_rows} training rows and {split.test_rows} held out rows."
+    return gate("split-covers-every-row", "split", ["profile", "contract"], failures, found)
+
+
+def split_is_seeded(lint: CheckReport, contract: Contract) -> Gate:
+    failures = [
+        f"{issue.file}:{issue.line} {issue.rule}."
+        for issue in lint.issues
+        if issue.package == SKLEARN and issue.rule in SEED_RULES
+    ]
+    found = f"The split has the seed {contract.split.seed}, and check reports no unseeded draw."
+    return gate("split-is-seeded", "split", ["check", "contract"], failures, found)
+
+
+def no_leakage(lint: CheckReport) -> Gate:
+    """Every error counts, so the errors of a pack that is added later count too."""
+    failures = [
+        f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
+        for issue in lint.issues
+        if issue.severity == "error"
+    ]
+    return gate("no-leakage", "validation", ["check"], failures, "check reports no error.")
+
+
+def inputs_are_raw_columns(profile: Profile, contract: Contract) -> Gate:
+    raw = {column.column: column.dtype for column in profile.columns}
+    failures = []
+    for column in contract.inputs:
+        if column.column == contract.data.target:
+            failures.append(f"The target {column.column} is an input.")
+        elif column.column not in raw:
+            failures.append(
+                f"The input {column.column} is no column of {profile.file}, so a step outside "
+                "the Pipeline made it."
+            )
+        elif raw[column.column] != column.dtype:
+            failures.append(
+                f"The input {column.column} is {column.dtype}, and the file holds "
+                f"{raw[column.column]}."
+            )
+    if not contract.inputs:
+        failures.append("The contract lists no input column.")
+    found = f"The model takes {len(contract.inputs)} columns of {profile.file} as they are read."
+    return gate("inputs-are-raw-columns", "preprocessing", ["profile", "contract"], failures, found)
+
+
+def one_pipeline(contract: Contract) -> Gate:
+    failures = []
+    if contract.model.type != PIPELINE:
+        failures.append(f"The saved object is a {contract.model.type}, not a {PIPELINE}.")
+    if not contract.steps:
+        failures.append("The contract lists no step.")
+    found = " then ".join(step.estimator for step in contract.steps)
+    return gate("one-pipeline", "model", ["contract"], failures, f"One Pipeline of {found}.")
+
+
+def dataflow_connects(dataflow: GraphReport, contract: Contract) -> Gate:
+    """A step may read the model's input columns and the columns of the steps before it. A read
+    of anything else is a column that is missing when the model predicts, or the target."""
+    failures = [
+        f"{problem.file}:{problem.line} {problem.message}"
+        for problem in dataflow.problems
+        if problem.severity in {"error", "warning"}
+    ]
+    inputs = {column.column for column in contract.inputs}
+    steps = 0
+    for pipeline in dataflow.pipelines:
+        known = set(inputs)
+        for step in pipeline.steps:
+            steps += 1
+            failures.extend(
+                f"{pipeline.file}:{step.line} {step.name}() reads {column}, which is no input "
+                "column and which no earlier step adds."
+                for column in step.reads
+                if column not in known
+            )
+            known.update(step.columns)
+    found = f"{steps} feature steps read only input columns and columns of earlier steps."
+    return gate("dataflow-connects", "preprocessing", ["graph", "contract"], failures, found)
+
+
+def cross_validated(contract: Contract) -> Gate:
+    validation = contract.validation
+    failures = []
+    if validation.folds < MIN_FOLDS:
+        failures.append(f"{validation.folds} folds is no cross-validation.")
+    if len(validation.cv_scores) != validation.folds:
+        failures.append(
+            f"The contract has {len(validation.cv_scores)} scores for {validation.folds} folds."
+        )
+    found = (
+        f"{validation.scoring} is {min(validation.cv_scores, default=0)} to "
+        f"{max(validation.cv_scores, default=0)} on {validation.folds} folds of the training "
+        f"rows, and {validation.test_score} on the held out rows."
+    )
+    return gate("cross-validated", "validation", ["contract"], failures, found)
+
+
+def equivalent(name: str, stage: Stage, result: Equivalence, found: str) -> Gate:
+    failures = [] if result.equivalent else [result.detail or "The results differ."]
+    return gate(name, stage, ["equiv"], failures, found)
+
+
+def versions_recorded(profile: Profile, contract: Contract) -> Gate:
+    versions = contract.model.versions
+    failures = [
+        f"The contract records no version of {name}." for name in VERSIONS if not versions.get(name)
+    ]
+    if versions.get("pandas") not in {None, profile.pandas}:
+        failures.append(
+            f"The model was written with pandas {versions['pandas']}, and the project's Python "
+            f"has {profile.pandas}."
+        )
+    found = ", ".join(f"{name} {version}" for name, version in versions.items())
+    return gate("versions-recorded", "persisted model", ["profile", "contract"], failures, found)
+
+
+def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
+    gates = [
+        data_is_profiled(profile, contract),
+        split_covers_every_row(profile, contract),
+        split_is_seeded(proof.lint, contract),
+        inputs_are_raw_columns(profile, contract),
+        dataflow_connects(proof.dataflow, contract),
+        one_pipeline(contract),
+        no_leakage(proof.lint),
+        cross_validated(contract),
+        equivalent(
+            "reproducible",
+            "proof",
+            proof.reproducible,
+            "Two runs of the training script predict the same for the held out rows.",
+        ),
+        equivalent(
+            "saved-model-predicts",
+            "persisted model",
+            proof.served,
+            "The model loaded from disk predicts what the fitted one did for the held out rows.",
+        ),
+        versions_recorded(profile, contract),
+    ]
+    failed = [gate.name for gate in gates if not gate.passed]
+    return GateReport(passed=not failed, failed=failed, gates=gates)
+
+
+def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
+    # A rule that the binary renamed would never match, and its gate would pass every run.
+    for rule in SEED_RULES:
+        rules.find(SKLEARN, rule)
+
+    @mcp.tool(tags={"pipeline"}, annotations=READS)
+    async def contract(ctx: Context, file: str) -> Contract | InputRequiredResult:
+        """Read the contract that a training script saved beside its model: the data file and
+        target, the split, the input columns, the steps of the Pipeline, the validation scores,
+        and the model file with the versions that wrote it. Changes no file.
+
+        It fails when the file does not have that shape, or when the data file or the model
+        file it names is not in the project. Pass the result to `gates`.
+
+        Args:
+            file: The contract, a JSON file inside the project root.
+        """
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        path = root.path / root.inside(file)
+        try:
+            read = Contract.model_validate_json(path.read_bytes())
+        except OSError as error:
+            msg = f"Cannot read {file}. {error}"
+            raise ToolError(msg) from error
+        except ValidationError as error:
+            fields = "; ".join(
+                " ".join([".".join(map(str, problem["loc"])), problem["msg"]]).strip()
+                for problem in error.errors()
+            )
+            msg = f"{file} is not a contract. {fields}"
+            raise ToolError(msg) from error
+        # The paths are compared with those of the other tools, which are relative to the root.
+        named = {"data": read.data.file, "model": read.model.file}
+        inside = {part: root.inside(raw) for part, raw in named.items()}
+        for raw in inside.values():
+            if not (root.path / raw).is_file():
+                msg = f"{file} names {raw}, which is no file in the project."
+                raise ToolError(msg)
+        return read.model_copy(
+            update={
+                "data": read.data.model_copy(update={"file": inside["data"]}),
+                "model": read.model.model_copy(update={"file": inside["model"]}),
+            }
+        )
+
+    @mcp.tool(tags={"pipeline"}, annotations=READS)
+    def gates(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
+        """Judge a pipeline run from raw rows to a saved model. Each gate is one requirement,
+        with the tools whose results decide it. The run is done when `passed` is true. Changes
+        no file and runs nothing, so pass results of this run.
+
+        The gates: the data is the profiled file and its target has no nulls, the split is
+        seeded and covers every row, the model takes raw columns, one Pipeline holds every
+        step, the feature steps connect, `check` reports no error such as leakage, the scores
+        come from folds of the training rows, two training runs agree, the saved model predicts
+        what the fitted one did, and the versions are recorded.
+
+        Args:
+            profile: The result of `profile` on the data file.
+            contract: The result of `contract` on the file the training script saved.
+            proof: `lint` is the result of `check` on the training, prediction and step files.
+                `dataflow` is the result of `graph` on the file with the feature steps.
+                `reproducible` is the result of `equiv` with the training script as both old
+                and new. `served` is the result of `equiv` with the training script as old and
+                the script that loads the saved model as new.
+        """
+        return judge(profile, contract, proof)

@@ -1,6 +1,42 @@
 """Prompts for the workflows of the xpd skill. Each names the tools to run and when it is done."""
 
+import json
+import posixpath
+
 from fastmcp import FastMCP
+
+# The stages of a pipeline run as one code mode script. Each result is handed to `gates`.
+STAGES = """\
+profile = await call_tool("profile", {"file": DATA})
+lint = await call_tool("check", {"paths": [TRAIN, PREDICT, FEATURES]})
+dataflow = await call_tool("graph", {"paths": [FEATURES]})
+reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
+served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
+contract = await call_tool("contract", {"file": CONTRACT})
+proof = {"lint": lint, "dataflow": dataflow, "reproducible": reproducible, "served": served}
+report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
+return {
+    "passed": report["passed"],
+    "gates": [
+        {"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}
+        for gate in report["gates"]
+    ],
+    "validation": contract["validation"],
+    "model": contract["model"],
+}"""
+
+
+def stages_script(data: str, folder: str) -> str:
+    """The script for one project: the paths as constants, then the stages."""
+    paths = {
+        "DATA": data,
+        "FEATURES": posixpath.join(folder, "features.py"),
+        "TRAIN": posixpath.join(folder, "train.py"),
+        "PREDICT": posixpath.join(folder, "predict.py"),
+        "CONTRACT": posixpath.join(folder, "model", "contract.json"),
+    }
+    constants = [f"{name} = {json.dumps(posixpath.normpath(path))}" for name, path in paths.items()]
+    return "\n".join([*constants, STAGES])
 
 
 def register(mcp: FastMCP) -> None:
@@ -94,3 +130,65 @@ def register(mcp: FastMCP) -> None:
    say why the code is right. For Hamilton, a warning about an input one edit from a node name
    is usually a typing error.
 5. Call the `check` tool on {path} and fix what it reports."""
+
+    @mcp.prompt(tags={"pipeline"})
+    def build_pipeline(data: str, target: str, folder: str = ".") -> str:
+        """Build a scikit-learn model from a data file, save it with its contract, and prove
+        with `gates` that the run has no leakage, repeats, and predicts from the saved file.
+
+        Args:
+            data: The data file, inside the project root.
+            target: The column the model predicts.
+            folder: The folder for the scripts and the model, inside the project root.
+        """
+        script = stages_script(data, folder)
+        return f"""Build a model that predicts {target} from {data}. Write three files in \
+{folder} and save the model in {folder}/model. Each script runs in the project root.
+
+1. Call the `profile` tool on {data}. Choose the steps from the real dtypes, nulls and distinct
+   values. The target must have no nulls.
+2. Write features.py. It holds the features that read one row at a time, as step code: each
+   step returns `frame.assign(...)`, and one function runs them as `frame.pipe(a).pipe(b)`.
+   A step reads only input columns and columns of earlier steps, and never {target}.
+3. Write train.py.
+   - Split once with `train_test_split` and a `random_state`, before anything is fitted.
+   - Build one `sklearn.pipeline.Pipeline` that holds every step. Put
+     `FunctionTransformer` on the function of features.py first, so the model takes the raw
+     columns of {data}.
+   - Score it with cross-validation on the training rows, with a seeded splitter. Then fit it
+     on the training rows and score the held out rows once. Choose no setting by that score.
+   - Save the Pipeline with joblib to model/model.joblib, and save model/contract.json in
+     the shape below.
+   - Leave the predictions for the held out rows in `result`, as a Series with the rows'
+     index.
+4. Write predict.py. It reads only model/contract.json. It raises when the input columns or
+   dtypes of {data} differ from the contract, or when scikit-learn is another version. It
+   repeats the split from the contract, loads the model, and leaves the predictions for the
+   held out rows in `result`, as train.py does.
+5. Run the stages. With code mode on, call `execute` once with the script below. Without it,
+   call the same tools in the same order.
+6. The run is done when `passed` is true. For a gate that failed, read its `detail`, fix the
+   scripts and run the stages again. Never edit the contract by hand.
+
+The contract, with the values of the run in place of these:
+
+```json
+{{
+  "data": {{"file": "{data}", "target": "{target}", "rows": 344}},
+  "split": {{"seed": 0, "test_size": 0.25, "stratified": true, "train_rows": 258, "test_rows": 86}},
+  "inputs": [{{"column": "body_mass_g", "dtype": "float64"}}],
+  "steps": [{{"name": "features", "estimator": "FunctionTransformer"}}],
+  "validation": {{"scoring": "accuracy", "folds": 5, "cv_scores": [0.98], "test_score": 0.99}},
+  "model": {{
+    "file": "{posixpath.normpath(posixpath.join(folder, "model", "model.joblib"))}",
+    "type": "sklearn.pipeline.Pipeline",
+    "versions": {{"python": "3.13.1", "scikit-learn": "1.8.0", "pandas": "3.0.0"}}
+  }}
+}}
+```
+
+The script for `execute`:
+
+```python
+{script}
+```"""
