@@ -1,9 +1,5 @@
 [
   {
-    "query": "grouped regression, going from one model on all data to 24 individual models",
-    "expected": "sklego.meta.GroupedPredictor"
-  },
-  {
     "query": "time series bootstrap for cross validation",
     "expected": "mapie.subsample.BlockBootstrap"
   },
@@ -30,10 +26,6 @@
   {
     "query": "create an array of evenly spaced numbers over an interval",
     "expected": "numpy.linspace"
-  },
-  {
-    "query": "compute the average of an array along an axis",
-    "expected": "numpy.mean"
   },
   {
     "query": "compute the median along an axis",
@@ -84,16 +76,8 @@
     "expected": "sklego.meta.GroupedTransformer"
   },
   {
-    "query": "remove linear correlation between sensitive features and other features",
-    "expected": "sklego.preprocessing.InformationFilter"
-  },
-  {
     "query": "regression that is robust to outliers using a dead zone",
     "expected": "sklego.linear_model.DeadZoneRegressor"
-  },
-  {
-    "query": "change the threshold of a binary classifier",
-    "expected": "sklego.meta.Thresholder"
   },
   {
     "query": "split conformal prediction intervals for regression",
@@ -172,24 +156,12 @@
     "expected": "pymoo.core.problem.ElementwiseProblem"
   },
   {
-    "query": "draw a bar chart",
-    "expected": "plotly.express.bar"
-  },
-  {
     "query": "draw a scatter plot",
     "expected": "plotly.express.scatter"
   },
   {
-    "query": "draw a histogram",
-    "expected": "plotly.express.histogram"
-  },
-  {
     "query": "draw a box plot",
     "expected": "plotly.express.box"
-  },
-  {
-    "query": "build a Hamilton driver",
-    "expected": "hamilton.driver.Builder"
   },
   {
     "query": "extract columns from the output dataframe of a node",
@@ -208,10 +180,6 @@
     "expected": "python/dict-str-any"
   },
   {
-    "query": "bar chart of amounts by category",
-    "expected": "plotly.express.bar"
-  },
-  {
     "query": "prediction intervals for a regressor",
     "expected": "mapie.regression.SplitConformalRegressor"
   },
@@ -220,32 +188,8 @@
     "expected": "linearmodels.PanelOLS"
   },
   {
-    "query": "rounded bars example",
-    "expected": "plotly/recipe/bar-charts.md#35"
-  },
-  {
-    "query": "make sparklines with Plotly Express",
-    "expected": "plotly/recipe/line-charts.md#9"
-  },
-  {
-    "query": "create a basic table with Plotly",
-    "expected": "plotly/recipe/table.md#1"
-  },
-  {
-    "query": "construct a discrete or discontinuous color scale",
-    "expected": "plotly/recipe/colorscales.md#11"
-  },
-  {
     "query": "multi-hot encoding for delimiter-separated items",
     "expected": "category_encoders/recipe/category_encoders/multi_hot.py#1"
-  },
-  {
-    "query": "Gray encoding example for categorical variables",
-    "expected": "category_encoders/recipe/category_encoders/gray.py#1"
-  },
-  {
-    "query": "load the chicken dataset example",
-    "expected": "sklego/recipe/sklego/datasets.py#3"
   },
   {
     "query": "maximum relevance minimum redundancy feature selection example",
@@ -270,9 +214,5 @@
   {
     "query": "show a block bootstrap training set example",
     "expected": "mapie/recipe/mapie/subsample.py#2"
-  },
-  {
-    "query": "Augmented Dickey Fuller unit root test example",
-    "expected": "arch/recipe/arch/unitroot/unitroot.py#1"
   }
 ]

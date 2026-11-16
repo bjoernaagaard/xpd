@@ -14,7 +14,7 @@ pub(crate) fn tokens(text: &str) -> Vec<String> {
         .filter(|s| {
             ![
                 "the", "and", "for", "with", "from", "into", "that", "this", "how", "can", "use",
-                "data", "using", "going", "to", "of", "in", "on", "is", "an", "my", "it", "all",
+                "to", "of", "in", "on", "is", "an", "my", "it", "all",
             ]
             .contains(s)
         })
@@ -25,26 +25,7 @@ pub(crate) fn tokens(text: &str) -> Vec<String> {
                 .strip_suffix('s')
                 .filter(|_| s.len() > 4 && !s.ends_with("ss"))
                 .unwrap_or(s);
-            match s {
-                "column" | "feature" => "feature",
-                "orthogonal" | "orthogonality" | "decorrelation" | "correlat" => "correlation",
-                "estimator" | "predictor" => "model",
-                "encoding" | "encoder" | "encode" | "cod" | "coding" => "encod",
-                "categorical" | "categorie" | "category" => "categor",
-                "average" => "mean",
-                "transformer" | "transformation" | "transform" => "transform",
-                "builder" | "build" | "construct" | "constructs" => "build",
-                "separately" | "separate" => "separate",
-                "thresholder" | "threshold" => "threshold",
-                "anova" => "variance",
-                "chart" | "draw" | "visualize" => "plot",
-                "remove" | "filter" => "filter",
-                "regression" | "regressor" => "regress",
-                "classification" | "classifier" => "classify",
-                "prediction" => "predict",
-                _ => s,
-            }
-            .to_owned()
+            s.to_owned()
         })
         .collect()
 }
