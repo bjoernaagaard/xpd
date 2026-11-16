@@ -1,7 +1,6 @@
 """Prompts for the workflows of the xpd skill. Each names the tools to run and when it is done."""
 
 import json
-import posixpath
 
 from fastmcp import FastMCP
 
@@ -26,16 +25,16 @@ return {
 }"""
 
 
-def stages_script(data: str, folder: str) -> str:
+def stages_script(data: str) -> str:
     """The script for one project: the paths as constants, then the stages."""
     paths = {
         "DATA": data,
-        "FEATURES": posixpath.join(folder, "features.py"),
-        "TRAIN": posixpath.join(folder, "train.py"),
-        "PREDICT": posixpath.join(folder, "predict.py"),
-        "CONTRACT": posixpath.join(folder, "model", "contract.json"),
+        "FEATURES": "features.py",
+        "TRAIN": "train.py",
+        "PREDICT": "predict.py",
+        "CONTRACT": "model/contract.json",
     }
-    constants = [f"{name} = {json.dumps(posixpath.normpath(path))}" for name, path in paths.items()]
+    constants = [f"{name} = {json.dumps(path)}" for name, path in paths.items()]
     return "\n".join([*constants, STAGES])
 
 
@@ -132,18 +131,17 @@ def register(mcp: FastMCP) -> None:
 5. Call the `check` tool on {path} and fix what it reports."""
 
     @mcp.prompt(tags={"pipeline"})
-    def build_pipeline(data: str, target: str, folder: str = ".") -> str:
+    def build_pipeline(data: str, target: str) -> str:
         """Build a scikit-learn model from a data file, save it with its contract, and prove
         with `gates` that the run has no leakage, repeats, and predicts from the saved file.
 
         Args:
             data: The data file, inside the project root.
             target: The column the model predicts.
-            folder: The folder for the scripts and the model, inside the project root.
         """
-        script = stages_script(data, folder)
-        return f"""Build a model that predicts {target} from {data}. Write three files in \
-{folder} and save the model in {folder}/model. Each script runs in the project root.
+        script = stages_script(data)
+        return f"""Build a model that predicts {target} from {data}. Write three scripts in the \
+project root, which is where each of them runs, and save the model in the folder model.
 
 1. Call the `profile` tool on {data}. Choose the steps from the real dtypes, nulls and distinct
    values. The target must have no nulls.
@@ -180,7 +178,7 @@ The contract, with the values of the run in place of these:
   "steps": [{{"name": "features", "estimator": "FunctionTransformer"}}],
   "validation": {{"scoring": "accuracy", "folds": 5, "cv_scores": [0.98], "test_score": 0.99}},
   "model": {{
-    "file": "{posixpath.normpath(posixpath.join(folder, "model", "model.joblib"))}",
+    "file": "model/model.joblib",
     "type": "sklearn.pipeline.Pipeline",
     "versions": {{"python": "3.13.1", "scikit-learn": "1.8.0", "pandas": "3.0.0"}}
   }}
