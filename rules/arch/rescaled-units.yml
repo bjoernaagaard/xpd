@@ -1,0 +1,22 @@
+# With rescale=True arch may multiply the data before it estimates, and it reports the factor as
+# the scale attribute of the result. The parameters, the residuals, the conditional volatility
+# and the forecasts are in the units of the rescaled data. On the daily S&P 500 returns in
+# arch.data.sp500 as decimals, arch 9.0.0 and 8.0.0 chose a scale of 100: the last conditional
+# volatility was 1.9926 where the data's was 0.019926, and the one step variance forecast was
+# 3.5965, which is 10,000 times the variance in the units of the data. When the data already has
+# a variance near 1 the scale is 1.0 and nothing changes, so the rule is a warning.
+#
+# The rule reports rescale=True in a file that reads conditional_volatility or calls forecast,
+# which are in the rescaled units, and that never reads an attribute named scale. A file that
+# only reads the standardized residuals or the fit statistics is left alone.
+id: rescaled-units
+language: python
+severity: warning
+message: rescale=True lets arch multiply the data, and the conditional volatility, the forecasts and the parameters are then in the rescaled units. On daily S&P 500 returns as decimals arch 9.0.0 chose a scale of 100, and the variance forecast was 10,000 times the variance in the units of the data. This file never reads scale from the result. Divide volatilities by it and variances by its square.
+rule:
+  kind: keyword_argument
+  regex: '^rescale\s*=\s*True$'
+  all:
+    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } } }
+    - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: attribute, has: { field: attribute, regex: '^(conditional_volatility|forecast)$' } } }
+    - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: attribute, has: { field: attribute, regex: '^scale$' } } } }

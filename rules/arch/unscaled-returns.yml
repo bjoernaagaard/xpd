@@ -1,0 +1,53 @@
+# arch estimates by maximum likelihood, and the optimizer works badly when the variance of the
+# data is far from 1. Returns from pct_change or from a log difference are decimals with a
+# variance near 0.0001. On the daily S&P 500 returns in arch.data.sp500, arch 9.0.0 and 8.0.0
+# warned DataScaleWarning, the optimizer stopped with code 4, and a constant mean GARCH(1,1)
+# came back with mu 4.02 for pct_change and -2.73 for the log difference, where the same returns
+# times 100 gave 0.056 with code 0. On arch 5.0, 6.1.0 and 6.2.0 the code was 0 and mu for
+# pct_change was -0.0011, against 0.00056 in the same units.
+#
+# The rule reads how the series is built and not its values. It reports a series that the call,
+# or every assignment to the name in the file, builds with pct_change or with log and diff or
+# shift, and that nothing multiplies. A name that is also assigned something else, such as the
+# same returns times 100, is left alone, and so is a call that says rescale, in either way.
+id: unscaled-returns
+language: python
+severity: warning
+message: $C gets returns as decimals here, straight from pct_change or a log difference, with no rescale. On daily S&P 500 returns arch 9.0.0 then warned DataScaleWarning, the optimizer stopped with code 4, and mu came back as 4.02 where the same returns in percent gave 0.056. Multiply the returns by 100, or pass rescale=True and read the scale from the result.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $C, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^rescale$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+    - has:
+        field: arguments
+        has:
+          any:
+            - all: [{ nthChild: 1 }, { matches: unscaled }]
+            - kind: keyword_argument
+              all:
+                - has: { field: name, regex: '^y$' }
+                - has: { field: value, matches: unscaled }
+utils:
+  decimal-returns:
+    all:
+      - any:
+          - regex: '\.pct_change\('
+          - all: [{ regex: '\blog\(' }, { regex: '\.(diff|shift)\(' }]
+      - not: { regex: '\*|\.(mul|multiply|rmul)\(|/\s*0?\.0+1\b' }
+      - not: { kind: keyword_argument }
+  returns-name:
+    any: [{ kind: identifier }, { kind: subscript }]
+    pattern: $R
+    all:
+      - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: decimal-returns } }] } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: decimal-returns } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: augmented_assignment, has: { field: left, pattern: $R } } } }
+  unscaled:
+    any:
+      - matches: decimal-returns
+      - matches: returns-name
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(dropna|fillna|copy|squeeze|to_numpy)$' } }, { has: { field: object, matches: returns-name } }] }
+          - not: { regex: '\*' }

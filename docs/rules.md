@@ -7554,6 +7554,90 @@ beside `lags=8`. Of the 10 reports on arch's own code, one is a test that passes
 check that it raises, where the advice is beside the point. The other nine are tests and the
 documentation page above.
 
+### The units of the data
+
+arch estimates by maximum likelihood, and the optimizer works badly when the variance of the data
+is far from 1. arch warns `DataScaleWarning` when the variance is outside the range it likes, and
+its message asks for a value between 1 and 1000. Daily returns as decimals have a variance near
+0.0001: the 5,030 daily S&P 500 returns in `arch.data.sp500` have 0.000145.
+
+#### unscaled-returns
+
+**Severity:** warning. **Fix:** none.
+
+Reports a series from `pct_change`, or from `log` with `diff` or `shift`, that is given to `arch_model`, `ConstantMean`, `ZeroMean`, `ARX`, `HARX`, `LS`, `MAMean` or `ARCHInMean` with nothing that multiplies it and no `rescale`.
+
+Example:
+
+```python
+returns = prices.pct_change().dropna()
+res = arch_model(returns).fit(disp="off")
+```
+
+Use instead:
+
+```python
+returns = 100 * prices.pct_change().dropna()
+res = arch_model(returns).fit(disp="off")
+```
+
+A constant mean GARCH(1,1) was fitted to the S&P 500 returns in three forms, on each release.
+
+| Returns | arch | Warnings | Optimizer code | mu | omega |
+| --- | --- | --- | --- | --- | --- |
+| `100 * price.pct_change()` | 9.0.0, 8.0.0 | none | 0 | 0.0564 | 0.0175 |
+| `price.pct_change()` | 9.0.0, 8.0.0 | DataScaleWarning, ConvergenceWarning | 4 | 4.02 | 0.0000029 |
+| `np.log(price).diff()` | 9.0.0, 8.0.0 | DataScaleWarning, ConvergenceWarning | 4 | -2.73 | 0.0000029 |
+| `price.pct_change()` | 5.0, 6.1.0, 6.2.0 | DataScaleWarning | 0 | -0.0011 | 0.0000029 |
+| `price.pct_change()` with `rescale=True` | 9.0.0, 8.0.0 | none | 0 | 0.0564 | 0.0175 |
+
+A mean of 4.02 for returns whose mean is 0.00056 is a failed fit, and on the older releases the
+optimizer reported success with a mean of the wrong sign. `rescale=False` turns the warning off
+and gave the same failed fit.
+
+The rule reads how the series is built and not its values. It reports the expression in the
+call, and a name or a column that every assignment in the file builds that way. A series that is
+multiplied anywhere, such as `100 * prices.pct_change()` or `returns = returns * 100`, is left
+alone, and so is a call that says `rescale`, in either way. Returns that come from a file or a
+function are not seen.
+
+All 23 reports on the public code were returns as decimals: each series was a `pct_change` or a
+log difference with no factor.
+
+#### rescaled-units
+
+**Severity:** warning. **Fix:** none.
+
+Reports `rescale=True` on `arch_model` or a mean class in a file that reads `conditional_volatility` or calls `forecast` and never reads `scale`.
+
+Example:
+
+```python
+res = arch_model(returns, rescale=True).fit(disp="off")
+variance = res.forecast(horizon=1).variance.iloc[-1, 0]
+```
+
+Use instead:
+
+```python
+res = arch_model(returns, rescale=True).fit(disp="off")
+variance = res.forecast(horizon=1).variance.iloc[-1, 0] / res.scale**2
+```
+
+With `rescale=True` arch may multiply the data before it estimates, and the result reports the
+factor as `scale`. On the S&P 500 returns as decimals, arch 9.0.0 and 8.0.0 chose a scale of
+100. The parameters were those of the returns in percent, the last conditional volatility was
+1.9926 where the data's was 0.019926, and the variance forecast one step ahead was 3.5965, which
+is 10,000 times the variance in the units of the data.
+
+When the data already has a variance near 1 the scale is 1.0 and nothing changes, and results
+that have no unit, such as the standardized residuals, are right at any scale. The rule cannot
+see either, so it is a warning. Of its 14 reports on the public code, 11 used a volatility or a
+forecast in rescaled units, two of them with a division by 10,000 written into the code where
+the square of `scale` belongs. Three had wrong advice: two fitted data that was made standard normal
+first, and one only divided the residuals by the volatility. The 4 reports on arch's own code
+are tests of `rescale` itself.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
