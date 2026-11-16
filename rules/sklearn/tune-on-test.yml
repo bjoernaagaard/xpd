@@ -1,7 +1,7 @@
 # A loop that builds one model per setting, scores each on the test rows and keeps the scores
 # picks the setting by the test score. The best of 30 such scores was 0.597 accuracy on noise.
-# The rule needs a score, predict or predict_proba on a name with test in it, and the loop
-# variable as a keyword of the call that built that model.
+# The score uses a test name or a held out target of an earlier train_test_split unpack.
+# The loop variable must be a keyword of the call that built that model.
 id: tune-on-test
 language: python
 severity: error
@@ -10,12 +10,36 @@ rule:
   kind: for_statement
   all:
     - has: { field: left, kind: identifier, pattern: $V }
-    - has:
-        field: body
-        stopBy: end
-        kind: call
-        any: [{ pattern: '$N.score($$$S)' }, { pattern: '$N.predict($$$S)' }, { pattern: '$N.predict_proba($$$S)' }]
-        has: { field: arguments, has: { nthChild: 1, regex: '(?i)(^|[^a-z])test([^a-z]|$)', not: { regex: '(?i)train' } } }
+    - any:
+        - has:
+            field: body
+            stopBy: end
+            kind: call
+            any: [{ pattern: '$N.score($$$S)' }, { pattern: '$N.predict($$$S)' }, { pattern: '$N.predict_proba($$$S)' }]
+            has: { field: arguments, has: { nthChild: 1, regex: '(?i)(^|[^a-z])test([^a-z]|$)', not: { regex: '(?i)train' } } }
+        - all:
+            - has:
+                field: body
+                stopBy: end
+                kind: call
+                any: [{ pattern: '$N.score($$$S)' }, { pattern: '$N.predict($$$S)' }, { pattern: '$N.predict_proba($$$S)' }]
+                has: { field: arguments, has: { kind: identifier, pattern: $H } }
+            - follows:
+                stopBy: end
+                kind: expression_statement
+                has:
+                  kind: assignment
+                  all:
+                    - has:
+                        field: left
+                        any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+                        has:
+                          pattern: $H
+                          any: [{ nthChild: 2 }, { nthChild: 4 }]
+                    - has:
+                        field: right
+                        kind: call
+                        has: { field: function, regex: '(^|\.)train_test_split$' }
     - has:
         field: body
         stopBy: end

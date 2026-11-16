@@ -23,8 +23,10 @@ sequenceDiagram
     Agent->>Sandbox: one script
     Sandbox->>Server: call_tool("profile"), then "check", then "graph"
     Sandbox->>Server: call_tool("equiv") twice
-    Server->>Python: train.py twice, then train.py and predict.py, each in a new process
-    Sandbox->>Server: call_tool("contract"), then call_tool("gates") with every result
+    Server->>Python: train.py twice, then train.py and predict.py
+    Sandbox->>Server: call_tool("contract"), then call_tool("refit")
+    Server->>Python: refit from raw training rows
+    Sandbox->>Server: call_tool("gates") with every result
     Sandbox-->>Agent: passed, and one line per gate
 ```
 
@@ -38,7 +40,7 @@ The design follows what FastMCP documents for code mode, and it uses the default
 | `call_tool` returns the tool's structured result | The script hands one tool's result to the next tool as it is |
 | A tool runs in the server, with the same checks as a direct call | A path outside the project root is still refused |
 | The sandbox stops a script after 30 seconds and 100 MB, and the time a tool takes does not count | A long training run does not stop the script |
-| One `execute` call makes at most 50 tool calls | The pipeline script below makes up to 20 |
+| One `execute` call makes at most 50 tool calls | The pipeline script below makes up to 21 |
 | Prompts and resources are not tools | The agent reads the `build_pipeline` prompt through its client, before it calls `execute` |
 
 ## What worked before this draft
@@ -54,13 +56,14 @@ An agent had to decide for itself whether a run was good.
 | `discovery_gate` | Tool | Reads direct imported calls in the chosen modules and compares their names and literal keywords with `api` |
 | The stages of a run | Typed models in `python/xpd/mcp/models.py` | Name what each stage hands to the next |
 | `contract` | Tool | Reads the JSON file that the training script saves beside its model |
+| `refit` | Tool and command | Fits a clone of the saved Pipeline on raw training rows and compares outputs and scores |
 | `gates` | Tool | Takes the results of the other tools and returns one verdict, with one line per requirement |
 | `build_pipeline` | Prompt | Tells the agent which three files to write, and holds the script for `execute` |
-| `samples/pipeline/` | Sample project | A run that passes every gate, and a leaky script that fails one |
+| `samples/pipeline/` | Sample project | A run that passes every gate, and a leaky script that stops at the held out selection rule |
 | `xpd equiv` in two processes | Command | Runs each script in its own Python process, so the prediction script gets no module and no path from the training script |
 
-Neither new tool runs Python or loads a model, and the server needs no new package. The
-project's Python needs pandas and scikit-learn.
+The `contract` and `gates` tools run no Python and load no model. The server needs no new
+package. The project's Python needs pandas and scikit-learn.
 
 ## The stages
 
@@ -75,7 +78,7 @@ A run has nine stages when it starts with discovery. Each one hands a typed resu
 | Preprocessing | The raw columns the model takes, and each step of the one Pipeline | `InputColumn`, `FittedStep` | The contract |
 | Model | The last step of the Pipeline | `FittedStep` | The contract |
 | Validation | One score per fold, and one score for the held out rows | `Validation` | The contract |
-| Proof | What `check`, `graph` and `equiv` found | `Proof` | Those three tools |
+| Proof | What `check`, `graph`, `equiv` and `refit` found | `Proof` | Those four tools |
 | Persisted model | The model file, the class of the saved object, the versions that wrote it and the code files it imports | `SavedModel` | The contract |
 
 The contract is one JSON file with those parts. The JSON below shows the model fields;
@@ -103,10 +106,24 @@ sample run.
     {"name": "classifier", "estimator": "LogisticRegression"}
   ],
   "validation": {
+    "splitter": {
+      "class": "StratifiedKFold",
+      "args": {
+        "n_splits": 5,
+        "shuffle": true,
+        "random_state": 0
+      }
+    },
     "scoring": "accuracy",
     "folds": 5,
-    "cv_scores": [0.9808, 0.9808, 1.0, 1.0, 0.9804],
-    "test_score": 0.9884
+    "cv_scores": [
+      0.9807692307692307,
+      0.9807692307692307,
+      1.0,
+      1.0,
+      0.9803921568627451
+    ],
+    "test_score": 0.9883720930232558
   },
   "model": {
     "file": "model/model.joblib",
@@ -125,12 +142,11 @@ sample run.
 
 ## The gates
 
-In this draft, a run is done when it passes the eleven original gates below and, when discovery is supplied, the two discovery gates. `gates` returns each one
+In this draft, a run is done when it passes the thirteen gates below and, when discovery is supplied, the two discovery gates. `gates` returns each one
 with `passed` and a `detail`. The last column names the tools whose results decide the gate.
 
-A gate shows only what its column says. No gate shows that a run has no leak:
-`check-reports-no-error` passes when `check` has no rule for a leak or does not know the held
-out rows by their name. [What is open](#what-is-open) lists leaks that pass every gate.
+A gate shows only what its column says. Refit checks outputs and scores computed from the raw file. It does not prove that a run
+has no leak. [What is open](#what-is-open) lists the remaining limits.
 
 | Gate | Stage | The run passes when | Decided by |
 | --- | --- | --- | --- |
@@ -143,16 +159,17 @@ out rows by their name. [What is open](#what-is-open) lists leaks that pass ever
 | `dataflow-connects` | Preprocessing | `graph` reports no error or warning, and each feature step reads only input columns and columns of earlier steps | `graph`, `contract` |
 | `one-pipeline` | Model | The contract names the saved object as `sklearn.pipeline.Pipeline` and lists its steps | `contract` |
 | `check-reports-no-error` | Proof | `check` reports no error of any pack. The table below names the errors that are leaks | `check` |
-| `cross-validated` | Validation | The contract has one score for each of two or more folds. Which rows the folds hold is not checked | `contract` |
-| `reproducible` | Proof | `equiv` of the training script with itself is equivalent, so two runs in two Python processes leave an equal `result` | `equiv` |
+| `cross-validated` | Validation | The contract has one score for each of two or more folds. The refit checks their scores on training rows | `contract` |
+| `reproducible` | Proof | Two training runs in separate Python processes leave equal outputs | `equiv` |
+| `refit-matches-model` | Proof | A clone fitted on raw training rows gives equal held out outputs | `refit` |
+| `refit-matches-scores` | Validation | The recorded held out score, fold scores and row and fold counts equal those computed by refit | `refit`, `contract` |
 | `saved-model-predicts` | Persisted model | `equiv` of the training script with the prediction script is equivalent, so a new Python process that loads the model from disk leaves the `result` of the fitted one | `equiv` |
 | `versions-recorded` | Persisted model | The contract records Python, scikit-learn and pandas, and its pandas is the one `profile` ran with | `profile`, `contract` |
 
 `check-reports-no-error` counts every error of every pack, and not a list of rules.
 `split-is-seeded` reads a list of rules, and the server refuses to start when the binary no
 longer has one of them. Its rules are from the six packs in the table below. A draw from another
-library, such as `np.random.default_rng()` without a seed, is in no list, and only `reproducible`
-can find it.
+library, such as `np.random.default_rng()` without a seed, is in no list, but can fail `refit-matches-model` when it changes the fitted outputs.
 
 | Pack | Rules that fail `split-is-seeded` | Errors about a leak that fail `check-reports-no-error` |
 | --- | --- | --- |
@@ -229,8 +246,10 @@ dataflow = await call_tool("graph", {"paths": [FEATURES]})
 reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
 served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
 contract = await call_tool("contract", {"file": CONTRACT})
+refitted = await call_tool("refit", {"file": CONTRACT})
 proof = {
-    "lint": lint, "dataflow": dataflow, "reproducible": reproducible,
+    "lint": lint, "dataflow": dataflow, "refit": refitted,
+    "reproducible": reproducible,
     "served": served, "discovery": api_proof,
 }
 report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
@@ -240,6 +259,7 @@ return {
         {"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}
         for gate in report["gates"]
     ],
+    "refit": refitted,
     "validation": contract["validation"],
     "model": contract["model"],
 }
@@ -257,11 +277,29 @@ asyncio.run(main())
 ```
 
 The script is the one that the `build_pipeline` prompt returns for `data` set to
-`penguins.csv` and `target` set to `species`. The first `equiv` call runs `train.py` twice,
-which fits the Pipeline and saves the model and the contract. The second runs `train.py` and
-`predict.py`. Each script runs in its own Python process, so `predict.py` has to import
-`features.py` and load the model by itself. Both scripts leave the class probabilities of the
-86 held out rows in `result`. This is what the client printed.
+`penguins.csv` and `target` set to `species`. The first `equiv` call runs `train.py` twice. The second runs `train.py` and
+`predict.py`, each in a new Python process. The training script saves the model and
+contract, and the prediction script imports `features.py` and loads the saved model.
+Then `refit` loads that Pipeline, clones it and fits it on the raw training rows.
+It computes fold scores with the contract's splitter and held out scores with its scorer.
+Save the full scores without rounding. The JSON contract below records the splitter too.
+
+Refit uses the same comparisons as `equiv`. Arrays and scalar scores must be exactly equal
+under `numpy.testing.assert_equal`. DataFrames and Series use pandas testing defaults.
+For floating pandas values the default relative tolerance is 0.00001 and the absolute
+tolerance is 0.00000001. The comparison uses probabilities when available, then decision
+values, then predictions. Equality concerns those held out outputs, not every fitted
+attribute or every possible input.
+
+Unseeded NumPy noise added to the raw input values fails `refit-matches-model`. Refit does
+not replace `reproducible`. A training script that draws
+`C=float(np.exp(np.random.default_rng().normal()))` for LogisticRegression passed refit
+with a probability gap of 0.0, equal scores and equal fold scores. Its two training runs
+failed `equiv`. A clone keeps the saved value of `C`, so it does not draw that choice again.
+The `reproducible` gate and its `equiv` call remain. Training runs three times, and xpd
+fits its own clone once.
+
+The sample report follows.
 
 ```json
 {
@@ -305,12 +343,22 @@ which fits the Pipeline and saves the model and the contract. The second runs `t
     {
       "name": "cross-validated",
       "passed": true,
-      "detail": "The contract records accuracy 0.9804 to 1.0 on 5 folds, and 0.9884 as the held out score."
+      "detail": "The contract records accuracy 0.9803921568627451 to 1.0 on 5 folds, and 0.9883720930232558 as the held out score."
     },
     {
       "name": "reproducible",
       "passed": true,
       "detail": "Two runs of the training script, each in its own Python process, leave an equal `result`."
+    },
+    {
+      "name": "refit-matches-model",
+      "passed": true,
+      "detail": "The raw training refit matches the saved model on predict_proba."
+    },
+    {
+      "name": "refit-matches-scores",
+      "passed": true,
+      "detail": "The contract scores and row and fold counts match the raw training refit."
     },
     {
       "name": "saved-model-predicts",
@@ -333,17 +381,53 @@ which fits the Pipeline and saves the model and the contract. The second runs `t
       "detail": "The contract records the discovery question, candidates and reason of the proof."
     }
   ],
+  "refit": {
+    "rows": 344,
+    "train_rows": 258,
+    "test_rows": 86,
+    "output": "predict_proba",
+    "largest_gap": 0.0,
+    "model_matches": true,
+    "contract_test_score": 0.9883720930232558,
+    "refit_test_score": 0.9883720930232558,
+    "contract_cv_scores": [
+      0.9807692307692307,
+      0.9807692307692307,
+      1.0,
+      1.0,
+      0.9803921568627451
+    ],
+    "refit_cv_scores": [
+      0.9807692307692307,
+      0.9807692307692307,
+      1.0,
+      1.0,
+      0.9803921568627451
+    ],
+    "test_score_matches": true,
+    "cv_scores_match": true,
+    "counts_match": true,
+    "passed": true
+  },
   "validation": {
+    "splitter": {
+      "class": "StratifiedKFold",
+      "args": {
+        "n_splits": 5,
+        "shuffle": true,
+        "random_state": 0
+      }
+    },
     "scoring": "accuracy",
     "folds": 5,
     "cv_scores": [
-      0.9808,
-      0.9808,
+      0.9807692307692307,
+      0.9807692307692307,
       1.0,
       1.0,
-      0.9804
+      0.9803921568627451
     ],
-    "test_score": 0.9884
+    "test_score": 0.9883720930232558
   },
   "model": {
     "file": "model/model.joblib",
@@ -384,9 +468,43 @@ FileNotFoundError: The model imports ['features.py'], and no such file is here.
 
 `leaky.py` tries four strengths of regularization and keeps the one with the best score
 on held out rows. The current prompt script stops at `check` when it sees
-`sklearn/tune-on-test`, before either `equiv` call can run that code. To try it, set
+`sklearn/tune-on-test`, before the `equiv` call can run that code. To try it, set
 `TRAIN = "leaky.py"` in the pipeline script above. This shows an error that the rule knows.
-The same loop with the held out rows named `X_hold` remains a limit of that rule.
+The same loop with `X_hold` fails too when that name is a held out target of an earlier
+`train_test_split` unpack in the same scope.
+
+## Refit results from the sample
+
+The wheel built from this worktree was installed with pandas and scikit-learn in
+`/var/tmp/xpd-refit-venv`. Each copy below ran the documented `execute` script through
+`xpd mcp --code-mode --root`. The clean copy passed all 15 gates. The refit read 344 raw
+rows, fitted on 258 and compared the 86 held out rows. The fold scores of its clone were
+`[0.9807692307692307, 0.9807692307692307, 1.0, 1.0, 0.9803921568627451]`.
+
+| Copy | Gates that fail | Largest probability gap | Held out score in contract | Held out score from refit |
+| --- | --- | --- | --- | --- |
+| Clean | None | 0.0 | 0.9883720930232558 | 0.9883720930232558 |
+| Scaled before the split | `refit-matches-model`, `refit-matches-scores`, `saved-model-predicts` | 0.9999965987620804 | 0.9883720930232558 | 0.9883720930232558 |
+| Fitted on every row | `refit-matches-model`, `refit-matches-scores` | 0.1839658915622739 | 0.9883720930232558 | 0.9883720930232558 |
+| Target copied into body_mass_g | `refit-matches-model`, `refit-matches-scores`, `saved-model-predicts` | 0.9989810090351536 | 1.0 | 0.9883720930232558 |
+| Unseeded NumPy noise in inputs | `reproducible`, `refit-matches-model`, `refit-matches-scores`, `saved-model-predicts` | 0.04555828298731365 | 0.9883720930232558 | 0.9883720930232558 |
+| Unseeded NumPy noise in C | `reproducible` | 0.0 | 0.9883720930232558 | 0.9883720930232558 |
+
+The `X_hold` copy stopped at lint with `sklearn/tune-on-test`. For the gate report only,
+a second diagnostic script removed the early return after lint. The server returned
+`check-reports-no-error` as false with `detail` equal to
+`train.py:72 sklearn/tune-on-test.`.
+
+The complete sample took 6.528 seconds before the change and 7.568 seconds after it.
+Each number is one wall time measurement from starting the client through its returned
+report. Both reports passed all their gates. These are sample timings, not a benchmark.
+
+A Pipeline with StandardScaler and LinearRegression on the diabetes data used `predict`.
+Its refit gap was 0.0 and its held out R squared score was 0.35940880381777085 on both
+sides. A Pipeline with StandardScaler and LinearSVC on iris used `decision_function`.
+Its gap was 0.0 and accuracy was 0.9473684210526315 on both sides. Both fold score lists
+matched exactly. A contract without the splitter was refused with
+`validation.splitter Field required`.
 
 ## Where the other parts plug in
 
@@ -407,21 +525,19 @@ Discovery ranks the words in names, signatures, docstring summaries, rule texts 
 | Open item | What the draft does now |
 | --- | --- |
 | `gates` cannot tell which files a result is about | It trusts the script. A script that lints another file, or hands in an old result, passes. The tools would have to return the paths they ran on, or `gates` would have to run the stages itself |
-| The contract is the training script's own account | `gates` checks the file, the rows, the columns, the dtypes and the pandas version against `profile`. The steps, the seed and the scores are not checked against the saved model. That needs a command that loads the model in the project's Python |
-| No gate finds a leak that `check` has no rule for | Each script below passes all pipeline gates. A gate would need the rows that each step was fitted and scored on, from the run itself and not from the script's own account |
-| The held out rows under another name | `leaky.py` with `candidate.score(X_hold, y_hold)`. The rule `tune-on-test` knows the rows by names such as `X_test` |
-| A step fitted on every row before the split | `penguins[MEASURED] = StandardScaler().fit_transform(penguins[MEASURED])`, or the same with the mean and the standard deviation of pandas, and then `train_test_split` |
-| A fit on every row | `cross_val_score(model, X, y, ...)` and `model.fit(X, y)`, and then `model.score(X_test, y_test)`. `cross-validated` reads the scores of the contract and not the rows behind them |
-| The target copied into an input | `penguins["body_mass_g"] = penguins[TARGET].map({...})` before the split scores 1.0 on every fold. `inputs-are-file-columns` compares names and dtypes, and not values |
-| `equiv` compares what the scripts leave in `result` | The sample leaves class probabilities, so a training run with unseeded NumPy noise fails `reproducible`. A script that leaves only the predicted classes passes with two models that have other coefficients. The saved model files are not compared |
+| The contract still declares some model facts | Refit checks the actual Pipeline and its outputs and scores. It does not compare the declared step list or every recorded library version with the saved object |
+| Training runs three times | The repeat check remains because a clone keeps the saved parameters and does not repeat the training script's choices |
 | The model needs its code files | The contract lists them under `model.code`, `contract` refuses a contract that names a missing file, and `predict.py` checks them. Nothing finds a file that the training script left out of the list. A feature step from an installed package would need no file |
 | No gate judges the score | A model that is no better than guessing passes. A gate could compare the scores with a baseline, and the held out score with the folds |
 | The model file is a joblib pickle | Loading it runs code, so load only a file you wrote. The scikit-learn guide names `skops.io` as the safer format. The draft uses joblib because it installs with scikit-learn |
-| One file, one random split | The contract has no place for groups, for a split by time, or for data from several files |
-| Training runs three times | Each `equiv` call runs both of its scripts, each in a new Python process. A tool that runs a script once and keeps its result would cut that to one run |
+| One file, one random split | The contract has no place for groups, for a held out split by time, or for data from several files |
 | No time limit on a tool call | The draft sets no `wall_clock_timeout_secs`, so a training script that hangs keeps `execute` open |
 | `fix` in a script | `fix` with `unsafe` asks the user to confirm. How that question travels through `execute` is not tested |
 | The scripts run in the project root | `train.py` imports `features` and reads `penguins.csv` by a relative path, so the server's root has to be the folder of the scripts |
+| Choosing a model over several separate runs | No check of one run can see choices made over other runs |
+| A raw column that stands in for the target | Refitting preserves the raw column, so judging it needs domain knowledge |
+| Held out outputs can agree while fitted attributes differ | Refit compares outputs on the held out rows, not all internal values or all possible inputs |
+| A validation split can be a legitimate place to choose | The split rule recognizes second and fourth targets, but does not establish the purpose of each split |
 
 ## Discovery before execution
 
@@ -466,8 +582,9 @@ contract with `Proof.discovery`; it does not check that the choice was the best 
 `samples/pipeline/discovery.json` is the inspected planning record for the penguin model.
 The training scripts copy it into `model/contract.json`. After changing that choice, save
 the new inspected record before running training. The earlier pipeline script returns
-thirteen gates, including the API gate and the recorded discovery gate. Older contracts
-and proofs with neither discovery field retain the eleven original gates.
+fifteen gates, including the API gate and the recorded discovery gate. Contracts and proofs
+with neither discovery field use the thirteen gates. Every contract now records
+`validation.splitter`.
 
 ### Run the scripts through the server
 

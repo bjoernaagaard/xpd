@@ -276,3 +276,47 @@ def tune_on_test():
         print(k, verdict)
     search = GridSearchCV(KNeighborsClassifier(), {"n_neighbors": list(range(1, 10))}, cv=3).fit(X_train, y_train)
     return max(scores), best_k, search.score(X_test, y_test)
+
+@case
+def tune_on_held_rows():
+    df = frame()
+    X_fit, X_hold, y_fit, y_hold = train_test_split(df[["x1", "x2"]], df["y"], random_state=0)
+    best_score = 0.0
+    for strength in (0.1, 1.0, 10.0):  # xpd: tune-on-test
+        candidate = LogisticRegression(C=strength).fit(X_fit, y_fit)
+        score = candidate.score(X_hold, y_hold)
+        if score > best_score:
+            best_score = score
+    return best_score
+
+
+@case
+def tune_on_held_labels():
+    df = frame()
+    (fit_rows, held_rows, fit_labels, held_labels) = train_test_split(
+        df[["x1", "x2"]], df["y"], random_state=0
+    )
+    scores = []
+    for strength in (0.1, 1.0, 10.0):  # xpd: tune-on-test
+        candidate = LogisticRegression(C=strength).fit(fit_rows, fit_labels)
+        scores.append(candidate.score(held_rows, held_labels))
+    return max(scores)
+
+
+@case
+def held_rows_in_another_scope():
+    df = frame()
+    fit_rows, held_rows, fit_labels, held_labels = train_test_split(
+        df[["x1", "x2"]], df["y"], random_state=0
+    )
+
+    def choose(fit_rows, held_rows, fit_labels, held_labels):
+        best_score = 0.0
+        for strength in (0.1, 1.0, 10.0):
+            candidate = LogisticRegression(C=strength).fit(fit_rows, fit_labels)
+            score = candidate.score(held_rows, held_labels)
+            if score > best_score:
+                best_score = score
+        return best_score
+
+    return choose(fit_rows, held_rows, fit_labels, held_labels)
