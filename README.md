@@ -1,8 +1,8 @@
 # xpd
 
 xpd checks Python code for slow operations and wrong results. It checks code that uses pandas,
-NumPy, SciPy, scikit-learn or Apache Hamilton. xpd can rewrite many of the lines it reports, and
-a coding agent can run it after every edit.
+NumPy, SciPy, scikit-learn, scikit-lego or Apache Hamilton. xpd can rewrite many of the lines it
+reports, and a coding agent can run it after every edit.
 
 ## What xpd reports
 
@@ -53,6 +53,7 @@ runs only on files that import the library. The Python pack runs on every file.
 | NumPy | `append-flattens` | `np.append` without `axis` flattens both arrays |
 | SciPy | `removed-keyword` | `tol=` on the sparse iterative solvers was removed and raises `TypeError` |
 | scikit-learn | `fit-on-test` | A fit on the test rows makes the score on those rows useless |
+| scikit-lego | `thresholder-score` | `Thresholder.score` ignores `threshold`, so a search scores every threshold the same |
 | Hamilton | `node-mutates-input` | A node writes to one of its parameters, and Hamilton hands the same object to other nodes |
 | Python | `dict-str-any` | `dict[str, Any]` in a signature hides the keys the function uses |
 
