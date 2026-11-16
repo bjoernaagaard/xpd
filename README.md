@@ -152,7 +152,7 @@ Rules: mapie/unseeded-resampling
 | Results without `--limit` | Up to 5 symbols, 3 rules and 3 recipes |
 | Flags | `--kind symbol`, `--kind rule` or `--kind recipe` selects one kind, and `--package` selects one library |
 | Ranking | By keywords and by meaning, so a task finds an entry whose documentation uses other words |
-| Model for the meaning | EmbeddingGemma, which the first `find` downloads once, 334 MB, to `~/.cache/xpd/models` |
+| Model for the meaning | EmbeddingGemma, which the first `find` downloads once, 333 MB, to `~/.cache/xpd/models` |
 | Without the model | `find` says so on stderr and ranks by keywords only |
 | Where recipes come from | Library documentation and galleries. xpd keeps an example only when its own rules report nothing in it, and it never runs the example |
 
