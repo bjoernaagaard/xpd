@@ -41,6 +41,28 @@ about a place in a file, so its `line` and `column` are `null`.
 source locations and proposed fixes. GitHub output uses workflow annotations. Neither format
 changes the exit code or which rules run.
 
+`--rule` selects a package, bare rule name or qualified name such as
+`pandas/chained-assignment`. Repeat it to combine selections. `--severity warning` keeps
+warnings and errors. `rules` accepts the same filters, and `rules --builtin` lists only the
+bundled catalog.
+
+A project adds rules through the nearest `sgconfig.yml` or `sgconfig.yaml`. `--config` selects
+another configuration. `ruleDirs` and `utilDirs` contain plain ast-grep rules and shared
+utilities. An optional `xpd.yml` beside the configuration assigns folders to library packs.
+The files created by `xpd new project --pack team` show the format. Local fixes without a
+safety declaration are unsafe. Library import gates, version bounds and value proofs apply
+to local library packs just as they do to bundled packs. Plain structural rules run without
+those Python checks.
+
+A comment such as `# ast-grep-ignore: pandas/row-loop` suppresses the named rule on the next
+line, or on the same line when trailing code. An unnamed suppression covers all rules.
+The shared scanner reports comments that suppress no structural match as
+`xpd/unused-suppression`. Filtered runs omit that check because excluded rules could use the
+comment. Suppressions use public names, so they cover every variant of a rule.
+
+The scanner currently infers languages from file extensions. It warns when a project sets
+`customLanguages`, `languageGlobs` or `languageInjections`, which this scanner does not read.
+
 ## run
 
 ```sh
@@ -54,7 +76,8 @@ Finds syntax patterns or node kinds without executing the source. The language c
 pattern. `query` is an alias for `run`.
 
 Without a write flag, a replacement is a preview. Use `--interactive` to accept individual
-rewrites or `--update-all` to write every replacement. Structural rewrites have no xpd value
+rewrites or `--update-all` to write every replacement. JSON output is a preview and cannot
+be combined with either write flag. Structural rewrites have no xpd value
 proof or safe-fix classification, so inspect the proposed changes before applying them.
 
 JSON contains each match's file, text, byte range, line and column range, language and captured

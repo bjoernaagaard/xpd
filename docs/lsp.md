@@ -12,6 +12,13 @@ xpd lsp
 └── settings        unsafeFixes
 ```
 
+Project rules use the same catalog as `xpd check`. Open source files can use any built-in
+language that the project's rules name. Configure the editor to send those files to xpd.
+Opening YAML files from rule and utility folders also gives validation errors while editing.
+The server reloads the catalog after a save or a watched YAML change. If the new catalog is
+invalid, the last valid rules remain active. Local rule hovers use the rule's note or message,
+and their links point to the rule file or its supplied URL.
+
 ## What the editor gets
 
 The server lints the text the editor holds with the same code as [`xpd check`](commands.md#check).
@@ -332,5 +339,5 @@ terminal that has it on `PATH`, or set `PATH` in `glspc.environmentVariables`.
 ### Another editor
 
 Any LSP client works with three facts: the command is `xpd lsp`, the transport is stdio, and
-the language is Python. The server exits with 0 after `shutdown` and `exit`, and with 1 when the
+the language is Python, or a language named by a project rule. The server exits with 0 after `shutdown` and `exit`, and with 1 when the
 client goes away without them.

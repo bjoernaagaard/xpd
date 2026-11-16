@@ -29,7 +29,9 @@ and previews a replacement. `rewrite` presents the matches and asks for confirma
 writing. `outline` returns live symbols, imports and members, including projects that have no
 saved index. `new` creates a rule project, rule, empty case template or shared utility using
 the same options as the CLI. `test` compares rule examples and snapshots through xpd's scanner;
-it writes snapshots only when `update_snapshots` is true.
+it writes snapshots only when `update_snapshots` is true. `check` and `fix` accept
+`options.rules`, `options.severity` and a project-relative `options.config`. The preview before
+unsafe fixes uses the same selection as the write.
 
 ```mermaid
 sequenceDiagram
