@@ -1,0 +1,156 @@
+# arch draws its random numbers from generators of its own, which start from a new seed in
+# every process, so a result that rests on them changes from run to run. Each form below gave
+# two different results in two runs on arch 9.0.0 and on 8.0.0, and the same result twice with
+# the seed that the message names. np.random.seed(0) before each run did not make them equal,
+# because arch does not draw from NumPy's global generator: that was run on 9.0.0 for each of
+# the six bootstraps, for SPA, StepM and MCS, for both forecast methods and for simulate. A seed
+# does not move what the method estimates, so the rule is info.
+#
+# seed is a keyword of the bootstraps, the tests and the distributions since arch 5.0: on 4.19
+# IIDBootstrap(x, seed=0) raised TypeError and on 5.0 it ran. Every document carries since.
+
+# The bootstraps. A file that still calls seed on the object, which arch removed in 8.0, is
+# reported by removed-in-arch and not here, and a file that assigns the object's state has set
+# the generator and is left alone.
+id: arch-unseeded-draws
+language: python
+severity: info
+message: $C draws its samples from a new seed on every run, so the intervals and variances change from run to run, and np.random.seed does not reach it. Pass seed.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $C, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(seed|random_state)$' } }, { kind: dictionary_splat }] } } }
+    - not: { matches: seeded-later }
+    - not: { inside: { kind: class_definition, field: superclasses, stopBy: end } }
+utils:
+  seeded-later:
+    inside:
+      kind: assignment
+      all:
+        - has: { field: left, pattern: $B }
+        - inside:
+            kind: module
+            stopBy: end
+            has:
+              stopBy: end
+              any:
+                - { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^seed$' } }, { has: { field: object, pattern: $B } }] } }
+                - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^state$' } }, { has: { field: object, pattern: $B } }] } }
+metadata: { since: "5.0" }
+---
+# SPA, StepM, MCS and RealityCheck run a bootstrap of their own. The names are short, so the
+# file must import them from arch.bootstrap.
+id: arch-unseeded-draws
+language: python
+severity: info
+message: $C runs a bootstrap from a new seed on every run, so the p-values change from run to run, and np.random.seed does not reach it. Pass seed.
+rule:
+  kind: call
+  all:
+    - has:
+        field: function
+        pattern: $C
+        any:
+          - { kind: attribute, regex: '^arch\.bootstrap(\.multiple_comparison)?\.(SPA|StepM|MCS|RealityCheck)$' }
+          - kind: identifier
+            regex: '^(SPA|StepM|MCS|RealityCheck)$'
+            inside:
+              kind: module
+              stopBy: end
+              has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^seed$' } }, { kind: dictionary_splat }] } } }
+    - not: { matches: seeded-later }
+utils:
+  seeded-later:
+    inside:
+      kind: assignment
+      all:
+        - has: { field: left, pattern: $B }
+        - inside:
+            kind: module
+            stopBy: end
+            has:
+              stopBy: end
+              any:
+                - { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^seed$' } }, { has: { field: object, pattern: $B } }] } }
+                - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^state$' } }, { has: { field: object, pattern: $B } }] } }
+metadata: { since: "5.0" }
+---
+# forecast with method="simulation" draws from the model's distribution. Two calls gave 2.671
+# and 2.601 for the same step, and a model whose distribution was Normal(seed=0) gave 2.571
+# twice. A file that builds a seeded distribution anywhere is left alone, because the pattern
+# cannot see which model gets it.
+id: arch-unseeded-draws
+language: python
+severity: info
+message: forecast with method="simulation" draws from a new seed on every run. Two calls gave 2.671 and 2.601 for the same step on arch 9.0.0, and np.random.seed did not change that. Give the model a seeded distribution, such as Normal(seed=0), or pass a seeded rng.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")simulation(''|")$' } }] } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(rng|random_state)$' } }, { kind: dictionary_splat }] } } }
+    - not: { matches: seeded-distribution }
+utils:
+  seeded-distribution:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(Normal|StudentsT|SkewStudent|GeneralizedError)$' }
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+metadata: { since: "5.0" }
+---
+# forecast with method="bootstrap" draws past residuals with a RandomState of its own. Two
+# calls gave 2.587 and 2.578, and random_state=np.random.RandomState(0) gave 2.595 twice. A
+# call that passes rng is reported by arch-ignored-argument.
+id: arch-unseeded-draws
+language: python
+severity: info
+message: forecast with method="bootstrap" draws from a new seed on every run. Two calls gave 2.587 and 2.578 for the same step on arch 9.0.0, and np.random.seed did not change that. Pass random_state=np.random.RandomState(0), which gave the same forecast twice.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")bootstrap(''|")$' } }] } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(rng|random_state)$' } }, { kind: dictionary_splat }] } } }
+metadata: { since: "5.0" }
+---
+# simulate on a model that the file builds from arch_model or a mean class. Two runs gave -1.24
+# and 0.07 as the last value, and a model whose distribution was Normal(seed=0) gave 0.097
+# twice.
+id: arch-unseeded-draws
+language: python
+severity: info
+message: simulate draws from a new seed on every run, so the simulated series changes from run to run, and np.random.seed does not reach it. Give the model a seeded distribution, such as Normal(seed=0).
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^simulate$' } }, { has: { field: object, matches: model } }] }
+    - not: { matches: seeded-distribution }
+utils:
+  seeded-distribution:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(Normal|StudentsT|SkewStudent|GeneralizedError)$' }
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
+metadata: { since: "5.0" }

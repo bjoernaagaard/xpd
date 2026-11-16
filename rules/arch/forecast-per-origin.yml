@@ -1,0 +1,32 @@
+# forecast(start=i) returns one row for every origin from i to the end of the data, so a loop
+# that calls it once for each origin and keeps one row computes the same numbers many times
+# over. On 5,030 daily S&P 500 returns, a loop over the last 200 origins with horizon=10 took
+# 0.106 seconds on arch 9.0.0 and one call with start at the first of them took 0.0005 seconds,
+# with the same values. On 8.0.0 it was 0.329 against 0.0056 seconds.
+#
+# The rule reports forecast with start set to the variable of a for loop or a comprehension
+# over range(...) around it. A loop over a few chosen origins, such as a tuple, is left alone.
+# A loop that also calls fit or fix is a rolling estimate, where each origin has its own
+# parameters, and is left alone too. No forecast of another library that was looked at takes
+# start, so the call is read on any object.
+id: forecast-per-origin
+language: python
+severity: warning
+message: This calls forecast once for each value of $I. One call with start set to the first origin returns a row for every origin with the same values. On arch 9.0.0, 200 origins took 0.106 seconds in a loop and 0.0005 seconds in one call.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^start$' } }, { has: { field: value, kind: identifier, pattern: $I } }] } }
+    - inside:
+        stopBy: end
+        any:
+          - kind: for_statement
+            all:
+              - has: { field: left, pattern: $I }
+              - has: { field: right, kind: call, has: { field: function, regex: '^range$' } }
+              - not: { has: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(fit|fix)$' } } } }
+          - any: [{ kind: list_comprehension }, { kind: dictionary_comprehension }, { kind: generator_expression }, { kind: set_comprehension }]
+            all:
+              - has: { kind: for_in_clause, all: [{ has: { field: left, pattern: $I } }, { has: { field: right, kind: call, has: { field: function, regex: '^range$' } } }] }
+              - not: { has: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(fit|fix)$' } } } }

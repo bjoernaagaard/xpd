@@ -1,0 +1,172 @@
+# An argument that arch accepts and does not read, so the model or the test is not the one the
+# call describes. Each form was run on arch 9.0.0 with and without the argument, and the two
+# gave the same parameters or the same statistic. The release notes of 9.0 say that arguments of
+# arch_model that do not apply to the selected model are still ignored. A value or an option
+# that is a variable is not read, so the rule is silent on it.
+
+# arch_model has lags for the "ar", "arx", "har" and "harx" means only. With mean="constant",
+# which is the default, "zero" or "ls", a fit of 1,500 daily S&P 500 returns with lags=2 had the
+# same parameters as one without lags. With more than two positional arguments the mean may be
+# positional, so the call is left alone.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: arch_model ignores lags when mean is "constant", "zero" or "ls", and "constant" is the default, so this model has no lagged terms. A fit with lags=2 gave the same parameters as one without it on arch 9.0.0. Pass mean="AR" to get the lags, or drop lags.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^lags$' }
+    - has: { field: value, any: [{ kind: integer, regex: '^[1-9]\d*$' }, { kind: list, has: { kind: integer } }] }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+          - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+          - not: { has: { nthChild: 3, not: { kind: keyword_argument } } }
+          - any:
+              - not: { has: { kind: keyword_argument, has: { field: name, regex: '^mean$' } } }
+              - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mean$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(constant|zero|ls)(''|")$' } }] }
+---
+# x is read by the "ls", "arx" and "harx" means only. With mean="constant", "zero", "ar" or
+# "har" a fit with a regressor had the same parameters as one without it.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: arch_model ignores x when mean is "constant", "zero", "ar" or "har", and "constant" is the default, so the regressors are not in this model. A fit with x gave the same parameters as one without it on arch 9.0.0. Pass mean="ARX", "HARX" or "LS" to use them, or drop x.
+rule:
+  any:
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^x$' }
+        - not: { has: { field: value, regex: '^None$' } }
+    - any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }]
+      nthChild: 2
+  inside:
+    kind: argument_list
+    all:
+      - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+      - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+      - not: { has: { nthChild: 3, not: { kind: keyword_argument } } }
+      - any:
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: '^mean$' } } }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mean$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(constant|zero|ar|har)(''|")$' } }] }
+---
+# vol="arch" and vol="harch" read p only. A fit with o=1 had the same parameters as one with
+# o=0, q=2 the same as q=1, and power=1.0 the same as power=2.0. A value that changes nothing in
+# a GARCH either, such as o=0 or power=2.0, is left alone.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: arch_model ignores $K when vol is "arch" or "harch", which read p only, so this is not the model that $K describes. A fit with another $K gave the same parameters on arch 9.0.0. Pass vol="garch" to use $K, or drop it.
+rule:
+  kind: keyword_argument
+  any:
+    - all:
+        - has: { field: name, pattern: $K, regex: '^[oq]$' }
+        - has: { field: value, kind: integer, regex: '^[1-9]\d*$' }
+    - all:
+        - has: { field: name, pattern: $K, regex: '^power$' }
+        - has: { field: value, any: [{ kind: integer }, { kind: float }], not: { regex: '^2(\.0*)?$' } }
+  inside:
+    kind: argument_list
+    all:
+      - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+      - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^vol$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(arch|harch)(''|")$' } }] }
+---
+# vol="egarch", "aparch", "fiaparch" and "ngarch" have no power: a fit with power=1.0 had the
+# same parameters as one with power=2.0. APARCH and FIAPARCH estimate their own power, delta.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: arch_model ignores power when vol is "egarch", "aparch", "fiaparch" or "ngarch". A fit with power=1.0 gave the same parameters as one with power=2.0 on arch 9.0.0. Drop power, or pass vol="garch" for a model in that power.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^power$' }
+    - has: { field: value, any: [{ kind: integer }, { kind: float }], not: { regex: '^2(\.0*)?$' } }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^vol$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(egarch|aparch|fiaparch|ngarch)(''|")$' } }] }
+---
+# vol="figarch" has no asymmetric term: a fit with o=1 had the same parameters as one with o=0.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: arch_model ignores o when vol is "figarch", which has no asymmetric term. A fit with o=1 gave the same parameters as one with o=0 on arch 9.0.0. Pass vol="fiaparch" for an asymmetric model with long memory, or drop o.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^o$' }
+    - has: { field: value, kind: integer, regex: '^[1-9]\d*$' }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^vol$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")figarch(''|")$' } }] }
+---
+# ADF, DFGLS and ZivotAndrews search for the lag length only when lags is None. With lags=4 the
+# statistic of 1,000 log prices was the same for method "aic", "bic" and "t-stat", and the same
+# for max_lags 2 and 20. lags is read as a keyword or as the second positional argument, and
+# only when it is a number written in the call.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: $C searches for a lag length only when lags is not given, so $K is ignored here. With lags=4 the statistic was the same for method "aic", "bic" and "t-stat" and for max_lags 2 and 20 on arch 9.0.0. Drop $K, or drop lags to let the search choose.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, pattern: $K, regex: '^(method|max_lags)$' }
+    - not: { has: { field: value, regex: '^None$' } }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)(ADF|DFGLS|ZivotAndrews)$' } }
+          - any:
+              - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^lags$' } }, { has: { field: value, kind: integer } }] }
+              - has: { nthChild: 2, kind: integer }
+---
+# forecast reads random_state only for method="bootstrap". With method="simulation" two calls
+# with np.random.RandomState(0) gave 2.586 and 2.598 for the same step on arch 9.0.0, and 2.553
+# and 2.547 on 8.0.0. The page on volatility forecasts in arch's own documentation has this
+# call. No forecast of another library that was looked at takes method and random_state
+# together, so the call is read on any object. A call that also passes rng is seeded by it and
+# is left alone, and so is the forecast of a volatility process, which takes four positional
+# arguments.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: forecast reads random_state only when method is "bootstrap", so this simulation is not seeded. Two calls with RandomState(0) gave 2.586 and 2.598 for the same step on arch 9.0.0. Give the model a seeded distribution, such as Normal(seed=0), or pass a seeded rng.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^random_state$' }
+    - not: { has: { field: value, regex: '^None$' } }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } } }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")simulation(''|")$' } }] }
+          - not: { has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^rng$' } }, { kind: dictionary_splat }] } }
+          - not: { has: { nthChild: 4, not: { kind: keyword_argument } } }
+---
+# forecast reads rng only for method="simulation". With method="bootstrap" two calls with
+# np.random.default_rng(0).standard_normal gave 2.588 and 2.470 on arch 9.0.0, and the same two
+# calls with random_state=np.random.RandomState(0) gave 2.595 twice.
+id: arch-ignored-argument
+language: python
+severity: warning
+message: forecast reads rng only when method is "simulation", so this bootstrap is not seeded. Two calls with the same seeded rng gave 2.588 and 2.470 for the same step on arch 9.0.0. Pass random_state=np.random.RandomState(0), which gave the same forecast twice.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^rng$' }
+    - not: { has: { field: value, regex: '^None$' } }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } } }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")bootstrap(''|")$' } }] }
+          - not: { has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^random_state$' } }, { kind: dictionary_splat }] } }
+          - not: { has: { nthChild: 4, not: { kind: keyword_argument } } }

@@ -1,8 +1,9 @@
 # Rules
 
-xpd has nine rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+xpd has ten rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
-[Category Encoders](#category-encoders), [Hamilton](#hamilton) and [Python](#python). A library's
+[Category Encoders](#category-encoders), [arch](#arch), [Hamilton](#hamilton) and
+[Python](#python). A library's
 rules run only on files that import it. The Python rules run on every file.
 
 ## pandas
@@ -7315,6 +7316,678 @@ These habits were looked at and have no rule.
 - `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
   index.
 
+## arch
+
+These rules run on files that import `arch`, the module of
+[arch](https://bashtage.github.io/arch/), which fits ARCH and GARCH volatility models, tests for
+unit roots and cointegration, and runs bootstraps and multiple comparison tests. They report API
+that arch removed, string options that arch refuses, arguments that it accepts and does not read,
+returns in units that the optimizer handles badly, forecasts that raise or that are computed many
+times over, and random draws without a seed. Every number in this section was measured on arch
+9.0.0 with NumPy 2.5.5, pandas 3.1.1, SciPy 1.18.1 and statsmodels 0.15.0, unless another release
+is named. Examples assume that the arch names they use are imported. Names such as `returns`,
+`prices`, `losses` and `x` represent values supplied by your program.
+
+arch 8.0 removed the `RandomState` paths of the bootstraps and the distributions, and arch 9.0
+removed `arch.__future__` and the `type` keyword of `hedgehog_plot`, made some attributes read
+only and started to check every argument. A rule document about such a change carries `since`.
+xpd reads the installed version from the project's venv, as it does for pandas, and skips the
+document on an older release, so a project that still has arch 7.2 gets no report about what 8.0
+removed. When the venv has no arch, or there is no venv, every document runs.
+
+A pattern has no types, so each rule ties its report to a name that the file binds to arch. A
+call is read by the name of its class or function, such as `arch_model` or `IIDBootstrap`. A
+short name that another library may have, such as `SPA`, `MCS` or `Normal`, is read only when the
+file imports it from arch. A method such as `fit`, `forecast` or `conf_int` is read only on a
+model, a result or a bootstrap that the file builds from an arch name and assigns to a variable,
+and the rule is silent when the same variable is assigned anything else anywhere in the file, or
+is bound there in another way: as a parameter, a loop variable, an `as` target or one name of a
+tuple assignment. `samples/arch/names.py` shows each case. An option or a value is read only when
+it is written in the call. A variable in its place is never taken for the bad value.
+
+### How a rule earns its place
+
+Every rule document ships on something that was run, and it is one of five kinds:
+
+- An interpreter proof runs the old form on arch 9.0.0. It passes when the old form raises and
+  the new form runs. A document with `since` was also run on the release before the one it
+  names, where the old form ran or only warned.
+- A same result proof fits or tests with and without an argument. It passes when the two give the
+  same parameters or the same statistic, so the argument is not read.
+- A numbers proof runs both forms on the daily S&P 500 returns that ship with arch and gives the
+  two numbers.
+- A speed proof times both forms as the median of 3 runs and compares what they return.
+- A rerun proof runs the old form twice in fresh objects. It passes when the two results differ
+  and the new form gives the same result twice.
+
+A document is `error` only on an interpreter proof, and its message names the exception. A
+document that can also match code that is right, such as `rescale=True` on data that needs no
+rescaling, is `warning`.
+
+The rules were then run over two sets of real code, and every report but the 291 of
+`arch-unseeded-draws` was read. Those 291 were checked by a script that looked in each file for
+a later `seed` call or `state` assignment on the same variable. The first set is arch's own code
+at the 9.0.0 tag: 202 Python files, which are the 69 files of the library, its 104 test files,
+the code blocks of 16 documentation pages, its 9 notebooks and 4 scripts. The second is 1,303
+files of public code from 861 repositories, found with GitHub code search for the import lines
+of arch: 795 Python files and 508 notebooks, of which 1,268 import arch. A rule that reported
+correct code there was narrowed or dropped, and the table gives what is left.
+
+| Rule | Severity | Proof | Reports on arch's own code | Reports on public code | Wrong advice | Fix |
+| --- | --- | --- | --- | --- | --- | --- |
+| [`removed-in-arch`](#removed-in-arch) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, AttributeError, ValueError | 1 | 34 | 0 | unsafe |
+| [`arch-unknown-option`](#arch-unknown-option) | error | interpreter: ValueError | 0 | 13 | 0 | none |
+| [`arch-ignored-argument`](#arch-ignored-argument) | warning | same result, and rerun for the two seeds | 10 | 21 | 1 | none |
+| [`unscaled-returns`](#unscaled-returns) | warning | numbers: mu 4.02 against 0.056, with optimizer code 4 | 0 | 21 | 0 | none |
+| [`rescaled-units`](#rescaled-units) | warning | numbers: a variance forecast 10,000 times the data's | 4 | 14 | 7 | none |
+| [`analytic-forecast-horizon`](#analytic-forecast-horizon) | error | interpreter: ValueError | 0 | 0 | no reports | none |
+| [`forecast-per-origin`](#forecast-per-origin) | warning | speed: 0.106 seconds against 0.0005 | 1 | 0 | 0 | none |
+| [`reindex-is-default`](#reindex-is-default) | info | equal frames with and without the argument | 20 | 61 | 0 | safe |
+| [`fit-output-in-loop`](#fit-output-in-loop) | info | output: 240 lines for 20 fits | 0 | 15 | 0 | none |
+| [`arch-unseeded-draws`](#arch-unseeded-draws) | info | rerun: the result differs | 109 | 182 | 1 | none |
+| [`results-before-compute`](#results-before-compute) | error | interpreter: RuntimeError | 2 | 0 | 2 | none |
+| [`opt-bandwidth-as-bandwidth`](#opt-bandwidth-as-bandwidth) | warning | numbers: 0.5245 against 0.5158 | 0 | 0 | no reports | none |
+
+Wrong advice counts the reports where following the message would not fix a real problem in that
+code. There are 11 among the 508 reports: 8 in arch's own code and 3 in public code, and each
+rule's section says which they are. One report is in the library's own source, on a placeholder
+bootstrap that a base class builds and never draws from, and the other 146 on arch's own code
+are in its tests, notebooks and documentation.
+
+One rule was written and dropped. It reported `forecast(start=...)` on a result whose `fit` had
+no `last_obs`, because the parameters have then seen the rows that are forecast: on 1,500 S&P
+500 returns such forecasts from row 1,000 on differed from those of a fit that stopped there by
+13% on average, and their QLIKE loss was 0.142 against 0.181. Of its 14 reports on public code, 7
+started at the last row, which is a forecast of the future and right, and 4 started at row 0 to
+draw the fitted path. All 11 reports on arch's own code were examples and tests that forecast
+the fitted rows on purpose.
+
+Recall was not measured. No set of real arch code was held back, so the table says how often a
+rule is wrong when it reports, and not how often it misses. A rule that follows a variable
+through the file is silent when the same name is bound to something else anywhere in it, also in
+another function, so a file that reuses a name such as `res` for an arch result and for another
+object gets no report on that name.
+
+### Removed API
+
+Each form below raises on arch 9.0.0. Each was run on the release before the removal and on the
+release that made it, both installed from PyPI, because the release notes of 8.0 do not list what
+8.0 removed. Every fix of a removed form turns code that raises into code that runs, so none of
+those fixes can be compared with the old form and none is safe.
+
+#### removed-in-arch
+
+**Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` on a bootstrap or a distribution, `plot_type=` for `type=` on `hedgehog_plot` of a result that the file gets from an arch model, and `from arch.utility.cov import cov_nw` for the import from `arch.utility` when `cov_nw` is the only name. The other forms have no fix.
+
+Reports `from arch.__future__ import reindexing`, `type=` given to `hedgehog_plot`, `random_state=` given to `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap` or `LocalBlockBootstrap`, `random_state=` or a positional argument given to `Normal`, `StudentsT`, `SkewStudent` or `GeneralizedError`, the methods `seed`, `get_state` and `set_state` and the property `random_state` on a bootstrap, `seed` on an `SPA`, `StepM`, `MCS` or `RealityCheck`, `cov_nw` imported from `arch.utility`, an assignment to `block_size` of a block bootstrap or to `bootstrap` of a multiple comparison test, and `nested=True` with `studentize=False` on `SPA`, `StepM` or `RealityCheck`.
+
+Example:
+
+```python
+from arch.__future__ import reindexing
+
+bs = IIDBootstrap(x, random_state=np.random.RandomState(0))
+bs.seed(1234)
+dist = Normal(random_state=np.random.RandomState(0))
+fig = res.hedgehog_plot(type="mean")
+```
+
+Use instead:
+
+```python
+bs = IIDBootstrap(x, seed=1234)
+dist = Normal(seed=np.random.default_rng(0))
+fig = res.hedgehog_plot(plot_type="mean")
+```
+
+The table gives what each form did on the release before the removal and what it does from that
+release on.
+
+| Form | Before | From | Now |
+| --- | --- | --- | --- |
+| `IIDBootstrap(x, random_state=rs)` | 7.2.0: FutureWarning | 8.0.0 | TypeError, because `random_state` is read as data |
+| `Normal(random_state=rs)`, `Normal(rs)` | 7.2.0: FutureWarning | 8.0.0 | TypeError |
+| `bs.seed(1)`, `bs.get_state()`, `bs.set_state(s)`, `bs.random_state` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
+| `SPA(...).seed(1)`, the same on `StepM` and `MCS` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
+| `from arch.utility import cov_nw` | 7.2.0: runs | 8.0.0 | ImportError |
+| `from arch.__future__ import reindexing` | 8.0.0: runs and does nothing | 9.0.0 | ModuleNotFoundError |
+| `res.hedgehog_plot(type="mean")` | 8.0.0: FutureWarning | 9.0.0 | TypeError |
+| `bs.block_size = 5`, `spa.bootstrap = bs` | 8.0.0: runs | 9.0.0 | AttributeError |
+| `SPA(..., studentize=False, nested=True)` | 8.0.0: runs | 9.0.0 | ValueError |
+
+The bootstraps take their data as keyword arguments, so 8.0.0 and 9.0.0 read `random_state` as
+one more series and raise because a `RandomState` is not an array. `seed` takes the same
+`RandomState`, a `Generator` or an integer, and exists since arch 5.0: on 4.19
+`IIDBootstrap(x, seed=0)` raised TypeError. `IIDBootstrap(x, seed=np.random.RandomState(0))` drew
+the same samples on 6.1.0, 7.2.0, 8.0.0 and 9.0.0. The state of the generator is read and set
+through the `state` property, and `generator` gives the generator itself.
+
+`seed`, `get_state`, `set_state`, `random_state`, `block_size` and `bootstrap` are names that
+other objects have too, such as a NumPy `RandomState`. They are reported only on a variable that
+the file assigns from one of the arch classes and from nothing else. `hedgehog_plot` is reported
+on any object, because no other library that was looked at has a method of that name, and it is
+fixed only on a result that the file gets from `fit` or `fix` of an arch model.
+
+The rule leaves alone an import inside a `try` block that catches the error, code behind a
+version check, and code inside `pytest.raises`. arch 9.0.0 has no deprecation of its own left:
+its source raises no `DeprecationWarning` and no `FutureWarning`, so the pack has no rule for
+deprecated API.
+
+### Options and arguments
+
+arch 9.0 checks every argument when a function is called, and it still ignores an argument that
+does not apply to the model that was asked for. The first rule reports a string that the check
+refuses. The second reports an argument that is accepted and never read, so the code runs and
+describes another model or test than the one it estimates.
+
+#### arch-unknown-option
+
+**Severity:** error. **Fix:** none.
+
+Reports a string that is not one of the option's values: `mean`, `vol` and `dist` of `arch_model`, `trend` of `ADF`, `DFGLS`, `KPSS`, `PhillipsPerron`, `VarianceRatio`, `ZivotAndrews`, `engle_granger`, `phillips_ouliaris`, `DynamicOLS`, `FullyModifiedOLS` and `CanonicalCointegratingReg`, `method` of `ADF`, `DFGLS`, `ZivotAndrews`, `engle_granger` and `DynamicOLS`, `test_type` of `PhillipsPerron` and `phillips_ouliaris`, `kernel` of `auto_bandwidth`, `method` of `MCS`, `bootstrap` of `SPA`, `StepM`, `MCS` and `RealityCheck`, `cov_type` and `disp` of `fit`, `method` and `align` of `forecast`, `plot_type` and `method` of `hedgehog_plot`, and `method` and `tail` of `conf_int`.
+
+Example:
+
+```python
+gjr = arch_model(returns, vol="gjr", dist="student")
+res = gjr.fit(cov_type="mle")
+adf = ADF(prices, trend="nc")
+```
+
+Use instead:
+
+```python
+gjr = arch_model(returns, vol="garch", o=1, dist="t")
+res = gjr.fit(cov_type="classic")
+adf = ADF(prices, trend="n")
+```
+
+arch checks each option against a table of accepted spellings, without regard to case. A script
+wrapped that check on arch 9.0.0, called each API once and kept the table it was handed, so the
+lists in the rule are the ones the installed release uses and none is typed by hand. The script
+then ran each API with every spelling of its table, in lower and in upper case, and with 28 other
+strings, and each of those raised ValueError. The tables hold more than the signatures show:
+`vol="constant"` builds a model with a constant variance, `conf_int` also takes `"var"`, `"cov"`,
+`"debiased"` and `"bias-corrected"`, `method` of the unit root tests also takes `"t"` and
+`"tstat"`, and `bootstrap="moving_block"` is the same as `"moving block"`.
+
+| Option | Values on arch 9.0.0 |
+| --- | --- |
+| `arch_model(mean=)` | `constant`, `zero`, `ls`, `ar`, `arx`, `har`, `harx` |
+| `arch_model(vol=)` | `garch`, `arch`, `egarch`, `figarch`, `fiaparch`, `aparch`, `harch`, `ngarch`, `constant` |
+| `arch_model(dist=)` | `normal`, `gaussian`, `t`, `studentst`, `skewstudent`, `skewt`, `ged`, `generalized error` |
+| `trend=` of `ADF`, `engle_granger`, `phillips_ouliaris`, `DynamicOLS`, `FullyModifiedOLS`, `CanonicalCointegratingReg` | `n`, `c`, `ct`, `ctt` |
+| `trend=` of `DFGLS`, `KPSS` | `c`, `ct` |
+| `trend=` of `PhillipsPerron` | `n`, `c`, `ct` |
+| `trend=` of `VarianceRatio` | `n`, `c` |
+| `trend=` of `ZivotAndrews` | `c`, `t`, `ct` |
+| `method=` of `ADF`, `DFGLS`, `ZivotAndrews`, `engle_granger` | `aic`, `bic`, `t-stat`, `maic`, `t`, `tstat` |
+| `method=` of `DynamicOLS` | `aic`, `bic`, `hqic` |
+| `PhillipsPerron(test_type=)` | `tau`, `rho` |
+| `phillips_ouliaris(test_type=)` | `za`, `zt`, `pu`, `pz` |
+| `auto_bandwidth(kernel=)` | `ba`, `bartlett`, `nw`, `pa`, `parzen`, `gallant`, `qs`, `andrews` |
+| `MCS(method=)` | `r`, `max` |
+| `bootstrap=` of `SPA`, `StepM`, `MCS`, `RealityCheck` | `stationary`, `sb`, `circular`, `cbb`, `moving block`, `mbb` |
+| `fit(cov_type=)` | `robust`, `classic` |
+| `fit(disp=)` | `off`, `final`, or a bool |
+| `forecast(method=)`, `hedgehog_plot(method=)` | `analytic`, `simulation`, `bootstrap` |
+| `forecast(align=)` | `origin`, `target`, `horizon` |
+| `hedgehog_plot(plot_type=)` | `volatility`, `mean` |
+| `conf_int(method=)` | `basic`, `percentile`, `studentized`, `norm`, `var`, `cov`, `bc`, `debiased`, `bias-corrected`, `bca` |
+| `conf_int(tail=)` | `two`, `lower`, `upper` |
+
+Before 9.0 some of these options took any string and fell back to one value without a word. On
+arch 4.19, 5.0, 6.1.0, 6.2.0 and 8.0.0, `fit(cov_type="mle")` gave the standard errors of
+`"classic"`, 0.00843 for omega on 1,500 daily S&P 500 returns where `"robust"` gave 0.01329, and
+`PhillipsPerron(y, test_type="z")` gave the statistic of `"tau"`, -1.136, where `"rho"` gave
+-2.0998. On 5.0, 6.1.0, 6.2.0 and 8.0.0, `MCS(losses, 0.1, method="range")` gave the p-values of
+`"max"` and not those of `"R"`. The documents have no `since`, so the report also reaches a
+project on an older arch, where the value is the wrong one in silence.
+
+Releases before 9.0 took some options in one case only: `ADF(y, method="AIC")` raised on 8.0.0
+and runs on 9.0.0. The rule follows 9.0.0 and does not report it. A value that only 9.0 has, such
+as `method="maic"` or `align="horizon"`, is not reported either.
+
+The public code had 13 reports: `trend="nc"`, which is the old statsmodels name, `vol="AVGARCH"`,
+`disp="on"`, `method="stationary"` on `MCS`, and `ZivotAndrews(y, method="c")`, where the trend
+was written as the method.
+
+#### arch-ignored-argument
+
+**Severity:** warning. **Fix:** none.
+
+Reports `lags=` given to `arch_model` with `mean` `"constant"`, `"zero"` or `"ls"`, or with no `mean`, `x` given to `arch_model` with `mean` `"constant"`, `"zero"`, `"ar"` or `"har"`, or with no `mean`, `o=`, `q=` and `power=` given with `vol="arch"` or `vol="harch"`, `power=` given with `vol` `"egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"`, `o=` given with `vol="figarch"`, `method=` and `max_lags=` given to `ADF`, `DFGLS` or `ZivotAndrews` together with a number for `lags`, `random_state=` given to `forecast` with `method="simulation"`, and `rng=` given to `forecast` with `method="bootstrap"`.
+
+Example:
+
+```python
+ar = arch_model(returns, lags=2)
+with_regressors = arch_model(returns, x=x, vol="garch", p=1, q=1)
+arch3 = arch_model(returns, vol="arch", q=3)
+adf = ADF(prices, lags=4, method="bic")
+paths = res.forecast(horizon=5, method="simulation", random_state=np.random.RandomState(0))
+```
+
+Use instead:
+
+```python
+ar = arch_model(returns, mean="AR", lags=2)
+with_regressors = arch_model(returns, x=x, mean="ARX", lags=0, vol="garch", p=1, q=1)
+arch3 = arch_model(returns, vol="arch", p=3)
+adf = ADF(prices, method="bic")
+paths = res.forecast(horizon=5, method="simulation", rng=np.random.default_rng(0).standard_normal)
+```
+
+Each form was fitted with and without the argument on 1,500 daily S&P 500 returns, on arch 9.0.0
+and on 8.0.0, and the two fits had the same parameters. `"fiaparch"` and `"ngarch"` are new in
+9.0 and were run there only.
+
+| Call | Compared with | Parameters |
+| --- | --- | --- |
+| `arch_model(y, lags=2)`, and with `mean="zero"` or `"ls"` | the same call without `lags` | equal |
+| `arch_model(y, mean="ar", lags=2)` | without `lags` | differ |
+| `arch_model(y, x=x)`, and with `mean="zero"`, `"ar"` or `"har"` | without `x` | equal |
+| `arch_model(y, x=x, mean="ls")`, and with `"arx"` or `"harx"` | without `x` | differ |
+| `vol="arch"` or `"harch"` with `o=1`, `q=2` or `power=1.0` | `o=0`, `q=1`, `power=2.0` | equal |
+| `vol="egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"` with `power=1.0` | `power=2.0` | equal |
+| `vol="figarch"` with `o=1` | `o=0` | equal |
+| `vol="garch"` with `o=1`, `q=2` or `power=1.0` | `o=0`, `q=1`, `power=2.0` | differ |
+
+`ADF`, `DFGLS` and `ZivotAndrews` search for a lag length only when `lags` is not given. With
+`lags=4` the statistic of 1,000 log prices was the same for `method` `"aic"`, `"bic"` and
+`"t-stat"`, and the same for `max_lags` 2 and 20. Without `lags`, `"t-stat"` chose 8 lags where
+`"aic"` chose 0, and the statistic moved from -1.2674 to -1.0838 for `ADF`.
+
+`forecast` reads `random_state` only for `method="bootstrap"` and `rng` only for
+`method="simulation"`. Two calls with `method="simulation"` and
+`random_state=np.random.RandomState(0)` gave 2.586 and 2.598 for the variance five steps ahead,
+and two calls with a seeded `rng` gave 2.571 twice. Two calls with `method="bootstrap"` and the
+same seeded `rng` gave 2.588 and 2.470, and with `random_state=np.random.RandomState(0)` they
+gave 2.595 twice. The page on volatility forecasts in arch's own documentation passes
+`random_state` to a simulation. A call that passes both seeds is left alone.
+
+A value that changes nothing in a GARCH model either, such as `o=0`, `q=0` or `power=2.0`, is not
+reported. `lags=0`, `x=None` and a `mean` or a `vol` that is a variable are not reported. A call
+with three or more positional arguments is left alone, because its `mean` may be positional.
+
+The public code had 21 reports and none with wrong advice. Twelve were `x=` or a positional `x`
+with a constant mean, seven of them copies of one function that fits
+`arch_model(resid, x=exog, mean="Constant", ...)` as if the regressors were in the model. Four
+were `vol="ARCH"` with `q=3` or `q=1`, where the order of an ARCH model is `p`. Two were
+`random_state=` on a simulation, two were `lags=1` with `mean="constant"`, and one was a `method`
+beside `lags=8`. Of the 10 reports on arch's own code, one is a test that passes `max_lags=2.5` to
+check that it raises, where the advice is beside the point. The other nine are tests and the
+documentation page above.
+
+### The units of the data
+
+arch estimates by maximum likelihood, and the optimizer works badly when the variance of the data
+is far from 1. arch warns `DataScaleWarning` when the variance is outside the range it likes, and
+its message asks for a value between 1 and 1000. Daily returns as decimals have a variance near
+0.0001: the 5,030 daily S&P 500 returns in `arch.data.sp500` have 0.000145.
+
+#### unscaled-returns
+
+**Severity:** warning. **Fix:** none.
+
+Reports a series from `pct_change`, or from `log` with `diff` or `shift`, that is given to `arch_model`, `ConstantMean`, `ZeroMean`, `ARX`, `HARX`, `LS`, `MAMean` or `ARCHInMean` with nothing that multiplies it and no `rescale`.
+
+Example:
+
+```python
+returns = prices.pct_change().dropna()
+res = arch_model(returns).fit(disp="off")
+```
+
+Use instead:
+
+```python
+returns = 100 * prices.pct_change().dropna()
+res = arch_model(returns).fit(disp="off")
+```
+
+A constant mean GARCH(1,1) was fitted to the S&P 500 returns in three forms, on each release.
+
+| Returns | arch | Warnings | Optimizer code | mu | omega |
+| --- | --- | --- | --- | --- | --- |
+| `100 * price.pct_change()` | 9.0.0, 8.0.0 | none | 0 | 0.0564 | 0.0175 |
+| `price.pct_change()` | 9.0.0, 8.0.0 | DataScaleWarning, ConvergenceWarning | 4 | 4.02 | 0.0000029 |
+| `np.log(price).diff()` | 9.0.0, 8.0.0 | DataScaleWarning, ConvergenceWarning | 4 | -2.73 | 0.0000029 |
+| `price.pct_change()` | 5.0, 6.1.0, 6.2.0 | DataScaleWarning | 0 | -0.0011 | 0.0000029 |
+| `price.pct_change()` with `rescale=True` | 9.0.0, 8.0.0 | none | 0 | 0.0564 | 0.0175 |
+
+A mean of 4.02 for returns whose mean is 0.00056 is a failed fit, and on the older releases the
+optimizer reported success with a mean of the wrong sign. `rescale=False` turns the warning off
+and gave the same failed fit.
+
+The rule reads how the series is built and not its values. It reports the expression in the
+call, and a name or a column that every assignment in the file builds that way. A series that is
+multiplied anywhere, such as `100 * prices.pct_change()` or `returns = returns * 100`, is left
+alone, and so is a call that says `rescale`, in either way. Returns that come from a file or a
+function are not seen.
+
+All 21 reports on the public code were returns as decimals: each series was a `pct_change` or a
+log difference with no factor.
+
+#### rescaled-units
+
+**Severity:** warning. **Fix:** none.
+
+Reports `rescale=True` on `arch_model` or a mean class in a file that reads `conditional_volatility` or calls `forecast` and never reads `scale`.
+
+Example:
+
+```python
+res = arch_model(returns, rescale=True).fit(disp="off")
+variance = res.forecast(horizon=1).variance.iloc[-1, 0]
+```
+
+Use instead:
+
+```python
+res = arch_model(returns, rescale=True).fit(disp="off")
+variance = res.forecast(horizon=1).variance.iloc[-1, 0] / res.scale**2
+```
+
+With `rescale=True` arch may multiply the data before it estimates, and the result reports the
+factor as `scale`. On the S&P 500 returns as decimals, arch 9.0.0 and 8.0.0 chose a scale of
+100. The parameters were those of the returns in percent, the last conditional volatility was
+1.9926 where the data's was 0.019926, and the variance forecast one step ahead was 3.5965, which
+is 10,000 times the variance in the units of the data.
+
+When the data already has a variance near 1 the scale is 1.0 and nothing changes, and results
+that have no unit, such as the standardized residuals, are right at any scale. The rule cannot
+see either, so it is a warning. Of its 14 reports on the public code, 11 used a volatility or a
+forecast in rescaled units, two of them with a division by 10,000 written into the code where
+the square of `scale` belongs. Three had wrong advice: two fitted data that was made standard normal
+first, and one only divided the residuals by the volatility. The 4 reports on arch's own code
+are tests of `rescale` itself.
+
+### Forecasts and fits
+
+`forecast` has `method="analytic"`, `horizon=1` and `reindex=False` as its defaults, and it
+forecasts from the last row unless `start` names an earlier one. `fit` prints the steps of the
+optimizer unless `disp="off"`.
+
+#### analytic-forecast-horizon
+
+**Severity:** error. **Fix:** none.
+
+Reports `forecast` with a `horizon` above 1 and the analytic method on a result of `arch_model` with `vol` `"egarch"`, `"aparch"` or `"fiaparch"`, or with a `power` that is not 2 and `vol` `"garch"`, `"figarch"` or no `vol`.
+
+Example:
+
+```python
+res = arch_model(returns, vol="EGARCH", p=1, o=1, q=1).fit(disp="off")
+forecasts = res.forecast(horizon=5)
+```
+
+Use instead:
+
+```python
+res = arch_model(returns, vol="EGARCH", p=1, o=1, q=1).fit(disp="off")
+forecasts = res.forecast(horizon=5, method="simulation")
+```
+
+A volatility model that does not evolve in squares has no closed form beyond one step.
+`forecast(horizon=5)` was run for each `vol` on arch 9.0.0.
+
+| Model | `forecast(horizon=5)` | `forecast(horizon=1)` |
+| --- | --- | --- |
+| `vol="egarch"`, `"aparch"`, `"fiaparch"` | ValueError: Analytic forecasts not available for horizon > 1 | runs |
+| `vol="garch"` or `"figarch"` with `power=1.0` | ValueError: Analytic forecasts not available for horizon > 1 when power != 2 | runs |
+| `vol="garch"`, also with `o=1`, `"arch"`, `"figarch"`, `"harch"`, `"ngarch"` | runs | runs |
+
+The rule follows the model through the file: the call is `forecast` on a variable that the file
+assigns from `fit` or `fix` of a variable that it assigns from such an `arch_model` call, and
+each of the two names is assigned from nothing else. A `horizon` or a `method` that is a
+variable is not read, and `power` is read only where `arch_model` reads it. A model that is
+built from the classes, such as `ConstantMean(y, volatility=EGARCH())`, is not seen. The corpus
+had no report.
+
+#### forecast-per-origin
+
+**Severity:** warning. **Fix:** none.
+
+Reports `forecast` with `start` set to the variable of a `for` loop or a comprehension over `range(...)`, when the loop calls neither `fit` nor `fix`.
+
+Example:
+
+```python
+rows = []
+for origin in range(first, len(returns)):
+    rows.append(res.forecast(horizon=10, start=origin).variance.iloc[0])
+```
+
+Use instead:
+
+```python
+variance = res.forecast(horizon=10, start=first).variance
+```
+
+`forecast(start=i)` returns one row for every origin from `i` to the end of the data, so the
+loop computes the same rows many times over and keeps one. On the 5,030 S&P 500 returns with
+`horizon=10`, a loop over the last 200 origins took 0.106 seconds and one call took 0.0005
+seconds, with equal values. On arch 8.0.0 it was 0.329 against 0.0056 seconds.
+
+A loop that fits inside is a rolling estimate, where each origin has its own parameters, and is
+left alone. So is a loop over a few chosen origins, such as a tuple. The one report in the
+corpus is a test in arch that steps through the origins of a hedgehog plot.
+
+#### reindex-is-default
+
+**Severity:** info. **Fix:** safe: the argument is taken out when a comma comes right before it, so not when it is the first argument or follows a comment.
+
+Reports `reindex=False` given to `forecast` of an arch model or result.
+
+Example:
+
+```python
+forecasts = res.forecast(horizon=5, reindex=False)
+```
+
+Use instead:
+
+```python
+forecasts = res.forecast(horizon=5)
+```
+
+Until arch 6.2 `forecast` returned a frame as long as the data and warned that the default would
+change, and code from that time passes `reindex=False` to get the short frame without the
+warning. On 6.1.0, `forecast()` on 1,500 rows returned 1,500 rows with a FutureWarning, and on
+6.2.0 it returned 1 row with no warning, so the document carries `since: "6.2"`. On 6.2.0, 8.0.0
+and 9.0.0 the frames of `forecast(reindex=False)` and `forecast()` were equal, for the last row
+and with `start`, which is why the fix is safe. `reindex=True` still returns the long frame and
+is left alone.
+
+The import `from arch.__future__ import reindexing` belongs to the same habit and is reported by
+[`removed-in-arch`](#removed-in-arch). The public code had 61 reports of this rule, and arch's own
+tests, notebooks and documentation had 20.
+
+#### fit-output-in-loop
+
+**Severity:** info. **Fix:** none.
+
+Reports `fit` without `disp` on an arch model inside a loop or a comprehension.
+
+Example:
+
+```python
+for end in range(1000, len(returns)):
+    res = arch_model(returns.iloc[:end]).fit()
+```
+
+Use instead:
+
+```python
+for end in range(1000, len(returns)):
+    res = arch_model(returns.iloc[:end]).fit(disp="off")
+```
+
+`fit` has `disp="final"` and `update_freq=1`, so it prints a line for every iteration and a
+summary at the end. Twenty fits of a GARCH(1,1) in a loop printed 240 lines, and none with
+`disp="off"`. The time was the same, 0.102 and 0.101 seconds, so the rule is info.
+`update_freq=0` alone still prints the summary. All 15 reports on the public code were fits in a
+loop over windows, assets or model orders.
+
+### Bootstraps, tests and covariance estimators
+
+#### arch-unseeded-draws
+
+**Severity:** info. **Fix:** none.
+
+Reports `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap`, `LocalBlockBootstrap`, `SPA`, `StepM`, `MCS` and `RealityCheck` without `seed`, `forecast` with `method="simulation"` and no `rng`, `forecast` with `method="bootstrap"` and no `random_state`, and `simulate` on an arch model, unless the file builds a distribution with a seed.
+
+Example:
+
+```python
+np.random.seed(0)
+bs = StationaryBootstrap(10, returns)
+interval = bs.conf_int(np.mean, 1000)
+```
+
+Use instead:
+
+```python
+bs = StationaryBootstrap(10, returns, seed=0)
+interval = bs.conf_int(np.mean, 1000)
+```
+
+arch draws from generators of its own, which start from a new seed in every process. Each form
+was run twice without a seed and twice with one, on arch 9.0.0 and on 8.0.0. The two runs
+without a seed differed on both releases, and the table gives the numbers of 9.0.0.
+
+| Form | Two runs without a seed | Two runs with a seed | Seeded by |
+| --- | --- | --- | --- |
+| `IIDBootstrap(x).conf_int(np.mean, 200)`, lower bound | -0.15601, -0.15855 | -0.15667 twice | `seed=0` |
+| `StationaryBootstrap(10, x)`, the same | -0.13476, -0.13188 | -0.14428 twice | `seed=0` |
+| `CircularBlockBootstrap(10, x)`, the same | -0.18054, -0.14953 | -0.15445 twice | `seed=0` |
+| `MovingBlockBootstrap(10, x)`, the same | -0.14193, -0.14765 | -0.16665 twice | `seed=0` |
+| `SPA(...)`, lower p-value | 0.7233, 0.6800 | 0.6700 twice | `seed=0` |
+| `MCS(...)`, first p-value | 0.250, 0.283 | 0.297 twice | `seed=0` |
+| `forecast(horizon=5, method="simulation")`, last step | 2.671, 2.601 | 2.571 twice | `Normal(seed=0)` as the model's distribution, or a seeded `rng` |
+| `forecast(horizon=5, method="bootstrap")`, last step | 2.587, 2.578 | 2.595 twice | `random_state=np.random.RandomState(0)` |
+| `arch_model(None).simulate(params, 100)`, last value | -1.24, 0.07 | 0.097 twice | `Normal(seed=0)` as the model's distribution |
+
+`np.random.seed(0)` before each run did not make any of them equal: `IIDBootstrap` gave -0.1328
+and -0.15246, the simulated forecast 2.676 and 2.534, the bootstrap forecast 2.468 and 2.737,
+and `simulate` -1.27 and 0.30. arch does not draw from NumPy's global generator. 49 of the 291
+reports in the corpus are in a file that calls `np.random.seed`. One report has wrong advice: a
+base class in arch's own source builds a placeholder bootstrap that it never draws from.
+
+`seed` is a keyword of the bootstraps, the tests and the distributions since arch 5.0, so every
+document carries `since: "5.0"`. A seed does not move what the method estimates, so the rule is
+info. A bootstrap whose `state` the file assigns is left alone. A file that builds a distribution
+with `seed=` anywhere is left alone by the two documents that read the model's distribution,
+because a pattern cannot see which model gets it. `SPA`, `StepM`, `MCS` and `RealityCheck` are
+read only when the file imports them from `arch.bootstrap`.
+
+#### results-before-compute
+
+**Severity:** error. **Fix:** none.
+
+Reports `pvalues`, `critical_values`, `better_models`, `superior_models`, `included` and `excluded` read from an `SPA`, `StepM`, `MCS` or `RealityCheck` in a file that never calls `compute` on that object.
+
+Example:
+
+```python
+mcs = MCS(losses, size=0.1, seed=0)
+kept = mcs.included
+```
+
+Use instead:
+
+```python
+mcs = MCS(losses, size=0.1, seed=0)
+mcs.compute()
+kept = mcs.included
+```
+
+The tests run their bootstrap in `compute` and not when they are created. On a new object,
+`pvalues`, `critical_values()` and `better_models()` of `SPA` raised RuntimeError with "compute
+must be called before pvalues are available", `superior_models` of `StepM` raised it with
+"compute must be called before accessing superior_models", and `pvalues`, `included` and
+`excluded` of `MCS` raised it with "Must call compute before accessing results", on arch 9.0.0
+and on 8.0.0.
+
+The rule reports a result read straight from the constructor call, and a result read from a
+variable that the file assigns from one of the four classes and from nothing else, when no line
+of the file calls `compute` on that variable. It does not follow the order of the lines, so a
+`compute` after the read is not reported. Both reports in the corpus are rows of a table in
+arch's tests that pass a bad `pvalue` to `critical_values` to check the ValueError that comes
+first, so the advice is wrong there.
+
+#### opt-bandwidth-as-bandwidth
+
+**Severity:** warning. **Fix:** none.
+
+Reports `bandwidth=` set to the `opt_bandwidth` of an estimator, on `Bartlett`, `Gallant`, `NeweyWest`, `Parzen`, `ParzenCauchy`, `ParzenGeometric`, `ParzenRiesz`, `TukeyHamming`, `TukeyHanning` and `TukeyParzen`.
+
+Example:
+
+```python
+first = Bartlett(returns)
+again = Bartlett(returns, bandwidth=first.opt_bandwidth)
+```
+
+Use instead:
+
+```python
+first = Bartlett(returns)
+again = Bartlett(returns, bandwidth=first.bandwidth)
+```
+
+A kernel covariance estimator reports the bandwidth it used as `bandwidth` and the optimal
+bandwidth of Newey and West as `opt_bandwidth`. Until arch 9.0 the two were one number. Since
+9.0 a kernel that is 0 beyond a finite lag uses `opt_bandwidth` minus 1, and the release notes
+say that `Bartlett(x, bandwidth=est.opt_bandwidth)` is not the same as `Bartlett(x)`.
+
+| Estimator on 1,500 S&P 500 returns | `bandwidth` | `opt_bandwidth` | Long run variance | With `bandwidth=opt_bandwidth` |
+| --- | --- | --- | --- | --- |
+| `Bartlett`, arch 9.0.0 | 10.943 | 11.943 | 0.52445 | 0.51582 |
+| `Parzen`, arch 9.0.0 | 20.467 | 21.467 | 0.48023 | 0.47335 |
+| `QuadraticSpectral`, arch 9.0.0 | 7.658 | 7.658 | 0.55401 | 0.55401 |
+| `Bartlett`, arch 8.0.0 | 19.221 | 19.221 | 0.45172 | 0.45172 |
+
+A script built every estimator class of `arch.covariance.kernel` on 9.0.0 and compared the two
+attributes. They differ for the ten classes the rule names and are equal for `Andrews`,
+`QuadraticSpectral` and `ZeroLag`, which are left alone. The document carries `since: "9.0"`.
+The corpus had no report. The table also shows that the automatic bandwidth itself changed in
+9.0, from 19.221 to 10.943 for `Bartlett`, so an estimate without `bandwidth` differs between the
+two releases.
+
+### What the pack leaves out
+
+These habits were looked at and have no rule.
+
+- `SPA`, `StepM` and `RealityCheck` studentize the losses since arch 9.0 when `studentize=True`,
+  which is the default and did nothing before. On the same seeded losses the p-values of `SPA`
+  were 0.6733, 0.91 and 0.96 on 8.0.0 and 0.67, 0.8967 and 0.9533 on 9.0.0, and the lowest
+  critical value moved from 0.1353 to 1.5984. `studentize=False` on 9.0.0 gave the numbers of
+  8.0.0. A rule would report every call that does not say `studentize`, which is nearly all of
+  them, so the change is written here and not reported.
+- `nested=True` on those tests runs a bootstrap inside every replication since 9.0. With 300
+  replications `SPA` took 1.14 seconds against 0.0105 without it, and 0.0109 on 8.0.0. That is
+  what the option asks for, so it has no rule.
+- `forecast(start=...)` on a fit without `last_obs` forecasts rows that the fit has seen. The
+  rule for it reported more right code than wrong and was dropped. Its numbers are under "How a
+  rule earns its place".
+- `starting_values` from the last window did not speed up a rolling fit: 40 windows took 0.209
+  seconds without them and 0.200 with them.
+- An `IIDBootstrap` resamples single rows, and arch's documentation gives the block bootstraps
+  and `optimal_block_length` for a series that is correlated in time. A pattern cannot see
+  whether a series is correlated. `CircularBlockBootstrap` and `MovingBlockBootstrap` raise
+  TypeError since 9.0 on a block size that is not a whole number, such as the 55.04 that
+  `optimal_block_length` returned for one series, and `StationaryBootstrap` takes it. The block
+  size is a variable in such code, and a pattern does not read a variable.
+- A unit root test on the wrong series and a p-value read against the wrong null hypothesis are
+  mistakes in the data or in the reading of the result. On 1,000 log prices of the S&P 500,
+  `ADF` gave a p-value of 0.648 and `KPSS` gave 0.0001, because the null of `ADF` is a unit root
+  and the null of `KPSS` is no unit root. A pattern sees neither the series nor the reading.
+- A whole number given as a float, such as `horizon=5.0` or `lags=2.0`, raises TypeError on
+  9.0.0. The public code had no such number written for `horizon`, `simulations`, `reps`,
+  `max_lags` or `block_size`.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
@@ -7771,7 +8444,8 @@ cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --un
 ```
 
 The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
-`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/hamilton/` and
+`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/arch/`,
+`samples/hamilton/` and
 `samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to

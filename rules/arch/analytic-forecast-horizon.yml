@@ -1,0 +1,65 @@
+# forecast has method="analytic" as its default. A volatility model that does not evolve in
+# squares has no closed form beyond one step, and forecast then raises ValueError. On arch
+# 9.0.0, forecast(horizon=5) raised "Analytic forecasts not available for horizon > 1" for
+# vol="egarch", "aparch" and "fiaparch", and "... when power != 2" for vol="garch" and "figarch"
+# with power=1.0. horizon=1 ran for each, and so did horizon=5 for "garch" with o=1, "arch",
+# "figarch", "harch" and "ngarch".
+#
+# The rule follows the model through the file: forecast must be called on a result that comes
+# from fit or fix of an arch_model call with one of those settings written in it, and the names
+# in between must be assigned from nothing else. power is read only where arch_model reads it,
+# which is with vol "garch" or "figarch", or with no vol. A horizon or a method that is a
+# variable is not read.
+id: analytic-forecast-horizon
+language: python
+severity: error
+message: This model has no analytic forecast beyond one step, and forecast raises ValueError, "Analytic forecasts not available for horizon > 1". Pass method="simulation" or method="bootstrap".
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, matches: result } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^horizon$' } }, { has: { field: value, kind: integer, regex: '^([2-9]|[1-9]\d+)$' } }] } }
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^method$' }
+                  - not: { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")analytic(''|")$' } }
+              - kind: dictionary_splat
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '(^|\.)arch_model$' }
+      - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+      - has:
+          field: arguments
+          any:
+            - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^vol$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(egarch|aparch|fiaparch)(''|")$' } }] }
+            - all:
+                - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^power$' } }, { has: { field: value, any: [{ kind: integer }, { kind: float }], not: { regex: '^2(\.0*)?$' } } }] }
+                - not: { has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^vol$' } }, { not: { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(garch|figarch)(''|")$' } } }] } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $R } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $R } }, { kind: named_expression, has: { field: name, pattern: $R } }] } } }

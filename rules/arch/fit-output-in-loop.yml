@@ -1,0 +1,32 @@
+# fit has disp="final" and update_freq=1 as its defaults, so it prints one line for every
+# iteration of the optimizer and a summary at the end. In a loop over windows or models that
+# buries the output of the script. On arch 9.0.0, 20 fits of a GARCH(1,1) on 1,000 daily
+# returns printed 240 lines, and none with disp="off". The time was the same, 0.102 and 0.101
+# seconds, so the rule is info.
+#
+# The rule reads fit only on a model that the file builds from arch_model or a mean class, and
+# the name must be assigned from nothing else. update_freq=0 alone still prints the summary.
+id: fit-output-in-loop
+language: python
+severity: info
+message: fit prints every iteration and a summary on each call, and this one runs in a loop. On arch 9.0.0, 20 fits printed 240 lines. Pass disp="off".
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^disp$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+    - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+    - inside:
+        stopBy: { kind: function_definition }
+        any: [{ kind: for_statement }, { kind: while_statement }, { kind: list_comprehension }, { kind: dictionary_comprehension }, { kind: generator_expression }, { kind: set_comprehension }]
+utils:
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }

@@ -1,0 +1,10 @@
+# The arch pack, for files that import arch. Every other .yml file in this folder is a rule.
+
+# No fix in this pack writes a short name such as `np.`, so the pack lists no alias.
+aliases: {}
+
+# The pack has no package checks. matplotlib is the one package that only some of arch needs,
+# for plot and hedgehog_plot, and a package check cannot ask whether a project draws a plot, so
+# it would warn every project that has arch. The wheels of arch 9.0.0 hold the compiled
+# recursions, so numba is not needed for speed either.
+packages: []
