@@ -221,4 +221,4 @@ The rest of this file needs a reader. The `python-review` skill is that reader.
   [typing documentation](https://typing.python.org/en/latest/)
 - What each release added: [What's New in Python](https://docs.python.org/3/whatsnew/)
 - Every xpd rule with before and after code:
-  [xpd rules](https://bjoernaagaard.github.io/xpd/rules/)
+  [xpd rules](https://bjoernaagaard.github.io/xpd/rules.html)

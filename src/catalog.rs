@@ -20,7 +20,7 @@ use crate::venv::Distributions;
 use crate::version::Version;
 
 /// The page whose `#<rule id>` anchors document each embedded rule.
-const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules/");
+const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules.html");
 
 /// The address of the section about the embedded rule or package check `id` on the rules page.
 pub(crate) fn url(id: &str) -> String {

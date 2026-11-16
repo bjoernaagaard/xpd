@@ -80,13 +80,13 @@ plotting backend of pandas.
 | Hamilton | `node-mutates-input` | A node writes to its input, and Hamilton hands the same object to other nodes |
 | Python | `dict-str-any` | `dict[str, Any]` in a signature hides the keys the function uses |
 
-`xpd rules` lists every rule, and the [rules page](https://bjoernaagaard.github.io/xpd/rules/)
+`xpd rules` lists every rule, and the [rules page](https://bjoernaagaard.github.io/xpd/rules.html)
 shows each one with code before and after.
 
 ## Commands
 
 `xpd <command> -h` lists the flags of a command, and the
-[commands page](https://bjoernaagaard.github.io/xpd/commands/) shows the output and the exit
+[commands page](https://bjoernaagaard.github.io/xpd/commands.html) shows the output and the exit
 codes of each one.
 
 ```text
@@ -163,7 +163,7 @@ On macOS the model folder is `~/Library/Caches/xpd/models`, and on Windows it is
 
 `xpd lsp` starts a language server, so your editor shows each issue while you type, with a quick
 fix and the rule's documentation on hover. The
-[language server page](https://bjoernaagaard.github.io/xpd/lsp/) has the setup for Neovim, Helix,
+[language server page](https://bjoernaagaard.github.io/xpd/lsp.html) has the setup for Neovim, Helix,
 Zed and VS Code.
 
 ## Use with a coding agent
@@ -255,8 +255,8 @@ xpd mcp
 ```
 
 The server takes every rule and every result from the xpd binary, so it matches the installed
-version. The [MCP page](https://bjoernaagaard.github.io/xpd/mcp/) covers other clients, the
-settings and HTTP. The [code mode page](https://bjoernaagaard.github.io/xpd/code-mode/) shows a
+version. The [MCP page](https://bjoernaagaard.github.io/xpd/mcp.html) covers other clients, the
+settings and HTTP. The [code mode page](https://bjoernaagaard.github.io/xpd/code-mode.html) shows a
 run from a data file to a saved scikit-learn model, with checks that xpd runs itself.
 
 ### Skills

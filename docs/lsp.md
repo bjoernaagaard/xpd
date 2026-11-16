@@ -44,7 +44,7 @@ The server sends the diagnostic below for the same place. Lines and characters c
 {
   "code": "chained-assignment",
   "codeDescription": {
-    "href": "https://bjoernaagaard.github.io/xpd/rules/#chained-assignment"
+    "href": "https://bjoernaagaard.github.io/xpd/rules.html#chained-assignment"
   },
   "message": "Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, \"a\"] instead.",
   "range": {
@@ -147,7 +147,7 @@ Use instead:
 df.loc[row, "load"] = value
 ```
 
-[pandas/chained-assignment](https://bjoernaagaard.github.io/xpd/rules/#chained-assignment)
+[pandas/chained-assignment](https://bjoernaagaard.github.io/xpd/rules.html#chained-assignment)
 ````
 
 For a rule of the project, the hover shows the rule's `note`, or its `message` when it has no

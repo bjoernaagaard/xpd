@@ -5,8 +5,16 @@ cargo-deny = "0.20.2"
 lefthook = "2.2.2"
 jactionlint = "2.5.0"
 ruff = "0.17.4"
-"pipx:zensical" = "0.1.1"
+"github:rust-lang/mdBook" = "0.5.4"
+"github:badboy/mdbook-mermaid" = "0.17.1"
 "aqua:Kitware/CMake" = "latest"
+
+[tasks.docs]
+description = "Build the documentation site into site/"
+run = """
+mdbook-mermaid install .
+mdbook build
+"""
 
 # Builds the wheels this machine can build, to try a build before pushing a tag. zig cross-compiles
 # the C and C++ code of tree-sitter and llama.cpp for Linux. llama.cpp links Apple's frameworks on

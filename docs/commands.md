@@ -590,8 +590,8 @@ without rounding.
 | 1 | A comparison differs |
 | 2 | `refit` could not run, and the JSON has an `error` |
 
-!!! warning
-    joblib runs code when it loads a model, so load only a model you trust.
+> [!WARNING]
+> joblib runs code when it loads a model, so load only a model you trust.
 
 ## equiv
 

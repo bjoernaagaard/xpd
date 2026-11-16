@@ -1,7 +1,8 @@
-# Build output: cargo, maturin and zensical
 /target
 /dist
 /site
+/mermaid.min.js
+/mermaid-init.js
 
 # Local Python environment. xpd has no Python dependencies to lock.
 /.venv

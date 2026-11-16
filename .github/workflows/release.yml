@@ -8,7 +8,7 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
-    paths-ignore: [docs/**, zensical.toml, "**.md"]
+    paths-ignore: [docs/**, book.toml, "**.md"]
   workflow_dispatch:
 
 permissions:

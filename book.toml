@@ -1,0 +1,30 @@
+[book]
+title = "xpd"
+description = "Fast, opinionated linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn"
+language = "en"
+src = "docs"
+
+[build]
+build-dir = "site"
+
+[output.html]
+site-url = "/xpd/"
+git-repository-url = "https://github.com/bjoernaagaard/xpd"
+edit-url-template = "https://github.com/bjoernaagaard/xpd/edit/main/{path}"
+no-section-label = true
+smart-punctuation = false
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[output.html.search]
+heading-split-level = 4
+
+[output.html.redirect]
+"/commands/index.html" = "../commands.html"
+"/claude-code/index.html" = "../claude-code.html"
+"/mcp/index.html" = "../mcp.html"
+"/code-mode/index.html" = "../code-mode.html"
+"/lsp/index.html" = "../lsp.html"
+"/rules/index.html" = "../rules.html"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

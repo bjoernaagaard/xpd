@@ -1404,6 +1404,8 @@ The replacement is advice. xpd does not apply it automatically.
 
 ### groupby, agg and transform
 
+Replace a lambda or `apply` in a `groupby` with a built-in aggregation, which pandas runs in compiled code for all groups at once.
+
 #### groupby-lambda
 
 **Severity:** warning. **Fix:** unsafe: `"max"` for min, max, median, count and nunique, `"sum"`, `"mean"`. The named method can give another dtype, and it raises on a column the lambda could reduce. A reduction with arguments, a count of a condition and `resample` have no fix.
@@ -4170,6 +4172,8 @@ it from `scipy`. A form made only of NumPy names, such as `np.linalg.inv(a) @ b`
 
 ### Names that are gone or that warn
 
+Replace each name that SciPy removed or deprecated with the name the rule gives, because a removed name raises on import or on the call.
+
 #### removed-in-scipy
 
 **Severity:** error. **Fix:** unsafe: `trapezoid`, `cumulative_trapezoid` and `simpson` for `trapz`, `cumtrapz` and `simps`, `pinv` for `pinv2`, `eye` for `speye`, `median_abs_deviation` and `gibrat` for `median_absolute_deviation` and `gilbrat`, each in the module the code already names, `from scipy.integrate import trapezoid as trapz` for an import of the old name, `scipy.signal.windows.<name>` for a window on the `scipy.signal` namespace, `stats.mstats.find_repeats` and `kendalltau_seasonal`, and `np.<name>` for a NumPy name on the `scipy` namespace. Each is unsafe because the old body is not in SciPy 1.18.1, so the fix cannot be shown to give the same result. The other forms have no fix.
@@ -4243,6 +4247,8 @@ D = scipy.spatial.distance.cdist(X, Y)
 ```
 
 ### Arguments, defaults and legacy entry points
+
+Change each argument that SciPy removed, deprecated or ignores, and move each legacy function to the interface that SciPy's documentation names as its replacement.
 
 #### removed-keyword
 
@@ -4557,6 +4563,8 @@ u, p = stats.mannwhitneyu(x, y, use_continuity=False, method="asymptotic")
 
 ### Forms that keep digits
 
+Use the SciPy function that computes the quantity directly, because the two-step form loses digits when a value is close to 0 or 1.
+
 #### log-of-special
 
 **Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5. A function imported by name has no fix.
@@ -4865,6 +4873,8 @@ x = spla.spsolve(A, b)
 
 ### Sparse matrices
 
+Build a sparse matrix in a format made for writes, and use the sparse array classes in place of the matrix classes.
+
 #### empty-csr-write
 
 **Severity:** warning. **Fix:** none.
@@ -4922,6 +4932,8 @@ I = sparse.eye_array(n)
 ```
 
 ### The API that SciPy's docs prefer on SciPy 1.18
+
+Use the class or module that SciPy's documentation prefers, because the older name stays only for old code.
 
 #### ckdtree
 
@@ -6327,6 +6339,8 @@ imported under another name and a method held in a variable.
 
 ### Reproducible results
 
+Pass `random_state` wherever scikit-learn shuffles or draws, so two runs give the same split and the same score.
+
 #### random-state-without-shuffle
 
 **Severity:** error. **Fix:** none.
@@ -6925,6 +6939,8 @@ that `LogisticRegression` is a classifier.
 
 ### Scorers, datasets and helpers
 
+Call each scikit-lego scorer, dataset loader and pipeline helper with the arguments it reads, because the forms below raise or return something other than the code expects.
+
 #### scorer-called-as-metric
 
 **Severity:** error. **Fix:** unsafe: `p_percent_score("sex")` for `make_scorer(p_percent_score("sex"))`. The other forms have no fix.
@@ -7213,6 +7229,8 @@ is another basis than the radial one, so its columns are other numbers. `Identit
 `FunctionTransformer()` returned the same array.
 
 ### Speed and repeatable runs
+
+Keep `GroupTimeSeriesSplit` to few folds, and give each estimator that draws random numbers a seed, so a run finishes and repeats.
 
 #### group-time-series-split-folds
 
@@ -7818,6 +7836,8 @@ The replacement is advice. xpd does not apply it automatically.
 
 ### Work done twice
 
+Take the points and the intervals from one call, and pass every confidence level to one estimator, because each extra call repeats the same work.
+
 #### predict-and-predict-interval
 
 **Severity:** warning. **Fix:** none.
@@ -7893,6 +7913,8 @@ then differ from the list form. `ConformalizedQuantileRegressor` takes one level
 leaves it alone.
 
 ### Reproducible results
+
+Pass `random_state` to each MAPIE resampler, so two runs give the same intervals.
 
 #### unseeded-resampling
 
@@ -8602,6 +8624,8 @@ keyword is safe.
 
 ### Encoders that scikit-learn ships
 
+Use scikit-learn's own encoder where it ships the same one, because its `OneHotEncoder` ran `fit_transform` 2.7 to 4.5 times faster.
+
 #### sklearn-ships-encoder
 
 **Severity:** info. **Fix:** none.
@@ -8661,6 +8685,8 @@ the scikit-learn class 0.544, over 30 seeds with a random forest. The rule there
 speed and nothing about the score.
 
 ### Reproducible results
+
+Pass `random_state` to an encoder that adds noise, so two runs give the same codes.
 
 #### encoder-noise-without-seed
 
@@ -9527,6 +9553,8 @@ code doesn't show a dtype, so the rule is info, and data that is categorical whe
 reported without need.
 
 ### Results
+
+Read a linearmodels result by its own attribute names, pass `compare` a precision that it takes, and use the built-in Hausman test in place of one written by hand.
 
 #### statsmodels-result-name
 
@@ -12779,6 +12807,8 @@ import.
 
 ### Shared inputs
 
+Copy an input before a node changes it, because Hamilton hands the same object to every node that takes the input.
+
 #### node-mutates-input
 
 **Severity:** error. **Fix:** none.
@@ -12849,6 +12879,8 @@ and the `python-review` skill reviews code against it.
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors` |
 
 ### Names
+
+Name each module after what it holds, and leave the underscore off module level names.
 
 #### module-private-name
 
@@ -12934,6 +12966,8 @@ other module imports it. xpd reports the file on line 1.
 
 ### Modules
 
+Keep calls and environment reads out of the top level of a module, so an import runs no work.
+
 #### import-side-effect
 
 **Severity:** warning. **Fix:** none.
@@ -12995,6 +13029,8 @@ The rule leaves alone the cases in the list:
 - A call inside `if`, `try`, `with` or a class body, and a call whose result is assigned.
 
 ### Types
+
+State the real type in a signature, so the type checker can check the keys and the values the function uses.
 
 #### typing-cast
 
@@ -13076,6 +13112,8 @@ ruff's `ANN401` reports a parameter or a return value annotated with `Any` alone
 
 ### Tests
 
+Test with real objects, because a test with a mock checks the mock and not the code.
+
 #### mock-import
 
 **Severity:** warning. **Fix:** none.
@@ -13108,6 +13146,8 @@ A test that replaces a function with a mock passes when the mock is called the w
 expects, whatever the real function does. Run the real code on real input.
 
 ### Comprehensions
+
+Write a loop when a comprehension merges dicts, unpacks or holds two `for` clauses, because the loop is easier to read.
 
 #### comprehension-merges-dicts
 

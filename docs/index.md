@@ -80,6 +80,8 @@ xpd check .
 
 ## Where to go next
 
+Pick the page for what you want to do next.
+
 | You want to | Page |
 | --- | --- |
 | see every command, its output and its exit codes | [Commands](commands.md) |
