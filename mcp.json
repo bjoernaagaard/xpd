@@ -4,7 +4,7 @@
     "xpd": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["xpd@0.17.0", "mcp"]
+      "args": ["xpd@0.18.0", "mcp"]
     }
   }
 }
