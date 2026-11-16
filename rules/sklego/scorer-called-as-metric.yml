@@ -1,0 +1,46 @@
+# p_percent_score, equal_opportunity_score, correlation_score and subset_score of sklego.metrics
+# are factories. Each takes the column to look at and returns a scorer with the signature
+# (estimator, X, y), which scoring= takes as it is.
+#
+# make_scorer expects a metric with the signature (y_true, y_pred) and calls the scorer with
+# those, so the scorer indexes the target with the column name and raises IndexError, or
+# TypeError for equal_opportunity_score. Inside a search scikit-learn catches the error and the
+# score of every candidate is NaN.
+
+id: scorer-called-as-metric
+language: python
+severity: error
+message: $S returns a scorer that takes (estimator, X, y), and make_scorer calls it with (y_true, y_pred), which raises IndexError or TypeError and makes every score of a search NaN. Pass the scorer itself to scoring=.
+rule:
+  pattern: $M($S($$$B))
+constraints:
+  M: { regex: '(^|\.)make_scorer$' }
+  S: { regex: '(^|\.)(p_percent_score|equal_opportunity_score|correlation_score|subset_score)$' }
+fix: $S($$$B)
+metadata: { fix: unsafe }
+---
+# The same call with more arguments to make_scorer, which the scorer has no place for.
+id: scorer-called-as-metric
+language: python
+severity: error
+message: $S returns a scorer that takes (estimator, X, y), and make_scorer calls it with (y_true, y_pred), which raises IndexError or TypeError and makes every score of a search NaN. Pass the scorer itself to scoring=.
+rule:
+  pattern: $M($S($$$B), $$$A)
+  has: { field: arguments, has: { nthChild: 2 } }
+constraints:
+  M: { regex: '(^|\.)make_scorer$' }
+  S: { regex: '(^|\.)(p_percent_score|equal_opportunity_score|correlation_score|subset_score)$' }
+---
+# Called as a metric, the factory takes the target as the column and the predictions as the
+# positive label, and returns a function where the code expects a number. Nothing raises.
+id: scorer-called-as-metric
+language: python
+severity: error
+message: $S($Y, $P) does not compute a score. It reads $Y as the sensitive column and returns a function. Call $S(column)(model, X, y), where column names the sensitive column of X.
+rule:
+  pattern: $F($Y, $P)
+  has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $S } }, { pattern: $S }] }
+constraints:
+  S: { regex: '^(p_percent_score|equal_opportunity_score)$' }
+  Y: { kind: identifier, regex: '^(y|Y|y_?(true|test|val|valid|train)|labels?|targets?)$' }
+  P: { kind: identifier }

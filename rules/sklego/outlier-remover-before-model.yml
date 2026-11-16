@@ -1,0 +1,26 @@
+# OutlierRemover drops rows of X while the pipeline is fitted, and a scikit-learn pipeline has
+# no way to drop the same rows of y. The step after it gets fewer rows of X than of y, and a
+# model that reads y raises ValueError "Found input variables with inconsistent numbers of
+# samples: [356, 400]". A pipeline that ends in a clusterer, which reads no y, fitted on the 356
+# kept rows. The rule reports the remover when the pipeline holds a step named like a regressor
+# or a classifier.
+
+id: outlier-remover-before-model
+language: python
+severity: error
+message: 'OutlierRemover drops rows of X and leaves y whole, so the model after it raises ValueError "Found input variables with inconsistent numbers of samples: [356, 400]". Drop the outliers from X and y before the pipeline, with the detector''s fit_predict as a mask.'
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)OutlierRemover$' }
+    - inside:
+        stopBy: end
+        kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(make_pipeline|Pipeline|make_debug_pipeline|DebugPipeline)$' }
+          - has:
+              field: arguments
+              has:
+                stopBy: end
+                kind: call
+                has: { field: function, regex: '(Regressor|Classifier|Regression|RegressionCV|(^|\.)(Ridge|RidgeCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|SVC|SVR|NuSVC|NuSVR|LinearSVC|LinearSVR|GaussianNB|MultinomialNB|BernoulliNB|Perceptron|LinearDiscriminantAnalysis|QuadraticDiscriminantAnalysis))$' }

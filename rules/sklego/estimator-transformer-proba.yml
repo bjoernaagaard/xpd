@@ -1,0 +1,18 @@
+# EstimatorTransformer.transform reshapes the output of the inner method to one column when the
+# target has one dimension. predict_proba returns one column per class, so a binary model on 400
+# rows came back as 800 rows and 1 column, with the two probabilities of each row stacked. A
+# pipeline or FeatureUnion around it then raises ValueError on the row counts.
+
+id: estimator-transformer-proba
+language: python
+severity: error
+message: EstimatorTransformer reshapes the output to one column, so predict_proba on 400 rows came back with the shape (800, 1), and a pipeline around it raised ValueError. Use predict_func="decision_function" for a binary model, or scikit-learn's StackingClassifier(stack_method="predict_proba").
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)EstimatorTransformer$' }
+    - has:
+        field: arguments
+        any:
+          - has: { kind: keyword_argument, regex: '^predict_func\s*=\s*["''](predict_proba|predict_log_proba)["'']$' }
+          - has: { nthChild: 2, kind: string, regex: '^["''](predict_proba|predict_log_proba)["'']$' }

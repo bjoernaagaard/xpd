@@ -1,0 +1,121 @@
+# Each document finds a scikit-lego form that raises a DeprecationWarning on 0.9.10. The old
+# form still runs and gives the same result as the new one, so the renames are safe fixes.
+# A function or class that the file itself defines under an old name is the file's own, and its
+# definition stays silent.
+
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: KlusterFoldValidation warns since scikit-lego 0.8.2 and only calls ClusterFoldValidation. Use ClusterFoldValidation.
+rule:
+  kind: identifier
+  regex: ^KlusterFoldValidation$
+  not: { any: [{ inside: { kind: function_definition, field: name } }, { inside: { kind: class_definition, field: name } }] }
+fix: ClusterFoldValidation
+metadata: { fix: safe, since: "0.8.2" }
+---
+# TypeSelector reads a pandas frame with select_dtypes, as PandasTypeSelector did, so the columns
+# it keeps are the same.
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: PandasTypeSelector warns since scikit-lego 0.9.0 and is a subclass of TypeSelector that adds nothing. Use TypeSelector, which also takes Polars frames.
+rule:
+  kind: identifier
+  regex: ^PandasTypeSelector$
+  not: { any: [{ inside: { kind: function_definition, field: name } }, { inside: { kind: class_definition, field: name } }] }
+fix: TypeSelector
+metadata: { fix: safe, since: "0.9" }
+---
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: TimeGapSplit renamed date_serie= to date_series= in scikit-lego 0.9.9, and date_serie= warns. Pass date_series= instead.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^date_serie$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    not: { has: { kind: keyword_argument, has: { field: name, regex: ^date_series$ } } }
+    inside:
+      kind: call
+      has: { field: function, regex: '(^|\.)TimeGapSplit$' }
+fix: date_series=$V
+metadata: { fix: safe, since: "0.9.9" }
+---
+# The fitted attributes that scikit-lego renamed to the scikit-learn names. Each old name is a
+# property that warns and returns the new one. An assignment to the name, and a name on self, is
+# the user's own attribute.
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: $A warns since scikit-lego 0.7.0 and returns n_features_in_. Read n_features_in_ instead.
+rule:
+  kind: attribute
+  all:
+    - has: { field: object, pattern: $O, not: { regex: '^(self|cls)$' } }
+    - has: { field: attribute, pattern: $A, regex: '^(dim_|num_fit_cols_|n_columns_|num_cols_)$' }
+  not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+fix: $O.n_features_in_
+metadata: { fix: safe, since: "0.7" }
+---
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: n_levels_ warns since scikit-lego 0.9.0 and returns n_fitted_levels_. Read n_fitted_levels_ instead.
+rule:
+  kind: attribute
+  all:
+    - has: { field: object, pattern: $O, not: { regex: '^(self|cls)$' } }
+    - has: { field: attribute, regex: '^n_levels_$' }
+  not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+fix: $O.n_fitted_levels_
+metadata: { fix: safe, since: "0.9" }
+---
+# MLPClassifier and MLPRegressor of scikit-learn have a real coefs_, so a file that names an MLP
+# is left alone.
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: coefs_ warns since scikit-lego 0.7.0 and returns coef_. Read coef_ instead.
+rule:
+  kind: attribute
+  all:
+    - has: { field: object, pattern: $O, not: { regex: '^(self|cls)$' } }
+    - has: { field: attribute, regex: '^coefs_$' }
+    - not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+    - inside: { stopBy: end, kind: module, all: [{ regex: '\b(ProbWeightRegression|DeadZoneRegressor)\b' }, { not: { regex: '\bMLP' } }] }
+fix: $O.coef_
+metadata: { fix: safe, since: "0.7" }
+---
+# The replacement that the warning names is a private constant, so the rule offers no fix.
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: $A warns since scikit-lego 0.7.0. The values it returns are fixed, so write them out where the code needs them.
+rule:
+  kind: attribute
+  all:
+    - has: { field: object, not: { regex: '^(self|cls)$' } }
+    - has: { field: attribute, pattern: $A, regex: '^(allowed_strategies|allowed_methods|allowed_effects)$' }
+  not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+metadata: { since: "0.7" }
+---
+id: deprecated-in-sklego
+language: python
+severity: warning
+message: $C warns on penalty="none" since scikit-lego 0.9.1. Pass penalty=None, which fits the same coefficients.
+rule:
+  kind: keyword_argument
+  regex: '^penalty\s*=\s*["'']none["'']$'
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+constraints:
+  C: { regex: '^(DemographicParityClassifier|EqualOpportunityClassifier)$' }
+fix: penalty=None
+metadata: { fix: safe, since: "0.9.1" }

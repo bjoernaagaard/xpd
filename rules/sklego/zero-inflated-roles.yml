@@ -1,0 +1,48 @@
+# ZeroInflatedRegressor takes the classifier first, which decides zero or not, and the regressor
+# second, which predicts the size. fit checks both with is_classifier and is_regressor and raises
+# ValueError "`classifier` has to be a classifier" or "`regressor` has to be a regressor". The
+# rule reads the class names, and LogisticRegression is a classifier.
+
+id: zero-inflated-roles
+language: python
+severity: error
+message: ZeroInflatedRegressor takes the classifier first and the regressor second, and fit raises ValueError "`classifier` has to be a classifier" on $M. Pass a classifier there.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)ZeroInflatedRegressor$' }
+    - has:
+        field: arguments
+        any:
+          - has: { nthChild: 1, matches: regressor }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^classifier$' } }, { has: { field: value, matches: regressor } }] }
+utils:
+  regressor:
+    kind: call
+    has:
+      field: function
+      any: [{ kind: attribute, has: { field: attribute, pattern: $M } }, { pattern: $M }]
+constraints:
+  M: { regex: '^(\w*Regressor|LinearRegression|\w*Ridge(CV)?|Lasso(CV)?|ElasticNet(CV)?|SVR|NuSVR|LinearSVR)$' }
+---
+id: zero-inflated-roles
+language: python
+severity: error
+message: ZeroInflatedRegressor takes the classifier first and the regressor second, and fit raises ValueError "`regressor` has to be a regressor" on $M. Pass a regressor there.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)ZeroInflatedRegressor$' }
+    - has:
+        field: arguments
+        any:
+          - has: { nthChild: 2, matches: classifier }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^regressor$' } }, { has: { field: value, matches: classifier } }] }
+utils:
+  classifier:
+    kind: call
+    has:
+      field: function
+      any: [{ kind: attribute, has: { field: attribute, pattern: $M } }, { pattern: $M }]
+constraints:
+  M: { regex: '^(\w*Classifier|LogisticRegression(CV)?|SVC|NuSVC|LinearSVC|\w+NB)$' }
