@@ -9486,9 +9486,10 @@ figure. The method is called on the call that makes the figure, as in
 `px.bar(...).update_xaxes(...)`, or on a variable that was assigned from such a call at most 12
 statements earlier in the same block. A second assignment to the variable, a loop variable or
 a `with ... as` of the same name between the two ends the proof, and so does a parameter. A
-figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure,
-and it does not prove a bar chart, so [`bar-axis-without-zero`](#bar-axis-without-zero) is
-silent there.
+figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure.
+What it holds is proved by the statements after the assignment: an `add_trace` of a `go.Bar`
+makes it a bar chart for [`bar-axis-without-zero`](#bar-axis-without-zero), when no second
+assignment of the name comes between the two.
 
 A rule reads a value only where it is written in the call: a number, a string, `True` or
 `None`. A name in that place may hold any value, so the rule is silent.
@@ -9544,24 +9545,47 @@ A review then changed six rules, and the table gives the counts after it:
 - The rules count the items of a list without the comments between them, which adds one
   report of `legend-instead-of-labels`: two lines with a third one commented out.
 
+The second version reads the `go` forms of seven rules, and the table gives the counts with
+them. Every new report of a rule with 20 or fewer was read, and 20 of each form of
+`legend-instead-of-labels`:
+
+- `animation-frame` reads `go.Figure(frames=...)`, `fig.update(frames=...)` and
+  `fig.frames = ...`. 14 reports are new, and all 14 build an animation from `go.Frame`.
+- `free-facet-scales` reads a loop that adds the same written column as `y` to the cells of
+  `make_subplots`. 2 reports are new. A third, on a long table whose `"Value"` column held a
+  different variable in each panel, led to the rule leaving a column named `value` alone.
+- `legend-instead-of-labels` reads two to four named lines added one by one to an empty
+  `go.Figure()`, and `px.line` with `color` or with `y` as a written list. 24 and 52 reports
+  are new. Of the 40 reports read, 39 name lines that only a legend identifies. The 40th was a
+  dot plot that `update_traces(mode="markers")` turns into points, and the rule now leaves such
+  a file alone. In 3 of the 39, one line for each training run, the number of runs is not in
+  the code.
+- `pie-chart` reports each `go.Pie` that shares its figure with another pie with the message
+  for several pies. 15 reports changed their message, and the count stayed the same.
+- `redundant-color` reads `go.Bar` with `marker_color` equal to `x` or `y`. 7 reports are new,
+  and all 7 color the bars by their own length.
+- `bar-axis-without-zero` reads bars added with `add_trace` or `add_bar`, and
+  `marker-size-diameter` reads `go.scatter.Marker(size=...)` and a column read as
+  `df.pop_total`. Neither form is in this code with a value the rule reads.
+
 | Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Fix |
 | --- | --- | --- | --- | --- | --- |
 | [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 1, 0, 6 | none |
-| [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | none |
+| [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels, 145.4 and 290.9 in a `go.Figure` | 0, 0, 0 | none |
 | [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | none |
 | [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | none |
 | [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | none |
-| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel | 2, 0, 0 | none |
+| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel. Drawn: bars of 5 and 10 equally tall | 2, 0, 2 | none |
 | [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 102, 18, 231 | unsafe |
 | [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | unsafe |
 | [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 2, 1, 13 | none |
-| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels | 14, 0, 82 | none |
+| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels. Drawn: 3 shades for 3 bar lengths | 16, 0, 87 | none |
 | [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
 | [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
-| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet | 28, 7, 128 | none |
+| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet or in 2 cells | 28, 7, 128 | none |
 | [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | unsafe |
-| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once | 8, 1, 18 | none |
-| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 1, 2, 2 | none |
+| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once. Drawn: 1 of 3 frames | 11, 1, 29 | none |
+| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 7, 3, 71 | none |
 | [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
 
 `default-template` reports a file once, so its 351 reports are 351 of the 1,087 files.
@@ -9592,8 +9616,6 @@ The book states principles that the code of a figure does not show, so no rule c
   missing argument.
 - The Shrink Principle (page 169). The right size of a figure depends on how many values it
   shows, which the code does not say.
-- A pie made of several `go.Pie` traces, or bars added to an empty `go.Figure()` with
-  `add_trace`. xpd does not follow a figure through its statements.
 
 ### Sizes that do not follow the numbers
 
@@ -9607,7 +9629,7 @@ and calls a factor above 1.05 or below 0.95 a substantial distortion (page 57).
 
 **Severity:** error. **Fix:** none.
 
-Reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
+Reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}`, `marker=go.scatter.Marker(size=...)` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
 
 Example:
 
@@ -9637,8 +9659,12 @@ one on the plotly page about bubble charts.
 `px.scatter(size=...)` and the six other px functions that take `size` set `sizemode="area"`
 themselves, so they are not reported.
 
-The rule reads a size only when it takes a column by name, as `df["pop"]` and `df["pop"] / 10`
-do, from an object that the same trace reads `x`, `y` or another coordinate from. A number, a
+The rule reads a size only when it takes a column by name, as `df["pop"]`, `df["pop"] / 10` and
+`df.pop_total` do, from an object that the same trace reads `x`, `y` or another coordinate from.
+A pandas property such as `df.size` or `df.index` is not a column, and neither is a method that
+is called, such as `np.full(...)`. `go.scatter.Marker(size=df.pop_total)` resolved to
+`sizemode="diameter"` and drew sizes 10, 20 and 40 with radii of 5, 10 and 20 pixels, the same
+as `dict(size=...)`. A number, a
 bare name, a written list, a column of another object and a size chosen with `np.where` or a
 condition may be a design choice, so they are left alone. So is a size that the code takes a
 root, a power or a logarithm of: with `np.sqrt(df["pop"])` the areas for 100, 400 and 1,600 were
@@ -9655,7 +9681,7 @@ fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, 
 
 **Severity:** warning. **Fix:** none.
 
-Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`, and in the constructor `go.Figure(data=[go.Bar(...)], layout=...)` with `yaxis=dict(range=...)` in the layout or with `layout_yaxis_range=...`.
+Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`, and in the constructor `go.Figure(data=[go.Bar(...)], layout=...)` with `yaxis=dict(range=...)` in the layout or with `layout_yaxis_range=...`. The same three settings afterwards are read on a `go.Figure()` that gets its bars from `fig.add_trace(go.Bar(...))` or `fig.add_bar(...)`.
 
 Example:
 
@@ -9689,6 +9715,14 @@ and `base`, or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `o
 to 100 lay whole inside `range_y=[90, 101]`, with lengths in the ratio of their values. A
 `go.Figure` with a `go.Bar` and `layout=go.Layout(yaxis=dict(range=[90, 101]))` resolved to the
 y range 90 to 101, as `update_yaxes` does.
+
+Bars of 95 and 100 added with `add_trace` to an empty `go.Figure()` kept
+`update_yaxes(range=[90, 101])` as written and were drawn 145.4 and 290.9 pixels long, the same
+as bars given to `go.Figure` itself, and 288.8 and 304.0 pixels long without the range.
+`add_bar` with `update_layout(yaxis_range=[90, 101])` drew the same lengths. The bar must be
+added to the same variable after its assignment and before the range, in the statement itself
+or in a loop or a condition, with no second assignment of the name in between. A bar with
+`orientation`, `base` or `yaxis` is left alone.
 
 #### polar-bar-area
 
@@ -9792,7 +9826,7 @@ does not read it.
 
 **Severity:** info. **Fix:** none.
 
-Reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`.
+Reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`. It also reports a loop that adds a `go.Scatter`, `go.Scattergl`, `go.Bar`, `go.Box` or `go.Violin` with the same written column as `y` to the cells of a `make_subplots` figure without `shared_yaxes`, where the row or the col changes with the loop.
 
 Example:
 
@@ -9816,6 +9850,33 @@ the second y axis resolved to `matches="y"`, and both panels got the range 0.38 
 was drawn at 0.70 of the height of one panel and at 0.45 of the other. A reader who compares
 heights across the panels reads a difference that the data does not have. Free scales are
 right when the panels hold different units, which is why the rule is info.
+
+`make_subplots` gives every cell its own y axis. With `rows=1, cols=2`, a bar of 5 in one cell
+and a bar of 10 in the other resolved to the ranges 0 to 5.26 and 0 to 10.53 with no
+`matches`, and both bars were drawn 304.0 pixels tall. With `shared_yaxes="all"` both axes got 0
+to 10.53 and the bars were 152.0 and 304.0 pixels tall. `shared_yaxes=True` shares the axes of
+one row only: with `rows=2, cols=1` the two axes kept 0 to 5.26 and 0 to 10.53, so the message
+names `"all"`.
+
+Example:
+
+```python
+fig = make_subplots(rows=1, cols=2)
+for i, (shop, part) in enumerate(df.groupby("shop")):
+    fig.add_trace(go.Bar(x=part["month"], y=part["sales"]), row=1, col=i + 1)
+```
+
+Use instead:
+
+```python
+fig = make_subplots(rows=1, cols=2, shared_yaxes="all")
+```
+
+The rule reads a loop because a column written as `y=part["sales"]` in each pass proves that
+every panel holds the same measure. A column named `value` or `values` is left alone, because
+`pd.melt` gives that name to the column of a long table, which holds a different measure in
+each panel. So is a file that names `matches`, `shared_yaxes` or a y axis range anywhere, which
+may set the scales afterwards, and a trace added with `secondary_y`.
 
 ### Ink that shows no data
 
@@ -9966,6 +10027,13 @@ One color for each category is sometimes meant, to match the colors of another c
 same categories, which is why the rule is info. A column given by a name, as in
 `color=column`, is left alone.
 
+The rule also reads `go.Bar` whose `marker_color`, or `color` inside `marker`, is the same
+expression as its `x` or `y`, as in `go.Bar(x=names, y=df["sales"], marker_color=df["sales"])`.
+`go.Bar(y=[1, 2, 4], marker_color=[1, 2, 4])` drew the three bars in `rgb(13, 8, 135)`,
+`rgb(156, 23, 158)` and `rgb(240, 249, 33)`, where the same bars without `marker_color` were all
+`rgb(99, 110, 250)`. The length of a bar already shows its value, so the colors repeat it. A
+written string or number as the color is left alone.
+
 #### pattern-fill
 
 **Severity:** warning. **Fix:** none.
@@ -10033,7 +10101,7 @@ does not show.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `px.pie(...)` and `go.Pie(...)`, and with a second message `px.pie` with `facet_col` or `facet_row`, which draws several pies.
+Reports `px.pie(...)` and `go.Pie(...)`. A second message goes to `px.pie` with `facet_col` or `facet_row`, which draws several pies, and to each `go.Pie` that shares its figure with another pie: two in the data list of `go.Figure` or of `add_traces`, an `add_trace` of a pie next to another `add_trace` of a pie on the same figure, or a pie added in a loop to a cell that changes with the loop.
 
 Example:
 
@@ -10061,6 +10129,11 @@ few shares, `go.Table` shows the exact numbers.
 
 A facet given as `None` draws one pie and gets the first message. `px.sunburst` and
 `px.funnel_area` are not reported, because the book names the pie chart alone.
+
+`make_subplots(rows=1, cols=2)` with two cells of type `"domain"` and a `go.Pie` added to each
+resolved to two traces of type `pie` with the domains 0 to 0.45 and 0.55 to 1 across. Each pie
+is reported once, with the message for several pies. Two `add_trace` calls count as one figure
+only when no second assignment of the name comes between them.
 
 #### spline-line
 
@@ -10097,7 +10170,7 @@ name is left alone.
 
 **Severity:** info. **Fix:** none.
 
-Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11.
+Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11. It also reports frames built with `go.Frame`: `frames=` in `go.Figure` or in `update` on a plotly figure, and `fig.frames = ...`.
 
 Example:
 
@@ -10127,13 +10200,20 @@ the rule is info and has no fix. 11 of the 28 functions have no `facet_col`: `ba
 raised TypeError, "got an unexpected keyword argument 'facet_col'", so for those the message
 says to draw one panel for each frame with `make_subplots`.
 
+A `go.Figure` with three frames of one point each held the 3 frames and drew 1 point, and the
+page that `to_html` wrote passed the three frames to `Plotly.addFrames`. The same three points in
+`make_subplots(rows=1, cols=3)` drew all 3. `full_figure_for_development` keeps no frames, so
+the count was read from the figure and the drawn page. Frames copied from another figure, as
+`frames=fig.frames`, are left alone, because the figure they come from is reported where it is
+made, and so are `frames=None` and `frames=[]`.
+
 ### Words on the figure
 
 #### legend-instead-of-labels
 
 **Severity:** info. **Fix:** none.
 
-Reports a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`, in a file that names no `showlegend`, no annotation and no text mode.
+Reports three forms in a file that names no `showlegend`, no annotation and no text mode: a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`, two to four such calls added one by one with `fig.add_trace(...)` to an empty `go.Figure()`, and `px.line` with `color="column"` or with `y` as a written list of two to four column names.
 
 Example:
 
@@ -10163,10 +10243,23 @@ as friendly: "labels are placed on the graphic itself; no legend is required" (p
 entries. With `mode="lines+text"`, a label at the last point of each line and
 `showlegend=False`, it drew no legend and the names beside the lines.
 
-xpd cannot count the traces of a figure at run time, so the rule reads the one form where the
-code shows the count. A `px.line(color=...)` and traces added with `add_trace` are not
-reported. A trace with `mode="markers"` is left alone, and so is a list with a fifth trace,
-because many lines have no room for a label each.
+Two named lines added one by one with `add_trace` resolved to `showlegend=True` and drew a
+legend of two entries, the same figure. The statements count when they follow each other with
+no second assignment of the name in between. A figure that also gets a trace in another way,
+such as `add_bar`, `add_traces`, an `add_trace` of another trace, or an `add_trace` in a loop or
+a condition, is left alone, because the code then does not show the size of the legend. So is
+an `add_trace` with `row`, `col` or `secondary_y`.
+
+`px.line(color="sex")` drew two lines and a legend of two entries, and `px.line(y=["a", "b"])`
+drew a legend of two entries titled "variable". The number of values of a column is known only
+at run time, so a `px.line` with `color` may draw many lines. Of 20 such reports read, every
+one is a chart of several lines told apart by the legend alone, and in 3 of them the number of
+lines is not in the code. A call with `line_group`, where many lines
+share one entry, is left alone.
+
+A trace with `mode="markers"` is left alone, and so is a file that calls
+`update_traces(mode="markers")`, a written list with a fifth trace, and a run of five
+`add_trace` calls, because many lines have no room for a label each.
 
 #### rotated-tick-labels
 

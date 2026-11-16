@@ -16,7 +16,9 @@ rule:
     - all:
         - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(pie)$' } }, { has: { field: object, matches: px } }] }
         - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(facet_col|facet_row)$' } }, { not: { has: { field: value, kind: none } } }] } } }
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] }
+    - all:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] }
+        - not: { matches: several-pies }
 utils:
   # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
   px:
@@ -52,6 +54,131 @@ utils:
               - any:
                   - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
                   - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that puts its trace in a cell that changes with the loop around it: row or col, as a
+  # keyword or as the second or third argument, names a variable that the loop binds, in its
+  # target or by an assignment in its body.
+  loop-cell:
+    kind: call
+    has:
+      field: arguments
+      has:
+        all:
+          - any:
+              - { kind: keyword_argument, has: { field: name, regex: '^(row|col)$' } }
+              - { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument }] } } } }
+              - { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument }] } } } }
+          - any: [{ matches: cell-var }, { has: { stopBy: end, matches: cell-var } }]
+  cell-var:
+    kind: identifier
+    pattern: $V
+    not: { inside: { kind: keyword_argument, field: name } }
+    inside:
+      stopBy: end
+      kind: for_statement
+      any:
+        - has: { field: left, any: [{ pattern: $V }, { has: { stopBy: end, pattern: $V } }] }
+        - has: { field: body, has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $V }, { has: { stopBy: end, pattern: $V } }] } } }
+  # A go.Pie call.
+  pie:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] }
+  # A statement that adds a pie to $FIG.
+  pie-added:
+    has:
+      stopBy: end
+      kind: call
+      any:
+        - all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_traces?$' } }] }
+            - has: { field: arguments, has: { stopBy: end, matches: pie } }
+        - has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_pie$' } }] }
+  # A go.Pie that shares its figure with another pie.
+  several-pies:
+    matches: pie
+    any:
+      # Two pies in one written list of traces, for go.Figure or for add_traces.
+      - any: [{ precedes: { stopBy: end, matches: pie } }, { follows: { stopBy: end, matches: pie } }]
+        inside:
+          kind: list
+          any:
+            - inside: { kind: argument_list, inside: { matches: takes-traces } }
+            - inside: { kind: keyword_argument, has: { field: name, regex: '^data$' }, inside: { kind: argument_list, inside: { matches: takes-traces } } }
+      # A pie added to a figure that gets another pie, with no assignment of the name in
+      # between, or that is added in a loop over the cells.
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            all:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^add_trace$' } }, { has: { field: object, kind: identifier, pattern: $FIG, matches: figure } }] }
+              - any:
+                  - matches: loop-cell
+                  - inside:
+                      stopBy: end
+                      kind: expression_statement
+                      any:
+                        - follows: { stopBy: { matches: holds-binder }, matches: pie-added }
+                        - precedes: { stopBy: { matches: holds-binder }, matches: pie-added }
+  takes-traces:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^add_traces$' } }, { has: { field: object, matches: figure } }] }
 ---
 # Several pies. px.pie with facet_col="sex" drew two pie traces side by side, and four with
 # facet_row as well (runs/behavior.txt). A facet given as None is left to the first document.
@@ -82,3 +209,160 @@ utils:
               - any:
                   - has: { field: name, regex: '^plotly\.express$' }
                   - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# Several go.Pie traces in one figure: two or more in the data list of go.Figure or of add_traces,
+# a pie added with add_trace next to another add_trace of a pie on the same figure, or a pie added
+# in a loop to a cell whose row or col changes with the loop, as into the cells of type "domain"
+# of make_subplots. On plotly 7.1.0 make_subplots(rows=1, cols=2) with two cells of type "domain"
+# and a go.Pie added to each resolved to two traces of type "pie" with the domains x (0, 0.45) and
+# (0.55, 1) (runs/v2/A/probe_a.txt). Each pie is reported once, by this document instead of the
+# first.
+id: pie-chart
+language: python
+severity: warning
+message: This pie is one of several in the figure, and Tufte calls several pies the only design worse than one pie, because the reader compares shares within and between them. Draw the groups as bars on one shared scale, with px.bar and facet_col or color, or put the numbers in a go.Table.
+rule:
+  matches: several-pies
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable that holds it. The variable
+  # counts when the statement around the call, or a block around that statement, comes at most
+  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
+  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
+  # same name ends the proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - kind: identifier
+        pattern: $FIG
+        inside:
+          stopBy: { kind: block, inside: { kind: function_definition } }
+          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
+  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+  back-1: { follows: { matches: fig-assigned } }
+  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
+  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
+  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
+  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
+  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
+  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
+  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
+  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
+  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
+  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
+  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+  # A call that puts its trace in a cell that changes with the loop around it: row or col, as a
+  # keyword or as the second or third argument, names a variable that the loop binds, in its
+  # target or by an assignment in its body.
+  loop-cell:
+    kind: call
+    has:
+      field: arguments
+      has:
+        all:
+          - any:
+              - { kind: keyword_argument, has: { field: name, regex: '^(row|col)$' } }
+              - { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument }] } } } }
+              - { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument }] } } } }
+          - any: [{ matches: cell-var }, { has: { stopBy: end, matches: cell-var } }]
+  cell-var:
+    kind: identifier
+    pattern: $V
+    not: { inside: { kind: keyword_argument, field: name } }
+    inside:
+      stopBy: end
+      kind: for_statement
+      any:
+        - has: { field: left, any: [{ pattern: $V }, { has: { stopBy: end, pattern: $V } }] }
+        - has: { field: body, has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $V }, { has: { stopBy: end, pattern: $V } }] } } }
+  # A go.Pie call.
+  pie:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] }
+  # A statement that adds a pie to $FIG.
+  pie-added:
+    has:
+      stopBy: end
+      kind: call
+      any:
+        - all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_traces?$' } }] }
+            - has: { field: arguments, has: { stopBy: end, matches: pie } }
+        - has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_pie$' } }] }
+  # A go.Pie that shares its figure with another pie.
+  several-pies:
+    matches: pie
+    any:
+      # Two pies in one written list of traces, for go.Figure or for add_traces.
+      - any: [{ precedes: { stopBy: end, matches: pie } }, { follows: { stopBy: end, matches: pie } }]
+        inside:
+          kind: list
+          any:
+            - inside: { kind: argument_list, inside: { matches: takes-traces } }
+            - inside: { kind: keyword_argument, has: { field: name, regex: '^data$' }, inside: { kind: argument_list, inside: { matches: takes-traces } } }
+      # A pie added to a figure that gets another pie, with no assignment of the name in
+      # between, or that is added in a loop over the cells.
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            all:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^add_trace$' } }, { has: { field: object, kind: identifier, pattern: $FIG, matches: figure } }] }
+              - any:
+                  - matches: loop-cell
+                  - inside:
+                      stopBy: end
+                      kind: expression_statement
+                      any:
+                        - follows: { stopBy: { matches: holds-binder }, matches: pie-added }
+                        - precedes: { stopBy: { matches: holds-binder }, matches: pie-added }
+  takes-traces:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^add_traces$' } }, { has: { field: object, matches: figure } }] }
