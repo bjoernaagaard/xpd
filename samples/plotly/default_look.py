@@ -20,4 +20,6 @@ def case(fn):
 @case
 def default_look():
     df = pd.DataFrame({"day": ["Thu", "Fri", "Sat", "Sun"], "tip": [3.1, 2.7, 4.2, 3.9]})
-    return px.scatter(df, x="day", y="tip"), go.Figure(go.Scatter(x=df["day"], y=df["tip"]))
+    # A hovertemplate is the text of the hover box, so the file still chooses no look.
+    hover = px.scatter(df, x="day", y="tip").update_traces(hovertemplate="%{y} dollars")
+    return px.scatter(df, x="day", y="tip"), go.Figure(go.Scatter(x=df["day"], y=df["tip"])), hover

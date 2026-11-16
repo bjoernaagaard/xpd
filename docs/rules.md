@@ -9529,27 +9529,42 @@ rules were narrowed after the first run, and the table gives the reports that ar
   their figures through Streamlit, which draws with its own theme. It now reports the first
   import, and no file that names `streamlit`.
 
+A review then changed six rules, and the table gives the counts after it:
+
+- `marker-size-diameter` reported `np.sqrt(df["pop"])` and `df["pop"] ** 0.5`, where the area
+  already follows the value, and one public file whose `"size"` column was made with
+  `.pow(0.3)` on another line. It now leaves a root, a power, a logarithm and a column named as
+  a size alone. It also reads a size next to a written `sizemode="diameter"`, which adds one
+  report on the plotly documentation, the page on 3D bubble charts.
+- `default-template` took `hovertemplate` and `texttemplate` for a template, and reported files
+  whose only figures have no plot area. 22 files are new and 21 are gone.
+- `bar-axis-without-zero` reported `px.bar` with `base`, `three-d-for-two-d` reported a trace
+  that gets its `z` on the next line, `animation-frame` named `facet_col` for 11 functions that
+  do not have it, and `spline-line` quoted the numbers of a figure with a fixed y range.
+- The rules count the items of a list without the comments between them, which adds one
+  report of `legend-instead-of-labels`: two lines with a third one commented out.
+
 | Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Fix |
 | --- | --- | --- | --- | --- | --- |
-| [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 0, 0, 7 | none |
+| [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 1, 0, 6 | none |
 | [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | none |
 | [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | none |
 | [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | none |
 | [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | none |
 | [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel | 2, 0, 0 | none |
-| [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 96, 18, 236 | unsafe |
+| [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 102, 18, 231 | unsafe |
 | [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | unsafe |
 | [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 2, 1, 13 | none |
 | [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels | 14, 0, 82 | none |
 | [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
 | [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
 | [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet | 28, 7, 128 | none |
-| [`spline-line`](#spline-line) | info | 92 | drawn: 10.8 where the data ends at 10 | 4, 0, 7 | unsafe |
+| [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | unsafe |
 | [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once | 8, 1, 18 | none |
-| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 1, 1, 2 | none |
+| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 1, 2, 2 | none |
 | [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
 
-`default-template` reports a file once, so its 350 reports are 350 of the 1,087 files.
+`default-template` reports a file once, so its 351 reports are 351 of the 1,087 files.
 `bar-axis-without-zero` and `three-d-for-two-d` have no report on this code. They are kept for
 the figures they catch, which the samples in `samples/plotly/` show.
 
@@ -9592,7 +9607,7 @@ and calls a factor above 1.05 or below 0.95 a substantial distortion (page 57).
 
 **Severity:** error. **Fix:** none.
 
-Reports a go trace whose marker size is read from the data and whose size mode is left at the default. It covers `marker=dict(size=...)`, `marker={"size": ...}` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
+Reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
 
 Example:
 
@@ -9625,8 +9640,14 @@ themselves, so they are not reported.
 The rule reads a size only when it takes a column by name, as `df["pop"]` and `df["pop"] / 10`
 do, from an object that the same trace reads `x`, `y` or another coordinate from. A number, a
 bare name, a written list, a column of another object and a size chosen with `np.where` or a
-condition may be a design choice, so they are left alone. The rule is silent in a file that
-names `sizemode` anywhere, because the mode can be set on the figure afterwards. It has no
+condition may be a design choice, so they are left alone. So is a size that the code takes a
+root, a power or a logarithm of: with `np.sqrt(df["pop"])` the areas for 100, 400 and 1,600 were
+78.5, 314.2 and 1,256.6 square pixels, a Lie Factor of 1, and `sizemode="area"` would then
+understate. A column that is named as a size, such as `df["size"]`, was made for the markers
+and is left alone too. The rule is silent in a file that names `sizemode` in any other way than
+`sizemode="diameter"`, because the mode can be set on the figure afterwards. After
+`update_traces(marker_sizemode="diameter")` a px bubble chart resolved to `sizemode="diameter"`,
+so the size column is drawn as the diameter, and that line is reported. The rule has no
 fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, and the
 `sizeref` that keeps the markers visible depends on the data.
 
@@ -9634,7 +9655,7 @@ fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, 
 
 **Severity:** warning. **Fix:** none.
 
-Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, and on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`.
+Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`, and in the constructor `go.Figure(data=[go.Bar(...)], layout=...)` with `yaxis=dict(range=...)` in the layout or with `layout_yaxis_range=...`.
 
 Example:
 
@@ -9662,8 +9683,12 @@ The rule reads a range only when both ends are written numbers above zero and th
 has as many digits before the point as the upper end, or one fewer. So `[90, 101]` and `[2, 5]`
 are read, and `[1, 100]`, `[0, 101]`, `[-10, 101]` and `[low, high]` are not. A call with
 `log_y` is left alone, and a range set on the figure afterwards is left alone in a file that
-names a log axis. A figure of upright bars is `px.bar` or `px.histogram` without `orientation`,
-or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `orientation` and `base`.
+names a log axis. A figure of upright bars is `px.bar` or `px.histogram` without `orientation`
+and `base`, or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `orientation` and
+`base`. With `base` each bar starts at its base and not at zero: bars from 91 to 95 and from 93
+to 100 lay whole inside `range_y=[90, 101]`, with lengths in the ratio of their values. A
+`go.Figure` with a `go.Bar` and `layout=go.Layout(yaxis=dict(range=[90, 101]))` resolved to the
+y range 90 to 101, as `update_yaxes` does.
 
 #### polar-bar-area
 
@@ -9721,7 +9746,9 @@ resolved the trace to `visible=False` in an empty scene, so the first form is an
 the third axis and the perspective show no data.
 
 A call with a `**` argument is left alone, and so is a px call with `z` as its fourth
-positional argument. The second form reads only a constant it can see in the call, and
+positional argument. So is a file that sets `z` afterwards, as in `trace.z = values` or
+`update_traces(z=values)`: `go.Scatter3d` with `x` and `y` followed by `trace.z = [3, 1, 2]`
+resolved to `visible=True`. The second form reads only a constant it can see in the call, and
 `np.` or `numpy.` in front of the function name.
 
 #### dual-y-axis
@@ -9800,7 +9827,7 @@ reason" (page 100).
 
 **Severity:** info. **Fix:** unsafe for a named template: `"simple_white"`. None for a file that sets no template.
 
-Reports two things. The first is a file that draws px or go figures and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
+Reports two things. The first is a file that draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
 
 Example:
 
@@ -9835,7 +9862,13 @@ ticks. The book says that "the grid should usually be muted or completely suppre
 to a white plot area, and `"plotly_dark"` is a dark theme, so these seven are not reported.
 
 The first form is silent in a file that names `streamlit`, because `st.plotly_chart` draws with
-the theme of Streamlit unless `theme=None` is passed. Another module can set
+the theme of Streamlit unless `theme=None` is passed. `hovertemplate` and `texttemplate` are
+other attributes and do not count as a template: a scatter plot with a `hovertemplate` still
+resolved to `#E5ECF6`. A file whose only figures have no plot area is left alone: `px.pie`,
+`px.treemap`, `px.sunburst`, `px.icicle`, `px.funnel_area`, `px.parallel_coordinates` and
+`px.parallel_categories`, and `go.Pie`, `go.Treemap`, `go.Sunburst`, `go.Icicle`,
+`go.Funnelarea`, `go.Parcoords`, `go.Parcats`, `go.Sankey`, `go.Table` and `go.Indicator`, drew
+no tint and no grid line with the default template. Another module can set
 `pio.templates.default` for the file, which the rule does not see. The fix is unsafe, because
 `"simple_white"` also changes the colors of the marks.
 
@@ -10049,9 +10082,12 @@ fig = px.line(df, x="hour", y="reading", line_shape="linear")
 
 "Above all else show the data" (page 92). A spline draws a smooth curve through the points,
 and the curve passes through values that the data does not hold. The readings 0, 0, 10, 10, 0
-and 0 drawn with `go.Scatter(line_shape="spline")` reached 10.8 at the top and -0.53 at the
-bottom, and `px.line(line_shape="spline")` reached 10.75 and -0.5. The straight line stayed
-between 0 and 10. How far the curve leaves the data depends on the data, so the rule is info.
+and 0 drawn with `go.Scatter(line_shape="spline")` at the default size reached 10.55 at the top
+and -0.37 at the bottom, and `px.line(line_shape="spline")` reached 10.51 and -0.34. The
+straight line stayed between 0 and 10. plotly computes the spline in pixels, so the same
+readings with the y axis set to -5 to 15 at 700 by 500 pixels reached 10.8 and -0.53. How far
+the curve leaves the data depends on the data, on the axis range and on the size of the figure,
+so the rule is info.
 
 The fix is unsafe, because straight segments make the figure look different. It leaves a
 `smoothing` argument in place, which plotly ignores for a straight line. A shape given by a
@@ -10061,7 +10097,7 @@ name is left alone.
 
 **Severity:** info. **Fix:** none.
 
-Reports `animation_frame="column"` on the 28 px functions that take it.
+Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11.
 
 Example:
 
@@ -10085,8 +10121,11 @@ frames and drew 142 of the 1,704 rows at once, and `facet_col="year"` with `face
 drew all 1,704 rows in 12 panels.
 
 Panels need room, and with many frames an animation can be the better choice, which is why
-the rule is info and has no fix. `px.pie`, `px.treemap` and the other px functions without
-`facet_col` are not among the 28.
+the rule is info and has no fix. 11 of the 28 functions have no `facet_col`: `bar_polar`,
+`choropleth_map`, `density_map`, `line_3d`, `line_map`, `line_polar`, `line_ternary`,
+`scatter_3d`, `scatter_map`, `scatter_polar` and `scatter_ternary`. `px.scatter_3d(facet_col=...)`
+raised TypeError, "got an unexpected keyword argument 'facet_col'", so for those the message
+says to draw one panel for each frame with `make_subplots`.
 
 ### Words on the figure
 

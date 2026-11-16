@@ -2,10 +2,12 @@
 #
 # A spline draws a smooth curve through the points, and the curve passes through values that the
 # data does not hold. On plotly 7.1.0, the values 0, 0, 10, 10, 0, 0 drawn with
-# go.Scatter(line_shape="spline") reached 10.8 at the top and -0.53 at the bottom, and
-# px.line(line_shape="spline") reached 10.75 and -0.5, read from the drawn path. The straight line
-# stayed between 0 and 10 (runs/behavior.txt). How far the curve leaves the data depends on the
-# data, so the rule is info.
+# go.Scatter(line_shape="spline") at the default size and with the automatic y range reached
+# 10.55 at the top and -0.37 at the bottom, and px.line(line_shape="spline") reached 10.51 and
+# -0.34, read from the drawn path. The straight line stayed between 0 and 10. plotly computes the
+# spline in pixels, so the same values with the y axis set to -5 to 15 at 700 by 500 pixels
+# reached 10.8 and -0.53 (runs/behavior.txt). How far the curve leaves the data depends on the
+# data, on the axis range and on the size of the figure, so the rule is info.
 #
 # The fix is unsafe: "linear" draws straight segments between the same points, so the figure looks
 # different.
@@ -15,7 +17,7 @@
 id: spline-line
 language: python
 severity: info
-message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 it rose to 10.8 and fell to -0.5. Tufte asks above all else to show the data. Use line_shape="linear", which joins the measured points with straight lines.
+message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 a go.Scatter at the default size rose to 10.55 and fell to -0.37. Tufte asks above all else to show the data. Use line_shape="linear", which joins the measured points with straight lines.
 rule:
   kind: string
   regex: '^["'']spline["'']$'
@@ -129,7 +131,7 @@ metadata: { fix: unsafe }
 id: spline-line
 language: python
 severity: info
-message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 it rose to 10.8 and fell to -0.5. Tufte asks above all else to show the data. Use shape="linear", which joins the measured points with straight lines.
+message: A spline draws a curve between the points, and the curve passes through values the data does not hold. For the values 0, 0, 10, 10, 0, 0 a go.Scatter at the default size rose to 10.55 and fell to -0.37. Tufte asks above all else to show the data. Use shape="linear", which joins the measured points with straight lines.
 rule:
   kind: string
   regex: '^["'']spline["'']$'

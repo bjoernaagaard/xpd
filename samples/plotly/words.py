@@ -67,7 +67,9 @@ def frames_over_time():
     multiples = px.scatter(gap, x="gdpPercap", y="lifeExp", facet_col="year", facet_col_wrap=2, log_x=True)
     frame = None
     still = px.scatter(gap, x="gdpPercap", y="lifeExp", animation_frame=frame, log_x=True)
-    return movie, multiples, still
+    # px.scatter_3d has no facet_col, so the message names make_subplots for it.
+    movie_3d = px.scatter_3d(gap, x="gdpPercap", y="lifeExp", z="pop", animation_frame="year")  # xpd: animation-frame
+    return movie, multiples, still, movie_3d
 
 
 @case

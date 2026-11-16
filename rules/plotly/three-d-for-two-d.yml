@@ -5,7 +5,8 @@
 # px.scatter_3d, px.line_3d and go.Scatter3d with x and y resolved to visible=False, with an empty
 # scene whose z axis runs from -1 to 1 (runs/behavior.txt). The figure is empty, so the rule is an
 # error. A call with a ** argument, or with z as the fourth positional argument of the px
-# functions, is left alone.
+# functions, is left alone. So is a file that sets z on an object afterwards: go.Scatter3d with x
+# and y followed by trace.z = [3, 1, 2] resolved to visible=True with that z.
 id: three-d-for-two-d
 language: python
 severity: error
@@ -22,6 +23,17 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } }
     - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(z)$' } } } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    # A file that sets z afterwards, as in trace.z = values or update_traces(z=values), draws the trace.
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            any:
+              - { kind: assignment, has: { field: left, kind: attribute, has: { field: attribute, regex: '^z$' } } }
+              - { kind: assignment, has: { field: left, kind: subscript, has: { field: subscript, regex: '^["'']z["'']$' } } }
+              - { kind: keyword_argument, has: { field: name, regex: '^z$' }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_traces|update|restyle)$' } } } } }
 utils:
   # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
   px:

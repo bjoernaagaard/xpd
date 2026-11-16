@@ -9,6 +9,9 @@
 #
 # The template is a choice for the whole file, so the rule reports once, on the first import of
 # plotly.express, in a file that calls a px function and never names a template or a plot_bgcolor.
+# hovertemplate and texttemplate are other attributes and do not count as a template. The px
+# function must be one that draws a plot area: px.pie, treemap, sunburst, icicle, funnel_area and
+# the two parallel plots drew no tint and no grid line with either template.
 # A file that names streamlit is left alone, because st.plotly_chart draws with the theme of
 # Streamlit unless it is told not to. Another module can still set the default for this file,
 # which the rule cannot see, so the message says what the file itself does. The rule has no fix,
@@ -27,8 +30,9 @@ rule:
     - inside:
         kind: module
         all:
-          - not: { regex: '(^|[^-])template|plot_bgcolor|streamlit' }
-          - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, has: { field: object, matches: px } } }
+          - not: { regex: '(^|[^-a-zA-Z])template|plot_bgcolor|streamlit' }
+          # A figure with no plot area, such as a treemap or a pie, shows neither the tint nor the grid.
+          - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: object, matches: px } }, { has: { field: attribute, regex: '^[a-z]', not: { regex: '^(pie|treemap|sunburst|icicle|funnel_area|parallel_coordinates|parallel_categories|get_trendline_results|set_mapbox_access_token)$' } } }] } }
 utils:
   # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
   px:
@@ -64,9 +68,15 @@ rule:
     - inside:
         kind: module
         all:
-          - not: { regex: '(^|[^-])template|plot_bgcolor|streamlit' }
+          - not: { regex: '(^|[^-a-zA-Z])template|plot_bgcolor|streamlit' }
           - not: { has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.express|from plotly import [^\n]*express' } }
           - has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } }
+          # A file whose only go traces have no plot area, such as a treemap or a pie, is left alone.
+          - not:
+              all:
+                - has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie|Treemap|Sunburst|Icicle|Funnelarea|Parcoords|Parcats|Sankey|Table|Indicator)$' } }, { has: { field: object, matches: go } }] }
+                - not: { has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: '^[A-Z]', not: { regex: '^(Pie|Treemap|Sunburst|Icicle|Funnelarea|Parcoords|Parcats|Sankey|Table|Indicator|Figure|FigureWidget|Layout|Frame)$' } } }, { has: { field: object, matches: go } }] } }
+                - not: { has: { stopBy: end, kind: attribute, has: { field: attribute, regex: '^add_', not: { regex: '^add_(annotation|shape|layout_image|trace|traces|vline|hline|vrect|hrect)$' } } } }
 utils:
   # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
   go:

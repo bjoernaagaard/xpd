@@ -1,10 +1,11 @@
-"""Forms that three rules leave alone for the whole file.
+"""Forms that four rules leave alone for the whole file.
 
-`marker-size-diameter` is silent in a file that names sizemode, `bar-axis-without-zero` reads no
-range set on a figure in a file that names a log axis, and `legend-instead-of-labels` is silent
-in a file that names showlegend, an annotation or a text mode. The size mode, the axis type
-and the labels can be set on the figure after the call that the rule reads, so one mention
-ends the proof. No line of this file is reported. Each case returns the figures the code
+`marker-size-diameter` is silent in a file that names sizemode with another value than
+"diameter", `bar-axis-without-zero` reads no range set on a figure in a file that names a log
+axis, `legend-instead-of-labels` is silent in a file that names showlegend, an annotation or a
+text mode, and `three-d-for-two-d` reports no missing z in a file that sets z on an object. The
+size mode, the axis type, the labels and z can be set after the call that the rule reads, so
+one mention ends the proof. No line of this file is reported. Each case returns the figures the code
 builds.
 """
 
@@ -40,6 +41,13 @@ def bars_on_a_log_axis():
     fig.update_yaxes(type="log")
     fig.update_yaxes(range=[1, 3])
     return fig
+
+
+@case
+def z_set_afterwards():
+    trace = go.Scatter3d(x=[1, 2, 3], y=[1, 2, 3], mode="markers")
+    trace.z = [3, 1, 2]
+    return go.Figure(trace)
 
 
 @case

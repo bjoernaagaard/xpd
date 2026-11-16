@@ -51,8 +51,18 @@ def marker_size():
     a_name = go.Scatter(x=[1, 2, 3], y=[1, 1, 1], mode="markers", marker=dict(size=sizes))
     colored = go.Scatter(x=df["area"], y=df["rain"], mode="markers", marker=dict(color=df["pop"]))
     by_px = px.scatter(df, x="area", y="rain", size="pop")
+    # A square root makes the area follow the value, and a column named size was made for the markers.
+    rooted = go.Scatter(x=df["area"], y=df["rain"], mode="markers", marker=dict(size=np.sqrt(df["pop"])))
+    powered = go.Scatter(x=df["area"], y=df["rain"], mode="markers", marker_size=df["pop"] ** 0.5)
+    sized = df.assign(size=np.sqrt(df["pop"]))
+    made_for_markers = go.Scatter(x=sized["area"], y=sized["rain"], mode="markers", marker=dict(size=sized["size"]))
+    # The diameter written out is the same distortion, also on a px figure that had the area.
+    written = go.Scatter(x=df["area"], y=df["rain"], mode="markers", marker=dict(size=df["pop"], sizemode="diameter"))  # xpd: marker-size-diameter
+    turned_back = px.scatter(df, x="area", y="rain", size="pop")
+    turned_back.update_traces(marker_sizemode="diameter")  # xpd: marker-size-diameter
     traces = (by_diameter, scaled, in_dict, underscore, on_a_map, two_sizes, other_source, by_condition, one_size, named_size, a_name, colored)
-    return [go.Figure(t) for t in traces] + [by_px]
+    traces += (rooted, powered, made_for_markers, written)
+    return [go.Figure(t) for t in traces] + [by_px, turned_back]
 
 
 @case
@@ -77,7 +87,12 @@ def bar_axis():
     reused = px.bar(df, x="team", y="score")
     reused = px.line(df, x="team", y="score")
     reused.update_yaxes(range=[90, 101])
-    return cut, cut_flat, counted, later, in_layout, nested, from_zero, below_zero, from_names, nearly_zero, points, line, reused
+    in_constructor = go.Figure(data=[go.Bar(x=df["team"], y=df["score"])], layout=go.Layout(yaxis=dict(range=[90, 101])))  # xpd: bar-axis-without-zero
+    # With base each bar starts at its base, so a range above zero cuts nothing.
+    temps = pd.DataFrame({"month": ["jan", "feb"], "low": [91, 93], "spread": [4, 7]})
+    floating = px.bar(temps, x="month", y="spread", base="low", range_y=[90, 101])
+    figures = (cut, cut_flat, counted, later, in_layout, nested, from_zero, below_zero, from_names, nearly_zero, points, line, reused)
+    return figures + (in_constructor, floating)
 
 
 @case
