@@ -9548,6 +9548,7 @@ A review then changed six rules, and the table gives the counts after it:
 | --- | --- | --- | --- | --- | --- |
 | [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 1, 0, 6 | none |
 | [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | none |
+| [`area-axis-without-zero`](#area-axis-without-zero) | warning | 57 | drawn: fills of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | none |
 | [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | none |
 | [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | none |
 | [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | none |
@@ -9559,14 +9560,17 @@ A review then changed six rules, and the table gives the counts after it:
 | [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
 | [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
 | [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet | 28, 7, 128 | none |
+| [`sunburst-as-pie`](#sunburst-as-pie) | warning | 178 | drawn: a wedge of 45 with 2.25 times the area of one of 60 | 14, 2, 11 | none |
 | [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | unsafe |
 | [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once | 8, 1, 18 | none |
 | [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 1, 2, 2 | none |
 | [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
+| [`axis-title-column-name`](#axis-title-column-name) | info | 183 | resolved: axis title `gdpPercap` | 68, 1, 107 | none |
 
 `default-template` reports a file once, so its 351 reports are 351 of the 1,087 files.
-`bar-axis-without-zero` and `three-d-for-two-d` have no report on this code. They are kept for
-the figures they catch, which the samples in `samples/plotly/` show.
+`bar-axis-without-zero`, `area-axis-without-zero` and `three-d-for-two-d` have no report on
+this code. They are kept for the figures they catch, which the samples in `samples/plotly/`
+show.
 
 None of the reports that were read after the narrowing names a line where the rule's claim is
 false. Whether the advice fits is a choice for the `info` rules: a wind rose is the usual chart
@@ -9592,6 +9596,12 @@ The book states principles that the code of a figure does not show, so no rule c
   missing argument.
 - The Shrink Principle (page 169). The right size of a figure depends on how many values it
   shows, which the code does not say.
+- The quartile plot (page 124), which erases the box of a box plot and leaves a line from the
+  lowest value to the lower quartile, a gap at the median and a line from the upper quartile to
+  the highest value. No setting of `px.box` or `go.Box` draws it. The thinnest `go.Box` still
+  drew 7 straight lines for each group, against 4 for the quartile plot, and hid the median.
+  The quartile plot needs the five numbers computed by hand and drawn with `go.Scatter`, so a
+  rule would ask every box plot to become another program.
 - A pie made of several `go.Pie` traces, or bars added to an empty `go.Figure()` with
   `add_trace`. xpd does not follow a figure through its statements.
 
@@ -9689,6 +9699,43 @@ and `base`, or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `o
 to 100 lay whole inside `range_y=[90, 101]`, with lengths in the ratio of their values. A
 `go.Figure` with a `go.Bar` and `layout=go.Layout(yaxis=dict(range=[90, 101]))` resolved to the
 y range 90 to 101, as `update_yaxes` does.
+
+#### area-axis-without-zero
+
+**Severity:** warning. **Fix:** none.
+
+Reports an area chart whose value axis is given a range that starts above zero: `range_y` on `px.area`, and on a figure of filled areas `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`.
+
+Example:
+
+```python
+fig = px.area(df, x="month", y="sales", range_y=[90, 101])
+```
+
+Use instead:
+
+```python
+fig = px.area(df, x="month", y="sales")
+line = px.line(df, x="month", y="sales", range_y=[90, 101])
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+An area chart shows its value by the height of the fill below the line. plotly starts the axis
+of `px.area` and of `go.Scatter(fill="tozeroy")` at zero by itself: values of 95 and 100 got
+the range 0 to 105.26 and fills 324.9 and 342.0 pixels tall, the ratio of the values. An
+explicit range is kept as written, and the fill is cut at the lower edge of the plot. With
+`[90, 101]` the same fills were 163.6 and 327.3 pixels tall, whether the range was set in
+`px.area`, in `update_yaxes` or in `update_layout`, a Lie Factor of 19 as for a bar.
+`px.line` ranged the same values to 94.72 and 100.28 by itself, so a line is the chart that
+needs no zero.
+
+The rule reads a range as [`bar-axis-without-zero`](#bar-axis-without-zero) does: both ends
+written numbers above zero, and the lower end with as many digits before the point as the upper
+end, or one fewer. A call with `orientation` or `log_y` is left alone, and a range set on the
+figure afterwards is left alone in a file that names a log axis. A figure of filled areas is
+`px.area` without `orientation` and `log_y`, or a `go.Figure(...)` whose own arguments hold a
+`go.Scatter` with `fill="tozeroy"`.
 
 #### polar-bar-area
 
@@ -10059,8 +10106,44 @@ numbers along a visual dimension, pie charts should never be used" (page 178). `
 `px.pie(facet_col="sex")` drew two pies side by side, and four with `facet_row` as well. For a
 few shares, `go.Table` shows the exact numbers.
 
-A facet given as `None` draws one pie and gets the first message. `px.sunburst` and
-`px.funnel_area` are not reported, because the book names the pie chart alone.
+A facet given as `None` draws one pie and gets the first message. `px.sunburst` has its own
+rule, [`sunburst-as-pie`](#sunburst-as-pie). `px.funnel_area` is not reported: its sections
+were drawn with areas in the ratio of the values, stacked from top to bottom.
+
+#### sunburst-as-pie
+
+**Severity:** warning. **Fix:** none.
+
+Reports `px.sunburst(...)` with `values` or `path`, and `go.Sunburst(...)` with `values`.
+
+Example:
+
+```python
+fig = px.sunburst(df, path=["region", "shop"], values="sales")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df.sort_values("sales"), x="sales", y="shop", color="region", orientation="h")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book rejects pie charts for "their low data-density and failure to order numbers along a
+visual dimension" (page 178). A sunburst draws each value as a wedge, as a pie does, and its
+rings make the order worse. Two regions, west 60 and east 40, with the shops c 15 and d 45 in
+west and a 30 and b 10 in east, were drawn with the regions in the inner ring and the shops in
+the outer ring, which has three times the area for each degree. Shop d with 45 got 17,918.9
+square pixels and region west with 60 got 7,963.9, so the smaller number was drawn 2.25 times
+larger. Shop a with 30 against region east with 40 was reversed the same way. The angles keep
+the order only within one ring. `px.sunburst` and `go.Sunburst` resolved to a trace of type
+`sunburst`.
+
+A sunburst without numbers is left alone. A `go.Sunburst` with `labels` and `parents` and no
+`values` gave each leaf one equal share, so it draws a hierarchy, such as a flavor wheel, and
+not quantities. `px.sunburst` with `path` and no `values` counts the rows of each group, which
+are numbers, so it is reported.
 
 #### spline-line
 
@@ -10199,6 +10282,40 @@ drawn level.
 The rule has no fix, because `tickangle=0` can make long labels run into each other, and the
 level layout swaps x and y. An angle given by a name is left alone, and so is the `tickangle`
 of a colorbar.
+
+#### axis-title-column-name
+
+**Severity:** info. **Fix:** none.
+
+Reports a px call whose `x` or `y` is a written column name that is code and not words, such as `"gdpPercap"` or `"total_bill"`, in a call without `labels`.
+
+Example:
+
+```python
+fig = px.scatter(df, x="gdpPercap", y="lifeExp")
+```
+
+Use instead:
+
+```python
+fig = px.scatter(df, x="gdpPercap", y="lifeExp", labels={"gdpPercap": "GDP per person", "lifeExp": "Life expectancy"})
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book lists as friendly "words are spelled out, mysterious and elaborate encoding avoided",
+and as unfriendly "abbreviations abound, requiring the viewer to sort through text to decode
+abbreviations" (page 183). px titles an axis with the column that `x` or `y` names:
+`px.scatter(x="gdpPercap", y="lifeExp")` resolved the axis titles `gdpPercap` and `lifeExp`,
+and `px.histogram(x="total_bill")` resolved `total_bill`. `labels=`, a later
+`update_xaxes(title_text=...)` and a later `update_layout(xaxis_title=...)` each replaced them.
+
+The rule reads a name with an underscore, or with a capital inside a word, as in `lifeExp`. A
+plain word such as `"day"` is left alone, and so are a name given by a variable and a list of
+columns, which px titles `value`. The rule is silent in a file that sets an axis title or an
+axis dictionary anywhere, such as `update_xaxes(...)`, `update_layout(xaxis_title=...)` or
+`xaxis=dict(...)`, because the title may be replaced on the figure afterwards. It has no fix,
+because only the author knows the words.
 
 ## Hamilton
 

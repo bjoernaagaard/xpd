@@ -1,0 +1,54 @@
+# Tufte, vdqi.md line 7966, printed page 183, lists as friendly "words are spelled out, mysterious
+# and elaborate encoding avoided" and as unfriendly "abbreviations abound, requiring the viewer to
+# sort through text to decode abbreviations".
+#
+# px titles an axis with the column name that x or y gives. On plotly 7.1.0,
+# px.scatter(x="gdpPercap", y="lifeExp") resolved the axis titles "gdpPercap" and "lifeExp",
+# px.histogram(x="total_bill") resolved "total_bill", and labels={"gdpPercap": "GDP per person",
+# ...} or a later update_xaxes(title_text=...) or update_layout(xaxis_title=...) replaced them
+# (runs/v2/B5/axis-title.txt). The rule reads a written column name that is code and not words:
+# one with an underscore, or with a capital inside a word, as in lifeExp. A plain word such as
+# "day" is left alone, and so is a list of columns, which px titles "value". A call with labels=
+# or ** is left alone, and so is a file that sets an axis title or an axis dict anywhere, because
+# the title may be set on the figure afterwards. The rule is info and has no fix, because only the
+# author knows the words.
+id: axis-title-column-name
+language: python
+severity: info
+message: '$A="$V" puts the column name $V on the axis as its title. px.scatter(x="gdpPercap") drew the axis title "gdpPercap". Tufte asks for words that are spelled out, and lists abbreviations that the reader has to decode as unfriendly. Name the axis in words with labels={"$V": "..."} in the same call.'
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|density_contour|ecdf|funnel|histogram|line|line_3d|scatter|scatter_3d|strip|violin)$' } }, { has: { field: object, matches: px } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, pattern: $A, regex: '^[xy]$' }
+            - has:
+                field: value
+                kind: string
+                not: { has: { kind: interpolation } }
+                has: { kind: string_content, pattern: $V, regex: '^[A-Za-z][A-Za-z0-9]*([_][A-Za-z0-9]+)+$|[a-z][A-Z][a-z]' }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(labels)$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { inside: { stopBy: end, kind: module, regex: '[xy]axis[0-9]*(_title|_title_text|\s*=\s*(dict\(|\{))|["''][xy]axis[0-9]*["'']\s*:|update_[xy]axes\(|for_each_[xy]axis|[.]title[.]text' } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
