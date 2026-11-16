@@ -54,11 +54,16 @@ Runs both scripts and compares the variable `result` each one leaves. DataFrames
 are compared with `pandas.testing`, anything else with `numpy.testing`, so a list and an
 array with the same values count as equal. Run it after you refactor data logic.
 
+Each script runs in its own Python process, in the folder you run `xpd equiv` in. The second
+script gets no module, no `sys.path` entry and no variable from the first. What a script
+prints goes to stderr, so stdout holds only the JSON. A `result` travels back as a pickle, so
+it cannot be an object of a class that the script itself defines.
+
 | Exit code | Meaning |
 | --- | --- |
 | 0 | `{"equivalent": true}` |
 | 1 | The results differ, with the difference in `detail` |
-| 2 | A script failed, has no `result`, or pandas is missing |
+| 2 | A script failed, exited, has no `result` or one that pickle cannot save, or pandas is missing |
 
 ## graph
 

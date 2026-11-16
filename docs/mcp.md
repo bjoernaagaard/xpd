@@ -100,7 +100,7 @@ Every path is relative to the project root, and a path outside it is refused.
 | `fix` | `paths` (default: the root), `unsafe` (default: `false`) | Writes the safe fixes, then lints what is left. With `unsafe`, it writes unsafe fixes too, after the user confirms | Yes |
 | `graph` | `paths` | Reads the dataflow of step code and Hamilton modules, as [`xpd graph`](commands.md#graph) | No |
 | `profile` | `file` | Profiles a data file, as [`xpd profile`](commands.md#profile) | No |
-| `equiv` | `old`, `new` | Runs two scripts and compares their `result`, as [`xpd equiv`](commands.md#equiv) | Whatever the scripts do |
+| `equiv` | `old`, `new` | Runs two scripts, each in its own Python process, and compares their `result`, as [`xpd equiv`](commands.md#equiv) | Whatever the scripts do |
 | `rules` | `package`, `severity`, `fixable`, `query`, all optional | Lists the rules that match every filter given. `package` is a module name, such as `numpy` or `sklearn` | No |
 | `rule` | `package`, `rule` | Shows one rule with its documentation and examples | No |
 | `contract` | `file` | Reads the contract that a training script saved beside its model, as [Code mode](code-mode.md#the-stages) describes | No |

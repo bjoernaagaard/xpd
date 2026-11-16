@@ -191,10 +191,11 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
     @mcp.tool(tags={"data", "refactor"}, annotations=RUNS_CODE, task=True)
     async def equiv(ctx: Context, old: str, new: str) -> Equivalence | InputRequiredResult:
-        """Run two scripts with the project's Python and check that they leave an equal
-        `result` (DataFrames and Series with pandas.testing, anything else with
-        numpy.testing). A refactor of data logic is done when this says `equivalent: true`.
-        Both scripts must assign `result`. Needs pandas in the project's Python.
+        """Run two scripts with the project's Python, each in its own process, and check that
+        they leave an equal `result` (DataFrames and Series with pandas.testing, anything else
+        with numpy.testing). A refactor of data logic is done when this says
+        `equivalent: true`. Both scripts must assign `result`, and pickle must be able to save
+        it. Needs pandas in the project's Python.
 
         Args:
             old: The script before the refactor, inside the project root.
