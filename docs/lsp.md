@@ -60,8 +60,22 @@ samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes 
 
 A client that supports pull diagnostics asks with `textDocument/diagnostic`, and the server
 answers with the issues of the document. Every other client gets
-`textDocument/publishDiagnostics` when a document opens, changes or is saved. The server never
-does both for one client, because the editor would show each issue twice.
+`textDocument/publishDiagnostics` when a document opens or changes, and after a save that gave
+the project other rules. The server never does both for one client, because the editor would
+show each issue twice.
+
+A lint of a long file takes seconds, so the server lints a document once for each text it holds
+and not once for each message.
+
+| The client sends | What the server does |
+| --- | --- |
+| Several `textDocument/didChange` while a lint runs | Applies all of them, then lints once and publishes the issues of the newest version |
+| A hover, a code action or `textDocument/diagnostic` for text it has linted | Answers from the issues it kept, without a new lint |
+| `$/cancelRequest` for a request that waits | Answers that request with the error `RequestCancelled`, -32800, and does no work for it |
+| A message whose `Content-Length` is over 1 GiB | Stops with exit code 1 and one line on stderr, as for any message it cannot read |
+
+The server cannot stop a lint that has started, so a request it already works on is answered
+in full.
 
 `xpd check` also warns about a package the project's venv lacks, such as pyarrow. Such a
 warning is about the project, so the server puts it on the first line of the project's
@@ -72,7 +86,7 @@ warning is about the project, so the server puts it on the first line of the pro
 
 | Action | Kind | When the server offers it |
 | --- | --- | --- |
-| `xpd: fix pandas/no-inplace` | `quickfix`, preferred | The issue has a safe fix |
+| `xpd: fix pandas/convert-then-drop-zone` | `quickfix`, preferred | The issue has a safe fix |
 | `xpd: fix pandas/chained-assignment (unsafe fix, may change behavior)` | `quickfix` | The issue has an unsafe fix |
 | `xpd: apply every safe fix` | `source.fixAll.xpd` | The document has a safe fix. It writes what `xpd check --fix` writes |
 
