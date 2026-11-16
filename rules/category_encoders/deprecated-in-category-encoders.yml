@@ -1,0 +1,67 @@
+# Each document finds a form that category_encoders 2.11.2 still takes and has marked as
+# deprecated.
+
+# get_feature_names warns on 2.11.2: "FutureWarning: `get_feature_names` is deprecated in all of
+# sklearn. Use `get_feature_names_out` instead." Both return the same NumPy array, so the fix is
+# safe. scikit-learn removed its own get_feature_names, and removed-in-sklearn of the
+# scikit-learn pack reports every call in a file that imports sklearn, so this document runs
+# only in a file that does not. It needs the receiver built from a category_encoders class, in
+# the same expression or in an assignment of the same function.
+id: deprecated-in-category-encoders
+language: python
+severity: warning
+message: get_feature_names is deprecated in category_encoders and raises FutureWarning. Call $E.get_feature_names_out(), which returns the same array.
+rule:
+  pattern: $E.get_feature_names()
+  all:
+    - any:
+        - has: { field: function, has: { field: object, regex: '(Encoder|Wrapper)\(' } }
+        - inside:
+            stopBy: { kind: function_definition }
+            any: [{ kind: function_definition }, { kind: module }]
+            has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { has: { field: right, regex: '(Encoder|Wrapper)\(' } }] }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          any:
+            - has: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^sklearn(\.|$)' } }
+            - has: { stopBy: end, kind: import_statement, has: { stopBy: end, kind: dotted_name, regex: '^sklearn(\.|$)' } }
+            - has: { stopBy: end, kind: function_definition, has: { field: name, regex: '^get_feature_names$' } }
+fix: $E.get_feature_names_out()
+metadata: { fix: safe, since: "2.6" }
+---
+# The changelog of 2.6.4 says of max_sample: "it has no use anymore". HashingEncoder still takes
+# the keyword and raises no warning. With max_sample=10 and without it, the encoded frame was
+# equal on 2.11.2, with one process and with two, so the fix that drops it is safe.
+id: deprecated-in-category-encoders
+language: python
+severity: info
+message: HashingEncoder(max_sample=) is deprecated since category_encoders 2.6.4 and does nothing. Drop it.
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)HashingEncoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^max_sample$' } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^max_sample$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^max_sample$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: safe, since: "2.6.4" }

@@ -1,0 +1,81 @@
+# Ten encoders of category_encoders learn from the target. On 2.11.2 fit_transform(X) raises
+# "TypeError: fit_transform() missing argument: y" on each of them. fit(X) raises "ValueError:
+# Supervised encoders need a target for the fitting" on nine, and TypeError on SummaryEncoder,
+# whose fit has no default for y. A scikit-learn transformer takes fit(X), so the form is easy
+# to carry over. The names in this document belong to category_encoders alone.
+# Code inside assertRaises, pytest.raises or a try block with an except clause expects the error
+# and stays silent.
+id: supervised-encoder-without-target
+language: python
+severity: error
+message: $C learns from the target, and $M without it raises on category_encoders 2.11.2, with TypeError from fit_transform and ValueError from fit. Pass the target as the second argument.
+rule:
+  pattern: $C($$$A).$M($X)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  C: { regex: '(^|\.)(CatBoostEncoder|CountTargetEncoder|GLMMEncoder|JamesSteinEncoder|LeaveOneOutEncoder|MEstimateEncoder|QuantileEncoder|SummaryEncoder|WOEEncoder)$' }
+  M: { regex: '^(fit|fit_transform)$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] } }
+---
+# scikit-learn has a TargetEncoder too, and it raises on a missing target as well, but the
+# message below names category_encoders, so the document needs proof of where the class comes
+# from.
+id: supervised-encoder-without-target
+language: python
+severity: error
+message: The category_encoders TargetEncoder learns from the target, and $M without it raises on 2.11.2, with TypeError from fit_transform and ValueError from fit. Pass the target as the second argument.
+rule:
+  pattern: $C($$$A).$M($X)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+  has:
+    field: function
+    has:
+      field: object
+      kind: call
+      all:
+        - has: { field: function, regex: '(^|\.)TargetEncoder$' }
+        - matches: from-category-encoders
+constraints:
+  M: { regex: '^(fit|fit_transform)$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] } }
+utils:
+  from-category-encoders:
+    any:
+      - has: { field: function, kind: attribute, regex: '^category_encoders\.' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, pattern: $MOD } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^category_encoders(\.|$)' } }, { has: { field: alias, pattern: $MOD } }] } }
+      - all:
+          - has: { field: function, kind: identifier, pattern: $CLS }
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+                  - any: [{ has: { kind: dotted_name, pattern: $CLS } }, { has: { kind: wildcard_import } }]
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, pattern: $CLS } }] } } }
+---
+# The encoder is built on one line and fitted on another. The rule needs the name assigned
+# from a supervised class of category_encoders in the same function, or in the module for code
+# outside a function, and never from another call there.
+id: supervised-encoder-without-target
+language: python
+severity: error
+message: $E is a supervised encoder of category_encoders, and $M without the target raises on 2.11.2, with TypeError from fit_transform and ValueError from fit. Pass the target as the second argument.
+rule:
+  pattern: $E.$M($X)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+  inside:
+    stopBy: { kind: function_definition }
+    any: [{ kind: function_definition }, { kind: module }]
+    all:
+      - has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { has: { field: right, kind: call, has: { field: function, regex: '(^|\.)(CatBoostEncoder|CountTargetEncoder|GLMMEncoder|JamesSteinEncoder|LeaveOneOutEncoder|MEstimateEncoder|QuantileEncoder|SummaryEncoder|WOEEncoder)$' } } }] }
+      - not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { not: { has: { field: right, kind: call, has: { field: function, regex: '(^|\.)(CatBoostEncoder|CountTargetEncoder|GLMMEncoder|JamesSteinEncoder|LeaveOneOutEncoder|MEstimateEncoder|QuantileEncoder|SummaryEncoder|WOEEncoder)$' } } } }] } }
+constraints:
+  E: { kind: identifier }
+  M: { regex: '^(fit|fit_transform)$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] } }

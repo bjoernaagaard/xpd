@@ -1,0 +1,44 @@
+# handle_unknown="return_nan" codes a category that fit did not see as NaN, in every output
+# column of that row, and handle_missing="return_nan" does the same for a missing value. In a
+# Pipeline the NaN goes to the next step. On 2.11.2, with a OneHotEncoder or a TargetEncoder in
+# front of a LogisticRegression, predict on a row with an unseen city raised "ValueError: Input
+# X contains NaN", and so did an OrdinalEncoder with handle_missing="return_nan" on a row with
+# a missing city. The fit passed, because the training rows had no unseen category, so the
+# error first shows on new data. The rule reports the encoder only inside a Pipeline or
+# make_pipeline call, and stays silent when the same call holds an imputer or a model that
+# takes NaN. A choice can be right, so the rule is info.
+id: nan-into-pipeline
+language: python
+severity: info
+message: $KW makes $C code an unseen or missing category as NaN, and the next step of the pipeline gets it. LogisticRegression raised "ValueError, Input X contains NaN" at predict. Use "value", or put an imputer after the encoder.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: 'Encoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, pattern: $KW, regex: '^handle_(unknown|missing)\s*=\s*["'']return_nan["'']$' } }
+    - inside:
+        stopBy: end
+        kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(Pipeline|make_pipeline)$' }
+          - not: { regex: 'Imputer|HistGradientBoosting|XGB|LGBM|CatBoost(Classifier|Regressor)|fillna' }
+---
+# CountEncoder also takes handle_unknown=None, which was its default until 2.5 and leaves the
+# count of an unseen category as NaN.
+id: nan-into-pipeline
+language: python
+severity: info
+message: handle_unknown=None makes CountEncoder code an unseen category as NaN, and the next step of the pipeline gets it. LogisticRegression raised "ValueError, Input X contains NaN" at predict. Use "value", the default, which codes it as 0.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)CountEncoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^handle_unknown\s*=\s*None$' } }
+    - inside:
+        stopBy: end
+        kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(Pipeline|make_pipeline)$' }
+          - not: { regex: 'Imputer|HistGradientBoosting|XGB|LGBM|CatBoost(Classifier|Regressor)|fillna' }

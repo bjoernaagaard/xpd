@@ -31,6 +31,7 @@ const PACK_HEADINGS: &[(&str, &str)] = &[
     ("NumPy", "numpy"),
     ("SciPy", "scipy"),
     ("scikit-learn", "sklearn"),
+    ("Category Encoders", "category_encoders"),
     ("Hamilton", "hamilton"),
     ("Python", "python"),
 ];

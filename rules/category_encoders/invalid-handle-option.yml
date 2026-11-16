@@ -1,0 +1,224 @@
+# Since category_encoders 2.10 an encoder checks handle_unknown and handle_missing at fit and
+# raises ValueError on a string it does not know, such as "Unexpected handle_unknown value
+# 'ignore' for OneHotEncoder. Supported values: ['error', 'indicator', 'return_nan', 'value']".
+# Before 2.10 such a string was taken in silence and did not act as the default: on 2.9.0,
+# handle_unknown="ignore" coded an unseen category as NaN on OneHotEncoder, OrdinalEncoder,
+# BinaryEncoder, TargetEncoder and WOEEncoder, where "value" codes it as zeros, -1 or the prior.
+# The form is wrong on both sides of 2.10, so the documents carry no version. The strings each
+# class takes were read from 2.11.2 by fitting every class with every string. CountEncoder
+# checks nothing and is left alone. A value that is not a string, such as a number or a
+# function, is allowed since 2.11 and is left alone too. Code inside assertRaises, pytest.raises
+# or a try block with an except clause expects the error and stays silent.
+#
+# The classes in this document take "error", "return_nan" and "value" for both keywords, and
+# their names belong to category_encoders alone.
+id: invalid-handle-option
+language: python
+severity: error
+message: $C takes "error", "return_nan" or "value" here. $KW raises ValueError at fit since category_encoders 2.10, and before that it was taken in silence and did not act as the default. Use "value", the default.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(CatBoostEncoder|CountTargetEncoder|GLMMEncoder|JamesSteinEncoder|LeaveOneOutEncoder|MEstimateEncoder|QuantileEncoder|SummaryEncoder|WOEEncoder)$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $KW
+          all:
+            - has: { field: name, regex: '^handle_(unknown|missing)$' }
+            - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } }
+---
+# OrdinalEncoder and TargetEncoder take the same three strings. scikit-learn has classes of both
+# names with other options, so the document needs proof that the class comes from
+# category_encoders.
+id: invalid-handle-option
+language: python
+severity: error
+message: $C of category_encoders takes "error", "return_nan" or "value" here. $KW raises ValueError at fit since 2.10, and before that it was taken in silence and did not act as the default. Use "value", the default.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(OrdinalEncoder|TargetEncoder)$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $KW
+          all:
+            - has: { field: name, regex: '^handle_(unknown|missing)$' }
+            - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } }
+    - matches: from-category-encoders
+utils:
+  from-category-encoders:
+    any:
+      - has: { field: function, kind: attribute, regex: '^category_encoders\.' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, pattern: $MOD } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^category_encoders(\.|$)' } }, { has: { field: alias, pattern: $MOD } }] } }
+      - all:
+          - has: { field: function, kind: identifier, pattern: $CLS }
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+                  - any: [{ has: { kind: dotted_name, pattern: $CLS } }, { has: { kind: wildcard_import } }]
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, pattern: $CLS } }] } } }
+---
+# The base-N and contrast encoders also take "indicator", which adds a column for the unseen
+# or missing category.
+id: invalid-handle-option
+language: python
+severity: error
+message: $C takes "error", "return_nan", "value" or "indicator" here. $KW raises ValueError at fit since category_encoders 2.10, and before that it was taken in silence and did not act as the default. Use "value", the default.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(BackwardDifferenceEncoder|BaseNEncoder|BinaryEncoder|GrayEncoder|HelmertEncoder|PolynomialEncoder|SumEncoder)$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $KW
+          all:
+            - has: { field: name, regex: '^handle_(unknown|missing)$' }
+            - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } }
+---
+# The scikit-learn OneHotEncoder takes handle_unknown="ignore", and that string is what this
+# document most often finds. "value" does the same here: an unseen category becomes a row of
+# zeros. MultiHotEncoder was added in 2.11 with the same strings.
+id: invalid-handle-option
+language: python
+severity: error
+message: $C of category_encoders takes "error", "return_nan", "value" or "indicator" for handle_unknown. $KW raises ValueError at fit since 2.10, and before that it coded an unseen category as NaN in silence. Use "value", the default, which codes it as zeros, as "ignore" does in scikit-learn.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(OneHotEncoder|MultiHotEncoder)$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $KW
+          all:
+            - has: { field: name, regex: '^handle_unknown$' }
+            - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } }
+    - any:
+        - has: { field: function, regex: '(^|\.)MultiHotEncoder$' }
+        - matches: from-category-encoders
+utils:
+  from-category-encoders:
+    any:
+      - has: { field: function, kind: attribute, regex: '^category_encoders\.' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, pattern: $MOD } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^category_encoders(\.|$)' } }, { has: { field: alias, pattern: $MOD } }] } }
+      - all:
+          - has: { field: function, kind: identifier, pattern: $CLS }
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+                  - any: [{ has: { kind: dotted_name, pattern: $CLS } }, { has: { kind: wildcard_import } }]
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, pattern: $CLS } }] } } }
+---
+# handle_missing on the same two classes also takes "ignore", which fills a missing value with
+# zeros.
+id: invalid-handle-option
+language: python
+severity: error
+message: $C of category_encoders takes "error", "return_nan", "value", "indicator" or "ignore" for handle_missing, and $KW raises ValueError at fit since 2.10. Use "value", the default, which gives a missing value seen at fit a column of its own.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(OneHotEncoder|MultiHotEncoder)$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $KW
+          all:
+            - has: { field: name, regex: '^handle_missing$' }
+            - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator|ignore)["'']+$|\{' } }
+    - any:
+        - has: { field: function, regex: '(^|\.)MultiHotEncoder$' }
+        - matches: from-category-encoders
+utils:
+  from-category-encoders:
+    any:
+      - has: { field: function, kind: attribute, regex: '^category_encoders\.' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, pattern: $MOD } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^category_encoders(\.|$)' } }, { has: { field: alias, pattern: $MOD } }] } }
+      - all:
+          - has: { field: function, kind: identifier, pattern: $CLS }
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+                  - any: [{ has: { kind: dotted_name, pattern: $CLS } }, { has: { kind: wildcard_import } }]
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, pattern: $CLS } }] } } }
+---
+# RankHotEncoder takes no "indicator". It raised on an unknown string before 2.10 as well, so
+# the document carries no version.
+id: invalid-handle-option
+language: python
+severity: error
+message: RankHotEncoder takes "error", "return_nan" or "value" for handle_unknown, and "ignore" as well for handle_missing, so $KW raises ValueError at fit. Use "value", the default.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)RankHotEncoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $KW
+          any:
+            - all:
+                - has: { field: name, regex: '^handle_unknown$' }
+                - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } }
+            - all:
+                - has: { field: name, regex: '^handle_missing$' }
+                - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|ignore)["'']+$|\{' } }
+---
+# HashingEncoder keeps no list of categories, so it has neither keyword and raises "TypeError:
+# HashingEncoder.__init__() got an unexpected keyword argument 'handle_unknown'".
+id: invalid-handle-option
+language: python
+severity: error
+message: HashingEncoder has no $K, and the keyword raises TypeError when the encoder is built. Drop it. A hash needs no list of known categories, so an unseen category is coded like any other.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)HashingEncoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, pattern: $K, regex: '^handle_(unknown|missing)$' } } }

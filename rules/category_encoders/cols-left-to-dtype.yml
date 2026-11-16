@@ -1,0 +1,62 @@
+# An encoder built without cols encodes the columns of the object, category and string dtypes
+# and passes every other column through. Inside a ColumnTransformer the columns are already
+# chosen, so a numeric column that was chosen on purpose, such as a zip code, comes back as it
+# went in. On 2.11.2, (OneHotEncoder(), ["zip"]) on a whole-number column of 5 values gave 1
+# output column, equal to the input, and printed "Warning: No categorical columns found" where a
+# warning would be raised. With cols="all", added in 2.10, it gave 5 columns. The rule is info,
+# because it cannot see the dtype of the chosen columns. It has no fix for the same reason.
+#
+# The names in this document belong to category_encoders alone.
+id: cols-left-to-dtype
+language: python
+severity: info
+message: $C() without cols encodes only text and category columns, so a numeric column that this ColumnTransformer hands it passes through as it is. A whole-number column of 5 values came back as 1 column. Pass cols="all" to encode every column it is given.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(BackwardDifferenceEncoder|BaseNEncoder|BinaryEncoder|CatBoostEncoder|CountEncoder|CountTargetEncoder|GLMMEncoder|GrayEncoder|HashingEncoder|HelmertEncoder|JamesSteinEncoder|LeaveOneOutEncoder|MEstimateEncoder|MultiHotEncoder|PolynomialEncoder|QuantileEncoder|RankHotEncoder|SumEncoder|SummaryEncoder|WOEEncoder)$' }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(cols|mapping)$' } } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+    # cols is the second positional parameter of every encoder but HashingEncoder.
+    - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+    - inside: { kind: tuple, inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)(ColumnTransformer|make_column_transformer)$' } } }
+metadata: { since: "2.10" }
+---
+# OneHotEncoder, OrdinalEncoder and TargetEncoder exist in scikit-learn too, where every column
+# is encoded, so the document needs proof that the class comes from category_encoders.
+id: cols-left-to-dtype
+language: python
+severity: info
+message: $C() of category_encoders without cols encodes only text and category columns, so a numeric column that this ColumnTransformer hands it passes through as it is. A whole-number column of 5 values came back as 1 column. Pass cols="all", or use the scikit-learn class of the same name, which encodes every column it is given.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(OneHotEncoder|OrdinalEncoder|TargetEncoder)$' }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(cols|mapping)$' } } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+    - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+    - inside: { kind: tuple, inside: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)(ColumnTransformer|make_column_transformer)$' } } }
+    - matches: from-category-encoders
+utils:
+  from-category-encoders:
+    any:
+      - has: { field: function, kind: attribute, regex: '^category_encoders\.' }
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, pattern: $MOD } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^category_encoders(\.|$)' } }, { has: { field: alias, pattern: $MOD } }] } }
+      - all:
+          - has: { field: function, kind: identifier, pattern: $CLS }
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+                  - any: [{ has: { kind: dotted_name, pattern: $CLS } }, { has: { kind: wildcard_import } }]
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, pattern: $CLS } }] } } }
+metadata: { since: "2.10" }

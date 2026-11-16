@@ -1,0 +1,33 @@
+# An encoder finds its cols by name, so it needs a DataFrame. A scikit-learn imputer, scaler or
+# ColumnTransformer hands the next step a NumPy array unless set_output says otherwise, and the
+# names are gone. On 2.11.2, make_pipeline(SimpleImputer(strategy="most_frequent"),
+# OneHotEncoder(cols=["city"])).fit(X, y) raised "ValueError: X does not contain the columns
+# listed in cols: ['city'] The encoder received a non-DataFrame input at fit, where named
+# columns cannot be recovered positionally". With set_output(transform="pandas") on the imputer
+# the same pipeline ran. The rule reports an encoder with a name in cols that comes after a
+# step it knows to give an array, and stays silent in a file that calls set_output or sets
+# transform_output. Code inside assertRaises, pytest.raises or a try block with an except clause
+# expects the error and stays silent too.
+id: named-cols-after-array-step
+language: python
+severity: error
+message: $C looks its cols up by name, and the step before it in this pipeline gives a NumPy array, so fit raises "ValueError, X does not contain the columns listed in cols". Call set_output(transform="pandas") on the step before, or put the encoder first.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: 'Encoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cols$' } }, { has: { field: value, kind: list, has: { kind: string } } }] } }
+    - any:
+        # make_pipeline(SimpleImputer(), OneHotEncoder(cols=["city"]))
+        - all:
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)make_pipeline$' } } }
+            - follows: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)(SimpleImputer|KNNImputer|IterativeImputer|StandardScaler|MinMaxScaler|MaxAbsScaler|RobustScaler|Normalizer|PowerTransformer|QuantileTransformer|KBinsDiscretizer|PolynomialFeatures|ColumnTransformer|make_column_transformer)$' } }
+        # Pipeline([("impute", SimpleImputer()), ("encode", OneHotEncoder(cols=["city"]))])
+        - inside:
+            kind: tuple
+            all:
+              - inside: { kind: list, inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)Pipeline$' } } } }
+              - follows: { stopBy: end, kind: tuple, has: { kind: call, has: { field: function, regex: '(^|\.)(SimpleImputer|KNNImputer|IterativeImputer|StandardScaler|MinMaxScaler|MaxAbsScaler|RobustScaler|Normalizer|PowerTransformer|QuantileTransformer|KBinsDiscretizer|PolynomialFeatures|ColumnTransformer|make_column_transformer)$' } } }
+    - not: { inside: { kind: module, stopBy: end, regex: 'set_output|transform_output' } }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }

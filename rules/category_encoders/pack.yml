@@ -1,0 +1,11 @@
+# The Category Encoders pack. Every other .yml file in this folder is a rule.
+
+# The short name the library's documentation imports it by. A fix that writes `ce.` applies
+# only in a file with `import category_encoders as ce`, and elsewhere the issue has no fix. No
+# fix of this pack writes the alias, because each one rewrites names the code already has.
+aliases:
+  ce: category_encoders
+
+# The pack has no package check. statsmodels is the one package that category_encoders 2.11
+# stopped installing, and only GLMMEncoder needs it. A package check cannot ask whether a file
+# uses that class, so it would warn every project that has category_encoders.

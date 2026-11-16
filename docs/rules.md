@@ -1,7 +1,7 @@
 # Rules
 
-xpd has six rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
-[scikit-learn](#scikit-learn), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
+xpd has seven rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+[scikit-learn](#scikit-learn), [Category Encoders](#category-encoders), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
 Python rules run on every file.
 
 ## pandas
@@ -5301,6 +5301,740 @@ call with `shuffle=False` or `**`, a `train_test_split` whose result is thrown a
 constructor that only `isinstance` reads. Of 527 held-back reports, 52 were labelled, and each
 reader called 1 wrong. Recall was 79 of 80.
 
+## Category Encoders
+
+These rules run on files that import `category_encoders`. They report code that leaks the
+target into the test rows, arguments that give wrong codes without an error, code that raises
+on category_encoders 2.11.2, and forms that a release removed or deprecated. Every number in
+this section was measured on category_encoders 2.11.2 with scikit-learn 1.9.1, pandas 3.1.1 and
+NumPy 2.5.5 on Python 3.13. Examples assume `import category_encoders as ce` and that the
+scikit-learn names they use are imported. Names such as `X_train`, `y_test` and `encoder`
+represent values supplied by your program.
+
+Three class names exist in scikit-learn as well: `OneHotEncoder`, `OrdinalEncoder` and
+`TargetEncoder`. A rule about one of them reports a call only with proof that the class comes
+from category_encoders. The proof is the module in front of the name, as in
+`ce.OneHotEncoder`, or an import of the name from `category_encoders` in the same file. A file
+that imports the same name from two libraries gives no proof, so those rules stay silent there.
+The other 20 encoder names belong to category_encoders alone and need no proof.
+
+A rule document whose advice needs a newer release carries `since`. xpd reads the installed
+version from the project's venv, as it does for pandas, and skips that document on an older
+release. When the venv has no category_encoders, or there is no venv, every document runs.
+
+The scikit-learn pack already reports a target encoder that is fitted before the split, fitted
+before cross-validation, or refitted on the test rows, through
+[`fit-before-split`](#fit-before-split),
+[`cross-val-on-fitted-data`](#cross-val-on-fitted-data) and [`fit-on-test`](#fit-on-test). A
+file that uses category_encoders with a split nearly always imports scikit-learn, so this pack
+does not repeat those rules. It adds the one form they leave alone, in
+[`encode-before-split`](#encode-before-split).
+
+### How a rule earns its place
+
+Every `error` and `warning` document ships on a proof that was run, and the message quotes what
+the proof measured. A proof is one of four kinds:
+
+- A score proof runs the old and the new form over 30 seeds on data whose target is drawn apart
+  from every feature, where the honest AUC is 0.5. It passes when the old form's mean is more
+  than three standard errors above 0.5 and the new form's mean is within 0.02 of it.
+- A result proof runs the old form and prints the codes it gives, next to the codes of the new
+  form. It passes when the old form gives a code that is wrong for every input of that shape,
+  such as -1.0 for every row.
+- An interpreter proof runs the old form under `python -W error`. It passes when the old form
+  raises an exception or a warning and the new form runs clean. category_encoders 2.11.2 itself
+  sets a pandas option that pandas 3.1 deprecates, so that one warning was ignored.
+- A speed proof times both forms on one thread, as the median of 7 runs, at 10,000 and 100,000
+  rows. It passes when the new form is at least 1.5 times faster at both sizes.
+
+A document is `info` when no proof passed for it, or when its advice depends on something the
+code does not show, such as the dtype of a column. `sklearn-ships-encoder` passed its speed
+proof and is still `info`, because the two libraries return different things and the swap is a
+choice.
+
+The rules were run over two sets of code. The first is the library's own code at its latest
+release: the 86 Python files of the repository, and 35 more blocks taken from its docstrings,
+its `.rst` pages and its README. The second is 55 files from public repositories that import
+`category_encoders`. Four rules were narrowed after these runs, and the table gives the
+reports that are left:
+
+- `invalid-handle-option` reported three scikit-learn `OneHotEncoder(handle_unknown="ignore")`
+  calls in files that import the name from both libraries, which is why a second import now
+  removes the proof.
+- `hashing-default-components` reported `HashingEncoder().hashing_trick(df, N=3)`, which passes
+  the number of columns itself.
+- `zero-regularization` reported `CountTargetEncoder(smoothing=0)` inside `assertRaises`. Code
+  that expects the error is now left alone by every rule about a form that raises.
+- `sklearn-ships-encoder` reported 6 encoders handed to `PolynomialWrapper` or
+  `NestedCVWrapper`, which take only the encoders of this library.
+
+| Rule | Severity | Proof | Reports on the library | Reports on 55 real files | Fix |
+| --- | --- | --- | --- | --- | --- |
+| [`transform-with-test-target`](#transform-with-test-target) | error, info | score: 0.582 against 0.498 AUC | 4 | 0 | unsafe |
+| [`encode-before-split`](#encode-before-split) | error | score: 0.624 against 0.500 AUC | 0 | 0 | none |
+| [`ordinal-mapping-pairs`](#ordinal-mapping-pairs) | error | result: every code is -1.0 | 0 | 0 | unsafe |
+| [`ordinal-mapping-unknown`](#ordinal-mapping-unknown) | info | result: -1.0 for a category the mapping lacks | 3 | 1 | none |
+| [`zero-regularization`](#zero-regularization) | error | result: inf. Interpreter: ValueError | 0 | 0 | none |
+| [`hashing-default-components`](#hashing-default-components) | warning | result: 100 values give 8 distinct rows | 10 | 1 | none |
+| [`cols-left-to-dtype`](#cols-left-to-dtype) | info | result: 1 column where 5 were meant | 1 | 0 | none |
+| [`nan-into-pipeline`](#nan-into-pipeline) | info | interpreter: ValueError at predict | 0 | 0 | none |
+| [`supervised-encoder-without-target`](#supervised-encoder-without-target) | error | interpreter: TypeError, ValueError | 0 | 0 | none |
+| [`invalid-handle-option`](#invalid-handle-option) | error | interpreter: ValueError, TypeError | 0 | 0 | none |
+| [`named-cols-after-array-step`](#named-cols-after-array-step) | error | interpreter: ValueError | 0 | 0 | none |
+| [`wrapper-fit-returns-none`](#wrapper-fit-returns-none) | error | interpreter: AttributeError | 0 | 0 | none |
+| [`removed-in-category-encoders`](#removed-in-category-encoders) | error | interpreter: TypeError, AttributeError, KeyError | 0 | 0 | unsafe |
+| [`deprecated-in-category-encoders`](#deprecated-in-category-encoders) | warning, info | interpreter: FutureWarning. Result: equal frames | 0 | 0 | safe |
+| [`sklearn-ships-encoder`](#sklearn-ships-encoder) | info | speed: 1.67 times at the lowest | 61 | 16 | none |
+| [`encoder-noise-without-seed`](#encoder-noise-without-seed) | info | result: two runs differ by up to 0.14 | 4 | 0 | none |
+
+A score proof gives the old form's mean against the new form's mean. The speed proof gives the
+lowest ratio over the three classes and both sizes.
+
+None of the 83 reports on the library names a line where the rule's claim is false. The advice
+still does not apply to most of them, because the library is using or testing its own classes:
+
+- All 61 reports of `sklearn-ships-encoder` are the library's tests, examples and documentation
+  building its own `OneHotEncoder`, `OrdinalEncoder` or `TargetEncoder`.
+- The 4 reports of `transform-with-test-target` are tests that pass a target to `transform` on
+  purpose, to check what the encoder does with it.
+- The 10 reports of `hashing-default-components` are calls that do run with 8 columns: 4 in
+  tests, 4 in benchmark examples and 2 in the documentation.
+- The report of `cols-left-to-dtype` is an example that hands a `TargetEncoder()` two text
+  columns, which it encodes.
+
+The 18 reports on the 55 real files all name a category_encoders class. Recall was not
+measured, and most rules have no report on the real files, so nothing here says how often the
+old forms occur.
+
+### Leakage
+
+A target encoder codes a category by the labels of its rows. When it sees the labels of the
+test rows, the code of a test row holds part of its own label, and the score on the test rows is
+too high. The score proofs in this group use 600 rows with one text column of 100 levels and a
+target drawn apart from it, a random forest of 50 trees, and give the mean test AUC over 30
+seeds.
+
+#### transform-with-test-target
+
+**Severity:** error when the encoder is a `LeaveOneOutEncoder`, and info for the other supervised encoders. **Fix:** unsafe: `encoder.transform(X_test)`.
+
+Reports `encoder.transform(X_test, y_test)`. The supervised encoders of category_encoders take the target in `transform`, which no scikit-learn transformer does. It is meant for the training rows.
+
+Example:
+
+```python
+encoder = ce.LeaveOneOutEncoder(cols=["city"])
+X_train = encoder.fit_transform(X_train, y_train)
+X_test = encoder.transform(X_test, y_test)
+```
+
+Use instead:
+
+```python
+encoder = ce.LeaveOneOutEncoder(cols=["city"])
+X_train = encoder.fit_transform(X_train, y_train)
+X_test = encoder.transform(X_test)
+```
+
+With the target, `LeaveOneOutEncoder` takes each row's own label out of the mean of its
+category, so the code of a test row moves with its label. That scored 0.582 AUC on data with no
+signal, 7.3 standard errors above 0.5, against 0.498 for `transform(X_test)`.
+
+The other supervised encoders read the target in `transform` only to add the noise of `sigma`
+or `randomized=True`. `CatBoostEncoder` scored 0.507 with the test labels, 0.8 standard errors
+from 0.5. `TargetEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder`,
+`QuantileEncoder` and `CountTargetEncoder` scored the same with and without them. The form is
+still not meant for test rows, so it is info for them.
+
+The rule reads the name of the first argument, which must hold `test` or `holdout`, or be a
+validation name such as `X_val`. It needs the encoder assigned from a supervised class in the
+same function, or in the module for code outside a function. The fix changes the codes of the
+test rows of a `LeaveOneOutEncoder` or a `CatBoostEncoder`, and it takes the noise off the test
+rows of an encoder with `randomized=True`, so it is unsafe. On a `TargetEncoder` and a
+`WOEEncoder` without noise, the fixed line gave an equal frame.
+
+#### encode-before-split
+
+**Severity:** error. **Fix:** none.
+
+Reports `TargetEncoder(...).fit_transform(X, y)` on every row, when the file imports `TargetEncoder` from `category_encoders` and the result is later split by `train_test_split` or passed to `cross_val_score` or another cross-validation function.
+
+Example:
+
+```python
+from category_encoders import TargetEncoder
+
+X_encoded = TargetEncoder(cols=["city"]).fit_transform(X, y)
+X_train, X_test, y_train, y_test = train_test_split(X_encoded, y, random_state=0)
+```
+
+Use instead:
+
+```python
+from category_encoders import TargetEncoder
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+encoder = TargetEncoder(cols=["city"])
+X_train = encoder.fit_transform(X_train, y_train)
+X_test = encoder.transform(X_test)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+On data with no signal the old form scored 0.624 AUC, 13.4 standard errors above 0.5, against
+0.500 when the split came first. Before `cross_val_score` it scored 0.610 against 0.495 for a
+Pipeline that holds the encoder and the model. Fitted on every row before the split,
+`LeaveOneOutEncoder`, `CatBoostEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder`
+and `CountTargetEncoder` scored between 0.620 and 0.623.
+
+[`fit-before-split`](#fit-before-split) and
+[`cross-val-on-fitted-data`](#cross-val-on-fitted-data) of the scikit-learn pack report this
+for every step but one: a bare `TargetEncoder(...)` built in the same expression, which they
+take for the scikit-learn class, because that class cross-fits in `fit_transform`. The
+category_encoders class does not, so this rule reports the same form when the import shows
+which class it is. Every other form, such as `ce.TargetEncoder(...)`, an encoder kept in a
+name, or another encoder class, is reported by the scikit-learn pack.
+
+### Codes that are wrong without an error
+
+Each old form below runs and gives a number, and the number is not the one the code asks for.
+
+#### ordinal-mapping-pairs
+
+**Severity:** error. **Fix:** unsafe: the list of pairs written as a dict.
+
+Reports an `OrdinalEncoder` mapping whose `"mapping"` entry is a list of `(category, code)` pairs. That was the form before category_encoders 2.0, and old answers and notebooks still show it.
+
+Example:
+
+```python
+mapping = [{"col": "size", "mapping": [("small", 1), ("medium", 2), ("large", 3)]}]
+encoder = ce.OrdinalEncoder(cols=["size"], mapping=mapping)
+```
+
+Use instead:
+
+```python
+mapping = [{"col": "size", "mapping": {"small": 1, "medium": 2, "large": 3}}]
+encoder = ce.OrdinalEncoder(cols=["size"], mapping=mapping)
+```
+
+2.11.2 takes the list of pairs without an error and finds no category in it. With
+`[("a", 1), ("b", 2), ("c", 3)]` every row of a column that holds a, b and c was coded -1.0. The
+fix changes every code of the column, from -1.0 to the code the pair names, so it is unsafe. The
+rule reports the `"mapping"` entry of a dict that also has a `"col"` entry.
+
+#### ordinal-mapping-unknown
+
+**Severity:** info. **Fix:** none.
+
+Reports `OrdinalEncoder(mapping=...)` without `handle_unknown`. A category that the mapping does not name is then coded -1, with no error and no warning.
+
+Example:
+
+```python
+encoder = ce.OrdinalEncoder(cols=["size"], mapping=[{"col": "size", "mapping": {"small": 1, "medium": 2}}])
+```
+
+Use instead:
+
+```python
+encoder = ce.OrdinalEncoder(
+    cols=["size"],
+    mapping=[{"col": "size", "mapping": {"small": 1, "medium": 2, "large": 3}}],
+    handle_unknown="error",
+)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+With the mapping `{"a": 1, "b": 2}`, the column a, b, c came out as 1.0, 2.0, -1.0. A key with
+a typing error, or a category that appears later, reaches the model as -1, which is below
+every real code. With `handle_unknown="error"` the same fit raised `ValueError: Unexpected
+categories found in column c`. Whether the mapping names every category cannot be read from
+the code, so the rule is info. A call that states `handle_unknown`, with any value, is left
+alone.
+
+#### zero-regularization
+
+**Severity:** error. **Fix:** none.
+
+Reports `WOEEncoder(regularization=0)` and `CountTargetEncoder(smoothing=0)`.
+
+Example:
+
+```python
+encoder = ce.WOEEncoder(cols=["city"], regularization=0)
+```
+
+Use instead:
+
+```python
+encoder = ce.WOEEncoder(cols=["city"], regularization=0.5)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+`WOEEncoder` adds `regularization`, 1.0 by default, to the counts of both classes before it
+takes the logarithm of their ratio. With 0, a category that holds one class alone divides by
+zero. A category of five rows of class 1 was coded `inf`, with no error and no warning, where
+the default gave 1.204. On a column where every category held both classes the codes were
+finite. `CountTargetEncoder(smoothing=0)` raised `ValueError: smoothing must be strictly bigger
+than 0.` at fit. That document carries `since: "2.11"`, the release that added the class.
+
+`TargetEncoder(smoothing=0)` and `MEstimateEncoder(m=0)` gave the plain mean of each category
+and are left alone.
+
+#### hashing-default-components
+
+**Severity:** warning. **Fix:** none.
+
+Reports `HashingEncoder(...)` without `n_components`. The encoder hashes every value into `n_components` columns, 8 by default, and all encoded columns share them.
+
+Example:
+
+```python
+encoder = ce.HashingEncoder(cols=["city", "shop"])
+```
+
+Use instead:
+
+```python
+encoder = ce.HashingEncoder(cols=["city", "shop"], n_components=1024)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+| `n_components` | Distinct encoded rows for a column of 100 distinct values |
+| --- | --- |
+| 8, the default | 8 |
+| 64 | 48 |
+| 1024 | 95 |
+
+Two columns encoded by one `HashingEncoder()` gave 8 output columns in all, and the rows
+`(x, y)` and `(y, x)` got the same code, so the encoder also loses which column a value came
+from. The rule has no fix, because the right number depends on how many distinct values the
+columns hold. A call that passes the number by position, a call inside `isinstance`, and
+`HashingEncoder().hashing_trick(...)`, which takes the number as `N`, are left alone.
+
+Two ideas about this class were measured and dropped. `max_process=1` was 9.81 times faster
+than the default at 1,000 rows and 2.2 times slower at 100,000 rows, so no setting is right for
+both. `FeatureHasher` of scikit-learn was 5.4 times faster at 10,000 and 100,000 rows, but it
+returns a sparse matrix and takes no column names, so it is no drop-in.
+
+#### cols-left-to-dtype
+
+**Severity:** info. **Fix:** none.
+
+Reports an encoder built without `cols` inside a `ColumnTransformer` or `make_column_transformer`. Without `cols`, an encoder encodes the columns of the object, category and string dtypes and passes every other column through.
+
+Example:
+
+```python
+columns = make_column_transformer((ce.BinaryEncoder(), ["zip_code"]), remainder="passthrough")
+```
+
+Use instead:
+
+```python
+columns = make_column_transformer((ce.BinaryEncoder(cols="all"), ["zip_code"]), remainder="passthrough")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+Inside a `ColumnTransformer` the columns are already chosen, so a numeric column that was
+chosen on purpose comes back as it went in. `(ce.OneHotEncoder(), ["zip"])` on a whole-number
+column of 5 values gave 1 output column, equal to the input, and printed `Warning: No
+categorical columns found` with `print`, where a warning would be raised. With `cols="all"` it
+gave 5 columns. A `TargetEncoder()` gave the column back unchanged in the same way.
+
+`cols="all"` was added in category_encoders 2.10, so the rule carries `since: "2.10"`. The rule
+cannot see the dtype of the chosen columns, and on text columns the old form is right, so it is
+info. For `OneHotEncoder`, `OrdinalEncoder` and `TargetEncoder` the message also names the
+scikit-learn class, which encodes every column it is given.
+
+#### nan-into-pipeline
+
+**Severity:** info. **Fix:** none.
+
+Reports an encoder with `handle_unknown="return_nan"` or `handle_missing="return_nan"` inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.
+
+Example:
+
+```python
+model = make_pipeline(ce.OneHotEncoder(cols=["city"], handle_unknown="return_nan"), LogisticRegression())
+```
+
+Use instead:
+
+```python
+model = make_pipeline(ce.OneHotEncoder(cols=["city"], handle_unknown="value"), LogisticRegression())
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+`return_nan` codes a category that fit did not see as NaN, in every output column of that row.
+In a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in
+front of a `LogisticRegression`, `predict` on a row with an unseen city raised `ValueError:
+Input X contains NaN`, and so did an `OrdinalEncoder` with `handle_missing="return_nan"` on a
+row with a missing city. The fit passed, because the training rows had no
+unseen category, so the error first shows on new data. With `"value"`, the default, the same
+`predict` ran.
+
+| Encoder | Code of an unseen category with `"value"` | With `"return_nan"` |
+| --- | --- | --- |
+| `OrdinalEncoder` | -1.0 | NaN |
+| `OneHotEncoder` | 0 in every column | NaN in every column |
+| `BinaryEncoder` | 0 in every column | NaN in every column |
+| `TargetEncoder` | the mean of the target, 0.5 here | NaN |
+| `CountEncoder` | 0.0 | NaN |
+
+The rule stays silent when the same pipeline call holds an imputer or a model that takes NaN,
+such as `HistGradientBoostingClassifier`. Outside a pipeline call the option is left alone,
+because the code may handle the NaN itself.
+
+### Code that raises
+
+Each old form below raises on category_encoders 2.11.2. Code inside `assertRaises`,
+`pytest.raises` or a `try` block with an `except` clause expects the error and stays silent.
+
+#### supervised-encoder-without-target
+
+**Severity:** error. **Fix:** none.
+
+Reports `fit(X)` and `fit_transform(X)` without the target on a supervised encoder.
+
+Example:
+
+```python
+X_encoded = ce.TargetEncoder(cols=["city"]).fit_transform(X)
+```
+
+Use instead:
+
+```python
+X_encoded = ce.TargetEncoder(cols=["city"]).fit_transform(X, y)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+Ten encoders learn from the target: `CatBoostEncoder`, `CountTargetEncoder`, `GLMMEncoder`,
+`JamesSteinEncoder`, `LeaveOneOutEncoder`, `MEstimateEncoder`, `QuantileEncoder`,
+`SummaryEncoder`, `TargetEncoder` and `WOEEncoder`. On each of them `fit_transform(X)` raised
+`TypeError: fit_transform() missing argument: y`. `fit(X)` raised `ValueError: Supervised
+encoders need a target for the fitting. The target cannot be None` on nine of them, and
+`TypeError` on `SummaryEncoder`, whose `fit` has no default for `y`. A scikit-learn transformer
+takes `fit(X)`, so the form is easy to carry over from an `OrdinalEncoder` or a
+`OneHotEncoder`.
+
+The rule reports the call on an encoder built in the same expression, and on a name that is
+assigned from a supervised class in the same function and from nothing else there.
+
+#### invalid-handle-option
+
+**Severity:** error. **Fix:** none.
+
+Reports a `handle_unknown` or `handle_missing` string that the encoder does not take, such as `handle_unknown="ignore"`, which belongs to the scikit-learn `OneHotEncoder`.
+
+Example:
+
+```python
+encoder = ce.OneHotEncoder(cols=["city"], handle_unknown="ignore")
+```
+
+Use instead:
+
+```python
+encoder = ce.OneHotEncoder(cols=["city"], handle_unknown="value")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+| Encoders | `handle_unknown` | `handle_missing` |
+| --- | --- | --- |
+| The ten supervised encoders, and `OrdinalEncoder` | `error`, `return_nan`, `value` | `error`, `return_nan`, `value` |
+| `BackwardDifferenceEncoder`, `BaseNEncoder`, `BinaryEncoder`, `GrayEncoder`, `HelmertEncoder`, `PolynomialEncoder`, `SumEncoder` | the three, and `indicator` | the three, and `indicator` |
+| `OneHotEncoder`, `MultiHotEncoder` | the three, and `indicator` | the three, `indicator` and `ignore` |
+| `RankHotEncoder` | the three | the three, and `ignore` |
+| `HashingEncoder` | not a parameter | not a parameter |
+| `CountEncoder` | not checked | not checked |
+
+The table was read from 2.11.2 by fitting every class with every string. Since 2.10 an unknown
+string raises at fit, as in `ValueError: Unexpected handle_unknown value 'ignore' for
+OneHotEncoder. Supported values: ['error', 'indicator', 'return_nan', 'value']`. Before 2.10 the
+string was taken in silence and did not act as the default. On 2.9.0, `handle_unknown="ignore"`
+coded an unseen category as NaN on `OneHotEncoder`, `OrdinalEncoder`, `BinaryEncoder`,
+`TargetEncoder` and `WOEEncoder`. The form is wrong on both sides of 2.10, so the rule runs on
+every version.
+
+`"value"` on a category_encoders `OneHotEncoder` codes an unseen category as zeros, which is
+what `"ignore"` does in scikit-learn. `HashingEncoder` keeps no list of categories, so it has
+neither keyword and raised `TypeError: HashingEncoder.__init__() got an unexpected keyword
+argument 'handle_unknown'`. A value that is not a string, such as a number or a function, is
+allowed since 2.11 and is left alone, and so is `CountEncoder`, which checks nothing.
+
+#### named-cols-after-array-step
+
+**Severity:** error. **Fix:** none.
+
+Reports an encoder with names in `cols` that comes after an imputer, a scaler or a `ColumnTransformer` in a pipeline. Those steps hand the next step a NumPy array, and the names are gone.
+
+Example:
+
+```python
+model = make_pipeline(SimpleImputer(strategy="most_frequent"), ce.OneHotEncoder(cols=["city"]))
+```
+
+Use instead:
+
+```python
+imputer = SimpleImputer(strategy="most_frequent").set_output(transform="pandas")
+model = make_pipeline(imputer, ce.OneHotEncoder(cols=["city"]))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The old form raised at fit: `ValueError: X does not contain the columns listed in cols:
+['city'] The encoder received a non-DataFrame input at fit, where named columns cannot be
+recovered positionally`. With `set_output(transform="pandas")` on the imputer the same
+pipeline ran, and so did the old form with the column given by position, as in `cols=[0]`.
+
+The rule knows these steps to give an array: `SimpleImputer`, `KNNImputer`, `IterativeImputer`,
+`StandardScaler`, `MinMaxScaler`, `MaxAbsScaler`, `RobustScaler`, `Normalizer`,
+`PowerTransformer`, `QuantileTransformer`, `KBinsDiscretizer`, `PolynomialFeatures`,
+`ColumnTransformer` and `make_column_transformer`. It reads `make_pipeline(...)` and
+`Pipeline([...])` calls whose steps are written in the call. It stays silent in a file that
+calls `set_output` or sets `transform_output`, anywhere.
+
+#### wrapper-fit-returns-none
+
+**Severity:** error. **Fix:** none.
+
+Reports a method call on the result of `fit` of a `PolynomialWrapper` or a `NestedCVWrapper`, and a name assigned from that `fit`. Their `fit` has no return statement, so it returns `None` where every scikit-learn estimator returns itself.
+
+Example:
+
+```python
+encoded = PolynomialWrapper(ce.TargetEncoder(cols=["city"])).fit(X, y).transform(X)
+```
+
+Use instead:
+
+```python
+wrapper = PolynomialWrapper(ce.TargetEncoder(cols=["city"]))
+wrapper.fit(X, y)
+encoded = wrapper.transform(X)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The old form raised `AttributeError: 'NoneType' object has no attribute 'transform'` on both
+wrappers. `fit_transform` returns the encoded frame on both and is left alone.
+
+### Removed and deprecated forms
+
+The release of each removal was found by reading the constructor of every class in the wheels
+of 1.3.0, 2.2.2, 2.5.1, 2.6.4, 2.7.0, 2.8.0, 2.8.1, 2.9.0, 2.10.0 and 2.11.2, and each exception
+was raised on 2.11.2. Code inside `assertRaises`, `pytest.raises` or a `try` block with an `except`
+clause expects the error or handles both releases, and stays silent.
+
+#### removed-in-category-encoders
+
+**Severity:** error. **Fix:** unsafe for the two renamed names in `category_encoders.utils`. The other forms have no fix.
+
+Reports forms that a release of category_encoders removed and that raise on 2.11.2.
+
+Example:
+
+```python
+encoder = ce.OneHotEncoder(impute_missing=True)
+```
+
+Use instead:
+
+```python
+encoder = ce.OneHotEncoder(handle_missing="value")
+```
+
+| Old form | Removed in | On 2.11.2 | Write instead |
+| --- | --- | --- | --- |
+| `impute_missing=` on any encoder | 2.0 | TypeError | `handle_missing="value"`, the default |
+| `LeaveOneOutEncoder(randomized=True, sigma=0.05)` | 2.0 | TypeError | `LeaveOneOutEncoder(sigma=0.05)` |
+| `utils.get_obj_cols(df)` | 2.6 | AttributeError | `utils.get_categorical_cols(df)` |
+| `utils.TransformerWithTargetMixin` | 2.8 | AttributeError | `utils.SupervisedTransformerMixin` |
+| `encoded.drop(columns=["intercept"])` after a contrast encoder | 2.7 | KeyError | remove the drop |
+| `encoder.feature_names_out_.index("a")` | 2.7 | AttributeError | `list(encoder.feature_names_out_).index("a")` |
+
+Until 2.6 the four contrast encoders, `BackwardDifferenceEncoder`, `HelmertEncoder`,
+`PolynomialEncoder` and `SumEncoder`, added a column named `intercept` that holds 1 on every
+row. 2.7 stopped adding it, so a drop by that name raises `KeyError: "['intercept'] not found
+in axis"`. The rule reports the drop only in a file that names one of the four classes, and it
+leaves a drop with `errors="ignore"` alone.
+
+`feature_names_out_` and the result of `get_feature_names_out` were lists until 2.6 and are
+NumPy arrays since 2.7, so `index`, `remove`, `append`, `extend`, `insert`, `count` and `pop`
+raise `AttributeError` on them. `feature_names_in_` is still a list.
+
+The two fixes are unsafe. `get_obj_cols` named the columns of the object dtype, and
+`get_categorical_cols` also names the columns of the category and string dtypes. A file that
+defines its own `get_obj_cols` is left alone.
+
+#### deprecated-in-category-encoders
+
+**Severity:** warning for `get_feature_names`, and info for `max_sample`. **Fix:** safe.
+
+Reports `encoder.get_feature_names()` and `HashingEncoder(max_sample=...)`.
+
+Example:
+
+```python
+names = encoder.get_feature_names()
+hasher = ce.HashingEncoder(cols=["city"], max_sample=1000, n_components=64)
+```
+
+Use instead:
+
+```python
+names = encoder.get_feature_names_out()
+hasher = ce.HashingEncoder(cols=["city"], n_components=64)
+```
+
+`get_feature_names` raised ``FutureWarning: `get_feature_names` is deprecated in all of
+sklearn. Use `get_feature_names_out` instead.`` Both methods returned the same NumPy array, so
+the fix is safe. The method `get_feature_names_out` was added in 2.6, so the document carries
+`since: "2.6"`.
+
+scikit-learn removed its own `get_feature_names`, and
+[`removed-in-sklearn`](#removed-in-sklearn) reports every call in a file that imports sklearn.
+This rule therefore runs only in a file that does not import it. It needs the receiver built
+from a class whose name ends in `Encoder` or `Wrapper`, in the same expression or in an
+assignment of the same function.
+
+The changelog of 2.6.4 says of `max_sample` that "it has no use anymore". `HashingEncoder` still
+takes the keyword and raises no warning, so the document is info. With `max_sample=10` and
+without it the encoded frame was equal, with one process and with two, so the fix that drops the
+keyword is safe.
+
+### Encoders that scikit-learn ships
+
+#### sklearn-ships-encoder
+
+**Severity:** info. **Fix:** none.
+
+Reports a category_encoders `OneHotEncoder`, `OrdinalEncoder` or `TargetEncoder` that uses nothing the scikit-learn class of the same name lacks.
+
+Example:
+
+```python
+encoder = ce.OneHotEncoder(cols=["city", "shop"])
+X_encoded = encoder.fit_transform(X)
+```
+
+Use instead:
+
+```python
+encoder = make_column_transformer(
+    (OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["city", "shop"]),
+    remainder="passthrough",
+)
+X_encoded = encoder.fit_transform(X)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+`fit_transform` on 4 text columns of 50 levels each, as the median of 7 runs on one thread:
+
+| Class | 10,000 rows | 100,000 rows |
+| --- | --- | --- |
+| `OneHotEncoder` | 23.1 ms against 5.1 ms, 4.51 times | 113.5 ms against 42.4 ms, 2.68 times |
+| `OrdinalEncoder` | 7.5 ms against 3.9 ms, 1.94 times | 47.0 ms against 28.1 ms, 1.67 times |
+| `TargetEncoder` | 18.5 ms against 6.5 ms, 2.83 times | 99.7 ms against 46.7 ms, 2.14 times |
+
+The two libraries do not return the same thing, so the rule is info and has no fix:
+
+- category_encoders returns a DataFrame with every column of the input. scikit-learn returns an
+  array of the encoded columns, and a `ColumnTransformer` chooses the columns.
+- The scikit-learn `OrdinalEncoder` starts its codes at 0 and follows sorted order.
+  category_encoders starts at 1 and follows the order in which the categories first appear.
+- The scikit-learn `TargetEncoder`, added in scikit-learn 1.3, cross-fits in `fit_transform`, so
+  a training row is never coded from its own label.
+- The scikit-learn `OneHotEncoder` raises on an unseen category unless it is given
+  `handle_unknown="ignore"`.
+
+The rule reports a call only when every keyword is one of `cols`, `verbose`, `return_df` and, on
+`OneHotEncoder`, `use_cat_names`. Any other keyword, such as `mapping`, `hierarchy`,
+`handle_missing` or `smoothing`, asks for something the scikit-learn class does in another way
+or not at all. An encoder handed to `PolynomialWrapper` or `NestedCVWrapper` is left alone, and
+an encoder without `cols` inside a `ColumnTransformer` is left to
+[`cols-left-to-dtype`](#cols-left-to-dtype).
+
+One idea was measured and dropped: that a Pipeline with the scikit-learn `TargetEncoder`
+scores better on the test rows than one with the category_encoders class. On 2,000 rows with a
+target that depends on a column of 300 levels, the category_encoders `TargetEncoder` scored
+0.599 AUC and the scikit-learn class 0.544, over 30 seeds with a random forest. The rule
+therefore claims the speed and nothing about the score.
+
+### Reproducible results
+
+#### encoder-noise-without-seed
+
+**Severity:** info. **Fix:** none.
+
+Reports an encoder that adds random noise without `random_state`, and a `NestedCVWrapper` that shuffles its folds without it.
+
+Example:
+
+```python
+encoder = ce.LeaveOneOutEncoder(cols=["city"], sigma=0.05)
+```
+
+Use instead:
+
+```python
+encoder = ce.LeaveOneOutEncoder(cols=["city"], sigma=0.05, random_state=0)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+Two `fit_transform` calls on the same 400 rows, and the largest gap between their codes:
+
+| Form | Largest gap between two runs |
+| --- | --- |
+| `WOEEncoder(randomized=True)` | 0.07 |
+| `JamesSteinEncoder(randomized=True)` | 0.11 |
+| `MEstimateEncoder(randomized=True)` | 0.13 |
+| `LeaveOneOutEncoder(sigma=0.05)` | 0.14 |
+| `CatBoostEncoder(sigma=0.05)` | 0.12 |
+| `NestedCVWrapper(TargetEncoder())` | 0.07 |
+
+With `random_state=0` the two calls were equal in each row of the table, and a
+`NestedCVWrapper` with `shuffle=False` was equal too. A seed does not move the expected score,
+so the rule is info, as [`missing-random-state`](#missing-random-state) of the scikit-learn
+pack is. A `NestedCVWrapper` given a splitter as `cv` is left alone, because the splitter
+brings its own seed. A file that calls `np.random.seed` is left alone, because the encoders
+then draw from that seed.
+
+### What the pack leaves out
+
+These habits were looked at and have no rule.
+
+- A target of more than two classes given to `TargetEncoder` as whole numbers is coded as the
+  mean of the class numbers, which means nothing. `PolynomialWrapper` is the answer, but a
+  pattern cannot see how many classes a target has. `WOEEncoder` raises `ValueError: The target
+  column y must be binary` in the same case.
+- `encoder.fit(X_train, y_train)` followed by `encoder.transform(X_train)` gives the training
+  rows of a `LeaveOneOutEncoder` the plain mean of their category. With a random forest that
+  scored 0.599 AUC on the test rows against 0.541 with the target passed, so the form the
+  documentation asks for was the worse one here, and no rule reports the other.
+- `LeaveOneOutEncoder()` without `sigma` scored 0.541 against 0.551 with `sigma=0.05` in a
+  forest, and the same in a logistic regression, which is no proof.
+- One encoder per column in a loop was 1.03 to 1.16 times slower than one encoder with `cols`.
+- `GLMMEncoder` needs statsmodels, which category_encoders stopped installing in 2.11, and
+  raises `ImportError` without it. A package check runs for every project that has
+  category_encoders and cannot ask whether a file uses that class, so the pack has none.
+- `X` and `y` with indexes that do not match raise `ValueError` at fit. A pattern cannot see an
+  index.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
@@ -5756,7 +6490,7 @@ target/release/xpd check samples/bad.py
 cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --unsafe-fixes
 ```
 
-The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/hamilton/` and
+The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/category_encoders/`, `samples/hamilton/` and
 `samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to

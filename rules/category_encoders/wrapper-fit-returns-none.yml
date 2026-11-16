@@ -1,0 +1,43 @@
+# fit of PolynomialWrapper and of NestedCVWrapper has no return statement, so it returns None
+# where every scikit-learn estimator returns itself. On 2.11.2,
+# PolynomialWrapper(TargetEncoder()).fit(X, y).transform(X) raised "AttributeError: 'NoneType'
+# object has no attribute 'transform'", and so did the same chain on NestedCVWrapper. A name
+# assigned from the fit call holds None in the same way. Code inside assertRaises, pytest.raises
+# or a try block with an except clause expects the error and stays silent.
+id: wrapper-fit-returns-none
+language: python
+severity: error
+message: fit of $W returns None on category_encoders 2.11.2, so .$M on its result raises AttributeError. Call fit on one line and $M on the next, or call fit_transform.
+rule:
+  pattern: $W($$$A).fit($$$B).$M
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  W: { regex: '(^|\.)(PolynomialWrapper|NestedCVWrapper)$' }
+---
+id: wrapper-fit-returns-none
+language: python
+severity: error
+message: fit of $W returns None on category_encoders 2.11.2, so $V holds None and not the fitted wrapper. Assign the wrapper first and call fit on the next line.
+rule:
+  pattern: $V = $W($$$A).fit($$$B)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  W: { regex: '(^|\.)(PolynomialWrapper|NestedCVWrapper)$' }
+---
+# The wrapper is built on one line and fitted on another, in the same function or both outside
+# any function.
+id: wrapper-fit-returns-none
+language: python
+severity: error
+message: $E is a wrapper of category_encoders, and its fit returns None on 2.11.2, so the result of this call is None. Call fit on a line of its own and use $E afterwards.
+rule:
+  any:
+    - pattern: $E.fit($$$B).$M
+    - pattern: $V = $E.fit($$$B)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+  inside:
+    stopBy: { kind: function_definition }
+    any: [{ kind: function_definition }, { kind: module }]
+    has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { has: { field: right, kind: call, has: { field: function, regex: '(^|\.)(PolynomialWrapper|NestedCVWrapper)$' } } }] }
+constraints:
+  E: { kind: identifier }

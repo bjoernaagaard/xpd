@@ -1,0 +1,31 @@
+# Before 2.0 the mapping of an OrdinalEncoder was a list of (category, code) pairs for each
+# column, and old answers and notebooks still show that form. Since 2.0 it is a dict or a pandas
+# Series. 2.11.2 takes the list of pairs without an error and finds no category in it, so every
+# row of the column gets -1.0: with [("a", 1), ("b", 2), ("c", 3)] the column a, b, c came out as
+# -1.0, -1.0, -1.0. The rule reports the "mapping" entry of a dict that also has a "col" entry.
+# Unsafe: the fix changes every code of the column from -1.0 to the code the pair names.
+id: ordinal-mapping-pairs
+language: python
+severity: error
+message: 'A mapping given as a list of (category, code) pairs matches no category on category_encoders 2.11.2, so every row of the column is coded -1.0. Write the mapping as a dict, such as {"a": 1, "b": 2}.'
+rule:
+  kind: pair
+  all:
+    - has: { field: key, kind: string, regex: '^["'']mapping["'']$', pattern: $KEY }
+    - has:
+        field: value
+        kind: list
+        pattern: '[$$$PAIRS]'
+        all:
+          - has: { kind: tuple }
+          - not: { has: { any: [{ kind: list_splat }, { kind: list_comprehension }, { kind: identifier }, { kind: call }] } }
+    - inside: { kind: dictionary, has: { kind: pair, has: { field: key, kind: string, regex: '^["'']col["'']$' } } }
+rewriters:
+  - id: pair
+    rule: { kind: tuple, pattern: '($K, $V)' }
+    fix: "$K: $V"
+transform:
+  ENTRIES:
+    rewrite: { source: $$$PAIRS, rewriters: [pair], joinBy: ", " }
+fix: "$KEY: {$ENTRIES}"
+metadata: { fix: unsafe }
