@@ -46,25 +46,6 @@ pub(crate) struct Index {
     pub(crate) entries: Vec<Entry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) recipes: Option<crate::recipe::Stats>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) inputs: Option<Inputs>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Inputs {
-    pub(crate) griffe: String,
-    pub(crate) python: String,
-    pub(crate) archive: Option<String>,
-    pub(crate) examples: Option<Examples>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Examples {
-    pub(crate) archive: String,
-    pub(crate) path: String,
-    pub(crate) url: String,
-    pub(crate) license: String,
-    pub(crate) notice: Option<String>,
 }
 
 /// Gets the public API from Griffe without importing the library.
