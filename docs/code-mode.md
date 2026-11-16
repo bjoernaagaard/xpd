@@ -132,7 +132,7 @@ out rows by their name. [What is open](#what-is-open) lists leaks that pass ever
 | --- | --- | --- | --- |
 | `data-is-profiled` | Raw data | The contract names the profiled file with its row count, and the target has no nulls | `profile`, `contract` |
 | `split-covers-every-row` | Split | The training rows and the held out rows add up to the rows of the file | `profile`, `contract` |
-| `split-is-seeded` | Split | `check` reports no draw without a seed in scikit-learn, scikit-lego, MAPIE or Category Encoders code, by the rules in the table below | `check`, `contract` |
+| `split-is-seeded` | Split | `check` reports no draw without a seed in scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo code, by the rules in the table below | `check`, `contract` |
 | `inputs-are-file-columns` | Preprocessing | Each input of the contract has the name and dtype of a column of the file, and none is the target. The values are not compared | `profile`, `contract` |
 | `dataflow-connects` | Preprocessing | `graph` reports no error or warning, and each feature step reads only input columns and columns of earlier steps | `graph`, `contract` |
 | `one-pipeline` | Model | The saved object is a `sklearn.pipeline.Pipeline` with its steps listed | `contract` |
@@ -144,7 +144,7 @@ out rows by their name. [What is open](#what-is-open) lists leaks that pass ever
 
 `check-reports-no-error` counts every error of every pack, and not a list of rules.
 `split-is-seeded` reads a list of rules, and the server refuses to start when the binary no
-longer has one of them. Both gates read the four packs about models. A draw from another
+longer has one of them. Its rules are from the six packs in the table below. A draw from another
 library, such as `np.random.default_rng()` without a seed, is in no list, and only `reproducible`
 can find it.
 
@@ -154,6 +154,8 @@ can find it.
 | sklego | `unseeded-random-estimator` | None. Its errors are wrong numbers and code that raises |
 | mapie | `unseeded-resampling` | `calibrate-on-training-rows`, `coverage-on-seen-rows` |
 | category_encoders | `encoder-noise-without-seed` | `encode-before-split`, `transform-with-test-target` |
+| arch | `arch-unseeded-draws` | None. Its errors are removed names, unknown options and code that raises |
+| pymoo | `unseeded-run`, `numpy-seed-ignored` | None. Its errors are removed names, ignored arguments, wrong results and code that raises |
 
 ## A run from raw rows to a saved model
 
@@ -243,7 +245,7 @@ which fits the Pipeline and saves the model and the contract. The second runs `t
     {
       "name": "split-is-seeded",
       "passed": true,
-      "detail": "The contract records the seed 0, and check reports no unseeded scikit-learn, scikit-lego, MAPIE or Category Encoders draw."
+      "detail": "The contract records the seed 0, and check reports no unseeded scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo draw."
     },
     {
       "name": "inputs-are-file-columns",

@@ -27,20 +27,22 @@ from xpd.mcp.models import (
 from xpd.mcp.root import Project
 from xpd.mcp.tools import READS
 
-# The rules of each pack that report a split, an estimator or an encoder that draws without a
-# seed. A pack without such a rule is not listed.
+# The rules of each pack that report a split, an estimator, an encoder, a bootstrap, a simulation
+# or an optimizer run that draws without a seed. A pack without such a rule is not listed.
 SEED_RULES = {
     "sklearn": ("missing-random-state", "random-state-without-shuffle"),
     "sklego": ("unseeded-random-estimator",),
     "mapie": ("unseeded-resampling",),
     "category_encoders": ("encoder-noise-without-seed",),
+    "arch": ("arch-unseeded-draws",),
+    "pymoo": ("unseeded-run", "numpy-seed-ignored"),
 }
 PIPELINE = "sklearn.pipeline.Pipeline"
 # What a later run needs to rebuild the environment that wrote the model.
 VERSIONS = ("python", "scikit-learn", "pandas")
 MIN_FOLDS = 2
 # The libraries that SEED_RULES covers, as the detail of `split-is-seeded` names them.
-SEED_LIBRARIES = "scikit-learn, scikit-lego, MAPIE or Category Encoders"
+SEED_LIBRARIES = "scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo"
 
 
 def gate(
@@ -305,10 +307,10 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
 
         The gates: the data is the profiled file and its target has no nulls, the split
         covers every row, `check` reports no draw without a seed in scikit-learn, scikit-lego,
-        MAPIE or Category Encoders code, the inputs have the names and dtypes of columns of the
-        file, one Pipeline holds every step, the feature steps connect, `check` reports no
-        error, the contract has a score for each fold, two training runs leave an equal
-        `result`, the prediction script leaves that `result` too, and the versions are
+        MAPIE, Category Encoders, arch or pymoo code, the inputs have the names and dtypes of
+        columns of the file, one Pipeline holds every step, the feature steps connect, `check`
+        reports no error, the contract has a score for each fold, two training runs leave an
+        equal `result`, the prediction script leaves that `result` too, and the versions are
         recorded.
 
         A passed report is no proof that the run has no leak. `check` reads the code and finds
