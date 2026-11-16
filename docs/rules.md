@@ -2271,6 +2271,26 @@ For `replace(tzinfo=None)` in a lambda, `dt.tz_localize(None)` took 2.3 ms where
 746 ms on 200,000 rows. `apply-date-method` leaves `replace(tzinfo=zone)` alone, because `replace`
 skips the daylight saving check that `tz_localize` makes.
 
+#### row-window-on-uneven-times
+
+**Severity:** warning. **Fix:** none.
+
+Reports `rolling` with an integer window and `on=`. A window given as a number counts rows, also when `on=` names a time column. On six days with gaps, `rolling(3, on="day").sum()` gave 14.0 for 2024-01-10, the sum of three rows that reach back 8 days, and `rolling("3D", on="day").sum()` gave 8.0, the one row of the last 3 days. `rolling(3)` without `on=` gave the same numbers as with it. A row window on a frame whose index holds the times is not reported, because xpd cannot see that the index is one of times.
+
+Example:
+
+```python
+weekly = df.rolling(7, on="day")["sold"].sum()
+```
+
+Use instead:
+
+```python
+weekly = df.rolling("7D", on="day")["sold"].sum()
+```
+
+The replacement is advice. xpd does not apply it automatically. A time window starts with `min_periods=1`, where the row window gives missing values until it has 7 rows.
+
 ### Stated intent
 
 #### merge-without-validate

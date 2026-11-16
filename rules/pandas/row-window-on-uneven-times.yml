@@ -1,0 +1,20 @@
+# A rolling window given as a number counts rows, also when on= names a time column. On pandas
+# 3.1.1 and six days with gaps, rolling(3, on="day").sum() gave 14.0 for 2024-01-10, the sum of
+# three rows that reach back 8 days to 2024-01-02. rolling("3D", on="day").sum() gave 8.0 there,
+# the one row of the last 3 days. rolling(3) without on= gave the same numbers as with it, so
+# on= changed nothing for the row window (research/modern-pandas/probes/rolling.txt).
+#
+# xpd cannot see whether the times have gaps, so the rule reports the form that says the window
+# is meant in time: an integer window together with on=. A row window on a frame whose index
+# holds the times is not reported. The rule has no fix: the offset is the author's to choose, and
+# a time window also starts with min_periods=1 where the row window waits for 3 rows.
+id: row-window-on-uneven-times
+language: python
+severity: warning
+message: on=$C names the time column, but a window given as a number counts rows. On days with gaps, rolling(3, on="day") summed three rows that reached back 8 days and gave 14.0, where rolling("3D", on="day") gave 8.0 for the last 3 days. Pass the span as an offset, as in rolling("7D", on=$C).
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, has: { field: attribute, regex: ^rolling$ } }
+    - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: keyword_argument, all: [{ has: { field: name, regex: ^window$ } }, { has: { field: value, kind: integer } }] }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^on$ } }, { has: { field: value, pattern: $C } }] } }
