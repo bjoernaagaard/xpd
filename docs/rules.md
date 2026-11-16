@@ -9602,12 +9602,6 @@ The book states principles that the code of a figure does not show, so no rule c
   missing argument.
 - The Shrink Principle (page 169). The right size of a figure depends on how many values it
   shows, which the code does not say.
-- The quartile plot (page 124), which erases the box of a box plot and leaves a line from the
-  lowest value to the lower quartile, a gap at the median and a line from the upper quartile to
-  the highest value. No setting of `px.box` or `go.Box` draws it. The thinnest `go.Box` still
-  drew 7 straight lines for each group, against 4 for the quartile plot, and hid the median.
-  The quartile plot needs the five numbers computed by hand and drawn with `go.Scatter`, so a
-  rule would ask every box plot to become another program.
 
 ### Sizes that do not follow the numbers
 
@@ -10065,6 +10059,51 @@ non-data-bearing frame" (page 131). `mirror=True` draws each axis line a second 
 far side of the plot, which closes a box around the data: the x axis line had one segment
 with `showline=True` alone and two with `mirror=True`. Under the default template `mirror=True`
 without `showline` drew no line, so the rule reads the two together.
+
+#### box-plot-ink
+
+Severity: info. Fix: none.
+
+Reports `px.box` and `go.Box` constructors with exactly one of `x` or `y`,
+without written point settings, notches, means, quartile methods, precomputed
+statistics, box styling, orientation or unknown argument splats. Express color,
+facet and animation groups are outside this narrow form. The advice is conditional.
+The rule does not establish that a box plot is wrong.
+
+Example:
+
+```python
+fig = go.Figure(go.Box(y=values))
+```
+
+Use instead, if only the minimum, quartiles, median and maximum are needed:
+
+```python
+low, q1, median, q3, high = 1, 2.5, 4, 5.5, 7
+fig = go.Figure(go.Scatter(
+    x=[0, 0, None, 0.03, 0.03, None, 0.03, 0.03, None, 0, 0, None],
+    y=[low, q1, None, q1, median - 0.05, None,
+       median + 0.05, q3, None, q3, high, None],
+    mode="lines",
+))
+```
+
+The five numbers above are an example, computed from values 1 through 7 with
+linear quartiles. Compute the numbers separately for each distribution. Choose
+the offset and median gap for the data scale, and retain the original box when
+its outliers, notches, hover information or statistical convention are needed.
+Default whiskers end at sample values within the 1.5 IQR fences, which need not
+be the minimum and maximum. Replacing them with min/max changes the statistic.
+
+Tufte prefers the offset middle half of the quartile plot (page 124), but says
+the choice also rests on statistical and aesthetic criteria at vdqi.md lines
+4877 to 4893. The Plotly 7.1.0 drawing probe rendered four default boxes with
+36 straight segments and 15,241.7 square pixels of filled box area. The offset
+`go.Scatter` drawing used 16 segments and no filled box area. A thinned box
+still used 28 segments and obscured the median. These are drawing measurements,
+not a claim of statistical equivalence. The rendered figures and resolved
+values are in `research/plotly-rules/runs/v2/fix-R5/`. No automatic fix can make
+the statistical and aesthetic choice for the author.
 
 #### redundant-color
 
