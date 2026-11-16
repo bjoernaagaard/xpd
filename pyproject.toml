@@ -5,8 +5,8 @@ build-backend = "maturin"
 [project]
 name = "xpd"
 requires-python = ">=3.11"
-license = "MIT OR Apache-2.0"
-license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+license = "MIT AND Apache-2.0 AND BSD-3-Clause AND NCSA"
+license-files = ["LICENSE-MIT", "LICENSE-APACHE", "licenses/*"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",

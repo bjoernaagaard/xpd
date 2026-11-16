@@ -231,4 +231,9 @@ rule.
 
 ## License
 
-You may use xpd under the MIT license or the Apache-2.0 license.
+You may use xpd's own code under the MIT license or the Apache-2.0 license.
+Harvested recipes keep their source licenses, including MIT, BSD-3-Clause, Apache-2.0
+and NCSA. Run `xpd api <recipe-name>` to read the license text, copyright notices,
+source link and modification status with the code. The `licenses/` directory contains
+the upstream license and notice files shipped in the crate, sdist and wheel.
+Package metadata lists the combined licenses of the bundled work.
