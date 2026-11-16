@@ -206,3 +206,11 @@ configured from the environment settings above, and the client commands start `x
 fastmcp list --command 'xpd mcp' --resources --prompts
 fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
 ```
+
+## Library discovery
+
+Call `find(task, package=None, kind=None)` before selecting a library, even if the project has
+not installed it. The result holds up to five symbols or rules ranked by keywords. `package`
+is a Python import name and `kind` is `symbol` or `rule`. Call `api(name)` with a returned dotted
+name to read its parameter names, docstring summary, own class members and possible guarding
+rules. Both tools call the installed binary. The server holds no symbol index.

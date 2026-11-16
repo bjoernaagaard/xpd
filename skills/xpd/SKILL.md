@@ -6,12 +6,14 @@ description: "Python library habits: run xpd to lint code for slow or wrong use 
 # xpd
 
 Use `xpd` whenever you write or change Python code.
-`xpd -h` and `xpd <command> -h` are the source of truth; prefer them over this file.
+`xpd <command> -h` lists the current flags.
 
 - `xpd check <paths…> --format json`: lint. Fix every `error`. Fix `warning`s
   unless you can state why the pattern is right here. Don't silence rules.
   A `missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
+- `xpd find "<task>"`: discover library symbols and rules before choosing a library.
+  `xpd api <dotted.name>` reads a result with its parameters and guarding rules.
 - `xpd rules --format json`: every rule with its documentation. Read a rule's
   `doc` before you change code it reports.
 - `xpd check <paths…> --fix`: apply safe fixes. Add `--unsafe-fixes` for fixes
@@ -33,6 +35,6 @@ Use `xpd` whenever you write or change Python code.
     name, so check it for a typing error. `inputs` are what the caller passes.
 
 When the xpd MCP server is connected, call its tools (`check`, `fix`, `graph`,
-`profile`, `equiv`, `rules`, `rule`) instead of the shell commands. They take
+`profile`, `equiv`, `rules`, `rule`, `find`, `api`) instead of the shell commands. They take
 the same paths and return the same JSON, except that `rules` lists the rules
 without their documentation and `rule` returns one rule with it.

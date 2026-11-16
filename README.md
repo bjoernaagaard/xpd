@@ -80,6 +80,9 @@ uv tool install xpd
 ```text
 xpd
 ├── check [paths]          lint files and folders, and rewrite with --fix
+├── find "<task>"          find library symbols and rules before choosing a library
+├── api <dotted.name>       read parameters, summary, class members and rule links
+├── index <source>         refresh a versioned source index without importing Python
 ├── rules                  list every rule with its documentation
 ├── graph <files>          print the dataflow of step code or Hamilton modules
 ├── profile <data file>    print dtypes, nulls, unique counts and memory per column
@@ -89,6 +92,10 @@ xpd
 ├── lsp                    start the language server for editors
 └── skill                  print the agent skill for this version
 ```
+
+`find` and `api` search indexes shipped in the binary, including libraries you have not
+installed. Search is offline and uses keywords. For example, run `xpd find "time series bootstrap
+for cross validation"`, then `xpd api mapie.subsample.BlockBootstrap`.
 
 `check`, `rules` and `graph` read the files and start no Python. `profile` and `equiv` run the
 project's Python and need pandas there. `xpd <command> -h` lists the flags of a command. The
@@ -180,6 +187,7 @@ xpd mcp
 ├── tools
 │   ├── check, fix                 lint, and write fixes after the user confirms unsafe ones
 │   ├── graph, profile, equiv      the commands of the same names
+│   ├── find, api                   discover a library for a task and read its API
 │   ├── rules, rule                list the rules, and read one with its examples
 │   ├── contract, gates            judge a run from a data file to a saved model
 │   └── show_issues, show_dataflow, show_columns    tables and a chart, in hosts that draw them

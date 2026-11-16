@@ -14,7 +14,15 @@ from typing import Generic, TypeVar
 from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
 
-from xpd.mcp.models import CheckReport, Equivalence, GraphReport, Profile, Rule, SkillSource
+from xpd.mcp.models import (
+    CheckReport,
+    DiscoveryEntry,
+    Equivalence,
+    GraphReport,
+    Profile,
+    Rule,
+    SkillSource,
+)
 
 # Exit codes that carry a result. 1 means the result holds an error, such as a failing check.
 FINDINGS = frozenset({0, 1})
@@ -33,6 +41,8 @@ class Command(Generic[T]):
     results: frozenset[int]
 
 
+FIND = Command(("find", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
+API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
 CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport), FINDINGS)
 GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport), FINDINGS)
 # profile exits 1 when it cannot read the file, so only 0 carries a profile.

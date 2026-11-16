@@ -1,6 +1,7 @@
 """The tools that run xpd on the project's files."""
 
 from collections.abc import Sequence
+from pathlib import Path
 
 from fastmcp import Context, FastMCP
 from mcp.types import (
@@ -11,8 +12,8 @@ from mcp.types import (
     ToolAnnotations,
 )
 
-from xpd.mcp.binary import CHECK, EQUIV, GRAPH, PROFILE, Command, T, Xpd
-from xpd.mcp.models import CheckReport, Equivalence, GraphReport, Profile
+from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, Command, T, Xpd
+from xpd.mcp.models import CheckReport, DiscoveryEntry, Equivalence, GraphReport, Profile
 from xpd.mcp.protocol import uses_handshake
 from xpd.mcp.root import Project, Root
 
@@ -100,6 +101,7 @@ async def unsafe_confirmed(
 
 
 def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
+    register_discovery(mcp, xpd)
     register_lint(mcp, xpd, project)
     register_data(mcp, xpd, project)
 
@@ -206,3 +208,27 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         if isinstance(root, InputRequiredResult):
             return root
         return await run(ctx, xpd, EQUIV, root, [root.inside(old), root.inside(new)])
+
+
+def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
+    @mcp.tool(tags={"discovery"}, annotations=READS)
+    async def find(
+        task: str, package: str | None = None, kind: str | None = None
+    ) -> list[DiscoveryEntry]:
+        """Find the top five library symbols and rules for a task in plain words.
+
+        Search offline before choosing a library, even when it is not installed.
+        Read the chosen symbol with api before writing code.
+        """
+        flags = []
+        if package:
+            flags.extend(["--package", package])
+        if kind:
+            flags.extend(["--kind", kind])
+        return await xpd.run(FIND, Path.cwd(), [task], *flags)
+
+    @mcp.tool(tags={"discovery"}, annotations=READS)
+    async def api(name: str) -> DiscoveryEntry:
+        """Read a public dotted name's parameters, summary, own class members and rule links."""
+        entries = await xpd.run(API, Path.cwd(), [name])
+        return entries[0]

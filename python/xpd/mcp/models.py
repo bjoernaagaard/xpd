@@ -293,3 +293,20 @@ class GateReport(BaseModel):
     passed: bool = Field(description="True when every gate passed.")
     failed: list[str] = Field(description="The names of the gates that failed.")
     gates: list[Gate]
+
+
+class ApiMember(Output):
+    name: str
+    parameters: list[str]
+    summary: str
+
+
+class DiscoveryEntry(Output):
+    kind: str
+    package: str
+    name: str
+    callable: Literal["class", "function"] | None
+    parameters: list[str]
+    summary: str
+    members: list[ApiMember]
+    rules: list[str]

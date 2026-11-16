@@ -10678,3 +10678,22 @@ a glob against the path as it was given, so start it with `**/` to match at any 
 A new folder under `rules/` is a new pack, with no Rust change. Its rules run only on files that
 import the module. A pack about Python itself, such as `rules/python/`, sets `everyFile: true` in
 `pack.yml`, and its rules run on every file.
+
+### Index a new pack
+
+For a pack backed by a library, generate its source index after installing the library without
+its dependencies in an empty folder outside the repository. Use `/var/tmp` for downloaded code.
+
+```sh
+uv venv /var/tmp/xpd-source/venv
+uv pip install --python /var/tmp/xpd-source/venv/bin/python --no-deps scikit-lego
+xpd index /var/tmp/xpd-source/venv/lib/python3.15/site-packages --package sklego
+```
+
+Use the Python version directory created by uv. For a version bump, update the package in
+that environment, then rerun the last command. It reads the version from distribution metadata
+and replaces `indexes/sklego.json` without hand editing. Commit the generated file. `build.rs`
+embeds each library JSON file under `indexes/`; Python itself needs only its rule entries.
+Add real questions for the new pack to `indexes/questions.json` and run
+`cargo run -- find --check indexes/questions.json`. Keep failing questions and improve the
+ranking for general language patterns. Read downloaded source as data and never import it.

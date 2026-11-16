@@ -253,3 +253,70 @@ flags, and reads its one setting from the editor.
 | --- | --- |
 | 0 | The editor sent `shutdown` and then `exit` |
 | 1 | The editor went away without them, or never sent `initialize` |
+
+## find
+
+```sh
+xpd find "time series bootstrap for cross validation"
+xpd find "grouped regression" --package sklego --kind symbol --format json
+xpd find "small multiples" --kind rule
+```
+
+Returns up to five entries in keyword rank order, with summaries and rule links. Class members
+are returned by `api`. The binary includes source indexes for all
+library packs and the compiled rule messages and documentation. No library installation,
+network or Python execution is needed. `--package` takes the Python import name, and `--kind`
+takes `symbol` or `rule`. Empty matches return an empty list and exit 0.
+
+Names are split at underscores and camel case. Name tokens get weight three in BM25, with
+light stemming and common word forms shared by queries and entries. Parameter names and
+source-derived introductory keywords get lower weights. Exact acronym names and phrases get
+bonuses, and shorter public paths rank higher. Results are keyword matches, not a judgment
+that a library suits every requirement. Read the chosen API and its rules before using it.
+
+## api
+
+```sh
+xpd api sklego.meta.GroupedPredictor
+xpd api plotly.express.bar --format json
+```
+
+Prints the entry's parameter names, first docstring paragraph, own public methods and rule
+links. JSON is a list containing one entry, with the same shape as `find`. Missing names exit
+2. Parameter names come from source and do not include defaults, type annotations or inherited
+methods. Compiled extension functions and dynamically constructed exports may be absent.
+
+Rule links are inferred from symbol name tokens in the pack's rule patterns, including regex
+patterns. They are possible guards, rather than proof that every use of the symbol matches.
+The rule entries include the full documentation, so terms such as "small multiples" are searchable.
+
+## index
+
+```sh
+xpd index /path/to/site-packages --package sklego
+xpd index /path/to/source/sklego --package sklego --version 0.9.10 --output local.json
+xpd find "grouped regression" --index local.json
+xpd api sklego.meta.GroupedPredictor --index local.json
+```
+
+Parses Python source with tree-sitter and never imports or executes library code. The first
+command reads the version from wheel metadata and writes `indexes/sklego.json`. For a source
+checkout, pass `--version`. `--output` selects another file. The output directory must exist.
+An explicit local index replaces the embedded index for its package and also supports libraries
+without an xpd rule pack. Both read commands accept `--index`.
+
+Each file has `schema_version`, `package`, `version` and `entries`. Every entry has a `kind`,
+`package`, `name`, `callable`, `parameters`, `summary`, `members`, `rules` and optional source-derived `keywords`. Symbols have kind
+`symbol`; rule entries are built from xpd's compiled rules at run time. Future entry kinds can
+share the same commands. Source generation follows explicit and wildcard imports and simple
+assignment re-exports. Each definition uses the path with the fewest parts, then shortest text,
+then lexical order, excluding paths with underscore-prefixed parts. Tests, validators,
+graph_objs, vendored trees and symlinks are skipped.
+
+`xpd find --check indexes/questions.json` runs the real discovery questions and exits 2 if an
+expected entry is absent from the top five. It prints every failure. Lefthook runs it with `--max-misses 3` before commits to enforce
+the measured baseline of 49 out of 52. The strict command allows no misses. The three baseline
+misses are pairwise distances with expected `scipy.spatial.distance.pdist`, removing sensitive
+feature correlation with expected `sklego.preprocessing.InformationFilter`, and changing a
+binary classifier threshold with expected `sklego.meta.Thresholder`. The question file retains
+all three.
