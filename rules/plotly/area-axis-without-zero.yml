@@ -1,0 +1,184 @@
+# Tufte, vdqi.md line 1525, printed page 56: "The representation of numbers, as physically
+# measured on the surface of the graphic itself, should be directly proportional to the numerical
+# quantities represented." Line 1533, printed page 57, defines the Lie Factor.
+#
+# An area chart shows its value by the height of the fill below the line. plotly 7.1.0 ranges the
+# axis of px.area and of go.Scatter(fill="tozeroy") from zero by itself: values of 95 and 100 got
+# the y range (0, 105.26) and fills of 324.9 and 342.0 pixels, the ratio of the values. An
+# explicit range is kept as written, and the fill is cut at the lower edge of the plot. With [90,
+# 101] the same fills were 163.6 and 327.3 pixels tall, set in px.area, in update_yaxes or in
+# update_layout, and 145.4 and 290.9 on go.Scatter(fill="tozeroy") (runs/v2/B5/area-cut.txt). The
+# data grows by 5.3 percent and the fill by 100 percent, a Lie Factor of 19, as for a bar. px.line
+# ranged the same values to (94.72, 100.28), so the cut is right for a line and wrong for a fill.
+#
+# The rule reads the range only when both ends are numbers above zero. It has no fix, because the
+# honest chart is either the same fill from zero or a line without a fill, and that is the
+# author's choice.
+#
+# This document reads range_y on px.area. A call with orientation or log_y is left alone.
+id: area-axis-without-zero
+language: python
+severity: warning
+message: range_y=$R starts the axis of the area chart above zero, so the height of the fill no longer follows its value. With [90, 101], fills for 95 and 100 were drawn 163.6 and 327.3 pixels tall, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or draw the values as a line with px.line, which needs no zero.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(range_y)$' } }, { has: { field: value, pattern: $R, matches: cut-range } }] } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|log_y)$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A range written as two numbers above zero, such as [90, 101], whose lower end has as many
+  # digits before the point as the upper end, or one fewer. So [90, 101] and [2, 5] are read,
+  # and [1, 100] is not, because it cuts a hundredth off the longest bar. A name, a zero, a
+  # negative number or a number below 1 at the lower end is left alone.
+  cut-range:
+    kind: list
+    all:
+      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+      - any:
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0,1}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1,2}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2,3}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3,4}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4,5}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5,6}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6,7}([.][0-9]*)?$' } }]
+---
+# The same cut set on the figure afterwards: update_yaxes(range=...), update_layout with
+# yaxis_range=... or with yaxis=dict(range=...). The figure must be one of filled areas, by the
+# call that made it, and a file that names a log axis anywhere is left alone.
+id: area-axis-without-zero
+language: python
+severity: warning
+message: The range $R starts the axis of the area chart above zero, so the height of the fill no longer follows its value. With [90, 101], fills for 95 and 100 were drawn 163.6 and 327.3 pixels tall, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or draw the values as a line with px.line, which needs no zero.
+rule:
+  all:
+    - any:
+        - kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^range$' }
+            - has: { field: value, pattern: $R, matches: cut-range }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: figure } }] } } }
+        - kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^yaxis_range$' }
+            - has: { field: value, pattern: $R, matches: cut-range }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
+        - any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
+          all:
+            - has: { field: value, pattern: $R, matches: cut-range }
+            - inside:
+                any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+                inside:
+                  stopBy: { kind: argument_list }
+                  kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^yaxis$' }
+                    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
+    - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A range written as two numbers above zero, such as [90, 101], whose lower end has as many
+  # digits before the point as the upper end, or one fewer. So [90, 101] and [2, 5] are read,
+  # and [1, 100] is not, because it cuts a hundredth off the longest bar. A name, a zero, a
+  # negative number or a number below 1 at the lower end is left alone.
+  cut-range:
+    kind: list
+    all:
+      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+      - any:
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0,1}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1,2}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2,3}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3,4}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4,5}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5,6}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6,7}([.][0-9]*)?$' } }]
+  # A figure of filled areas: px.area without orientation and log_y, or a go.Figure whose own
+  # arguments hold a go.Scatter with fill="tozeroy".
+  new-figure:
+    kind: call
+    any:
+      - all:
+          - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area)$' } }, { has: { field: object, matches: px } }] }
+          - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|log_y)$' } } } }
+          - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+      - all:
+          - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+          - has:
+              stopBy: end
+              kind: call
+              all:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scattergl)$' } }, { has: { field: object, matches: go } }] }
+                - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(fill)$' } }, { has: { field: value, regex: '^["'']tozeroy["'']$' } }] } }
+                - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
+metadata: { holds: { FIG: { matches: figure-expr } } }

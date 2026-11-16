@@ -1,0 +1,174 @@
+# Tufte, vdqi.md line 3707, printed page 92: "Above all else show the data."
+#
+# zsmooth fills the space between the cells with colors that blend their values. On plotly 7.1.0 a
+# go.Heatmap of a 2 by 2 grid of 0 and 10, drawn in "Greys" at 400 by 400 pixels with no margin,
+# drew 2 colors with zsmooth=False, 61 with "fast" and 252 with "best". The two colors of the data
+# covered all 160,000 pixels without smoothing and 45,156 and 40,401 with it. go.Histogram2d drew
+# 252 colors with "best", and its "fast" resolved to False and drew 2, on the 2 by 2 grid and on
+# 500 points in 10 by 10 bins (runs/v2/B1/probe.txt). So "fast" is read on go.Heatmap only.
+#
+# The fix is unsafe: zsmooth=False draws each cell as a block of one color, so the figure looks
+# different.
+#
+# This document reads "best" and "fast" on go.Heatmap and "best" on go.Histogram2d.
+id: heatmap-smoothing
+language: python
+severity: info
+message: zsmooth=$S blends the colors of neighboring cells, so the heatmap shows values between the cells that the data does not hold. A 2 by 2 grid of 0 and 10 drew 252 colors with "best" and 61 with "fast", where zsmooth=False drew 2. Tufte asks above all else to show the data. Use zsmooth=False, which draws each cell in its own color.
+rule:
+  kind: string
+  pattern: $S
+  any:
+    - all:
+        - regex: '^["''](best|fast)["'']$'
+        - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^zsmooth$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Heatmap)$' } }, { has: { field: object, matches: go } }] } } } }] }
+    - all:
+        - regex: '^["'']best["'']$'
+        - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^zsmooth$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Histogram2d)$' } }, { has: { field: object, matches: go } }] } } } }] }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+fix: 'False'
+metadata: { fix: unsafe }
+---
+# go.Image takes zsmooth "fast" or False, and "best" raised ValueError on plotly 7.1.0. The
+# attribute's docstring says it "only applies for image traces that use the source attribute". A 2
+# by 2 checkerboard given as z drew 2 colors with "fast", and the same pixels given as a PNG in
+# source drew 61 (runs/v2/B1/probe.txt). So the rule reads "fast" only on a go.Image whose own
+# arguments set source.
+id: heatmap-smoothing
+language: python
+severity: info
+message: zsmooth=$S blends the colors of neighboring pixels of the image in source, so it shows values between the pixels that the data does not hold. A 2 by 2 checkerboard of black and white drew 61 colors with "fast", where zsmooth=False drew 2. Tufte asks above all else to show the data. Use zsmooth=False, which draws each pixel in its own color.
+rule:
+  kind: string
+  pattern: $S
+  regex: '^["'']fast["'']$'
+  inside:
+    kind: keyword_argument
+    field: value
+    all:
+      - has: { field: name, regex: '^zsmooth$' }
+      - inside: { kind: argument_list, inside: { kind: call, all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Image)$' } }, { has: { field: object, matches: go } }] } }, { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(source)$' } } } }] } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+fix: 'False'
+metadata: { fix: unsafe }
+---
+# The same smoothing set afterwards with update_traces(zsmooth="best") on a plotly figure.
+# px.density_heatmap made a histogram2d trace, and "best" drew 1,156 colors where False drew 1,011
+# (runs/v2/B1/probe.txt). "fast" is left alone here, because it does nothing on a histogram2d and
+# the rule cannot see which traces the figure holds.
+id: heatmap-smoothing
+language: python
+severity: info
+message: zsmooth=$S blends the colors of neighboring cells, so the heatmap shows values between the cells that the data does not hold. A 2 by 2 grid of 0 and 10 drew 252 colors with "best", where zsmooth=False drew 2. Tufte asks above all else to show the data. Use zsmooth=False, which draws each cell in its own color.
+rule:
+  kind: string
+  pattern: $S
+  regex: '^["'']best["'']$'
+  inside:
+    kind: keyword_argument
+    field: value
+    all:
+      - has: { field: name, regex: '^zsmooth$' }
+      - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_traces$' } }, { has: { field: object, matches: figure } }] } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
+  figure-type:
+    kind: type
+    has: { kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
+fix: 'False'
+metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

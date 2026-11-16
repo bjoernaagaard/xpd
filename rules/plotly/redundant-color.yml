@@ -35,3 +35,57 @@ utils:
               - any:
                   - has: { field: name, regex: '^plotly\.express$' }
                   - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# The same double encoding on go.Bar: marker_color, or color in marker, set to the same expression
+# as x or y. On plotly 7.1.0 go.Bar(x=["a", "b", "c"], y=v, marker_color=v) with v = [1, 2, 4]
+# resolved marker.color to (1, 2, 4) on the colorscale from #0d0887 to #f0f921, and drew the bars
+# in rgb(13, 8, 135), rgb(156, 23, 158) and rgb(240, 249, 33), where the same bars without
+# marker_color were all rgb(99, 110, 250) (runs/v2/A/probe_a.txt). The bar length already shows
+# the values, so the colors repeat them. A written string or number is left alone.
+id: redundant-color
+language: python
+severity: info
+message: The marker color $C repeats the values or categories used for coordinate $A. Color can repeat a bar length or a category position. Tufte asks to erase redundant data-ink within reason. Use one color unless the category colors serve another purpose, such as matching another chart.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: go } }] }
+    - any:
+        - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_color)$' } }, { has: { field: value, pattern: $C } }] } }
+        - has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              all:
+                - has: { field: name, regex: '^marker$' }
+                - has:
+                    field: value
+                    any:
+                      - kind: call
+                        all:
+                          - has: { field: function, regex: '^dict$' }
+                          - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(color)$' } }, { has: { field: value, pattern: $C } }] } }
+                      - kind: dictionary
+                        has: { kind: pair, all: [{ has: { field: key, regex: '^["'']color["'']$' } }, { has: { field: value, pattern: $C } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, pattern: $A, regex: '^[xy]$' } }, { has: { field: value, pattern: $C } }] } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+constraints:
+  C: { not: { any: [{ kind: string }, { kind: integer }, { kind: float }, { kind: none }, { kind: 'true' }, { kind: 'false' }] } }

@@ -26,6 +26,7 @@ rule:
           - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-lines }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^data$' } }, { has: { field: value, matches: named-lines } }] }
     - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
+    - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
 utils:
   # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
   go:
@@ -60,3 +61,170 @@ utils:
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(name)$' } } }
       - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } } }
       - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+---
+# The same few lines added one by one: fig = go.Figure() with nothing in it, then two to four
+# statements in a row of fig.add_trace(go.Scatter(name=...)). On plotly 7.1.0 two lines added that
+# way resolved to showlegend=True and drew a legend of two entries, the same figure as the written
+# list of the first document (runs/v2/A/probe_a.txt). The statements count when no assignment of
+# the name comes between them. A figure that also gets a trace in another way, such as add_bar,
+# add_traces, an add_trace of another trace or an add_trace in a loop or a condition, is left
+# alone, because the code then does not show how many entries the legend has. So is an add_trace
+# with row, col or secondary_y, a statement in a loop, and a file that calls
+# update_traces(mode="markers"), as the dot plot of the plotly docs does.
+id: legend-instead-of-labels
+language: python
+severity: info
+message: This figure names its few lines in a legend, so the reader looks back and forth between the legend and the lines. Tufte asks for labels on the graphic itself, with no legend required. Write each name at the end of its line with mode="lines+text" and text, or with fig.add_annotation, and set showlegend=False.
+rule:
+  kind: expression_statement
+  all:
+    - matches: line-add
+    - has: { kind: call, has: { field: function, kind: attribute, has: { field: object, matches: figure } } }
+    - not: { follows: { stopBy: { matches: holds-binder }, matches: line-add } }
+    - precedes: { stopBy: { matches: holds-binder }, matches: line-add }
+    - not: { precedes: { stopBy: { matches: holds-binder }, matches: line-add, precedes: { stopBy: { matches: holds-binder }, matches: line-add, precedes: { stopBy: { matches: holds-binder }, matches: line-add, precedes: { stopBy: { matches: holds-binder }, matches: line-add } } } } }
+    - not: { follows: { stopBy: { matches: holds-binder }, matches: other-add } }
+    - not: { precedes: { stopBy: { matches: holds-binder }, matches: other-add } }
+    - not: { inside: { stopBy: { kind: function_definition }, any: [{ kind: for_statement }, { kind: while_statement }] } }
+    - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
+    - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # An empty go.Figure, so every trace it draws is added later.
+  new-figure:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+      - not: { has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } } }
+      - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(data)$' } } } }
+  # A statement that adds one named line to $FIG and puts it in no cell or second axis.
+  line-add:
+    kind: expression_statement
+    has:
+      kind: call
+      all:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^add_trace$' } }, { has: { field: object, pattern: $FIG } }] }
+        - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-line } }
+        - not: { has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
+  # A statement that adds any other trace to $FIG.
+  other-add:
+    not: { matches: line-add }
+    has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_', not: { regex: '^add_(annotation|shape|layout_image|vline|hline|vrect|hrect)$' } } }] } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
+  # A list of two to four go.Scatter calls, each with a name and none drawn as markers alone.
+  named-lines:
+    kind: list
+    all:
+      - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-line }
+      - has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-line }
+      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { matches: named-line } } }
+      - not: { has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { matches: named-line } } }
+      - not: { has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+  named-line:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(name)$' } } }
+      - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } } }
+      - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  fig-target:
+    any:
+      - pattern: $FIG
+      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
+        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
+  binder:
+    any:
+      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
+        has: { field: left, matches: fig-target }
+      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
+      - { kind: named_expression, has: { field: name, pattern: $FIG } }
+  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
+metadata: { holds: { FIG: { matches: figure-expr } } }
+---
+# The same legend on px.line: color= with a column name draws one line for each value of the
+# column, and y= with a written list of two to four column names draws one line for each column.
+# On plotly 7.1.0 px.line(color="sex") of the tips data resolved to two traces with
+# showlegend=True and drew a legend of two entries, and px.line(y=["a", "b"]) drew a legend of two
+# entries titled "variable" (runs/v2/A/probe_a.txt). The number of values in a column is known
+# only at run time, so a call with line_group, where many lines share one entry, is left alone.
+id: legend-instead-of-labels
+language: python
+severity: info
+message: px.line with $C names each line in a legend, so the reader looks back and forth between the legend and the lines. Tufte asks for labels on the graphic itself, with no legend required. Write each name at the end of its line with fig.add_annotation, or with text on the last point, and set showlegend=False.
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(line)$' } }, { has: { field: object, matches: px } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          pattern: $C
+          any:
+            - all: [{ has: { field: name, regex: '^color$' } }, { has: { field: value, kind: string } }]
+            - all:
+                - has: { field: name, regex: '^y$' }
+                - has:
+                    field: value
+                    kind: list
+                    all:
+                      - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: string }
+                      - has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: string }
+                      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: string } } }
+                      - not: { has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: string } } }
+                      - not: { has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(line_group)$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
+    - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

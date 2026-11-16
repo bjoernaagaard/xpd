@@ -234,20 +234,156 @@ utils:
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
           - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
-  # What a method is called on: the figure itself, or a variable that holds it. The variable
-  # counts when the statement around the call, or a block around that statement, comes at most
-  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
-  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
-  # same name ends the proof, so the rule is silent there.
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
   figure:
     any:
       - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
+metadata: { holds: { FIG: { matches: figure-expr } } }
+---
+# The same cut on bars added after the figure is made: fig = go.Figure(), then
+# fig.add_trace(go.Bar(...)) or fig.add_bar(...), then a range set as in the third document. On
+# plotly 7.1.0 bars of 95 and 100 added that way to an empty go.Figure() kept the range
+# update_yaxes(range=[90, 101]) as written and were drawn 145.4 and 290.9 pixels long, the same as
+# bars given to go.Figure itself, and 288.8 and 304.0 pixels long without the range
+# (runs/v2/A/probe_a.txt). add_bar with update_layout(yaxis_range=[90, 101]) drew the same. The
+# bar must be added to the same variable after its assignment and before the range, with no
+# assignment of the name in between. A bar with orientation, base or yaxis is left alone, and so
+# is a go.Figure that holds bars of its own, which the third document reads.
+id: bar-axis-without-zero
+language: python
+severity: warning
+message: The range $R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 added to a go.Figure were drawn 145.4 and 290.9 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with go.Scatter.
+rule:
+  all:
+    - any:
+        - kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^range$' }
+            - has: { field: value, pattern: $R, matches: cut-range }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: bar-built } }] } } }
+        - kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^yaxis_range$' }
+            - has: { field: value, pattern: $R, matches: cut-range }
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: bar-built } }] } } }
+        - any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
+          all:
+            - has: { field: value, pattern: $R, matches: cut-range }
+            - inside:
+                any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+                inside:
+                  stopBy: { kind: argument_list }
+                  kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^yaxis$' }
+                    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: bar-built } }] } } }
+    - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
+utils:
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
       - kind: identifier
-        pattern: $FIG
+        pattern: $GO
         inside:
-          stopBy: { kind: block, inside: { kind: function_definition } }
-          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
-  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A range written as two numbers above zero, such as [90, 101], whose lower end has as many
+  # digits before the point as the upper end, or one fewer. So [90, 101] and [2, 5] are read,
+  # and [1, 100] is not, because it cuts a hundredth off the longest bar. A name, a zero, a
+  # negative number or a number below 1 at the lower end is left alone.
+  cut-range:
+    kind: list
+    all:
+      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+      - any:
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0,1}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1,2}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2,3}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3,4}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4,5}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5,6}([.][0-9]*)?$' } }]
+          - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6,7}([.][0-9]*)?$' } }]
+  # A go.Figure that holds no go.Bar of its own, so its bars come from add_trace or add_bar.
+  new-figure:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+      - not: { matches: go-bar-figure }
+  # An upright bar on the first y axis.
+  upright-bar:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: go } }] }
+      - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|base|yaxis)$' } } } }
+      - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  # A statement after `$FIG = go.Figure()` that adds an upright bar to $FIG, in itself or in a
+  # loop or a condition around it.
+  bar-added:
+    all:
+      - has:
+          stopBy: end
+          kind: call
+          any:
+            - all:
+                - has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_traces?$' } }] }
+                - has: { field: arguments, has: { stopBy: end, matches: upright-bar } }
+            - all:
+                - has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_bar$' } }] }
+                - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|base|yaxis)$' } } } }
+                - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  # $FIG where the statement around it, or a block around that statement, comes after a
+  # statement that added a bar, with no assignment of $FIG in between.
+  bar-built:
+    kind: identifier
+    pattern: $FIG
+    inside:
+      stopBy: { kind: block, inside: { kind: function_definition } }
+      all: [{ not: { matches: holds-binder } }, { follows: { stopBy: { matches: holds-binder }, matches: bar-added } }]
+  # A go.Figure whose own arguments hold a go.Bar without orientation and base.
+  go-bar-figure:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+      - has:
+          stopBy: end
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: go } }] }
+            - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|base)$' } } } }
+            - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
   fig-target:
     any:
       - pattern: $FIG
@@ -260,18 +396,7 @@ utils:
       - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
       - { kind: named_expression, has: { field: name, pattern: $FIG } }
   holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
-  back-1: { follows: { matches: fig-assigned } }
-  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
-  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
-  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
-  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
-  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
-  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
-  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
-  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
-  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
-  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
-  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+metadata: { holds: { FIG: { matches: figure-expr } } }
 ---
 # The same cut written in the constructor: go.Figure(data=[go.Bar(...)], layout=...) with
 # yaxis=dict(range=...) in go.Layout, in dict or in a dictionary, or with layout_yaxis_range=....
@@ -280,7 +405,7 @@ utils:
 id: bar-axis-without-zero
 language: python
 severity: warning
-message: The range $R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 were drawn 163.6 and 327.3 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with px.scatter.
+message: The range $R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 were drawn 145.4 and 290.9 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with px.scatter.
 rule:
   all:
     - any:
@@ -390,41 +515,14 @@ utils:
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
           - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
-  # What a method is called on: the figure itself, or a variable that holds it. The variable
-  # counts when the statement around the call, or a block around that statement, comes at most
-  # 12 statements after `$FIG = <figure>` in the same block, and nothing from the assignment to
-  # the call binds $FIG again. A second assignment, a loop variable or a `with ... as` of the
-  # same name ends the proof, so the rule is silent there.
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
   figure:
     any:
       - matches: figure-expr
-      - kind: identifier
-        pattern: $FIG
-        inside:
-          stopBy: { kind: block, inside: { kind: function_definition } }
-          all: [{ not: { matches: holds-binder } }, { matches: back-12 }]
-  fig-assigned: { kind: expression_statement, has: { kind: assignment, all: [{ has: { field: left, pattern: $FIG } }, { has: { field: right, matches: figure-expr } }] } }
-  fig-target:
-    any:
-      - pattern: $FIG
-      - any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }]
-        has: { stopBy: end, pattern: $FIG, not: { inside: { any: [{ kind: attribute }, { kind: subscript }] } } }
-  binder:
-    any:
-      - any: [{ kind: assignment }, { kind: augmented_assignment }, { kind: for_statement }, { kind: for_in_clause }]
-        has: { field: left, matches: fig-target }
-      - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
-      - { kind: named_expression, has: { field: name, pattern: $FIG } }
-  holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
-  back-1: { follows: { matches: fig-assigned } }
-  back-2: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-1 }] }] } }
-  back-3: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-2 }] }] } }
-  back-4: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-3 }] }] } }
-  back-5: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-4 }] }] } }
-  back-6: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-5 }] }] } }
-  back-7: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-6 }] }] } }
-  back-8: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-7 }] }] } }
-  back-9: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-8 }] }] } }
-  back-10: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-9 }] }] } }
-  back-11: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-10 }] }] } }
-  back-12: { follows: { any: [{ matches: fig-assigned }, { all: [{ not: { matches: holds-binder } }, { matches: back-11 }] }] } }
+      - { kind: identifier, pattern: $FIG }
+metadata: { holds: { FIG: { matches: figure-expr } } }

@@ -1,0 +1,145 @@
+# Tufte, vdqi.md lines 7994 and 7995, printed page 183, in the table of friendly and unfriendly
+# graphics: friendly "type is upper-and-lower case, with serifs", unfriendly "type is all
+# capitals, sans serif".
+#
+# plotly keeps a title as written: px.bar(title="SALES BY REGION") resolved title.text to "SALES
+# BY REGION", and update_layout(xaxis_title="MONTH OF YEAR") kept its text too. Drawn at 20 pixels
+# in the default font, "SALES BY REGION" was 178 pixels wide and "Sales by region" 136, 1.31 times
+# as wide, and two more titles were 1.26 and 1.35 times as wide (runs/v2/B1/probe.txt).
+#
+# Short names in capitals such as "RSI", "GDP (USD)" and "AUC" are abbreviations and are right as
+# written, so the rule reads a string with no lowercase letter and at least two words of four or
+# more capitals. HTML tags such as <b> and escapes are skipped, and an f-string with a field is
+# left alone. It reads the string as a title, as title_text, as a setting that ends in _title or
+# _title_text, as the text of a title dict, as a value of the labels of a px call and as an item
+# of subplot_titles, inside a plotly call. The rule is info and has no fix, because the case of
+# each word, such as an abbreviation, is the author's to choose.
+id: all-caps-title
+language: python
+severity: info
+message: The title $T is set in capitals only. Drawn at 20 pixels, "SALES BY REGION" was 1.31 times as wide as "Sales by region", and words in capitals all have the same rectangular outline, so they are slower to read. Tufte lists upper and lower case type as friendly and all capitals as unfriendly. Write the title in sentence case, and keep capitals for abbreviations.
+rule:
+  kind: string
+  pattern: $T
+  all:
+    - regex: '^[a-zA-Z]{0,2}["'']+(?:[^\p{Ll}<{\\]|<[^>]*>|\\.)*["'']+$'
+    - regex: '\p{Lu}{4,}\P{L}(?:.*\P{L})?\p{Lu}{4,}'
+  any:
+    - inside:
+        kind: keyword_argument
+        field: value
+        all:
+          - has: { field: name, regex: '^([a-z0-9]+_)*title(_text)?$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        kind: pair
+        field: value
+        all:
+          - has: { field: key, regex: '^["'']title["'']$' }
+          - inside: { stopBy: end, matches: plotly-call }
+    - inside:
+        any: [{ kind: keyword_argument, has: { field: name, regex: '^text$' } }, { kind: pair, has: { field: key, regex: '^["'']text["'']$' } }]
+        field: value
+        inside:
+          any:
+            - kind: argument_list
+              inside: { kind: call, has: { field: function, regex: '^dict$' }, matches: title-setting }
+            - { kind: dictionary, matches: title-setting }
+    - inside:
+        kind: pair
+        field: value
+        inside:
+          kind: dictionary
+          inside:
+            kind: keyword_argument
+            all:
+              - has: { field: name, regex: '^labels$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, has: { field: object, matches: px } } } }
+    - inside:
+        any: [{ kind: list }, { kind: tuple }]
+        inside:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^subplot_titles$' }
+            - inside: { stopBy: end, matches: plotly-call }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
+  figure-type:
+    kind: type
+    has: { kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
+  # A call that proves plotly: a px function, a go class at any depth such as go.layout.XAxis,
+  # make_subplots, or a method of a plotly figure.
+  plotly-call:
+    kind: call
+    any:
+      - matches: new-figure
+      - has: { field: function, kind: attribute, has: { field: object, any: [{ matches: go }, { kind: attribute, has: { field: object, matches: go } }] } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(update_|add_|for_each_)' } }, { has: { field: object, matches: figure } }] }
+  # The value of a title setting inside a plotly call.
+  title-setting:
+    inside:
+      any: [{ kind: keyword_argument, has: { field: name, regex: '^([a-z0-9]+_)*title$' } }, { kind: pair, has: { field: key, regex: '^["'']title["'']$' } }]
+      field: value
+      inside: { stopBy: end, matches: plotly-call }
+metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

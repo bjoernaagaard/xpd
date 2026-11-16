@@ -1,0 +1,69 @@
+# Tufte, vdqi.md line 7166, printed page 178: "A table is nearly always better than a dumb pie
+# chart; the only worse design than a pie chart is several of them, for then the viewer is asked
+# to compare quantities located in spatial disarray both within and between pies ... Given their
+# low data-density and failure to order numbers along a visual dimension, pie charts should never
+# be used."
+#
+# A sunburst draws each value as a wedge, as a pie does, and the rings make it worse. On plotly
+# 7.1.0, px.sunburst of two regions, west 60 and east 40, with the shops c 15 and d 45 in west and
+# a 30 and b 10 in east, drew the regions in the inner ring and the shops in the outer ring, which
+# is three times as large for each degree. Shop d with 45 was drawn with 17,918.9 square pixels
+# and region west with 60 with 7,963.9, so the drawn sizes put the smaller number above the larger
+# one. East 40 against shop a 30 was reversed the same way, and d against east is a Lie Factor of
+# 3.0 (runs/v2/B5/sunburst-order.txt). The angles keep the order only within one ring. px.sunburst
+# and go.Sunburst resolve to a trace of type "sunburst". The rule has no fix, because a bar chart
+# or a table is another figure.
+#
+# The rule reads a sunburst that is given numbers: values=, or for px.sunburst a path=, which
+# counts the rows of each group. Without them a go.Sunburst gave each leaf one equal share, a tree
+# of x with three leaves and y with one drew x at 270 degrees and y at 90, so the figure draws a
+# hierarchy and not quantities, as the coffee flavor wheel of the plotly documentation does. Those
+# are left alone.
+id: sunburst-as-pie
+language: python
+severity: warning
+message: A sunburst draws each value as a wedge, and a wedge in an outer ring gets more area for each degree than one in an inner ring. A shop of 45 was drawn with 2.25 times the area of the region of 60 around it. Tufte rejects pie charts for their failure to order numbers along a visual dimension. Show the leaves as a sorted px.bar with color for the parent, or the values as a go.Table when they are few.
+rule:
+  kind: call
+  any:
+    - all:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(sunburst)$' } }, { has: { field: object, matches: px } }] }
+        - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(values|path)$' } } }
+    - all:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Sunburst)$' } }, { has: { field: object, matches: go } }] }
+        - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(values)$' } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

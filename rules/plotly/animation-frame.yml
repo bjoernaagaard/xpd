@@ -8,10 +8,10 @@
 # with animation_frame="year" made 12 frames and drew 142 of the 1,704 rows at once. The same call
 # with facet_col="year" and facet_col_wrap=4 drew 12 panels with all 1,704 rows
 # (runs/behavior.txt). The 28 px functions are the ones whose signature has animation_frame
-# (runs/lists.txt). 17 of them have facet_col as well, and this document reads those. The other
-# 11 raise TypeError for facet_col, as px.scatter_3d and px.scatter_map did, so the second
-# document names make_subplots for them. The rule is info and has no fix, because the panels need room, and with many
-# frames an animation can be the better choice.
+# (runs/lists.txt). 17 of them have facet_col as well, and this document reads those. The other 11
+# raise TypeError for facet_col, as px.scatter_3d and px.scatter_map did, so the second document
+# names make_subplots for them. The rule is info and has no fix, because the panels need room, and
+# with many frames an animation can be the better choice.
 id: animation-frame
 language: python
 severity: info
@@ -68,3 +68,107 @@ utils:
               - any:
                   - has: { field: name, regex: '^plotly\.express$' }
                   - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+---
+# The same animation built from go.Frame objects: frames= in go.Figure or in update on a plotly
+# figure, or fig.frames = ... after it is made. On plotly 7.1.0 a go.Figure with three frames of
+# one point each held the 3 frames and drew 1 point, and the page that to_html wrote passed the
+# three frames to Plotly.addFrames, so the reader sees them one after another. The same three
+# points in make_subplots(rows=1, cols=3) drew all 3 (runs/v2/A/probe_a.txt). Frames copied from
+# another figure, as frames=fig.frames, are left alone, because the figure they come from is
+# reported where it is made.
+id: animation-frame
+language: python
+severity: info
+message: This code sets figure frames. If multiple frames display different data, animation asks the reader to compare them from memory. An empty figure or a single frame does not establish that comparison. A measured go.Figure with three frames of one point drew 1 point, where make_subplots(rows=1, cols=3) drew all 3. Tufte's small multiples put comparable frames side by side. Use make_subplots when multiple displayed frames are few enough to fit.
+rule:
+  any:
+    - kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^frames$' }
+        - has: { field: value, matches: own-frames }
+        - inside:
+            kind: argument_list
+            inside:
+              kind: call
+              any:
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update$' } }, { has: { field: object, matches: figure } }] }
+    - kind: assignment
+      all:
+        - has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^frames$' } }, { has: { field: object, matches: figure } }] }
+        - has: { field: right, matches: own-frames }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # A call that makes a plotly figure.
+  new-figure:
+    kind: call
+    any:
+      - has: { field: function, kind: attribute, has: { field: object, matches: px } }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+      - all:
+          - has: { field: function, regex: '(^|\.)make_subplots$' }
+          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+  # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
+  figure-type:
+    kind: type
+    has: { kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: go } }] }
+  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
+  figure-expr:
+    any:
+      - matches: new-figure
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
+  # variable only when `holds` in the metadata of this document proves what it holds: the
+  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
+  # a parameter and every call of its function in the file passes a figure. Any other binding
+  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
+  # proof, so the rule is silent there.
+  figure:
+    any:
+      - matches: figure-expr
+      - { kind: identifier, pattern: $FIG }
+  # Frames that the code makes itself: not None, not an empty list and not the frames of
+  # another figure.
+  own-frames:
+    not:
+      any:
+        - kind: none
+        - { kind: list, not: { has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
+        - { kind: attribute, has: { field: attribute, regex: '^frames$' } }
+metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

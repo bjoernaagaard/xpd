@@ -9468,7 +9468,7 @@ Display of Quantitative Information", second edition, to plotly figures. Each ru
 principle of the book that the figure breaks, says what the reader then sees, and names the
 plotly code to write instead. A page number in this section is a printed page of the book.
 
-Every number in this section was measured on plotly 7.1.0 with pandas 3.1.1 on Python 3.14.
+The figure behavior measurements in this section used plotly 7.1.0 with pandas 3.1.1 on Python 3.14.
 Each figure was resolved by plotly.js through `full_figure_for_development`, which fills in
 every default, and where a rule is about a drawn size the figure was rendered to SVG and the
 size was read from the drawn path. Examples assume `import plotly.express as px`,
@@ -9483,12 +9483,31 @@ proof.
 
 A rule about a method, such as `fig.update_xaxes(...)`, needs proof that the object is a plotly
 figure. The method is called on the call that makes the figure, as in
-`px.bar(...).update_xaxes(...)`, or on a variable that was assigned from such a call at most 12
-statements earlier in the same block. A second assignment to the variable, a loop variable or
-a `with ... as` of the same name between the two ends the proof, and so does a parameter. A
-figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure,
-and it does not prove a bar chart, so [`bar-axis-without-zero`](#bar-axis-without-zero) is
-silent there.
+`px.bar(...).update_xaxes(...)`, or on a variable that holds one. xpd follows the variable to
+its value in three ways:
+
+- The nearest earlier statement that binds the variable is an assignment from such a call,
+  however many statements lie between the two. The statement is in the same block as the
+  method call or in a block around it, up to the start of the function. A variable assigned
+  from another variable, as in `chart = fig`, holds what that one held.
+- The variable is a parameter with the annotation `go.Figure` or `go.FigureWidget`, or an
+  assignment gives it that annotation, as in `fig: go.Figure = load()`.
+- The variable is a parameter without that annotation, and every call of its function in the
+  file passes a plotly figure. The function must be called at least once, by its name alone.
+  A method, a function with a decorator, a function that is passed on as a value and a call
+  with `*args` or `**kwargs` give no proof, because the file does not show every argument.
+
+Any other binding of the name on the way ends the proof: a second assignment that is not a
+figure, a loop variable, a `with ... as`, an import, a `def` or a `del` of the same name, and an
+assignment inside an `if` or a loop that stands before the method call or around it. A function
+that is defined in one module and called from another is not followed, so its parameter needs
+the annotation.
+
+A figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure.
+What it holds is proved by the statements after the assignment: an `add_trace` of a `go.Bar`
+makes it a bar chart for [`bar-axis-without-zero`](#bar-axis-without-zero), when no second
+assignment of the name comes between the two.
+The annotation `go.Figure` alone does not prove a bar chart.
 
 A rule reads a value only where it is written in the call: a number, a string, `True` or
 `None`. A name in that place may hold any value, so the rule is silent.
@@ -9511,72 +9530,63 @@ A rule is `error` when the figure is wrong for every reader, `warning` when the 
 not follow the numbers or the book rejects the form outright, and `info` when the form is a
 choice that the book argues against.
 
-The rules were run over 1,087 files of plotly code: the Python blocks of 151 pages of the
-plotly documentation, 117 files of the Dash sample apps that name plotly, and 819 files from
-819 public repositories, 326 of them notebooks. Up to 20 reports of each rule were read. Five
-rules were narrowed after the first run, and the table gives the reports that are left:
+The corpus scan reads 1,089 Python files as text, including the two corpus helper files.
+It does not import or run the collected code. The table gives current corpus reports by
+source, total reports and distinct files with a report. Figure behavior measurements are
+separate from corpus counts.
 
-- `marker-size-diameter` reported `size=[12, 15]` on two highlighted points and
-  `layer["size"] + 11` in a glow effect. It now reads a size only when it takes a column from
-  the object that the same trace reads a coordinate from.
-- `bar-axis-without-zero` reported `update_yaxes(range=[1, 100])` on a rating scale, which cuts
-  a hundredth off the longest bar. It now reads a range only when its lower end has as many
-  digits as its upper end, or one fewer.
-- `gauge-indicator` reported gauges with `shape="bullet"`, which are bars and not dials.
-- `explicit-grid` reported the graticule of a map, a black `gridcolor` beside `showgrid=False`,
-  and a white grid of width 2. It now reads only the x and y axes, and only black.
-- `default-template` reported every `import plotly.express` of a file, and files that show
-  their figures through Streamlit, which draws with its own theme. It now reports the first
-  import, and no file that names `streamlit`.
+Recall follows the planting method used for scikit-learn above. The frozen manifest has
+1,164 known bad forms in copies of 47 real corpus files. Each rule has 48 plants across six
+form groups and three import spellings. `free-facet-scales` has 12 extra subplot plants.
+The groups include literal settings, updates, dictionaries, objects and values held in names
+where the shape permits. Each plant counts once, only when its rule reports its target lines.
+Pre-existing reports do not count. Every complete copy passed `ast.parse`; none was run.
 
-A review then changed six rules, and the table gives the counts after it:
+The source files were available during development and some reports were already reviewed.
+They are held aside for this measurement, not an unseen evaluation set. Selection requires
+AST-readable files with express and graph_objects or graph_objs imports. The forms reuse
+actual px and go spellings, including `from plotly import graph_objects as go`. The main set
+uses six form groups with six value or data variations, rather than 36 independent shapes.
+Existing file-wide exclusions still apply. Recall measures these plants, not every program.
+The manifest, copies, per-target outcomes, spelling distribution and two rerun commands are
+saved under `research/plotly-rules/runs/recall/`. `measure.py --rules` accepts any five rule
+names and `--binary` accepts a review binary. The manifest remains fixed after rule changes.
 
-- `marker-size-diameter` reported `np.sqrt(df["pop"])` and `df["pop"] ** 0.5`, where the area
-  already follows the value, and one public file whose `"size"` column was made with
-  `.pow(0.3)` on another line. It now leaves a root, a power, a logarithm and a column named as
-  a size alone. It also reads a size next to a written `sizemode="diameter"`, which adds one
-  report on the plotly documentation, the page on 3D bubble charts.
-- `default-template` took `hovertemplate` and `texttemplate` for a template, and reported files
-  whose only figures have no plot area. 22 files are new and 21 are gone.
-- `bar-axis-without-zero` reported `px.bar` with `base`, `three-d-for-two-d` reported a trace
-  that gets its `z` on the next line, `animation-frame` named `facet_col` for 11 functions that
-  do not have it, and `spline-line` quoted the numbers of a figure with a fixed y range.
-- The rules count the items of a list without the comments between them, which adds one
-  report of `legend-instead-of-labels`: two lines with a third one commented out.
+| Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Total reports | Files with report | Recall | Fix |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 1, 0, 6 | 7 | 6 | 39 of 48 | none |
+| [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels, 145.4 and 290.9 in a `go.Figure` | 0, 0, 0 | 0 | 0 | 37 of 48 | none |
+| [`area-axis-without-zero`](#area-axis-without-zero) | warning | 57 | drawn: fills of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | 0 | 0 | 37 of 48 | none |
+| [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | 15 | 8 | 48 of 48 | none |
+| [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | 0 | 0 | 32 of 48 | none |
+| [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | 62 | 37 | 32 of 48 | none |
+| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel. Drawn: bars of 5 and 10 equally tall | 2, 0, 2 | 4 | 3 | 40 of 60 | none |
+| [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 102, 18, 231 | 351 | 351 | 32 of 48 | unsafe |
+| [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | 41 | 19 | 40 of 48 | unsafe |
+| [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 7, 1, 18 | 26 | 7 | 40 of 48 | none |
+| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels. Drawn: 3 shades for 3 bar lengths | 16, 0, 87 | 103 | 59 | 40 of 48 | none |
+| [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | 20 | 11 | 40 of 48 | none |
+| [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | 36 | 25 | 40 of 48 | none |
+| [`rainbow-colorscale`](#rainbow-colorscale) | warning | 154 | resolved: Jet lightness 13.5, 97.1, 25.5 along the scale | 1, 0, 7 | 8 | 6 | 40 of 48 | none |
+| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet or in 2 cells | 28, 7, 128 | 163 | 88 | 48 of 48 | none |
+| [`sunburst-as-pie`](#sunburst-as-pie) | warning | 178 | drawn: a wedge of 45 with 2.25 times the area of one of 60 | 14, 2, 11 | 27 | 15 | 48 of 48 | none |
+| [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | 11 | 8 | 40 of 48 | unsafe |
+| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once. Drawn: 1 of 3 frames | 11, 1, 29 | 41 | 22 | 40 of 48 | none |
+| [`heatmap-smoothing`](#heatmap-smoothing) | info | 92 | drawn: 252 colors for a grid of two values | 2, 0, 0 | 2 | 1 | 40 of 48 | unsafe |
+| [`table-for-small-data`](#table-for-small-data) | info | 56 | drawn: 0 of 4 values written, 4 of 4 in `go.Table` | 31, 0, 1 | 32 | 12 | 17 of 48 | none |
+| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 7, 3, 71 | 81 | 59 | 21 of 48 | none |
+| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 90 | 99 | 57 | 40 of 48 | none |
+| [`all-caps-title`](#all-caps-title) | info | 183 | drawn: a title 1.31 times as wide in capitals | 3, 0, 1 | 4 | 2 | 40 of 48 | none |
+| [`axis-title-column-name`](#axis-title-column-name) | info | 183 | resolved: axis title `gdpPercap` | 68, 1, 107 | 176 | 72 | 15 of 48 | none |
 
-| Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Fix |
-| --- | --- | --- | --- | --- | --- |
-| [`marker-size-diameter`](#marker-size-diameter) | error | 57 | drawn: areas 1, 4, 16 for sizes 10, 20, 40 | 1, 0, 6 | none |
-| [`bar-axis-without-zero`](#bar-axis-without-zero) | warning | 57 | drawn: bars of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | none |
-| [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | none |
-| [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | none |
-| [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | none |
-| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel | 2, 0, 0 | none |
-| [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 102, 18, 231 | unsafe |
-| [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | unsafe |
-| [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 2, 1, 13 | none |
-| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels | 14, 0, 82 | none |
-| [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
-| [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
-| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet | 28, 7, 128 | none |
-| [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | unsafe |
-| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once | 8, 1, 18 | none |
-| [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 1, 2, 2 | none |
-| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
-
-`default-template` reports a file once, so its 351 reports are 351 of the 1,087 files.
-`bar-axis-without-zero` and `three-d-for-two-d` have no report on this code. They are kept for
-the figures they catch, which the samples in `samples/plotly/` show.
-
-None of the reports that were read after the narrowing names a line where the rule's claim is
-false. Whether the advice fits is a choice for the `info` rules: a wind rose is the usual chart
-in meteorology and `polar-bar-area` still reports it, and all 28 reports of `pie-chart` on the
-plotly documentation are the pages that teach pie charts. Recall was not measured.
+`bar-axis-without-zero`, `area-axis-without-zero` and `three-d-for-two-d` each have
+0 corpus reports in 0 files. The sample figures show the forms they catch.
+The corpus counts describe frequency, not recall or whether advice suits a particular chart.
 
 No fix of the pack is safe, because every fix changes what the reader sees. `--fix` alone
-writes nothing for this pack, and `--fix --unsafe-fixes` writes three rewrites: a tinted
-template becomes `"simple_white"`, `showgrid=True` becomes `showgrid=False`, and `"spline"`
-becomes `"linear"`.
+writes nothing for this pack, and `--fix --unsafe-fixes` writes four rewrites: a tinted
+template becomes `"simple_white"`, `showgrid=True` becomes `showgrid=False`, `"spline"`
+becomes `"linear"`, and a `zsmooth` of `"best"` or `"fast"` becomes `False`.
 
 ### What the pack does not check
 
@@ -9592,8 +9602,6 @@ The book states principles that the code of a figure does not show, so no rule c
   missing argument.
 - The Shrink Principle (page 169). The right size of a figure depends on how many values it
   shows, which the code does not say.
-- A pie made of several `go.Pie` traces, or bars added to an empty `go.Figure()` with
-  `add_trace`. xpd does not follow a figure through its statements.
 
 ### Sizes that do not follow the numbers
 
@@ -9607,7 +9615,10 @@ and calls a factor above 1.05 or below 0.95 a substantial distortion (page 57).
 
 **Severity:** error. **Fix:** none.
 
-Reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
+Recall was 39 of 48. The rule found none of 8 values held in a name. Other measured misses were
+`Scatter marker dict` (1).
+
+Reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}`, `marker=go.scatter.Marker(size=...)` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
 
 Example:
 
@@ -9637,8 +9648,12 @@ one on the plotly page about bubble charts.
 `px.scatter(size=...)` and the six other px functions that take `size` set `sizemode="area"`
 themselves, so they are not reported.
 
-The rule reads a size only when it takes a column by name, as `df["pop"]` and `df["pop"] / 10`
-do, from an object that the same trace reads `x`, `y` or another coordinate from. A number, a
+The rule reads a size only when it takes a column by name, as `df["pop"]`, `df["pop"] / 10` and
+`df.pop_total` do, from an object that the same trace reads `x`, `y` or another coordinate from.
+A pandas property such as `df.size` or `df.index` is not a column, and neither is a method that
+is called, such as `np.full(...)`. `go.scatter.Marker(size=df.pop_total)` resolved to
+`sizemode="diameter"` and drew sizes 10, 20 and 40 with radii of 5, 10 and 20 pixels, the same
+as `dict(size=...)`. A number, a
 bare name, a written list, a column of another object and a size chosen with `np.where` or a
 condition may be a design choice, so they are left alone. So is a size that the code takes a
 root, a power or a logarithm of: with `np.sqrt(df["pop"])` the areas for 100, 400 and 1,600 were
@@ -9655,7 +9670,10 @@ fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, 
 
 **Severity:** warning. **Fix:** none.
 
-Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`, and in the constructor `go.Figure(data=[go.Bar(...)], layout=...)` with `yaxis=dict(range=...)` in the layout or with `layout_yaxis_range=...`.
+Recall was 37 of 48. The rule found none of 8 values held in a name. Other measured misses were
+`layout yaxis_range` (2), `added Bar axis dict` (1).
+
+Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`, and in the constructor `go.Figure(data=[go.Bar(...)], layout=...)` with `yaxis=dict(range=...)` in the layout or with `layout_yaxis_range=...`. The same three settings afterwards are read on a `go.Figure()` that gets its bars from `fig.add_trace(go.Bar(...))` or `fig.add_bar(...)`.
 
 Example:
 
@@ -9690,9 +9708,60 @@ to 100 lay whole inside `range_y=[90, 101]`, with lengths in the ratio of their 
 `go.Figure` with a `go.Bar` and `layout=go.Layout(yaxis=dict(range=[90, 101]))` resolved to the
 y range 90 to 101, as `update_yaxes` does.
 
+Bars of 95 and 100 added with `add_trace` to an empty `go.Figure()` kept
+`update_yaxes(range=[90, 101])` as written and were drawn 145.4 and 290.9 pixels long, the same
+as bars given to `go.Figure` itself, and 288.8 and 304.0 pixels long without the range.
+`add_bar` with `update_layout(yaxis_range=[90, 101])` drew the same lengths. The bar must be
+added to the same variable after its assignment and before the range, in the statement itself
+or in a loop or a condition, with no second assignment of the name in between. A bar with
+`orientation`, `base` or `yaxis` is left alone.
+
+#### area-axis-without-zero
+
+**Severity:** warning. **Fix:** none.
+
+Recall was 37 of 48. The rule found none of 8 values held in a name. Other measured misses were
+`layout yaxis_range` (2), `go filled Scatter` (1).
+
+Reports an area chart whose value axis is given a range that starts above zero: `range_y` on `px.area`, and on a figure of filled areas `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`.
+
+Example:
+
+```python
+fig = px.area(df, x="month", y="sales", range_y=[90, 101])
+```
+
+Use instead:
+
+```python
+fig = px.area(df, x="month", y="sales")
+line = px.line(df, x="month", y="sales", range_y=[90, 101])
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+An area chart shows its value by the height of the fill below the line. plotly starts the axis
+of `px.area` and of `go.Scatter(fill="tozeroy")` at zero by itself: values of 95 and 100 got
+the range 0 to 105.26 and fills 324.9 and 342.0 pixels tall, the ratio of the values. An
+explicit range is kept as written, and the fill is cut at the lower edge of the plot. With
+`[90, 101]` the same fills were 163.6 and 327.3 pixels tall, whether the range was set in
+`px.area`, in `update_yaxes` or in `update_layout`, a Lie Factor of 19 as for a bar.
+`px.line` ranged the same values to 94.72 and 100.28 by itself, so a line is the chart that
+needs no zero.
+
+The rule reads a range as [`bar-axis-without-zero`](#bar-axis-without-zero) does: both ends
+written numbers above zero, and the lower end with as many digits before the point as the upper
+end, or one fewer. A call with `orientation` or `log_y` is left alone, and a range set on the
+figure afterwards is left alone in a file that names a log axis. A figure of filled areas is
+`px.area` without `orientation` and `log_y`, or a `go.Figure(...)` whose own arguments hold a
+`go.Scatter` with `fill="tozeroy"`.
+
 #### polar-bar-area
 
 **Severity:** warning. **Fix:** none.
+
+Recall was 48 of 48. The rule found 8 of 8 forms with values held in a name. All planted forms were
+found.
 
 Reports `px.bar_polar(...)` and `go.Barpolar(...)`.
 
@@ -9721,6 +9790,9 @@ axis type draws the area in proportion.
 #### three-d-for-two-d
 
 **Severity:** error for a 3D trace without `z`, and warning for a `z` that is one constant. **Fix:** none.
+
+Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
+`flat Surface` (8).
 
 Reports `px.scatter_3d`, `px.line_3d` and `go.Scatter3d` with `x` and `y` and no `z`, and the same three with an `x`, `y` or `z` written as one constant: `[0] * n`, `np.zeros(n)`, `np.ones(n)`, `np.zeros_like(a)`, `np.ones_like(a)` or `np.full(n, v)`.
 
@@ -9755,7 +9827,14 @@ resolved to `visible=True`. The second form reads only a constant it can see in 
 
 **Severity:** info. **Fix:** none.
 
+Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
+`update_yaxes overlaying` (8).
+
 Reports a cell with `"secondary_y": True` in the `specs` of `make_subplots`, and an axis with `overlaying="y"` or `overlaying="x"` in `update_layout`, `go.Layout` or `go.Figure`.
+
+The rule reports the axis configuration. It does not prove that traces populate both axes.
+An unused secondary axis draws no second scale. The comparison warning applies when traces
+use both overlaid axes with independent ranges.
 
 Example:
 
@@ -9792,7 +9871,10 @@ does not read it.
 
 **Severity:** info. **Fix:** none.
 
-Reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`.
+Recall was 40 of 60. The rule found none of 8 values held in a name. Other measured misses were
+`layout yaxis_matches` (8), `subplot Bar loop` (1), `subplot Scatter loop` (3).
+
+Reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`. It also reports a loop that adds a `go.Scatter`, `go.Scattergl`, `go.Bar`, `go.Box` or `go.Violin` with the same written column as `y` to the cells of a `make_subplots` figure without `shared_yaxes`, where the row or the col changes with the loop.
 
 Example:
 
@@ -9817,6 +9899,33 @@ was drawn at 0.70 of the height of one panel and at 0.45 of the other. A reader 
 heights across the panels reads a difference that the data does not have. Free scales are
 right when the panels hold different units, which is why the rule is info.
 
+`make_subplots` gives every cell its own y axis. With `rows=1, cols=2`, a bar of 5 in one cell
+and a bar of 10 in the other resolved to the ranges 0 to 5.26 and 0 to 10.53 with no
+`matches`, and both bars were drawn 304.0 pixels tall. With `shared_yaxes="all"` both axes got 0
+to 10.53 and the bars were 152.0 and 304.0 pixels tall. `shared_yaxes=True` shares the axes of
+one row only: with `rows=2, cols=1` the two axes kept 0 to 5.26 and 0 to 10.53, so the message
+names `"all"`.
+
+Example:
+
+```python
+fig = make_subplots(rows=1, cols=2)
+for i, (shop, part) in enumerate(df.groupby("shop")):
+    fig.add_trace(go.Bar(x=part["month"], y=part["sales"]), row=1, col=i + 1)
+```
+
+Use instead:
+
+```python
+fig = make_subplots(rows=1, cols=2, shared_yaxes="all")
+```
+
+The rule reads a loop because a column written as `y=part["sales"]` in each pass proves that
+every panel holds the same measure. A column named `value` or `values` is left alone, because
+`pd.melt` gives that name to the column of a long table, which holds a different measure in
+each panel. So is a file that names `matches`, `shared_yaxes` or a y axis range anywhere, which
+may set the scales afterwards, and a trace added with `secondary_y`.
+
 ### Ink that shows no data
 
 The book defines the data-ink ratio as the share of a graphic's ink that shows data, and
@@ -9826,6 +9935,9 @@ reason" (page 100).
 #### default-template
 
 **Severity:** info. **Fix:** unsafe for a named template: `"simple_white"`. None for a file that sets no template.
+
+Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
+`Figure.update layout template` (8).
 
 Reports two things. The first is a file that draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
 
@@ -9868,13 +9980,25 @@ resolved to `#E5ECF6`. A file whose only figures have no plot area is left alone
 `px.treemap`, `px.sunburst`, `px.icicle`, `px.funnel_area`, `px.parallel_coordinates` and
 `px.parallel_categories`, and `go.Pie`, `go.Treemap`, `go.Sunburst`, `go.Icicle`,
 `go.Funnelarea`, `go.Parcoords`, `go.Parcats`, `go.Sankey`, `go.Table` and `go.Indicator`, drew
-no tint and no grid line with the default template. Another module can set
-`pio.templates.default` for the file, which the rule does not see. The fix is unsafe, because
-`"simple_white"` also changes the colors of the marks.
+no tint and no grid line with the default template.
+
+The first form is also silent when a module that the file imports sets the template for it,
+with `pio.templates.default = ...` or `px.defaults.template = ...`. xpd reads the `__init__.py`
+of each package the file is in, each module of the project that the file imports, and what
+those import in turn. A scatter plot in a module of a package whose `__init__.py` assigns
+`pio.templates.default = "simple_white"` resolved to a white plot area with no grid, and so
+did one in a script that imports the module with the assignment. `px.defaults.template`
+changed the px figure and left a `go.Figure` at `#E5ECF6`, so it silences a file of px figures
+only. A module that imports the file, such as the script that starts the program, is not
+read, and a file beside the one with the assignment that does not import it is still
+reported. The fix is unsafe, because `"simple_white"` also changes the colors of the marks.
 
 #### explicit-grid
 
 **Severity:** info. **Fix:** unsafe for `showgrid=True`: `showgrid=False`. None for a black grid.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
 
 Reports `showgrid=True` without `gridcolor` and `gridwidth` beside it, and `gridcolor` set to black, on an x or y axis of a plotly figure. It reads the keyword in `update_xaxes`, `update_yaxes`, `go.layout.XAxis` and `go.layout.YAxis`, the underscore form such as `xaxis_showgrid` in `update_layout` and `go.Layout`, and `xaxis=dict(showgrid=True)` or `xaxis={"showgrid": True}` in `update_layout`, `go.Layout` and `go.Figure`.
 
@@ -9910,6 +10034,9 @@ of a map. The fix is unsafe, because it removes grid lines from a figure drawn w
 
 **Severity:** info. **Fix:** none.
 
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
 Reports `mirror=True`, `mirror="all"`, `mirror="ticks"` or `mirror="allticks"` beside `showline=True` on an x or y axis of a plotly figure, in `update_xaxes`, `update_yaxes`, `go.layout.XAxis`, `go.layout.YAxis`, and in `xaxis=dict(...)` or `xaxis={...}` in `update_layout`, `go.Layout` and `go.Figure`.
 
 Example:
@@ -9937,9 +10064,57 @@ far side of the plot, which closes a box around the data: the x axis line had on
 with `showline=True` alone and two with `mirror=True`. Under the default template `mirror=True`
 without `showline` drew no line, so the rule reads the two together.
 
+#### box-plot-ink
+
+Severity: info. Fix: none.
+
+Reports `px.box` and `go.Box` constructors with exactly one of `x` or `y`,
+without written point settings, notches, means, quartile methods, precomputed
+statistics, box styling, orientation or unknown argument splats. Express color,
+facet and animation groups are outside this narrow form. The advice is conditional.
+The rule does not establish that a box plot is wrong.
+
+Example:
+
+```python
+fig = go.Figure(go.Box(y=values))
+```
+
+Use instead, if only the minimum, quartiles, median and maximum are needed:
+
+```python
+low, q1, median, q3, high = 1, 2.5, 4, 5.5, 7
+fig = go.Figure(go.Scatter(
+    x=[0, 0, None, 0.03, 0.03, None, 0.03, 0.03, None, 0, 0, None],
+    y=[low, q1, None, q1, median - 0.05, None,
+       median + 0.05, q3, None, q3, high, None],
+    mode="lines",
+))
+```
+
+The five numbers above are an example, computed from values 1 through 7 with
+linear quartiles. Compute the numbers separately for each distribution. Choose
+the offset and median gap for the data scale, and retain the original box when
+its outliers, notches, hover information or statistical convention are needed.
+Default whiskers end at sample values within the 1.5 IQR fences, which need not
+be the minimum and maximum. Replacing them with min/max changes the statistic.
+
+Tufte prefers the offset middle half of the quartile plot (page 124), but says
+the choice also rests on statistical and aesthetic criteria at vdqi.md lines
+4877 to 4893. The Plotly 7.1.0 drawing probe rendered four default boxes with
+36 straight segments and 15,241.7 square pixels of filled box area. The offset
+`go.Scatter` drawing used 16 segments and no filled box area. A thinned box
+still used 28 segments and obscured the median. These are drawing measurements,
+not a claim of statistical equivalence. The rendered figures and resolved
+values are in `research/plotly-rules/runs/v2/fix-R5/`. No automatic fix can make
+the statistical and aesthetic choice for the author.
+
 #### redundant-color
 
 **Severity:** info. **Fix:** none.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
 
 Reports a px call whose `color` is the same column name as its `x` or its `y`, both written as strings. It covers the 13 px functions that take `color`, `x` and `y`: `px.area`, `px.bar`, `px.box`, `px.density_contour`, `px.ecdf`, `px.funnel`, `px.histogram`, `px.line`, `px.line_3d`, `px.scatter`, `px.scatter_3d`, `px.strip` and `px.violin`.
 
@@ -9966,9 +10141,22 @@ One color for each category is sometimes meant, to match the colors of another c
 same categories, which is why the rule is info. A column given by a name, as in
 `color=column`, is left alone.
 
+The rule also reads `go.Bar` whose `marker_color`, or `color` inside `marker`, is the same
+expression as its `x` or `y`, as in `go.Bar(x=names, y=df["sales"], marker_color=df["sales"])`.
+`go.Bar(y=[1, 2, 4], marker_color=[1, 2, 4])` drew the three bars in `rgb(13, 8, 135)`,
+`rgb(156, 23, 158)` and `rgb(240, 249, 33)`, where the same bars without `marker_color` were all
+`rgb(99, 110, 250)`. The length of a bar already shows its value, so the colors repeat it. A
+written string or number as the color is left alone. If the repeated coordinate holds
+categories, color repeats the category positions rather than the bar lengths. For example,
+`go.Bar(x=["red", "blue"], y=[1, 2], marker_color=["red", "blue"])` assigns a color to each
+category. Keep those colors when they match another chart or serve another purpose.
+
 #### pattern-fill
 
 **Severity:** warning. **Fix:** none.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
 
 Reports hatching: `pattern_shape="column"` on `px.area`, `px.bar`, `px.bar_polar`, `px.histogram` and `px.timeline`, a pattern shape on the eight go traces that have `marker.pattern`, which are `go.Bar`, `go.Barpolar`, `go.Funnelarea`, `go.Histogram`, `go.Icicle`, `go.Pie`, `go.Sunburst` and `go.Treemap`, and `fillpattern` on `go.Scatter`.
 
@@ -10001,6 +10189,9 @@ On a go trace the rule reads `marker_pattern_shape=`, `marker=dict(pattern=dict(
 
 **Severity:** info. **Fix:** none.
 
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
 Reports `go.Indicator` whose `mode` is a string that names `gauge`, such as `mode="gauge+number"`.
 
 Example:
@@ -10027,13 +10218,66 @@ shape, so it is not reported. A gauge with `shape="bullet"` is a bar and not a d
 left alone. The rule has no fix, because a gauge can carry a threshold that the number alone
 does not show.
 
+### Color without an order
+
+"The mind's eye does not readily give a visual ordering to colors, except possibly for red to
+reflect higher levels than other colors", and "varying shades of gray show varying quantities
+better than color" (page 154).
+
+#### rainbow-colorscale
+
+**Severity:** warning. **Fix:** none.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
+Reports the color scales Jet, Rainbow, Turbo and HSV, written as a string in any case with or without `_r`, or as `px.colors.sequential.Jet` and the like, when it is given to `colorscale`, `color_continuous_scale` or a setting that ends in `_colorscale` inside a plotly call, or assigned to `px.defaults.color_continuous_scale`.
+
+The rule reports a configured scale, including unused coloraxis settings. Its drawn-color
+warning applies only when a trace uses the scale for numeric color. A scatter without numeric
+color values or a reference to the configured coloraxis does not display that scale.
+
+Example:
+
+```python
+fig = px.imshow(grid, color_continuous_scale="jet")
+fig = go.Figure(go.Heatmap(z=grid, colorscale=px.colors.sequential.Turbo))
+```
+
+Use instead:
+
+```python
+fig = px.imshow(grid, color_continuous_scale="Greys")
+fig = go.Figure(go.Heatmap(z=grid, colorscale="Viridis"))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The test of order is lightness. Each of the 94 named scales was resolved on a `go.Heatmap` and
+sampled at 21 even steps, and the CIELAB lightness of each step was computed, from 0 for black
+to 100 for white. 61 scales, such as `"Greys"`, `"Blues"` and `"Viridis"`, never changed
+direction. Jet rose from 13.5 to 97.1 and fell back to 25.5, so it changed direction 3 times,
+Rainbow 2 times, HSV 3 times and Turbo once, with its lightest color in the middle. A low and a
+high value then come out equally dark. `px.imshow` with `"jet"`, a `go.Scatter` marker with
+`"Jet"` and `update_layout(coloraxis_colorscale="Jet")` all resolved to the same six stops.
+
+Earth, mrybm and mygbm change direction too and appear in no file the rules were run on.
+Blackbody, Bluered, Portland and Picnic change once, near one end or at a midpoint as the
+two-sided RdBu does, and are left alone. `color_discrete_sequence` is left alone, because it
+colors groups and not quantities. Numbers that name groups, such as cluster numbers, are
+better colored as categories, and the message says so. The rule has no fix, because the scale
+to use depends on whether the data has a midpoint.
+
 ### Chart forms the book argues against
 
 #### pie-chart
 
 **Severity:** warning. **Fix:** none.
 
-Reports `px.pie(...)` and `go.Pie(...)`, and with a second message `px.pie` with `facet_col` or `facet_row`, which draws several pies.
+Recall was 48 of 48. The rule found 8 of 8 forms with values held in a name. All planted forms were
+found.
+
+Reports `px.pie(...)` and `go.Pie(...)`. A second message goes to `px.pie` with `facet_col` or `facet_row`, which draws several pies, and to each `go.Pie` that shares its figure with another pie: two in the data list of `go.Figure` or of `add_traces`, an `add_trace` of a pie next to another `add_trace` of a pie on the same figure, or a pie added in a loop to a cell that changes with the loop.
 
 Example:
 
@@ -10059,14 +10303,69 @@ numbers along a visual dimension, pie charts should never be used" (page 178). `
 `px.pie(facet_col="sex")` drew two pies side by side, and four with `facet_row` as well. For a
 few shares, `go.Table` shows the exact numbers.
 
-A facet given as `None` draws one pie and gets the first message. `px.sunburst` and
-`px.funnel_area` are not reported, because the book names the pie chart alone.
+Each `go.Pie` constructor is reported once. When several pies share a receiver whose
+figure type cannot be proved, each constructor keeps the single-pie message. A proved
+figure receiver or a written `go.Figure` data list gets the several-pies message.
+
+A facet given as `None` draws one pie and gets the first message. `px.sunburst` has its own
+rule, [`sunburst-as-pie`](#sunburst-as-pie). `px.funnel_area` is not reported: its sections
+were drawn with areas in the ratio of the values, stacked from top to bottom.
+
+#### sunburst-as-pie
+
+**Severity:** warning. **Fix:** none.
+
+Recall was 48 of 48. The rule found 8 of 8 forms with values held in a name. All planted forms were
+found.
+
+Reports `px.sunburst(...)` with `values` or `path`, and `go.Sunburst(...)` with `values`.
+
+Example:
+
+```python
+fig = px.sunburst(df, path=["region", "shop"], values="sales")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df.sort_values("sales"), x="sales", y="shop", color="region", orientation="h")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book rejects pie charts for "their low data-density and failure to order numbers along a
+visual dimension" (page 178). A sunburst draws each value as a wedge, as a pie does, and its
+rings make the order worse. Two regions, west 60 and east 40, with the shops c 15 and d 45 in
+west and a 30 and b 10 in east, were drawn with the regions in the inner ring and the shops in
+the outer ring, which has three times the area for each degree. Shop d with 45 got 17,918.9
+square pixels and region west with 60 got 7,963.9, so the smaller number was drawn 2.25 times
+larger. Shop a with 30 against region east with 40 was reversed the same way. The angles keep
+the order only within one ring. `px.sunburst` and `go.Sunburst` resolved to a trace of type
+`sunburst`.
+
+A sunburst without numbers is left alone. A `go.Sunburst` with `labels` and `parents` and no
+`values` gave each leaf one equal share, so it draws a hierarchy, such as a flavor wheel, and
+not quantities. `px.sunburst` with `path` and no `values` counts the rows of each group, which
+are numbers, so it is reported.
+
+`make_subplots(rows=1, cols=2)` with two cells of type `"domain"` and a `go.Pie` added to each
+resolved to two traces of type `pie` with the domains 0 to 0.45 and 0.55 to 1 across. Each pie
+is reported once, with the message for several pies. Two `add_trace` calls count as one figure
+only when no second assignment of the name comes between them.
 
 #### spline-line
 
 **Severity:** info. **Fix:** unsafe: `"linear"`.
 
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
 Reports the line shape `"spline"`: `line_shape="spline"` on `px.area`, `px.line`, `px.line_polar` and `px.line_ternary`, on the five go traces whose line takes the shape, which are `go.Scatter`, `go.Scattercarpet`, `go.Scatterpolar`, `go.Scattersmith` and `go.Scatterternary`, and in `update_traces` on a plotly figure, and `line=dict(shape="spline")` or `line={"shape": "spline"}` on the same five traces.
+
+The rule reports the interpolation setting. It does not prove that the trace draws a line.
+A markers-only trace draws no curve, so the interpolation warning applies only when line
+mode is active. The unsafe fix changes the configured shape even if it is currently unused.
 
 Example:
 
@@ -10097,7 +10396,14 @@ name is left alone.
 
 **Severity:** info. **Fix:** none.
 
-Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11.
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
+Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11. It also reports frames built with `go.Frame`: `frames=` in `go.Figure` or in `update` on a plotly figure, and `fig.frames = ...`.
+
+The rule reports frame configuration. An empty figure or a single frame does not establish
+an animation with different data to compare. The small-multiple advice applies when multiple
+frames display different data, and their panels fit on the page.
 
 Example:
 
@@ -10127,13 +10433,137 @@ the rule is info and has no fix. 11 of the 28 functions have no `facet_col`: `ba
 raised TypeError, "got an unexpected keyword argument 'facet_col'", so for those the message
 says to draw one panel for each frame with `make_subplots`.
 
+A `go.Figure` with three frames of one point each held the 3 frames and drew 1 point, and the
+page that `to_html` wrote passed the three frames to `Plotly.addFrames`. The same three points in
+`make_subplots(rows=1, cols=3)` drew all 3. `full_figure_for_development` keeps no frames, so
+the count was read from the figure and the drawn page. Frames copied from another figure, as
+`frames=fig.frames`, are left alone, because the figure they come from is reported where it is
+made, and so are `frames=None` and `frames=[]`.
+
+#### heatmap-smoothing
+
+**Severity:** info. **Fix:** unsafe: `False`.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
+Reports `zsmooth="best"` and `zsmooth="fast"` on `go.Heatmap`, `zsmooth="best"` on `go.Histogram2d` and in `update_traces` on a plotly figure, and `zsmooth="fast"` on a `go.Image` that sets `source`.
+
+Example:
+
+```python
+fig = go.Figure(go.Heatmap(z=grid, zsmooth="best"))
+```
+
+Use instead:
+
+```python
+fig = go.Figure(go.Heatmap(z=grid, zsmooth=False))
+```
+
+"Above all else show the data" (page 92). Smoothing fills the space between the cells with
+colors that blend their values. A 2 by 2 grid of 0 and 10, drawn in `"Greys"` at 400 by 400
+pixels, drew 2 colors with `zsmooth=False`, 61 with `"fast"` and 252 with `"best"`. The two
+colors of the data covered all 160,000 pixels without smoothing, and 45,156 and 40,401 with
+it.
+
+`go.Histogram2d` drew 252 colors with `"best"`, and its `"fast"` resolved to `False` and drew
+2, so `"fast"` is read on `go.Heatmap` only. `go.Image` takes `"fast"` or `False`, and
+`"best"` raised ValueError. Its docstring says that `zsmooth` "only applies for image traces
+that use the source attribute": a checkerboard given as `z` drew 2 colors with `"fast"`, and
+the same pixels given as a PNG in `source` drew 61. `update_traces(zsmooth="fast")` is left
+alone, because the rule cannot see which traces the figure holds.
+
+The fix is unsafe, because each cell is then drawn as a block of one color, so the figure looks
+different.
+
+#### table-for-small-data
+
+**Severity:** info. **Fix:** none.
+
+Recall was 17 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
+bar literal values` (2), `px pie literal values` (3), `bare Bar y` (8), `bare horizontal Bar x` (8),
+`Figure Pie list` (2).
+
+Reports `px.bar` and `go.Bar` whose values, `y`, or `x` with `orientation="h"`, are a written list or tuple of 1 to 20 numbers, and `px.pie` and `go.Pie` whose `values` is one, when the call is a px call or the only trace of a `go.Figure`.
+
+Example:
+
+```python
+fig = px.bar(x=["north", "south", "east", "west"], y=[41.3, 37.8, 12.6, 8.3])
+```
+
+Use instead:
+
+```python
+fig = go.Figure(go.Table(
+    header=dict(values=["region", "share"]),
+    cells=dict(values=[["north", "south", "east", "west"], [41.3, 37.8, 12.6, 8.3]]),
+))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"Tables usually outperform graphics in reporting on small data sets of 20 numbers or less"
+(page 56), and "tables are preferable to graphics for many small data sets" (page 178). A
+chart of a few numbers draws them as lengths or angles and does not write them. `px.bar` of
+41.3, 37.8, 12.6 and 8.3 drew the four names and the ticks 0 to 40, and none of the four
+values. `go.Pie` of 413, 378, 126 and 83 wrote the four shares as percentages and none of the
+values. `go.Table` wrote all four.
+
+xpd cannot count the rows of a data frame or the traces of a figure, so the rule reads the one
+form where the code shows the whole data: a px call, or a `go.Figure` whose data is this one
+trace. A trace added with `add_trace` is left alone, and so is an `x` of numbers on a bar
+without `orientation="h"`, because those are positions. A chart that writes its values with
+`text`, `texttemplate`, `textinfo` or `text_auto`, or a file that names `textposition`, is left
+alone. A pie is also reported by [`pie-chart`](#pie-chart), for its form. A list with a name, a
+`None` or a 21st number is left alone.
+
 ### Words on the figure
+
+#### all-caps-title
+
+**Severity:** info. **Fix:** none.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
+
+Reports a title written in capitals only, with at least two words of four or more capitals: a `title`, a `title_text`, a setting that ends in `_title` or `_title_text`, the `text` of a title dict, a value of the `labels` of a px call, or an item of `subplot_titles`, inside a plotly call.
+
+Example:
+
+```python
+fig = px.bar(df, x="region", y="sales", title="SALES BY REGION")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df, x="region", y="sales", title="Sales by region")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book lists as friendly "type is upper-and-lower case, with serifs", and as unfriendly "type
+is all capitals, sans serif" (page 183). plotly keeps a title as written:
+`title="SALES BY REGION"` resolved to the same text. Drawn at 20 pixels in the default font,
+`"SALES BY REGION"` was 178 pixels wide and `"Sales by region"` 136, so 1.31 times as wide, and
+two more titles were 1.26 and 1.35 times as wide.
+
+Short names in capitals such as `"RSI"`, `"GDP (USD)"` and `"AUC"` are abbreviations and are
+right as written, so they are left alone, and so is a single word such as `"NVIDIA"`. HTML
+tags such as `<b>` are skipped, and an f-string with a field is left alone. The rule has no
+fix, because the case of each word, such as an abbreviation, is the author's to choose.
 
 #### legend-instead-of-labels
 
 **Severity:** info. **Fix:** none.
 
-Reports a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`, in a file that names no `showlegend`, no annotation and no text mode.
+Recall was 21 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
+line color` (5), `px line column list` (5), `added named Scatter` (2), `Figure named Scatter list`
+(2), `px line color with markers` (5).
+
+Reports three forms in a file that names no `showlegend`, no annotation and no text mode: a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`, two to four such calls added one by one with `fig.add_trace(...)` to an empty `go.Figure()`, and `px.line` with `color="column"` or with `y` as a written list of two to four column names.
 
 Example:
 
@@ -10163,14 +10593,28 @@ as friendly: "labels are placed on the graphic itself; no legend is required" (p
 entries. With `mode="lines+text"`, a label at the last point of each line and
 `showlegend=False`, it drew no legend and the names beside the lines.
 
-xpd cannot count the traces of a figure at run time, so the rule reads the one form where the
-code shows the count. A `px.line(color=...)` and traces added with `add_trace` are not
-reported. A trace with `mode="markers"` is left alone, and so is a list with a fifth trace,
-because many lines have no room for a label each.
+Two named lines added one by one with `add_trace` resolved to `showlegend=True` and drew a
+legend of two entries, the same figure. The statements count when they follow each other with
+no second assignment of the name in between. A figure that also gets a trace in another way,
+such as `add_bar`, `add_traces`, an `add_trace` of another trace, or an `add_trace` in a loop or
+a condition, is left alone, because the code then does not show the size of the legend. So is
+an `add_trace` with `row`, `col` or `secondary_y`.
+
+`px.line(color="sex")` drew two lines and a legend of two entries, and `px.line(y=["a", "b"])`
+drew a legend of two entries titled "variable". The number of values of a column is known only
+at run time, so a `px.line` with `color` may draw many lines. A call with `line_group`,
+where many lines share one entry, is left alone.
+
+A trace with `mode="markers"` is left alone, and so is a file that calls
+`update_traces(mode="markers")`, a written list with a fifth trace, and a run of five
+`add_trace` calls, because many lines have no room for a label each.
 
 #### rotated-tick-labels
 
 **Severity:** info. **Fix:** none.
+
+Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
+found.
 
 Reports a `tickangle` written as a number other than 0, 180 and 360, on an x or y axis of a plotly figure. It reads the keyword in `update_xaxes`, `update_yaxes`, `go.layout.XAxis` and `go.layout.YAxis`, the underscore form such as `xaxis_tickangle` in `update_layout` and `go.Layout`, and `xaxis=dict(tickangle=...)` or `xaxis={"tickangle": ...}` in `update_layout`, `go.Layout` and `go.Figure`.
 
@@ -10199,6 +10643,44 @@ drawn level.
 The rule has no fix, because `tickangle=0` can make long labels run into each other, and the
 level layout swaps x and y. An angle given by a name is left alone, and so is the `tickangle`
 of a colorbar.
+
+#### axis-title-column-name
+
+**Severity:** info. **Fix:** none.
+
+Recall was 15 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
+scatter column` (5), `px bar column` (5), `px line column` (3), `px area column` (4), `explicit axis
+title` (8).
+
+Reports a px call whose `x` or `y` is a written column name that is code and not words, such as `"gdpPercap"` or `"total_bill"`, in a call without `labels`.
+
+Example:
+
+```python
+fig = px.scatter(df, x="gdpPercap", y="lifeExp")
+```
+
+Use instead:
+
+```python
+fig = px.scatter(df, x="gdpPercap", y="lifeExp", labels={"gdpPercap": "GDP per person", "lifeExp": "Life expectancy"})
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book lists as friendly "words are spelled out, mysterious and elaborate encoding avoided",
+and as unfriendly "abbreviations abound, requiring the viewer to sort through text to decode
+abbreviations" (page 183). px titles an axis with the column that `x` or `y` names:
+`px.scatter(x="gdpPercap", y="lifeExp")` resolved the axis titles `gdpPercap` and `lifeExp`,
+and `px.histogram(x="total_bill")` resolved `total_bill`. `labels=`, a later
+`update_xaxes(title_text=...)` and a later `update_layout(xaxis_title=...)` each replaced them.
+
+The rule reads a name with an underscore, or with a capital inside a word, as in `lifeExp`. A
+plain word such as `"day"` is left alone, and so are a name given by a variable and a list of
+columns, which px titles `value`. The rule is silent in a file that sets an axis title or an
+axis dictionary anywhere, such as `update_xaxes(...)`, `update_layout(xaxis_title=...)` or
+`xaxis=dict(...)`, because the title may be replaced on the figure afterwards. It has no fix,
+because only the author knows the words.
 
 ## Hamilton
 

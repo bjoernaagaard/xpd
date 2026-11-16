@@ -25,6 +25,13 @@ pub(crate) struct Place {
     pub(crate) path: PathBuf,
 }
 
+impl Place {
+    /// Where the document is on disk, from which a rule follows its imports.
+    pub(crate) fn disk(&self) -> PathBuf {
+        self.root.join(&self.path)
+    }
+}
+
 /// What the server knows about one project folder.
 #[derive(Debug)]
 pub(crate) struct Project {

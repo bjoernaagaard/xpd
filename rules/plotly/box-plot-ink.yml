@@ -1,0 +1,71 @@
+# Tufte, vdqi.md line 4877, printed page 124: "The revised design, a quartile plot, shows the same
+# five numbers." Lines 4885 to 4893 prefer offsetting the middle half and require "reasonable
+# data-ink maximizing", with statistical and aesthetic criteria.
+#
+# Plotly 7.1.0 drew 36 straight segments and 15241.7 square pixels of filled box area for four
+# default boxes, against 16 segments and zero filled box area for the offset quartile drawing in
+# go.Scatter (runs/v2/fix-R5/box-ink.txt). This measures drawing, not statistical equivalence.
+# Default Box whiskers use fences, not necessarily the minimum and maximum in the book. Outlier
+# points and hover information can matter.
+#
+# Limit this advice to single-axis raw-data constructors without written box styling, notches,
+# means, precomputed statistics, point settings or unknown splats. Express grouping by color or
+# facets is outside this narrow form. No fix can choose the statistic or replace the trace while
+# preserving all its behavior.
+id: box-plot-ink
+language: python
+severity: info
+message: Tufte's quartile plot reduces box outlines when only a five-number summary is needed. If that suits this figure, compute the minimum, quartiles, median and maximum and draw an offset middle half with a median gap using go.Scatter with mode='lines'. Default box whiskers end at sample values within the 1.5 IQR fences, which can differ from the minimum and maximum, so retain the box when its outlier, notch or hover information matters. Choose on statistical and aesthetic grounds. No automatic fix is offered.
+rule:
+  kind: call
+  all:
+    - any:
+        - all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(box)$' } }, { has: { field: object, matches: px } }] }
+            - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(color|facet_row|facet_col|facet_col_wrap|animation_frame|animation_group)$' } } } }
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Box)$' } }, { has: { field: object, matches: go } }] }
+    - any:
+        - all:
+            - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } }
+            - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } } }
+        - all:
+            - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } }
+            - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(points|boxpoints|notched|notchwidth|notchspan|boxmean|mean|sd|sizemode|quartilemethod|q1|median|q3|lowerfence|upperfence|fillcolor|line|line_.*|marker|marker_.*|whiskerwidth|width|jitter|pointpos|boxmode|orientation)$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { has: { field: arguments, has: { kind: list_splat } } }
+utils:
+  # The name the file binds to plotly.express: the dotted module itself, or the alias of its import.
+  px:
+    any:
+      - { kind: attribute, regex: '^plotly\.express$' }
+      - kind: identifier
+        pattern: $PX
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $PX }
+              - any:
+                  - has: { field: name, regex: '^plotly\.express$' }
+                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
+  go:
+    any:
+      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
+      - kind: identifier
+        pattern: $GO
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            kind: aliased_import
+            all:
+              - has: { field: alias, pattern: $GO }
+              - any:
+                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
+                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
