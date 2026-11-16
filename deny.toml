@@ -10,6 +10,9 @@ yanked = "deny"
 # Permissive licenses only. Read a license's terms before adding it here.
 allow = ["Apache-2.0", "BSD-3-Clause", "MIT", "NCSA", "Unicode-3.0", "Zlib"]
 confidence-threshold = 0.8
+# bindgen loads libclang through libloading while llama-cpp-sys-2 builds. ISC is permissive, and
+# libloading is not part of the binary.
+exceptions = [{ crate = "libloading", allow = ["ISC"] }]
 
 [bans]
 multiple-versions = "warn"
