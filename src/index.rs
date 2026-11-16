@@ -16,6 +16,7 @@ type Syntax<'a> = Node<'a, StrDoc<SupportLang>>;
 pub(crate) enum Kind {
     Symbol,
     Rule,
+    Recipe,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +38,8 @@ pub(crate) struct Entry {
     pub(crate) keywords: Vec<String>,
     pub(crate) members: Vec<Member>,
     pub(crate) rules: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) recipe: Option<crate::recipe::Recipe>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,6 +48,8 @@ pub(crate) struct Index {
     pub(crate) package: String,
     pub(crate) version: String,
     pub(crate) entries: Vec<Entry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) recipes: Option<crate::recipe::Stats>,
 }
 
 fn public(name: &str) -> bool {
@@ -294,6 +299,7 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         package: package.into(),
         version: version.into(),
         entries: result,
+        recipes: None,
     })
 }
 
@@ -366,7 +372,7 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
         ensure!(index.schema_version == 1, "unsupported index schema");
         let mut entries = RECORDS
             .iter()
-            .filter(|e| e.package != index.package)
+            .filter(|e| e.package != index.package || e.kind == Kind::Rule)
             .map(|e| serde_json::from_str(e.json))
             .collect::<std::result::Result<Vec<Entry>, _>>()?;
         entries.extend(index.entries);
@@ -457,8 +463,10 @@ pub(crate) fn find(
         })
         .collect();
     ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(b.name)));
+    let mut recipes = 0;
     ranked
         .into_iter()
+        .filter(|(e, _)| keep_recipe(e.kind, kind, &mut recipes))
         .take(5)
         .map(|(e, _)| serde_json::from_str(e.json).expect("build validated index entry"))
         .collect()
@@ -513,7 +521,21 @@ fn find_dynamic<'a>(
         })
         .collect::<Vec<_>>();
     ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(&b.name)));
-    ranked.into_iter().take(5).map(|(e, _)| e).collect()
+    let mut recipes = 0;
+    ranked
+        .into_iter()
+        .filter(|(e, _)| keep_recipe(e.kind, kind, &mut recipes))
+        .take(5)
+        .map(|(e, _)| e)
+        .collect()
+}
+
+fn keep_recipe(entry: Kind, filter: Option<Kind>, recipes: &mut usize) -> bool {
+    if entry == Kind::Recipe && filter.is_none() {
+        *recipes += 1;
+        return *recipes <= 3;
+    }
+    true
 }
 
 fn search_terms(query: &str) -> Vec<String> {
@@ -652,6 +674,7 @@ fn read_definitions(
                     })
                     .collect(),
                 rules: Vec::new(),
+                recipe: None,
             },
         );
         bindings.insert(full.clone(), full);

@@ -260,18 +260,22 @@ flags, and reads its one setting from the editor.
 xpd find "time series bootstrap for cross validation"
 xpd find "grouped regression" --package sklego --kind symbol --format json
 xpd find "small multiples" --kind rule
+xpd find "rounded bars" --kind recipe
 ```
 
 Returns up to five entries in keyword rank order, with summaries and rule links. Class members
 are returned by `api`. The binary includes source indexes for all
-library packs and the compiled rule messages and documentation. No library installation,
+library packs, worked recipes and the rule documentation. No library installation,
 network or Python execution is needed. `--package` takes the Python import name, and `--kind`
-takes `symbol` or `rule`. Empty matches return an empty list and exit 0.
+takes `symbol`, `rule` or `recipe`. Empty matches return an empty list and exit 0. Unfiltered results include at most three
+recipes, leaving room for API entries or rules. `--kind recipe` returns up to five recipes.
 
 Names are split at underscores and camel case. Name tokens get weight three in BM25, with
 light stemming and common word forms shared by queries and entries. Parameter names and
-source-derived introductory keywords get lower weights. Exact acronym names and phrases get
-bonuses, and shorter public paths rank higher. Results are keyword matches, not a judgment
+source documentation and class member summaries get lower weights. Adjacent words help distinguish
+tasks that share individual words. Exact acronym names and phrases get
+bonuses, and shorter public paths rank higher. The build prepares the search table, and queries decode only the returned entries. Long signatures
+are shortened in text search results; JSON and `api` retain every parameter. Results are keyword matches, not a judgment
 that a library suits every requirement. Read the chosen API and its rules before using it.
 
 ## api
@@ -281,14 +285,18 @@ xpd api sklego.meta.GroupedPredictor
 xpd api plotly.express.bar --format json
 ```
 
-Prints the entry's parameter names, first docstring paragraph, own public methods and rule
+Prints the entry's parameter names, first docstring paragraph, public methods and rule
 links. JSON is a list containing one entry, with the same shape as `find`. Missing names exit
-2. Parameter names come from source and do not include defaults, type annotations or inherited
-methods. Compiled extension functions and dynamically constructed exports may be absent.
+2. Parameter names come from source and do not include defaults or type annotations. Classes inherit constructor parameters and public
+members from the nearest defining base in the same library, following parsed import aliases. Compiled extension functions and dynamically constructed exports may be absent.
 
 Rule links are inferred from symbol name tokens in the pack's rule patterns, including regex
 patterns. They are possible guards, rather than proof that every use of the symbol matches.
 The rule entries include the full documentation, so terms such as "small multiples" are searchable.
+A rule prints as `plotly/bar-axis-without-zero [rule]`, without a call signature or raw matcher
+metavariables. A recipe prints its title, used symbols, pinned source, license, attribution and
+complete Python snippet. `recipe.modified` records whether xpd applied fixes; `recipe.code` is
+null for a source whose license is not recognized as permitting redistribution.
 
 ## index
 
@@ -306,17 +314,49 @@ An explicit local index replaces the embedded index for its package and also sup
 without an xpd rule pack. Both read commands accept `--index`.
 
 Each file has `schema_version`, `package`, `version` and `entries`. Every entry has a `kind`,
-`package`, `name`, `callable`, `parameters`, `summary`, `members`, `rules` and optional source-derived `keywords`. Symbols have kind
-`symbol`; rule entries are built from xpd's compiled rules at run time. Future entry kinds can
-share the same commands. Source generation follows explicit and wildcard imports and simple
-assignment re-exports. Each definition uses the path with the fewest parts, then shortest text,
-then lexical order, excluding paths with underscore-prefixed parts. Tests, validators,
-graph_objs, vendored trees and symlinks are skipped.
+`package`, `name`, `callable`, `parameters`, `summary`, `members`, `rules` and optional
+source-derived `keywords`. A recipe adds `recipe`, with `title`, `symbols`, `source`, `code`,
+`license`, `attribution` and `modified`. An index with harvested examples also records candidate,
+clean, fixed, dropped, capped and retained counts under `recipes`.
+
+Source generation follows explicit and wildcard imports and simple assignment re-exports.
+Each definition uses the path with the fewest parts, then shortest text, then lexical order,
+excluding paths with underscore-prefixed parts. Tests, validators, graph_objs, vendored trees
+and symlinks are skipped. A module whose own documentation marks it for internal use or says
+it should be accessed through another module is also excluded. This removes Plotly's
+matplotlib converter helpers without naming Plotly in the filter.
+
+To refresh recipes with symbols, use a pinned library checkout under a new empty `/var/tmp`
+directory. For example, after downloading and unpacking the library source there, run one command.
+
+```sh
+xpd index /var/tmp/xpd-source/scikit-lego-0.9.10 --package sklego --version 0.9.10 \
+  --examples /var/tmp/xpd-source/scikit-lego-0.9.10 \
+  --source-url https://github.com/koaning/scikit-lego/blob/v0.9.10 \
+  --license /var/tmp/xpd-source/scikit-lego-0.9.10/LICENSE
+```
+
+`--examples` selects the documentation and gallery tree. The harvester reads Python docstring
+Examples, Python files under examples or gallery directories, Markdown Python fences, RST
+doctests and notebook code cells. For Plotly, select the repository's `doc/python` directory
+and include `/doc/python` after the pinned revision in `--source-url`. For scikit-learn, select
+the repository root to include both `examples/` and source docstrings. `--license` supplies the
+source license. Root NOTICE, DISCLAIMER and third-party notices are retained automatically;
+`--notice` adds a notice outside the selected root.
+
+The harvester never imports or executes downloaded code. It rejects syntax errors, placeholders,
+snippets without imports, missing names and snippets without calls into the requested library.
+It runs the rule engine, applies safe and unsafe fixes, and rejects every remaining issue,
+including informational issues. MIT, BSD, NCSA and Apache license text and copyright notices
+are included with recipes. An unrecognized license yields a pointer with no copied code.
+Parsing and linting do not prove that external datasets or optional dependencies are available.
+
+Each pack retains at most 24 recipes, 96,000 code bytes and 8,000 bytes per snippet. Selection
+prefers short examples of public APIs and different primary symbols. `capped` counts clean
+examples omitted by those limits or because they repeat the same primary symbol. `dropped`
+counts candidates rejected before selection. Refresh the source version and pinned URL together,
+then rerun the command to regenerate both symbols and recipes.
 
 `xpd find --check indexes/questions.json` runs the real discovery questions and exits 2 if an
-expected entry is absent from the top five. It prints every failure. Lefthook runs it with `--max-misses 3` before commits to enforce
-the measured baseline of 49 out of 52. The strict command allows no misses. The three baseline
-misses are pairwise distances with expected `scipy.spatial.distance.pdist`, removing sensitive
-feature correlation with expected `sklego.preprocessing.InformationFilter`, and changing a
-binary classifier threshold with expected `sklego.meta.Thresholder`. The question file retains
-all three.
+expected entry is absent from the top five. It prints every failure. Lefthook runs this command
+before commits with no tolerated misses. Keep failing questions and improve general ranking.

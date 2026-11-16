@@ -80,9 +80,9 @@ uv tool install xpd
 ```text
 xpd
 ├── check [paths]          lint files and folders, and rewrite with --fix
-├── find "<task>"          find library symbols and rules before choosing a library
-├── api <dotted.name>       read parameters, summary, class members and rule links
-├── index <source>         refresh a versioned source index without importing Python
+├── find "<task>"          find library symbols, rules and worked recipes
+├── api <dotted.name>       read a full API or recipe with source and attribution
+├── index <source>         refresh symbols and documentation recipes without running Python
 ├── rules                  list every rule with its documentation
 ├── graph <files>          print the dataflow of step code or Hamilton modules
 ├── profile <data file>    print dtypes, nulls, unique counts and memory per column
@@ -96,6 +96,12 @@ xpd
 `find` and `api` search indexes shipped in the binary, including libraries you have not
 installed. Search is offline and uses keywords. For example, run `xpd find "time series bootstrap
 for cross validation"`, then `xpd api mapie.subsample.BlockBootstrap`.
+Use `xpd find "rounded bars" --kind recipe` for worked Python examples. Pass a returned recipe
+name to `xpd api` to read its code, used symbols, pinned source and license. Recipes are harvested
+from library documentation and galleries. The harvester applies safe and unsafe fixes and keeps
+only examples with zero remaining issues from xpd's packs. It never runs the examples.
+The [index command](https://bjoernaagaard.github.io/xpd/commands/#index) refreshes symbols and
+recipes together.
 
 `check`, `rules` and `graph` read the files and start no Python. `profile` and `equiv` run the
 project's Python and need pandas there. `xpd <command> -h` lists the flags of a command. The

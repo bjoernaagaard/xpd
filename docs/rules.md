@@ -10693,7 +10693,23 @@ xpd index /var/tmp/xpd-source/venv/lib/python3.15/site-packages --package sklego
 Use the Python version directory created by uv. For a version bump, update the package in
 that environment, then rerun the last command. It reads the version from distribution metadata
 and replaces `indexes/sklego.json` without hand editing. Commit the generated file. `build.rs`
-embeds each library JSON file under `indexes/`; Python itself needs only its rule entries.
+prepares the embedded discovery records and BM25 table from `indexes/` and this page; Python
+itself needs only its rule entries.
 Add real questions for the new pack to `indexes/questions.json` and run
 `cargo run -- find --check indexes/questions.json`. Keep failing questions and improve the
 ranking for general language patterns. Read downloaded source as data and never import it.
+
+
+A source index can also contain harvested recipes. Refresh them in the same command as symbols
+by passing `--examples`, `--source-url` and `--license`. Select a pinned checkout's documentation
+and gallery root, and a source URL ending in `/blob/<tag>` with the same relative root.
+For Plotly, harvest `doc/python`; for scikit-learn, harvest `examples/` and the source docstrings
+by selecting its repository root. The [index command](commands.md#index) shows the full command.
+
+The harvester parses examples without running them. It applies safe and unsafe fixes with the
+rule engine and ships only snippets with zero remaining issues across applicable library packs
+and the Python pack. It includes the source license, copyright and notices with each recipe;
+an unrecognized license produces a pointer instead of copied code. It reports rejected and
+capped candidates. The cap is 24 recipes and 96,000 code bytes per pack, with 8,000 bytes per
+snippet. Do not hand-write recipes or edit generated entries to improve a question's rank.
+Use `xpd find "<task>" --kind recipe` and pass a returned name to `xpd api` for the full example.

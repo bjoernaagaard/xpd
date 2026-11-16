@@ -61,6 +61,16 @@ struct IndexArgs {
     version: Option<String>,
     #[arg(long)]
     output: Option<PathBuf>,
+    /// Documentation and gallery root to harvest with the symbol index.
+    #[arg(long, requires_all = ["source_url", "license"])]
+    examples: Option<PathBuf>,
+    /// Repository URL ending in /blob/<pinned revision> for example attribution.
+    #[arg(long, requires = "examples")]
+    source_url: Option<String>,
+    #[arg(long, requires = "examples")]
+    license: Option<PathBuf>,
+    #[arg(long, requires = "examples")]
+    notice: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -260,10 +270,33 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
         package,
         version,
         output,
+        examples,
+        source_url: url,
+        license,
+        notice,
     } = args;
     let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
     let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
-    let index = index::generate(&source, &package, &version)?;
+    let mut index = index::generate(&source, &package, &version)?;
+    if let (Some(root), Some(url), Some(license)) =
+        (examples.as_deref(), url.as_deref(), license.as_deref())
+    {
+        let stats = crate::recipe::harvest(
+            &crate::recipe::Source {
+                root,
+                url,
+                license,
+                notice: notice.as_deref(),
+            },
+            &package,
+            &mut index.entries,
+        )?;
+        println!(
+            "{package} recipes: {} candidates, {} clean, {} after fixes, {} dropped, {} capped, {} shipped",
+            stats.candidates, stats.clean, stats.fixed, stats.dropped, stats.capped, stats.retained
+        );
+        index.recipes = Some(stats);
+    }
     std::fs::write(&output, serde_json::to_vec(&index)?)?;
     println!(
         "{package} {version}: {} entries written to {}",
@@ -591,9 +624,31 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
                 println!(
                     "{}{signature} [{}]\n{}",
                     entry.name,
-                    entry.callable.as_deref().unwrap_or("rule"),
+                    entry
+                        .callable
+                        .as_deref()
+                        .unwrap_or(if entry.kind == Kind::Recipe {
+                            "recipe"
+                        } else {
+                            "rule"
+                        }),
                     entry.summary
                 );
+                if matches!(detail, Detail::Full)
+                    && let Some(recipe) = &entry.recipe
+                {
+                    println!(
+                        "Source: {}\nSymbols: {}\nLicense: {}\n{}\nModified by xpd fixes: {}",
+                        recipe.source,
+                        recipe.symbols.join(", "),
+                        recipe.license,
+                        recipe.attribution,
+                        recipe.modified
+                    );
+                    if let Some(code) = &recipe.code {
+                        println!("\n```python\n{code}```");
+                    }
+                }
                 for member in &entry.members {
                     println!(
                         "  {}({}) {}",

@@ -10,6 +10,7 @@ mod mcp;
 mod nodes;
 mod pack;
 mod package_check;
+mod recipe;
 mod report;
 mod rule;
 mod scan;
