@@ -46,8 +46,11 @@ fix: date_series=$V
 metadata: { fix: safe, since: "0.9.9" }
 ---
 # The fitted attributes that scikit-lego renamed to the scikit-learn names. Each old name is a
-# property that warns and returns the new one. An assignment to the name, and a name on self, is
-# the user's own attribute.
+# property that warns and returns the new one. The rule reports the name only on an object that
+# the file builds from a scikit-lego class with that property: a call chain that starts at the
+# class, or a name that the file assigns such a chain to. The same name on any other object,
+# such as an instance of the user's own class, is left alone, because the rename would raise
+# AttributeError there.
 id: deprecated-in-sklego
 language: python
 severity: warning
@@ -55,9 +58,42 @@ message: $A warns since scikit-lego 0.7.0 and returns n_features_in_. Read n_fea
 rule:
   kind: attribute
   all:
-    - has: { field: object, pattern: $O, not: { regex: '^(self|cls)$' } }
-    - has: { field: attribute, pattern: $A, regex: '^(dim_|num_fit_cols_|n_columns_|num_cols_)$' }
-  not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+    - has: { field: object, pattern: $O }
+    - has: { field: attribute, pattern: $A }
+    - not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+    - any:
+        - all:
+            - has: { field: attribute, regex: '^dim_$' }
+            - has:
+                field: object
+                any:
+                  - { kind: call, regex: '^(\w+\.)*(RandomRegressor|RandomAdder|DictMapper|OutlierRemover)\(' }
+                  - kind: identifier
+                    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $O } }, { has: { field: right, kind: call, regex: '^(\w+\.)*(RandomRegressor|RandomAdder|DictMapper|OutlierRemover)\(' } }] } }
+        - all:
+            - has: { field: attribute, regex: '^num_fit_cols_$' }
+            - has:
+                field: object
+                any:
+                  - { kind: call, regex: '^(\w+\.)*(GaussianMixtureNB|BayesianGaussianMixtureNB)\(' }
+                  - kind: identifier
+                    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $O } }, { has: { field: right, kind: call, regex: '^(\w+\.)*(GaussianMixtureNB|BayesianGaussianMixtureNB)\(' } }] } }
+        - all:
+            - has: { field: attribute, regex: '^n_columns_$' }
+            - has:
+                field: object
+                any:
+                  - { kind: call, regex: '^(\w+\.)*(ColumnCapper)\(' }
+                  - kind: identifier
+                    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $O } }, { has: { field: right, kind: call, regex: '^(\w+\.)*(ColumnCapper)\(' } }] } }
+        - all:
+            - has: { field: attribute, regex: '^num_cols_$' }
+            - has:
+                field: object
+                any:
+                  - { kind: call, regex: '^(\w+\.)*(IntervalEncoder)\(' }
+                  - kind: identifier
+                    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $O } }, { has: { field: right, kind: call, regex: '^(\w+\.)*(IntervalEncoder)\(' } }] } }
 fix: $O.n_features_in_
 metadata: { fix: safe, since: "0.7" }
 ---
@@ -68,9 +104,17 @@ message: n_levels_ warns since scikit-lego 0.9.0 and returns n_fitted_levels_. R
 rule:
   kind: attribute
   all:
-    - has: { field: object, pattern: $O, not: { regex: '^(self|cls)$' } }
-    - has: { field: attribute, regex: '^n_levels_$' }
-  not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+    - has: { field: object, pattern: $O }
+    - not: { any: [{ inside: { kind: assignment, field: left } }, { inside: { kind: augmented_assignment, field: left } }, { inside: { kind: delete_statement } }] }
+    - any:
+        - all:
+            - has: { field: attribute, regex: '^n_levels_$' }
+            - has:
+                field: object
+                any:
+                  - { kind: call, regex: '^(\w+\.)*(HierarchicalRegressor|HierarchicalClassifier)\(' }
+                  - kind: identifier
+                    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $O } }, { has: { field: right, kind: call, regex: '^(\w+\.)*(HierarchicalRegressor|HierarchicalClassifier)\(' } }] } }
 fix: $O.n_fitted_levels_
 metadata: { fix: safe, since: "0.9" }
 ---

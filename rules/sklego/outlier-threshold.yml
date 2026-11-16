@@ -6,8 +6,11 @@
 #
 # GMMOutlierDetector and BayesianGMMOutlierDetector with the default method="quantile" read
 # threshold as the share of training rows to keep, so the default 0.99 flags 1 percent. A small
-# number, written as if it were the share of outliers, flags nearly every row: 0.05 flagged 380
-# of 400 training rows and 0.95 flagged 20. A number above 1 raises ValueError.
+# number, written as if it were the share of outliers, flags most rows: 0.05 flagged 380 of 400
+# training rows, 0.4 flagged 240, 0.5 flagged 200 and 0.95 flagged 20. A number above 1 raises
+# ValueError. method="stddev" reads threshold as a count of standard deviations, so the two
+# documents about the share run only when the call leaves method out or writes
+# method="quantile". A method given as a variable may be "stddev".
 
 id: outlier-threshold
 language: python
@@ -26,7 +29,7 @@ constraints:
 id: outlier-threshold
 language: python
 severity: error
-message: $C with method="quantile" keeps the share threshold of the training rows as inliers, so a small threshold flags nearly every row. 0.05 flagged 380 of 400 training rows, where 0.95 flagged 20. Pass 1 minus the share of outliers.
+message: $C with method="quantile" keeps the share threshold of the training rows as inliers, so a threshold below 0.5 flags more than half of them. 0.05 flagged 380 of 400 training rows, where 0.95 flagged 20. Pass 1 minus the share of outliers.
 rule:
   pattern: $F($$$A)
   all:
@@ -36,11 +39,21 @@ rule:
         any:
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: small-share } }] }
           - has: { nthChild: 1, matches: small-share }
-    - not: { has: { field: arguments, regex: 'stddev' } }
+    - matches: quantile-method
 constraints:
   C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
 utils:
-  small-share: { kind: float, regex: '^0?\.([0-4]\d*|50*)$' }
+  small-share: { kind: float, regex: '^0?\.[0-4]\d*$' }
+  quantile-method:
+    has:
+      field: arguments
+      not:
+        has:
+          any:
+            - { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { not: { has: { field: value, regex: '^["'']quantile["'']$' } } }] }
+            - { nthChild: 2, not: { any: [{ kind: keyword_argument }, { regex: '^["'']quantile["'']$' }] } }
+            - { kind: dictionary_splat }
+            - { kind: list_splat }
 ---
 id: outlier-threshold
 language: python
@@ -55,10 +68,20 @@ rule:
         any:
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: above-one } }] }
           - has: { nthChild: 1, matches: above-one }
-    - not: { has: { field: arguments, regex: 'stddev' } }
+    - matches: quantile-method
 constraints:
   C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
 utils:
+  quantile-method:
+    has:
+      field: arguments
+      not:
+        has:
+          any:
+            - { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { not: { has: { field: value, regex: '^["'']quantile["'']$' } } }] }
+            - { nthChild: 2, not: { any: [{ kind: keyword_argument }, { regex: '^["'']quantile["'']$' }] } }
+            - { kind: dictionary_splat }
+            - { kind: list_splat }
   above-one:
     any:
       - { kind: integer, regex: '^([2-9]|[1-9]\d+)$' }

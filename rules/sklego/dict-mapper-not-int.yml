@@ -1,7 +1,8 @@
 # DictMapper.transform runs the mapping through np.vectorize(..., otypes=[int]), so every mapped
 # value and the default are cast to int. {"a": 0.5, "b": 1.7} with default=-1 gave 0, 1 and -1,
 # with no warning. A string value, and a NaN default, raise ValueError in that cast. A float with
-# no fraction, such as 1.0, keeps its value and is left alone.
+# no fraction, such as 1.0, keeps its value and is left alone. So is a string that holds a
+# whole number, such as "1" or " -2 ", which int() reads.
 
 id: dict-mapper-not-int
 language: python
@@ -30,7 +31,7 @@ utils:
 id: dict-mapper-not-int
 language: python
 severity: error
-message: DictMapper casts every mapped value and the default to int, so a text value raises ValueError "invalid literal for int()" in transform, and a NaN default raises "cannot convert float NaN to integer". Map to whole numbers, or map the column with pandas Series.map before the pipeline.
+message: DictMapper casts every mapped value and the default to int, so a text value that is no whole number raises ValueError "invalid literal for int()" in transform, and a NaN default raises "cannot convert float NaN to integer". Map to whole numbers, or map the column with pandas Series.map before the pipeline.
 rule:
   pattern: $F($$$A)
   all:
@@ -43,10 +44,11 @@ rule:
           - has: { nthChild: 2, matches: not-a-number }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^default$' } }, { has: { field: value, matches: not-a-number } }] }
 utils:
+  text: { kind: string, not: { regex: '^["'']\s*[-+]?\d+\s*["'']$' } }
   not-a-number:
     any:
-      - { kind: string }
+      - { matches: text }
       - { regex: '^((np|numpy|math)\.nan|float\(["'']nan["'']\))$' }
   holds-text:
     kind: dictionary
-    has: { kind: pair, has: { field: value, kind: string } }
+    has: { kind: pair, has: { field: value, matches: text } }

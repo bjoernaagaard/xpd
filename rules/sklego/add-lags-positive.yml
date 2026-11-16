@@ -5,6 +5,10 @@
 # the column from lag -1 predicted the sign of its own row with accuracy 0.531.
 #
 # A positive lag is right when the column is the target of a forecast, so the rule is a warning.
+#
+# A range holds a positive lag when it starts at 1 or more, or when it counts up to a stop of 2
+# or more. range(0, -3, -1) holds 0, -1 and -2 and is left alone, as is a range whose numbers
+# are not written out.
 
 id: add-lags-positive
 language: python
@@ -24,4 +28,18 @@ utils:
     any:
       - { kind: integer, regex: '^[1-9]' }
       - { any: [{ kind: list }, { kind: tuple }], has: { kind: integer, regex: '^[1-9]' } }
-      - { kind: call, regex: '^(list\(\s*)?range\(\s*\d' }
+      - { matches: positive-range }
+      - { kind: call, all: [{ has: { field: function, regex: '^(list|tuple)$' } }, { has: { field: arguments, has: { nthChild: 1, matches: positive-range } } }] }
+  positive-range:
+    kind: call
+    all:
+      - has: { field: function, regex: '^range$' }
+      - has:
+          field: arguments
+          any:
+            # range(1, n) and range(3, 0, -1): every lag it holds is positive.
+            - all: [{ has: { nthChild: 1, kind: integer, regex: '^[1-9]' } }, { has: { nthChild: 2 } }]
+            # range(3) and range(-2, 3): it counts up to 2 or more.
+            - all: [{ has: { nthChild: { position: 1, reverse: true }, kind: integer, regex: '^([2-9]|[1-9]\d+)$' } }, { not: { has: { nthChild: 3 } } }]
+            # range(0, 6, 2): the same with a step that counts up.
+            - all: [{ has: { nthChild: 2, kind: integer, regex: '^([2-9]|[1-9]\d+)$' } }, { has: { nthChild: 3, kind: integer } }]

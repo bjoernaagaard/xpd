@@ -5474,7 +5474,8 @@ The replacement is advice. xpd does not apply it automatically. `{"a": 0.5, "b":
 `default=-1` came back as 0, 1 and -1 with no warning. A text value raised ValueError "invalid
 literal for int() with base 10", and `default=np.nan` raised ValueError "cannot convert float NaN
 to integer". A float with no fraction, such as `1.0`, keeps its value, and the rule leaves it
-alone.
+alone. It also leaves a string that holds a whole number alone: `DictMapper({"a": "1"}, default=0)`
+gave 1.
 
 #### regression-outlier-column-name
 
@@ -5532,7 +5533,7 @@ rule leaves it alone.
 
 **Severity:** error. **Fix:** none.
 
-Reports `PCAOutlierDetection` and `UMAPOutlierDetection` built without a `threshold`, and `GMMOutlierDetector` and `BayesianGMMOutlierDetector` whose `threshold` is 0.5 or less, or above 1, with the default `method="quantile"`.
+Reports `PCAOutlierDetection` and `UMAPOutlierDetection` built without a `threshold`, and `GMMOutlierDetector` and `BayesianGMMOutlierDetector` whose `threshold` is below 0.5, or above 1, with `method="quantile"` written out or left as the default.
 
 Example:
 
@@ -5551,9 +5552,11 @@ gmm = GMMOutlierDetector(threshold=0.95)
 The replacement is advice. xpd does not apply it automatically. Without a threshold, `fit` of the
 PCA and UMAP detectors raised ValueError "The `threshold` value cannot be `None`." The mixture
 detectors keep the share `threshold` of the training rows as inliers. `threshold=0.05` flagged 380
-of 400 training rows, 0.95 flagged 20, and the default 0.99 flagged 4. `threshold=2` raised
-ValueError, and ran with `method="stddev"`, which counts standard deviations. A detector inside a
-search is left alone, because the search may set the threshold.
+of 400 training rows, 0.4 flagged 240, 0.5 flagged 200, 0.95 flagged 20, and the default 0.99
+flagged 4. `threshold=2` raised ValueError, and ran with `method="stddev"`, which counts standard
+deviations. A call whose `method` is anything but the text `"quantile"`, such as a variable, is
+left alone, because it may be `"stddev"`. A detector inside a search is left alone, because the
+search may set the threshold.
 
 #### grouped-shrinkage-arguments
 
@@ -5611,7 +5614,9 @@ The replacement is advice. xpd does not apply it automatically. On a frame with 
 the second row on. On a series of pure noise, a model given the column from lag 1 predicted the
 sign of the next row with accuracy 0.992, and a model given the column from lag -1 predicted the
 sign of its own row with accuracy 0.531. A positive lag is right when the new column is the
-target of a forecast, so the rule is a warning.
+target of a forecast, so the rule is a warning. A `range` is reported when its numbers are
+written out and it holds a positive lag: it starts at 1 or more, or it counts up to a stop of 2
+or more. `range(0, -3, -1)` holds 0, -1 and -2 and is left alone.
 
 #### decay-on-shuffled-rows
 
@@ -5684,8 +5689,10 @@ model = make_pipeline(StandardScaler(), DecayEstimator(Ridge()))
 The replacement is advice. xpd does not apply it automatically. The pipeline raised ValueError
 "Pipeline.fit does not accept the sample_weight parameter", and `KNeighborsRegressor` raised
 TypeError "Model KNeighborsRegressor.fit() does not have 'sample_weight'". The list of models is
-every classifier and regressor of scikit-learn 1.9.1 that takes no argument to build and whose
-`fit` raised TypeError inside a `DecayEstimator`. With the `DecayEstimator` around the last step,
+every classifier and regressor of `sklearn.utils.all_estimators()` on scikit-learn 1.9.1 that
+takes no argument to build and whose `fit` raised that TypeError inside a `DecayEstimator`. It
+has 22 names, among them `PassiveAggressiveClassifier`, `PassiveAggressiveRegressor`, `CCA` and
+`PLSCanonical`. With the `DecayEstimator` around the last step,
 the pipeline fitted.
 
 #### zero-inflated-roles
@@ -5903,9 +5910,16 @@ width = capper.n_features_in_
 ```
 
 Every fix was run before and after on the pack's sample file, and the folds, the selected
-columns, the attribute values, the coefficients and the predictions were equal. An attribute on
-`self`, an assignment to the name, and the definition of a function or class of the name are the
-file's own and stay silent. `coefs_` is reported only in a file that names `ProbWeightRegression`
+columns, the attribute values, the coefficients and the predictions were equal. An old attribute
+name is reported only on an object that the file builds from a scikit-lego class with that
+property: a call chain that starts at the class, as in `ColumnCapper().fit(X).n_columns_`, or a
+name that the file assigns such a chain to. The classes are `RandomRegressor`, `RandomAdder`,
+`DictMapper` and `OutlierRemover` for `dim_`, the two mixture naive Bayes classifiers for
+`num_fit_cols_`, `ColumnCapper` for `n_columns_`, `IntervalEncoder` for `num_cols_`, and
+`HierarchicalRegressor` and `HierarchicalClassifier` for `n_levels_`. The same name on any other
+object, such as `cfg.dim_` on your own class, stays silent, because the rename would raise
+AttributeError there. An assignment to the name, and the definition of a function or class of
+the name, are the file's own and stay silent. `coefs_` is reported only in a file that names `ProbWeightRegression`
 or `DeadZoneRegressor` and no MLP, because scikit-learn's MLP models have a real `coefs_`. Each
 document carries `since` with the release that began to warn.
 

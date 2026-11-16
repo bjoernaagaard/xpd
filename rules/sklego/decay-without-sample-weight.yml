@@ -3,8 +3,8 @@
 # accept the sample_weight parameter". The estimators named in the second document have no
 # sample_weight in fit on scikit-learn 1.9.1, and DecayEstimator raises TypeError "Model
 # KNeighborsRegressor.fit() does not have 'sample_weight'" for them. The list is every
-# classifier and regressor of scikit-learn 1.9.1 that takes no argument to build and whose fit
-# raised TypeError inside a DecayEstimator.
+# classifier and regressor of sklearn.utils.all_estimators() on scikit-learn 1.9.1 that takes
+# no argument to build and whose fit raised that TypeError inside a DecayEstimator, 22 in all.
 
 id: decay-without-sample-weight
 language: python
@@ -42,4 +42,4 @@ utils:
     kind: call
     has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $M } }, { pattern: $M }] }
 constraints:
-  M: { regex: '^(ARDRegression|GaussianProcessClassifier|GaussianProcessRegressor|KNeighborsClassifier|KNeighborsRegressor|LabelPropagation|LabelSpreading|Lars|LassoLars|LassoLarsIC|LinearDiscriminantAnalysis|NearestCentroid|OrthogonalMatchingPursuit|PLSRegression|QuadraticDiscriminantAnalysis|RadiusNeighborsClassifier|RadiusNeighborsRegressor|TheilSenRegressor)$' }
+  M: { regex: '^(ARDRegression|CCA|GaussianProcessClassifier|GaussianProcessRegressor|KNeighborsClassifier|KNeighborsRegressor|LabelPropagation|LabelSpreading|Lars|LassoLars|LassoLarsIC|LinearDiscriminantAnalysis|NearestCentroid|OrthogonalMatchingPursuit|PassiveAggressiveClassifier|PassiveAggressiveRegressor|PLSCanonical|PLSRegression|QuadraticDiscriminantAnalysis|RadiusNeighborsClassifier|RadiusNeighborsRegressor|TheilSenRegressor)$' }
