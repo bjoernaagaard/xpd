@@ -3,6 +3,7 @@
 
 mod catalog;
 mod cli;
+mod embed;
 mod graph;
 mod imports;
 mod index;

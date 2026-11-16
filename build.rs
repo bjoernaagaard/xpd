@@ -26,6 +26,12 @@ const RULES_PAGE: &str = "docs/rules.md";
 const PLUGIN: &str = "plugin.json";
 /// The plugin's file that starts xpd with `uvx xpd@VERSION`.
 const PLUGIN_MCP: &str = "mcp.json";
+/// The vector of each index record, by the record's name. `xpd find --write-vectors` writes it.
+const VECTORS: &str = "indexes/vectors.bin";
+/// The start of `VECTORS`. Each record follows as its name's length (u16 LE), its name, and
+/// `DIMENSIONS` signed bytes.
+const VECTORS_HEADER: &[u8] = b"xpd vectors 256\n";
+const DIMENSIONS: usize = 256;
 /// The `## ` headings of the rules page that hold a pack's sections, each with the pack's
 /// module. A heading names the library as its project writes it, which is not always the name
 /// it is imported by.
@@ -359,7 +365,43 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
     }
     write(&out.join("strings.rs"), &format!("&{ordered:?}"))?;
     write(&out.join("records.rs"), &records)?;
+    vectors_source(out, &entries)?;
     search_source(out, &entries)
+}
+
+/// Writes `OUT_DIR/vectors.bin`, the vector of each entry in the order of the entries. An entry
+/// that `VECTORS` has no vector for gets zeros, and `xpd find --check` fails on it.
+fn vectors_source(out: &Path, entries: &[serde_json::Value]) -> Result<()> {
+    let bytes = if Path::new(VECTORS).exists() {
+        fs::read(VECTORS).with_context(|| format!("cannot read {VECTORS}"))?
+    } else {
+        VECTORS_HEADER.to_vec()
+    };
+    let mut rest = bytes
+        .strip_prefix(VECTORS_HEADER)
+        .with_context(|| format!("{VECTORS} does not start with {VECTORS_HEADER:?}"))?;
+    let mut found = BTreeMap::new();
+    while let Some((length, tail)) = rest.split_first_chunk::<2>() {
+        let (name, tail) = tail
+            .split_at_checked(usize::from(u16::from_le_bytes(*length)))
+            .with_context(|| format!("{VECTORS} ends inside a name"))?;
+        let (vector, tail) = tail
+            .split_at_checked(DIMENSIONS)
+            .with_context(|| format!("{VECTORS} ends inside a vector"))?;
+        found.insert(std::str::from_utf8(name)?, vector);
+        rest = tail;
+    }
+    ensure!(rest.is_empty(), "{VECTORS} ends inside a name length");
+    let mut data = Vec::with_capacity(entries.len() * DIMENSIONS);
+    for entry in entries {
+        let name = entry["name"].as_str().context("entry name")?;
+        match found.get(name) {
+            Some(vector) => data.extend_from_slice(vector),
+            None => data.resize(data.len() + DIMENSIONS, 0),
+        }
+    }
+    fs::write(out.join("vectors.bin"), data)?;
+    Ok(())
 }
 
 fn search_source(out: &Path, entries: &[serde_json::Value]) -> Result<()> {

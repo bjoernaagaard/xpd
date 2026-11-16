@@ -94,6 +94,10 @@ enum Cmd {
         /// Run real discovery questions and fail if an expected entry misses the top five.
         #[arg(long, conflicts_with = "query")]
         check: Option<PathBuf>,
+        /// Embed every index record with the model and write the vectors to this file, which
+        /// is indexes/vectors.bin in the repository.
+        #[arg(long, hide = true, conflicts_with_all = ["query", "check", "index"])]
+        write_vectors: Option<PathBuf>,
     },
     /// Show a public symbol's parameters, summary, own members and guarding rules.
     Api {
@@ -230,46 +234,18 @@ pub(crate) fn run() -> ExitCode {
             format,
             index,
             check,
+            write_vectors,
         } => discovery((|| {
-            let entries = index::load(index.as_deref())?;
-            if let Some(path) = check {
-                check_ranking(&entries, &path)?;
+            if let Some(path) = write_vectors {
+                index::write_vectors(&path)
+            } else if let Some(path) = check {
+                check_ranking(index.as_deref(), &path)
             } else {
+                let entries = index::load(index.as_deref())?;
                 let query = query.context("provide a task query or --check")?;
-                let mut found = index::find(&entries, &query, package.as_deref(), kind, limit);
-                for group in [&mut found.symbols, &mut found.rules, &mut found.recipes] {
-                    for entry in group {
-                        entry.keywords.clear();
-                        entry.members.clear();
-                        entry.summary = entry
-                            .summary
-                            .split("\n\n")
-                            .next()
-                            .unwrap_or_default()
-                            .to_owned();
-                    }
-                }
-                match format {
-                    Format::Json => println!("{}", serde_json::to_string(&found)?),
-                    Format::Text => {
-                        for (heading, selected, group) in [
-                            ("Symbols", Kind::Symbol, &found.symbols),
-                            ("Rules", Kind::Rule, &found.rules),
-                            ("Recipes", Kind::Recipe, &found.recipes),
-                        ] {
-                            if kind.is_none_or(|k| k == selected) {
-                                println!("{heading}");
-                                print_entries(
-                                    &group.iter().collect::<Vec<_>>(),
-                                    format,
-                                    Detail::Summary,
-                                )?;
-                            }
-                        }
-                    }
-                }
+                let found = index::find(&entries, &query, package.as_deref(), kind, limit);
+                print_matches(found, kind, format)
             }
-            Ok(())
         })()),
         Cmd::Api {
             name,
@@ -299,6 +275,38 @@ pub(crate) fn run() -> ExitCode {
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
     }
+}
+
+/// Prints what `find` found, each entry with the first paragraph of its summary.
+fn print_matches(mut found: index::Matches, kind: Option<Kind>, format: Format) -> Result<()> {
+    for group in [&mut found.symbols, &mut found.rules, &mut found.recipes] {
+        for entry in group {
+            entry.keywords.clear();
+            entry.members.clear();
+            entry.summary = entry
+                .summary
+                .split("\n\n")
+                .next()
+                .unwrap_or_default()
+                .to_owned();
+        }
+    }
+    match format {
+        Format::Json => println!("{}", serde_json::to_string(&found)?),
+        Format::Text => {
+            for (heading, selected, group) in [
+                ("Symbols", Kind::Symbol, &found.symbols),
+                ("Rules", Kind::Rule, &found.rules),
+                ("Recipes", Kind::Recipe, &found.recipes),
+            ] {
+                if kind.is_none_or(|k| k == selected) {
+                    println!("{heading}");
+                    print_entries(&group.iter().collect::<Vec<_>>(), format, Detail::Summary)?;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Prints every rule of every pack, whatever the project's venv holds.
@@ -717,46 +725,95 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
     Ok(())
 }
 
-fn check_ranking(entries: &index::Library, path: &std::path::Path) -> Result<()> {
+/// Asks each question of `path` and fails when its expected entry misses the top five. A
+/// question is asked with keyword search, which is what runs without the embedding model, and
+/// again with the model when it is there. A question with `"needs_model": true` is asked only
+/// with the model.
+fn check_ranking(index: Option<&std::path::Path>, path: &std::path::Path) -> Result<()> {
     let questions: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
-    let mut failed = 0;
-    // An open question records what a user asked and the answer they expect. Keyword ranking
-    // cannot answer it yet, so it is kept as data and not checked.
+    let with_model = index::load(index)?;
+    let keywords = index::load(index)?.keywords_only();
+    let searches = [
+        ("keywords", &keywords),
+        ("keywords and the embedding model", &with_model),
+    ];
+    // An open question records what a user asked and the answer they expect. Search cannot
+    // answer it yet, so it is kept as data and not checked.
     let (open, questions): (Vec<_>, Vec<_>) = questions
         .into_iter()
         .partition(|question| question["open"] == true);
+    let has_model = with_model.has_model();
+    let mut asked = [0; 2];
+    let mut failed = [0; 2];
     for question in &questions {
         let query = question["query"].as_str().context("question needs query")?;
-        let expected = question["expected"]
-            .as_str()
-            .context("question needs expected")?;
-        let entry = index::api(entries, expected)?
-            .with_context(|| format!("expected entry {expected} is absent from the index"))?;
-        let matches = index::find(entries, query, None, Some(entry.kind), Some(5));
-        let found = match entry.kind {
-            Kind::Symbol => matches.symbols,
-            Kind::Rule => matches.rules,
-            Kind::Recipe => matches.recipes,
+        // A list names entries that each answer the question.
+        let expected: Vec<&str> = match &question["expected"] {
+            Value::Array(names) => names.iter().filter_map(Value::as_str).collect(),
+            name => name.as_str().into_iter().collect(),
         };
-        if !found.iter().any(|e| e.name == expected) {
-            failed += 1;
+        let mut kinds = Vec::new();
+        for name in &expected {
+            let entry = index::api(&keywords, name)?
+                .with_context(|| format!("expected entry {name} is absent from the index"))?;
+            kinds.push(entry.kind);
+        }
+        let kind = *kinds.first().context("question needs expected")?;
+        anyhow::ensure!(
+            kinds.iter().all(|k| *k == kind),
+            "{query}: the expected entries must be of one kind"
+        );
+        let needs_model = question["needs_model"] == true;
+        for (search, (name, library)) in searches.iter().enumerate() {
+            if (search == 0 && needs_model) || (search == 1 && !has_model) {
+                continue;
+            }
+            asked[search] += 1;
+            let matches = index::find(library, query, None, Some(kind), Some(5));
+            let found = match kind {
+                Kind::Symbol => matches.symbols,
+                Kind::Rule => matches.rules,
+                Kind::Recipe => matches.recipes,
+            };
+            if !found.iter().any(|e| expected.contains(&e.name.as_str())) {
+                failed[search] += 1;
+                println!(
+                    "FAIL with {name}: {query} expected {}; found {}",
+                    expected.join(" or "),
+                    found
+                        .iter()
+                        .map(|e| e.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+        }
+    }
+    for (search, (name, _)) in searches.iter().enumerate() {
+        if search == 1 && !has_model {
+            println!("The embedding model is absent, so search with it is not checked");
+        } else {
             println!(
-                "FAIL {query} expected {expected}; found {}",
-                found
-                    .iter()
-                    .map(|e| e.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                "{} of {} questions passed with {name}",
+                asked[search] - failed[search],
+                asked[search]
             );
         }
     }
-    println!(
-        "{} of {} questions passed",
-        questions.len() - failed,
-        questions.len()
-    );
     println!("{} open questions are recorded and not checked", open.len());
+    let missing = index::records_without_vector();
+    if let Some(first) = missing.first() {
+        println!(
+            "{} records have no vector in indexes/vectors.bin, such as {first}. Write it again with xpd find --write-vectors indexes/vectors.bin",
+            missing.len()
+        );
+    }
+    let failed = failed[0] + failed[1];
     anyhow::ensure!(failed == 0, "{failed} discovery questions failed");
-
+    anyhow::ensure!(
+        missing.is_empty(),
+        "{} records have no vector",
+        missing.len()
+    );
     Ok(())
 }

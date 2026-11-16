@@ -1,10 +1,12 @@
-//! Source-only library discovery and keyword search.
-use std::collections::BTreeSet;
+//! Source-only library discovery, and search by keywords and by meaning.
+use std::cell::OnceCell;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
+use crate::embed::{DIMENSIONS, Model};
 use crate::{pack, venv};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
@@ -13,6 +15,17 @@ pub(crate) enum Kind {
     Symbol,
     Rule,
     Recipe,
+}
+
+impl Kind {
+    /// The kind's group in `Matches`, and the number of results it shows by default.
+    fn group(self) -> (usize, usize) {
+        match self {
+            Kind::Symbol => (0, 5),
+            Kind::Rule => (1, 3),
+            Kind::Recipe => (2, 3),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +87,30 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
 #[derive(Debug)]
 pub(crate) struct Library {
     local: Option<Vec<Entry>>,
+    /// Loaded on the first search, so `api` never loads it. `None` inside when it is absent.
+    model: OnceCell<Option<Model>>,
+}
+
+impl Library {
+    /// The same library, searched by keywords only.
+    pub(crate) fn keywords_only(self) -> Self {
+        Self {
+            model: OnceCell::from(None),
+            ..self
+        }
+    }
+
+    /// The embedding model, which is used for the embedded records only.
+    fn model(&self) -> Option<&Model> {
+        if self.local.is_some() {
+            return None;
+        }
+        self.model.get_or_init(Model::open).as_ref()
+    }
+
+    pub(crate) fn has_model(&self) -> bool {
+        self.model().is_some()
+    }
 }
 
 pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
@@ -90,7 +127,10 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
     } else {
         None
     };
-    Ok(Library { local })
+    Ok(Library {
+        local,
+        model: OnceCell::new(),
+    })
 }
 
 pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
@@ -159,6 +199,12 @@ fn decode(data: &mut &[u8]) -> serde_json::Value {
 const POSTINGS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/postings.bin"));
 const TABLE: &[(&str, u32, u32)] = include!(concat!(env!("OUT_DIR"), "/search.rs"));
 const RECORDS: &[Stored] = include!(concat!(env!("OUT_DIR"), "/records.rs"));
+/// `DIMENSIONS` signed bytes for each of `RECORDS`, all zero for a record without a vector.
+const VECTORS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/vectors.bin"));
+/// The start of `indexes/vectors.bin`, which build.rs reads.
+const VECTORS_HEADER: &[u8] = b"xpd vectors 256\n";
+/// Reciprocal rank fusion adds `weight / (FUSION_K + rank)` from each ranking.
+const FUSION_K: f64 = 60.0;
 
 #[derive(Debug, Default, Serialize)]
 pub(crate) struct Matches {
@@ -171,10 +217,11 @@ impl Matches {
     fn collect(entries: impl IntoIterator<Item = Entry>, limit: Option<usize>) -> Self {
         let mut found = Self::default();
         for entry in entries {
-            let (group, default) = match entry.kind {
-                Kind::Symbol => (&mut found.symbols, 5),
-                Kind::Rule => (&mut found.rules, 3),
-                Kind::Recipe => (&mut found.recipes, 3),
+            let (_, default) = entry.kind.group();
+            let group = match entry.kind {
+                Kind::Symbol => &mut found.symbols,
+                Kind::Rule => &mut found.rules,
+                Kind::Recipe => &mut found.recipes,
             };
             if group.len() < limit.unwrap_or(default) {
                 group.push(entry);
@@ -199,6 +246,45 @@ pub(crate) fn find(
             limit,
         );
     }
+    let passes =
+        |e: &Stored| package.is_none_or(|p| e.package == p) && kind.is_none_or(|k| e.kind == k);
+    let meaning = library.model().and_then(|model| {
+        model
+            .query(query)
+            .inspect_err(|e| {
+                eprintln!("xpd: cannot embed the query: {e:#}. Search uses keywords only.");
+            })
+            .ok()
+    });
+    let mut ranked = keyword_ranking(query, passes);
+    if let Some(meaning) = meaning {
+        ranked = fuse(&ranked, &meaning_ranking(&meaning, passes));
+    }
+    // Select within each kind before decoding the embedded entries.
+    let mut counts = [0; 3];
+    Matches::collect(
+        ranked
+            .into_iter()
+            .filter(|(i, _)| {
+                let (slot, default) = RECORDS[*i].kind.group();
+                counts[slot] += 1;
+                counts[slot] <= limit.unwrap_or(default)
+            })
+            .map(|(i, _)| RECORDS[i].entry().expect("build validated index entry")),
+        limit,
+    )
+}
+
+/// Sorts `(record, score)` pairs by score, best first, and by name between equal scores.
+fn sort_ranking(ranked: &mut [(usize, f64)]) {
+    ranked.sort_by(|(a, sa), (b, sb)| {
+        sb.total_cmp(sa)
+            .then_with(|| RECORDS[*a].name.cmp(RECORDS[*b].name))
+    });
+}
+
+/// The records that share a keyword with the query, best first.
+fn keyword_ranking(query: &str, passes: impl Fn(&Stored) -> bool) -> Vec<(usize, f64)> {
     let words: BTreeSet<_> = search_terms(query).into_iter().collect();
     let mut scores = vec![0.0; RECORDS.len()];
     for word in &words {
@@ -220,39 +306,112 @@ pub(crate) fn find(
             }
         }
     }
-    let mut ranked: Vec<_> = RECORDS
-        .iter()
-        .zip(scores)
-        .filter(|(e, score)| {
-            *score > 0.0
-                && package.is_none_or(|p| e.package == p)
-                && kind.is_none_or(|k| e.kind == k)
-        })
-        .map(|(e, score)| {
+    let mut ranked: Vec<_> = scores
+        .into_iter()
+        .enumerate()
+        .filter(|(i, score)| *score > 0.0 && passes(&RECORDS[*i]))
+        .map(|(i, score)| {
+            let e = &RECORDS[i];
             (
-                e,
+                i,
                 rank_score(e.name, e.summary, e.kind, query, words.len(), score),
             )
         })
         .collect();
-    ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(b.name)));
-    // Select within each kind before decoding the embedded entries.
-    let mut counts = [0; 3];
-    Matches::collect(
-        ranked
-            .into_iter()
-            .filter(|(e, _)| {
-                let (slot, default) = match e.kind {
-                    Kind::Symbol => (0, 5),
-                    Kind::Rule => (1, 3),
-                    Kind::Recipe => (2, 3),
-                };
-                counts[slot] += 1;
-                counts[slot] <= limit.unwrap_or(default)
-            })
-            .map(|(e, _)| e.entry().expect("build validated index entry")),
-        limit,
-    )
+    sort_ranking(&mut ranked);
+    ranked
+}
+
+/// Every record with a vector, by its cosine similarity to the query's vector, best first.
+fn meaning_ranking(meaning: &[f32], passes: impl Fn(&Stored) -> bool) -> Vec<(usize, f64)> {
+    let mut ranked: Vec<_> = VECTORS
+        .as_chunks::<DIMENSIONS>()
+        .0
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| passes(&RECORDS[*i]))
+        .filter_map(|(i, vector)| {
+            let (dot, norm) =
+                vector
+                    .iter()
+                    .zip(meaning)
+                    .fold((0.0, 0.0), |(dot, norm), (&v, &m)| {
+                        let v = f32::from(v.cast_signed());
+                        (dot + v * m, norm + v * v)
+                    });
+            (norm > 0.0).then(|| (i, f64::from(dot / norm.sqrt())))
+        })
+        .collect();
+    sort_ranking(&mut ranked);
+    ranked
+}
+
+/// Reciprocal rank fusion of the two rankings, within each kind. The keyword ranking weighs a
+/// little more, and its first three get a bonus, so an exact match keeps its place. The values
+/// pass every checked question in indexes/questions.json, and 1.0 or 1.3 for the weight do not.
+fn fuse(keywords: &[(usize, f64)], meaning: &[(usize, f64)]) -> Vec<(usize, f64)> {
+    let mut fused = BTreeMap::<usize, f64>::new();
+    for (ranking, weight, bonus) in [
+        (keywords, 1.15, [0.05, 0.02, 0.02]),
+        (meaning, 1.0, [0.0; 3]),
+    ] {
+        let mut counts = [0_u32; 3];
+        for &(i, _) in ranking {
+            let (slot, _) = RECORDS[i].kind.group();
+            counts[slot] += 1;
+            let rank = counts[slot];
+            let top = usize::try_from(rank - 1)
+                .ok()
+                .and_then(|place| bonus.get(place))
+                .copied()
+                .unwrap_or_default();
+            *fused.entry(i).or_default() += weight / (FUSION_K + f64::from(rank)) + top;
+        }
+    }
+    let mut ranked: Vec<_> = fused.into_iter().collect();
+    sort_ranking(&mut ranked);
+    ranked
+}
+
+/// The names of the embedded records that have no vector.
+pub(crate) fn records_without_vector() -> Vec<&'static str> {
+    RECORDS
+        .iter()
+        .zip(VECTORS.as_chunks::<DIMENSIONS>().0)
+        .filter(|(_, vector)| vector.iter().all(|&v| v == 0))
+        .map(|(e, _)| e.name)
+        .collect()
+}
+
+/// Writes the vector of every embedded record to `path`, as build.rs reads it. Each vector is
+/// scaled so its largest value is 127. Search compares directions, so the scale drops out.
+pub(crate) fn write_vectors(path: &Path) -> Result<()> {
+    let model = Model::open().context("the embedding model is needed to write vectors")?;
+    let mut data = VECTORS_HEADER.to_vec();
+    for (done, chunk) in RECORDS.chunks(500).enumerate() {
+        let documents: Vec<_> = chunk.iter().map(|e| (e.name, e.summary)).collect();
+        for (record, vector) in chunk.iter().zip(model.documents(&documents)?) {
+            let largest = vector.iter().fold(f32::EPSILON, |m, v| m.max(v.abs()));
+            data.extend(u16::try_from(record.name.len())?.to_le_bytes());
+            data.extend(record.name.as_bytes());
+            data.extend(vector.iter().map(|v| {
+                // The value is rounded and within -127..=127, so the cast loses nothing.
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    clippy::as_conversions,
+                    reason = "rounded value within -127..=127"
+                )]
+                let byte = (v / largest * 127.0).round() as i8;
+                byte.cast_unsigned()
+            }));
+        }
+        eprintln!(
+            "xpd: embedded {} of {} records",
+            (done * 500 + chunk.len()),
+            RECORDS.len()
+        );
+    }
+    std::fs::write(path, data).with_context(|| format!("cannot write {}", path.display()))
 }
 
 fn find_dynamic<'a>(
