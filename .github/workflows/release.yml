@@ -156,15 +156,21 @@ jobs:
     strategy:
       matrix:
         platform:
+          # llama.cpp uses std::filesystem, which macOS has from 10.15. maturin's default for
+          # x86_64 is 10.12.
           - runner: macos-15-intel
             target: x86_64
+            deployment: "10.15"
           - runner: macos-latest
             target: aarch64
+            deployment: "11.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
         # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.platform.deployment }}
         with:
           target: ${{ matrix.platform.target }}
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
