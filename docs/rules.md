@@ -9582,11 +9582,15 @@ them. Every new report of a rule with 20 or fewer was read, and 20 of each form 
 | [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels. Drawn: 3 shades for 3 bar lengths | 16, 0, 87 | none |
 | [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | none |
 | [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | none |
+| [`rainbow-colorscale`](#rainbow-colorscale) | warning | 154 | resolved: Jet lightness 13.5, 97.1, 25.5 along the scale | 1, 0, 7 | none |
 | [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet or in 2 cells | 28, 7, 128 | none |
 | [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | unsafe |
 | [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once. Drawn: 1 of 3 frames | 11, 1, 29 | none |
+| [`heatmap-smoothing`](#heatmap-smoothing) | info | 92 | drawn: 252 colors for a grid of two values | 2, 0, 0 | unsafe |
+| [`table-for-small-data`](#table-for-small-data) | info | 56 | drawn: 0 of 4 values written, 4 of 4 in `go.Table` | 31, 0, 1 | none |
 | [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 7, 3, 71 | none |
 | [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 86 | none |
+| [`all-caps-title`](#all-caps-title) | info | 183 | drawn: a title 1.31 times as wide in capitals | 3, 0, 1 | none |
 
 `default-template` reports a file once, so its 351 reports are 351 of the 1,087 files.
 `bar-axis-without-zero` and `three-d-for-two-d` have no report on this code. They are kept for
@@ -9598,9 +9602,9 @@ in meteorology and `polar-bar-area` still reports it, and all 28 reports of `pie
 plotly documentation are the pages that teach pie charts. Recall was not measured.
 
 No fix of the pack is safe, because every fix changes what the reader sees. `--fix` alone
-writes nothing for this pack, and `--fix --unsafe-fixes` writes three rewrites: a tinted
-template becomes `"simple_white"`, `showgrid=True` becomes `showgrid=False`, and `"spline"`
-becomes `"linear"`.
+writes nothing for this pack, and `--fix --unsafe-fixes` writes four rewrites: a tinted
+template becomes `"simple_white"`, `showgrid=True` becomes `showgrid=False`, `"spline"`
+becomes `"linear"`, and a `zsmooth` of `"best"` or `"fast"` becomes `False`.
 
 ### What the pack does not check
 
@@ -10095,6 +10099,49 @@ shape, so it is not reported. A gauge with `shape="bullet"` is a bar and not a d
 left alone. The rule has no fix, because a gauge can carry a threshold that the number alone
 does not show.
 
+### Color without an order
+
+"The mind's eye does not readily give a visual ordering to colors, except possibly for red to
+reflect higher levels than other colors", and "varying shades of gray show varying quantities
+better than color" (page 154).
+
+#### rainbow-colorscale
+
+**Severity:** warning. **Fix:** none.
+
+Reports the color scales Jet, Rainbow, Turbo and HSV, written as a string in any case with or without `_r`, or as `px.colors.sequential.Jet` and the like, when it is given to `colorscale`, `color_continuous_scale` or a setting that ends in `_colorscale` inside a plotly call, or assigned to `px.defaults.color_continuous_scale`.
+
+Example:
+
+```python
+fig = px.imshow(grid, color_continuous_scale="jet")
+fig = go.Figure(go.Heatmap(z=grid, colorscale=px.colors.sequential.Turbo))
+```
+
+Use instead:
+
+```python
+fig = px.imshow(grid, color_continuous_scale="Greys")
+fig = go.Figure(go.Heatmap(z=grid, colorscale="Viridis"))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The test of order is lightness. Each of the 94 named scales was resolved on a `go.Heatmap` and
+sampled at 21 even steps, and the CIELAB lightness of each step was computed, from 0 for black
+to 100 for white. 61 scales, such as `"Greys"`, `"Blues"` and `"Viridis"`, never changed
+direction. Jet rose from 13.5 to 97.1 and fell back to 25.5, so it changed direction 3 times,
+Rainbow 2 times, HSV 3 times and Turbo once, with its lightest color in the middle. A low and a
+high value then come out equally dark. `px.imshow` with `"jet"`, a `go.Scatter` marker with
+`"Jet"` and `update_layout(coloraxis_colorscale="Jet")` all resolved to the same six stops.
+
+Earth, mrybm and mygbm change direction too and appear in no file the rules were run on.
+Blackbody, Bluered, Portland and Picnic change once, near one end or at a midpoint as the
+two-sided RdBu does, and are left alone. `color_discrete_sequence` is left alone, because it
+colors groups and not quantities. Numbers that name groups, such as cluster numbers, are
+better colored as categories, and the message says so. The rule has no fix, because the scale
+to use depends on whether the data has a midpoint.
+
 ### Chart forms the book argues against
 
 #### pie-chart
@@ -10207,7 +10254,110 @@ the count was read from the figure and the drawn page. Frames copied from anothe
 `frames=fig.frames`, are left alone, because the figure they come from is reported where it is
 made, and so are `frames=None` and `frames=[]`.
 
+#### heatmap-smoothing
+
+**Severity:** info. **Fix:** unsafe: `False`.
+
+Reports `zsmooth="best"` and `zsmooth="fast"` on `go.Heatmap`, `zsmooth="best"` on `go.Histogram2d` and in `update_traces` on a plotly figure, and `zsmooth="fast"` on a `go.Image` that sets `source`.
+
+Example:
+
+```python
+fig = go.Figure(go.Heatmap(z=grid, zsmooth="best"))
+```
+
+Use instead:
+
+```python
+fig = go.Figure(go.Heatmap(z=grid, zsmooth=False))
+```
+
+"Above all else show the data" (page 92). Smoothing fills the space between the cells with
+colors that blend their values. A 2 by 2 grid of 0 and 10, drawn in `"Greys"` at 400 by 400
+pixels, drew 2 colors with `zsmooth=False`, 61 with `"fast"` and 252 with `"best"`. The two
+colors of the data covered all 160,000 pixels without smoothing, and 45,156 and 40,401 with
+it.
+
+`go.Histogram2d` drew 252 colors with `"best"`, and its `"fast"` resolved to `False` and drew
+2, so `"fast"` is read on `go.Heatmap` only. `go.Image` takes `"fast"` or `False`, and
+`"best"` raised ValueError. Its docstring says that `zsmooth` "only applies for image traces
+that use the source attribute": a checkerboard given as `z` drew 2 colors with `"fast"`, and
+the same pixels given as a PNG in `source` drew 61. `update_traces(zsmooth="fast")` is left
+alone, because the rule cannot see which traces the figure holds.
+
+The fix is unsafe, because each cell is then drawn as a block of one color, so the figure looks
+different.
+
+#### table-for-small-data
+
+**Severity:** info. **Fix:** none.
+
+Reports `px.bar` and `go.Bar` whose values, `y`, or `x` with `orientation="h"`, are a written list or tuple of 1 to 20 numbers, and `px.pie` and `go.Pie` whose `values` is one, when the call is a px call or the only trace of a `go.Figure`.
+
+Example:
+
+```python
+fig = px.bar(x=["north", "south", "east", "west"], y=[41.3, 37.8, 12.6, 8.3])
+```
+
+Use instead:
+
+```python
+fig = go.Figure(go.Table(
+    header=dict(values=["region", "share"]),
+    cells=dict(values=[["north", "south", "east", "west"], [41.3, 37.8, 12.6, 8.3]]),
+))
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+"Tables usually outperform graphics in reporting on small data sets of 20 numbers or less"
+(page 56), and "tables are preferable to graphics for many small data sets" (page 178). A
+chart of a few numbers draws them as lengths or angles and does not write them. `px.bar` of
+41.3, 37.8, 12.6 and 8.3 drew the four names and the ticks 0 to 40, and none of the four
+values. `go.Pie` of 413, 378, 126 and 83 wrote the four shares as percentages and none of the
+values. `go.Table` wrote all four.
+
+xpd cannot count the rows of a data frame or the traces of a figure, so the rule reads the one
+form where the code shows the whole data: a px call, or a `go.Figure` whose data is this one
+trace. A trace added with `add_trace` is left alone, and so is an `x` of numbers on a bar
+without `orientation="h"`, because those are positions. A chart that writes its values with
+`text`, `texttemplate`, `textinfo` or `text_auto`, or a file that names `textposition`, is left
+alone. A pie is also reported by [`pie-chart`](#pie-chart), for its form. A list with a name, a
+`None` or a 21st number is left alone.
+
 ### Words on the figure
+
+#### all-caps-title
+
+**Severity:** info. **Fix:** none.
+
+Reports a title written in capitals only, with at least two words of four or more capitals: a `title`, a `title_text`, a setting that ends in `_title` or `_title_text`, the `text` of a title dict, a value of the `labels` of a px call, or an item of `subplot_titles`, inside a plotly call.
+
+Example:
+
+```python
+fig = px.bar(df, x="region", y="sales", title="SALES BY REGION")
+```
+
+Use instead:
+
+```python
+fig = px.bar(df, x="region", y="sales", title="Sales by region")
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+The book lists as friendly "type is upper-and-lower case, with serifs", and as unfriendly "type
+is all capitals, sans serif" (page 183). plotly keeps a title as written:
+`title="SALES BY REGION"` resolved to the same text. Drawn at 20 pixels in the default font,
+`"SALES BY REGION"` was 178 pixels wide and `"Sales by region"` 136, so 1.31 times as wide, and
+two more titles were 1.26 and 1.35 times as wide.
+
+Short names in capitals such as `"RSI"`, `"GDP (USD)"` and `"AUC"` are abbreviations and are
+right as written, so they are left alone, and so is a single word such as `"NVIDIA"`. HTML
+tags such as `<b>` are skipped, and an f-string with a field is left alone. The rule has no
+fix, because the case of each word, such as an abbreviation, is the author's to choose.
 
 #### legend-instead-of-labels
 
