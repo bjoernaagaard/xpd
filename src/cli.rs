@@ -24,8 +24,9 @@ use crate::venv::{self, Venv};
 
 /// The agent skill that `xpd skill` prints.
 const SKILL: &str = include_str!("../skills/xpd/SKILL.md");
-/// The scripts that `profile` and `equiv` hand to the project's Python.
+/// The scripts that `profile`, `refit` and `equiv` hand to the project's Python.
 const PROFILE_PY: &str = include_str!("../py/profile.py");
+const REFIT_PY: &str = include_str!("../py/refit.py");
 const EQUIV_PY: &str = include_str!("../py/equiv.py");
 
 /// Exit code when xpd itself fails, as opposed to finding issues.
@@ -141,6 +142,8 @@ enum Cmd {
     Profile { file: PathBuf },
     /// Check that two scripts produce an equal `result` (`DataFrame` or Series). Needs pandas.
     Equiv { old: PathBuf, new: PathBuf },
+    /// Refit a saved Pipeline on raw training rows and compare its outputs and scores.
+    Refit { contract: PathBuf },
     /// Print the dataflow of step code or Hamilton modules: what reads what, and what does not
     /// connect.
     ///
@@ -282,6 +285,7 @@ pub(crate) fn run() -> ExitCode {
         Cmd::Hook => hook(),
         Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
+        Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
         Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
         Cmd::Rules { format } => rules(format.unwrap_or(default_format)),
         Cmd::Skill { json: false } => {

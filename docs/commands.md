@@ -44,6 +44,29 @@ xpd profile data.csv
 Prints JSON with each column's dtype, null count, unique count and memory use. Reads csv,
 parquet, feather, json and xlsx. Runs with the project's Python and needs pandas there.
 
+## refit
+
+```sh
+xpd refit model/contract.json
+```
+
+Refit loads the saved scikit-learn Pipeline with joblib, clones it and fits it on the raw
+training rows. Run it in the project root with pandas and scikit-learn installed in the
+project's Python. The contract must record `validation.splitter` with `class` naming a
+splitter in `sklearn.model_selection` and `args` holding its literal keyword arguments.
+It rebuilds the split, scores the held out rows with `get_scorer`, and computes fold scores
+with `cross_val_score` on training rows only. It changes no saved file.
+
+The JSON records actual row counts, `output`, `largest_gap`, both held out scores, both
+lists of fold scores, and a match flag for each comparison. It compares `predict_proba`
+when available, then `decision_function`, then `predict`. A nonnumeric prediction has a
+null gap and is still compared. As in `equiv`, DataFrames and Series use pandas testing
+defaults and other outputs use `numpy.testing.assert_equal`, which requires exact array
+and score equality. Floating pandas values use the pandas default relative tolerance
+of 0.00001 and absolute tolerance of 0.00000001. Save contract scores without rounding.
+Exit 0 means all comparisons match, 1 means a comparison differs, and 2 means refit could
+not run. Load only a model you trust because joblib loading runs code.
+
 ## equiv
 
 ```sh

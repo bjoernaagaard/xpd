@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field
 
 Severity = Literal["error", "warning", "info", "hint"]
 FixSafety = Literal["safe", "unsafe"]
@@ -178,7 +178,7 @@ class SkillSource(Output):
 #                     FittedStep    each step of that Pipeline, in order
 #   model             FittedStep    the last step
 #   validation        Validation    scores on folds of the training rows, one on the held out rows
-#   proof             Proof         what check, graph and equiv found
+#   proof             Proof         what check, graph, refit and equiv found
 #   persisted model   SavedModel    the file, the versions that wrote it and the code it imports
 #   verdict           GateReport    one Gate per requirement
 Stage = Literal[
@@ -192,7 +192,7 @@ Stage = Literal[
     "proof",
     "persisted model",
 ]
-Evidence = Literal["profile", "check", "graph", "equiv", "contract", "api", "source"]
+Evidence = Literal["profile", "check", "graph", "equiv", "contract", "api", "source", "refit"]
 
 
 class Written(BaseModel):
@@ -287,7 +287,32 @@ class FittedStep(Written):
     estimator: str = Field(description="The class name, such as ColumnTransformer.")
 
 
+class Splitter(Written):
+    model_config = ConfigDict(validate_by_name=True, serialize_by_alias=True)
+
+    class_name: str = Field(alias="class", min_length=1)
+    args: dict[str, JsonValue]
+
+
+class Refit(Output):
+    rows: int
+    train_rows: int
+    test_rows: int
+    output: Literal["predict_proba", "decision_function", "predict"]
+    largest_gap: float | None
+    model_matches: bool
+    contract_test_score: float
+    refit_test_score: float
+    contract_cv_scores: list[float]
+    refit_cv_scores: list[float]
+    test_score_matches: bool
+    cv_scores_match: bool
+    counts_match: bool
+    passed: bool
+
+
 class Validation(Written):
+    splitter: Splitter
     scoring: str = Field(description="The scorer name, such as accuracy.")
     folds: int
     cv_scores: list[float] = Field(description="One score per fold.")
@@ -356,6 +381,7 @@ class Proof(BaseModel):
     lint: CheckReport = Field(description="`check` on the training, prediction and step files.")
     dataflow: GraphReport = Field(description="`graph` on the file with the feature steps.")
     reproducible: Equivalence = Field(description="`equiv` of the training script with itself.")
+    refit: Refit = Field(description="`refit` on the saved contract.")
     served: Equivalence = Field(
         description="`equiv` of the training script with the script that loads the saved model."
     )

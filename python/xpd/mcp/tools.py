@@ -12,7 +12,7 @@ from mcp.types import (
     ToolAnnotations,
 )
 
-from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, Command, T, Xpd
+from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, REFIT, Command, T, Xpd
 from xpd.mcp.models import (
     CheckReport,
     DiscoveryEntry,
@@ -20,6 +20,7 @@ from xpd.mcp.models import (
     Equivalence,
     GraphReport,
     Profile,
+    Refit,
 )
 from xpd.mcp.protocol import uses_handshake
 from xpd.mcp.root import Project, Root
@@ -198,6 +199,20 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         if isinstance(root, InputRequiredResult):
             return root
         return await run(ctx, xpd, PROFILE, root, [root.inside(file)])
+
+    @mcp.tool(tags={"pipeline"}, annotations=RUNS_CODE, task=True)
+    async def refit(ctx: Context, file: str) -> Refit | InputRequiredResult:
+        """Fit a clone of the saved Pipeline on raw training rows and compare held out
+        outputs and validation scores. Load only a model you trust because joblib runs code.
+        Needs pandas and scikit-learn in the project's Python. Changes no saved file.
+
+        Args:
+            file: The contract, a JSON file inside the project root.
+        """
+        root = await project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return root
+        return await run(ctx, xpd, REFIT, root, [root.inside(file)])
 
     @mcp.tool(tags={"data", "refactor"}, annotations=RUNS_CODE, task=True)
     async def equiv(ctx: Context, old: str, new: str) -> Equivalence | InputRequiredResult:

@@ -99,8 +99,12 @@ contract = {
     "validation": {
         "scoring": SCORING,
         "folds": FOLDS,
-        "cv_scores": cv_scores.round(4).tolist(),
-        "test_score": round(test_score, 4),
+        "splitter": {
+            "class": "StratifiedKFold",
+            "args": {"n_splits": FOLDS, "shuffle": True, "random_state": SEED},
+        },
+        "cv_scores": cv_scores.tolist(),
+        "test_score": float(test_score),
     },
     "model": {
         "file": MODEL.as_posix(),

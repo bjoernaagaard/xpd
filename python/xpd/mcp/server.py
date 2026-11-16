@@ -34,8 +34,8 @@ exist instead of computing their formulas again.
 - After you refactor data logic, call `equiv` on the old and new script. The refactor is done \
 when it says `equivalent: true`.
 - To build a model from a data file, follow the `build_pipeline` prompt. The run is done when \
-`gates` returns `passed: true` for the results of `profile`, `check`, `graph`, `equiv` and \
-`contract`. With code mode on, one `execute` call chains them.
+`gates` returns `passed: true` for the results of `profile`, `check`, `graph`, `equiv`, \
+`refit` and `contract`. With code mode on, one `execute` call chains them.
 - The show_ tools draw the same results as tables and charts in hosts that render apps.
 - skill://xpd/SKILL.md, skill://python-best-practices/SKILL.md and \
 skill://python-review/SKILL.md hold the style a linter cannot check."""

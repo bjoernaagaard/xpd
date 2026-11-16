@@ -31,8 +31,10 @@ dataflow = await call_tool("graph", {"paths": [FEATURES]})
 reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
 served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
 contract = await call_tool("contract", {"file": CONTRACT})
+refitted = await call_tool("refit", {"file": CONTRACT})
 proof = {
-    "lint": lint, "dataflow": dataflow, "reproducible": reproducible,
+    "lint": lint, "dataflow": dataflow, "refit": refitted,
+    "reproducible": reproducible,
     "served": served, "discovery": api_proof,
 }
 report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
@@ -42,6 +44,7 @@ return {
         {"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}
         for gate in report["gates"]
     ],
+    "refit": refitted,
     "validation": contract["validation"],
     "model": contract["model"],
 }"""
@@ -158,8 +161,8 @@ def register(mcp: FastMCP) -> None:
     @mcp.prompt(tags={"pipeline"})
     def build_pipeline(data: str, target: str, task: str = "") -> str:
         """Build a scikit-learn model from a data file, save it with its contract, and show
-        with `gates` that `check` reports no error, that the run repeats, and that a new Python
-        process predicts from the saved file.
+        with `gates` that `check` reports no error, that a raw training refit agrees, and that
+        a new Python process predicts from the saved file.
 
         Args:
             data: The data file, inside the project root.
@@ -192,8 +195,10 @@ written choice, then checks code and runs the pipeline stages. It does not gener
    - Build one `sklearn.pipeline.Pipeline` that holds every step. Put
      `FunctionTransformer` on the function of features.py first, so the model takes the raw
      columns of {data}.
-   - Score it with cross-validation on the training rows, with a seeded splitter. Then fit it
-     on the training rows and score the held out rows once. Choose no setting by that score.
+   - Score it with cross-validation on the training rows, with a seeded splitter.
+     Record its class and literal arguments under `validation.splitter`. Save scores without
+     rounding. Then fit it on the training rows and score the held out rows once.
+     Choose no setting by that score.
    - Record the full discovery question, inspected candidates and choice with its reason
      as `discovery` in the contract. Use the same values passed to discovery_gate. They are
      the planning input for the split, preprocessing and model stages.
@@ -216,9 +221,8 @@ written choice, then checks code and runs the pipeline stages. It does not gener
    call the same tools in the same order.
 6. The run is done when `passed` is true. For a gate that failed, read its `detail`, fix the
    scripts and run the stages again. Never edit the contract by hand.
-7. The gates find no leak that `check` has no rule for. Read train.py once more yourself:
-   every fit and every choice of a setting uses the training rows only, and nothing changes
-   a column before the split.
+7. Refit checks the saved model against raw training rows. Review choices across separate
+   runs and raw columns that stand in for the target, since those need other evidence.
 
 The contract, with the values of the run in place of these:
 
@@ -228,7 +232,12 @@ The contract, with the values of the run in place of these:
   "split": {{"seed": 0, "test_size": 0.25, "stratified": true, "train_rows": 258, "test_rows": 86}},
   "inputs": [{{"column": "body_mass_g", "dtype": "float64"}}],
   "steps": [{{"name": "features", "estimator": "FunctionTransformer"}}],
-  "validation": {{"scoring": "accuracy", "folds": 5, "cv_scores": [0.98], "test_score": 0.99}},
+  "validation": {{
+    "scoring": "accuracy", "folds": 5,
+    "splitter": {{"class": "StratifiedKFold",
+                 "args": {{"n_splits": 5, "shuffle": true, "random_state": 0}}}},
+    "cv_scores": [0.98], "test_score": 0.99
+  }},
   "model": {{
     "file": "model/model.joblib",
     "type": "sklearn.pipeline.Pipeline",

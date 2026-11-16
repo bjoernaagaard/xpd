@@ -106,13 +106,14 @@ Every path is relative to the project root, and a path outside it is refused.
 | `equiv` | `old`, `new` | Runs two scripts, each in its own Python process, and compares their `result`, as [`xpd equiv`](commands.md#equiv) | Whatever the scripts do |
 | `rules` | `package`, `severity`, `fixable`, `query`, all optional | Lists the rules that match every filter given. `package` is a module name, such as `numpy` or `sklearn` | No |
 | `rule` | `package`, `rule` | Shows one rule with its documentation and examples | No |
+| `refit` | `file` | Fits a clone of the saved Pipeline on raw training rows and compares outputs and scores, as [`xpd refit`](commands.md#refit) | Runs model code |
 | `contract` | `file` | Reads the contract that a training script saved beside its model, as [Code mode](code-mode.md#the-stages) describes | No |
 | `gates` | `profile`, `contract`, `proof` | Judges a run from a data file to a saved model, from the results of the other tools. See [the gates](code-mode.md#the-gates) | No |
 | `show_issues` | `paths` (default: the root) | Shows what `check` finds as a table | No |
 | `show_dataflow` | `paths` | Shows what `graph` reads as a chart and a table | No |
 | `show_columns` | `file` | Shows what `profile` reads as a table | No |
 
-`profile` and `equiv` run the project's Python, which is the Python of `VIRTUAL_ENV`, then of the
+`profile`, `refit` and `equiv` run the project's Python, which is the Python of `VIRTUAL_ENV`, then of the
 nearest `.venv` above the project root, then `python3` on `PATH`. Install pandas there. Both
 scripts that `equiv` runs must assign their output to `result`.
 
@@ -143,7 +144,7 @@ the answer. A client that cannot ask its user gets an error, and no file is writ
 
 ### Background tasks
 
-`check`, `fix`, `profile` and `equiv` can run as background tasks for clients that ask for one.
+`check`, `fix`, `profile`, `refit` and `equiv` can run as background tasks for clients that ask for one.
 They report progress and log what they run.
 
 ## Resources

@@ -21,6 +21,7 @@ from xpd.mcp.models import (
     Equivalence,
     GraphReport,
     Profile,
+    Refit,
     Rule,
     SkillSource,
 )
@@ -48,6 +49,7 @@ CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport), FINDING
 GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport), FINDINGS)
 # profile exits 1 when it cannot read the file, so only 0 carries a profile.
 PROFILE = Command(("profile",), TypeAdapter(Profile), SUCCESS)
+REFIT = Command(("refit",), TypeAdapter(Refit), FINDINGS)
 EQUIV = Command(("equiv",), TypeAdapter(Equivalence), FINDINGS)
 RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]), SUCCESS)
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]), SUCCESS)

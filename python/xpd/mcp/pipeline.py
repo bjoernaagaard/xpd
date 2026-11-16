@@ -1,8 +1,8 @@
 """The tools that judge a pipeline run, from raw rows to a saved model: `contract` reads what the
 training script saved, and `gates` turns the results of the other tools into one verdict.
 
-Neither tool runs Python or loads a model. Each gate reads results that `profile`, `check`,
-`graph` and `equiv` returned for the same run, which a code mode script hands on."""
+These tools do not run Python or load a model. Each gate reads results that `profile`, `check`,
+`graph`, `refit` and `equiv` returned for the same run, which a code mode script hands on."""
 
 from collections.abc import Sequence
 
@@ -22,6 +22,7 @@ from xpd.mcp.models import (
     GraphReport,
     Profile,
     Proof,
+    Refit,
     Stage,
 )
 from xpd.mcp.root import Project
@@ -109,9 +110,9 @@ def check_reports_no_error(lint: CheckReport) -> Gate:
     `transform-with-test-target` of category_encoders. sklego has no rule about a leak, and its
     errors fail the gate as wrong results.
 
-    The gate does not show that a run has no leak. A rule reads the code and knows the held out
-    rows by names such as `X_test`, so it misses a leak under another name and a leak that no
-    rule describes."""
+    The gate does not show that a run has no leak. Some rules know held out rows by names
+    such as `X_test`, and tune-on-test also reads targets of an earlier split unpack.
+    A rule can still miss a leak that it does not describe."""
     failures = [
         f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
         for issue in lint.issues
@@ -193,8 +194,7 @@ def dataflow_connects(dataflow: GraphReport, contract: Contract) -> Gate:
 
 
 def cross_validated(contract: Contract) -> Gate:
-    """Reads the scores as the contract records them. No gate checks which rows the folds or
-    the held out score were computed on."""
+    """Check that the contract records one score per fold."""
     validation = contract.validation
     failures = []
     if validation.folds < MIN_FOLDS:
@@ -236,6 +236,50 @@ def versions_recorded(profile: Profile, contract: Contract) -> Gate:
     )
 
 
+def refit_matches_model(result: Refit) -> Gate:
+    failures = []
+    if not result.model_matches:
+        failures.append(
+            f"The raw training refit differs on {result.output}. "
+            f"The largest gap is {result.largest_gap}."
+        )
+    return gate(
+        "refit-matches-model",
+        "proof",
+        ["refit"],
+        failures,
+        f"The raw training refit matches the saved model on {result.output}.",
+    )
+
+
+def refit_matches_scores(contract: Contract, result: Refit) -> Gate:
+    failures = []
+    if contract.validation.test_score != result.refit_test_score:
+        failures.append(
+            f"The contract held out score is {contract.validation.test_score}, "
+            f"and the refit gives {result.refit_test_score}."
+        )
+    if contract.validation.cv_scores != result.refit_cv_scores:
+        failures.append(
+            f"The contract fold scores are {contract.validation.cv_scores}, "
+            f"and the refit gives {result.refit_cv_scores}."
+        )
+    if (
+        result.rows != contract.data.rows
+        or result.train_rows != contract.split.train_rows
+        or result.test_rows != contract.split.test_rows
+        or len(result.refit_cv_scores) != contract.validation.folds
+    ):
+        failures.append("The refit row or fold counts differ.")
+    return gate(
+        "refit-matches-scores",
+        "validation",
+        ["refit", "contract"],
+        failures,
+        "The contract scores and row and fold counts match the raw training refit.",
+    )
+
+
 def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
     gates = [
         data_is_profiled(profile, contract),
@@ -253,6 +297,8 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
             "Two runs of the training script, each in its own Python process, leave an equal "
             "`result`.",
         ),
+        refit_matches_model(proof.refit),
+        refit_matches_scores(contract, proof.refit),
         equivalent(
             "saved-model-predicts",
             "persisted model",
@@ -342,23 +388,23 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         covers every row, `check` reports no draw without a seed in scikit-learn, scikit-lego,
         MAPIE, Category Encoders, arch or pymoo code, the inputs have the names and dtypes of
         columns of the file, one Pipeline holds every step, the feature steps connect, `check`
-        reports no error, the contract has a score for each fold, two training runs leave an
-        equal `result`, the prediction script leaves that `result` too, and the versions are
-        recorded. When discovery is supplied, include its indexed-api-calls result and
-        require the contract's discovery record to match proof.discovery. Without discovery
-        in either, the original eleven gates apply.
+        reports no error, the contract has a score for each fold, a raw training refit matches
+        the saved model and the recorded scores, two training runs leave an equal `result`,
+        the prediction script leaves that `result` too,
+        and the versions are recorded. When discovery is supplied, include its indexed-api-calls
+        result and require the contract's discovery record to match proof.discovery.
+        Without discovery in either, thirteen gates apply.
 
-        A passed report is no proof that the run has no leak. `check` reads the code and finds
-        the leaks its rules describe, by names such as `X_test`. No gate checks which rows a
-        step was fitted or scored on, or that an input still holds the values of the file.
+        A passed report does not judge choices made across separate runs or raw columns
+        that stand in for the target. Pass fresh tool results from this project.
 
         Args:
             profile: The result of `profile` on the data file.
             contract: The result of `contract` on the file the training script saved.
             proof: `lint` is the result of `check` on the training, prediction and step files.
                 `dataflow` is the result of `graph` on the file with the feature steps.
-                `reproducible` is the result of `equiv` with the training script as both old
-                and new. `served` is the result of `equiv` with the training script as old and
-                the script that loads the saved model as new.
+                `reproducible` compares two runs of the training script with `equiv`.
+                `refit` is the result of refitting the saved contract. `served` is the result
+                of `equiv` with the training script as old and the loading script as new.
         """
         return judge(profile, contract, proof)
