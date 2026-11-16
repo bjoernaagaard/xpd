@@ -78,7 +78,9 @@ pub(crate) fn run() -> ExitCode {
 }
 
 fn serve(connection: &Connection) -> Result<ExitCode> {
-    let (id, params) = connection.initialize_start()?;
+    let (id, params) = connection
+        .initialize_start()
+        .context("the client sent no initialize request")?;
     // The protocol names the client's support for a refresh `workspace.diagnostics`, and
     // lsp-types 0.97 reads `workspace.diagnostic`, so this one answer comes from the JSON.
     let refresh = match params
@@ -100,7 +102,9 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
             version: Some(env!("CARGO_PKG_VERSION").to_owned()),
         }),
     };
-    connection.initialize_finish(id, serde_json::to_value(result)?)?;
+    connection
+        .initialize_finish(id, serde_json::to_value(result)?)
+        .context("the client did not confirm the initialize result")?;
     if let Some(e) = invalid_options {
         server.show(MessageType::WARNING, format!("xpd: {e:#}"));
     }
