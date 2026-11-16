@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::fs;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -94,20 +95,17 @@ pub(crate) fn scan(
             let mut src = fs::read_to_string(path).with_context(|| cannot_read(path))?;
             let mut fixed = 0;
             if let Some(allowed) = fix {
-                for _ in 0..MAX_FIX_PASSES {
-                    let (next, applied) = fix_pass(path, &src, packs, allowed);
-                    if applied == 0 {
-                        break;
-                    }
-                    src = next;
-                    fixed += applied;
-                }
+                (src, fixed) = fix_source(path, src, packs, allowed);
                 if fixed > 0 {
                     fs::write(path, &src)
                         .with_context(|| format!("cannot write {}", path.display()))?;
                 }
             }
-            Ok((lint(path, &src, packs), fixed))
+            let issues = lint_source(path, &src, packs)
+                .into_iter()
+                .map(|found| found.issue)
+                .collect();
+            Ok((issues, fixed))
         })
         .collect::<Result<_>>()?;
     let fixed = per_file.iter().map(|(_, n)| n).sum();
@@ -121,8 +119,47 @@ fn applying<'p>(root: &'p Root, src: &'p str, packs: &'p [Pack]) -> impl Iterato
     packs.iter().filter(move |pack| pack.applies(root, src))
 }
 
-/// The issues in one file's source.
-fn lint(path: &Path, src: &str, packs: &[Pack]) -> Vec<Issue> {
+/// One issue with the place of its match in the source, which a caller that edits the text
+/// needs, as the language server does.
+#[derive(Debug)]
+pub(crate) struct Found {
+    pub(crate) issue: Issue,
+    /// The bytes of the source that the rule matched.
+    pub(crate) range: Range<usize>,
+    /// What the rule's fix writes for this match. `None` when the issue has no fix.
+    pub(crate) fix: Option<Replacement>,
+}
+
+/// New text for a range of bytes of the source.
+#[derive(Debug)]
+pub(crate) struct Replacement {
+    pub(crate) range: Range<usize>,
+    pub(crate) text: String,
+}
+
+/// `src` after every fix up to `allowed`, with the number of fixes applied. `path` is the file
+/// the source belongs to, which selects the rules that run.
+pub(crate) fn fix_source(
+    path: &Path,
+    mut src: String,
+    packs: &[Pack],
+    allowed: Applicability,
+) -> (String, usize) {
+    let mut fixed = 0;
+    for _ in 0..MAX_FIX_PASSES {
+        let (next, applied) = fix_pass(path, &src, packs, allowed);
+        if applied == 0 {
+            break;
+        }
+        src = next;
+        fixed += applied;
+    }
+    (src, fixed)
+}
+
+/// The issues in one file's source, in the order of their positions. `path` is the file the
+/// source belongs to, which selects the rules that run.
+pub(crate) fn lint_source(path: &Path, src: &str, packs: &[Pack]) -> Vec<Found> {
     if !packs.iter().any(|pack| pack.may_apply(src)) {
         return Vec::new();
     }
@@ -134,10 +171,8 @@ fn lint(path: &Path, src: &str, packs: &[Pack]) -> Vec<Issue> {
         for rule in pack.rules.iter().filter(|rule| rule.runs_on(path)) {
             for m in root.root().find_all(&rule.config.matcher) {
                 let start = m.start_pos();
-                let fix = rule
-                    .fix
-                    .filter(|_| usable_edit(rule, &m, &unbound, src).is_some());
-                found.push(Issue {
+                let edit = usable_edit(rule, &m, &unbound, src);
+                let issue = Issue {
                     package: pack.module,
                     rule: rule.config.id.clone(),
                     file: path.to_path_buf(),
@@ -147,11 +182,22 @@ fn lint(path: &Path, src: &str, packs: &[Pack]) -> Vec<Issue> {
                     }),
                     severity: rule.config.severity.clone(),
                     message: rule.config.get_message(&m),
-                    fix,
+                    fix: rule.fix.filter(|_| edit.is_some()),
+                };
+                found.push(Found {
+                    issue,
+                    range: m.range(),
+                    fix: edit.map(|edit| Replacement {
+                        range: edit.position..edit.position + edit.deleted_length,
+                        text: String::from_utf8(edit.inserted_text)
+                            .expect("a fix writes UTF-8 text"),
+                    }),
                 });
             }
         }
     }
+    // A stable sort, so issues at one position keep the order of their packs and rules.
+    found.sort_by_key(|found| found.issue.position);
     found
 }
 

@@ -16,11 +16,22 @@ pub(crate) struct Venv {
 impl Venv {
     /// The venv in `$VIRTUAL_ENV`, or else the nearest `.venv` above the working directory.
     pub(crate) fn find() -> Option<Self> {
-        if let Some(root) = env::var_os("VIRTUAL_ENV") {
-            return Some(Self { root: root.into() });
-        }
-        let cwd = env::current_dir().ok()?;
-        cwd.ancestors()
+        Self::active().or_else(|| Self::above(&env::current_dir().ok()?))
+    }
+
+    /// The venv in `$VIRTUAL_ENV`, or else the nearest `.venv` in or above `dir`. The language
+    /// server starts from the folder of the project and not from its own working directory.
+    pub(crate) fn find_from(dir: &Path) -> Option<Self> {
+        Self::active().or_else(|| Self::above(dir))
+    }
+
+    fn active() -> Option<Self> {
+        let root = env::var_os("VIRTUAL_ENV")?;
+        Some(Self { root: root.into() })
+    }
+
+    fn above(dir: &Path) -> Option<Self> {
+        dir.ancestors()
             .map(|dir| dir.join(".venv"))
             .find(|root| root.is_dir())
             .map(|root| Self { root })

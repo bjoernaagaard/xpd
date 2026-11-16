@@ -11,6 +11,7 @@ use serde_json::Value;
 
 use crate::catalog;
 use crate::graph::Graph;
+use crate::lsp;
 use crate::mcp;
 use crate::pack;
 use crate::package_check;
@@ -135,6 +136,12 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
+    /// Start the language server, which an editor runs to show the issues as you type.
+    ///
+    /// It speaks the Language Server Protocol on stdin and stdout, and lints the text the editor
+    /// holds, saved or not. Exit 0 after `shutdown` and `exit`, 1 when the client goes away
+    /// without them.
+    Lsp,
 }
 
 /// Runs the command the arguments name.
@@ -175,6 +182,7 @@ pub(crate) fn run() -> ExitCode {
             ExitCode::SUCCESS
         }
         Cmd::Mcp { args } => mcp::run(&args),
+        Cmd::Lsp => lsp::run(),
     }
 }
 
@@ -212,7 +220,9 @@ fn lint(paths: &[PathBuf], fix: Option<Applicability>, scope: Scope) -> Result<R
     let scanned = scan::scan(&files, &packs, fix)?;
     let mut issues = scanned.issues;
     if let (Scope::Project, Some(venv), Some(installed)) = (scope, &venv, &installed) {
-        issues.extend(package_check::missing(&packs, venv, installed));
+        // Without a working directory there is no project folder to look in.
+        let project = std::env::current_dir().unwrap_or_default();
+        issues.extend(package_check::missing(&packs, venv, installed, &project));
     }
     Ok(Report {
         issues,
