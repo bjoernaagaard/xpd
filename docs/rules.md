@@ -7347,10 +7347,10 @@ proof.
 A rule about `fit` or about a result reads only an object it can follow to a linearmodels
 class: a call on the class itself, such as `PanelOLS(y, X).fit(...)`, or a name that its
 function, or the module outside any function, assigns from such calls and from nothing else. A
-name that is also assigned from anything else, that a loop or a `with` statement binds, or that
-comes in as an argument is left alone. A statsmodels model in the same file is therefore never
-reported: the 950 real files hold 700 `cov_type=` strings of statsmodels, such as `"HC3"` and
-`"cluster"`, on statsmodels models, and no rule reports one of them.
+name that is also assigned from anything else, that a loop, a `with` statement or a lambda
+parameter binds, or that comes in as an argument is left alone. A statsmodels model in the same
+file is therefore not reported: the 950 real files hold 583 `cov_type=` strings with a
+statsmodels name, such as `"HC3"` and `"cluster"`, and no rule reports one of them.
 
 A rule reads an argument only when it is written out. A `cov_type`, a formula or a flag that is
 a name, an f-string or a value unpacked from a dictionary is left alone.
@@ -7598,7 +7598,7 @@ fixed = PanelOLS(y, X, entity_effects=True).fit()
 pooled = PooledOLS(y, X).fit()
 ```
 
-On the wage panel, on 7.1 and 7.0, `PanelOLS(y, X)` and `PooledOLS(y, X)` returned the same coefficients, with `exper` at 0.0349, and `PanelOLS(y, X, entity_effects=True)` returned 0.0698. The rule reports 37 calls in 25 of the 950 real files. Among them are results named `fe_model` and `mod_fe`, and a function whose docstring starts "One- and two-way fixed effects estimator for panel data" and whose body is `PanelOLS(y, exogenous).fit()`. A call that passes any of the three keywords is left alone, also with the value `False`, and so is a call that unpacks its keywords.
+On the wage panel, on 7.1 and 7.0, `PanelOLS(y, X)` and `PooledOLS(y, X)` returned the same coefficients, with `exper` at 0.0349, and `PanelOLS(y, X, entity_effects=True)` returned 0.0698. The rule reports 37 calls in 25 of the 950 real files. Among them are results named `fe_model` and `mod_fe`, and a function whose docstring starts "One- and two-way fixed effects estimator for panel data" and whose body is `PanelOLS(y, exogenous).fit()`. A call that passes any of the three keywords is left alone, also with the value `False`, and so is a call that unpacks its keywords. A formula with a `C()` term may hold the effects as dummies and is left alone too.
 
 #### too-many-effects
 
