@@ -85,6 +85,7 @@ test_score = model.score(X_test, y_test)
 MODEL.parent.mkdir(exist_ok=True)
 joblib.dump(model, MODEL)
 contract = {
+    "discovery": json.loads(Path("discovery.json").read_text(encoding="utf-8")),
     "data": {"file": DATA.as_posix(), "target": TARGET, "rows": len(penguins)},
     "split": {
         "seed": SEED,

@@ -1,0 +1,169 @@
+{
+  "question": {
+    "task": "classify penguin species with a logistic regression pipeline"
+  },
+  "candidates": [
+    {
+      "kind": "symbol",
+      "package": "sklearn",
+      "name": "sklearn.linear_model.LogisticRegression",
+      "callable": "class",
+      "parameters": [
+        "penalty",
+        "C",
+        "l1_ratio",
+        "dual",
+        "tol",
+        "fit_intercept",
+        "intercept_scaling",
+        "class_weight",
+        "random_state",
+        "solver",
+        "max_iter",
+        "verbose",
+        "warm_start",
+        "n_jobs"
+      ],
+      "summary": "Logistic Regression (aka logit, MaxEnt) classifier.",
+      "members": [
+        {
+          "name": "set_callbacks",
+          "parameters": [
+            "callbacks"
+          ],
+          "summary": "Set callbacks for the estimator."
+        },
+        {
+          "name": "fit",
+          "parameters": [
+            "X",
+            "y",
+            "sample_weight"
+          ],
+          "summary": "Fit the model according to the given training data."
+        },
+        {
+          "name": "predict_proba",
+          "parameters": [
+            "X"
+          ],
+          "summary": "Probability estimates."
+        },
+        {
+          "name": "predict_log_proba",
+          "parameters": [
+            "X"
+          ],
+          "summary": "Predict logarithm of probability estimates."
+        }
+      ],
+      "rules": [
+        "sklearn/deprecated-in-sklearn",
+        "sklearn/removed-in-sklearn"
+      ],
+      "signature": "sklearn.linear_model.LogisticRegression(penalty, C, l1_ratio, dual, tol, fit_intercept, intercept_scaling, class_weight, random_state, solver, max_iter, verbose, warm_start, n_jobs)"
+    },
+    {
+      "kind": "symbol",
+      "package": "sklearn",
+      "name": "sklearn.linear_model.LogisticRegressionCV",
+      "callable": "class",
+      "parameters": [
+        "Cs",
+        "l1_ratios",
+        "fit_intercept",
+        "cv",
+        "dual",
+        "penalty",
+        "scoring",
+        "solver",
+        "tol",
+        "max_iter",
+        "class_weight",
+        "n_jobs",
+        "verbose",
+        "refit",
+        "intercept_scaling",
+        "random_state",
+        "use_legacy_attributes"
+      ],
+      "summary": "Logistic Regression CV (aka logit, MaxEnt) classifier.",
+      "members": [
+        {
+          "name": "fit",
+          "parameters": [
+            "X",
+            "y",
+            "sample_weight",
+            "params"
+          ],
+          "summary": "Fit the model according to the given training data."
+        },
+        {
+          "name": "score",
+          "parameters": [
+            "X",
+            "y",
+            "sample_weight",
+            "score_params"
+          ],
+          "summary": "Score using the `scoring` option on the given test data and labels."
+        },
+        {
+          "name": "get_metadata_routing",
+          "parameters": [],
+          "summary": "Get metadata routing of this object."
+        }
+      ],
+      "rules": [
+        "sklearn/deprecated-in-sklearn",
+        "sklearn/removed-in-sklearn",
+        "sklearn/unknown-scoring-name"
+      ],
+      "signature": "sklearn.linear_model.LogisticRegressionCV(Cs, l1_ratios, fit_intercept, cv, dual, penalty, scoring, solver, tol, max_iter, class_weight, n_jobs, verbose, refit, intercept_scaling, random_state, use_legacy_attributes)"
+    },
+    {
+      "kind": "symbol",
+      "package": "sklego",
+      "name": "sklego.datasets.load_penguins",
+      "callable": "function",
+      "parameters": [
+        "return_X_y",
+        "as_frame"
+      ],
+      "summary": "Loads the penguins dataset, which is a lovely alternative for the iris dataset. We've added this dataset for educational use.",
+      "members": [],
+      "rules": [],
+      "signature": "sklego.datasets.load_penguins(return_X_y, as_frame)"
+    },
+    {
+      "kind": "rule",
+      "package": "category_encoders",
+      "name": "category_encoders/nan-into-pipeline",
+      "callable": null,
+      "parameters": [],
+      "summary": "$KW makes $C code an unseen or missing category as NaN, and the next step of the pipeline gets it. LogisticRegression raised \"ValueError, Input X contains NaN\" at predict. Use \"value\", or put an imputer after the encoder.\n\n#### nan-into-pipeline\n\n**Severity:** info. **Fix:** none.\n\nReports an encoder with `handle_unknown=\"return_nan\"` or `handle_missing=\"return_nan\"` inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.\n\nExample:\n\n```python\nmodel = make_pipeline(ce.OneHotEncoder(cols=[\"city\"], handle_unknown=\"return_nan\"), LogisticRegression())\n```\n\nUse instead:\n\n```python\nmodel = make_pipeline(ce.OneHotEncoder(cols=[\"city\"], handle_unknown=\"value\"), LogisticRegression())\n```\n\nThe replacement is advice. xpd does not apply it automatically.\n\n`return_nan` codes a category that fit did not see as NaN, in every output column of that row.\nIn a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in\nfront of a `LogisticRegression`, `predict` on a row with an unseen city raised `ValueError:\nInput X contains NaN`, and so did an `OrdinalEncoder` with `handle_missing=\"return_nan\"` on a\nrow with a missing city. The fit passed, because the training rows had no\nunseen category, so the error first shows on new data. With `\"value\"`, the default, the same\n`predict` ran.\n\n| Encoder | Code of an unseen category with `\"value\"` | With `\"return_nan\"` |\n| --- | --- | --- |\n| `OrdinalEncoder` | -1.0 | NaN |\n| `OneHotEncoder` | 0 in every column | NaN in every column |\n| `BinaryEncoder` | 0 in every column | NaN in every column |\n| `TargetEncoder` | the mean of the target, 0.5 here | NaN |\n| `CountEncoder` | 0.0 | NaN |\n\nThe rule stays silent when the same pipeline call holds an imputer or a model that takes NaN,\nsuch as `HistGradientBoostingClassifier`. Outside a pipeline call the option is left alone,\nbecause the code may handle the NaN itself.",
+      "members": [],
+      "rules": [],
+      "signature": null
+    },
+    {
+      "kind": "rule",
+      "package": "sklearn",
+      "name": "sklearn/pipeline-step-form",
+      "callable": null,
+      "parameters": [],
+      "summary": "The step name $N has two underscores in a row, and fit raises ValueError on it, because set_params splits parameter names there. Use one underscore.\n\n#### pipeline-step-form\n\n**Severity:** error. **Fix:** none.\n\nReports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare estimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.\n\nExample:\n\n```python\nfrom sklearn.pipeline import Pipeline\n\npipe = Pipeline([(\"smote\", SMOTE()), (\"model\", LogisticRegression())])\n```\n\nUse instead:\n\n```python\nfrom imblearn.pipeline import Pipeline\n\npipe = Pipeline([(\"smote\", SMOTE()), (\"model\", LogisticRegression())])\n```\n\nThe replacement is advice. xpd does not apply it automatically.",
+      "members": [],
+      "rules": [],
+      "signature": null
+    }
+  ],
+  "choice": {
+    "name": "sklearn.linear_model.LogisticRegression",
+    "reason": "Class probabilities for the species target.",
+    "symbols": [
+      "sklearn.linear_model.LogisticRegression"
+    ]
+  }
+}

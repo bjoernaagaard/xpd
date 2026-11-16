@@ -9,7 +9,7 @@ from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
-from xpd.mcp import catalog, pipeline, prompts, tools, views
+from xpd.mcp import catalog, discovery, pipeline, prompts, tools, views
 from xpd.mcp.binary import RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
@@ -21,6 +21,8 @@ dataflow of step code and Hamilton modules, profiles data files, and checks that
 its result. Every path is relative to the project root.
 
 - Before choosing a library, call `find` with the task, then `api` with a returned name.\
+
+- After choosing and writing code, call `discovery_gate` on its files before `equiv`.\
 
 - After you write or change Python, call `check`. Fix every error. Fix a warning unless you can \
 say why the code is right. `fix` writes xpd's fixes, and asks the user before unsafe ones.
@@ -58,6 +60,7 @@ def build(settings: Settings) -> FastMCP:
     )
     mcp.add_extension(TasksExtension())
     tools.register(mcp, xpd, project)
+    discovery.register(mcp, xpd, project)
     views.register(mcp, xpd, project)
     catalog.register(mcp, rules)
     pipeline.register(mcp, project, rules)

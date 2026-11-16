@@ -83,7 +83,9 @@ def split_covers_every_row(profile: Profile, contract: Contract) -> Gate:
             f"{split.train_rows} training rows and {split.test_rows} held out rows are not the "
             f"{profile.rows} rows of the file."
         )
-    found = f"{split.train_rows} training rows and {split.test_rows} held out rows."
+    found = (
+        f"The contract counts {split.train_rows} training rows and {split.test_rows} held out rows."
+    )
     return gate("split-covers-every-row", "split", ["profile", "contract"], failures, found)
 
 
@@ -150,11 +152,19 @@ def inputs_are_file_columns(profile: Profile, contract: Contract) -> Gate:
 def one_pipeline(contract: Contract) -> Gate:
     failures = []
     if contract.model.type != PIPELINE:
-        failures.append(f"The saved object is a {contract.model.type}, not a {PIPELINE}.")
+        failures.append(
+            f"The contract names the saved object as {contract.model.type}, not {PIPELINE}."
+        )
     if not contract.steps:
         failures.append("The contract lists no step.")
     found = " then ".join(step.estimator for step in contract.steps)
-    return gate("one-pipeline", "model", ["contract"], failures, f"One Pipeline of {found}.")
+    return gate(
+        "one-pipeline",
+        "model",
+        ["contract"],
+        failures,
+        f"The contract lists one Pipeline of {found}.",
+    )
 
 
 def dataflow_connects(dataflow: GraphReport, contract: Contract) -> Gate:
@@ -217,7 +227,13 @@ def versions_recorded(profile: Profile, contract: Contract) -> Gate:
             f"has {profile.pandas}."
         )
     found = ", ".join(f"{name} {version}" for name, version in versions.items())
-    return gate("versions-recorded", "persisted model", ["profile", "contract"], failures, found)
+    return gate(
+        "versions-recorded",
+        "persisted model",
+        ["profile", "contract"],
+        failures,
+        f"The contract records {found}.",
+    )
 
 
 def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
@@ -246,6 +262,23 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
         ),
         versions_recorded(profile, contract),
     ]
+    if contract.discovery is not None or proof.discovery is not None:
+        failures = []
+        if proof.discovery is None:
+            failures.append("No discovery_gate result was supplied.")
+        else:
+            gates.append(proof.discovery.gate)
+            if contract.discovery != proof.discovery.discovery:
+                failures.append("The contract and proof record different discovery choices.")
+        gates.append(
+            gate(
+                "discovery-is-recorded",
+                "discovery",
+                ["contract"],
+                failures,
+                "The contract records the discovery question, candidates and reason of the proof.",
+            )
+        )
     failed = [gate.name for gate in gates if not gate.passed]
     return GateReport(passed=not failed, failed=failed, gates=gates)
 
@@ -311,7 +344,9 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         columns of the file, one Pipeline holds every step, the feature steps connect, `check`
         reports no error, the contract has a score for each fold, two training runs leave an
         equal `result`, the prediction script leaves that `result` too, and the versions are
-        recorded.
+        recorded. When discovery is supplied, include its indexed-api-calls result and
+        require the contract's discovery record to match proof.discovery. Without discovery
+        in either, the original eleven gates apply.
 
         A passed report is no proof that the run has no leak. `check` reads the code and finds
         the leaks its rules describe, by names such as `X_test`. No gate checks which rows a
