@@ -9736,67 +9736,87 @@ The pack has no rule for the following forms:
 
 ## arch
 
-These rules run on files that import `arch`, the module of
-[arch](https://bashtage.github.io/arch/), which fits ARCH and GARCH volatility models, tests for
-unit roots and cointegration, and runs bootstraps and multiple comparison tests. They report API
-that arch removed, string options that arch refuses, arguments that it accepts and does not read,
-returns in units that the optimizer handles badly, forecasts that raise or that are computed many
-times over, and random draws without a seed. Every number in this section was measured on arch
-9.0.0 with NumPy 2.5.5, pandas 3.1.1, SciPy 1.18.1 and statsmodels 0.15.0, unless another release
-is named. Examples assume that the arch names they use are imported. Names such as `returns`,
-`prices`, `losses` and `x` represent values supplied by your program.
+The arch rules find code that raises on arch 9.0, options and arguments that arch refuses or
+never reads, returns in units that break the fit, and random draws without a seed. They run on
+files that import `arch`, the module of [arch](https://bashtage.github.io/arch/), which fits
+ARCH and GARCH volatility models, tests for unit roots and cointegration, and runs bootstraps
+and multiple comparison tests.
 
-arch 8.0 removed the `RandomState` paths of the bootstraps and the distributions, and arch 9.0
-removed `arch.__future__` and the `type` keyword of `hedgehog_plot`, made some attributes read
-only and started to check every argument. A rule document about such a change carries `since`.
-xpd reads the installed version from the project's venv, as it does for pandas, and skips the
-document on an older release, so a project that still has arch 7.2 gets no report about what 8.0
-removed. When the venv has no arch, or there is no venv, every document runs.
+| Group | What its rules report |
+| --- | --- |
+| Removed API | API that arch 8.0 and 9.0 removed |
+| Options and arguments | a string or a number that arch refuses, and an argument that arch accepts and never reads |
+| The units of the data | returns as decimals, and results that are read in rescaled units |
+| Forecasts and fits | forecasts that raise or that compute the same rows many times, and fits that print in a loop |
+| Bootstraps, tests and covariance estimators | draws without a seed, results read before `compute`, and a bandwidth that changed its meaning in 9.0 |
 
-A pattern has no types, so each rule ties its report to a name that the file binds to arch. A
-call is read by the name of its class or function, such as `arch_model` or `IIDBootstrap`. A
-short name that another library may have, such as `SPA`, `MCS` or `Normal`, is read only when the
-file imports it from arch. A method such as `fit`, `forecast` or `conf_int` is read only on a
-model, a result or a bootstrap that the file builds from an arch name and assigns to a variable,
-and the rule is silent when the same variable is assigned anything else anywhere in the file, or
-is bound there in another way: as a parameter, a loop variable, an `as` target or one name of a
-tuple assignment. `samples/arch/names.py` shows each case. An option or a value is read only when
-it is written in the call. A variable in its place is never taken for the bad value.
+Every number in the arch section was measured on arch 9.0.0 with NumPy 2.5.5, pandas 3.1.1, SciPy
+1.18.1 and statsmodels 0.15.0, unless another release is named. The examples assume that the
+arch names they use are imported, and names such as `returns`, `prices`, `losses` and `x` stand
+for values from your program.
+
+xpd skips a rule document about a newer arch than the one in the project's venv. arch 8.0
+removed the `RandomState` paths of the bootstraps and the distributions. arch 9.0 removed
+`arch.__future__` and the `type` keyword of `hedgehog_plot`, made some attributes read only and
+started to check every argument. A rule document about such a change carries `since`, and xpd
+reads the installed version from the venv as it does for pandas:
+
+```text
+on(check a file that imports arch)
+  if the venv has no arch, or there is no venv
+    run every document
+  else if the document's since is above the installed version
+    skip the document           # a project on arch 7.2 gets no report about what 8.0 removed
+  else
+    run the document
+```
+
+Each rule ties its report to a name that the file binds to arch, because a pattern sees no
+types. `samples/arch/names.py` shows each case.
+
+| Code | Read by the rules |
+| --- | --- |
+| a call by the name of an arch class or function, such as `arch_model(...)` or `IIDBootstrap(...)` | yes |
+| a short name that another library may have, such as `SPA`, `MCS` or `Normal` | only when the file imports it from arch |
+| a method such as `fit`, `forecast` or `conf_int` on a variable | only when the file assigns the variable from an arch name and from nothing else |
+| the same variable bound as a parameter, a loop variable, an `as` target or one name of a tuple assignment | no |
+| an option or a value written in the call, such as `vol="gjr"` | yes |
+| a variable in place of the option or the value | no |
 
 ### How a rule earns its place
 
-Every rule document ships on something that was run, and it is one of five kinds:
+Every rule document ships on a proof that was run, and the proof is one of five kinds.
 
-- An interpreter proof runs the old form on arch 9.0.0. It passes when the old form raises and
-  the new form runs. A document with `since` was also run on the release before the one it
-  names, where the old form ran or only warned.
-- A same result proof fits or tests with and without an argument. It passes when the two give the
-  same parameters or the same statistic, so the argument is not read.
-- A numbers proof runs both forms on the daily S&P 500 returns that ship with arch and gives the
-  two numbers.
-- A speed proof times both forms as the median of 3 runs and compares what they return.
-- A rerun proof runs the old form twice in fresh objects. It passes when the two results differ
-  and the new form gives the same result twice.
+| Proof | How it was run | What it shows |
+| --- | --- | --- |
+| interpreter | The old form ran on arch 9.0.0. A document with `since` also ran on the release before the one it names. | The old form raises and the new form runs. On the release before, the old form ran or only warned. |
+| same result | A fit or a test ran with and without the argument. | Both gave the same parameters or the same statistic, so arch does not read the argument. |
+| numbers | Both forms ran on the daily S&P 500 returns that ship with arch. | The two numbers. |
+| speed | Both forms were timed as the median of 3 runs. | The two times, and whether the two forms return the same values. |
+| rerun | The old form ran twice in fresh objects. | The two results differ, and the new form gives the same result twice. |
 
 A document is `error` only on an interpreter proof, and its message names the exception. A
-document that can also match code that is right, such as `rescale=True` on data that needs no
-rescaling, is `warning`.
+document that can also match right code, such as `rescale=True` on data that needs no
+rescaling, is a `warning`.
 
-The rules were then run over two sets of real code, and every report but the 291 of
-`arch-unseeded-draws` was read. Those 291 were checked by a script that looked in each file for
-a later `seed` call or `state` assignment on the same variable. The first set is arch's own code
-at the 9.0.0 tag: 202 Python files, which are the 69 files of the library, its 104 test files,
-the code blocks of 16 documentation pages, its 9 notebooks and 4 scripts. The second is 1,303
-files of public code from 861 repositories, found with GitHub code search for the import lines
-of arch: 795 Python files and 508 notebooks, of which 1,268 import arch. A rule that reported
-correct code there was narrowed or dropped, and the table gives what is left.
+The rules were then run over two sets of real code, and a rule that reported correct code was
+narrowed or dropped.
+
+| Set | Files | What the files are |
+| --- | --- | --- |
+| arch's own code at the 9.0.0 tag | 202 | 69 library files, 104 test files, the code blocks of 16 documentation pages, 9 notebooks and 4 scripts |
+| public code | 1,303 from 861 repositories | 795 Python files and 508 notebooks that GitHub code search found for the import lines of arch, of which 1,268 import arch |
+
+Every report was read, except the 291 reports of `arch-unseeded-draws`. A script checked the 291
+by looking in each file for a later `seed` call or `state` assignment on the same variable. The
+table gives what is left after the rules were narrowed.
 
 | Rule | Severity | Proof | Reports on arch's own code | Reports on public code | Wrong advice | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
 | [`removed-in-arch`](#removed-in-arch) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, AttributeError, ValueError | 1 | 34 | 0 | unsafe |
 | [`arch-unknown-option`](#arch-unknown-option) | error | interpreter: ValueError | 0 | 13 | 0 | none |
 | [`arch-ignored-argument`](#arch-ignored-argument) | warning | same result, and rerun for the two seeds | 10 | 21 | 1 | none |
-| [`arch-rejected-number`](#arch-rejected-number) | error | interpreter: TypeError, ValueError | not run | not run | not run | none |
+| [`arch-rejected-number`](#arch-rejected-number) | error | interpreter: TypeError, ValueError | 1, over 189 files | not run | 1 | none |
 | [`unscaled-returns`](#unscaled-returns) | warning | numbers: mu 4.02 against 0.056, with optimizer code 4 | 0 | 21 | 0 | none |
 | [`rescaled-units`](#rescaled-units) | warning | numbers: a variance forecast 10,000 times the data's | 4 | 14 | 7 | none |
 | [`analytic-forecast-horizon`](#analytic-forecast-horizon) | error | interpreter: ValueError | 0 | 0 | no reports | none |
@@ -9808,37 +9828,49 @@ correct code there was narrowed or dropped, and the table gives what is left.
 | [`opt-bandwidth-as-bandwidth`](#opt-bandwidth-as-bandwidth) | warning | numbers: 0.5245 against 0.5158 | 0 | 0 | no reports | none |
 
 Wrong advice counts the reports where following the message would not fix a real problem in that
-code. There are 11 among the 508 reports: 8 in arch's own code and 3 in public code, and each
-rule's section says which they are. One report is in the library's own source, on a placeholder
-bootstrap that a base class builds and never draws from, and the other 146 on arch's own code
-are in its tests, notebooks and documentation.
+code, and each rule's section says which reports they are. The first run made 508 reports.
+
+| Code | Reports | Wrong advice |
+| --- | --- | --- |
+| arch's library source | 1 | 1, a placeholder bootstrap that a base class builds and never draws from |
+| arch's tests, notebooks and documentation | 146 | 7 |
+| public code | 361 | 3 |
+
+`arch-rejected-number` was added after a review, when the public code was no longer on disk. It
+ran over the 189 Python files of arch's repository and made one report, in a test that checks
+the error it reports.
 
 One rule was written and dropped. It reported `forecast(start=...)` on a result whose `fit` had
-no `last_obs`, because the parameters have then seen the rows that are forecast: on 1,500 S&P
-500 returns such forecasts from row 1,000 on differed from those of a fit that stopped there by
-13% on average, and their QLIKE loss was 0.142 against 0.181. Of its 14 reports on public code, 7
-started at the last row, which is a forecast of the future and right, and 4 started at row 0 to
-draw the fitted path. All 11 reports on arch's own code were examples and tests that forecast
-the fitted rows on purpose.
+no `last_obs`, because the parameters have then seen the rows that are forecast. The forecasts
+did change, and most reports were on right code.
 
-Recall was not measured. No set of real arch code was held back, so the table says how often a
-rule is wrong when it reports, and not how often it misses. A rule that follows a variable
-through the file is silent when the same name is bound to something else anywhere in it, also in
-another function, so a file that reuses a name such as `res` for an arch result and for another
-object gets no report on that name.
+| Measurement on 1,500 S&P 500 returns, forecasts from row 1,000 on | Value |
+| --- | --- |
+| mean difference from the forecasts of a fit that stopped at row 1,000 | 13% |
+| QLIKE loss with the fit on all rows | 0.142 |
+| QLIKE loss with the fit that stopped at row 1,000 | 0.181 |
+| reports on public code | 14, of which 7 start at the last row and forecast the future, and 4 start at row 0 to draw the fitted path |
+| reports on arch's own code | 11, all examples and tests that forecast the fitted rows on purpose |
+
+Recall was not measured, because no set of real arch code was held back. The table says how
+often a rule is wrong when it reports, and not how often it misses. A rule that follows a
+variable is silent when the file binds the same name to something else anywhere, also in
+another function. So a file that uses `res` for an arch result and for another object gets no
+report on `res`.
 
 ### Removed API
 
-Each form below raises on arch 9.0.0. Each was run on the release before the removal and on the
-release that made it, both installed from PyPI, because the release notes of 8.0 do not list what
-8.0 removed. Every fix of a removed form turns code that raises into code that runs, so none of
-those fixes can be compared with the old form and none is safe.
+`removed-in-arch` reports code that raises on arch 9.0.0. Each form was run on the release
+before the removal and on the release that made it, both installed from PyPI, because the
+release notes of 8.0 do not list what 8.0 removed. No fix of a removed form is safe, because
+each fix turns code that raises into code that runs, so the two forms cannot be compared.
 
 #### removed-in-arch
 
 **Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` on a bootstrap or a distribution, `plot_type=` for `type=` on `hedgehog_plot` of a result that the file gets from an arch model, and `from arch.utility.cov import cov_nw` for the import from `arch.utility` when `cov_nw` is the only name. The other forms have no fix.
 
-Reports `from arch.__future__ import reindexing`, `type=` given to `hedgehog_plot`, `random_state=` given to `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap` or `LocalBlockBootstrap`, `random_state=` or a positional argument given to `Normal`, `StudentsT`, `SkewStudent` or `GeneralizedError`, the methods `seed`, `get_state` and `set_state` and the property `random_state` on a bootstrap, `seed` on an `SPA`, `StepM`, `MCS` or `RealityCheck`, `cov_nw` imported from `arch.utility`, an assignment to `block_size` of a block bootstrap or to `bootstrap` of a multiple comparison test, and `nested=True` with `studentize=False` on `SPA`, `StepM` or `RealityCheck`.
+Reports a form that arch 8.0 or 9.0 removed. The table after the example lists every form, with
+what it did on the release before the removal and what it does now.
 
 Example:
 
@@ -9859,52 +9891,53 @@ dist = Normal(seed=np.random.default_rng(0))
 fig = res.hedgehog_plot(plot_type="mean")
 ```
 
-The table gives what each form did on the release before the removal and what it does from that
-release on.
-
-| Form | Before | From | Now |
+| Form | Before | Removed in | Now |
 | --- | --- | --- | --- |
-| `IIDBootstrap(x, random_state=rs)` | 7.2.0: FutureWarning | 8.0.0 | TypeError, because `random_state` is read as data |
-| `Normal(random_state=rs)`, `Normal(rs)` | 7.2.0: FutureWarning | 8.0.0 | TypeError |
-| `bs.seed(1)`, `bs.get_state()`, `bs.set_state(s)`, `bs.random_state` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
-| `SPA(...).seed(1)`, the same on `StepM` and `MCS` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
+| `random_state=` on `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap` or `LocalBlockBootstrap` | 7.2.0: FutureWarning | 8.0.0 | TypeError, because `random_state` is read as data |
+| `random_state=` or a positional argument on `Normal`, `StudentsT`, `SkewStudent` or `GeneralizedError` | 7.2.0: FutureWarning | 8.0.0 | TypeError |
+| `bs.seed(1)`, `bs.get_state()`, `bs.set_state(s)` and `bs.random_state` on a bootstrap | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
+| `seed` on `SPA`, `StepM`, `MCS` or `RealityCheck` | 7.2.0: FutureWarning | 8.0.0 | AttributeError |
 | `from arch.utility import cov_nw` | 7.2.0: runs | 8.0.0 | ImportError |
 | `from arch.__future__ import reindexing` | 8.0.0: runs and does nothing | 9.0.0 | ModuleNotFoundError |
 | `res.hedgehog_plot(type="mean")` | 8.0.0: FutureWarning | 9.0.0 | TypeError |
-| `bs.block_size = 5`, `spa.bootstrap = bs` | 8.0.0: runs | 9.0.0 | AttributeError |
-| `SPA(..., studentize=False, nested=True)` | 8.0.0: runs | 9.0.0 | ValueError |
+| an assignment to `block_size` of a block bootstrap, or to `bootstrap` of a multiple comparison test | 8.0.0: runs | 9.0.0 | AttributeError |
+| `nested=True` with `studentize=False` on `SPA`, `StepM` or `RealityCheck` | 8.0.0: runs | 9.0.0 | ValueError |
 
 The bootstraps take their data as keyword arguments, so 8.0.0 and 9.0.0 read `random_state` as
 one more series and raise because a `RandomState` is not an array. `seed` takes the same
-`RandomState`, a `Generator` or an integer, and exists since arch 5.0: on 4.19
+`RandomState`, a `Generator` or an integer, and it exists since arch 5.0, so on 4.19
 `IIDBootstrap(x, seed=0)` raised TypeError. `IIDBootstrap(x, seed=np.random.RandomState(0))` drew
-the same samples on 6.1.0, 7.2.0, 8.0.0 and 9.0.0. The state of the generator is read and set
-through the `state` property, and `generator` gives the generator itself.
+the same samples on 6.1.0, 7.2.0, 8.0.0 and 9.0.0. The `state` property reads and sets the
+state of the generator, and `generator` gives the generator itself.
 
-`seed`, `get_state`, `set_state`, `random_state`, `block_size` and `bootstrap` are names that
-other objects have too, such as a NumPy `RandomState`. They are reported only on a variable that
-the file assigns from one of the arch classes and from nothing else. `hedgehog_plot` is reported
-on any object, because no other library that was looked at has a method of that name, and it is
-fixed only on a result that the file gets from `fit` or `fix` of an arch model.
+Other objects also have the names `seed`, `get_state`, `set_state`, `random_state`, `block_size`
+and `bootstrap`, such as a NumPy `RandomState`. The rule reports them only on a variable that the
+file assigns from one of the arch classes and from nothing else. It reports `hedgehog_plot` on
+any object, because no other library that was looked at has a method of that name, and it fixes
+the call only on a result that the file gets from `fit` or `fix` of an arch model.
 
 The rule leaves alone an import inside a `try` block that catches the error, code behind a
-version check, and code inside `pytest.raises`. arch 9.0.0 has no deprecation of its own left:
-its source raises no `DeprecationWarning` and no `FutureWarning`, so the pack has no rule for
-deprecated API.
+version check, and code inside `pytest.raises`. The pack has no rule for deprecated API, because
+the source of arch 9.0.0 raises no `DeprecationWarning` and no `FutureWarning`.
 
 ### Options and arguments
 
-arch 9.0 checks every argument when a function is called, and it still ignores an argument that
-does not apply to the model that was asked for. The first rule reports a string that the check
-refuses. The second reports an argument that is accepted and never read, so the code runs and
-describes another model or test than the one it estimates. The third reports a number that the
-check refuses.
+The rules in the group report an argument that arch 9.0 refuses or never reads. arch 9.0 checks
+every argument when a function is called, and it still ignores an argument that does not apply
+to the model that was asked for.
+
+| Rule | What it reports | What happens |
+| --- | --- | --- |
+| `arch-unknown-option` | a string that is not one of the option's values | ValueError |
+| `arch-ignored-argument` | an argument that arch accepts and never reads | the code runs and estimates another model or test than the one it describes |
+| `arch-rejected-number` | a number that arch refuses | TypeError or ValueError |
 
 #### arch-unknown-option
 
 **Severity:** error. **Fix:** none.
 
-Reports a string that is not one of the option's values: `mean`, `vol` and `dist` of `arch_model`, `trend` of `ADF`, `DFGLS`, `KPSS`, `PhillipsPerron`, `VarianceRatio`, `ZivotAndrews`, `engle_granger`, `phillips_ouliaris`, `DynamicOLS`, `FullyModifiedOLS` and `CanonicalCointegratingReg`, `method` of `ADF`, `DFGLS`, `ZivotAndrews`, `engle_granger` and `DynamicOLS`, `test_type` of `PhillipsPerron` and `phillips_ouliaris`, `kernel` of `auto_bandwidth`, `method` of `MCS`, `bootstrap` of `SPA`, `StepM`, `MCS` and `RealityCheck`, `cov_type` and `disp` of `fit`, `method` and `align` of `forecast`, `plot_type` and `method` of `hedgehog_plot`, and `method` and `tail` of `conf_int`.
+Reports a string that is not one of the option's values, for each option in the table after the
+example. arch raises ValueError on such a string.
 
 Example:
 
@@ -9922,14 +9955,16 @@ res = gjr.fit(cov_type="classic")
 adf = ADF(prices, trend="n")
 ```
 
-arch checks each option against a table of accepted spellings, without regard to case. A script
-wrapped that check on arch 9.0.0, called each API once and kept the table it was handed, so the
-lists in the rule are the ones the installed release uses and none is typed by hand. The script
-then ran each API with every spelling of its table, in lower and in upper case, and with 28 other
-strings, and each of those raised ValueError. The tables hold more than the signatures show:
-`vol="constant"` builds a model with a constant variance, `conf_int` also takes `"var"`, `"cov"`,
-`"debiased"` and `"bias-corrected"`, `method` of the unit root tests also takes `"t"` and
-`"tstat"`, and `bootstrap="moving_block"` is the same as `"moving block"`.
+The lists in the rule are the ones that arch 9.0.0 uses, and none is typed by hand. arch checks
+each option against a table of accepted spellings, without regard to case. A script wrapped
+that check, called each API once and kept the table it was handed. The script then ran each API
+with every spelling of its table, in lower and in upper case. It also ran each API with 28 other
+strings, and each of the 28 raised ValueError.
+
+The tables hold more than the signatures show. For example, `vol="constant"` builds a model with
+a constant variance, and `conf_int` also takes `"var"`, `"cov"`, `"debiased"` and
+`"bias-corrected"`. Moreover, `method` of the unit root tests also takes `"t"` and `"tstat"`, and
+`bootstrap="moving_block"` is the same as `"moving block"`.
 
 | Option | Values on arch 9.0.0 |
 | --- | --- |
@@ -9956,27 +9991,43 @@ strings, and each of those raised ValueError. The tables hold more than the sign
 | `conf_int(method=)` | `basic`, `percentile`, `studentized`, `norm`, `var`, `cov`, `bc`, `debiased`, `bias-corrected`, `bca` |
 | `conf_int(tail=)` | `two`, `lower`, `upper` |
 
-Before 9.0 some of these options took any string and fell back to one value without a word. On
-arch 4.19, 5.0, 6.1.0, 6.2.0 and 8.0.0, `fit(cov_type="mle")` gave the standard errors of
-`"classic"`, 0.00843 for omega on 1,500 daily S&P 500 returns where `"robust"` gave 0.01329, and
-`PhillipsPerron(y, test_type="z")` gave the statistic of `"tau"`, -1.136, where `"rho"` gave
--2.0998. On 5.0, 6.1.0, 6.2.0 and 8.0.0, `MCS(losses, 0.1, method="range")` gave the p-values of
-`"max"` and not those of `"R"`. The documents have no `since`, so the report also reaches a
-project on an older arch, where the value is the wrong one in silence.
+The documents have no `since`, so the report also reaches a project on an older arch. Before 9.0
+some of the options took any string and fell back to one value without a warning.
 
-Releases before 9.0 took some options in one case only: `ADF(y, method="AIC")` raised on 8.0.0
-and runs on 9.0.0. The rule follows 9.0.0 and does not report it. A value that only 9.0 has, such
-as `method="maic"` or `align="horizon"`, is not reported either.
+| Call | Releases | Result | Value with a right option |
+| --- | --- | --- | --- |
+| `fit(cov_type="mle")` on 1,500 daily S&P 500 returns | 4.19, 5.0, 6.1.0, 6.2.0, 8.0.0 | the standard errors of `"classic"`, 0.00843 for omega | `"robust"`: 0.01329 |
+| `PhillipsPerron(y, test_type="z")` | 4.19, 5.0, 6.1.0, 6.2.0, 8.0.0 | the statistic of `"tau"`, -1.136 | `"rho"`: -2.0998 |
+| `MCS(losses, 0.1, method="range")` | 5.0, 6.1.0, 6.2.0, 8.0.0 | the p-values of `"max"` | `"R"`: other p-values |
 
-The public code had 13 reports: `trend="nc"`, which is the old statsmodels name, `vol="AVGARCH"`,
-`disp="on"`, `method="stationary"` on `MCS`, and `ZivotAndrews(y, method="c")`, where the trend
-was written as the method.
+Releases before 9.0 took some options in one case only. For example, `ADF(y, method="AIC")`
+raised on 8.0.0 and runs on 9.0.0, and the rule follows 9.0.0 and does not report it. A value
+that only 9.0 has, such as `method="maic"` or `align="horizon"`, is not reported either.
+
+The public code had 13 reports, and each was a value that arch refuses:
+
+- `trend="nc"`, which is the old statsmodels name
+- `vol="AVGARCH"` and `disp="on"`
+- `method="stationary"` on `MCS`
+- `ZivotAndrews(y, method="c")`, where the trend was written as the method
 
 #### arch-ignored-argument
 
 **Severity:** warning. **Fix:** none.
 
-Reports `lags=` given to `arch_model` with `mean` `"constant"`, `"zero"` or `"ls"`, or with no `mean`, `x` given to `arch_model` with `mean` `"constant"`, `"zero"`, `"ar"` or `"har"`, or with no `mean`, `o=`, `q=` and `power=` given with `vol="arch"` or `vol="harch"`, `power=` given with `vol` `"egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"`, `o=` given with `vol="figarch"`, `method=` and `max_lags=` given to `ADF`, `DFGLS` or `ZivotAndrews` together with a number for `lags`, `random_state=` given to `forecast` with `method="simulation"`, and `rng=` given to `forecast` with `method="bootstrap"`.
+Reports an argument that arch accepts and never reads for the model or the test that the call
+asks for.
+
+| Argument | Reported when the call has |
+| --- | --- |
+| `lags=` on `arch_model` | `mean` `"constant"`, `"zero"` or `"ls"`, or no `mean` |
+| `x` on `arch_model` | `mean` `"constant"`, `"zero"`, `"ar"` or `"har"`, or no `mean` |
+| `o=`, `q=` and `power=` | `vol="arch"` or `vol="harch"` |
+| `power=` | `vol` `"egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"` |
+| `o=` | `vol="figarch"` |
+| `method=` and `max_lags=` on `ADF`, `DFGLS` or `ZivotAndrews` | a number for `lags` |
+| `random_state=` on `forecast` | `method="simulation"` |
+| `rng=` on `forecast` | `method="bootstrap"` |
 
 Example:
 
@@ -9998,9 +10049,10 @@ adf = ADF(prices, method="bic")
 paths = res.forecast(horizon=5, method="simulation", rng=np.random.default_rng(0).standard_normal)
 ```
 
-Each form was fitted with and without the argument on 1,500 daily S&P 500 returns, on arch 9.0.0
-and on 8.0.0, and the two fits had the same parameters. `"fiaparch"` and `"ngarch"` are new in
-9.0 and were run there only.
+A reported argument does not change the fit. Each form was fitted with and without the argument
+on 1,500 daily S&P 500 returns, on arch 9.0.0 and on 8.0.0, and the table gives whether the
+parameters of the two fits were equal. `"fiaparch"` and `"ngarch"` are new in 9.0 and were run
+there only.
 
 | Call | Compared with | Parameters |
 | --- | --- | --- |
@@ -10016,28 +10068,40 @@ and on 8.0.0, and the two fits had the same parameters. `"fiaparch"` and `"ngarc
 `ADF`, `DFGLS` and `ZivotAndrews` search for a lag length only when `lags` is not given. With
 `lags=4` the statistic of 1,000 log prices was the same for `method` `"aic"`, `"bic"` and
 `"t-stat"`, and the same for `max_lags` 2 and 20. Without `lags`, `"t-stat"` chose 8 lags where
-`"aic"` chose 0, and the statistic moved from -1.2674 to -1.0838 for `ADF`.
+`"aic"` chose 0, and the statistic of `ADF` moved from -1.2674 to -1.0838.
 
 `forecast` reads `random_state` only for `method="bootstrap"` and `rng` only for
-`method="simulation"`. Two calls with `method="simulation"` and
-`random_state=np.random.RandomState(0)` gave 2.586 and 2.598 for the variance five steps ahead,
-and two calls with a seeded `rng` gave 2.571 twice. Two calls with `method="bootstrap"` and the
-same seeded `rng` gave 2.588 and 2.470, and with `random_state=np.random.RandomState(0)` they
-gave 2.595 twice. The page on volatility forecasts in arch's own documentation passes
-`random_state` to a simulation. A call that passes both seeds is left alone.
+`method="simulation"`. The table gives the variance five steps ahead from two calls with the
+same seed.
 
-A value that changes nothing in a GARCH model either, such as `o=0`, `q=0` or `power=2.0`, is not
-reported. `lags=0`, `x=None` and a `mean` or a `vol` that is a variable are not reported. A call
-with three or more positional arguments is left alone, because its `mean` may be positional.
+| Method | Seed | First call | Second call |
+| --- | --- | --- | --- |
+| `"simulation"` | `random_state=np.random.RandomState(0)` | 2.586 | 2.598 |
+| `"simulation"` | a seeded `rng` | 2.571 | 2.571 |
+| `"bootstrap"` | a seeded `rng` | 2.588 | 2.470 |
+| `"bootstrap"` | `random_state=np.random.RandomState(0)` | 2.595 | 2.595 |
 
-The public code had 21 reports and none with wrong advice. Twelve were `x=` or a positional `x`
-with a constant mean, seven of them copies of one function that fits
-`arch_model(resid, x=exog, mean="Constant", ...)` as if the regressors were in the model. Four
-were `vol="ARCH"` with `q=3` or `q=1`, where the order of an ARCH model is `p`. Two were
-`random_state=` on a simulation, two were `lags=1` with `mean="constant"`, and one was a `method`
-beside `lags=8`. Of the 10 reports on arch's own code, one is a test that passes `max_lags=2.5` to
-check that it raises, where the advice is beside the point. The other nine are tests and the
-documentation page above.
+The page on volatility forecasts in arch's own documentation passes `random_state` to a
+simulation. A call that passes both seeds is left alone.
+
+The rule leaves alone a value that changes nothing in a GARCH model either, such as `o=0`, `q=0`
+or `power=2.0`. It also leaves alone `lags=0`, `x=None`, and a `mean` or a `vol` that is a
+variable. A call with three or more positional arguments is left alone, because its `mean` may
+be positional.
+
+The public code had 21 reports, and none had wrong advice.
+
+| Reports | Code |
+| --- | --- |
+| 12 | `x=` or a positional `x` with a constant mean. Seven are copies of one function that fits `arch_model(resid, x=exog, mean="Constant", ...)` as if the regressors were in the model. |
+| 4 | `vol="ARCH"` with `q=3` or `q=1`, where the order of an ARCH model is `p` |
+| 2 | `random_state=` on a simulation |
+| 2 | `lags=1` with `mean="constant"` |
+| 1 | a `method` beside `lags=8` |
+
+Of the 10 reports on arch's own code, one is a test that passes `max_lags=2.5` to check that it
+raises, and there the advice is beside the point. The other nine are in tests and in the
+documentation page on volatility forecasts.
 
 #### arch-rejected-number
 
@@ -10075,25 +10139,32 @@ Each form was run on arch 9.0.0 and on 8.0.0.
 | `conf_int(size=95)`, `size=90.0`, `size=1` | ValueError: size must be a finite float in (0, 1); got 95 (int) | ValueError: size must be strictly between 0 and 1 |
 | `arch_model(vol="ngarch")` with no `o` or with `o=0` | ValueError: o must be at least 1 when vol='ngarch' | ValueError: Unknown model type in vol, for every `o` |
 
-The first three rows and the last carry `since: "9.0"`, because 8.0.0 took the float in the
-classes and has no `"ngarch"`. `arch_model` does not check an order that the process does not
-have: `o=1.0` and `q=1.0` ran with `vol="arch"` and `"harch"`, `o=1.0` with `"figarch"`, and all
-three with `"constant"`, so the rule reads `arch_model` only with the `vol` values of the first
-row. `arch_model(vol="ngarch", o=1)` ran on 9.0.0, and `o=2` raised
-because `o` may not be above `p`. `horizon` and `simulations` are read only on a result that the
-file gets from `arch_model`, since other libraries have a `forecast` with a horizon. `reps` and
-`size` are read by the name of the method, since no other library that was looked at has those
-keywords on `conf_int`, `var`, `cov`, `apply` or `bootstrap`. A number that is a variable is not
-read, and neither is a positional argument. The rule was added after a review and was not run
-over the public code, which is no longer on disk. Over the 189 Python files of arch's repository it made one
-report, on `conf_int(mean_fn, 20, size=1.5)` in a test that checks this error.
+The documents of the first three rows and of the last carry `since: "9.0"`, because 8.0.0 took
+the float in the classes and has no `"ngarch"`. `arch_model(vol="ngarch", o=1)` ran on 9.0.0,
+and `o=2` raised because `o` may not be above `p`.
+
+`arch_model` does not check an order that the process does not have, so the rule reads
+`arch_model` only with the `vol` values of the first row. For example, `o=1.0` and `q=1.0` ran
+with `vol="arch"` and `"harch"`, `o=1.0` ran with `"figarch"`, and all three ran with
+`"constant"`.
+
+| Keyword | Where the rule reads it | Why |
+| --- | --- | --- |
+| `horizon`, `simulations` | only on a result that the file gets from `arch_model` | other libraries have a `forecast` with a horizon |
+| `reps`, `size` | by the name of the method | no other library that was looked at has the keywords on `conf_int`, `var`, `cov`, `apply` or `bootstrap` |
+
+A number that is a variable is not read, and neither is a positional argument. The rule was
+added after a review and was not run over the public code, which was no longer on disk. Over the
+189 Python files of arch's repository it made one report, on `conf_int(mean_fn, 20, size=1.5)`
+in a test that checks the error.
 
 ### The units of the data
 
-arch estimates by maximum likelihood, and the optimizer works badly when the variance of the data
-is far from 1. arch warns `DataScaleWarning` when the variance is outside the range it likes, and
+Give arch returns in percent, and divide a result by `scale` when you let arch rescale. arch
+estimates by maximum likelihood, and the optimizer works badly when the variance of the data is
+far from 1. arch warns `DataScaleWarning` when the variance is outside the range it accepts, and
 its message asks for a value between 1 and 1000. Daily returns as decimals have a variance near
-0.0001: the 5,030 daily S&P 500 returns in `arch.data.sp500` have 0.000145.
+0.0001, and the 5,030 daily S&P 500 returns in `arch.data.sp500` have 0.000145.
 
 #### unscaled-returns
 
@@ -10129,17 +10200,25 @@ A mean of 4.02 for returns whose mean is 0.00056 is a failed fit, and on the old
 optimizer reported success with a mean of the wrong sign. `rescale=False` turns the warning off
 and gave the same failed fit.
 
-The rule reads how the series is built and not its values. It reports the expression in the
-call, and a name or a column that every assignment in the file builds that way: `pct_change`,
-the difference of a log, or the log of a price over its lag, followed by nothing but `dropna`,
-`fillna`, `copy`, `squeeze`, `to_numpy`, `iloc`, `loc` or `values`. A series that is multiplied
-anywhere, such as `100 * prices.pct_change()` or `returns = returns * 100`, is left alone. So
-are returns divided by their standard deviation, which have a variance of 1, returns that a
-helper takes as an argument, and a call that says `rescale`, in either way. Returns that come from a file or a
-function are not seen.
+The rule reads how the series is built and not its values.
 
-All 21 reports on the public code were returns as decimals: each series was a `pct_change` or a
-log difference with no factor.
+```text
+report(series given to the model)
+  if the series is written in the call, or every assignment in the file builds it
+     as pct_change, the difference of a log, or the log of a price over its lag
+     followed by nothing but dropna, fillna, copy, squeeze, to_numpy, iloc, loc or values
+    report
+leave alone
+  a series that is multiplied anywhere       # 100 * prices.pct_change(), returns = returns * 100
+  returns divided by their standard deviation, which have a variance of 1
+  returns that a helper takes as an argument
+  a call that says rescale, either way
+not seen
+  returns that come from a file or a function
+```
+
+All 21 reports on the public code were returns as decimals, and each series was a `pct_change`
+or a log difference with no factor.
 
 #### rescaled-units
 
@@ -10163,23 +10242,31 @@ variance = res.forecast(horizon=1).variance.iloc[-1, 0] / res.scale**2
 
 With `rescale=True` arch may multiply the data before it estimates, and the result reports the
 factor as `scale`. On the S&P 500 returns as decimals, arch 9.0.0 and 8.0.0 chose a scale of
-100. The parameters were those of the returns in percent, the last conditional volatility was
-1.9926 where the data's was 0.019926, and the variance forecast one step ahead was 3.5965, which
-is 10,000 times the variance in the units of the data.
+100, and the parameters matched a fit of the returns in percent.
 
-When the data already has a variance near 1 the scale is 1.0 and nothing changes, and results
-that have no unit, such as the standardized residuals, are right at any scale. The rule cannot
-see either, so it is a warning. Of its 14 reports on the public code, 11 used a volatility or a
-forecast in rescaled units, two of them with a division by 10,000 written into the code where
-the square of `scale` belongs. Three had wrong advice: two fitted data that was made standard normal
-first, and one only divided the residuals by the volatility. The 4 reports on arch's own code
-are tests of `rescale` itself.
+| Result | Rescaled units | Units of the data |
+| --- | --- | --- |
+| last conditional volatility | 1.9926 | 0.019926 |
+| variance forecast one step ahead | 3.5965 | 0.00035965, which is 3.5965 divided by `scale` squared |
+
+When the data already has a variance near 1 the scale is 1.0 and nothing changes. Results that
+have no unit, such as the standardized residuals, are right at any scale. The rule cannot see
+either case, so it is a warning.
+
+Of its 14 reports on the public code, 11 used a volatility or a forecast in rescaled units. Two
+of the 11 divided by 10,000 in the code where the square of `scale` belongs. Three reports had
+wrong advice, because two fitted data that was made standard normal first, and one only divided
+the residuals by the volatility. The 4 reports on arch's own code are tests of `rescale` itself.
 
 ### Forecasts and fits
 
-`forecast` has `method="analytic"`, `horizon=1` and `reindex=False` as its defaults, and it
-forecasts from the last row unless `start` names an earlier one. `fit` prints the steps of the
-optimizer unless `disp="off"`.
+The rules in the group report forecasts that raise or repeat work, and fits that print. The
+defaults they rely on are in the table.
+
+| Call | Default | Effect |
+| --- | --- | --- |
+| `forecast` | `method="analytic"`, `horizon=1`, `reindex=False` | forecasts from the last row unless `start` names an earlier one |
+| `fit` | `disp="final"`, `update_freq=1` | prints the steps of the optimizer unless `disp="off"` |
 
 #### analytic-forecast-horizon
 
@@ -10210,16 +10297,24 @@ A volatility model that does not evolve in squares has no closed form beyond one
 | `vol="garch"` or `"figarch"` with `power=1.0` | ValueError: Analytic forecasts not available for horizon > 1 when power != 2 | runs |
 | `vol="garch"`, also with `o=1`, `"arch"`, `"figarch"`, `"harch"`, `"ngarch"` | runs | runs |
 
-The rule follows the model through the file: the call is `forecast` on a variable that the file
-assigns from `fit` or `fix` of a variable that it assigns from such an `arch_model` call, and
-each of the two names is assigned from nothing else. A `horizon` or a `method` that is a
-variable is not read, and `power` is read only where `arch_model` reads it. A model whose
-`volatility` the file assigns, as in `am.volatility = GARCH(1, 0, 1)`, is left alone.
+The rule follows the model through the file, as in the call tree below. Each of the two names
+must be assigned from nothing else.
+
+```text
+am = arch_model(returns, vol="EGARCH")     # such an arch_model call
+  res = am.fit(...)                        # or am.fix(...)
+    res.forecast(horizon=5)                # reported
+```
+
+A `horizon` or a `method` that is a variable is not read, and `power` is read only where
+`arch_model` reads it. A model whose `volatility` the file assigns, as in
+`am.volatility = GARCH(1, 0, 1)`, is left alone. A model that is built from the classes, such as
+`ConstantMean(y, volatility=EGARCH())`, is not seen.
+
 `hedgehog_plot` forecasts 10 steps with `method="analytic"` unless the call says otherwise. On
 9.0.0 and on 8.0.0 it raised the same ValueError for `vol="egarch"`, and it ran with `horizon=1`
-and with `method="simulation"`. It is read only when every argument is a keyword. A model that is
-built from the classes, such as `ConstantMean(y, volatility=EGARCH())`, is not seen. The corpus
-had no report.
+and with `method="simulation"`. The rule reads it only when every argument is a keyword. The
+corpus had no report.
 
 #### forecast-per-origin
 
@@ -10242,15 +10337,19 @@ variance = res.forecast(horizon=10, start=first).variance
 ```
 
 `forecast(start=i)` returns one row for every origin from `i` to the end of the data, so the
-loop computes the same rows many times over and keeps one. On the 5,030 S&P 500 returns with
-`horizon=10`, a loop over the last 200 origins took 0.106 seconds and one call took 0.0005
-seconds, with equal values. On arch 8.0.0 it was 0.329 against 0.0056 seconds.
+loop computes the same rows many times over and keeps one. Both forms ran on the 5,030 S&P 500
+returns with `horizon=10` and gave equal values.
 
-A loop that fits inside is a rolling estimate, where each origin has its own parameters, and is
-left alone. So is a loop over a few chosen origins, such as a tuple, and a call whose object or
-whose other arguments hold the loop variable, as in `fits[i].forecast(start=i)`, where each
-origin has its own result. The one report in the
-corpus is a test in arch that steps through the origins of a hedgehog plot.
+| arch | Loop over the last 200 origins | One call |
+| --- | --- | --- |
+| 9.0.0 | 0.106 seconds | 0.0005 seconds |
+| 8.0.0 | 0.329 seconds | 0.0056 seconds |
+
+The rule leaves alone a loop that fits inside, because the loop is then a rolling estimate where
+each origin has its own parameters. It also leaves alone a loop over a few chosen origins, such
+as a tuple, and a call whose object or other arguments hold the loop variable, as in
+`fits[i].forecast(start=i)`, where each origin has its own result. The one report in the corpus
+is a test in arch that steps through the origins of a hedgehog plot.
 
 #### reindex-is-default
 
@@ -10272,17 +10371,21 @@ res = arch_model(returns).fit(disp="off")
 forecasts = res.forecast(horizon=5)
 ```
 
-Until arch 6.2 `forecast` returned a frame as long as the data and warned that the default would
-change, and code from that time passes `reindex=False` to get the short frame without the
-warning. On 6.1.0, `forecast()` on 1,500 rows returned 1,500 rows with a FutureWarning, and on
-6.2.0 it returned 1 row with no warning, so the document carries `since: "6.2"`. On 6.2.0, 8.0.0
-and 9.0.0 the frames of `forecast(reindex=False)` and `forecast()` were equal, for the last row
-and with `start`, which is why the fix is safe. `reindex=True` still returns the long frame and
-is left alone.
+Before arch 6.2 `forecast` returned a frame as long as the data and warned that the default would
+change, so code from before 6.2 passes `reindex=False` to get the short frame without the
+warning. The document carries `since: "6.2"`.
 
-The import `from arch.__future__ import reindexing` belongs to the same habit and is reported by
-[`removed-in-arch`](#removed-in-arch). The public code had 61 reports of this rule, and arch's own
-tests, notebooks and documentation had 20.
+| arch | `forecast()` on 1,500 rows | `forecast(reindex=False)` |
+| --- | --- | --- |
+| 6.1.0 | 1,500 rows and a FutureWarning | the short frame, without the warning |
+| 6.2.0, 8.0.0, 9.0.0 | 1 row and no warning | the same frame as `forecast()`, for the last row and with `start` |
+
+The fix is safe, because the two frames were equal on 6.2.0, 8.0.0 and 9.0.0. `reindex=True`
+still returns the long frame and is left alone.
+
+The import `from arch.__future__ import reindexing` comes from the same habit and is reported by
+[`removed-in-arch`](#removed-in-arch). The rule made 61 reports on the public code, and 20 on
+arch's own tests, notebooks and documentation.
 
 #### fit-output-in-loop
 
@@ -10305,18 +10408,34 @@ for end in range(1000, len(returns)):
 ```
 
 `fit` has `disp="final"` and `update_freq=1`, so it prints a line for every iteration and a
-summary at the end. Twenty fits of a GARCH(1,1) in a loop printed 240 lines, and none with
-`disp="off"`. The time was the same, 0.102 and 0.101 seconds, so the rule is info.
+summary at the end. The rule is info, because the output costs no time.
+
+| Twenty fits of a GARCH(1,1) in a loop | Lines printed | Time |
+| --- | --- | --- |
+| `fit()` | 240 | 0.102 seconds |
+| `fit(disp="off")` | 0 | 0.101 seconds |
+
 `update_freq=0` alone still prints the summary. All 15 reports on the public code were fits in a
 loop over windows, assets or model orders.
 
 ### Bootstraps, tests and covariance estimators
 
+The rules in the group report random draws without a seed, test results read before
+`compute`, and a bandwidth whose meaning changed in arch 9.0.
+
 #### arch-unseeded-draws
 
 **Severity:** info. **Fix:** none.
 
-Reports `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap`, `LocalBlockBootstrap`, `SPA`, `StepM`, `MCS` and `RealityCheck` without `seed`, `forecast` with `method="simulation"` and no `rng`, `forecast` with `method="bootstrap"` and no `random_state`, and `simulate` on an arch model, unless the file builds a distribution with a seed.
+Reports a call that draws random numbers without a seed.
+
+| Call | Reported without |
+| --- | --- |
+| `IIDBootstrap`, `IndependentSamplesBootstrap`, `StationaryBootstrap`, `CircularBlockBootstrap`, `MovingBlockBootstrap`, `LocalBlockBootstrap` | `seed` |
+| `SPA`, `StepM`, `MCS`, `RealityCheck` | `seed` |
+| `forecast` with `method="simulation"` | `rng`, unless the file builds a distribution with a seed |
+| `forecast` with `method="bootstrap"` | `random_state` |
+| `simulate` on an arch model | a distribution with a seed anywhere in the file |
 
 Example:
 
@@ -10335,33 +10454,35 @@ interval = bs.conf_int(np.mean, 1000)
 
 arch draws from generators of its own, which start from a new seed in every process. Each form
 was run twice without a seed and twice with one, on arch 9.0.0 and on 8.0.0. The two runs
-without a seed differed on both releases, and the table gives the numbers of 9.0.0.
+without a seed differed on both releases, and the table gives the numbers of 9.0.0. The column
+`np.random.seed(0)` gives two runs that each called `np.random.seed(0)` first.
 
-| Form | Two runs without a seed | Two runs with a seed | Seeded by |
-| --- | --- | --- | --- |
-| `IIDBootstrap(x).conf_int(np.mean, 200)`, lower bound | -0.15601, -0.15855 | -0.15667 twice | `seed=0` |
-| `StationaryBootstrap(10, x)`, the same | -0.13476, -0.13188 | -0.14428 twice | `seed=0` |
-| `CircularBlockBootstrap(10, x)`, the same | -0.18054, -0.14953 | -0.15445 twice | `seed=0` |
-| `MovingBlockBootstrap(10, x)`, the same | -0.14193, -0.14765 | -0.16665 twice | `seed=0` |
-| `SPA(...)`, lower p-value | 0.7233, 0.6800 | 0.6700 twice | `seed=0` |
-| `MCS(...)`, first p-value | 0.250, 0.283 | 0.297 twice | `seed=0` |
-| `forecast(horizon=5, method="simulation")`, last step | 2.671, 2.601 | 2.571 twice | `Normal(seed=0)` as the model's distribution, or a seeded `rng` |
-| `forecast(horizon=5, method="bootstrap")`, last step | 2.587, 2.578 | 2.595 twice | `random_state=np.random.RandomState(0)` |
-| `arch_model(None).simulate(params, 100)`, last value | -1.24, 0.07 | 0.097 twice | `Normal(seed=0)` as the model's distribution |
+| Form | Two runs without a seed | Two runs after `np.random.seed(0)` | Two runs with a seed | Seeded by |
+| --- | --- | --- | --- | --- |
+| `IIDBootstrap(x).conf_int(np.mean, 200)`, lower bound | -0.15601, -0.15855 | -0.1328, -0.15246 | -0.15667 twice | `seed=0` |
+| `StationaryBootstrap(10, x)`, the same | -0.13476, -0.13188 | not run | -0.14428 twice | `seed=0` |
+| `CircularBlockBootstrap(10, x)`, the same | -0.18054, -0.14953 | not run | -0.15445 twice | `seed=0` |
+| `MovingBlockBootstrap(10, x)`, the same | -0.14193, -0.14765 | not run | -0.16665 twice | `seed=0` |
+| `SPA(...)`, lower p-value | 0.7233, 0.6800 | not run | 0.6700 twice | `seed=0` |
+| `MCS(...)`, first p-value | 0.250, 0.283 | not run | 0.297 twice | `seed=0` |
+| `forecast(horizon=5, method="simulation")`, last step | 2.671, 2.601 | 2.676, 2.534 | 2.571 twice | `Normal(seed=0)` as the model's distribution, or a seeded `rng` |
+| `forecast(horizon=5, method="bootstrap")`, last step | 2.587, 2.578 | 2.468, 2.737 | 2.595 twice | `random_state=np.random.RandomState(0)` |
+| `arch_model(None).simulate(params, 100)`, last value | -1.24, 0.07 | -1.27, 0.30 | 0.097 twice | `Normal(seed=0)` as the model's distribution |
 
-`np.random.seed(0)` before each run did not make any of them equal: `IIDBootstrap` gave -0.1328
-and -0.15246, the simulated forecast 2.676 and 2.534, the bootstrap forecast 2.468 and 2.737,
-and `simulate` -1.27 and 0.30. arch does not draw from NumPy's global generator. 49 of the 291
-reports in the corpus are in a file that calls `np.random.seed`. One report has wrong advice: a
-base class in arch's own source builds a placeholder bootstrap that it never draws from.
+arch does not draw from NumPy's global generator, so `np.random.seed(0)` did not make any two
+runs equal. 49 of the 291 reports in the corpus are in a file that calls `np.random.seed`. One
+report has wrong advice, on a placeholder bootstrap that a base class in arch's own source
+builds and never draws from.
 
 `seed` is a keyword of the bootstraps, the tests and the distributions since arch 5.0, so every
-document carries `since: "5.0"`. A seed does not move what the method estimates, so the rule is
-info. A bootstrap whose `state` or `generator` the file assigns is left alone: on arch 9.0.0,
-8.0.0 and 5.0, `bs.generator = np.random.default_rng(0)` gave the same interval as `seed=0`. A
-file that builds a distribution with `seed=` anywhere is left alone by the two documents that
-read the model's distribution, because a pattern cannot see which model gets it. `SPA`, `StepM`, `MCS` and `RealityCheck` are
-read only when the file imports them from `arch.bootstrap`.
+document carries `since: "5.0"`. The rule is info, because a seed does not move what the method
+estimates.
+
+The rule leaves alone a bootstrap whose `state` or `generator` the file assigns. On arch 9.0.0,
+8.0.0 and 5.0, `bs.generator = np.random.default_rng(0)` gave the same interval as `seed=0`. The
+two documents that read the model's distribution leave alone a file that builds a distribution
+with `seed=` anywhere, because a pattern cannot see which model gets it. `SPA`, `StepM`, `MCS`
+and `RealityCheck` are read only when the file imports them from `arch.bootstrap`.
 
 #### results-before-compute
 
@@ -10384,22 +10505,25 @@ mcs.compute()
 kept = mcs.included
 ```
 
-The tests run their bootstrap in `compute` and not when they are created. On a new object,
-`pvalues`, `critical_values()` and `better_models()` of `SPA` raised RuntimeError with "compute
-must be called before pvalues are available", `superior_models` of `StepM` raised it with
-"compute must be called before accessing superior_models", and `pvalues`, `included` and
-`excluded` of `MCS` raised it with "Must call compute before accessing results", on arch 9.0.0
-and on 8.0.0.
+The tests run their bootstrap in `compute` and not when they are created. On a new object each
+read raised RuntimeError, on arch 9.0.0 and on 8.0.0.
 
-The rule reports a result read straight from the constructor call, and a result read from a
-variable that the file assigns from one of the four classes and from nothing else, when no line
-of the file calls `compute` on that variable. It does not follow the order of the lines, so a
-`compute` after the read is not reported. A variable that the file also reads without a dot
-after it, as an argument of a call, in a tuple or a list, or on the right of an assignment, can
-reach `compute` under another name, as in `for test in (spa, mcs): test.compute()`, so the rule
-leaves it alone. Both reports in the corpus are rows of a table in
-arch's tests that pass a bad `pvalue` to `critical_values` to check the ValueError that comes
-first, so the advice is wrong there.
+| Class | Read | Message |
+| --- | --- | --- |
+| `SPA` | `pvalues`, `critical_values()`, `better_models()` | compute must be called before pvalues are available |
+| `StepM` | `superior_models` | compute must be called before accessing superior_models |
+| `MCS` | `pvalues`, `included`, `excluded` | Must call compute before accessing results |
+
+The rule reports a result read straight from the constructor call. It also reports a result read
+from a variable that the file assigns from one of the four classes and from nothing else, when no
+line of the file calls `compute` on that variable. It does not follow the order of the lines, so
+a read before a later `compute` is not reported.
+
+The rule leaves alone a variable that the file also reads without a dot after it, such as an
+argument of a call, an item of a tuple or a list, or the right side of an assignment. Such a
+variable can reach `compute` under another name, as in `for test in (spa, mcs): test.compute()`.
+Both reports in the corpus have wrong advice. They are rows of a table in arch's tests that pass
+a bad `pvalue` to `critical_values` to check the ValueError that comes first.
 
 #### opt-bandwidth-as-bandwidth
 
@@ -10422,7 +10546,7 @@ again = Bartlett(returns, bandwidth=first.bandwidth)
 ```
 
 A kernel covariance estimator reports the bandwidth it used as `bandwidth` and the optimal
-bandwidth of Newey and West as `opt_bandwidth`. Until arch 9.0 the two were one number. Since
+bandwidth of Newey and West as `opt_bandwidth`. Before arch 9.0 the two were one number. Since
 9.0 a kernel that is 0 beyond a finite lag uses `opt_bandwidth` minus 1, and the release notes
 say that `Bartlett(x, bandwidth=est.opt_bandwidth)` is not the same as `Bartlett(x)`.
 
@@ -10434,102 +10558,112 @@ say that `Bartlett(x, bandwidth=est.opt_bandwidth)` is not the same as `Bartlett
 | `Bartlett`, arch 8.0.0 | 19.221 | 19.221 | 0.45172 | 0.45172 |
 
 A script built every estimator class of `arch.covariance.kernel` on 9.0.0 and compared the two
-attributes. They differ for the ten classes the rule names and are equal for `Andrews`,
-`QuadraticSpectral` and `ZeroLag`, which are left alone. The document carries `since: "9.0"`.
-The corpus had no report. The table also shows that the automatic bandwidth itself changed in
-9.0, from 19.221 to 10.943 for `Bartlett`, so an estimate without `bandwidth` differs between the
+attributes. They differ for the ten classes the rule names. They are equal for `Andrews`,
+`QuadraticSpectral` and `ZeroLag`, which the rule leaves alone. The document carries
+`since: "9.0"`, and the corpus had no report. The automatic bandwidth itself also changed in 9.0,
+from 19.221 to 10.943 for `Bartlett`, so an estimate without `bandwidth` differs between the
 two releases.
 
 ### What the pack leaves out
 
-These habits were looked at and have no rule.
+The habits in the table were looked at and have no rule.
 
-- `SPA`, `StepM` and `RealityCheck` studentize the losses since arch 9.0 when `studentize=True`,
-  which is the default and did nothing before. On the same seeded losses the p-values of `SPA`
-  were 0.6733, 0.91 and 0.96 on 8.0.0 and 0.67, 0.8967 and 0.9533 on 9.0.0, and the lowest
-  critical value moved from 0.1353 to 1.5984. `studentize=False` on 9.0.0 gave the numbers of
-  8.0.0. A rule would report every call that does not say `studentize`, which is nearly all of
-  them, so the change is written here and not reported.
-- `nested=True` on those tests runs a bootstrap inside every replication since 9.0. With 300
-  replications `SPA` took 1.14 seconds against 0.0105 without it, and 0.0109 on 8.0.0. That is
-  what the option asks for, so it has no rule.
-- `forecast(start=...)` on a fit without `last_obs` forecasts rows that the fit has seen. The
-  rule for it reported more right code than wrong and was dropped. Its numbers are under "How a
-  rule earns its place".
-- `starting_values` from the last window did not speed up a rolling fit: 40 windows took 0.209
-  seconds without them and 0.200 with them.
-- An `IIDBootstrap` resamples single rows, and arch's documentation gives the block bootstraps
-  and `optimal_block_length` for a series that is correlated in time. A pattern cannot see
-  whether a series is correlated. `CircularBlockBootstrap` and `MovingBlockBootstrap` raise
-  TypeError since 9.0 on a block size that is not a whole number, such as the 55.04 that
-  `optimal_block_length` returned for one series, and `StationaryBootstrap` takes it. The block
-  size is a variable in such code, and a pattern does not read a variable.
-- A unit root test on the wrong series and a p-value read against the wrong null hypothesis are
-  mistakes in the data or in the reading of the result. On 1,000 log prices of the S&P 500,
-  `ADF` gave a p-value of 0.648 and `KPSS` gave 0.0001, because the null of `ADF` is a unit root
-  and the null of `KPSS` is no unit root. A pattern sees neither the series nor the reading.
-- A `block_size` given as a float is a variable in the code that was read, as described above,
-  so `arch-rejected-number` does not read it.
+| Habit | What was measured | Why there is no rule |
+| --- | --- | --- |
+| `SPA`, `StepM` and `RealityCheck` studentize the losses since arch 9.0 when `studentize=True`, the default, which did nothing before | On the same seeded losses the p-values of `SPA` were 0.6733, 0.91 and 0.96 on 8.0.0 and 0.67, 0.8967 and 0.9533 on 9.0.0, and the lowest critical value moved from 0.1353 to 1.5984. `studentize=False` on 9.0.0 gave the numbers of 8.0.0. | A rule would report nearly every call, because few calls say `studentize` |
+| `nested=True` on the same tests runs a bootstrap inside every replication since 9.0 | With 300 replications `SPA` took 1.14 seconds, against 0.0105 without it and 0.0109 on 8.0.0 | The option asks for the extra work |
+| `forecast(start=...)` on a fit without `last_obs` forecasts rows that the fit has seen | The numbers are under "How a rule earns its place" | The rule reported more right code than wrong and was dropped |
+| `starting_values` from the last window of a rolling fit | 40 windows took 0.209 seconds without them and 0.200 with them | The fit was not faster |
+| an `IIDBootstrap` on a series that is correlated in time, where arch's documentation gives the block bootstraps and `optimal_block_length` | `CircularBlockBootstrap` and `MovingBlockBootstrap` raise TypeError since 9.0 on a block size that is not a whole number, such as the 55.04 that `optimal_block_length` returned for one series. `StationaryBootstrap` takes it. | A pattern cannot see whether a series is correlated, and the block size is a variable in such code |
+| a unit root test on the wrong series, or a p-value read against the wrong null hypothesis | On 1,000 log prices of the S&P 500, `ADF` gave a p-value of 0.648 and `KPSS` gave 0.0001, because the null of `ADF` is a unit root and the null of `KPSS` is no unit root | A pattern sees neither the series nor the reading |
+| a `block_size` given as a float | It was a variable in every file that was read | `arch-rejected-number` reads only a number written in the call |
 
 ## pymoo
 
-These rules run on files that import `pymoo`, the module of [pymoo](https://pymoo.org/), which
-runs single-objective and multi-objective optimization with evolutionary algorithms. They report
-imports and options that older releases had and that raise on pymoo 0.6.2, problem classes that
-hand pymoo wrong numbers, keywords that pymoo accepts and never reads, runs whose result is not
-the one the code asks for, and reference points and weights that give another number than the
-code means. Every number in this section was measured on pymoo 0.6.2 with NumPy 2.4.6, unless
-another release is named. Examples assume that the pymoo names they use are imported. Names such
-as `problem`, `F` and `pf` represent values supplied by your program.
+The pymoo rules find code from older pymoo releases that raises or does nothing on pymoo 0.6.2,
+problem classes that hand pymoo wrong numbers, runs whose result is not the one the code asks
+for, and reference points and weights that give another number than the code means. They run on
+files that import `pymoo`, the module of [pymoo](https://pymoo.org/), which runs
+single-objective and multi-objective optimization with evolutionary algorithms.
 
-pymoo renamed its modules in 0.5.0, removed `pymoo.factory` and most keywords of the 0.4 API in
-0.6.0 and 0.6.1, and moved its random numbers to a generator of its own in 0.6.1.6. A rule
-document about such a change carries `since`. xpd reads the installed version from the project's
-venv, as it does for pandas, and skips the document on an older release, so a project that still
-has pymoo 0.5.0 gets no report about 0.6. When the venv has no pymoo, or there is no venv, every
-document runs but those with `until`. A document carries `until` when its advice differs by
-release: `StarmapParallelization` and `DaskParallelization` are in `pymoo.core.problem` on 0.6.0
-to 0.6.1.5 and in `pymoo.parallelization` from 0.6.1.6 on, where the other import raised
-ModuleNotFoundError, and the Nelder and Mead and pattern search modules are
-`pymoo.algorithms.soo.nonconvex.nelder_mead` and `pattern_search` on 0.5.0 and `nelder` and
-`pattern` from 0.6.0 on. A project gets the module of the release in its venv.
+| Group | What its rules report |
+| --- | --- |
+| Older releases | imports, keywords and options of pymoo 0.4 and 0.5 that raise, warn or do nothing on 0.6.2 |
+| The problem class | an `_evaluate` that hands pymoo wrong numbers or raises |
+| Running an algorithm | `minimize` keywords that pymoo never reads, and an algorithm read or reused after a run |
+| Random numbers | runs without a seed, and draws from `np.random` that the seed does not reach |
+| Indicators and decisions | reference points and weights that give another number than the code means |
 
-A pattern sees no types, so every rule ties what it reports to pymoo by a name. A class or a
-function must be one the file imports from pymoo, such as `Problem` from `pymoo.core.problem` or
-`minimize` from `pymoo.optimize`, and an object must be a name the file binds to such a class.
-One document of `deprecated-in-pymoo`, about the `"feasible"` key, reads the name of a variable
-instead. It says so and has no fix.
+Every number in the pymoo section was measured on pymoo 0.6.2 with NumPy 2.4.6, unless another
+release is named. The examples assume that the pymoo names they use are imported, and names such
+as `problem`, `F` and `pf` stand for values from your program.
+
+xpd picks the rule documents that match the pymoo release in the project's venv. pymoo renamed
+its modules in 0.5.0, removed `pymoo.factory` and most keywords of the 0.4 API in 0.6.0 and
+0.6.1, and moved its random numbers to a generator of its own in 0.6.1.6. A rule document about
+such a change carries `since`. A document carries `until` as well when its advice differs by
+release, and a second document then gives the advice of the newer releases. xpd reads the
+installed version from the venv as it does for pandas:
+
+```text
+on(check a file that imports pymoo)
+  if the venv has no pymoo, or there is no venv
+    run every document that has no until
+  else
+    run each document whose since is at most the installed version
+      and whose until, if it has one, is above it
+```
+
+A project on pymoo 0.5.0 therefore gets no report about 0.6. The table gives the two moves that
+need `until`, and a project gets the module of the release in its venv. From 0.6.0 to 0.6.1.5
+the import from `pymoo.parallelization` raised ModuleNotFoundError.
+
+| Names | 0.5.0 | 0.6.0 to 0.6.1.5 | 0.6.1.6 and later |
+| --- | --- | --- | --- |
+| `StarmapParallelization`, `DaskParallelization` | not in pymoo | `pymoo.core.problem` | `pymoo.parallelization` |
+| Nelder and Mead, pattern search | `pymoo.algorithms.soo.nonconvex.nelder_mead`, `pattern_search` | `pymoo.algorithms.soo.nonconvex.nelder`, `pattern` | `pymoo.algorithms.soo.nonconvex.nelder`, `pattern` |
+
+Every rule ties what it reports to pymoo by a name, because a pattern sees no types. A class or
+a function must be one that the file imports from pymoo, such as `Problem` from
+`pymoo.core.problem` or `minimize` from `pymoo.optimize`. An object must be a name that the file
+binds to such a class. One document of `deprecated-in-pymoo`, about the `"feasible"` key, reads
+the name of a variable instead, and its section says so.
 
 ### How a rule earns its place
 
-Every rule document ships on something that was run, and it is one of four kinds:
+Every rule document ships on a proof that was run, and the proof is one of four kinds.
 
-- An interpreter proof runs the old form and the new form. It passes when the old form raises or
-  warns and the new form runs clean. For a removed import, the old form also had to run on the
-  last release that has it and raise on the next one. The eleven releases from 0.4.2.2 to 0.6.2
-  were installed from PyPI for that, and `since` names the first release where the form raises.
-- A value proof runs the old and the new form on the same input and gives both results.
-- A rerun proof runs the old form twice. It passes when the two results differ and the new form
-  gives the same result twice.
-- A speed proof times both forms and compares what they return.
+| Proof | How it was run | What it shows |
+| --- | --- | --- |
+| interpreter | The old form and the new form ran. For a removed import, the old form also ran on the last release that has it and on the next one, from the eleven releases from 0.4.2.2 to 0.6.2 on PyPI. | The old form raises or warns and the new form runs clean. `since` names the first release where the old form raises. |
+| value | The old and the new form ran on the same input. | Both results. |
+| rerun | The old form ran twice. | The two results differ, and the new form gives the same result twice. |
+| speed | Both forms were timed. | The two times, and whether the two forms return the same values. |
 
 A document is `error` only on an interpreter proof or a value proof, and its message quotes what
 was measured. A document that can also match code that is meant, such as a mutation that few
-individuals should get, is `warning`.
+individuals should get, is a `warning`.
 
-The lists inside the rules were read from the installed releases and not written by hand. The
-130 removed modules, the 49 names that a kept module lost, the ten termination names that 0.6.0
-dropped and the 45 algorithm classes are what the wheels hold, and each removed import was run
-on the release before and on the release at the version named. The first two lists leave out
-`pymoo.experimental`, `pymoo.usage`, `pymoo.docs` and `pymoo.vendor`. Each of the 89 replacement modules
-that a fix writes was imported on 0.6.2 together with every name the fix lets through.
+The lists inside the rules were read from the installed wheels and not written by hand.
 
-The rules were then run over two sets of code, and reports were read. The first is pymoo's own
-code at the 0.6.2 tag: 541 Python files, which are the library, its examples, its tests and the
-Python code of its documentation pages. The second is 2,046 files from 409 public repositories
-that import pymoo, found by a code search on GitHub. Another 2,464 files in those repositories
-are copies of pymoo's own modules and are not counted. A rule that reported correct code was
-narrowed, and the table gives what is left.
+| List | Entries | Check |
+| --- | --- | --- |
+| removed modules | 130 | each import ran on the release before and on the release named |
+| names that a kept module lost | 49 | the same |
+| termination names that 0.6.0 dropped | 10 | read from the wheels |
+| algorithm classes | 45 | read from the wheels |
+| replacement modules that a fix writes | 89 | each was imported on 0.6.2 with every name the fix lets through |
+
+The first two lists leave out `pymoo.experimental`, `pymoo.usage`, `pymoo.docs` and
+`pymoo.vendor`.
+
+The rules were then run over two sets of code, and the reports were read. A rule that reported
+correct code was narrowed, and the table after the list of sets gives what is left.
+
+| Set | Files | What the files are |
+| --- | --- | --- |
+| pymoo's own code at the 0.6.2 tag | 541 | the library, its examples, its tests and the Python code of its documentation pages |
+| public code | 2,046 from 409 repositories | files that import pymoo, found by a code search on GitHub. Another 2,464 files in the repositories are copies of pymoo's own modules and are not counted. |
 
 | Rule | Severity | Proof | Reports on pymoo's own code | Reports on public code | Wrong advice | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -10562,36 +10696,39 @@ where following the message would not fix a real problem in that code. Where a r
 reports than were read, the cell says how many were read. A rule with fewer reports had every
 report read.
 
-The one report with wrong advice is a documentation page of pymoo that saves the history for a
-later page to plot, which xpd reads as another file. The public reports of `unread-history` were
-not judged for that reason: 94 of the 110 are in a repository where some other file names
-history, so the rule is `info`. The 57 reports on pymoo's own code are otherwise real. Its
-examples pass `n_gen=100` to `minimize`, where it does nothing, its documentation reads the
-deprecated `"feasible"` key, and the custom operators in its guide draw from `np.random`.
+The one report with wrong advice is on a documentation page of pymoo that saves the history for
+a later page to plot, which xpd reads as another file. For the same reason the public reports of
+`unread-history` were not judged, and the rule is `info`, because 94 of the 110 are in a
+repository where another file names `history`. Apart from that one report, the 57 reports on pymoo's own code are real.
+For example, its examples pass `n_gen=100` to `minimize`, where the keyword does nothing, and its
+documentation reads the deprecated `"feasible"` key. The custom operators in its guide draw from
+`np.random`.
 
-Three rules were narrowed after the first run. `algorithm-read-after-minimize` reported 29
-callbacks and comprehensions that have a variable named like the algorithm, and now needs the
-read in the scope of the run. `evaluate-returns-value` reported one base class that returns
-`NotImplemented`. `unread-history` reported runs inside functions, whose caller may read the
-history.
+Rules were narrowed twice. The reports on pymoo's own code and on the public files were the same
+before and after the second change, line for line.
 
-A review then found reports on code that runs. `evaluate-indexing` and
-`objectives-stacked-by-row` now leave a class alone that can be built with `elementwise=True`,
-`reused-algorithm-without-copy` leaves a loop over the algorithms alone,
-`algorithm-read-after-minimize` reads a walrus as a new binding, and `has-terminated-assignment`
-and the `calc` document of `removed-in-pymoo` need a name that the file ties to pymoo. The
-reports on pymoo's own code and on the public files were the same before and after, line for
-line, and `positional-problem-bounds`, which the review added, made no report on either.
+| Rule | Right code it matched | Change |
+| --- | --- | --- |
+| `algorithm-read-after-minimize` | 29 callbacks and comprehensions with a variable named like the algorithm | needs the read in the scope of the run, and reads a walrus as a new binding |
+| `evaluate-returns-value` | one base class that returns `NotImplemented` | leaves the class alone |
+| `unread-history` | runs inside functions, whose caller may read the history | reads runs outside every function |
+| `evaluate-indexing`, `objectives-stacked-by-row` | a class that can be built with `elementwise=True` | leave the class alone |
+| `reused-algorithm-without-copy` | a loop over the algorithms | leaves the loop alone |
+| `has-terminated-assignment`, the `calc` document of `removed-in-pymoo` | a name with no tie to pymoo | need a name that the file ties to pymoo |
 
-Recall was not measured. No set of real pymoo code was held back, so the table says how often a
-rule is wrong when it reports, and not how often it misses.
+The first three changes came after the first run, and the others after a review. The review also
+added `positional-problem-bounds`, which made no report on either set.
 
-The pack has no rule for the following, because a pattern cannot see what decides them.
+Recall was not measured, because no set of real pymoo code was held back. The table says how
+often a rule is wrong when it reports, and not how often it misses.
+
+The pack has no rule for the habits in the table, because a pattern cannot see what decides
+them.
 
 | Habit | What was measured | Why there is no rule |
 | --- | --- | --- |
 | A constraint written with the wrong sign | `out["G"]` must be at most 0 where the constraint holds | The direction a constraint is meant in is not in the code |
-| A maximised objective that is not negated back | pymoo only minimizes, so `res.F` holds the negated value | The problem class and the code that reads `res.F` are mostly in different files |
+| A maximized objective that is not negated back | pymoo only minimizes, so `res.F` holds the negated value | The problem class and the code that reads `res.F` are mostly in different files |
 | `pop_size` below the number of reference directions in `NSGA3` | pymoo prints a warning, and 54 solutions came back for 91 directions | The number of directions is a binomial of two arguments |
 | A problem without `xl` and `xu` | `GA` raised TypeError when it sampled | A binary or a permutation problem needs no bounds |
 | Variables given with `vars` and run with `NSGA2` | TypeError, `'>=' not supported between instances of 'dict' and 'dict'` | The problem and the algorithm are tied only by the call that runs them |
@@ -10601,14 +10738,25 @@ The pack has no rule for the following, because a pattern cannot see what decide
 
 ### Older releases
 
-Each form below worked on an older pymoo. On pymoo 0.6.2 it raises, warns, or is accepted and
-does nothing.
+The rules in the group report forms that worked on an older pymoo and that raise, warn, or are
+accepted and do nothing on pymoo 0.6.2.
 
 #### removed-in-pymoo
 
 **Severity:** error. **Fix:** unsafe: the new module for 89 removed modules when every imported name is still in it, such as `pymoo.core.problem` for `pymoo.model.problem` and `pymoo.algorithms.moo.nsga2` for `pymoo.algorithms.nsga2`, the new import for `get_problem`, `get_termination` or `get_reference_directions` imported alone from `pymoo.factory`, and `do` for `calc` on an indicator. The other forms have no fix.
 
-Reports an import of one of the 130 modules that pymoo removed between 0.5.0 and 0.6.2, with the module that took its place where there is one. That covers `pymoo.model`, the algorithm modules of 0.4 such as `pymoo.algorithms.nsga2` and `pymoo.algorithms.so_genetic_algorithm`, the long operator modules such as `pymoo.operators.crossover.simulated_binary_crossover`, `pymoo.performance_indicator`, `pymoo.decision_making`, `pymoo.util.termination`, `pymoo.operators.mixed_variable_operator`, `pymoo.interface`, `pymoo.util.function_loader` and `pymoo.factory`. It also reports the functions of `pymoo.factory` that built an object from a name, each with the classes to use, 49 names that a module of 0.6.2 no longer has, such as `Display` in `pymoo.util.display` and `starmap_parallelized_eval` in `pymoo.core.problem`, the ten termination names that 0.6.0 dropped, such as `"f_tol"` and `"x_tol"`, given to `get_termination` or in a tuple given to `minimize`, and `calc` on an indicator. An import inside a `try` block that catches the error, or behind a version check, is left alone.
+Reports a module, a name or an option that pymoo removed between 0.5.0 and 0.6.2, and the
+message names what took its place where there is one.
+
+| Form | Examples |
+| --- | --- |
+| an import of one of the 130 removed modules | `pymoo.model`, the algorithm modules of 0.4 such as `pymoo.algorithms.nsga2` and `pymoo.algorithms.so_genetic_algorithm`, the long operator modules such as `pymoo.operators.crossover.simulated_binary_crossover`, `pymoo.performance_indicator`, `pymoo.decision_making`, `pymoo.util.termination`, `pymoo.operators.mixed_variable_operator`, `pymoo.interface`, `pymoo.util.function_loader` and `pymoo.factory` |
+| a function of `pymoo.factory` that built an object from a name | `get_sampling("real_random")`, and the message names the class to use |
+| one of 49 names that a module of 0.6.2 no longer has | `Display` in `pymoo.util.display`, `starmap_parallelized_eval` in `pymoo.core.problem` |
+| one of the ten termination names that 0.6.0 dropped, given to `get_termination` or in a tuple given to `minimize` | `"f_tol"`, `"x_tol"` |
+| `calc` on an indicator | `Hypervolume(...).calc(F)` |
+
+An import inside a `try` block that catches the error, or behind a version check, is left alone.
 
 Example:
 
@@ -10652,7 +10800,17 @@ hv = HV(ref_point=np.array([1.1, 1.1]))(res.F)
 
 **Severity:** warning. **Fix:** safe: `from pymoo.parallelization import StarmapParallelization` for the import from `pymoo.core.problem` when the statement imports that one name, and `"FEAS"` for `"feasible"` on the population of a result of `minimize`. The key on another object has no fix.
 
-Reports `StarmapParallelization` imported from `pymoo.core.problem`, which raises ImportError on pymoo 0.6.1.6 and DeprecationWarning on 0.6.2, where both paths give the same class. It also reports the key `"feasible"` given to `get`, which raised 40 warnings for a population of 20 where `"FEAS"` returned an equal array with none. One document needs `res.pop`, `res.opt` or `res.off`, where `res` is the result of `minimize`. Another reads the name of the object, a variable or an attribute named `pop`, `opt`, `off` or `population`, so `get` on a dictionary of that name gets a wrong report.
+Reports two forms that pymoo deprecated.
+
+| Form | On pymoo | Replacement |
+| --- | --- | --- |
+| `StarmapParallelization` imported from `pymoo.core.problem` | 0.6.1.6: ImportError. 0.6.2: DeprecationWarning. | the import from `pymoo.parallelization`, which gives the same class on 0.6.2 |
+| the key `"feasible"` given to `get` | since 0.6.1.2: a DeprecationWarning for every individual, 40 for a population of 20 | `"FEAS"`, which returned an equal array with no warning |
+
+The key is read in two ways. One document needs `res.pop`, `res.opt` or `res.off`, where `res`
+is the result of `minimize`, and it has the fix. Another reads the name of the object, a
+variable or an attribute named `pop`, `opt`, `off` or `population`, so `get` on a dictionary of
+such a name gets a wrong report, and it has no fix.
 
 Example:
 
@@ -10714,13 +10872,31 @@ class Sphere(Problem):
         super().__init__(2, 1, 0, xl=np.zeros(2), xu=np.ones(2))
 ```
 
-On pymoo 0.6.2 and on 0.6.0 the first class was built with no error and had `n_eq_constr` [0, 0], `xl` [1, 1] and `xu` None, and `minimize` with `GA` then raised TypeError, "only integer scalar arrays can be converted to a scalar index". With `xu=` as a keyword after the four positions it had `xl` None. On 0.5.0 both ran with `xl` [0, 0] and `xu` [1, 1], and the second class ran on all three. The rule reads a call with exactly five positional arguments and no `xl` or `xu` keyword, and a call with exactly four and `xu` as a keyword. A whole number written as the fourth argument is a count, as in `Problem(2, 1, 0, 0, xl)`, and is left alone.
+The first class was built with no error on 0.6.0 and later, and `minimize` failed afterwards.
+
+| Arguments of `super().__init__` | pymoo | What happened |
+| --- | --- | --- |
+| `(2, 1, 0, np.zeros(2), np.ones(2))` | 0.6.0, 0.6.2 | The problem had `n_eq_constr` [0, 0], `xl` [1, 1] and `xu` None, and `minimize` with `GA` raised TypeError, "only integer scalar arrays can be converted to a scalar index". |
+| `(2, 1, 0, np.zeros(2), xu=np.ones(2))` | 0.6.0, 0.6.2 | The problem had `xl` None. |
+| either of the two above | 0.5.0 | The run had `xl` [0, 0] and `xu` [1, 1]. |
+| `(2, 1, 0, xl=np.zeros(2), xu=np.ones(2))` | 0.5.0, 0.6.0, 0.6.2 | The run worked. |
+
+The rule reads a call with exactly five positional arguments and no `xl` or `xu` keyword, and a
+call with exactly four and `xu` as a keyword. A whole number written as the fourth argument is a
+count, as in `Problem(2, 1, 0, 0, xl)`, and is left alone.
 
 #### ignored-problem-keyword
 
 **Severity:** error for `elementwise_evaluation` and `parallelization`, warning for `type_var`. **Fix:** none.
 
-Reports three keywords of the pymoo 0.4 `Problem` that pymoo 0.6 stores in `problem.data` and never reads. With `elementwise_evaluation=True` the method gets the whole population where it expects one solution, and a method of `x[0]`, `x[1]` and `x[2]` returned [0.66, 0.93, 1.26] for three solutions whose values are [0.14, 0.77, 1.94]. With `parallelization=("starmap", pool.starmap)` the starmap was called 0 times in 3 generations, where pymoo 0.4.2.2 called it 3 times. A problem built with `type_var=int` had `vtype` None.
+Reports a keyword of the pymoo 0.4 `Problem` that pymoo 0.6 stores in `problem.data` and never
+reads.
+
+| Keyword | What happened on pymoo 0.6 |
+| --- | --- |
+| `elementwise_evaluation=True` | `_evaluate` gets the whole population where it expects one solution. A method of `x[0]`, `x[1]` and `x[2]` returned [0.66, 0.93, 1.26] for three solutions whose values are [0.14, 0.77, 1.94]. |
+| `parallelization=("starmap", pool.starmap)` | The starmap was called 0 times in 3 generations, where pymoo 0.4.2.2 called it 3 times. |
+| `type_var=int` | The problem had `vtype` None. |
 
 Example:
 
@@ -10748,7 +10924,13 @@ class Sphere(ElementwiseProblem):
 
 **Severity:** error. **Fix:** unsafe: `termination=` before the second argument.
 
-Reports a termination given to `setup` as the second positional argument, on a name the file binds to a pymoo algorithm. That was the form up to pymoo 0.5.0. It raises TypeError from 0.6.0 to 0.6.1.5, and since 0.6.1.6 the second parameter is `verbose`. `NSGA2` set up with `("n_gen", 7)` then printed a line for every generation and was still running after 30.
+Reports a termination given to `setup` as the second positional argument, on a name the file binds to a pymoo algorithm.
+
+| pymoo | `setup(problem, ("n_gen", 7))` |
+| --- | --- |
+| 0.5.0 and older | the second parameter is the termination |
+| 0.6.0 to 0.6.1.5 | TypeError |
+| 0.6.1.6 and later | the second parameter is `verbose`, and `NSGA2` printed a line for every generation and was still running after 30 |
 
 Example:
 
@@ -10768,7 +10950,7 @@ algorithm.setup(problem, termination=("n_gen", 200), seed=1)
 
 **Severity:** error. **Fix:** none.
 
-Reports `has_terminated = False` on a name that the file assigns from `np.load`, `pickle.load` or `dill.load`, also as one name of a tuple. Another object with an attribute of that name is left alone. The checkpoint recipe of pymoo 0.4 and 0.5 used that line to let a loaded algorithm run on. Since 0.6.0 nothing reads the attribute. An `NSGA2` that had finished its 5 generations ran 0 more generations after the line, and 15 more after it got a new termination.
+Reports `has_terminated = False` on a name that the file assigns from `np.load`, `pickle.load` or `dill.load`, also as one name of a tuple. Another object with an attribute of the same name is left alone. The checkpoint recipe of pymoo 0.4 and 0.5 set the attribute to let a loaded algorithm run on, and since 0.6.0 pymoo no longer reads it. An `NSGA2` that had finished its 5 generations ran 0 more generations after `has_terminated = False`, and 15 more after it got a new termination.
 
 Example:
 
@@ -10790,7 +10972,12 @@ res = minimize(problem, checkpoint, copy_algorithm=False)
 
 **Severity:** warning. **Fix:** unsafe: `prob_var=`.
 
-Reports `prob=` on `PM`, `PolynomialMutation`, `BitflipMutation`, `BFM`, `GaussianMutation` and `GM` when the value is 1 divided by something, or a number of at most 0.2, and the call has no `prob_var`. Up to pymoo 0.5.0 `prob` was the chance that one variable changes. Since 0.6.0 it is the share of individuals that mutate, and `prob_var` is the chance per variable. On 20,000 individuals of 30 variables, `prob=1/30` changed 63 percent of the individuals on pymoo 0.5.0 and 2 percent on 0.6.2, where `prob_var=1/30` changed 57 percent.
+Reports `prob=` on `PM`, `PolynomialMutation`, `BitflipMutation`, `BFM`, `GaussianMutation` and `GM` when the value is 1 divided by something, or a number of at most 0.2, and the call has no `prob_var`. Up to pymoo 0.5.0 `prob` was the chance that one variable changes. Since 0.6.0 it is the share of individuals that mutate, and `prob_var` is the chance per variable.
+
+| 20,000 individuals of 30 variables | pymoo 0.5.0 | pymoo 0.6.2 |
+| --- | --- | --- |
+| individuals changed by `prob=1/30` | 63 percent | 2 percent |
+| individuals changed by `prob_var=1/30` | not run | 57 percent |
 
 Example:
 
@@ -10808,7 +10995,13 @@ mutation = PM(prob_var=1 / problem.n_var, eta=20)
 
 **Severity:** error. **Fix:** unsafe: `zero_to_one=`.
 
-Reports `normalize=True` on `GD`, `GDPlus`, `IGD` and `IGDPlus`. The keyword is from pymoo 0.4, and the constructors still accept it and do nothing with it. With a front whose first objective runs to 1000, `IGD(pf, normalize=True)` gave 0.082 on pymoo 0.4.2.2. On 0.6.2 it gave 25.25, the same as `IGD(pf)`, where `IGD(pf, zero_to_one=True)` gave 0.082.
+Reports `normalize=True` on `GD`, `GDPlus`, `IGD` and `IGDPlus`. The keyword is from pymoo 0.4, and the constructors still accept it and do nothing with it.
+
+| A front whose first objective runs to 1000 | pymoo 0.4.2.2 | pymoo 0.6.2 |
+| --- | --- | --- |
+| `IGD(pf, normalize=True)` | 0.082 | 25.25 |
+| `IGD(pf)` | not run | 25.25 |
+| `IGD(pf, zero_to_one=True)` | not run | 0.082 |
 
 Example:
 
@@ -10824,15 +11017,22 @@ igd = IGD(pf, zero_to_one=True)(res.F)
 
 ### The problem class
 
-A `Problem` gets the whole population in one call of `_evaluate`, as an array with one row per
-solution. An `ElementwiseProblem` gets one solution, as an array with one value per variable.
-Both write their results to the dictionary `out`.
+The rules in the group report an `_evaluate` that hands pymoo wrong numbers or raises. The two
+problem classes get `x` in different shapes, and both write their results to the dictionary
+`out`.
+
+| Class | What `_evaluate` gets as `x` | The first variable |
+| --- | --- | --- |
+| `Problem` | the whole population, as an array with one row per solution | `x[:, 0]` |
+| `ElementwiseProblem` | one solution, as an array with one value per variable | `x[0]` |
 
 #### objectives-stacked-by-row
 
 **Severity:** error. **Fix:** unsafe: `np.column_stack` on the same list.
 
-Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. That array has one row per objective, and pymoo reshapes it to one row per solution without transposing. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10. An `ElementwiseProblem`, where a list of numbers is right, and a stack followed by `.T` are left alone. So is a class that passes `elementwise=` with any value but `False`, such as `elementwise=elementwise`, or passes `**kwargs` on to `__init__`, because the caller can then build it with `elementwise=True`.
+Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. Such an array has one row per objective, and pymoo reshapes it to one row per solution without transposing. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10.
+
+The rule leaves alone an `ElementwiseProblem`, where a list of numbers is right, and a stack followed by `.T`. It also leaves alone a class that passes `elementwise=` with any value but `False`, such as `elementwise=elementwise`, or passes `**kwargs` on to `__init__`, because the caller can then build it with `elementwise=True`.
 
 Example:
 
@@ -10910,7 +11110,14 @@ class Bounded(Problem):
 
 **Severity:** error. **Fix:** none.
 
-Reports `x[:, 0]` on the parameter of `_evaluate` in an `ElementwiseProblem`, which raised IndexError, "too many indices for array". It also reports `x[0]` in a `Problem` whose `_evaluate` uses the parameter only with whole numbers as subscripts and has no loop. That takes the first solution and not the first variable, and with 100 solutions of 2 variables it raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided (2,)". A `Problem` class that passes `elementwise=` with any value but `False`, or passes `**kwargs` on to `__init__`, can be built with `elementwise=True` and then gets one solution, so it is left alone.
+Reports an index that takes the wrong axis of `x` for the class.
+
+| Class | Code | What happened |
+| --- | --- | --- |
+| `ElementwiseProblem` | `x[:, 0]` on the parameter of `_evaluate` | IndexError, "too many indices for array" |
+| `Problem` | `x[0]`, when `_evaluate` uses the parameter only with whole numbers as subscripts and has no loop | `x[0]` takes the first solution and not the first variable. With 100 solutions of 2 variables it raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided (2,)". |
+
+The rule leaves alone a `Problem` class that passes `elementwise=` with any value but `False`, or passes `**kwargs` on to `__init__`, because it can be built with `elementwise=True` and then gets one solution.
 
 Example:
 
@@ -10932,7 +11139,14 @@ class Sphere(ElementwiseProblem):
 
 **Severity:** error. **Fix:** none.
 
-Reports `elementwise_runner=pool.starmap`, which raised TypeError, "ElementwiseEvaluationFunction.__call__() takes 2 positional arguments but 3 were given", because a runner is called as `runner(f, X)`. It also reports `elementwise_runner=` given to a class that the file defines with `Problem` as its base. A `Problem` evaluates the population in one call and never calls the runner: in 3 generations it was called 0 times, where an `ElementwiseProblem` called it 3 times. A call that also passes `elementwise=` or `**kwargs` is left alone. `StarmapParallelization` is in `pymoo.core.problem` on 0.6.0 to 0.6.1.5 and in `pymoo.parallelization` from 0.6.1.6 on, and the message names the module of the release in the venv.
+Reports an `elementwise_runner=` that pymoo cannot call or never calls.
+
+| Code | What happened |
+| --- | --- |
+| `elementwise_runner=pool.starmap` | TypeError, "ElementwiseEvaluationFunction.__call__() takes 2 positional arguments but 3 were given", because a runner is called as `runner(f, X)` |
+| `elementwise_runner=` given to a class that the file defines with `Problem` as its base | A `Problem` evaluates the population in one call, so the runner was called 0 times in 3 generations, where an `ElementwiseProblem` called it 3 times. |
+
+A call that also passes `elementwise=` or `**kwargs` is left alone. `StarmapParallelization` is in `pymoo.core.problem` on 0.6.0 to 0.6.1.5 and in `pymoo.parallelization` from 0.6.1.6 on, and the message names the module of the release in the venv.
 
 Example:
 
@@ -10948,11 +11162,19 @@ problem = MyElementwiseProblem(elementwise_runner=StarmapParallelization(pool.st
 
 ### Running an algorithm
 
+The rules in the group report `minimize` keywords that pymoo never reads, and an algorithm that
+is read or run again after `minimize` copied it.
+
 #### minimize-ignored-keyword
 
 **Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` and `random_seed=`. The stopping keywords have no fix.
 
-Reports `n_gen`, `n_eval`, `n_evals`, `n_iter`, `n_max_gen`, `max_gen` and `generations` given to `minimize` as keywords. `minimize` hands a keyword it does not know to the algorithm, which stores it and reads it nowhere. With each of the seven, `NSGA2` ran 1,000 generations and 20,000 evaluations, which is where the default termination stops. It also reports `random_state` and `random_seed`: two runs with either set to 1 returned different fronts, and two runs with `seed=1` the same front.
+Reports a keyword that `minimize` hands to the algorithm, which stores it and reads it nowhere.
+
+| Keyword | What happened |
+| --- | --- |
+| `n_gen`, `n_eval`, `n_evals`, `n_iter`, `n_max_gen`, `max_gen`, `generations` | With each of the seven, `NSGA2` ran 1,000 generations and 20,000 evaluations, where the default termination stops. |
+| `random_state`, `random_seed` | Two runs with either set to 1 returned different fronts, and two runs with `seed=1` returned the same front. |
 
 Example:
 
@@ -10970,7 +11192,16 @@ res = minimize(problem, NSGA2(pop_size=100), termination=("n_gen", 200), seed=1)
 
 **Severity:** error. **Fix:** none.
 
-Reports `pop`, `opt`, `off`, `n_gen`, `n_iter`, `history`, `callback` and `result` read from an algorithm after it was given to `minimize`. `minimize` runs a deep copy and returns it as `res.algorithm`. After a run of 10 generations, `algorithm.pop`, `algorithm.opt` and `algorithm.n_gen` were None, `algorithm.result()` raised TypeError, and a callback given to the constructor had 0 records, where the one in `res.algorithm` had 10. A call with `copy_algorithm`, a name that is assigned again after the run or bound by a walrus, as in `(algorithm := res.algorithm)`, and a file that also drives the same name with `setup` or `next` are left alone.
+Reports `pop`, `opt`, `off`, `n_gen`, `n_iter`, `history`, `callback` and `result` read from an algorithm after it was given to `minimize`. `minimize` runs a deep copy and returns it as `res.algorithm`.
+
+| After a run of 10 generations | Value |
+| --- | --- |
+| `algorithm.pop`, `algorithm.opt`, `algorithm.n_gen` | None |
+| `algorithm.result()` | TypeError |
+| records of a callback given to the constructor | 0 |
+| records of the callback in `res.algorithm` | 10 |
+
+The rule leaves alone a call with `copy_algorithm`, and a name that is assigned again after the run or bound by a walrus, as in `(algorithm := res.algorithm)`. It also leaves alone a file that drives the same name with `setup` or `next`.
 
 Example:
 
@@ -10992,7 +11223,7 @@ best = res.algorithm.callback.data["best"]
 
 **Severity:** error. **Fix:** none.
 
-Reports a second `minimize` on the same algorithm when both calls pass `copy_algorithm=False`, in one block or in a loop that never binds the name. A loop over the algorithms, as in `for algorithm in [NSGA2(), SMSEMOA()]`, gives each pass another object and is left alone. `minimize` then sets the algorithm up only when it has no problem yet. A second call with another problem, `("n_gen", 30)` and another seed returned the `F` of the first call, still at generation 11 and still on the first problem.
+Reports a second `minimize` on the same algorithm when both calls pass `copy_algorithm=False`, in one block or in a loop that never binds the name. With `copy_algorithm=False`, `minimize` sets the algorithm up only when it has no problem yet. A second call with another problem, `("n_gen", 30)` and another seed returned the `F` of the first call, still at generation 11 and still on the first problem. A loop over the algorithms, as in `for algorithm in [NSGA2(), SMSEMOA()]`, gives each pass another object and is left alone.
 
 Example:
 
@@ -11014,7 +11245,12 @@ for problem in problems:
 
 **Severity:** info. **Fix:** none.
 
-Reports `save_history=True` given to `minimize` outside every function, in a file that never names `history` and does not use pickle, dill or joblib. The option keeps a deep copy of the algorithm for every generation. `NSGA2` with 100 solutions and 200 generations took 2.6 times as long with it, 1.17 against 0.45 seconds, and its result pickled to 20.3 MB against 0.13 MB, with the same `F`. When another file reads the history of this run, the report is wrong.
+Reports `save_history=True` given to `minimize` outside every function, in a file that never names `history` and does not use pickle, dill or joblib. The option keeps a deep copy of the algorithm for every generation. When another file reads the history of the run, the report is wrong.
+
+| `NSGA2`, 100 solutions, 200 generations | Time | Pickled result | `F` |
+| --- | --- | --- | --- |
+| `save_history=True` | 1.17 seconds | 20.3 MB | the same |
+| without it | 0.45 seconds | 0.13 MB | the same |
 
 Example:
 
@@ -11034,7 +11270,12 @@ print(res.F)
 
 **Severity:** error. **Fix:** none.
 
-Reports `pop_size=` on `MOEAD`, which sets the population to the number of reference directions itself since pymoo 0.5.0 and raises TypeError, "got multiple values for keyword argument 'pop_size'". It also reports `decomposition=` given as a text such as `"pbi"`, the form of pymoo 0.4, which raises AttributeError in the first generation, "'str' object has no attribute 'do'".
+Reports two `MOEAD` arguments that raise.
+
+| Argument | What happens |
+| --- | --- |
+| `pop_size=` | TypeError, "got multiple values for keyword argument 'pop_size'", because `MOEAD` sets the population to the number of reference directions itself since pymoo 0.5.0 |
+| `decomposition=` given as a string such as `"pbi"`, the form of pymoo 0.4 | AttributeError in the first generation, "'str' object has no attribute 'do'" |
 
 Example:
 
@@ -11050,11 +11291,15 @@ algorithm = MOEAD(ref_dirs, decomposition=PBI())
 
 ### Random numbers
 
+The rules in the group report runs that give another result each time. Since pymoo 0.6.1.6 the
+library draws from a generator that `minimize` builds from `seed`, and `np.random.seed` does not
+reach it.
+
 #### unseeded-run
 
 **Severity:** info. **Fix:** none.
 
-Reports `minimize` without `seed`. Two runs of `NSGA2` on ZDT1 then returned different fronts, and two runs with `seed=1` the same front. A call that takes `**kwargs`, a call whose algorithm was built with `seed`, and a file that calls `np.random.seed`, which `numpy-seed-ignored` reports, are left alone.
+Reports `minimize` without `seed`. Two runs of `NSGA2` on ZDT1 then returned different fronts, and two runs with `seed=1` returned the same front. The rule leaves alone a call that takes `**kwargs`, a call whose algorithm was built with `seed`, and a file that calls `np.random.seed`, which `numpy-seed-ignored` reports.
 
 Example:
 
@@ -11072,7 +11317,15 @@ res = minimize(problem, NSGA2(pop_size=100), ("n_gen", 200), seed=1)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.random.seed` in a file whose `minimize` gets no `seed`, and a draw from `np.random` inside `_do` of a class that inherits from `Sampling`, `Crossover` or `Mutation`. Since pymoo 0.6.1.6 the library draws from a generator that `minimize` builds from `seed` and passes to each operator as `random_state`. On pymoo 0.6.1.5 two runs after `np.random.seed(1)` returned the same front, and on 0.6.1.6 and 0.6.2 they returned different fronts. A sampling, a crossover and a mutation that drew from `np.random` each gave different results in two runs with `seed=1`, and the same result twice when they drew from `random_state`.
+Reports `np.random.seed` in a file whose `minimize` gets no `seed`, and a draw from `np.random` inside `_do` of a class that inherits from `Sampling`, `Crossover` or `Mutation`. Since pymoo 0.6.1.6 the library draws from a generator that `minimize` builds from `seed` and passes to each operator as `random_state`.
+
+On pymoo 0.6.1.5 two runs after `np.random.seed(1)` returned the same front, and on 0.6.1.6 and 0.6.2 they returned different fronts. A custom operator gave the results in the table in two runs with `seed=1`.
+
+| Operator | Draws from `np.random` | Draws from `random_state` |
+| --- | --- | --- |
+| a sampling | different results | the same result twice |
+| a crossover | different results | the same result twice |
+| a mutation | different results | the same result twice |
 
 Example:
 
@@ -11097,11 +11350,19 @@ res = minimize(problem, NSGA2(pop_size=100, sampling=MySampling()), ("n_gen", 20
 
 ### Indicators and decisions
 
+The rules in the group report a reference point or weights that give another number than the
+code means.
+
 #### hv-reference-point
 
 **Severity:** warning for a reference point taken from the solutions, error for none. **Fix:** none.
 
-Reports `ref_point=F.max(axis=0)` and `ref_point=np.max(F, axis=0)` on `HV` and `Hypervolume`. A reference point at the largest value of each objective lies on the solutions that hold those values, so they add no volume. Three solutions scored 0.09 with it and 0.37 with the fixed point (1, 1), and the two extreme solutions alone scored 0.0. It also reports `HV()` with no argument, which raises AssertionError, "For Hypervolume a reference point needs to be provided!".
+Reports `ref_point=F.max(axis=0)` and `ref_point=np.max(F, axis=0)` on `HV` and `Hypervolume`, and `HV()` with no argument, which raises AssertionError, "For Hypervolume a reference point needs to be provided!". A reference point at the largest value of each objective lies on the solutions that hold the largest values, so they add no volume.
+
+| Reference point | Hypervolume of three solutions | Of the two extreme solutions alone |
+| --- | --- | --- |
+| `F.max(axis=0)` | 0.09 | 0.0 |
+| the fixed point (1, 1) | 0.37 | not run |
 
 Example:
 
@@ -11119,7 +11380,12 @@ hv = HV(ref_point=np.array([1.1, 1.1]))(res.F)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `ASF().do(F, np.array([0.2, 0.8]))`, where the weights are written out and are not all the same. `ASF` divides each objective by its weight, so the larger weight counts less, and the pymoo guide passes `1 / weights`. With the weights (0.2, 0.8) it picked the solution (0.1, 0.9), and with `1 / weights` it picked (0.9, 0.1). It also reports a weight above 1 written out in the argument of `PseudoWeights`, which compares the weights with shares that sum to 1: (2, 8) picked row 0 of five solutions, where (0.2, 0.8) picked row 3.
+Reports weights that the decision method reads in another way than the code means.
+
+| Code | How pymoo reads the weights | What it picked |
+| --- | --- | --- |
+| `ASF().do(F, np.array([0.2, 0.8]))`, with weights written out and not all the same | `ASF` divides each objective by its weight, so the larger weight counts less. The pymoo guide passes `1 / weights`. | the solution (0.1, 0.9), where `1 / weights` picked (0.9, 0.1) |
+| a weight above 1 written out in the argument of `PseudoWeights`, such as (2, 8) | `PseudoWeights` compares the weights with shares that sum to 1. | row 0 of five solutions, where (0.2, 0.8) picked row 3 |
 
 Example:
 
@@ -11137,36 +11403,52 @@ j = PseudoWeights(np.array([0.2, 0.8])).do(F)
 
 ## plotly
 
-These rules run on files that import `plotly`, and on files that make plotly the plotting
-backend of pandas. They apply Edward Tufte's book "The Visual
-Display of Quantitative Information", second edition, to plotly figures. Each rule names the
-principle of the book that the figure breaks, says what the reader then sees, and names the
-plotly code to write instead. A page number in this section is a printed page of the book.
+The plotly rules report figures whose drawn sizes do not follow the numbers, ink that shows no
+data, colors without an order, and chart forms and words that make a figure harder to read. They
+apply Edward Tufte's book "The Visual Display of Quantitative Information", second edition, to
+plotly figures. Each rule names the principle of the book that the figure breaks, says what the
+reader then sees, and names the plotly code to write instead. A page number in the plotly section is a
+printed page of the book.
 
-The figure behavior measurements in this section used plotly 7.1.0 with pandas 3.1.1 on Python 3.14.
-Each figure was resolved by plotly.js through `full_figure_for_development`, which fills in
-every default, and where a rule is about a drawn size the figure was rendered to SVG and the
-size was read from the drawn path. Examples assume `import plotly.express as px`,
-`import plotly.graph_objects as go` and `import plotly.io as pio`. Names such as `df` and
-`fig` represent values supplied by your program.
+| Group | What its rules report |
+| --- | --- |
+| Sizes that do not follow the numbers | marker areas, bar lengths, wedges, axes and scales that draw a number larger or smaller than it is |
+| Ink that shows no data | tinted templates, grids, frames, boxes, repeated colors, hatching and gauges |
+| Color without an order | rainbow color scales |
+| Chart forms the book argues against | pies, sunbursts, splines, animations, smoothed heatmaps and charts of a few numbers |
+| Words on the figure | titles in capitals, legends in place of labels, rotated tick labels and column names as axis titles |
 
-A rule reports a call only when the file binds the name in front of it to a plotly module. The
-proof is an import such as `import plotly.express as px` or
-`from plotly import graph_objects as go`, under any alias, or the full dotted name, as in
-`plotly.express.pie(...)`. A name `px` or `go` that the file binds to something else gives no
-proof.
+The rules run on files that import `plotly`, and on files that make plotly the plotting backend
+of pandas. Every figure measurement in the plotly section used plotly 7.1.0 with pandas 3.1.1 on
+Python 3.14. plotly.js resolved each figure through `full_figure_for_development`, which fills
+in every default. Where a rule is about a drawn size, the figure was rendered to SVG and the
+size was read from the drawn path. The examples assume `import plotly.express as px`,
+`import plotly.graph_objects as go` and `import plotly.io as pio`, and names such as `df` and
+`fig` stand for values from your program.
 
-A file that makes plotly the plotting backend of pandas need not import plotly. The file holds
-`pd.options.plotting.backend = "plotly"` or `pd.set_option("plotting.backend", "plotly")` and
-names no other backend, in an assignment, in `set_option` or as `backend=` of a call. There xpd
-reads `df.plot.bar(...)` as `px.bar(df, ...)`: on pandas 3.1.1 with plotly 7.1.0,
-`df.plot.bar(x="team", y="score")` was equal, as JSON, to `px.bar(df, x="team", y="score")`. The
-method names that pandas and plotly express share are `line`, `bar`, `area`, `scatter` and
-`box`. Every argument of the call must be named, because `px.bar` takes the frame first and
-`df.plot.bar` does not, so an argument given by position is another argument in the two. A
-call of the accessor itself, as in `df.plot(kind="bar")`, is not read, and
-[`plot-kind-argument`](#plot-kind-argument) of the pandas pack rewrites it to the method form.
-A file where another module sets the backend is not read either.
+A rule reports a call only when the file binds the name in front of the call to a plotly module.
+
+| Code | Proof that the name is plotly |
+| --- | --- |
+| `import plotly.express as px` or `from plotly import graph_objects as go`, under any alias | yes |
+| the full dotted name, as in `plotly.express.pie(...)` | yes |
+| a name `px` or `go` that the file binds to something else | no |
+
+A file that makes plotly the plotting backend of pandas need not import plotly. xpd then reads
+`df.plot.bar(...)` as `px.bar(df, ...)`, because on pandas 3.1.1 with plotly 7.1.0,
+`df.plot.bar(x="team", y="score")` was equal, as JSON, to `px.bar(df, x="team", y="score")`.
+
+```text
+on(a file that holds pd.options.plotting.backend = "plotly" or pd.set_option("plotting.backend", "plotly"))
+  if the file names no other backend, in an assignment, in set_option or as backend= of a call
+    read df.plot.line, bar, area, scatter and box as the px function of the same name
+      only when every argument of the call is named   # px.bar takes the frame first, df.plot.bar does not
+not read
+  df.plot(kind="bar")                     # plot-kind-argument of the pandas pack rewrites it to df.plot.bar
+  a file where another module sets the backend
+```
+
+[`plot-kind-argument`](#plot-kind-argument) is the pandas rule that rewrites the accessor call.
 
 A rule about a method, such as `fig.update_xaxes(...)`, needs proof that the object is a plotly
 figure. The method is called on the call that makes the figure, as in
@@ -11184,23 +11466,23 @@ its value in three ways:
   A method, a function with a decorator, a function that is passed on as a value and a call
   with `*args` or `**kwargs` give no proof, because the file does not show every argument.
 
-Any other binding of the name on the way ends the proof: a second assignment that is not a
-figure, a loop variable, a `with ... as`, an import, a `def` or a `del` of the same name, and an
-assignment inside an `if` or a loop that stands before the method call or around it. A function
-that is defined in one module and called from another is not followed, so its parameter needs
-the annotation.
+Any other binding of the name on the way ends the proof. Such a binding is a second assignment
+that is not a figure, a loop variable, a `with ... as`, an import, a `def` or a `del` of the same
+name, or an assignment inside an `if` or a loop that stands before the method call or around it.
+A function that is defined in one module and called from another is not followed, so its
+parameter needs the annotation.
 
-A figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure.
-What it holds is proved by the statements after the assignment: an `add_trace` of a `go.Bar`
-makes it a bar chart for [`bar-axis-without-zero`](#bar-axis-without-zero), when no second
-assignment of the name comes between the two.
-The annotation `go.Figure` alone does not prove a bar chart.
+A figure made by `go.Figure()` and filled later with `fig.add_trace(...)` proves a plotly figure,
+and the statements after the assignment prove what it holds. For example, an `add_trace` of a
+`go.Bar` makes it a bar chart for [`bar-axis-without-zero`](#bar-axis-without-zero), when no
+second assignment of the name comes between the two. The annotation `go.Figure` alone does not
+prove a bar chart.
 
-A rule reads a value only where it is written in the call: a number, a string, `True` or
-`None`. A name in that place may hold any value, so the rule is silent.
+A rule reads a value only where it is written in the call, as a number, a string, `True` or
+`None`. A name in the same place may hold any value, so the rule is silent.
 
-The names the messages tell you to write exist on plotly 5.0.0, 5.24.1, 6.0.0 and 7.1.0, where
-each was run, so no document of the pack carries `since`.
+No document of the pack carries `since`, because the names that the messages tell you to write
+exist on plotly 5.0.0, 5.24.1, 6.0.0 and 7.1.0, where each was run.
 
 ### How a rule earns its place
 
@@ -11213,41 +11495,34 @@ measurement is one of two kinds:
 - A drawn size is read from the SVG that plotly renders, such as the radius of a marker, the
   visible length of a bar, or the highest point of a curve.
 
-A rule is `error` when the figure is wrong for every reader, `warning` when the drawn sizes do
-not follow the numbers or the book rejects the form outright, and `info` when the form is a
-choice that the book argues against.
+| Severity | When |
+| --- | --- |
+| `error` | the figure is wrong for every reader |
+| `warning` | the drawn sizes do not follow the numbers, or the book rejects the form outright |
+| `info` | the form is a choice that the book argues against |
 
-The corpus scan reads 1,089 Python files as text, including the two corpus helper files.
-It does not import or run the collected code. The table gives current corpus reports by
-source, total reports and distinct files with a report. Figure behavior measurements are
-separate from corpus counts.
+The rules were run over a corpus of 1,087 Python files, read as text and never imported or run.
+The reports in the table are what the current build gives on the corpus.
 
-Recall measures 1,212 conditional configuration candidates in copies of 47 real corpus files.
-All 25 rules have 48 plants across six form groups, except `free-facet-scales`, which has
-60 across eight groups. The original 1,164 identities remain. Review corrected 128 missing
-figure or data premises, retained the other 1,036 plants and added 48 `box-plot-ink` candidates.
-The groups include literal settings, updates, dictionaries, objects and values held in names
-where the shape permits. Each plant counts once when its rule reports its target lines.
-Pre-existing reports do not count. Every complete copy passed `ast.parse`; none was run.
+| Part of the corpus | Files | What the files are |
+| --- | --- | --- |
+| docs | 151 | the `python` code blocks of each page of plotly's documentation |
+| Dash | 117 | Python files of Dash that name plotly |
+| public | 819 | public files that GitHub code search found for the import lines of plotly express, graph objects and `make_subplots` |
 
-Candidates qualify only under the stated data assumptions. External dataframe columns must
-have the intended numeric values and groups. An informational advisory is a design choice,
-not proof that the figure is wrong. The box candidates contain actual numeric lists and ask
-whether a five-number summary suffices; default outliers and hover information may matter.
-Independent equivalents of repaired forms and box forms were rendered with Plotly 7.1.0.
-Their resolved settings and SVG outputs are saved separately from the source copies.
+Recall was measured on forms planted in copies of 47 of the corpus files. Each rule got 48
+planted forms in six groups, and `free-facet-scales` got 60 in eight groups, so there were 1,212
+in all. The groups hold settings written in the call, later updates, dictionaries, objects, and
+values held in a name where the form allows one. A planted form counts as found when its rule
+reports the lines of the form, and a report that was already in the file does not count. Every
+copy passed `ast.parse`, and none was run.
 
-The source files were available during development and some reports were already reviewed.
-They are held aside for this measurement, not an unseen evaluation set. Selection requires
-AST-readable files with express and graph_objects or graph_objs imports. The forms reuse
-actual px and go spellings, including `from plotly import graph_objects as go`. The main set
-uses six form groups with six value or data variations, rather than 36 independent shapes.
-Existing file-wide exclusions still apply. Recall measures these plants, not every program.
-Unsupported forms remain in the denominator, including box dictionary splats, explicit bad
-axis titles and flat Surface. Recognition cannot establish universal design quality.
-The manifest, identity mapping, per-target truth decisions, outcomes and two rerun commands
-are saved under `research/plotly-rules/runs/recall/`. `measure.py --rules` accepts rule names
-and `--binary` accepts a review binary. Rule changes reuse the final manifest.
+The 47 files were seen while the rules were written, so they are not an unseen set, and some of
+their reports had been read before. A planted form counts only
+when the data has the values that the form assumes, such as a numeric column. Forms that no rule
+reads stay in the count, such as a box given as a `**` dictionary, a bad axis title written out,
+and a flat `go.Surface`. An `info` report is a design choice and does not prove that the figure
+is wrong.
 
 | Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Total reports | Files with report | Recall | Fix |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -11277,43 +11552,69 @@ and `--binary` accepts a review binary. Rule changes reuse the final manifest.
 | [`all-caps-title`](#all-caps-title) | info | 183 | drawn: a title 1.31 times as wide in capitals | 3, 0, 1 | 4 | 2 | 40 of 48 | none |
 | [`axis-title-column-name`](#axis-title-column-name) | info | 183 | resolved: axis title `gdpPercap` | 68, 1, 104 | 173 | 71 | 15 of 48 | none |
 
-`area-axis-without-zero`, `bar-axis-without-zero`, `heatmap-smoothing`, `three-d-for-two-d` each have 0 corpus reports in 0 files.
-The corpus counts describe frequency, not recall or whether advice suits a particular chart.
+The corpus counts say how often a rule reports, and not its recall or whether the advice suits
+a given chart. `area-axis-without-zero`, `bar-axis-without-zero`, `heatmap-smoothing` and
+`three-d-for-two-d` made no report on the corpus.
 
-No fix of the pack is safe, because every fix changes what the reader sees. `--fix` alone
-writes nothing for this pack, and `--fix --unsafe-fixes` writes four rewrites: a tinted
-template becomes `"simple_white"`, `showgrid=True` becomes `showgrid=False`, `"spline"`
-becomes `"linear"`, and a `zsmooth` of `"best"` or `"fast"` becomes `False`.
+Every rule but `box-plot-ink`, `pie-chart`, `polar-bar-area` and `sunburst-as-pie` missed the 8
+planted forms that hold the value in a name. The table gives every other planted form that a
+rule missed.
+
+| Rule | Other missed forms |
+| --- | --- |
+| `marker-size-diameter` | a size in a `go.Scatter` marker dictionary (1) |
+| `bar-axis-without-zero` | `update_layout(yaxis_range=...)` (2), an axis dictionary on an added `go.Bar` (1) |
+| `area-axis-without-zero` | `update_layout(yaxis_range=...)` (2), a filled `go.Scatter` (1) |
+| `three-d-for-two-d` | a flat `go.Surface` (8) |
+| `dual-y-axis` | `update_yaxes(overlaying=...)` (8) |
+| `free-facet-scales` | `update_layout(yaxis_matches=...)` (8), a loop that adds a `go.Scatter` to subplots (3), a loop that adds a `go.Bar` to subplots (1) |
+| `default-template` | a template set with `Figure.update_layout` (8) |
+| `box-plot-ink` | a box given as a `**` dictionary and a trace name (8). It found the 8 forms that hold the values in a name. |
+| `table-for-small-data` | written values in `px.pie` (3), a bare `go.Bar` with `y` (3), written values in `px.bar` (2), a `go.Figure` with a `go.Pie` list (2), a bare horizontal `go.Bar` with `x` (1) |
+| `legend-instead-of-labels` | `px.line` with `color` (5), `px.line` with a list of columns (5), `px.line` with `color` and markers (5), named `go.Scatter` traces added one by one (2), a `go.Figure` with a list of named `go.Scatter` traces (2) |
+| `axis-title-column-name` | an axis title written out (8), a column in `px.scatter` (5), `px.bar` (5), `px.area` (4) and `px.line` (3) |
+
+No fix of the pack is safe, because every fix changes what the reader sees. `--fix` alone writes
+nothing for the pack, and `--fix --unsafe-fixes` writes four rewrites:
+
+```diff
+-template="ggplot2"          # or "plotly", "seaborn"
++template="simple_white"
+-showgrid=True
++showgrid=False
+-line_shape="spline"
++line_shape="linear"
+-zsmooth="best"              # or "fast"
++zsmooth=False
+```
 
 ### What the pack does not check
 
-The book states principles that the code of a figure does not show, so no rule covers them:
+The book states principles that the code of a figure does not show, so no rule covers them.
 
-- "In time-series displays of money, deflated and standardized units of monetary measurement
-  are nearly always better than nominal units" (page 68). The code does not say that a column
-  is money.
-- "Graphics must not quote data out of context" (page 74). The rows that were left out are not
-  in the code.
-- The range-frame and the dot-dash-plot (page 130 and 133). plotly has no axis line that ends
-  at the lowest and highest value, and `marginal_x="rug"` is a choice xpd cannot ask for from a
-  missing argument.
-- The Shrink Principle (page 169). The right size of a figure depends on how many values it
-  shows, which the code does not say.
+| Principle | Page | What the code does not show |
+| --- | --- | --- |
+| "In time-series displays of money, deflated and standardized units of monetary measurement are nearly always better than nominal units" | 68 | whether a column is money |
+| "Graphics must not quote data out of context" | 74 | the rows that were left out |
+| The range-frame and the dot-dash-plot | 130, 133 | plotly has no axis line that ends at the lowest and highest value, and xpd cannot ask for `marginal_x="rug"` from a missing argument |
+| The Shrink Principle | 169 | how many values the figure shows, which sets its right size |
 
 ### Sizes that do not follow the numbers
 
-The first principle of graphical integrity in the book is "The representation of numbers, as
+The rules in the group report a figure that draws a number larger or smaller than it is. The
+first principle of graphical integrity in the book is "The representation of numbers, as
 physically measured on the surface of the graphic itself, should be directly proportional to
-the numerical quantities represented" (page 56). The book measures a break of it with the Lie
-Factor, the size of the effect shown in the graphic over the size of the effect in the data,
-and calls a factor above 1.05 or below 0.95 a substantial distortion (page 57).
+the numerical quantities represented" (page 56). The book measures a break of the principle
+with the Lie Factor, and calls a factor above 1.05 or below 0.95 a substantial distortion
+(page 57).
+
+```text
+Lie Factor = size of the effect shown in the graphic / size of the effect in the data
+```
 
 #### marker-size-diameter
 
 **Severity:** error. **Fix:** none.
-
-Recall was 39 of 48. The rule found none of 8 values held in a name. Other measured misses were
-`Scatter marker dict` (1).
 
 Reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}`, `marker=go.scatter.Marker(size=...)` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
 
@@ -11335,42 +11636,52 @@ fig = go.Figure(go.Scatter(
 
 The replacement is advice. xpd does not apply it automatically.
 
-All 11 trace types resolved `marker.sizemode` to `"diameter"`. Sizes 10, 20 and 40 were drawn
-with radii of 5, 10 and 20 pixels, so with areas of 78.5, 314.2 and 1,256.6 square pixels, in
-the ratio 1, 4 and 16. From 10 to 20 the data grows by 100 percent and the area by 300 percent,
-a Lie Factor of 3. With `sizemode="area"` and the `sizeref` above, where 40 is the diameter in
-pixels of the largest marker, the areas came out in the ratio 1, 2 and 4. The formula is the
-one on the plotly page about bubble charts.
+All 11 trace types resolved `marker.sizemode` to `"diameter"`, so a marker's area grows with the
+square of its size. From 10 to 20 the data grows by 100 percent and the area by 300 percent, a
+Lie Factor of 3.
 
-`px.scatter(size=...)` and the six other px functions that take `size` set `sizemode="area"`
-themselves, so they are not reported.
+| Size | Radius drawn | Area in square pixels | Area ratio with `"diameter"` | Area ratio with `sizemode="area"` and the `sizeref` above |
+| --- | --- | --- | --- | --- |
+| 10 | 5 | 78.5 | 1 | 1 |
+| 20 | 10 | 314.2 | 4 | 2 |
+| 40 | 20 | 1,256.6 | 16 | 4 |
+
+In the `sizeref` formula, 40 is the diameter in pixels of the largest marker, and the formula is
+the one on the plotly page about bubble charts. `px.scatter(size=...)` and the six other px
+functions that take `size` set `sizemode="area"` themselves, so they are not reported.
 
 The rule reads a size only when it takes a column by name, as `df["pop"]`, `df["pop"] / 10` and
 `df.pop_total` do, from an object that the same trace reads `x`, `y` or another coordinate from.
-A pandas property such as `df.size` or `df.index` is not a column, and neither is a method that
-is called, such as `np.full(...)`. `go.scatter.Marker(size=df.pop_total)` resolved to
-`sizemode="diameter"` and drew sizes 10, 20 and 40 with radii of 5, 10 and 20 pixels, the same
-as `dict(size=...)`. A number, a
-bare name, a written list, a column of another object and a size chosen with `np.where` or a
-condition may be a design choice, so they are left alone. So is a size that the code takes a
-root, a power or a logarithm of: with `np.sqrt(df["pop"])` the areas for 100, 400 and 1,600 were
-78.5, 314.2 and 1,256.6 square pixels, a Lie Factor of 1, and `sizemode="area"` would then
-understate. A column that is named as a size, such as `df["size"]`, was made for the markers
-and is left alone too. The rule is silent in a file that names `sizemode` in any other way than
-`sizemode="diameter"`, because the mode can be set on the figure afterwards. After
+`go.scatter.Marker(size=df.pop_total)` resolved to `sizemode="diameter"` and drew the same radii
+as `dict(size=...)`. The rule leaves alone the sizes in the table.
+
+| Size | Why the rule leaves it alone |
+| --- | --- |
+| a pandas property such as `df.size` or `df.index`, or a method that is called, such as `np.full(...)` | it is not a column |
+| a number, a bare name, a written list, a column of another object, or a size chosen with `np.where` or a condition | it may be a design choice |
+| a root, a power or a logarithm of a column | with `np.sqrt(df["pop"])` the areas for 100, 400 and 1,600 were 78.5, 314.2 and 1,256.6 square pixels, a Lie Factor of 1, and `sizemode="area"` would then understate |
+| a column named as a size, such as `df["size"]` | it was made for the markers |
+
+The rule is silent in a file that names `sizemode` in any other way than `sizemode="diameter"`,
+because the mode can be set on the figure afterwards. After
 `update_traces(marker_sizemode="diameter")` a px bubble chart resolved to `sizemode="diameter"`,
-so the size column is drawn as the diameter, and that line is reported. The rule has no
-fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, and the
-`sizeref` that keeps the markers visible depends on the data.
+so the size column is drawn as the diameter, and the rule reports the `update_traces` line. The
+rule has no fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, and
+the `sizeref` that keeps the markers visible depends on the data.
 
 #### bar-axis-without-zero
 
 **Severity:** warning. **Fix:** none.
 
-Recall was 37 of 48. The rule found none of 8 values held in a name. Other measured misses were
-`layout yaxis_range` (2), `added Bar axis dict` (1).
+Reports a bar chart whose value axis is given a range that starts above zero.
 
-Reports a bar chart whose value axis is given a range that starts above zero: `range_y` on `px.bar` and `px.histogram`, `range_x` on `px.bar(orientation="h")`, on a figure of upright bars `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`, and in the constructor `go.Figure(data=[go.Bar(...)], layout=...)` with `yaxis=dict(range=...)` in the layout or with `layout_yaxis_range=...`. The same three settings afterwards are read on a `go.Figure()` that gets its bars from `fig.add_trace(go.Bar(...))` or `fig.add_bar(...)`.
+| Figure | Range settings read |
+| --- | --- |
+| `px.bar`, `px.histogram` | `range_y` |
+| `px.bar(orientation="h")` | `range_x` |
+| a figure of upright bars, afterwards | `update_yaxes(range=...)`, `update_layout(yaxis_range=...)`, `update_layout(yaxis=dict(range=...))` |
+| `go.Figure(data=[go.Bar(...)], layout=...)` | `yaxis=dict(range=...)` in the layout, or `layout_yaxis_range=...` |
+| a `go.Figure()` that gets its bars from `fig.add_trace(go.Bar(...))` or `fig.add_bar(...)` | the same three settings afterwards |
 
 Example:
 
@@ -11386,13 +11697,19 @@ fig = px.bar(df, x="team", y="score")
 
 The replacement is advice. xpd does not apply it automatically.
 
-A bar shows its value by its length. plotly starts a bar axis at zero by itself: bars for 95
-and 100 got the range 0 to 105.26 and were drawn 324.9 and 342.0 pixels long, the ratio of the
-values. An explicit range is kept as written. With `[90, 101]` the same bars were 163.6 and
-327.3 pixels long. The data grows by 5.3 percent and the bar by 100 percent, a Lie Factor of
-19. `px.histogram` drew the same lengths for counts of 95 and 100, and lying bars with
-`range_x=[90, 101]` were 245.4 and 490.9 pixels long. When the differences are the message,
-`px.scatter` shows each value by its position, which needs no zero.
+A bar shows its value by its length. plotly starts a bar axis at zero by itself and keeps an
+explicit range as written. With `[90, 101]` the data grows by 5.3 percent and the bar by 100
+percent, a Lie Factor of 19.
+
+| Bars for 95 and 100 | Range | Lengths in pixels |
+| --- | --- | --- |
+| `px.bar` | 0 to 105.26, chosen by plotly | 324.9 and 342.0, the ratio of the values |
+| `px.bar(range_y=[90, 101])` | 90 to 101 | 163.6 and 327.3 |
+| `px.histogram` of counts 95 and 100, `range_y=[90, 101]` | 90 to 101 | 163.6 and 327.3 |
+| lying bars, `range_x=[90, 101]` | 90 to 101 | 245.4 and 490.9 |
+
+When the differences are the message, `px.scatter` shows each value by its position, which
+needs no zero.
 
 The rule reads a range only when both ends are written numbers above zero and the lower end
 has as many digits before the point as the upper end, or one fewer. So `[90, 101]` and `[2, 5]`
@@ -11400,25 +11717,28 @@ are read, and `[1, 100]`, `[0, 101]`, `[-10, 101]` and `[low, high]` are not. A 
 `log_y` is left alone, and a range set on the figure afterwards is left alone in a file that
 names a log axis. A figure of upright bars is `px.bar` or `px.histogram` without `orientation`
 and `base`, or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `orientation` and
-`base`. With `base` each bar starts at its base and not at zero: bars from 91 to 95 and from 93
-to 100 lay whole inside `range_y=[90, 101]`, with lengths in the ratio of their values. A
+`base`. With `base` each bar starts at its base and not at zero, so bars from 91 to 95 and from
+93 to 100 lay whole inside `range_y=[90, 101]`, with lengths in the ratio of their values. A
 `go.Figure` with a `go.Bar` and `layout=go.Layout(yaxis=dict(range=[90, 101]))` resolved to the
 y range 90 to 101, as `update_yaxes` does.
 
-Bars of 95 and 100 added with `add_trace` to an empty `go.Figure()` kept
-`update_yaxes(range=[90, 101])` as written and were drawn 145.4 and 290.9 pixels long, the same
-as bars given to `go.Figure` itself, and 288.8 and 304.0 pixels long without the range.
-`add_bar` with `update_layout(yaxis_range=[90, 101])` drew the same lengths. The bar must be
-added to the same variable after its assignment and before the range, in the statement itself
-or in a loop or a condition, with no second assignment of the name in between. A bar with
-`orientation`, `base` or `yaxis` is left alone.
+The rule also reads bars added to an empty `go.Figure()`, and plotly kept their range as
+written.
+
+| Bars of 95 and 100 in a `go.Figure` | Lengths in pixels |
+| --- | --- |
+| added with `add_trace`, without a range | 288.8 and 304.0 |
+| added with `add_trace`, then `update_yaxes(range=[90, 101])` | 145.4 and 290.9 |
+| added with `add_bar`, then `update_layout(yaxis_range=[90, 101])` | 145.4 and 290.9 |
+| given to `go.Figure` itself, with the range | 145.4 and 290.9 |
+
+The bar must be added to the same variable after its assignment and before the range, in the
+statement itself or in a loop or a condition, with no second assignment of the name in between.
+A bar with `orientation`, `base` or `yaxis` is left alone.
 
 #### area-axis-without-zero
 
 **Severity:** warning. **Fix:** none.
-
-Recall was 37 of 48. The rule found none of 8 values held in a name. Other measured misses were
-`layout yaxis_range` (2), `go filled Scatter` (1).
 
 Reports an area chart whose value axis is given a range that starts above zero: `range_y` on `px.area`, and on a figure of filled areas `update_yaxes(range=...)`, `update_layout(yaxis_range=...)` and `update_layout(yaxis=dict(range=...))`.
 
@@ -11438,17 +11758,20 @@ line = px.line(df, x="month", y="sales", range_y=[90, 101])
 The replacement is advice. xpd does not apply it automatically.
 
 An area chart shows its value by the height of the fill below the line. plotly starts the axis
-of `px.area` and of `go.Scatter(fill="tozeroy")` at zero by itself: values of 95 and 100 got
-the range 0 to 105.26 and fills 324.9 and 342.0 pixels tall, the ratio of the values. An
-explicit range is kept as written, and the fill is cut at the lower edge of the plot. With
-`[90, 101]` the same fills were 163.6 and 327.3 pixels tall, whether the range was set in
-`px.area`, in `update_yaxes` or in `update_layout`, a Lie Factor of 19 as for a bar.
-`px.line` ranged the same values to 94.72 and 100.28 by itself, so a line is the chart that
-needs no zero.
+of `px.area` and of `go.Scatter(fill="tozeroy")` at zero by itself. It keeps an explicit range
+as written and cuts the fill at the lower edge of the plot, a Lie Factor of 19 as for a bar.
 
-The rule reads a range as [`bar-axis-without-zero`](#bar-axis-without-zero) does: both ends
-written numbers above zero, and the lower end with as many digits before the point as the upper
-end, or one fewer. A call with `orientation` or `log_y` is left alone, and a range set on the
+| Values 95 and 100 | Range | Fill heights in pixels |
+| --- | --- | --- |
+| `px.area` | 0 to 105.26, chosen by plotly | 324.9 and 342.0, the ratio of the values |
+| `[90, 101]` set in `px.area`, in `update_yaxes` or in `update_layout` | 90 to 101 | 163.6 and 327.3 |
+| `px.line` | 94.72 to 100.28, chosen by plotly | no fill |
+
+A line is the chart that needs no zero.
+
+The rule reads a range as [`bar-axis-without-zero`](#bar-axis-without-zero) does. Both ends must
+be written numbers above zero, and the lower end must have as many digits before the point as
+the upper end, or one fewer. A call with `orientation` or `log_y` is left alone, and a range set on the
 figure afterwards is left alone in a file that names a log axis. A figure of filled areas is
 `px.area` without `orientation` and `log_y`, or a `go.Figure(...)` whose own arguments hold a
 `go.Scatter` with `fill="tozeroy"`.
@@ -11456,9 +11779,6 @@ figure afterwards is left alone in a file that names a log axis. A figure of fil
 #### polar-bar-area
 
 **Severity:** warning. **Fix:** none.
-
-Recall was 48 of 48. The rule found 8 of 8 forms with values held in a name. All planted forms were
-found.
 
 Reports `px.bar_polar(...)` and `go.Barpolar(...)`.
 
@@ -11476,20 +11796,25 @@ fig = px.bar(wind, x="direction", y="hours")
 
 The replacement is advice. xpd does not apply it automatically.
 
-A polar bar is a wedge, and plotly scales its radius with the value. Wedges of equal angle for
-1, 2, 3 and 4 were drawn with outer radii of 42.75, 85.5, 128.25 and 171 pixels, so their areas
-are in the ratio 1, 4, 9 and 16. From 1 to 2 the data grows by 100 percent and the area by 300
-percent, a Lie Factor of 3. The book adds that "the number of information-carrying (variable)
-dimensions depicted should not exceed the number of dimensions in the data" (page 71), and a
-wedge varies in two. The radial axis takes the types linear, log, date and category, so no
-axis type draws the area in proportion.
+A polar bar is a wedge, and plotly scales its radius with the value, so the area grows with the
+square of the value. From 1 to 2 the data grows by 100 percent and the area by 300 percent, a
+Lie Factor of 3.
+
+| Value | Outer radius in pixels | Area ratio |
+| --- | --- | --- |
+| 1 | 42.75 | 1 |
+| 2 | 85.5 | 4 |
+| 3 | 128.25 | 9 |
+| 4 | 171 | 16 |
+
+The book adds that "the number of information-carrying (variable) dimensions depicted should not
+exceed the number of dimensions in the data" (page 71), and a wedge varies in two. The radial
+axis takes the types linear, log, date and category, so no axis type draws the area in
+proportion.
 
 #### three-d-for-two-d
 
 **Severity:** error for a 3D trace without `z`, and warning for a `z` that is one constant. **Fix:** none.
-
-Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
-`flat Surface` (8).
 
 Reports `px.scatter_3d`, `px.line_3d` and `go.Scatter3d` with `x` and `y` and no `z`, and the same three with an `x`, `y` or `z` written as one constant: `[0] * n`, `np.zeros(n)`, `np.ones(n)`, `np.zeros_like(a)`, `np.ones_like(a)` or `np.full(n, v)`.
 
@@ -11509,29 +11834,28 @@ fig = px.scatter(df, x="area", y="rain")
 The replacement is advice. xpd does not apply it automatically.
 
 "The number of information-carrying (variable) dimensions depicted should not exceed the
-number of dimensions in the data" (page 71). Without `z`, plotly draws nothing: all three
-resolved the trace to `visible=False` in an empty scene, so the first form is an error. With
-`z=[0, 0, 0]` the points were drawn on one plane of a scene whose z axis ran from -1 to 1, so
-the third axis and the perspective show no data.
+number of dimensions in the data" (page 71).
 
-A call with a `**` argument is left alone, and so is a px call with `z` as its fourth
-positional argument. So is a file that sets `z` afterwards, as in `trace.z = values` or
-`update_traces(z=values)`: `go.Scatter3d` with `x` and `y` followed by `trace.z = [3, 1, 2]`
-resolved to `visible=True`. The second form reads only a constant it can see in the call, and
-`np.` or `numpy.` in front of the function name.
+| Form | What plotly drew | Severity |
+| --- | --- | --- |
+| no `z` | nothing, because all three resolved the trace to `visible=False` in an empty scene | error |
+| `z=[0, 0, 0]` | the points on one plane of a scene whose z axis ran from -1 to 1, so the third axis and the perspective show no data | warning |
+
+The rule leaves alone a call with a `**` argument, and a px call with `z` as its fourth
+positional argument. It also leaves alone a file that sets `z` afterwards, as in
+`trace.z = values` or `update_traces(z=values)`, because `go.Scatter3d` with `x` and `y` followed
+by `trace.z = [3, 1, 2]` resolved to `visible=True`. The second form reads only a constant that
+it can see in the call, with `np.` or `numpy.` in front of the function name.
 
 #### dual-y-axis
 
 **Severity:** info. **Fix:** none.
 
-Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
-`update_yaxes overlaying` (8).
-
 Reports a cell with `"secondary_y": True` in the `specs` of `make_subplots`, and an axis with `overlaying="y"` or `overlaying="x"` in `update_layout`, `go.Layout` or `go.Figure`.
 
-The rule reports the axis configuration. It does not prove that traces populate both axes.
-An unused secondary axis draws no second scale. The comparison warning applies when traces
-use both overlaid axes with independent ranges.
+The rule reports how the axes are set up, and it does not prove that traces use both axes. An
+unused second axis draws no second scale, so the advice applies when traces use both overlaid
+axes with independent ranges.
 
 Example:
 
@@ -11552,24 +11876,24 @@ fig.add_trace(go.Scatter(x=months, y=visits, name="visits"), row=2, col=1)
 The replacement is advice. xpd does not apply it automatically.
 
 "Show data variation, not design variation" (page 61). Two y axes in one plot have two free
-scales. The figure above resolved the second axis to `overlaying="y"` on the right with no
-`matches`, and the two traces got the ranges 8.6 to 31.4 and 393 to 507. The lines crossed at
-x=1.67. After `update_yaxes(range=[0, 1000], secondary_y=True)` the same data crossed at
-x=1.81. Where the lines cross, and which one looks steeper, is set by the ranges and not by the
-data.
+scales, so the ranges and not the data set where the lines cross and which one looks steeper.
+The figure above resolved the second axis to `overlaying="y"` on the right with no `matches`,
+and the first trace got the range 8.6 to 31.4.
+
+| Range of the second axis | Lines crossed at |
+| --- | --- |
+| 393 to 507, chosen by plotly | x=1.67 |
+| 0 to 1000, set with `update_yaxes(range=[0, 1000], secondary_y=True)` | x=1.81 |
 
 The rule reports the cell of `specs` and not each `add_trace`, so a figure gets one report for
-each cell with two axes. An axis that sets `overlaying` together with `matches` shares its
-range with the first axis: both resolved to -6 to 107. It is left alone. The underscore form
+each cell with two axes. It leaves alone an axis that sets `overlaying` together with `matches`,
+which shares its range with the first axis, and both resolved to -6 to 107. The underscore form
 `yaxis2_overlaying="y"` raised `ValueError` in `update_layout` on a `go.Figure`, so the rule
 does not read it.
 
 #### free-facet-scales
 
 **Severity:** info. **Fix:** none.
-
-Recall was 40 of 60. The rule found none of 8 values held in a name. Other measured misses were
-`layout yaxis_matches` (8), `subplot Bar loop` (1), `subplot Scatter loop` (3).
 
 Reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`. It also reports a loop that adds a `go.Scatter`, `go.Scattergl`, `go.Bar`, `go.Box` or `go.Violin` with the same written column as `y` to the cells of a `make_subplots` figure without `shared_yaxes`, where the row or the col changes with the loop.
 
@@ -11588,20 +11912,27 @@ fig = px.scatter(tips, x="total_bill", y="tip", facet_col="sex")
 
 The replacement is advice. xpd does not apply it automatically.
 
-The book says of small multiples: "The design remains constant through all the frames, so that
-attention is devoted entirely to shifts in the data" (page 170). px draws facets on one scale:
-the second y axis resolved to `matches="y"`, and both panels got the range 0.38 to 10.62.
-`matches=None` frees them. The panels then got 0.62 to 6.88 and 0.38 to 10.62, and a tip of 5
-was drawn at 0.70 of the height of one panel and at 0.45 of the other. A reader who compares
-heights across the panels reads a difference that the data does not have. Free scales are
-right when the panels hold different units, which is why the rule is info.
+The book says of small multiples, "The design remains constant through all the frames, so that
+attention is devoted entirely to shifts in the data" (page 170). px draws facets on one scale,
+and `matches=None` frees the scales. A reader who compares heights across the panels then reads
+a difference that the data does not have. Free scales are right when the panels hold different
+units, which is why the rule is info.
 
-`make_subplots` gives every cell its own y axis. With `rows=1, cols=2`, a bar of 5 in one cell
-and a bar of 10 in the other resolved to the ranges 0 to 5.26 and 0 to 10.53 with no
-`matches`, and both bars were drawn 304.0 pixels tall. With `shared_yaxes="all"` both axes got 0
-to 10.53 and the bars were 152.0 and 304.0 pixels tall. `shared_yaxes=True` shares the axes of
-one row only: with `rows=2, cols=1` the two axes kept 0 to 5.26 and 0 to 10.53, so the message
-names `"all"`.
+| Facets of `px.scatter` | Second y axis | Ranges of the two panels | A tip of 5 drawn at |
+| --- | --- | --- | --- |
+| as px draws them | `matches="y"` | 0.38 to 10.62 in both | the same height in both |
+| after `update_yaxes(matches=None)` | no `matches` | 0.62 to 6.88, and 0.38 to 10.62 | 0.70 of the height of one panel, and 0.45 of the other |
+
+`make_subplots` gives every cell its own y axis. The table gives a bar of 5 in one cell and a bar
+of 10 in the other.
+
+| `make_subplots` | Ranges | Bar heights in pixels |
+| --- | --- | --- |
+| `rows=1, cols=2` | 0 to 5.26, and 0 to 10.53, with no `matches` | 304.0 and 304.0 |
+| `rows=1, cols=2, shared_yaxes="all"` | 0 to 10.53 in both | 152.0 and 304.0 |
+| `rows=2, cols=1, shared_yaxes=True` | 0 to 5.26, and 0 to 10.53 | not measured |
+
+`shared_yaxes=True` shares the axes of one row only, so the message names `"all"`.
 
 Example:
 
@@ -11618,25 +11949,30 @@ fig = make_subplots(rows=1, cols=2, shared_yaxes="all")
 ```
 
 The rule reads a loop because a column written as `y=part["sales"]` in each pass proves that
-every panel holds the same measure. A column named `value` or `values` is left alone, because
+every panel holds the same measure. It leaves alone a column named `value` or `values`, because
 `pd.melt` gives that name to the column of a long table, which holds a different measure in
-each panel. So is a file that names `matches`, `shared_yaxes` or a y axis range anywhere, which
-may set the scales afterwards, and a trace added with `secondary_y`.
+each panel. It also leaves alone a trace added with `secondary_y`, and a file that names
+`matches`, `shared_yaxes` or a y axis range anywhere, because the file may set the scales
+afterwards.
 
 ### Ink that shows no data
 
-The book defines the data-ink ratio as the share of a graphic's ink that shows data, and
-asks to "erase non-data-ink, within reason" (page 96) and to "erase redundant data-ink, within
-reason" (page 100).
+The rules in the group report ink that a figure can lose without losing data. The book defines
+the data-ink ratio as the share of a graphic's ink that shows data, and asks to "erase
+non-data-ink, within reason" (page 96) and to "erase redundant data-ink, within reason"
+(page 100).
 
 #### default-template
 
 **Severity:** info. **Fix:** unsafe for a named template: `"simple_white"`. None for a file that sets no template.
 
-Recall was 32 of 48. The rule found none of 8 values held in a name. Other measured misses were
-`Figure.update layout template` (8).
+Reports a figure drawn with a template that tints the plot area and draws a grid.
 
-Reports two things. The first is a file that draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. It is reported once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express`. A file that draws through pandas and imports no plotly module is reported on the statement that makes plotly the plotting backend, when it calls `line`, `bar`, `barh`, `area`, `scatter`, `box` or `hist` on the accessor. The second is the template `"plotly"`, `"ggplot2"` or `"seaborn"` written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`.
+| Form | Where it is reported |
+| --- | --- |
+| A file draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. | once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express` |
+| A file draws through pandas, imports no plotly module, and calls `line`, `bar`, `barh`, `area`, `scatter`, `box` or `hist` on the accessor. | on the statement that makes plotly the plotting backend |
+| The template `"plotly"`, `"ggplot2"` or `"seaborn"` is written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`. | on the string |
 
 Example:
 
@@ -11659,47 +11995,41 @@ fig = px.scatter(df, x="day", y="tip")
 gray = px.scatter(df, x="day", y="tip", template="simple_white")
 ```
 
-plotly draws with the template `"plotly"` unless it is told otherwise. A scatter plot resolved
-to the plot background `#E5ECF6` with white grid lines on both axes, 10 lines in the drawn
-figure, and no axis lines. `"ggplot2"` resolved to `rgb(237,237,237)` and `"seaborn"` to
-`rgb(234,234,242)`, each with the same 10 white lines. With `"simple_white"` the same plot
-resolved to a white plot area with `showgrid=False`, 0 grid lines, axis lines and outside
-ticks. The book says that "the grid should usually be muted or completely suppressed"
-(page 112).
+plotly draws with the template `"plotly"` unless it is told otherwise. The book says that "the
+grid should usually be muted or completely suppressed" (page 112).
+
+| Template of a scatter plot | Plot background | Grid lines drawn | Axis lines |
+| --- | --- | --- | --- |
+| `"plotly"`, the default | `#E5ECF6` | 10, white | none |
+| `"ggplot2"` | `rgb(237,237,237)` | 10, white | not recorded |
+| `"seaborn"` | `rgb(234,234,242)` | 10, white | not recorded |
+| `"simple_white"` | white, with `showgrid=False` | 0 | yes, with outside ticks |
 
 `"plotly_white"`, `"none"`, `"presentation"`, `"gridon"`, `"xgridoff"` and `"ygridoff"` resolved
-to a white plot area, and `"plotly_dark"` is a dark theme, so these seven are not reported.
+to a white plot area, and `"plotly_dark"` is a dark theme, so the rule does not report the
+seven. Through the plotting backend of pandas, `df.plot.scatter(x="score", y="cost")` was equal,
+as JSON, to `px.scatter(df, x="score", y="cost")`, also with `template="simple_white"`.
 
-Through the plotting backend of pandas, `df.plot.scatter(x="score", y="cost")` was equal, as
-JSON, to `px.scatter(df, x="score", y="cost")`, and with `template="simple_white"` it was equal
-to the px call with that template.
+The first form is silent in the cases in the table.
 
-The first form is silent in a file that names `streamlit`, because `st.plotly_chart` draws with
-the theme of Streamlit unless `theme=None` is passed. `hovertemplate` and `texttemplate` are
-other attributes and do not count as a template: a scatter plot with a `hovertemplate` still
-resolved to `#E5ECF6`. A file whose only figures have no plot area is left alone: `px.pie`,
-`px.treemap`, `px.sunburst`, `px.icicle`, `px.funnel_area`, `px.parallel_coordinates` and
-`px.parallel_categories`, and `go.Pie`, `go.Treemap`, `go.Sunburst`, `go.Icicle`,
-`go.Funnelarea`, `go.Parcoords`, `go.Parcats`, `go.Sankey`, `go.Table` and `go.Indicator`, drew
-no tint and no grid line with the default template.
+| Case | Why |
+| --- | --- |
+| a file that names `streamlit` | `st.plotly_chart` draws with the theme of Streamlit unless `theme=None` is passed |
+| a file whose only figures have no plot area: `px.pie`, `px.treemap`, `px.sunburst`, `px.icicle`, `px.funnel_area`, `px.parallel_coordinates`, `px.parallel_categories`, `go.Pie`, `go.Treemap`, `go.Sunburst`, `go.Icicle`, `go.Funnelarea`, `go.Parcoords`, `go.Parcats`, `go.Sankey`, `go.Table`, `go.Indicator` | they drew no tint and no grid line with the default template |
+| a module that the file imports sets `pio.templates.default = ...` | a scatter plot in a module of a package whose `__init__.py` assigns `pio.templates.default = "simple_white"` resolved to a white plot area with no grid, and so did one in a script that imports the module with the assignment |
+| a module that the file imports sets `px.defaults.template = ...`, and the file draws only px figures | the setting changed the px figure and left a `go.Figure` at `#E5ECF6` |
 
-The first form is also silent when a module that the file imports sets the template for it,
-with `pio.templates.default = ...` or `px.defaults.template = ...`. xpd reads the `__init__.py`
-of each package the file is in, each module of the project that the file imports, and what
-those import in turn. A scatter plot in a module of a package whose `__init__.py` assigns
-`pio.templates.default = "simple_white"` resolved to a white plot area with no grid, and so
-did one in a script that imports the module with the assignment. `px.defaults.template`
-changed the px figure and left a `go.Figure` at `#E5ECF6`, so it silences a file of px figures
-only. A module that imports the file, such as the script that starts the program, is not
-read, and a file beside the one with the assignment that does not import it is still
-reported. The fix is unsafe, because `"simple_white"` also changes the colors of the marks.
+`hovertemplate` and `texttemplate` are other attributes and do not count as a template, and a
+scatter plot with a `hovertemplate` still resolved to `#E5ECF6`. To find a template set in
+another module, xpd reads the `__init__.py` of each package the file is in, each module of the
+project that the file imports, and each module that an imported module imports in turn. It does not read a module
+that imports the file, such as the script that starts the program, so it still reports a file
+beside the one with the assignment when the file does not import it. The fix is unsafe, because
+`"simple_white"` also changes the colors of the marks.
 
 #### explicit-grid
 
 **Severity:** info. **Fix:** unsafe for `showgrid=True`: `showgrid=False`. None for a black grid.
-
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
 
 Reports `showgrid=True` without `gridcolor` and `gridwidth` beside it, and `gridcolor` set to black, on an x or y axis of a plotly figure. It reads the keyword in `update_xaxes`, `update_yaxes`, `go.layout.XAxis` and `go.layout.YAxis`, the underscore form such as `xaxis_showgrid` in `update_layout` and `go.Layout`, and `xaxis=dict(showgrid=True)` or `xaxis={"showgrid": True}` in `update_layout`, `go.Layout` and `go.Figure`.
 
@@ -11719,24 +12049,25 @@ fig.update_yaxes(showgrid=True, gridcolor="#eee")
 ```
 
 "The grid should usually be muted or completely suppressed so that its presence is only
-implicit" (page 112), and "dark grid lines are chartjunk" (page 113). Under the templates `"plotly"` and
-`"none"` a scatter plot had 10 grid lines with and without `showgrid=True`, so the argument did
-nothing. Under `"simple_white"`, which has no grid, it added 10 lines in `rgb(232,232,232)`.
-So the argument either does nothing or brings back the ink that the template left out.
+implicit" (page 112), and "dark grid lines are chartjunk" (page 113). `showgrid=True` either
+does nothing or brings back the ink that the template left out.
 
-A call that sets `gridcolor` or `gridwidth` beside `showgrid=True` has chosen its grid and is
-left alone. Black is read as `"black"`, `"#000"`, `"#000000"` and `"rgb(0,0,0)"`, in any case.
-How dark another color is against the background cannot be read from the code. A black
-`gridcolor` beside `showgrid=False` draws nothing and is left alone, and so is the graticule
-of a map. The fix is unsafe, because it removes grid lines from a figure drawn with
-`"simple_white"`.
+| Template of a scatter plot | Grid lines without `showgrid=True` | Grid lines with it |
+| --- | --- | --- |
+| `"plotly"` | 10 | 10 |
+| `"none"` | 10 | 10 |
+| `"simple_white"` | 0 | 10, in `rgb(232,232,232)` |
+
+The rule leaves alone a call that sets `gridcolor` or `gridwidth` beside `showgrid=True`,
+because the call has chosen its grid. It reads black as `"black"`, `"#000"`, `"#000000"` and
+`"rgb(0,0,0)"`, in any case, because how dark another color is against the background cannot be
+read from the code. A black `gridcolor` beside `showgrid=False` draws nothing and is left alone,
+and so is the graticule of a map. The fix is unsafe, because it removes grid lines from a figure
+drawn with `"simple_white"`.
 
 #### boxed-axis-frame
 
 **Severity:** info. **Fix:** none.
-
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
 
 Reports `mirror=True`, `mirror="all"`, `mirror="ticks"` or `mirror="allticks"` beside `showline=True` on an x or y axis of a plotly figure, in `update_xaxes`, `update_yaxes`, `go.layout.XAxis`, `go.layout.YAxis`, and in `xaxis=dict(...)` or `xaxis={...}` in `update_layout`, `go.Layout` and `go.Figure`.
 
@@ -11761,22 +12092,19 @@ The replacement is advice. xpd does not apply it automatically.
 The book redraws a chart until it has "only the frame lines remaining as pure non-information"
 (page 103), and says that a frame which shows the range of the data "should replace the
 non-data-bearing frame" (page 131). `mirror=True` draws each axis line a second time on the
-far side of the plot, which closes a box around the data: the x axis line had one segment
-with `showline=True` alone and two with `mirror=True`. Under the default template `mirror=True`
+far side of the plot, which closes a box around the data. The x axis line had one segment with
+`showline=True` alone and two with `mirror=True`. Under the default template `mirror=True`
 without `showline` drew no line, so the rule reads the two together.
 
 #### box-plot-ink
 
-Severity: info. Fix: none.
+**Severity:** info. **Fix:** none.
 
-Recall was 40 of 48. The rule found 8 of 16 forms using names. Other measured misses were
-`dictionary splat and trace name` (8).
-
-Reports `px.box` and `go.Box` constructors with exactly one of `x` or `y`,
-without written point settings, notches, means, quartile methods, precomputed
-statistics, box styling, orientation or unknown argument splats. Express color,
-facet and animation groups are outside this narrow form. The advice is conditional.
-The rule does not establish that a box plot is wrong.
+Reports `px.box` and `go.Box` with exactly one of `x` or `y`, when the call writes no point
+settings, notches, means, quartile method, precomputed statistics, box style or orientation, and
+has no `**` argument. A px call with `color`, a facet or an animation is left alone. The rule
+does not prove that a box plot is wrong, and the advice holds only when the five numbers are
+all the reader needs.
 
 Example:
 
@@ -11796,29 +12124,27 @@ fig = go.Figure(go.Scatter(
 ))
 ```
 
-The five numbers above are an example, computed from values 1 through 7 with
-linear quartiles. Compute the numbers separately for each distribution. Choose
-the offset and median gap for the data scale, and retain the original box when
-its outliers, notches, hover information or statistical convention are needed.
-Default whiskers end at sample values within the 1.5 IQR fences, which need not
-be the minimum and maximum. Replacing them with min/max changes the statistic.
+The five numbers above are an example, computed from the values 1 to 7 with linear quartiles.
+Compute the five numbers for each distribution, and choose the offset and the gap at the median
+for the scale of the data. Keep the box when its outliers, notches, hover information or
+statistical convention are needed. The whiskers of a default box end at the sample values inside
+the fences at 1.5 times the interquartile range, which need not be the minimum and the maximum,
+so a drawing from the minimum to the maximum shows another statistic.
 
-Tufte prefers the offset middle half of the quartile plot (page 124), but says
-the choice also rests on statistical and aesthetic criteria at vdqi.md lines
-4877 to 4893. The Plotly 7.1.0 drawing probe rendered four default boxes with
-36 straight segments and 15,241.7 square pixels of filled box area. The offset
-`go.Scatter` drawing used 16 segments and no filled box area. A thinned box
-still used 28 segments and obscured the median. These are drawing measurements,
-not a claim of statistical equivalence. The rendered figures and resolved
-values are in `research/plotly-rules/runs/v2/fix-R5/`. No automatic fix can make
-the statistical and aesthetic choice for the author.
+The book prefers the quartile plot with the middle half offset (page 124), and says that the
+choice also rests on statistical and aesthetic criteria. The table gives what plotly 7.1.0 drew
+for four groups. The numbers measure the drawing and do not show that the two forms are equal
+as statistics, so the rule has no fix.
+
+| Drawing of four groups | Straight segments | Filled box area in square pixels |
+| --- | --- | --- |
+| four default `go.Box` traces | 36 | 15,241.7 |
+| a thinner box | 28, and the median was hidden | not recorded |
+| the offset quartile plot in `go.Scatter` | 16 | 0 |
 
 #### redundant-color
 
 **Severity:** info. **Fix:** none.
-
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
 
 Reports a px call whose `color` is the same column name as its `x` or its `y`, both written as strings. It covers the 13 px functions that take `color`, `x` and `y`: `px.area`, `px.bar`, `px.box`, `px.density_contour`, `px.ecdf`, `px.funnel`, `px.histogram`, `px.line`, `px.line_3d`, `px.scatter`, `px.scatter_3d`, `px.strip` and `px.violin`.
 
@@ -11847,22 +12173,29 @@ same categories, which is why the rule is info. A column given by a name, as in
 
 The rule also reads `go.Bar` whose `marker_color`, or `color` inside `marker`, is the same
 expression as its `x` or `y`, as in `go.Bar(x=names, y=df["sales"], marker_color=df["sales"])`.
-`go.Bar(y=[1, 2, 4], marker_color=[1, 2, 4])` drew the three bars in `rgb(13, 8, 135)`,
-`rgb(156, 23, 158)` and `rgb(240, 249, 33)`, where the same bars without `marker_color` were all
-`rgb(99, 110, 250)`. The length of a bar already shows its value, so the colors repeat it. A
-written string or number as the color is left alone. If the repeated coordinate holds
-categories, color repeats the category positions rather than the bar lengths. For example,
-`go.Bar(x=["red", "blue"], y=[1, 2], marker_color=["red", "blue"])` assigns a color to each
-category. Keep those colors when they match another chart or serve another purpose.
+The length of a bar already shows its value, so the colors repeat it.
+
+| `go.Bar(y=[1, 2, 4], ...)` | Colors of the three bars |
+| --- | --- |
+| without `marker_color` | `rgb(99, 110, 250)` for all three |
+| `marker_color=[1, 2, 4]` | `rgb(13, 8, 135)`, `rgb(156, 23, 158)` and `rgb(240, 249, 33)` |
+
+A written string or number as the color is left alone. When the repeated coordinate holds
+categories, the colors repeat the categories and not the lengths of the bars. For example,
+`go.Bar(x=["red", "blue"], y=[1, 2], marker_color=["red", "blue"])` gives each category a color.
+Keep such colors when they match another chart or serve another purpose.
 
 #### pattern-fill
 
 **Severity:** warning. **Fix:** none.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
+Reports hatching.
 
-Reports hatching: `pattern_shape="column"` on `px.area`, `px.bar`, `px.bar_polar`, `px.histogram` and `px.timeline`, a pattern shape on the eight go traces that have `marker.pattern`, which are `go.Bar`, `go.Barpolar`, `go.Funnelarea`, `go.Histogram`, `go.Icicle`, `go.Pie`, `go.Sunburst` and `go.Treemap`, and `fillpattern` on `go.Scatter`.
+| Setting | Calls |
+| --- | --- |
+| `pattern_shape="column"` | `px.area`, `px.bar`, `px.bar_polar`, `px.histogram`, `px.timeline` |
+| a pattern shape on `marker.pattern` | `go.Bar`, `go.Barpolar`, `go.Funnelarea`, `go.Histogram`, `go.Icicle`, `go.Pie`, `go.Sunburst`, `go.Treemap` |
+| `fillpattern` | `go.Scatter` |
 
 Example:
 
@@ -11893,9 +12226,6 @@ On a go trace the rule reads `marker_pattern_shape=`, `marker=dict(pattern=dict(
 
 **Severity:** info. **Fix:** none.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
-
 Reports `go.Indicator` whose `mode` is a string that names `gauge`, such as `mode="gauge+number"`.
 
 Example:
@@ -11912,34 +12242,36 @@ fig = go.Figure(go.Indicator(mode="number+delta", value=270, delta=dict(referenc
 
 The replacement is advice. xpd does not apply it automatically.
 
-"Maximize data density and the size of the data matrix, within reason" (page 168). A gauge
-shows one number. `mode="gauge+number"` drew 8 shapes and 7 labels for it, and the default
-`mode="number"` drew the same value with no shape and 2 labels. The book calls a graphic that
-"purveys Graphical Style rather than quantitative information" a duck (page 116).
+"Maximize data density and the size of the data matrix, within reason" (page 168). The book
+calls a graphic that "purveys Graphical Style rather than quantitative information" a duck
+(page 116). A gauge shows one number.
 
-The dial is drawn only when `mode` names it: a `gauge` argument with the default mode drew no
-shape, so it is not reported. A gauge with `shape="bullet"` is a bar and not a dial, and is
-left alone. The rule has no fix, because a gauge can carry a threshold that the number alone
-does not show.
+| `go.Indicator` | Shapes drawn | Labels drawn |
+| --- | --- | --- |
+| `mode="gauge+number"` | 8 | 7 |
+| `mode="number"`, the default | 0 | 2 |
+
+plotly draws the dial only when `mode` names it, and a `gauge` argument with the default mode
+drew no shape, so the rule does not report it. A gauge with `shape="bullet"` is a bar and not a
+dial, and is left alone. The rule has no fix, because a gauge can carry a threshold that the
+number alone does not show.
 
 ### Color without an order
 
-"The mind's eye does not readily give a visual ordering to colors, except possibly for red to
-reflect higher levels than other colors", and "varying shades of gray show varying quantities
-better than color" (page 154).
+The rule in the group reports a color scale whose colors do not get lighter or darker in one
+direction. The book says that "the mind's eye does not readily give a visual ordering to colors,
+except possibly for red to reflect higher levels than other colors", and that "varying shades
+of gray show varying quantities better than color" (page 154).
 
 #### rainbow-colorscale
 
 **Severity:** warning. **Fix:** none.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
-
 Reports the color scales Jet, Rainbow, Turbo and HSV, written as a string in any case with or without `_r`, or as `px.colors.sequential.Jet` and the like, when it is given to `colorscale`, `color_continuous_scale` or a setting that ends in `_colorscale` inside a plotly call, or assigned to `px.defaults.color_continuous_scale`.
 
-The rule reports a configured scale, including unused coloraxis settings. Its drawn-color
-warning applies only when a trace uses the scale for numeric color. A scatter without numeric
-color values or a reference to the configured coloraxis does not display that scale.
+The rule reports a scale where the code sets it, also on a color axis that no trace uses. The
+advice applies only when a trace colors numbers with the scale. A scatter plot without numeric
+colors, or without a reference to the color axis, does not show the scale.
 
 Example:
 
@@ -11959,29 +12291,42 @@ The replacement is advice. xpd does not apply it automatically.
 
 The test of order is lightness. Each of the 94 named scales was resolved on a `go.Heatmap` and
 sampled at 21 even steps, and the CIELAB lightness of each step was computed, from 0 for black
-to 100 for white. 61 scales, such as `"Greys"`, `"Blues"` and `"Viridis"`, never changed
-direction. Jet rose from 13.5 to 97.1 and fell back to 25.5, so it changed direction 3 times,
-Rainbow 2 times, HSV 3 times and Turbo once, with its lightest color in the middle. A low and a
-high value then come out equally dark. `px.imshow` with `"jet"`, a `go.Scatter` marker with
-`"Jet"` and `update_layout(coloraxis_colorscale="Jet")` all resolved to the same six stops.
+to 100 for white. A scale that changes direction draws a low and a high value equally dark.
 
-Earth, mrybm and mygbm change direction too and appear in no file the rules were run on.
-Blackbody, Bluered, Portland and Picnic change once, near one end or at a midpoint as the
-two-sided RdBu does, and are left alone. `color_discrete_sequence` is left alone, because it
-colors groups and not quantities. Numbers that name groups, such as cluster numbers, are
-better colored as categories, and the message says so. The rule has no fix, because the scale
-to use depends on whether the data has a midpoint.
+| Scale | Changes of direction in lightness | Reported |
+| --- | --- | --- |
+| 61 scales, such as `"Greys"`, `"Blues"` and `"Viridis"` | 0 | no |
+| Jet, which rose from 13.5 to 97.1 and fell back to 25.5 | 3 | yes |
+| HSV | 3 | yes |
+| Rainbow | 2 | yes |
+| Turbo, with its lightest color in the middle | 1 | yes |
+| Blackbody, Bluered, Portland, Picnic | 1, near one end or at a midpoint as the two-sided RdBu does | no |
+| Earth, mrybm, mygbm | more than 0 | no, because they appear in no file the rules were run on |
+
+`px.imshow` with `"jet"`, a `go.Scatter` marker with `"Jet"` and
+`update_layout(coloraxis_colorscale="Jet")` all resolved to the same six stops.
+`color_discrete_sequence` is left alone, because it colors groups and not quantities. Numbers
+that name groups, such as cluster numbers, are better colored as categories, and the message
+says so. The rule has no fix, because the scale to use depends on whether the data has a
+midpoint.
 
 ### Chart forms the book argues against
+
+The rules in the group report pies, sunbursts, smoothed lines and cells, animations, and charts
+of a few numbers that a table shows better.
 
 #### pie-chart
 
 **Severity:** warning. **Fix:** none.
 
-Recall was 48 of 48. The rule found 8 of 8 forms with values held in a name. All planted forms were
-found.
+Reports `px.pie(...)` and `go.Pie(...)`. A second message, for several pies, goes to the forms in the table.
 
-Reports `px.pie(...)` and `go.Pie(...)`. A second message goes to `px.pie` with `facet_col` or `facet_row`, which draws several pies, and to each `go.Pie` that shares its figure with another pie: two in the data list of `go.Figure` or of `add_traces`, an `add_trace` of a pie next to another `add_trace` of a pie on the same figure, or a pie added in a loop to a cell that changes with the loop.
+| Form | Example |
+| --- | --- |
+| `px.pie` with `facet_col` or `facet_row` | `px.pie(df, names="day", values="tip", facet_col="shop")` |
+| two `go.Pie` in the data list of `go.Figure` or of `add_traces` | `go.Figure([go.Pie(...), go.Pie(...)])` |
+| an `add_trace` of a pie next to another `add_trace` of a pie on the same figure | `fig.add_trace(go.Pie(...), row=1, col=1)` twice |
+| a pie added in a loop to a cell that changes with the loop | `fig.add_trace(go.Pie(...), row=1, col=i)` in `for i in ...` |
 
 Example:
 
@@ -12002,25 +12347,29 @@ The replacement is advice. xpd does not apply it automatically.
 "A table is nearly always better than a dumb pie chart; the only worse design than a pie chart
 is several of them, for then the viewer is asked to compare quantities located in spatial
 disarray both within and between pies. Given their low data-density and failure to order
-numbers along a visual dimension, pie charts should never be used" (page 178). `px.pie` and
-`go.Pie` resolved to a trace of type `pie`, with and without `hole`.
-`px.pie(facet_col="sex")` drew two pies side by side, and four with `facet_row` as well. For a
-few shares, `go.Table` shows the exact numbers.
+numbers along a visual dimension, pie charts should never be used" (page 178). For a few
+shares, `go.Table` shows the exact numbers.
 
-Each `go.Pie` constructor is reported once. When several pies share a receiver whose
-figure type cannot be proved, each constructor keeps the single-pie message. A proved
-figure receiver or a written `go.Figure` data list gets the several-pies message.
+| Code | What plotly made of it |
+| --- | --- |
+| `px.pie`, `go.Pie`, with and without `hole` | a trace of type `pie` |
+| `px.pie(facet_col="sex")` | two pies side by side |
+| `px.pie(facet_col="sex", facet_row=...)` | four pies |
+| `make_subplots(rows=1, cols=2)` with two cells of type `"domain"` and a `go.Pie` added to each | two traces of type `pie`, with the domains 0 to 0.45 and 0.55 to 1 across |
+
+Each `go.Pie` call is reported once. It gets the message for several pies when it is in a written
+`go.Figure` data list, or when the figure it is added to is proved to be a plotly figure. When the
+object that several pies are added to is not proved to be a figure, each pie keeps the first
+message. Two `add_trace` calls count as one figure only when no second assignment of the name
+comes between them.
 
 A facet given as `None` draws one pie and gets the first message. `px.sunburst` has its own
-rule, [`sunburst-as-pie`](#sunburst-as-pie). `px.funnel_area` is not reported: its sections
-were drawn with areas in the ratio of the values, stacked from top to bottom.
+rule, [`sunburst-as-pie`](#sunburst-as-pie). `px.funnel_area` is not reported, because its
+sections were drawn with areas in the ratio of the values, stacked from top to bottom.
 
 #### sunburst-as-pie
 
 **Severity:** warning. **Fix:** none.
-
-Recall was 48 of 48. The rule found 8 of 8 forms with values held in a name. All planted forms were
-found.
 
 Reports `px.sunburst(...)` with `values` or `path`, and `go.Sunburst(...)` with `values`.
 
@@ -12040,36 +12389,39 @@ The replacement is advice. xpd does not apply it automatically.
 
 The book rejects pie charts for "their low data-density and failure to order numbers along a
 visual dimension" (page 178). A sunburst draws each value as a wedge, as a pie does, and its
-rings make the order worse. Two regions, west 60 and east 40, with the shops c 15 and d 45 in
-west and a 30 and b 10 in east, were drawn with the regions in the inner ring and the shops in
-the outer ring, which has three times the area for each degree. Shop d with 45 got 17,918.9
-square pixels and region west with 60 got 7,963.9, so the smaller number was drawn 2.25 times
-larger. Shop a with 30 against region east with 40 was reversed the same way. The angles keep
-the order only within one ring. `px.sunburst` and `go.Sunburst` resolved to a trace of type
-`sunburst`.
+rings make the order worse, because the outer ring has three times the area of the inner ring
+for each degree. The angles keep the order only within one ring. `px.sunburst` and
+`go.Sunburst` resolved to a trace of type `sunburst`.
 
-A sunburst without numbers is left alone. A `go.Sunburst` with `labels` and `parents` and no
-`values` gave each leaf one equal share, so it draws a hierarchy, such as a flavor wheel, and
+The test sunburst had the regions west 60 and east 40 in the inner ring, and the shops c 15 and
+d 45 of west and a 30 and b 10 of east in the outer ring.
+
+| Wedge | Value | Area in square pixels |
+| --- | --- | --- |
+| region west, inner ring | 60 | 7,963.9 |
+| shop d, outer ring | 45 | 17,918.9, which is 2.25 times the area of west |
+
+Shop a with 30 against region east with 40 was reversed in the same way.
+
+The rule leaves alone a sunburst without numbers. A `go.Sunburst` with `labels` and `parents` and
+no `values` gave each leaf one equal share, so it draws a hierarchy, such as a flavor wheel, and
 not quantities. `px.sunburst` with `path` and no `values` counts the rows of each group, which
-are numbers, so it is reported.
-
-`make_subplots(rows=1, cols=2)` with two cells of type `"domain"` and a `go.Pie` added to each
-resolved to two traces of type `pie` with the domains 0 to 0.45 and 0.55 to 1 across. Each pie
-is reported once, with the message for several pies. Two `add_trace` calls count as one figure
-only when no second assignment of the name comes between them.
+are numbers, so the rule reports it.
 
 #### spline-line
 
 **Severity:** info. **Fix:** unsafe: `"linear"`.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
+Reports the line shape `"spline"`.
 
-Reports the line shape `"spline"`: `line_shape="spline"` on `px.area`, `px.line`, `px.line_polar` and `px.line_ternary`, on the five go traces whose line takes the shape, which are `go.Scatter`, `go.Scattercarpet`, `go.Scatterpolar`, `go.Scattersmith` and `go.Scatterternary`, and in `update_traces` on a plotly figure, and `line=dict(shape="spline")` or `line={"shape": "spline"}` on the same five traces.
+| Setting | Calls |
+| --- | --- |
+| `line_shape="spline"` | `px.area`, `px.line`, `px.line_polar`, `px.line_ternary`, `update_traces` on a plotly figure, and the five go traces whose line takes the shape: `go.Scatter`, `go.Scattercarpet`, `go.Scatterpolar`, `go.Scattersmith`, `go.Scatterternary` |
+| `line=dict(shape="spline")`, `line={"shape": "spline"}` | the same five go traces |
 
-The rule reports the interpolation setting. It does not prove that the trace draws a line.
-A markers-only trace draws no curve, so the interpolation warning applies only when line
-mode is active. The unsafe fix changes the configured shape even if it is currently unused.
+The rule reports the setting and does not prove that the trace draws a line. A trace with only
+markers draws no curve, so the advice applies only when the trace draws lines. The unsafe fix
+changes the shape also when no line uses it.
 
 Example:
 
@@ -12084,13 +12436,16 @@ fig = px.line(df, x="hour", y="reading", line_shape="linear")
 ```
 
 "Above all else show the data" (page 92). A spline draws a smooth curve through the points,
-and the curve passes through values that the data does not hold. The readings 0, 0, 10, 10, 0
-and 0 drawn with `go.Scatter(line_shape="spline")` at the default size reached 10.55 at the top
-and -0.37 at the bottom, and `px.line(line_shape="spline")` reached 10.51 and -0.34. The
-straight line stayed between 0 and 10. plotly computes the spline in pixels, so the same
-readings with the y axis set to -5 to 15 at 700 by 500 pixels reached 10.8 and -0.53. How far
-the curve leaves the data depends on the data, on the axis range and on the size of the figure,
-so the rule is info.
+and the curve passes through values that the data does not hold. plotly computes the spline in
+pixels, so how far the curve leaves the data depends on the data, on the axis range and on the
+size of the figure, and the rule is info.
+
+| Readings 0, 0, 10, 10, 0, 0 | Highest point drawn | Lowest point drawn |
+| --- | --- | --- |
+| a straight line | 10 | 0 |
+| `go.Scatter(line_shape="spline")`, default size | 10.55 | -0.37 |
+| `px.line(line_shape="spline")`, default size | 10.51 | -0.34 |
+| the spline with the y axis set to -5 to 15, at 700 by 500 pixels | 10.8 | -0.53 |
 
 The fix is unsafe, because straight segments make the figure look different. It leaves a
 `smoothing` argument in place, which plotly ignores for a straight line. A shape given by a
@@ -12100,14 +12455,11 @@ name is left alone.
 
 **Severity:** info. **Fix:** none.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
+Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11. It also reports frames built with `go.Frame`, as `frames=` in `go.Figure` or in `update` on a plotly figure, and as `fig.frames = ...`.
 
-Reports `animation_frame="column"` on the 28 px functions that take it. The message names `facet_col` for the 17 that have it, and `make_subplots` for the other 11. It also reports frames built with `go.Frame`: `frames=` in `go.Figure` or in `update` on a plotly figure, and `fig.frames = ...`.
-
-The rule reports frame configuration. An empty figure or a single frame does not establish
-an animation with different data to compare. The small-multiple advice applies when multiple
-frames display different data, and their panels fit on the page.
+The rule reports how the frames are set up. An empty figure or a single frame has no different
+data to compare, so the advice to draw small multiples applies when several frames show
+different data and their panels fit on the page.
 
 Example:
 
@@ -12126,32 +12478,40 @@ The replacement is advice. xpd does not apply it automatically.
 "Small multiples resemble the frames of a movie: a series of graphics, showing the same
 combination of variables, indexed by changes in another variable" (page 170). The book lists
 them as "inevitably comparative" (page 175). An animation shows one frame at a time, so the reader
-compares the frames from memory. On the gapminder data, `animation_frame="year"` made 12
-frames and drew 142 of the 1,704 rows at once, and `facet_col="year"` with `facet_col_wrap=4`
-drew all 1,704 rows in 12 panels.
+compares the frames from memory.
 
-Panels need room, and with many frames an animation can be the better choice, which is why
-the rule is info and has no fix. 11 of the 28 functions have no `facet_col`: `bar_polar`,
-`choropleth_map`, `density_map`, `line_3d`, `line_map`, `line_polar`, `line_ternary`,
-`scatter_3d`, `scatter_map`, `scatter_polar` and `scatter_ternary`. `px.scatter_3d(facet_col=...)`
-raised TypeError, "got an unexpected keyword argument 'facet_col'", so for those the message
-says to draw one panel for each frame with `make_subplots`.
+| Figure | Frames or panels | Points drawn at once |
+| --- | --- | --- |
+| gapminder, `animation_frame="year"` | 12 frames | 142 of the 1,704 rows |
+| gapminder, `facet_col="year", facet_col_wrap=4` | 12 panels | all 1,704 rows |
+| `go.Figure` with three frames of one point each | 3 frames | 1 |
+| the same three points in `make_subplots(rows=1, cols=3)` | 3 panels | 3 |
 
-A `go.Figure` with three frames of one point each held the 3 frames and drew 1 point, and the
-page that `to_html` wrote passed the three frames to `Plotly.addFrames`. The same three points in
-`make_subplots(rows=1, cols=3)` drew all 3. `full_figure_for_development` keeps no frames, so
-the count was read from the figure and the drawn page. Frames copied from another figure, as
-`frames=fig.frames`, are left alone, because the figure they come from is reported where it is
-made, and so are `frames=None` and `frames=[]`.
+`full_figure_for_development` keeps no frames, so the frames were counted in the figure and in
+the page that `to_html` wrote, which passed the three frames to `Plotly.addFrames`.
+
+The rule is info and has no fix, because panels need room, and with many frames an animation
+can be the better choice. 11 of the 28 functions have no `facet_col`, and
+`px.scatter_3d(facet_col=...)` raised TypeError, "got an unexpected keyword argument
+'facet_col'". For the 11, which are `bar_polar`, `choropleth_map`, `density_map`, `line_3d`,
+`line_map`, `line_polar`, `line_ternary`, `scatter_3d`, `scatter_map`, `scatter_polar` and
+`scatter_ternary`, the message says to draw one panel for each frame with `make_subplots`.
+
+The rule leaves alone frames copied from another figure, as `frames=fig.frames`, because the
+figure they come from is reported where it is made. It also leaves alone `frames=None` and
+`frames=[]`.
 
 #### heatmap-smoothing
 
 **Severity:** info. **Fix:** unsafe: `False`.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
+Reports a `zsmooth` value that blends the colors of the cells.
 
-Reports `zsmooth="best"` and `zsmooth="fast"` on `go.Heatmap`, `zsmooth="best"` on `go.Histogram2d` and in `update_traces` on a plotly figure, and `zsmooth="fast"` on a `go.Image` that sets `source`.
+| Call | Values reported |
+| --- | --- |
+| `go.Heatmap` | `"best"`, `"fast"` |
+| `go.Histogram2d`, `update_traces` on a plotly figure | `"best"` |
+| `go.Image` that sets `source` | `"fast"` |
 
 Example:
 
@@ -12166,17 +12526,26 @@ fig = go.Figure(go.Heatmap(z=grid, zsmooth=False))
 ```
 
 "Above all else show the data" (page 92). Smoothing fills the space between the cells with
-colors that blend their values. A 2 by 2 grid of 0 and 10, drawn in `"Greys"` at 400 by 400
-pixels, drew 2 colors with `zsmooth=False`, 61 with `"fast"` and 252 with `"best"`. The two
-colors of the data covered all 160,000 pixels without smoothing, and 45,156 and 40,401 with
-it.
+colors that blend their values.
 
-`go.Histogram2d` drew 252 colors with `"best"`, and its `"fast"` resolved to `False` and drew
-2, so `"fast"` is read on `go.Heatmap` only. `go.Image` takes `"fast"` or `False`, and
-`"best"` raised ValueError. Its docstring says that `zsmooth` "only applies for image traces
-that use the source attribute": a checkerboard given as `z` drew 2 colors with `"fast"`, and
-the same pixels given as a PNG in `source` drew 61. `update_traces(zsmooth="fast")` is left
-alone, because the rule cannot see which traces the figure holds.
+| A 2 by 2 grid of 0 and 10 in `"Greys"`, 400 by 400 pixels | Colors drawn |
+| --- | --- |
+| `go.Heatmap(zsmooth=False)` | 2 |
+| `go.Heatmap(zsmooth="fast")` | 61 |
+| `go.Heatmap(zsmooth="best")` | 252 |
+| `go.Histogram2d(zsmooth="best")` | 252 |
+| `go.Histogram2d(zsmooth="fast")`, which resolved to `False` | 2 |
+| `go.Image(zsmooth="fast")`, a checkerboard given as `z` | 2 |
+| `go.Image(zsmooth="fast")`, the same pixels given as a PNG in `source` | 61 |
+
+The two colors of the data covered all 160,000 pixels without smoothing, and 45,156 and 40,401
+pixels with it.
+
+The rule reads `"fast"` on `go.Heatmap` only, and on `go.Image` only with `source`, because the
+docstring of `go.Image` says that `zsmooth` "only applies for image traces that use the source
+attribute". `go.Image` takes `"fast"` or `False`, and `"best"` raised ValueError.
+`update_traces(zsmooth="fast")` is left alone, because the rule cannot see which traces the
+figure holds.
 
 The fix is unsafe, because each cell is then drawn as a block of one color, so the figure looks
 different.
@@ -12184,10 +12553,6 @@ different.
 #### table-for-small-data
 
 **Severity:** info. **Fix:** none.
-
-Recall was 29 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
-bar literal values` (2), `px pie literal values` (3), `bare Bar y` (3), `Figure Pie list` (2), `bare
-horizontal Bar x` (1).
 
 Reports `px.bar` and `go.Bar` whose values, `y`, or `x` with `orientation="h"`, are a written list or tuple of 1 to 20 numbers, and `px.pie` and `go.Pie` whose `values` is one, when the call is a px call or the only trace of a `go.Figure`.
 
@@ -12210,29 +12575,37 @@ The replacement is advice. xpd does not apply it automatically.
 
 "Tables usually outperform graphics in reporting on small data sets of 20 numbers or less"
 (page 56), and "tables are preferable to graphics for many small data sets" (page 178). A
-chart of a few numbers draws them as lengths or angles and does not write them. `px.bar` of
-41.3, 37.8, 12.6 and 8.3 drew the four names and the ticks 0 to 40, and none of the four
-values. `go.Pie` of 413, 378, 126 and 83 wrote the four shares as percentages and none of the
-values. `go.Table` wrote all four.
+chart of a few numbers draws them as lengths or angles and does not write them.
+
+| Chart | What it wrote |
+| --- | --- |
+| `px.bar` of 41.3, 37.8, 12.6 and 8.3 | the four names and the ticks 0 to 40, and none of the four values |
+| `go.Pie` of 413, 378, 126 and 83 | the four shares as percentages, and none of the values |
+| `go.Table` of the same values | all four values |
 
 xpd cannot count the rows of a data frame or the traces of a figure, so the rule reads the one
-form where the code shows the whole data: a px call, or a `go.Figure` whose data is this one
-trace. A trace added with `add_trace` is left alone, and so is an `x` of numbers on a bar
-without `orientation="h"`, because those are positions. A chart that writes its values with
-`text`, `texttemplate`, `textinfo` or `text_auto`, or a file that names `textposition`, is left
-alone. A pie is also reported by [`pie-chart`](#pie-chart), for its form. A list with a name, a
-`None` or a 21st number is left alone.
+form where the code shows the whole data, which is a px call or a `go.Figure` whose data is the
+one trace. A pie is also reported by [`pie-chart`](#pie-chart), for its form. The rule leaves
+alone the forms in the table.
+
+| Form | Why |
+| --- | --- |
+| a trace added with `add_trace` | the code does not show the other traces |
+| an `x` of numbers on a bar without `orientation="h"` | the numbers are positions |
+| a chart that writes its values with `text`, `texttemplate`, `textinfo` or `text_auto`, or a file that names `textposition` | the values are already written |
+| a list with a name, a `None` or a 21st number | the list is not 1 to 20 written numbers |
 
 ### Words on the figure
+
+The rules in the group report words that are harder to read than they need to be. The book lists
+what makes the words of a graphic friendly or unfriendly (page 183), and each rule quotes one
+line of the list.
 
 #### all-caps-title
 
 **Severity:** info. **Fix:** none.
 
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
-
-Reports a title written in capitals only, with at least two words of four or more capitals: a `title`, a `title_text`, a setting that ends in `_title` or `_title_text`, the `text` of a title dict, a value of the `labels` of a px call, or an item of `subplot_titles`, inside a plotly call.
+Reports a title written in capitals only, with at least two words of four or more capitals, inside a plotly call. A title is a `title`, a `title_text`, a setting that ends in `_title` or `_title_text`, the `text` of a title dict, a value of the `labels` of a px call, or an item of `subplot_titles`.
 
 Example:
 
@@ -12249,25 +12622,29 @@ fig = px.bar(df, x="region", y="sales", title="Sales by region")
 The replacement is advice. xpd does not apply it automatically.
 
 The book lists as friendly "type is upper-and-lower case, with serifs", and as unfriendly "type
-is all capitals, sans serif" (page 183). plotly keeps a title as written:
-`title="SALES BY REGION"` resolved to the same text. Drawn at 20 pixels in the default font,
-`"SALES BY REGION"` was 178 pixels wide and `"Sales by region"` 136, so 1.31 times as wide, and
-two more titles were 1.26 and 1.35 times as wide.
+is all capitals, sans serif" (page 183). plotly keeps a title as written, and
+`title="SALES BY REGION"` resolved to the same text.
 
-Short names in capitals such as `"RSI"`, `"GDP (USD)"` and `"AUC"` are abbreviations and are
-right as written, so they are left alone, and so is a single word such as `"NVIDIA"`. HTML
-tags such as `<b>` are skipped, and an f-string with a field is left alone. The rule has no
-fix, because the case of each word, such as an abbreviation, is the author's to choose.
+| Title drawn at 20 pixels in the default font | Width in pixels |
+| --- | --- |
+| `"SALES BY REGION"` | 178, which is 1.31 times as wide |
+| `"Sales by region"` | 136 |
+
+Two more titles were 1.26 and 1.35 times as wide in capitals. The rule leaves alone short names
+in capitals such as `"RSI"`, `"GDP (USD)"` and `"AUC"`, which are abbreviations and right as
+written, and a single word such as `"NVIDIA"`. It skips HTML tags such as `<b>`, and leaves alone
+an f-string with a field. The rule has no fix, because the case of each word, such as an
+abbreviation, is the author's to choose.
 
 #### legend-instead-of-labels
 
 **Severity:** info. **Fix:** none.
 
-Recall was 21 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
-line color` (5), `px line column list` (5), `added named Scatter` (2), `Figure named Scatter list`
-(2), `px line color with markers` (5).
+Reports a figure of two to four named lines with a legend, in a file that names no `showlegend`, no annotation and no text mode. The figure is one of three forms:
 
-Reports three forms in a file that names no `showlegend`, no annotation and no text mode: a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`, two to four such calls added one by one with `fig.add_trace(...)` to an empty `go.Figure()`, and `px.line` with `color="column"` or with `y` as a written list of two to four column names.
+- a `go.Figure` whose data is a written list of two to four `go.Scatter(...)` calls, each with a `name`
+- two to four such calls added one by one with `fig.add_trace(...)` to an empty `go.Figure()`
+- `px.line` with `color="column"`, or with `y` as a written list of two to four column names
 
 Example:
 
@@ -12292,33 +12669,31 @@ The replacement is advice. xpd does not apply it automatically.
 
 The book asks "to integrate the caption and legend into the design so that the eye is not
 required to dart back and forth between textual material and the graphic" (page 180), and lists
-as friendly: "labels are placed on the graphic itself; no legend is required" (page 183). A
-`go.Figure` with two named traces resolved to `showlegend=True` and drew a legend of two
-entries. With `mode="lines+text"`, a label at the last point of each line and
-`showlegend=False`, it drew no legend and the names beside the lines.
+as friendly "labels are placed on the graphic itself; no legend is required" (page 183).
 
-Two named lines added one by one with `add_trace` resolved to `showlegend=True` and drew a
-legend of two entries, the same figure. The statements count when they follow each other with
-no second assignment of the name in between. A figure that also gets a trace in another way,
-such as `add_bar`, `add_traces`, an `add_trace` of another trace, or an `add_trace` in a loop or
-a condition, is left alone, because the code then does not show the size of the legend. So is
-an `add_trace` with `row`, `col` or `secondary_y`.
+| Figure | `showlegend` | What it drew |
+| --- | --- | --- |
+| `go.Figure` with two named traces | `True` | a legend of two entries |
+| two named lines added one by one with `add_trace` | `True` | a legend of two entries, the same figure |
+| `px.line(color="sex")` | not recorded | two lines and a legend of two entries |
+| `px.line(y=["a", "b"])` | not recorded | a legend of two entries titled "variable" |
+| `mode="lines+text"`, a label at the last point of each line, and `showlegend=False` | `False` | no legend, and the names beside the lines |
 
-`px.line(color="sex")` drew two lines and a legend of two entries, and `px.line(y=["a", "b"])`
-drew a legend of two entries titled "variable". The number of values of a column is known only
-at run time, so a `px.line` with `color` may draw many lines. A call with `line_group`,
-where many lines share one entry, is left alone.
+`add_trace` statements count when they follow each other with no second assignment of the name
+in between. The number of values of a column is known only at run time, so a `px.line` with
+`color` may draw many lines. The rule leaves alone the forms in the table.
 
-A trace with `mode="markers"` is left alone, and so is a file that calls
-`update_traces(mode="markers")`, a written list with a fifth trace, and a run of five
-`add_trace` calls, because many lines have no room for a label each.
+| Form | Why |
+| --- | --- |
+| a figure that also gets a trace in another way, such as `add_bar`, `add_traces`, an `add_trace` of another trace, or an `add_trace` in a loop or a condition | the code does not show the size of the legend |
+| an `add_trace` with `row`, `col` or `secondary_y` | the traces are in different cells or on different axes |
+| a call with `line_group` | many lines share one entry |
+| a trace with `mode="markers"`, or a file that calls `update_traces(mode="markers")` | there is no line to label |
+| a written list with a fifth trace, or a run of five `add_trace` calls | many lines have no room for a label each |
 
 #### rotated-tick-labels
 
 **Severity:** info. **Fix:** none.
-
-Recall was 40 of 48. The rule found none of 8 values held in a name. All other planted forms were
-found.
 
 Reports a `tickangle` written as a number other than 0, 180 and 360, on an x or y axis of a plotly figure. It reads the keyword in `update_xaxes`, `update_yaxes`, `go.layout.XAxis` and `go.layout.YAxis`, the underscore form such as `xaxis_tickangle` in `update_layout` and `go.Layout`, and `xaxis=dict(tickangle=...)` or `xaxis={"tickangle": ...}` in `update_layout`, `go.Layout` and `go.Figure`.
 
@@ -12339,8 +12714,8 @@ The replacement is advice. xpd does not apply it automatically.
 
 The book lists as friendly "words run from left to right, the usual direction for reading
 occidental languages", and as unfriendly "words run vertically, particularly along the Y-axis;
-words run in several different directions" (page 183). plotly keeps a `tickangle` as written:
-`update_xaxes(tickangle=-90)` resolved to -90, and both category labels of a bar chart were
+words run in several different directions" (page 183). plotly keeps a `tickangle` as written,
+so `update_xaxes(tickangle=-90)` resolved to -90, and both category labels of a bar chart were
 drawn rotated. With the categories on y, as in `px.bar(orientation="h")`, every tick label was
 drawn level.
 
@@ -12351,10 +12726,6 @@ of a colorbar.
 #### axis-title-column-name
 
 **Severity:** info. **Fix:** none.
-
-Recall was 15 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
-scatter column` (5), `px bar column` (5), `px line column` (3), `px area column` (4), `explicit axis
-title` (8).
 
 Reports a px call whose `x` or `y` is a written column name that is code and not words, such as `"gdpPercap"` or `"total_bill"`, in a call without `labels`.
 
@@ -12374,28 +12745,37 @@ The replacement is advice. xpd does not apply it automatically.
 
 The book lists as friendly "words are spelled out, mysterious and elaborate encoding avoided",
 and as unfriendly "abbreviations abound, requiring the viewer to sort through text to decode
-abbreviations" (page 183). px titles an axis with the column that `x` or `y` names:
-`px.scatter(x="gdpPercap", y="lifeExp")` resolved the axis titles `gdpPercap` and `lifeExp`,
-and `px.histogram(x="total_bill")` resolved `total_bill`. `labels=`, a later
-`update_xaxes(title_text=...)` and a later `update_layout(xaxis_title=...)` each replaced them.
+abbreviations" (page 183). px titles an axis with the column that `x` or `y` names.
 
-The rule reads a name with an underscore, or with a capital inside a word, as in `lifeExp`. A
-plain word such as `"day"` is left alone, and so are a name given by a variable and a list of
-columns, which px titles `value`. The rule is silent in a file that sets an axis title or an
-axis dictionary anywhere, such as `update_xaxes(...)`, `update_layout(xaxis_title=...)` or
+| Call | Axis titles |
+| --- | --- |
+| `px.scatter(x="gdpPercap", y="lifeExp")` | `gdpPercap`, `lifeExp` |
+| `px.histogram(x="total_bill")` | `total_bill` |
+| with `labels=`, a later `update_xaxes(title_text=...)` or a later `update_layout(xaxis_title=...)` | the words given there |
+
+The rule reads a name with an underscore, or with a capital inside a word, as in `lifeExp`. It
+leaves alone a plain word such as `"day"`, a name given by a variable, and a list of columns,
+which px titles `value`. The rule is silent in a file that sets an axis title or an axis
+dictionary anywhere, such as `update_xaxes(...)`, `update_layout(xaxis_title=...)` or
 `xaxis=dict(...)`, because the title may be replaced on the figure afterwards. It has no fix,
 because only the author knows the words.
 
 ## Hamilton
 
-These rules run on files that import `hamilton`, the module of
-[Apache Hamilton](https://hamilton.apache.org/), which PyPI ships as `apache-hamilton` and
-`sf-hamilton`. Hamilton builds a dataflow from plain functions: the function name is the output
-and the parameter names are its inputs. The results below are from sf-hamilton 1.90.0 with pandas
-3.1.1.
+The Hamilton rule finds a node that changes an input that other nodes share. It runs on files
+that import `hamilton`, the module of [Apache Hamilton](https://hamilton.apache.org/), which PyPI
+ships as `apache-hamilton` and `sf-hamilton`. Hamilton builds a dataflow from plain functions, so
+the name of a function is its output and the names of its parameters are its inputs. The results
+below are from sf-hamilton 1.90.0 with pandas 3.1.1.
 
-A node module that uses no Hamilton decorator has no `hamilton` import, and xpd does not check
-it.
+```python
+def raw() -> pd.DataFrame: ...                      # node raw
+def clipped(raw: pd.DataFrame) -> pd.DataFrame: ... # node clipped, with the input raw
+def total_uk(raw: pd.DataFrame) -> float: ...       # node total_uk, with the same raw
+```
+
+xpd does not check a node module that uses no Hamilton decorator, because it has no `hamilton`
+import.
 
 ### Shared inputs
 
@@ -12431,14 +12811,18 @@ def total_uk(raw: pd.DataFrame) -> float:
 The replacement is advice. xpd does not apply it automatically.
 
 Hamilton calls each function once and hands its result, the same object, to every node that
-takes it. With the example above, `execute(["total_uk"])` gave 2.0 and
-`execute(["clipped", "total_uk"])` gave 4.0. With the replacement both gave 2.0. The Hamilton
+takes it, so the result of `total_uk` depends on whether `clipped` ran first. The Hamilton
 documentation asks for the same under
 [output immutability](https://hamilton.apache.org/concepts/best-practices/output-immutability/).
 
+| Request | Example | Replacement |
+| --- | --- | --- |
+| `execute(["total_uk"])` | 2.0 | 2.0 |
+| `execute(["clipped", "total_uk"])` | 4.0 | 2.0 |
+
 A node is a function at module level with a return hint and a name that does not start with an
 underscore. The rule also reports a write through a second name for the input, as in
-`gdf = buildings` followed by `gdf["area"] = ...`. It leaves these alone:
+`gdf = buildings` followed by `gdf["area"] = ...`. It leaves alone the cases in the list:
 
 - A parameter the function rebinds first, as in `raw = raw.copy()`.
 - A function under `@load_from` or `@dataloader`. No other node can take the frame they inject.
@@ -12451,10 +12835,18 @@ A write that reaches the input through a helper function is not seen.
 
 ## Python
 
-These rules are about Python itself, so they run on every file, whatever it imports. They cover
-style choices that no formatter or type checker makes. The `python-best-practices` skill in
+The Python rules report style choices that no formatter or type checker makes, and they run on
+every file, whatever it imports. The `python-best-practices` skill in
 [`skills/`](https://github.com/bjoernaagaard/xpd/tree/main/skills) holds the rest of the style,
-and `python-review` reviews code against it.
+and the `python-review` skill reviews code against it.
+
+| Group | Rules |
+| --- | --- |
+| Names | `module-private-name`, `vague-module-name` |
+| Modules | `import-side-effect` |
+| Types | `typing-cast`, `dict-str-any` |
+| Tests | `mock-import` |
+| Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors` |
 
 ### Names
 
@@ -12500,7 +12892,7 @@ The replacement is advice. xpd does not apply it automatically.
 checkers and documentation tools all read it. An underscore says the same thing once per name
 and makes every use of the name harder to read.
 
-The rule leaves these alone:
+The rule leaves alone the cases in the list:
 
 - A method or attribute of a class, such as `def _load(self)`.
 - A name inside a function.
@@ -12516,7 +12908,7 @@ The rule leaves these alone:
 **Severity:** warning. **Fix:** none.
 
 Reports a module named `util`, `utils`, `helper`, `helpers`, `common` or `misc`, and a package
-with one of those names.
+with one of the same names.
 
 Example:
 
@@ -12592,7 +12984,7 @@ process that imports the module. A program that imports the module to use one fu
 its logging and its library settings changed, and the environment is read before the program
 has parsed its own arguments.
 
-The rule leaves these alone:
+The rule leaves alone the cases in the list:
 
 - A file with no function and no class. It is a script, which runs from top to bottom.
 - A `__main__.py`, which is run and never imported.
@@ -12679,7 +13071,8 @@ The type says nothing about the keys or the values, so every function that takes
 to know its shape by heart, and the type checker cannot find a misspelled key. Decode the data
 once, where it enters the program, into a dataclass or a `TypedDict`.
 
-ruff's `ANN401` reports a parameter annotated with `Any` alone, and leaves `dict[str, Any]`.
+ruff's `ANN401` reports a parameter or a return value annotated with `Any` alone, and leaves
+`dict[str, Any]`.
 
 ### Tests
 
@@ -12809,93 +13202,132 @@ has to reorder the expression. Python 3.15 flattens with `[*case.checks for case
 
 ## Write a rule
 
-Rules are [ast-grep rules](https://ast-grep.github.io/guide/rule-config.html) in `.yml` files,
-compiled into the binary. A pack lives at `rules/<module>/`, where `<module>` is the name you
-import.
+Add a rule to xpd by writing an ast-grep rule file in the folder of its pack and a section on
+the rules page, then building xpd and running it on a sample. Rules are
+[ast-grep rules](https://ast-grep.github.io/guide/rule-config.html) in `.yml` files, compiled
+into the binary. A pack lives at `rules/<module>/`, where `<module>` is the name you import.
 
 ```text
 rules/pandas/
 ├── pack.yml        # the pack's manifest: import aliases and package checks. A pack may leave it out
 ├── row-loop.yml    # one file per rule, named after the rule id
 └── ...
+docs/rules.md       # one #### <rule id> section per rule, under the heading of its pack
 ```
 
-A rule file holds the documents of one rule, one per shape, and each document has the file's name
-as its `id`. The build fails on any other id.
+The build fails when a rule has no `#### <rule id>` section on the rules page, because `xpd rules`,
+`xpd find` and the editor hover print the section. A rule file holds the documents of one rule,
+one for each shape, and each document has the name of the file as its `id`. The build fails on
+any other id. Rules for your own project, outside xpd, are made with `xpd new rule` and checked
+with `xpd test`, which [the commands page](commands.md#new) describes.
 
-A rule may have one ast-grep `fix:`. It must then say whether the fix keeps what the code does,
-with `metadata: { fix: safe }` or `metadata: { fix: unsafe }`. A fix may write an alias that
-`pack.yml` lists under `aliases`, such as `pd.`, and xpd applies it only in a file that imports
-the module under that alias.
+| Setting | What it does |
+| --- | --- |
+| `fix:` | One ast-grep fix for the rule. The rule must then say whether the fix keeps what the code does, with `metadata: { fix: safe }` or `metadata: { fix: unsafe }`. |
+| `aliases` in `pack.yml` | A fix may write an alias that the pack lists, such as `pd.`, and xpd applies the fix only in a file that imports the module under that alias. |
+| `metadata: { since: "3.1" }` | xpd skips the rule when the project's venv holds an older version of the pack's library. |
+| `metadata: { since: "0.6", until: "0.6.1.6" }` | The rule's advice holds only up to a release, and a second document with `since: "0.6.1.6"` gives the newest advice. |
+| [`files` and `ignores`](https://ast-grep.github.io/reference/yaml.html#files) | Globs that limit the files a rule runs on. xpd matches a glob against the path as it was given, so start it with `**/` to match at any depth, as in `ignores: ["**/__main__.py"]`. |
+| `kind: module` | A rule about the file itself, such as `vague-module-name`, matches the module and is reported on line 1. |
+| `everyFile: true` in `pack.yml` | The pack's rules run on every file, as for `rules/python/`. Without it, the rules of a pack run only on files that import the module. |
 
-A rule that needs a newer library version says so with `metadata: { since: "3.1" }`. xpd skips it
-when the project's venv holds an older version of the pack's library. A rule whose advice holds
-only up to a release says so with `until`, as in `metadata: { since: "0.6", until: "0.6.1.6" }`.
-xpd runs it when the venv holds a version from `since` up to, and not including, `until`, and
-skips it when the version is not known, so that a second document with `since: "0.6.1.6"` gives
-the newest advice there. It finds the version for any
-pack the same way: from the dist-info folder whose name is the module, or whose `top_level.txt`
-lists the module.
+xpd finds the version of a pack's library the same way for every pack, from the dist-info folder
+whose name is the module, or whose `top_level.txt` lists the module. It then picks the documents
+to run:
 
-Add a file, rebuild, and check it against a sample:
+```text
+on(run a rule document)
+  if the venv's version of the pack's library is known
+    run the document when since <= version < until    # a missing since or until sets no bound
+  else
+    run the document unless it has until
+```
+
+A new folder under `rules/` is a new pack, with no Rust change. Build xpd and run it on a sample:
 
 ```sh
-cargo build --release
-target/release/xpd check samples/bad.py
-cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --unsafe-fixes
+cargo build
+target/debug/xpd check samples/bad.py --format text
+cp samples/bad.py /tmp/bad.py && target/debug/xpd check /tmp/bad.py --fix --unsafe-fixes
 ```
 
-The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
-`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/linearmodels/`,
-`samples/arch/`, `samples/pymoo/`, `samples/plotly/`, `samples/hamilton/` and `samples/python/`
-mark each line a rule reports with a comment that names the rules.
+The first check printed five issues and exited with 1, because one issue is an error:
 
-`pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
-look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the
-pack's library and lacks the package. With `onlyWith`, it warns only when the project also uses
-one of the tools.
+```text
+samples/bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
+samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
+samples/bad.py:7:1: info [pandas/no-inplace] inplace=True gives no speedup and blocks chaining. Reassign instead.
+samples/bad.py:8:5: warning [pandas/merge-without-validate] merge without validate= can silently duplicate rows.
+samples/bad.py:11:5: warning [pandas/concat-in-loop] out grows by one concat per pass, and each concat copies every earlier row. Collect the frames in a list and concat once after the loop.
+xpd: 5 issues, 2 more with --fix --unsafe-fixes
+```
 
-A rule may limit the files it runs on with ast-grep's
-[`files` and `ignores`](https://ast-grep.github.io/reference/yaml.html#files) globs. xpd matches
-a glob against the path as it was given, so start it with `**/` to match at any depth, as in
-`ignores: ["**/__main__.py"]`. A rule about the file itself, such as `vague-module-name`, matches
-`kind: module` and is reported on line 1.
+The second check fixed 2 issues in the copy and left the 3 warnings. Each pack has a folder of
+samples under `samples/<module>/`, and a sample marks each line that a rule reports with a
+comment that names the rule:
 
-A new folder under `rules/` is a new pack, with no Rust change. Its rules run only on files that
-import the module. A pack about Python itself, such as `rules/python/`, sets `everyFile: true` in
-`pack.yml`, and its rules run on every file.
+```python
+old.setup(problem, ("n_gen", 7), seed=1)  # xpd: setup-positional-termination
+```
+
+`pack.yml` may list package checks under `packages`. xpd warns when the venv has the pack's
+library and lacks the package.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | the name of the check |
+| `package` | the package to look for |
+| `message` | what the warning says |
+| `onlyWith` | optional. A list of tools, and xpd warns only when the project also uses one of them. |
 
 ### Index a new pack
 
-For a pack backed by a library, generate its source index after installing the library without
-its dependencies in an empty folder outside the repository. Use `/var/tmp` for downloaded code.
+Give a pack backed by a library a source index, so that `xpd find` and `xpd api` know the
+library's names. Install the library without its dependencies in an empty folder outside the
+repository, such as one under `/var/tmp`, and index it with Griffe 2.4.1:
 
 ```sh
 uv venv /var/tmp/xpd-source/venv
 uv pip install --python /var/tmp/xpd-source/venv/bin/python --no-deps scikit-lego
-xpd index /var/tmp/xpd-source/venv/lib/python3.15/site-packages --package sklego
+uv run --with griffe==2.4.1 xpd index /var/tmp/xpd-source/venv/lib/python3.15/site-packages --package sklego
 ```
 
-Use the Python version directory created by uv. For a version bump, update the package in
-that environment, then rerun the last command. It reads the version from distribution metadata
-and replaces `indexes/sklego.json` without hand editing. Commit the generated file. `build.rs`
-prepares the embedded discovery records and BM25 table from `indexes/` and this page; Python
-itself needs only its rule entries.
-Add real questions for the new pack to `indexes/questions.json` and run
-`cargo run -- find --check indexes/questions.json`. Keep failing questions and improve the
-ranking for general language patterns. Read downloaded source as data and never import it.
+Use the Python version folder that uv created. Without Griffe 2.4.1, `xpd index` stops with exit
+code 2 and prints the command to run. The command reads the version from the distribution
+metadata and writes `indexes/sklego.json`, and a run on the pymoo 0.6.2 source printed
+`pymoo 0.6.2: 971 entries written`. For a new version, update the package in the same venv and
+run the last command again. Commit the file that the command writes, and never edit it by hand.
 
+`build.rs` builds the records that `xpd find` searches, and their word weights, from
+`indexes/` and from the rule sections of the rules page. The Python pack has no library, so it needs
+only its rule sections. Add real questions for the new pack to `indexes/questions.json`, and
+check that each question finds its expected entry in the top five:
 
-A source index can also contain harvested recipes. Refresh them in the same command as symbols
-by passing `--examples`, `--source-url` and `--license`. Select a pinned checkout's documentation
-and gallery root, and a source URL ending in `/blob/<tag>` with the same relative root.
-For Plotly, harvest `doc/python`; for scikit-learn, harvest `examples/` and the source docstrings
-by selecting its repository root. The [index command](commands.md#index) shows the full command.
+```sh
+cargo run --quiet -- find --check indexes/questions.json
+```
 
-The harvester parses examples without running them. It applies safe and unsafe fixes with the
-rule engine and ships only snippets with zero remaining issues across applicable library packs
-and the Python pack. Each recipe names its source license, and the full license texts ship once in `licenses/`;
-an unrecognized license produces a pointer instead of copied code. It reports rejected and
-capped candidates. The cap is 24 recipes and 96,000 code bytes per pack, with 8,000 bytes per
-snippet. Do not hand-write recipes or edit generated entries to improve a question's rank.
-Use `xpd find "<task>" --kind recipe` and pass a returned name to `xpd api` for the full example.
+When a question fails, keep it and improve the ranking for the general pattern of words. Every
+record also needs a vector in `indexes/vectors.bin`. When a record has none, the check fails and
+prints the command that writes the missing vectors,
+`xpd find --write-vectors indexes/vectors.bin`. Read downloaded source as data, and never import
+it.
+
+A source index can also hold recipes, which are worked examples harvested from the library's
+documentation. Refresh them in the same command as the names, with `--examples`, `--source-url`
+and `--license`, and [the index command](commands.md#index) shows the full command.
+
+| Option | Value |
+| --- | --- |
+| `--examples` | the documentation and gallery folder of a pinned checkout. For plotly, `doc/python`. For scikit-learn, the repository root, which holds `examples/` and the docstrings. |
+| `--source-url` | a repository URL that ends in `/blob/<tag>` and the same folder, such as `/blob/<tag>/doc/python` for plotly |
+| `--license` | the license file of the source |
+
+The harvester parses the examples without running them, applies safe and unsafe fixes with the
+rule engine, and ships only examples with no issue left in the library's pack and the Python
+pack. Each recipe names its source license, and the full license texts ship once in
+`licenses/`. A license that xpd does not recognize gives a pointer to the source and no copied
+code. A pack keeps at most 24 recipes and 96,000 bytes of code, with at most 8,000 bytes for one
+example, and the command reports the rejected and capped examples. Do not write recipes by hand
+or edit generated entries to raise a question's rank. To use a recipe, run
+`xpd find "<task>" --kind recipe` and pass a returned name to `xpd api` for the full example.
