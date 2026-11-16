@@ -11,6 +11,7 @@ use ast_grep_core::Node;
 use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_language::SupportLang;
 
+use crate::outline::{self, Function, Parameter};
 use crate::scan;
 
 /// A node of the syntax tree of a Python file.
@@ -139,14 +140,6 @@ pub(crate) struct Module {
     pub(crate) functions: usize,
 }
 
-/// One parameter of a function. `*args` and `**kwargs` are not inputs and are left out.
-#[derive(Debug)]
-struct Param {
-    name: String,
-    hinted: bool,
-    optional: bool,
-}
-
 /// One decorator: its dotted name, and the call when it has arguments.
 struct Decorator<'r> {
     /// The last part of the dotted name, such as `when` for `config.when`.
@@ -163,29 +156,10 @@ pub(crate) fn read(src: &str) -> Module {
     let mut module = Module::default();
     let mut defined: Vec<(String, usize)> = Vec::new();
     let mut kept: Vec<(String, Vec<NodeDef>, Vec<Finding>)> = Vec::new();
-    for statement in root.root().children() {
-        let (function, decorators) = match statement.kind().as_ref() {
-            "function_definition" => (statement, Vec::new()),
-            "decorated_definition" => {
-                let Some(function) = statement
-                    .field("definition")
-                    .filter(|d| d.kind() == "function_definition")
-                else {
-                    continue;
-                };
-                let decorators = statement
-                    .children()
-                    .filter(|child| child.kind() == "decorator")
-                    .filter_map(|d| decorator(&d))
-                    .collect();
-                (function, decorators)
-            }
-            _ => continue,
-        };
-        let Some(name) = function.field("name").map(|n| n.text().into_owned()) else {
-            continue;
-        };
-        let line = function.start_pos().line() + 1;
+    for function in &outline::python_module(&root).functions {
+        let decorators: Vec<Decorator<'_>> = function.decorators.iter().map(decorator).collect();
+        let name = function.name.clone();
+        let line = function.definition.start_pos().line() + 1;
         // A @mutate function is no node of its own, with or without an underscore: Hamilton
         // applies it to the nodes the decorator names.
         if decorators.iter().any(|d| d.name == "mutate") {
@@ -198,11 +172,11 @@ pub(crate) fn read(src: &str) -> Module {
             });
             continue;
         }
-        if name.starts_with('_') || decorators.iter().any(|d| d.name == "hamilton_exclude") {
+        if !function.exported || decorators.iter().any(|d| d.name == "hamilton_exclude") {
             continue;
         }
         defined.push((name.clone(), line));
-        let (nodes, findings) = function_nodes(&name, line, &function, &decorators);
+        let (nodes, findings) = function_nodes(line, function, &decorators);
         kept.push((name, nodes, findings));
     }
     // Python binds a name to its last `def`, so an earlier one never reaches Hamilton.
@@ -238,22 +212,18 @@ pub(crate) fn read(src: &str) -> Module {
     module
 }
 
-/// The dotted name and the arguments of one decorator.
-fn decorator<'r>(node: &Syntax<'r>) -> Option<Decorator<'r>> {
-    let expression = node.children().find(Node::is_named)?;
-    let (target, call) = if expression.kind() == "call" {
-        (expression.field("function")?, Some(expression.clone()))
-    } else {
-        (expression.clone(), None)
-    };
-    let path = target.text().into_owned();
-    let name = path.rsplit('.').next().unwrap_or(&path).to_owned();
-    Some(Decorator {
-        name,
+/// The arguments of one decorator, for its dotted name.
+fn decorator<'r>(listed: &outline::Decorator<'r>) -> Decorator<'r> {
+    let path = listed.path.clone();
+    let expression = listed.node.children().find(Node::is_named);
+    Decorator {
+        name: path.rsplit('.').next().unwrap_or(&path).to_owned(),
+        call: expression.clone().filter(|e| e.kind() == "call"),
+        text: expression
+            .map(|e| e.text().into_owned())
+            .unwrap_or_default(),
         path,
-        call,
-        text: expression.text().into_owned(),
-    })
+    }
 }
 
 impl<'r> Decorator<'r> {
@@ -289,7 +259,7 @@ struct Effects {
 }
 
 impl Effects {
-    fn read(name: &str, params: &[Param], decorators: &[Decorator<'_>]) -> Self {
+    fn read(name: &str, params: &[Parameter], decorators: &[Decorator<'_>]) -> Self {
         let mut effects = Self::default();
         for d in decorators {
             let arguments = d.arguments();
@@ -362,7 +332,12 @@ impl Effects {
 
     /// The inputs of a node of the function: its parameters, without the ones a decorator or
     /// `assigned` fills, and with the nodes that the decorators and `read` name.
-    fn inputs(&self, params: &[Param], assigned: &BTreeSet<String>, read: &[String]) -> Vec<Input> {
+    fn inputs(
+        &self,
+        params: &[Parameter],
+        assigned: &BTreeSet<String>,
+        read: &[String],
+    ) -> Vec<Input> {
         let mut inputs: Vec<Input> = params
             .iter()
             .filter(|p| !self.filled.contains(&p.name) && !assigned.contains(&p.name))
@@ -385,19 +360,14 @@ impl Effects {
 
 /// The finding for a function that lacks a type hint, which Hamilton needs on the return
 /// value and on every parameter.
-fn missing_hints(
-    name: &str,
-    line: usize,
-    function: &Syntax<'_>,
-    params: &[Param],
-) -> Option<Finding> {
-    let unhinted: Vec<&str> = params
-        .iter()
+fn missing_hints(line: usize, function: &Function<'_>) -> Option<Finding> {
+    let name = &function.name;
+    let unhinted: Vec<&str> = (function.parameters.iter())
         .filter(|p| !p.hinted)
         .map(|p| p.name.as_str())
         .collect();
     let mut missing: Vec<String> = Vec::new();
-    if function.field("return_type").is_none() {
+    if function.definition.field("return_type").is_none() {
         missing.push("the return value".to_owned());
     }
     match unhinted.as_slice() {
@@ -420,13 +390,13 @@ fn missing_hints(
 
 /// The nodes one function defines, and what is wrong with it.
 fn function_nodes(
-    name: &str,
     line: usize,
-    function: &Syntax<'_>,
+    function: &Function<'_>,
     decorators: &[Decorator<'_>],
 ) -> (Vec<NodeDef>, Vec<Finding>) {
-    let params = parameters(function);
-    let effects = Effects::read(name, &params, decorators);
+    let name = function.name.as_str();
+    let params = &function.parameters;
+    let effects = Effects::read(name, params, decorators);
     let mut findings: Vec<Finding> = effects
         .notes
         .iter()
@@ -436,7 +406,7 @@ fn function_nodes(
             message: message.clone(),
         })
         .collect();
-    findings.extend(missing_hints(name, line, function, &params));
+    findings.extend(missing_hints(line, function));
 
     let config = decorators
         .iter()
@@ -459,11 +429,11 @@ fn function_nodes(
     let mut nodes = Vec::new();
     if let Some(variants) = &effects.variants {
         for variant in variants {
-            let inputs = effects.inputs(&params, &variant.assigned, &variant.sources);
+            let inputs = effects.inputs(params, &variant.assigned, &variant.sources);
             nodes.push(define(variant.name.clone(), inputs, Origin::Parameterized));
         }
     } else {
-        let inputs = effects.inputs(&params, &BTreeSet::new(), &[]);
+        let inputs = effects.inputs(params, &BTreeSet::new(), &[]);
         nodes.push(define(own_name.to_owned(), inputs, Origin::Function));
     }
     // A part of a result, and a saver, read the nodes they come from.
@@ -483,32 +453,6 @@ fn function_nodes(
         }
     }
     (nodes, findings)
-}
-
-/// The named parameters of a function.
-fn parameters(function: &Syntax<'_>) -> Vec<Param> {
-    let Some(list) = function.field("parameters") else {
-        return Vec::new();
-    };
-    list.children()
-        .filter_map(|param| {
-            let (name, hinted, optional) = match param.kind().as_ref() {
-                "identifier" => (param.clone(), false, false),
-                "typed_parameter" => {
-                    let name = param.children().find(|c| c.kind() == "identifier")?;
-                    (name, true, false)
-                }
-                "default_parameter" => (param.field("name")?, false, true),
-                "typed_default_parameter" => (param.field("name")?, true, true),
-                _ => return None,
-            };
-            Some(Param {
-                name: name.text().into_owned(),
-                hinted,
-                optional,
-            })
-        })
-        .collect()
 }
 
 /// One node that a `@parameterize` decorator names.

@@ -18,6 +18,7 @@ use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_language::SupportLang;
 
 use crate::nodes::{Finding, Level, literal};
+use crate::outline::{self, Function};
 use crate::scan;
 
 /// A node of the syntax tree of a Python file.
@@ -216,27 +217,21 @@ struct StepBody {
 pub(crate) fn read(src: &str) -> Vec<Pipeline> {
     let root = scan::parse(src);
     let module = root.root();
-    let mut functions: BTreeMap<String, Syntax<'_>> = BTreeMap::new();
-    let mut constants: BTreeMap<String, Syntax<'_>> = BTreeMap::new();
-    for statement in module.children() {
-        let statement = if statement.kind() == "decorated_definition" {
-            statement.field("definition").unwrap_or(statement)
-        } else {
-            statement
-        };
-        if statement.kind() == "function_definition" {
-            if let Some(name) = statement.field("name") {
-                functions.insert(name.text().into_owned(), statement);
-            }
-        } else if let Some((name, value)) = simple_assignment(&statement) {
-            constants.insert(name, value);
-        }
-    }
+    // Python binds each name to its last definition.
+    let outline::Module {
+        functions,
+        assignments,
+    } = outline::python_module(&root);
+    let functions: BTreeMap<String, Function<'_>> = (functions.into_iter())
+        .map(|function| (function.name.clone(), function))
+        .collect();
+    let constants: BTreeMap<String, Syntax<'_>> = assignments.into_iter().collect();
     let tree = docstring_tree(&module);
-    let mut orders: Vec<(&str, &Syntax<'_>, Vec<StepRef<'_>>)> = functions
+    let mut orders: Vec<(&str, &Function<'_>, Vec<StepRef<'_>>)> = functions
         .iter()
         .filter_map(|(name, function)| {
-            let order = step_order(&function.field("body")?, Some(name), &functions);
+            let body = function.definition.field("body")?;
+            let order = step_order(&body, Some(name), &functions);
             Some((name.as_str(), function, order))
         })
         .collect();
@@ -272,7 +267,7 @@ pub(crate) fn read(src: &str) -> Vec<Pipeline> {
         .iter()
         .filter(|(_, _, order)| order.len() >= MIN_STEPS)
         .map(|(name, function, order)| {
-            let line = function.start_pos().line() + 1;
+            let line = function.definition.start_pos().line() + 1;
             pipeline(name, line, order, &functions, &constants)
         })
         .collect();
@@ -345,7 +340,7 @@ const MIN_STEPS: usize = 2;
 fn step_order<'r>(
     body: &Syntax<'r>,
     own: Option<&str>,
-    functions: &BTreeMap<String, Syntax<'r>>,
+    functions: &BTreeMap<String, Function<'r>>,
 ) -> Vec<StepRef<'r>> {
     let is_step = |name: &str| functions.contains_key(name) && own != Some(name);
     let mut found: Vec<(usize, String)> = Vec::new();
@@ -458,7 +453,7 @@ fn pipeline<'r>(
     name: &str,
     line: usize,
     order: &[StepRef<'r>],
-    functions: &BTreeMap<String, Syntax<'r>>,
+    functions: &BTreeMap<String, Function<'r>>,
     constants: &BTreeMap<String, Syntax<'r>>,
 ) -> Pipeline {
     let mut bodies: Vec<StepBody> = order
@@ -722,25 +717,13 @@ struct Reader<'r, 'a> {
 impl<'r, 'a> Reader<'r, 'a> {
     fn new(
         name: &'a str,
-        function: &'a Syntax<'r>,
+        step: &'a Function<'r>,
         constants: &'a BTreeMap<String, Syntax<'r>>,
     ) -> Option<Self> {
-        let parameters = function.field("parameters")?;
-        let frame = parameters
-            .children()
-            .filter(Node::is_named)
-            .find_map(|p| match p.kind().as_ref() {
-                "identifier" => Some(p.text().into_owned()),
-                "typed_parameter" => p
-                    .children()
-                    .find(|c| c.kind() == "identifier")
-                    .map(|c| c.text().into_owned()),
-                "default_parameter" | "typed_default_parameter" => {
-                    p.field("name").map(|n| n.text().into_owned())
-                }
-                _ => None,
-            })
+        let frame = (step.parameters.first())
+            .map(|first| first.name.clone())
             .filter(|first| first != "self" && first != "cls")?;
+        let function = &step.definition;
         let body = function.field("body")?;
         let mut assigned: BTreeMap<String, Vec<Syntax<'r>>> = BTreeMap::new();
         for assignment in body.dfs().filter(|n| n.kind() == "assignment") {

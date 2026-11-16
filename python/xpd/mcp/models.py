@@ -69,6 +69,8 @@ class CodeMatch(Output):
     language: str
     range: SourceRange
     replacement: str | None = None
+    replacement_offsets: dict[str, int] | None = Field(default=None, alias="replacementOffsets")
+    meta_variables: dict[str, JsonValue] = Field(default_factory=dict, alias="metaVariables")
 
 
 class OutlineEntry(Output):
@@ -77,6 +79,10 @@ class OutlineEntry(Output):
     symbol_type: str = Field(alias="symbolType")
     range: SourceRange
     signature: str | None = None
+    ast_kind: str = Field(alias="astKind")
+    is_import: bool = Field(default=False, alias="isImport")
+    is_exported: bool = Field(default=False, alias="isExported")
+    is_public: bool | None = Field(default=None, alias="isPublic")
     members: list["OutlineEntry"] = Field(default_factory=list)
 
 

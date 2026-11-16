@@ -1,0 +1,53 @@
+# Every function and method of a Python file with its parameters, which `xpd index` reads for
+# the definitions Griffe resolves. Classes are no items here, so their methods are. A decorated
+# definition starts at its first decorator, which is the line Griffe reports.
+id: python-callable
+language: Python
+role: item
+symbolType: function
+rule:
+  kind: function_definition
+  not: {inside: {kind: decorated_definition}}
+  has: {field: name, pattern: $NAME}
+name: $NAME
+---
+id: python-decorated-callable
+language: Python
+role: item
+symbolType: function
+rule:
+  kind: decorated_definition
+  has:
+    field: definition
+    kind: function_definition
+    has: {field: name, pattern: $NAME}
+name: $NAME
+---
+id: python-callable-parameter
+language: Python
+role: member
+parentRuleIds: [python-callable, python-decorated-callable]
+symbolType: variable
+rule:
+  inside:
+    kind: parameters
+    inside:
+      kind: function_definition
+      not: {inside: {kind: function_definition, stopBy: end}}
+  any:
+    - kind: identifier
+      pattern: $NAME
+    - kind: typed_parameter
+      has:
+        any:
+          - kind: identifier
+            pattern: $NAME
+          - any: [{kind: list_splat_pattern}, {kind: dictionary_splat_pattern}]
+            has: {kind: identifier, pattern: $NAME}
+    - kind: default_parameter
+      has: {field: name, pattern: $NAME}
+    - kind: typed_default_parameter
+      has: {field: name, pattern: $NAME}
+    - any: [{kind: list_splat_pattern}, {kind: dictionary_splat_pattern}]
+      has: {kind: identifier, pattern: $NAME}
+name: $NAME

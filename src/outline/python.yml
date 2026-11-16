@@ -1,0 +1,379 @@
+# The structure of a Python module, in the schema of ast-grep outline rules. xpd uses these rules
+# in place of the bundled Python rules, which drop parenthesized imports, decorators, multiline
+# parameters and the leading underscore that makes a name private. `xpd graph` reads its Hamilton
+# nodes and pipeline steps from the same items, so a function keeps its decorators and parameters
+# as members, and a private function is kept with isExported false.
+id: python-import
+language: Python
+role: item
+symbolType: module
+rule:
+  kind: import_statement
+  pattern: $STATEMENT
+  has:
+    field: name
+    any:
+      - kind: dotted_name
+        pattern: $NAME
+      - kind: aliased_import
+        has: {field: name, pattern: $NAME}
+transform:
+  ONE_LINE:
+    replace: {source: $STATEMENT, replace: '\s+', by: ' '}
+name: $NAME
+signature: $ONE_LINE
+isImport: true
+isExported: false
+---
+id: python-import-from
+language: Python
+role: item
+symbolType: module
+rule:
+  kind: import_from_statement
+  pattern: $STATEMENT
+  has: {field: module_name, pattern: $MODULE}
+transform:
+  SPACED:
+    replace: {source: $STATEMENT, replace: '\s+', by: ' '}
+  ONE_LINE:
+    replace: {source: $SPACED, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+name: $MODULE
+signature: $ONE_LINE
+isImport: true
+isExported: false
+---
+id: python-function
+language: Python
+role: item
+symbolType: function
+rule:
+  kind: function_definition
+  pattern: $FUNCTION
+  inside: {kind: module}
+  all:
+    - has: {field: name, pattern: $NAME}
+    - has: {field: parameters, pattern: $PARAMS}
+    - any:
+        - has: {field: return_type, pattern: $RETURN}
+        - kind: function_definition
+transform:
+  KEYWORD:
+    replace: {source: $FUNCTION, replace: '^(async\s+)?def\b[\s\S]*$', by: '${1}def'}
+  SPACED:
+    replace: {source: $PARAMS, replace: '\s+', by: ' '}
+  PARAMETERS:
+    replace: {source: $SPACED, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+  ARROW:
+    replace: {source: $RETURN, replace: '^', by: ' -> '}
+  SPACED_RETURN:
+    replace: {source: $ARROW, replace: '\s+', by: ' '}
+  RETURNS:
+    replace: {source: $SPACED_RETURN, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+name: $NAME
+signature: $KEYWORD $NAME$PARAMETERS$RETURNS
+isExported:
+  not:
+    has: {field: name, regex: '^_'}
+---
+id: python-decorated-function
+language: Python
+role: item
+symbolType: function
+rule:
+  kind: decorated_definition
+  inside: {kind: module}
+  has:
+    field: definition
+    kind: function_definition
+    pattern: $FUNCTION
+    all:
+      - has: {field: name, pattern: $NAME}
+      - has: {field: parameters, pattern: $PARAMS}
+      - any:
+          - has: {field: return_type, pattern: $RETURN}
+          - kind: function_definition
+transform:
+  KEYWORD:
+    replace: {source: $FUNCTION, replace: '^(async\s+)?def\b[\s\S]*$', by: '${1}def'}
+  SPACED:
+    replace: {source: $PARAMS, replace: '\s+', by: ' '}
+  PARAMETERS:
+    replace: {source: $SPACED, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+  ARROW:
+    replace: {source: $RETURN, replace: '^', by: ' -> '}
+  SPACED_RETURN:
+    replace: {source: $ARROW, replace: '\s+', by: ' '}
+  RETURNS:
+    replace: {source: $SPACED_RETURN, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+name: $NAME
+signature: $KEYWORD $NAME$PARAMETERS$RETURNS
+isExported:
+  not:
+    has:
+      field: definition
+      has: {field: name, regex: '^_'}
+---
+id: python-class
+language: Python
+role: item
+symbolType: class
+rule:
+  kind: class_definition
+  inside: {kind: module}
+  all:
+    - has: {field: name, pattern: $NAME}
+    - any:
+        - has: {field: superclasses, pattern: $BASES}
+        - kind: class_definition
+transform:
+  SPACED:
+    replace: {source: $BASES, replace: '\s+', by: ' '}
+  ONE_LINE:
+    replace: {source: $SPACED, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+name: $NAME
+signature: class $NAME$ONE_LINE
+isExported:
+  not:
+    has: {field: name, regex: '^_'}
+---
+id: python-decorated-class
+language: Python
+role: item
+symbolType: class
+rule:
+  kind: decorated_definition
+  inside: {kind: module}
+  has:
+    field: definition
+    kind: class_definition
+    all:
+      - has: {field: name, pattern: $NAME}
+      - any:
+          - has: {field: superclasses, pattern: $BASES}
+          - kind: class_definition
+transform:
+  SPACED:
+    replace: {source: $BASES, replace: '\s+', by: ' '}
+  ONE_LINE:
+    replace: {source: $SPACED, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+name: $NAME
+signature: class $NAME$ONE_LINE
+isExported:
+  not:
+    has:
+      field: definition
+      has: {field: name, regex: '^_'}
+---
+id: python-constant
+language: Python
+role: item
+symbolType: constant
+rule:
+  kind: assignment
+  inside: {kind: expression_statement, inside: {kind: module}}
+  has: {field: left, kind: identifier, regex: '^_?[A-Z][A-Z0-9_]*$', pattern: $NAME}
+name: $NAME
+isExported:
+  not:
+    has: {field: left, regex: '^_'}
+---
+id: python-variable
+language: Python
+role: item
+symbolType: variable
+rule:
+  kind: assignment
+  inside: {kind: expression_statement, inside: {kind: module}}
+  has: {field: left, kind: identifier, pattern: $NAME}
+name: $NAME
+isExported:
+  not:
+    has: {field: left, regex: '^_'}
+---
+id: python-imported-module
+language: Python
+role: member
+parentRuleIds: [python-import]
+symbolType: module
+rule:
+  inside: {kind: import_statement}
+  any:
+    - kind: dotted_name
+      pattern: $NAME
+    - kind: aliased_import
+      has: {field: alias, pattern: $NAME}
+name: $NAME
+---
+id: python-imported-name
+language: Python
+role: member
+parentRuleIds: [python-import-from]
+symbolType: variable
+rule:
+  # A `field` on `inside` checks only the first child of that field, so the module name is
+  # excluded instead.
+  inside: {kind: import_from_statement}
+  not:
+    inside: {kind: import_from_statement, field: module_name}
+  any:
+    - kind: dotted_name
+      pattern: $NAME
+    - kind: aliased_import
+      has: {field: alias, pattern: $NAME}
+    - kind: wildcard_import
+      pattern: $NAME
+name: $NAME
+---
+id: python-decorator
+language: Python
+role: member
+parentRuleIds: [python-decorated-function, python-decorated-class]
+symbolType: function
+rule:
+  kind: decorator
+  pattern: $DECORATOR
+  inside: {kind: decorated_definition, inside: {kind: module}}
+  has:
+    any:
+      - kind: call
+        has: {field: function, pattern: $PATH}
+      - not: {kind: call}
+        pattern: $PATH
+transform:
+  ONE_LINE:
+    replace: {source: $DECORATOR, replace: '\s+', by: ' '}
+name: $PATH
+signature: $ONE_LINE
+---
+id: python-parameter
+language: Python
+role: member
+parentRuleIds: [python-function, python-decorated-function]
+symbolType: variable
+rule:
+  pattern: $PARAMETER
+  inside:
+    kind: parameters
+    inside:
+      kind: function_definition
+      inside:
+        any:
+          - kind: module
+          - kind: decorated_definition
+            inside: {kind: module}
+  any:
+    - kind: identifier
+      pattern: $NAME
+    - kind: typed_parameter
+      has: {kind: identifier, pattern: $NAME}
+    - kind: typed_parameter
+      has:
+        any: [{kind: list_splat_pattern}, {kind: dictionary_splat_pattern}]
+        pattern: $NAME
+    - kind: default_parameter
+      has: {field: name, pattern: $NAME}
+    - kind: typed_default_parameter
+      has: {field: name, pattern: $NAME}
+    - kind: list_splat_pattern
+      pattern: $NAME
+    - kind: dictionary_splat_pattern
+      pattern: $NAME
+transform:
+  ONE_LINE:
+    replace: {source: $PARAMETER, replace: '\s+', by: ' '}
+name: $NAME
+signature: $ONE_LINE
+---
+id: python-method
+language: Python
+role: member
+parentRuleIds: [python-class, python-decorated-class]
+symbolType: method
+rule:
+  kind: function_definition
+  pattern: $FUNCTION
+  inside:
+    any:
+      - kind: block
+        inside: &top-class
+          kind: class_definition
+          inside:
+            any:
+              - kind: module
+              - kind: decorated_definition
+                inside: {kind: module}
+      - kind: decorated_definition
+        inside: {kind: block, inside: *top-class}
+  all:
+    - has: {field: name, pattern: $NAME}
+    - has: {field: parameters, pattern: $PARAMS}
+    - any:
+        - has: {field: return_type, pattern: $RETURN}
+        - kind: function_definition
+transform:
+  KEYWORD:
+    replace: {source: $FUNCTION, replace: '^(async\s+)?def\b[\s\S]*$', by: '${1}def'}
+  SPACED:
+    replace: {source: $PARAMS, replace: '\s+', by: ' '}
+  PARAMETERS:
+    replace: {source: $SPACED, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+  ARROW:
+    replace: {source: $RETURN, replace: '^', by: ' -> '}
+  SPACED_RETURN:
+    replace: {source: $ARROW, replace: '\s+', by: ' '}
+  RETURNS:
+    replace: {source: $SPACED_RETURN, replace: '([(\[])\s|,?\s([)\]])', by: '${1}${2}'}
+name: $NAME
+signature: $KEYWORD $NAME$PARAMETERS$RETURNS
+isPublic:
+  any:
+    - not:
+        has: {field: name, regex: '^_'}
+    - has: {field: name, regex: '^__\w+__$'}
+---
+id: python-nested-class
+language: Python
+role: member
+parentRuleIds: [python-class, python-decorated-class]
+symbolType: class
+rule:
+  kind: class_definition
+  inside:
+    kind: block
+    inside:
+      kind: class_definition
+      inside:
+        any:
+          - kind: module
+          - kind: decorated_definition
+            inside: {kind: module}
+  has: {field: name, pattern: $NAME}
+name: $NAME
+isPublic:
+  not:
+    has: {field: name, regex: '^_'}
+---
+id: python-field
+language: Python
+role: member
+parentRuleIds: [python-class, python-decorated-class]
+symbolType: field
+rule:
+  kind: assignment
+  inside:
+    kind: expression_statement
+    inside:
+      kind: block
+      inside:
+        kind: class_definition
+        inside:
+          any:
+            - kind: module
+            - kind: decorated_definition
+              inside: {kind: module}
+  has: {field: left, kind: identifier, pattern: $NAME}
+name: $NAME
+isPublic:
+  not:
+    has: {field: left, regex: '^_'}

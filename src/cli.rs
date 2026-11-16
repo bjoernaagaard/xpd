@@ -16,7 +16,9 @@ use crate::graph::Graph;
 use crate::index::{self, Kind};
 use crate::lsp;
 use crate::mcp;
+use crate::outline::OutlineArgs;
 use crate::package_check;
+use crate::query::RunArgs;
 use crate::report::{self, Report};
 use crate::rule::Applicability;
 use crate::scan;
@@ -47,9 +49,9 @@ struct Cli {
     cmd: Cmd,
 }
 
-/// How `check`, `graph` and `rules` print what they found.
+/// How `check`, `graph`, `rules`, `run` and `outline` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]
-enum Format {
+pub(crate) enum Format {
     Text,
     Json,
 }
@@ -211,6 +213,11 @@ enum Cmd {
         #[arg(long, value_enum)]
         format: Option<Format>,
     },
+    /// Search code by syntax, in any language ast-grep parses, and preview or apply a rewrite.
+    #[command(visible_alias = "query")]
+    Run(RunArgs),
+    /// Map the files of a project: imports, definitions and their members, with line numbers.
+    Outline(OutlineArgs),
     /// List every rule and package check, with its severity, fix and documentation.
     ///
     /// The JSON has one object per rule, with `package`, `rule`, `severity`, `message`, `fix`,
@@ -327,6 +334,8 @@ pub(crate) fn run() -> ExitCode {
         Cmd::Index(args) => discovery(refresh_index(args)),
         Cmd::Hook => hook(),
         Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
+        Cmd::Run(args) => command_result(args.run()),
+        Cmd::Outline(args) => command_result(args.run()),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
         Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
@@ -348,6 +357,10 @@ pub(crate) fn run() -> ExitCode {
         }
         Cmd::New(args) => command_result(author::run(args)),
     }
+}
+
+fn discovery(result: Result<()>) -> ExitCode {
+    command_result(result.map(|()| ExitCode::SUCCESS))
 }
 
 fn command_result(result: Result<ExitCode>) -> ExitCode {
@@ -774,15 +787,7 @@ fn run_py(script: &str, args: &[PathBuf]) -> ExitCode {
     }
 }
 
-fn discovery(result: Result<()>) -> ExitCode {
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("xpd: {error:#}");
-            ExitCode::from(CHECK_FAILED)
-        }
-    }
-}
+/// The exit code of a command that chooses its own, or 2 when it fails.
 
 #[derive(Clone, Copy)]
 enum Detail {

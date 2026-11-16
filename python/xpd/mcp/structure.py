@@ -7,7 +7,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import InputRequiredResult
 from pydantic import BaseModel, Field
 
-from xpd.mcp.binary import NEW, OUTLINE, QUERY, TEST, Xpd
+from xpd.mcp.binary import NEW, OUTLINE, QUERY, REWRITE, TEST, Xpd
 from xpd.mcp.models import CaseReport, CodeMatch, CreatedFiles, FixSafety, OutlineFile, Severity
 from xpd.mcp.root import Project, Root
 from xpd.mcp.tools import READS, WRITES, confirmed, run
@@ -160,7 +160,9 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             return answer.model_copy(update={"input_requests": requests})
         if not answer:
             return preview
-        return await run(ctx, xpd, QUERY, root, paths, *flags, "--update-all")
+        output = await run(ctx, xpd, REWRITE, root, paths, *flags)
+        await ctx.info(output)
+        return preview
 
 
 def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:

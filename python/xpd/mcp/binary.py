@@ -9,7 +9,7 @@ import sysconfig
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
@@ -45,12 +45,14 @@ class Command(Generic[T]):
     args: tuple[str, ...]
     output: TypeAdapter[T]
     results: frozenset[int]
+    encoding: Literal["json", "text"] = "json"
 
 
 FIND = Command(("find", "--format", "json"), TypeAdapter(DiscoveryMatches), SUCCESS)
 API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
 CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport), FINDINGS)
 QUERY = Command(("run", "--format", "json"), TypeAdapter(list[CodeMatch]), FINDINGS)
+REWRITE = Command(("run", "--update-all", "--color=never"), TypeAdapter(str), FINDINGS, "text")
 OUTLINE = Command(("outline", "--format", "json"), TypeAdapter(list[OutlineFile]), SUCCESS)
 NEW = Command(("new",), TypeAdapter(CreatedFiles), SUCCESS)
 TEST = Command(("test", "--format", "json"), TypeAdapter(CaseReport), FINDINGS)
@@ -136,4 +138,6 @@ class Xpd:
             shown = " ".join([*command.args[:1], *args])
             msg = f"xpd {shown} exited with {code}: {reason}"
             raise ToolError(msg)
+        if command.encoding == "text":
+            return command.output.validate_python(stdout.decode())
         return command.output.validate_json(stdout)
