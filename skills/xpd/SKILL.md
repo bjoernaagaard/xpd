@@ -23,7 +23,9 @@ Use `xpd` whenever you write or change Python code.
 - `xpd check <paths…> --fix`: apply safe fixes. Add `--unsafe-fixes` for fixes
   that may change behavior, then read the diff.
 - `xpd profile <data file>`: dtypes, nulls, cardinality, memory. Run it before
-  choosing methods, so choices are based on the real data. Needs pandas.
+  choosing methods, so choices are based on the real data. Its `findings` name
+  column names that hold values, which `melt` makes long, and text columns that
+  suit `category`. Needs pandas.
 - `xpd equiv old.py new.py`: both scripts must assign `result`. Run it after
   any refactor of data logic; a refactor isn't done until it prints
   `"equivalent": true`. Needs pandas.

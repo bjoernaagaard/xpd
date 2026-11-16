@@ -117,6 +117,14 @@ class ColumnProfile(Output):
     memory_bytes: int
 
 
+class ProfileFinding(Output):
+    """What the columns of a file suggest about its shape or its dtypes."""
+
+    finding: str = Field(description="values-as-column-names or category-candidate.")
+    columns: list[str] = Field(description="The columns the finding is about.")
+    message: str = Field(description="What was measured on the file, and what to write.")
+
+
 class Profile(Output):
     """The columns of a data file as pandas reads it."""
 
@@ -125,6 +133,10 @@ class Profile(Output):
     rows: int
     memory_bytes: int
     columns: list[ColumnProfile]
+    findings: list[ProfileFinding] = Field(
+        default_factory=list,
+        description="Column names that hold values, and text columns that suit a category.",
+    )
 
 
 class Equivalence(Output):

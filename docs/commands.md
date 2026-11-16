@@ -44,6 +44,20 @@ xpd profile data.csv
 Prints JSON with each column's dtype, null count, unique count and memory use. Reads csv,
 parquet, feather, json and xlsx. Runs with the project's Python and needs pandas there.
 
+`findings` lists what the columns suggest about the file, each with the columns it is about and
+a message that holds what was measured on the file:
+
+| Finding | When | What the message names |
+| --- | --- | --- |
+| `values-as-column-names` | Three or more column names are years, are dates, or share a stem and differ in a number, as `sales_2022`, `sales_2023` and `sales_2024` do | The `melt` call that gives one row per value, with the other columns as `id_vars` |
+| `category-candidate` | A text column has at most half as many distinct values as rows, and takes at most half the memory as a category | The bytes it takes as a category and as it is, and `dtype={"city": "category"}` |
+
+```console
+$ xpd profile sales.csv | jq -r '.findings[].message'
+The column names 2019, 2020, 2021 and 3 more are values of one variable, a year, so the file is wide. df.melt(id_vars=["id", "city", "note"], var_name=..., value_name=...) gives one row per value, with the names in a column of their own.
+city holds 3 distinct texts in 100,000 rows. As a category it took 100,044 bytes, where it takes 1,433,305 as str. Pass dtype={"city": "category"} to the reader, or call astype("category").
+```
+
 ## refit
 
 ```sh
