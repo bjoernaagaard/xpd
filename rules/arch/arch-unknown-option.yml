@@ -1,0 +1,711 @@
+# A string option that arch does not have. arch checks each option against a table of accepted
+# spellings, without regard to case. A script wrapped that check on arch 9.0.0, called each API
+# once and kept the table it was handed, so every list below is the one the installed release
+# uses. Each API was then run with every spelling of its table, in lower and in upper case, and
+# with 28 other strings, each of which raised ValueError. A value that is a variable, an
+# f-string or a constant is not read, so the rule is silent on it. Code inside pytest.raises or
+# pytest.warns is meant to raise and stays silent. The class and function names are arch's own,
+# and SPA, StepM, MCS and RealityCheck, which are short enough to be another library's, are
+# reported only when the file imports them from arch.bootstrap.
+#
+# Releases before 9.0 took some of these options in one case only, so a value that 9.0.0 accepts
+# in another case is not reported, and neither is a value that only 9.0 has, such as "maic".
+
+# arch_model builds one of seven mean models. A moving average mean is the class MAMean and has
+# no name here.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'arch_model takes mean "zero", "constant", "harx", "har", "ar", "arx" or "ls", in any case. arch 9.0.0 raises ValueError for $V. Build another mean model from its class, such as MAMean.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(zero|constant|harx|har|ar|arx|ls)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^mean$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(arch_model)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# A GJR-GARCH is vol="garch" with o=1, and a TARCH adds power=1.0. Neither has a name of its own.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'arch_model takes vol "arch", "figarch", "fiaparch", "aparch", "garch", "harch", "constant", "egarch" or "ngarch", in any case. arch 9.0.0 raises ValueError for $V. A GJR-GARCH is vol="garch" with o=1, and a TARCH is that with power=1.0.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(arch|figarch|fiaparch|aparch|garch|harch|constant|egarch|ngarch)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^vol$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(arch_model)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'arch_model takes dist "normal", "gaussian", "studentst", "t", "skewstudent", "skewt", "ged" or "generalized error", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(normal|gaussian|studentst|t|skewstudent|skewt|ged|generalized error)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^dist$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(arch_model)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# trend is "n" for no deterministic term in arch. "nc" is the old statsmodels name and is not
+# accepted. Each test has its own list, because not every test has critical values for every trend.
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes trend "n", "c", "ct" or "ctt", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(n|c|ct|ctt)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^trend$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(ADF|engle_granger|phillips_ouliaris|DynamicOLS|FullyModifiedOLS|CanonicalCointegratingReg)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes trend "c" or "ct", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(c|ct)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^trend$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(DFGLS|KPSS)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes trend "n", "c" or "ct", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(n|c|ct)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^trend$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(PhillipsPerron)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes trend "n" or "c", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(n|c)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^trend$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(VarianceRatio)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes trend "c", "t" or "ct", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(c|t|ct)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^trend$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(ZivotAndrews)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# method picks how the lag length is chosen. It is not the trend: ZivotAndrews(y, method="c") raises.
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes method "aic", "bic", "t-stat", "maic", "t" or "tstat", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(aic|bic|t\-stat|maic|t|tstat)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^method$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(ADF|DFGLS|ZivotAndrews|engle_granger)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes method "aic", "bic" or "hqic", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(aic|bic|hqic)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^method$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(DynamicOLS)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# On arch 4.19, 5.0, 6.1.0, 6.2.0 and 8.0.0, test_type="z" gave the statistic of "tau", -1.136 on
+# 1,000 log prices, where "rho" gave -2.0998, so a misspelt "rho" was read as "tau" without a word.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'PhillipsPerron takes test_type "tau" or "rho", in any case. arch 9.0.0 raises ValueError for $V. arch 8.0.0 raised nothing, and test_type="z" gave the "tau" statistic there.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(tau|rho)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^test_type$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(PhillipsPerron)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'phillips_ouliaris takes test_type "za", "zt", "pu" or "pz", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(za|zt|pu|pz)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^test_type$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(phillips_ouliaris)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'auto_bandwidth takes kernel "ba", "bartlett", "nw", "pa", "parzen", "gallant", "qs" or "andrews", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(ba|bartlett|nw|pa|parzen|gallant|qs|andrews)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^kernel$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(auto_bandwidth)$' }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# On arch 5.0, 6.1.0, 6.2.0 and 8.0.0, method="range" gave the p-values of "max" and not those of
+# "R", so a misspelt range statistic was read as the max statistic without a word.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'MCS takes method "r" or "max", in any case. arch 9.0.0 raises ValueError for $V. arch 8.0.0 raised nothing, and method="range" gave the p-values of "max" there.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(r|max)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^method$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has:
+              field: function
+              pattern: $C
+              any:
+                - { kind: attribute, regex: '^arch\.bootstrap(\.multiple_comparison)?\.(MCS)$' }
+                - kind: identifier
+                  regex: '^(MCS)$'
+                  inside:
+                    kind: module
+                    stopBy: end
+                    has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes bootstrap "circular", "cbb", "stationary", "sb", "moving_block" or "mbb", in any case, and a space is read as an underscore. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(circular|cbb|stationary|sb|moving[_ ]block|mbb)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^bootstrap$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has:
+              field: function
+              pattern: $C
+              any:
+                - { kind: attribute, regex: '^arch\.bootstrap(\.multiple_comparison)?\.(SPA|StepM|MCS|RealityCheck)$' }
+                - kind: identifier
+                  regex: '^(SPA|StepM|MCS|RealityCheck)$'
+                  inside:
+                    kind: module
+                    stopBy: end
+                    has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+---
+# The options of fit, forecast and hedgehog_plot are read only on a model that the file builds
+# from arch_model or a mean class of arch, and on a result that it gets from fit or fix of such a
+# model. The name must be assigned from nothing else in the file.
+#
+# On arch 4.19, 5.0, 6.1.0, 6.2.0 and 8.0.0, fit(cov_type="mle") ran and gave the standard errors of
+# "classic", 0.00843 for omega on 1,500 daily S&P 500 returns where "robust" gave 0.01329.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'fit takes cov_type "robust" or "classic", in any case. arch 9.0.0 raises ValueError for $V. arch 8.0.0 raised nothing, and cov_type="mle" gave the standard errors of "classic" there.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(robust|classic)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^cov_type$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+---
+# disp also takes a bool, which is not a string and is not read here.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'fit takes disp "off" or "final", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(off|final)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^disp$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'forecast takes method "analytic", "simulation" or "bootstrap", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(analytic|simulation|bootstrap)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^method$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+---
+# "horizon" is another name for "target" since arch 9.0.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'forecast takes align "origin", "target" or "horizon", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(origin|target|horizon)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^align$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'hedgehog_plot takes plot_type "volatility" or "mean", in any case. arch 9.0.0 raises ValueError for $V. arch 8.0.0 raised nothing for another value.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(volatility|mean)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^plot_type$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^hedgehog_plot$' } }, { has: { field: object, matches: result } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'hedgehog_plot takes method "analytic", "simulation" or "bootstrap", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(analytic|simulation|bootstrap)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^method$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^hedgehog_plot$' } }, { has: { field: object, matches: result } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+---
+# conf_int is read only on a bootstrap that the file builds from an arch bootstrap class.
+id: arch-unknown-option
+language: python
+severity: error
+message: 'conf_int takes method "basic", "percentile", "studentized", "norm", "var", "cov", "bc", "debiased", "bias-corrected" or "bca", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(basic|percentile|studentized|norm|var|cov|bc|debiased|bias\-corrected|bca)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^method$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conf_int$' } }, { has: { field: object, matches: bootstrap } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  bootstrap-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
+  bootstrap:
+    any:
+      - matches: bootstrap-call
+      - kind: identifier
+        pattern: $B
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: bootstrap-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: bootstrap-call } } }] } } }
+---
+id: arch-unknown-option
+language: python
+severity: error
+message: 'conf_int takes tail "two", "lower" or "upper", in any case. arch 9.0.0 raises ValueError for $V.'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")(two|lower|upper)(''|")$' }
+    - not: { has: { kind: interpolation } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^tail$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conf_int$' } }, { has: { field: object, matches: bootstrap } }] }
+  not: { matches: expected-to-raise }
+utils:
+  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  bootstrap-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
+  bootstrap:
+    any:
+      - matches: bootstrap-call
+      - kind: identifier
+        pattern: $B
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: bootstrap-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: bootstrap-call } } }] } } }

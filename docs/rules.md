@@ -7408,6 +7408,152 @@ version check, and code inside `pytest.raises`. arch 9.0.0 has no deprecation of
 its source raises no `DeprecationWarning` and no `FutureWarning`, so the pack has no rule for
 deprecated API.
 
+### Options and arguments
+
+arch 9.0 checks every argument when a function is called, and it still ignores an argument that
+does not apply to the model that was asked for. The first rule reports a string that the check
+refuses. The second reports an argument that is accepted and never read, so the code runs and
+describes another model or test than the one it estimates.
+
+#### arch-unknown-option
+
+**Severity:** error. **Fix:** none.
+
+Reports a string that is not one of the option's values: `mean`, `vol` and `dist` of `arch_model`, `trend` of `ADF`, `DFGLS`, `KPSS`, `PhillipsPerron`, `VarianceRatio`, `ZivotAndrews`, `engle_granger`, `phillips_ouliaris`, `DynamicOLS`, `FullyModifiedOLS` and `CanonicalCointegratingReg`, `method` of `ADF`, `DFGLS`, `ZivotAndrews`, `engle_granger` and `DynamicOLS`, `test_type` of `PhillipsPerron` and `phillips_ouliaris`, `kernel` of `auto_bandwidth`, `method` of `MCS`, `bootstrap` of `SPA`, `StepM`, `MCS` and `RealityCheck`, `cov_type` and `disp` of `fit`, `method` and `align` of `forecast`, `plot_type` and `method` of `hedgehog_plot`, and `method` and `tail` of `conf_int`.
+
+Example:
+
+```python
+gjr = arch_model(returns, vol="gjr", dist="student")
+res = gjr.fit(cov_type="mle")
+adf = ADF(prices, trend="nc")
+```
+
+Use instead:
+
+```python
+gjr = arch_model(returns, vol="garch", o=1, dist="t")
+res = gjr.fit(cov_type="classic")
+adf = ADF(prices, trend="n")
+```
+
+arch checks each option against a table of accepted spellings, without regard to case. A script
+wrapped that check on arch 9.0.0, called each API once and kept the table it was handed, so the
+lists in the rule are the ones the installed release uses and none is typed by hand. The script
+then ran each API with every spelling of its table, in lower and in upper case, and with 28 other
+strings, and each of those raised ValueError. The tables hold more than the signatures show:
+`vol="constant"` builds a model with a constant variance, `conf_int` also takes `"var"`, `"cov"`,
+`"debiased"` and `"bias-corrected"`, `method` of the unit root tests also takes `"t"` and
+`"tstat"`, and `bootstrap="moving_block"` is the same as `"moving block"`.
+
+| Option | Values on arch 9.0.0 |
+| --- | --- |
+| `arch_model(mean=)` | `constant`, `zero`, `ls`, `ar`, `arx`, `har`, `harx` |
+| `arch_model(vol=)` | `garch`, `arch`, `egarch`, `figarch`, `fiaparch`, `aparch`, `harch`, `ngarch`, `constant` |
+| `arch_model(dist=)` | `normal`, `gaussian`, `t`, `studentst`, `skewstudent`, `skewt`, `ged`, `generalized error` |
+| `trend=` of `ADF`, `engle_granger`, `phillips_ouliaris`, `DynamicOLS`, `FullyModifiedOLS`, `CanonicalCointegratingReg` | `n`, `c`, `ct`, `ctt` |
+| `trend=` of `DFGLS`, `KPSS` | `c`, `ct` |
+| `trend=` of `PhillipsPerron` | `n`, `c`, `ct` |
+| `trend=` of `VarianceRatio` | `n`, `c` |
+| `trend=` of `ZivotAndrews` | `c`, `t`, `ct` |
+| `method=` of `ADF`, `DFGLS`, `ZivotAndrews`, `engle_granger` | `aic`, `bic`, `t-stat`, `maic`, `t`, `tstat` |
+| `method=` of `DynamicOLS` | `aic`, `bic`, `hqic` |
+| `PhillipsPerron(test_type=)` | `tau`, `rho` |
+| `phillips_ouliaris(test_type=)` | `za`, `zt`, `pu`, `pz` |
+| `auto_bandwidth(kernel=)` | `ba`, `bartlett`, `nw`, `pa`, `parzen`, `gallant`, `qs`, `andrews` |
+| `MCS(method=)` | `r`, `max` |
+| `bootstrap=` of `SPA`, `StepM`, `MCS`, `RealityCheck` | `stationary`, `sb`, `circular`, `cbb`, `moving block`, `mbb` |
+| `fit(cov_type=)` | `robust`, `classic` |
+| `fit(disp=)` | `off`, `final`, or a bool |
+| `forecast(method=)`, `hedgehog_plot(method=)` | `analytic`, `simulation`, `bootstrap` |
+| `forecast(align=)` | `origin`, `target`, `horizon` |
+| `hedgehog_plot(plot_type=)` | `volatility`, `mean` |
+| `conf_int(method=)` | `basic`, `percentile`, `studentized`, `norm`, `var`, `cov`, `bc`, `debiased`, `bias-corrected`, `bca` |
+| `conf_int(tail=)` | `two`, `lower`, `upper` |
+
+Before 9.0 some of these options took any string and fell back to one value without a word. On
+arch 4.19, 5.0, 6.1.0, 6.2.0 and 8.0.0, `fit(cov_type="mle")` gave the standard errors of
+`"classic"`, 0.00843 for omega on 1,500 daily S&P 500 returns where `"robust"` gave 0.01329, and
+`PhillipsPerron(y, test_type="z")` gave the statistic of `"tau"`, -1.136, where `"rho"` gave
+-2.0998. On 5.0, 6.1.0, 6.2.0 and 8.0.0, `MCS(losses, 0.1, method="range")` gave the p-values of
+`"max"` and not those of `"R"`. The documents have no `since`, so the report also reaches a
+project on an older arch, where the value is the wrong one in silence.
+
+Releases before 9.0 took some options in one case only: `ADF(y, method="AIC")` raised on 8.0.0
+and runs on 9.0.0. The rule follows 9.0.0 and does not report it. A value that only 9.0 has, such
+as `method="maic"` or `align="horizon"`, is not reported either.
+
+The public code had 13 reports: `trend="nc"`, which is the old statsmodels name, `vol="AVGARCH"`,
+`disp="on"`, `method="stationary"` on `MCS`, and `ZivotAndrews(y, method="c")`, where the trend
+was written as the method.
+
+#### arch-ignored-argument
+
+**Severity:** warning. **Fix:** none.
+
+Reports `lags=` given to `arch_model` with `mean` `"constant"`, `"zero"` or `"ls"`, or with no `mean`, `x` given to `arch_model` with `mean` `"constant"`, `"zero"`, `"ar"` or `"har"`, or with no `mean`, `o=`, `q=` and `power=` given with `vol="arch"` or `vol="harch"`, `power=` given with `vol` `"egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"`, `o=` given with `vol="figarch"`, `method=` and `max_lags=` given to `ADF`, `DFGLS` or `ZivotAndrews` together with a number for `lags`, `random_state=` given to `forecast` with `method="simulation"`, and `rng=` given to `forecast` with `method="bootstrap"`.
+
+Example:
+
+```python
+ar = arch_model(returns, lags=2)
+with_regressors = arch_model(returns, x=x, vol="garch", p=1, q=1)
+arch3 = arch_model(returns, vol="arch", q=3)
+adf = ADF(prices, lags=4, method="bic")
+paths = res.forecast(horizon=5, method="simulation", random_state=np.random.RandomState(0))
+```
+
+Use instead:
+
+```python
+ar = arch_model(returns, mean="AR", lags=2)
+with_regressors = arch_model(returns, x=x, mean="ARX", lags=0, vol="garch", p=1, q=1)
+arch3 = arch_model(returns, vol="arch", p=3)
+adf = ADF(prices, method="bic")
+paths = res.forecast(horizon=5, method="simulation", rng=np.random.default_rng(0).standard_normal)
+```
+
+Each form was fitted with and without the argument on 1,500 daily S&P 500 returns, on arch 9.0.0
+and on 8.0.0, and the two fits had the same parameters. `"fiaparch"` and `"ngarch"` are new in
+9.0 and were run there only.
+
+| Call | Compared with | Parameters |
+| --- | --- | --- |
+| `arch_model(y, lags=2)`, and with `mean="zero"` or `"ls"` | the same call without `lags` | equal |
+| `arch_model(y, mean="ar", lags=2)` | without `lags` | differ |
+| `arch_model(y, x=x)`, and with `mean="zero"`, `"ar"` or `"har"` | without `x` | equal |
+| `arch_model(y, x=x, mean="ls")`, and with `"arx"` or `"harx"` | without `x` | differ |
+| `vol="arch"` or `"harch"` with `o=1`, `q=2` or `power=1.0` | `o=0`, `q=1`, `power=2.0` | equal |
+| `vol="egarch"`, `"aparch"`, `"fiaparch"` or `"ngarch"` with `power=1.0` | `power=2.0` | equal |
+| `vol="figarch"` with `o=1` | `o=0` | equal |
+| `vol="garch"` with `o=1`, `q=2` or `power=1.0` | `o=0`, `q=1`, `power=2.0` | differ |
+
+`ADF`, `DFGLS` and `ZivotAndrews` search for a lag length only when `lags` is not given. With
+`lags=4` the statistic of 1,000 log prices was the same for `method` `"aic"`, `"bic"` and
+`"t-stat"`, and the same for `max_lags` 2 and 20. Without `lags`, `"t-stat"` chose 8 lags where
+`"aic"` chose 0, and the statistic moved from -1.2674 to -1.0838 for `ADF`.
+
+`forecast` reads `random_state` only for `method="bootstrap"` and `rng` only for
+`method="simulation"`. Two calls with `method="simulation"` and
+`random_state=np.random.RandomState(0)` gave 2.586 and 2.598 for the variance five steps ahead,
+and two calls with a seeded `rng` gave 2.571 twice. Two calls with `method="bootstrap"` and the
+same seeded `rng` gave 2.588 and 2.470, and with `random_state=np.random.RandomState(0)` they
+gave 2.595 twice. The page on volatility forecasts in arch's own documentation passes
+`random_state` to a simulation. A call that passes both seeds is left alone.
+
+A value that changes nothing in a GARCH model either, such as `o=0`, `q=0` or `power=2.0`, is not
+reported. `lags=0`, `x=None` and a `mean` or a `vol` that is a variable are not reported. A call
+with three or more positional arguments is left alone, because its `mean` may be positional.
+
+The public code had 21 reports and none with wrong advice. Twelve were `x=` or a positional `x`
+with a constant mean, seven of them copies of one function that fits
+`arch_model(resid, x=exog, mean="Constant", ...)` as if the regressors were in the model. Four
+were `vol="ARCH"` with `q=3` or `q=1`, where the order of an ARCH model is `p`. Two were
+`random_state=` on a simulation, two were `lags=1` with `mean="constant"`, and one was a `method`
+beside `lags=8`. Of the 10 reports on arch's own code, one is a test that passes `max_lags=2.5` to
+check that it raises, where the advice is beside the point. The other nine are tests and the
+documentation page above.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
