@@ -9,7 +9,7 @@
 # equal, for the last row and with start. The rule reads forecast only on a model that the file
 # builds from arch_model or a mean class, or on a result that it gets from fit or fix of such a
 # model, and the names must be assigned from nothing else. The fix takes the argument out with
-# the comma before it, so it applies when the argument is not the first one.
+# the comma before it, so it applies only when a comma comes right before the argument.
 id: reindex-is-default
 language: python
 severity: info
@@ -18,7 +18,7 @@ rule:
   kind: keyword_argument
   regex: '^reindex\s*=\s*False$'
   all:
-    - not: { nthChild: 1 }
+    - follows: { regex: '^,$' }
     - inside:
         kind: argument_list
         inside:
@@ -50,8 +50,8 @@ fix:
   expandStart: { regex: ',' }
 metadata: { fix: safe, since: "6.2" }
 ---
-# The same argument as the first one of the call. Taking it out would leave the comma after
-# it, so this form has no fix.
+# The same argument as the first one of the call, or after a comment. Taking it out would
+# leave a comma with nothing before it, so this form has no fix.
 id: reindex-is-default
 language: python
 severity: info
@@ -60,7 +60,7 @@ rule:
   kind: keyword_argument
   regex: '^reindex\s*=\s*False$'
   all:
-    - nthChild: 1
+    - not: { follows: { regex: '^,$' } }
     - inside:
         kind: argument_list
         inside:

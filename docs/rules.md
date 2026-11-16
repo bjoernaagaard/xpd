@@ -7776,7 +7776,7 @@ corpus is a test in arch that steps through the origins of a hedgehog plot.
 
 #### reindex-is-default
 
-**Severity:** info. **Fix:** safe: the argument is taken out when it is not the first one of the call.
+**Severity:** info. **Fix:** safe: the argument is taken out when a comma comes right before it, so not when it is the first argument or follows a comment.
 
 Reports `reindex=False` given to `forecast` of an arch model or result.
 
