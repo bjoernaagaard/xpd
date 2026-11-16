@@ -120,11 +120,11 @@ class CheckOptions(BaseModel):
     config: str | None = None
 
     def flags(self, root: Root) -> list[str]:
-        flags = [part for name in self.rules for part in ("--rule", name)]
+        flags = [f"--rule={name}" for name in self.rules]
         if self.severity is not None:
-            flags.extend(("--severity", self.severity))
+            flags.append(f"--severity={self.severity}")
         if self.config is not None:
-            flags.extend(("--config", root.inside(self.config)))
+            flags.append(f"--config={root.inside(self.config)}")
         return flags
 
 
@@ -271,11 +271,11 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
         """
         flags = []
         if limit is not None:
-            flags.extend(["--limit", str(limit)])
+            flags.append(f"--limit={limit}")
         if package:
-            flags.extend(["--package", package])
+            flags.append(f"--package={package}")
         if kind:
-            flags.extend(["--kind", kind])
+            flags.append(f"--kind={kind}")
         return await xpd.run(FIND, Path.cwd(), [task], *flags)
 
     @mcp.tool(tags={"discovery"}, annotations=READS)

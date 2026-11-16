@@ -33,7 +33,7 @@ class Query(BaseModel):
             ("--rewrite", self.rewrite),
         ):
             if value is not None:
-                flags.extend((option, value))
+                flags.append(f"{option}={value}")
         return flags
 
 
@@ -66,9 +66,7 @@ class NewItem(BaseModel):
 
     def flags(self, root: Root) -> list[str]:
         flags = [self.entity]
-        if self.name is not None:
-            flags.append(self.name)
-        flags.extend(("--yes", "--format", "json", "--directory", root.inside(self.directory)))
+        flags.extend(("--yes", "--format=json", f"--directory={root.inside(self.directory)}"))
         for option, value in (
             ("--lang", self.language),
             ("--pack", self.pack),
@@ -84,10 +82,9 @@ class NewItem(BaseModel):
             ("--public-id", self.public_id),
         ):
             if value is not None:
-                flags.extend((option, value))
+                flags.append(f"{option}={value}")
         for option, values in (("--holds", self.holds), ("--unless-holds", self.unless_holds)):
-            for value in values:
-                flags.extend((option, value))
+            flags.extend(f"{option}={value}" for value in values)
         if self.with_test:
             flags.append("--with-test")
         if self.every_file:
@@ -109,9 +106,9 @@ class CaseOptions(BaseModel):
         flags: list[str] = []
         for option, path in (("--config", self.config), ("--test-dir", self.test_dir)):
             if path is not None:
-                flags.extend((option, root.inside(path)))
+                flags.append(f"{option}={root.inside(path)}")
         if self.filter is not None:
-            flags.extend(("--filter", self.filter))
+            flags.append(f"--filter={self.filter}")
         if self.skip_snapshots:
             flags.append("--skip-snapshot-tests")
         if self.update_snapshots:
@@ -175,11 +172,11 @@ def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         if isinstance(root, InputRequiredResult):
             return root
         options = options or OutlineOptions()
-        flags = ["--items", options.items]
+        flags = [f"--items={options.items}"]
         if options.language is not None:
-            flags.extend(("--lang", options.language))
+            flags.append(f"--lang={options.language}")
         if options.rules is not None:
-            flags.extend(("--outline-rules", root.inside(options.rules)))
+            flags.append(f"--outline-rules={root.inside(options.rules)}")
         return await run(ctx, xpd, OUTLINE, root, root.all_inside(paths or ["."]), *flags)
 
 
@@ -190,7 +187,8 @@ def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):
             return root
-        return await run(ctx, xpd, NEW, root, [], *item.flags(root))
+        names = [item.name] if item.name is not None else []
+        return await run(ctx, xpd, NEW, root, names, *item.flags(root))
 
     @mcp.tool(name="test", tags={"rules", "authoring"}, annotations=WRITES, task=True)
     async def test_rules(

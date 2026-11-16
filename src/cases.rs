@@ -377,15 +377,12 @@ fn structural(options: &Options) -> Result<ExitCode> {
         ("--test-dir", options.test_dir.as_ref()),
     ] {
         if let Some(path) = path {
-            args.extend([flag.to_owned(), path.to_string_lossy().into_owned()]);
+            args.push(format!("{flag}={}", path.display()));
         }
     }
-    args.extend([
-        "--snapshot-dir".to_owned(),
-        options.snapshot_dir.to_string_lossy().into_owned(),
-    ]);
+    args.push(format!("--snapshot-dir={}", options.snapshot_dir.display()));
     if let Some(filter) = &options.filter {
-        args.extend(["--filter".to_owned(), filter.to_string()]);
+        args.push(format!("--filter={filter}"));
     }
     for (flag, enabled) in [
         ("--skip-snapshot-tests", options.skip_snapshot_tests),
