@@ -45,7 +45,7 @@ utils:
 id: redundant-color
 language: python
 severity: info
-message: The marker color $C repeats the values that $A already shows, so the bars encode one variable twice, by length and by color. A go.Bar with y=v and marker_color=v drew three bars in three shades for the heights they already had. Tufte asks to erase redundant data-ink. Use one color, or use color for another variable.
+message: The marker color $C repeats the values or categories used for coordinate $A. Color can repeat a bar length or a category position. Tufte asks to erase redundant data-ink within reason. Use one color unless the category colors serve another purpose, such as matching another chart.
 rule:
   kind: call
   all:

@@ -10103,7 +10103,10 @@ expression as its `x` or `y`, as in `go.Bar(x=names, y=df["sales"], marker_color
 `go.Bar(y=[1, 2, 4], marker_color=[1, 2, 4])` drew the three bars in `rgb(13, 8, 135)`,
 `rgb(156, 23, 158)` and `rgb(240, 249, 33)`, where the same bars without `marker_color` were all
 `rgb(99, 110, 250)`. The length of a bar already shows its value, so the colors repeat it. A
-written string or number as the color is left alone.
+written string or number as the color is left alone. If the repeated coordinate holds
+categories, color repeats the category positions rather than the bar lengths. For example,
+`go.Bar(x=["red", "blue"], y=[1, 2], marker_color=["red", "blue"])` assigns a color to each
+category. Keep those colors when they match another chart or serve another purpose.
 
 #### pattern-fill
 
