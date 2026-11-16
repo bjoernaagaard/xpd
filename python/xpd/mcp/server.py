@@ -9,7 +9,7 @@ from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
-from xpd.mcp import catalog, prompts, tools, views
+from xpd.mcp import catalog, pipeline, prompts, tools, views
 from xpd.mcp.binary import RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
@@ -29,6 +29,9 @@ exist instead of computing their formulas again.
 - Before you choose methods for a data file, call `profile`.
 - After you refactor data logic, call `equiv` on the old and new script. The refactor is done \
 when it says `equivalent: true`.
+- To build a model from a data file, follow the `build_pipeline` prompt. The run is done when \
+`gates` returns `passed: true` for the results of `profile`, `check`, `graph`, `equiv` and \
+`contract`. With code mode on, one `execute` call chains them.
 - The show_ tools draw the same results as tables and charts in hosts that render apps.
 - skill://xpd/SKILL.md, skill://python-best-practices/SKILL.md and \
 skill://python-review/SKILL.md hold the style a linter cannot check."""
@@ -55,6 +58,7 @@ def build(settings: Settings) -> FastMCP:
     tools.register(mcp, xpd, project)
     views.register(mcp, xpd, project)
     catalog.register(mcp, rules)
+    pipeline.register(mcp, project, rules)
     prompts.register(mcp)
 
     @mcp.resource(

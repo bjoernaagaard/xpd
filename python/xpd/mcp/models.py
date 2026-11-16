@@ -166,3 +166,124 @@ class SkillSource(Output):
 
     name: str
     files: list[SkillFile]
+
+
+# The stages of a pipeline run, from raw rows to a saved model, and what each hands to the next.
+# The training script writes the Contract, and the other shapes are results of xpd's own tools.
+#
+#   raw data          RawData       the file, the target column and the row count
+#   profile           Profile       each column's dtype and nulls, for the choice of steps
+#   split             Split         the seed and the rows held out, which no later stage fits on
+#   preprocessing     InputColumn   the raw columns that the one Pipeline takes
+#                     FittedStep    each step of that Pipeline, in order
+#   model             FittedStep    the last step
+#   validation        Validation    scores on folds of the training rows, one on the held out rows
+#   proof             Proof         what check, graph and equiv found
+#   persisted model   SavedModel    the file and the versions that wrote it
+#   verdict           GateReport    one Gate per requirement
+Stage = Literal[
+    "raw data",
+    "profile",
+    "split",
+    "preprocessing",
+    "model",
+    "validation",
+    "proof",
+    "persisted model",
+]
+Evidence = Literal["profile", "check", "graph", "equiv", "contract"]
+
+
+class Written(BaseModel):
+    """A shape the training script writes. A section xpd does not know, such as one that a rule
+    pack asks for, is kept."""
+
+    model_config = ConfigDict(extra="allow", frozen=True)
+
+
+class RawData(Written):
+    file: str = Field(description="The data file, relative to the project root.")
+    target: str = Field(description="The column the model predicts.")
+    rows: int = Field(description="Rows in the file, before the split.")
+
+
+class Split(Written):
+    """How the rows were divided once, before any step was fitted."""
+
+    seed: int = Field(description="The random_state of the split.")
+    test_size: float = Field(gt=0, lt=1, description="The share of the rows held out.")
+    stratified: bool = Field(description="True when the split keeps the target's proportions.")
+    train_rows: int
+    test_rows: int
+
+
+class InputColumn(Written):
+    """One column the saved model takes, as pandas reads it from the data file."""
+
+    column: str
+    dtype: str
+
+
+class FittedStep(Written):
+    """One step of the Pipeline. The last one is the model."""
+
+    name: str
+    estimator: str = Field(description="The class name, such as ColumnTransformer.")
+
+
+class Validation(Written):
+    scoring: str = Field(description="The scorer name, such as accuracy.")
+    folds: int
+    cv_scores: list[float] = Field(description="One score per fold of the training rows.")
+    test_score: float = Field(description="The score on the held out rows, computed once.")
+
+
+class SavedModel(Written):
+    file: str = Field(description="The saved model, relative to the project root.")
+    type: str = Field(description="The class of the saved object, with its module.")
+    versions: dict[str, str] = Field(description="Python and each library that wrote the file.")
+
+
+class Contract(Written):
+    """What a training script saves beside its model: all that a later run needs to load the
+    model, check its input and repeat the split."""
+
+    data: RawData
+    split: Split
+    inputs: list[InputColumn]
+    steps: list[FittedStep]
+    validation: Validation
+    model: SavedModel
+
+
+class Proof(BaseModel):
+    """What xpd's tools found about the scripts of a pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    lint: CheckReport = Field(description="`check` on the training, prediction and step files.")
+    dataflow: GraphReport = Field(description="`graph` on the file with the feature steps.")
+    reproducible: Equivalence = Field(description="`equiv` of the training script with itself.")
+    served: Equivalence = Field(
+        description="`equiv` of the training script with the script that loads the saved model."
+    )
+
+
+class Gate(BaseModel):
+    """One requirement of a pipeline run, and whether the evidence meets it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    stage: Stage
+    evidence: list[Evidence] = Field(description="The tools whose results decide the gate.")
+    passed: bool
+    detail: str = Field(description="What was found, or each reason the gate failed.")
+
+
+class GateReport(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    passed: bool = Field(description="True when every gate passed.")
+    failed: list[str] = Field(description="The names of the gates that failed.")
+    gates: list[Gate]
