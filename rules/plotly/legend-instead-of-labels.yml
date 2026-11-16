@@ -23,7 +23,7 @@ rule:
     - has:
         field: arguments
         any:
-          - has: { nthChild: 1, matches: named-lines }
+          - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-lines }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^data$' } }, { has: { field: value, matches: named-lines } }] }
     - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
 utils:
@@ -48,11 +48,11 @@ utils:
   named-lines:
     kind: list
     all:
-      - has: { nthChild: 1, matches: named-line }
-      - has: { nthChild: 2, matches: named-line }
-      - not: { has: { nthChild: 3, not: { matches: named-line } } }
-      - not: { has: { nthChild: 4, not: { matches: named-line } } }
-      - not: { has: { nthChild: 5 } }
+      - has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-line }
+      - has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, matches: named-line }
+      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { matches: named-line } } }
+      - not: { has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { matches: named-line } } }
+      - not: { has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
   named-line:
     kind: call
     all:

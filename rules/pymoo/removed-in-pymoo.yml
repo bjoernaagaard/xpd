@@ -2611,7 +2611,7 @@ rule:
   kind: string
   pattern: $NAME
   regex: '^["''](igd|x_tol|xtol|f_tol|ftol|f_tol_s|ftol_s|default|default_multi|default_single)["'']$'
-  nthChild: 1
+  nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
   any:
     - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)get_termination$' } } }
     - inside:

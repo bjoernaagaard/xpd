@@ -75,7 +75,7 @@ utils:
           kind: call
           all:
             - has: { field: function, regex: '^minimize$' }
-            - has: { field: arguments, has: { nthChild: 2, kind: identifier, pattern: $ALG } }
+            - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $ALG } }
             - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^copy_algorithm$' } } } }
             - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
             - matches: pymoo-minimize

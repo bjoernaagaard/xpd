@@ -23,7 +23,7 @@ rule:
         field: arguments
         has:
           any:
-            - all: [{ nthChild: 1 }, { matches: unscaled }]
+            - all: [{ nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } }, { matches: unscaled }]
             - kind: keyword_argument
               all:
                 - has: { field: name, regex: '^y$' }

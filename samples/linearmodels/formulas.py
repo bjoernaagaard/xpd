@@ -55,7 +55,9 @@ def no_intercept_instruments():
     with_intercept = IV2SLS.from_formula("lwage ~ 1 + exper + [educ ~ fatheduc + motheduc]", data).fit()
     system = SUR.from_formula({"wage": "lwage ~ exper", "hours": "hours ~ 1 + educ"}, data).fit()  # xpd: formula-without-constant
     whole = SUR.from_formula({"wage": "lwage ~ 1 + exper", "hours": "hours ~ 1 + educ"}, data).fit()
-    return through_origin.params, with_intercept.params, system.params, whole.params
+    # Without a block in brackets the instrument models add the intercept themselves.
+    added = IV2SLS.from_formula("lwage ~ exper", data).fit()
+    return through_origin.params, with_intercept.params, system.params, whole.params, added.params
 
 
 @case

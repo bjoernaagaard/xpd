@@ -15,7 +15,7 @@ rule:
     - has:
         field: arguments
         has:
-          nthChild: 2
+          nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
           pattern: $NP.array([$$$ITEMS])
           all:
             - has: { stopBy: end, kind: float }

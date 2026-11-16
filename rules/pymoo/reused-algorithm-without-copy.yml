@@ -43,7 +43,7 @@ utils:
     all:
       - has: { field: function, regex: '^minimize$' }
       - has: { field: arguments, has: { kind: keyword_argument, regex: '^copy_algorithm\s*=\s*False$' } }
-      - has: { field: arguments, has: { nthChild: 2, kind: identifier, pattern: $ALG } }
+      - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $ALG } }
       - matches: pymoo-minimize
 metadata: { since: "0.6" }
 ---
@@ -75,6 +75,6 @@ utils:
     all:
       - has: { field: function, regex: '^minimize$' }
       - has: { field: arguments, has: { kind: keyword_argument, regex: '^copy_algorithm\s*=\s*False$' } }
-      - has: { field: arguments, has: { nthChild: 2, kind: identifier, pattern: $ALG } }
+      - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $ALG } }
       - matches: pymoo-minimize
 metadata: { since: "0.6" }

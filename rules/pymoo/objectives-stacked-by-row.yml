@@ -21,7 +21,7 @@ rule:
   pattern: $NP.$FN($LIST)
   all:
     - has: { field: function, regex: '^(np|numpy|anp)\.(array|asarray|vstack|stack|row_stack)$' }
-    - has: { field: arguments, has: { nthChild: 1, kind: list, has: { nthChild: 2 } } }
+    - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: list, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
     - inside:
         kind: assignment
         field: right

@@ -16,7 +16,7 @@ rule:
     - any:
         - all:
             - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(scatter_3d|line_3d)$' } }, { has: { field: object, matches: px } }] }
-            - not: { has: { field: arguments, has: { nthChild: 4, not: { kind: keyword_argument } } } }
+            - not: { has: { field: arguments, has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } } }
         - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter3d)$' } }, { has: { field: object, matches: go } }] }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } }

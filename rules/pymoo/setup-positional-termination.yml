@@ -14,7 +14,7 @@ message: setup takes the termination by keyword since pymoo 0.6.0. A second posi
 rule:
   pattern: $A.setup($P, $T, $$$REST)
   all:
-    - has: { field: arguments, has: { nthChild: 2, any: [{ kind: tuple, has: { nthChild: 1, kind: string } }, { kind: call, has: { field: function, regex: '(^|\.)get_termination$' } }] } }
+    - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: tuple, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: string } }, { kind: call, has: { field: function, regex: '(^|\.)get_termination$' } }] } }
     - inside:
         kind: module
         stopBy: end

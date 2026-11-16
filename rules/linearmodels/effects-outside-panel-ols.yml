@@ -15,9 +15,9 @@ rule:
     - not: { has: { kind: interpolation } }
     - regex: '\b(EntityEffects|FixedEffects|TimeEffects)\b'
     - any:
-        - { nthChild: 1, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
+        - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
         - { inside: { kind: keyword_argument, has: { field: name, regex: '^formula$' }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } }
-        - { inside: { kind: pair, inside: { kind: dictionary, nthChild: 1, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
+        - { inside: { kind: pair, inside: { kind: dictionary, nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth)$' }] }

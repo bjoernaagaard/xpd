@@ -6,8 +6,9 @@
 #
 # The rule reports a result read straight from the constructor call, and a result read from a
 # name that the file assigns such an object to, and nothing else, when the file never calls
-# compute on that name. The class names are short, so the file must import them from
-# arch.bootstrap.
+# compute on that name and reads the name only before a dot. A loop over the tests and a helper
+# that takes the test both call compute through another name, and the results then read fine.
+# The class names are short, so the file must import them from arch.bootstrap.
 id: results-before-compute
 language: python
 severity: error
@@ -27,6 +28,9 @@ rule:
               - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $S } }, { not: { has: { field: right, matches: comparison-call } } }] } } }
               - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $S } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $S } }, { kind: named_expression, has: { field: name, pattern: $S } }] } } }
               - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: '^compute$' } }, { has: { field: object, pattern: $S } }] } } }
+              # A name that is read in any other place than before a dot may reach compute under another
+              # name: as an argument of a call, in a tuple or a list, or on the right of an assignment.
+              - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: identifier, pattern: $S, not: { any: [{ inside: { kind: attribute } }, { inside: { kind: assignment, field: left } }, { inside: { kind: keyword_argument, field: name } }] } } } }
   not: { matches: expected-to-raise }
 utils:
   expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }

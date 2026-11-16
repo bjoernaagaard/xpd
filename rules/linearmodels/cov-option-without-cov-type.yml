@@ -122,7 +122,7 @@ rule:
         - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }] } } }
         - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:unadjusted|homoskedastic|conventional|robust|heteroskedastic|clustered|one-way|homo|hccm)["'']+$' } }] } } }
     - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
-    - not: { has: { field: arguments, has: { nthChild: 1, not: { kind: keyword_argument } } } }
+    - not: { has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } } }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(FamaMacBeth)$' }] }
@@ -171,7 +171,7 @@ rule:
         - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }] } } }
         - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:robust|heteroskedastic)["'']+$' } }] } } }
     - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
-    - not: { has: { field: arguments, has: { nthChild: 1, not: { kind: keyword_argument } } } }
+    - not: { has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } } }
     - not: { matches: expected-to-raise }
 utils:
   # The class names that another library also has count only with proof of the import.

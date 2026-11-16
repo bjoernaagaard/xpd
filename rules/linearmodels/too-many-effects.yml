@@ -2,7 +2,8 @@
 # On linearmodels 7.1 and 7.0, entity_effects=True with time_effects=True and a one column
 # other_effects raised "ValueError: At most two effects supported.", and so did the formula with
 # both effect terms and other_effects. The rule reads the two flags only when they are written as
-# True.
+# True, and other_effects only when its value is written as data. With other_effects=None, or a
+# name that holds None, the same call ran on 7.1.
 id: too-many-effects
 language: python
 severity: error
@@ -13,9 +14,30 @@ rule:
     - has: { field: function, matches: lm-class }
     - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(entity_effects)$' } }, { has: { field: value, regex: '^True$' } }] } } }
     - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(time_effects)$' } }, { has: { field: value, regex: '^True$' } }] } } }
-    - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(other_effects)$' } }, { has: { field: value, not: { regex: '^None$' } } }] } } }
+    - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(other_effects)$' } }, { has: { field: value, matches: effect-data } }] } } }
     - not: { matches: expected-to-raise }
 utils:
+  # other_effects is a third effect only when its value is written as data: a subscript, an attribute
+  # or a call, or a name that its function, or the module outside any function, assigns from such
+  # values and from nothing else. A parameter, a name that holds None, a value read from self or
+  # from a settings object, and a get or getattr call can each be None when the call runs.
+  effect-expr:
+    any:
+      - { kind: subscript, not: { has: { field: value, regex: '^(self|cls|args|opts|options|config|cfg|conf|settings|params|kwargs)\b' } } }
+      - { kind: attribute, not: { has: { field: object, regex: '^(self|cls|args|opts|options|config|cfg|conf|settings|params|kwargs)\b' } } }
+      - { kind: call, not: { has: { field: function, regex: '(^|\.)(get|pop|setdefault|getattr)$' } } }
+  effect-data:
+    any:
+      - matches: effect-expr
+      - kind: identifier
+        pattern: $OEV
+        inside:
+          stopBy: { kind: function_definition }
+          any: [{ kind: function_definition }, { kind: module }]
+          all:
+            - has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $OEV } }, { has: { field: right, matches: effect-expr } }] }
+            - not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $OEV } }, { not: { has: { field: right, matches: effect-expr } } }] } }
+            - not: { has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $OEV } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $OEV } }, { kind: named_expression, has: { field: name, pattern: $OEV } }, { kind: augmented_assignment, has: { field: left, pattern: $OEV } }] } }
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS)$' }] }
   from-linearmodels:
@@ -58,13 +80,34 @@ rule:
     - not: { has: { kind: interpolation } }
     - regex: '\b(EntityEffects|FixedEffects)\b'
     - regex: '\bTimeEffects\b'
-    - inside: { kind: argument_list, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^other_effects$' } }, { not: { has: { field: value, regex: '^None$' } } }] } }
+    - inside: { kind: argument_list, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^other_effects$' } }, { has: { field: value, matches: effect-data } }] } }
     - not: { matches: expected-to-raise }
     - any:
-        - { nthChild: 1, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
+        - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
         - { inside: { kind: keyword_argument, has: { field: name, regex: '^formula$' }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } }
-        - { inside: { kind: pair, inside: { kind: dictionary, nthChild: 1, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
+        - { inside: { kind: pair, inside: { kind: dictionary, nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
 utils:
+  # other_effects is a third effect only when its value is written as data: a subscript, an attribute
+  # or a call, or a name that its function, or the module outside any function, assigns from such
+  # values and from nothing else. A parameter, a name that holds None, a value read from self or
+  # from a settings object, and a get or getattr call can each be None when the call runs.
+  effect-expr:
+    any:
+      - { kind: subscript, not: { has: { field: value, regex: '^(self|cls|args|opts|options|config|cfg|conf|settings|params|kwargs)\b' } } }
+      - { kind: attribute, not: { has: { field: object, regex: '^(self|cls|args|opts|options|config|cfg|conf|settings|params|kwargs)\b' } } }
+      - { kind: call, not: { has: { field: function, regex: '(^|\.)(get|pop|setdefault|getattr)$' } } }
+  effect-data:
+    any:
+      - matches: effect-expr
+      - kind: identifier
+        pattern: $OEV
+        inside:
+          stopBy: { kind: function_definition }
+          any: [{ kind: function_definition }, { kind: module }]
+          all:
+            - has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $OEV } }, { has: { field: right, matches: effect-expr } }] }
+            - not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $OEV } }, { not: { has: { field: right, matches: effect-expr } } }] } }
+            - not: { has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $OEV } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $OEV } }, { kind: named_expression, has: { field: name, pattern: $OEV } }, { kind: augmented_assignment, has: { field: left, pattern: $OEV } }] } }
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS)$' }] }
   from-linearmodels:

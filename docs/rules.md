@@ -7454,7 +7454,7 @@ argument, the `formula` keyword, or a value of the dictionary that a system mode
 
 **Severity:** warning. **Fix:** none.
 
-Reports a formula with no `1` term in `from_formula` of `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FamaMacBeth`, `PanelOLS`, the instrument models and the system models. linearmodels adds no intercept to a formula. statsmodels and R add one, so `"y ~ x"` is a regression through the origin here and a regression with an intercept there.
+Reports a formula with no `1` term in `from_formula` of `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FamaMacBeth`, `PanelOLS` and the system models, and in `from_formula` of `IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE`, `IVJIVE` and `OLS` when the formula has an instrument block in brackets. linearmodels adds no intercept to these formulas. statsmodels and R add one, so `"y ~ x"` is a regression through the origin here and a regression with an intercept there.
 
 Example:
 
@@ -7470,7 +7470,7 @@ model = PooledOLS.from_formula("lwage ~ 1 + exper", data)
 iv = IV2SLS.from_formula("lwage ~ 1 + exper + [educ ~ fatheduc + motheduc]", data)
 ```
 
-On the wage panel, on 7.1 and on 7.0, `PooledOLS` gave `exper` a coefficient of 0.2184 for `"lwage ~ exper"` and 0.0338, with an intercept of 1.4289, for `"lwage ~ 1 + exper"`. `RandomEffects` gave 0.1119 against 0.0589, `BetweenOLS` 0.2364 against -0.0229, and `IV2SLS` on the mroz data gave `educ` 0.0769 against 0.0664. The rule stays silent when the formula says `- 1` or `0 +`, which states that no intercept is meant, when it names a column that looks like a constant, such as `const`, when it has a `C()` term, whose dummies span the intercept, and when a `PanelOLS` formula has effects or the call has `other_effects`, which absorb it. A no-intercept model can be meant, so this is a warning.
+On the wage panel, on 7.1 and on 7.0, `PooledOLS` gave `exper` a coefficient of 0.2184 for `"lwage ~ exper"` and 0.0338, with an intercept of 1.4289, for `"lwage ~ 1 + exper"`. `RandomEffects` gave 0.1119 against 0.0589, `BetweenOLS` 0.2364 against -0.0229, and `IV2SLS` on the mroz data gave `educ` 0.0769 against 0.0664. The instrument models for one equation add the intercept themselves when the formula has no block in brackets: on 7.1, 7.0 and 5.0, `IV2SLS`, `IVLIML`, `IVGMM` and `IVGMMCUE` returned `Intercept` and `exper` for `"lwage ~ exper"`, so the rule leaves that form alone on those classes. The rule stays silent when the formula says `- 1` or `0 +`, which states that no intercept is meant, when it names a column that looks like a constant, such as `const`, when it has a `C()` term, whose dummies span the intercept, and when a `PanelOLS` formula has effects or the call has `other_effects`, which absorb it. A no-intercept model can be meant, so this is a warning.
 
 #### effects-outside-panel-ols
 
@@ -7604,7 +7604,7 @@ On the wage panel, on 7.1 and 7.0, `PanelOLS(y, X)` and `PooledOLS(y, X)` return
 
 **Severity:** error. **Fix:** none.
 
-Reports `PanelOLS` with `entity_effects=True`, `time_effects=True` and `other_effects`, and a formula with both effect terms next to `other_effects`. The model takes two effects at most.
+Reports `PanelOLS` with `entity_effects=True`, `time_effects=True` and an `other_effects` that is written as data, and a formula with both effect terms next to such an `other_effects`. The model takes two effects at most.
 
 Example:
 
@@ -7619,7 +7619,7 @@ effects = data.reset_index()[["nr", "year", "occupation"]].astype("category")
 model = AbsorbingLS(y.reset_index(drop=True), X.reset_index(drop=True), absorb=effects)
 ```
 
-7.1 and 7.0 raised `ValueError: At most two effects supported.` for both forms. `AbsorbingLS` with the three columns as categories ran on 7.1.
+7.1 and 7.0 raised `ValueError: At most two effects supported.` for both forms. `AbsorbingLS` with the three columns as categories ran on 7.1. With `other_effects=None` the call runs, so the rule counts `other_effects` only when its value is a subscript, an attribute or a call, such as `data[["occupation"]]`, or a name that its function assigns from such a value and from nothing else. A parameter, a name that holds `None`, a value read from `self` or from a settings object, and a `get` call are left alone.
 
 #### time-before-entity-index
 
@@ -7641,7 +7641,7 @@ data = wage.set_index(["nr", "year"])
 model = PanelOLS(data.lwage, data[["hours", "married"]], entity_effects=True)
 ```
 
-With the year first, `PanelOLS` read the wage panel as 8 entities over 545 periods, and `entity_effects=True` gave `married` 0.1622, which is what `time_effects=True` gives on the right index, where the entity effects estimate is 0.2483. No error and no warning was raised. The rule knows the order only by the names. A two level index is also made for other uses, so the frame must reach a panel model: the `set_index` call is an argument of the model, or its result is assigned to a name that a panel model in the same function reads. The first form of the rule read every `set_index` in a file that imports linearmodels, and 2 of its 4 reports on the real files were a table of portfolios by month that no panel model reads. The rule also stays silent when another statement in the function can change the index of the same name, such as `swaplevel`, a second `set_index`, a merge or an assignment to `.index`.
+With the year first, `PanelOLS` read the wage panel as 8 entities over 545 periods, and `entity_effects=True` gave `married` 0.1622, which is what `time_effects=True` gives on the right index, where the entity effects estimate is 0.2483. No error and no warning was raised. The rule knows the order only by the names. A two level index is also made for other uses, so the frame must reach a panel model: the `set_index` call is an argument of the model, or its result is assigned to a name that a panel model in the same function reads. The first form of the rule read every `set_index` in a file that imports linearmodels, and 2 of its 4 reports on the real files were a table of portfolios by month that no panel model reads. The rule also stays silent when another statement in the function can change the index of the same name, such as `swaplevel`, a second `set_index`, a merge or an assignment to `.index`, when the same chain goes on with such a call, as in `set_index(["year", "nr"]).swaplevel()`, and when a later statement assigns the name again. A list with a comment inside is reported without the fix, which would delete the comment.
 
 #### use-lsdv
 
@@ -8657,7 +8657,10 @@ and on 8.0.0.
 The rule reports a result read straight from the constructor call, and a result read from a
 variable that the file assigns from one of the four classes and from nothing else, when no line
 of the file calls `compute` on that variable. It does not follow the order of the lines, so a
-`compute` after the read is not reported. Both reports in the corpus are rows of a table in
+`compute` after the read is not reported. A variable that the file also reads without a dot
+after it, as an argument of a call, in a tuple or a list, or on the right of an assignment, can
+reach `compute` under another name, as in `for test in (spa, mcs): test.compute()`, so the rule
+leaves it alone. Both reports in the corpus are rows of a table in
 arch's tests that pass a bad `pvalue` to `critical_values` to check the ValueError that comes
 first, so the advice is wrong there.
 

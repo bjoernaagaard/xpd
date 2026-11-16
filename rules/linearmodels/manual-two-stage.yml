@@ -21,7 +21,7 @@ rule:
         field: arguments
         has:
           any:
-            - { nthChild: 2, not: { kind: keyword_argument } }
+            - { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } }
             - { kind: keyword_argument, has: { field: name, regex: '^exog$' } }
           has: { stopBy: end, kind: attribute, has: { field: attribute, regex: '^fitted_values$' } }
 utils:

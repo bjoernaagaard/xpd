@@ -39,12 +39,27 @@ def index_order():
     turned = data.set_index(["year", "nr"])
     turned = turned.swaplevel().sort_index()
     after = PanelOLS(turned.lwage, turned[regressors], entity_effects=True).fit(cov_type="robust")
+    # So does a swap in the same chain, and a later statement that gives the name another frame.
+    swapped_back = PooledOLS.from_formula("lwage ~ 1 + hours", data.set_index(["year", "nr"]).swaplevel().sort_index()).fit(cov_type="robust")
+    replaced = data.set_index(["year", "nr"])
+    yearly = replaced.groupby(level=0).lwage.mean()
+    replaced = right
+    by_right = PooledOLS(replaced.lwage, replaced[regressors]).fit(cov_type="robust")
+    # A list with a comment inside is reported without the fix, which would delete the comment.
+    noted = data.set_index(
+        [  # xpd: time-before-entity-index
+            "year",  # the time
+            "nr",
+        ]
+    )
+    by_note = PooledOLS(noted.lwage, noted[regressors]).fit(cov_type="robust")
     both_times = data.assign(month=data.nr).set_index(["year", "month"])
     by_month = PooledOLS(both_times.lwage, both_times[regressors]).fit(cov_type="robust")
     columns = ["year", "nr"]
     from_a_name = data.set_index(columns)
     named = PooledOLS(from_a_name.lwage, from_a_name[regressors]).fit(cov_type="robust")
-    return [r.params for r in (by_year, by_worker, direct, by_date, after, by_month, named)], lookup.shape
+    results = (by_year, by_worker, direct, by_date, after, swapped_back, by_right, by_note, by_month, named)
+    return [r.params for r in results], lookup.shape, yearly.shape
 
 
 @case
@@ -77,6 +92,17 @@ def dummy_columns(entities=60):
     return [r.params for r in (slow, chained, fast, switched_off, from_a_name)]
 
 
+@case
+def optional_third_effect():
+    data = table().set_index(["nr", "year"])
+
+    # other_effects is None unless the caller gives one, so the call with both flags runs.
+    def two_way(y, X, other_effects=None):
+        return PanelOLS(y, X, entity_effects=True, time_effects=True, other_effects=other_effects).fit(cov_type="robust")
+
+    return two_way(data.lwage, data[["hours"]]).params
+
+
 def raises_on_7_1():
     data = table().set_index(["nr", "year"])
     y, X = data.lwage, data[["hours"]]
@@ -84,6 +110,8 @@ def raises_on_7_1():
     PanelOLS(y, X, entity_effects=True, time_effects=True)
     PanelOLS(y, X, entity_effects=True, other_effects=data.occupation)
     PanelOLS(y, X, entity_effects=True, time_effects=True, other_effects=None)
+    extra = data[["occupation"]]
+    PanelOLS(y, X, entity_effects=True, time_effects=True, other_effects=extra)  # xpd: too-many-effects
     lm.FirstDifferenceOLS(y, sm.add_constant(X))  # xpd: first-difference-constant
     lm.FirstDifferenceOLS(y, exog=sm.add_constant(X))  # xpd: first-difference-constant
     lm.FirstDifferenceOLS(y, X)

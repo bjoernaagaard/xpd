@@ -22,7 +22,7 @@ rule:
         all:
           - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
           - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
-          - not: { has: { nthChild: 3, not: { kind: keyword_argument } } }
+          - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
           - any:
               - not: { has: { kind: keyword_argument, has: { field: name, regex: '^mean$' } } }
               - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mean$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(constant|zero|ls)(''|")$' } }] }
@@ -40,13 +40,13 @@ rule:
         - has: { field: name, regex: '^x$' }
         - not: { has: { field: value, regex: '^None$' } }
     - any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }]
-      nthChild: 2
+      nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
   inside:
     kind: argument_list
     all:
       - inside: { kind: call, has: { field: function, regex: '(^|\.)arch_model$' } }
       - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
-      - not: { has: { nthChild: 3, not: { kind: keyword_argument } } }
+      - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
       - any:
           - not: { has: { kind: keyword_argument, has: { field: name, regex: '^mean$' } } }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mean$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")(constant|zero|ar|har)(''|")$' } }] }
@@ -125,7 +125,7 @@ rule:
           - inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)(ADF|DFGLS|ZivotAndrews)$' } }
           - any:
               - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^lags$' } }, { has: { field: value, kind: integer } }] }
-              - has: { nthChild: 2, kind: integer }
+              - has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: integer }
 ---
 # forecast reads random_state only for method="bootstrap". With method="simulation" two calls
 # with np.random.RandomState(0) gave 2.586 and 2.598 for the same step on arch 9.0.0, and 2.553
@@ -149,7 +149,7 @@ rule:
           - inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } } }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")simulation(''|")$' } }] }
           - not: { has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^rng$' } }, { kind: dictionary_splat }] } }
-          - not: { has: { nthChild: 4, not: { kind: keyword_argument } } }
+          - not: { has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
 ---
 # forecast reads rng only for method="simulation". With method="bootstrap" two calls with
 # np.random.default_rng(0).standard_normal gave 2.588 and 2.470 on arch 9.0.0, and the same two
@@ -169,4 +169,4 @@ rule:
           - inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^forecast$' } } }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, kind: string, regex: '(?i)^[rbu]{0,2}(''|")bootstrap(''|")$' } }] }
           - not: { has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^random_state$' } }, { kind: dictionary_splat }] } }
-          - not: { has: { nthChild: 4, not: { kind: keyword_argument } } }
+          - not: { has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }

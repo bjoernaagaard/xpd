@@ -20,7 +20,7 @@ rule:
         kind: function_definition
         all:
           - has: { field: name, regex: '^_evaluate$' }
-          - has: { field: parameters, has: { nthChild: 3, regex: '^out$' } }
+          - has: { field: parameters, has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, regex: '^out$' } }
           - not: { has: { field: body, has: { stopBy: end, kind: identifier, regex: '^out$' } } }
           - inside:
               stopBy: end

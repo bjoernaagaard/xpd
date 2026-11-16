@@ -22,7 +22,7 @@ rule:
         kind: function_definition
         all:
           - has: { field: name, regex: '^_evaluate$' }
-          - has: { field: parameters, has: { nthChild: 2, kind: identifier, pattern: $X } }
+          - has: { field: parameters, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $X } }
           - inside:
               stopBy: end
               kind: class_definition
@@ -54,7 +54,7 @@ rule:
         kind: function_definition
         all:
           - has: { field: name, regex: '^_evaluate$' }
-          - has: { field: parameters, has: { nthChild: 2, kind: identifier, pattern: $X } }
+          - has: { field: parameters, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $X } }
           - not: { has: { field: body, has: { stopBy: end, any: [{ kind: for_statement }, { kind: while_statement }, { kind: for_in_clause }, { kind: lambda }] } } }
           - not:
               has:

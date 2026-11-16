@@ -198,7 +198,7 @@ rule:
   kind: call
   all:
     - has: { field: function, pattern: $C, matches: distribution-class }
-    - has: { field: arguments, has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+    - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] } } }
   not: { matches: compat-code }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }

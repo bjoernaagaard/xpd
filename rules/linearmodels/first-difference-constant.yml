@@ -14,9 +14,9 @@ rule:
     - regex: '[~+]\s*1\s*([+\[\]}"'']|$)'
     - not: { matches: expected-to-raise }
     - any:
-        - { nthChild: 1, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
+        - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
         - { inside: { kind: keyword_argument, has: { field: name, regex: '^formula$' }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } }
-        - { inside: { kind: pair, inside: { kind: dictionary, nthChild: 1, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
+        - { inside: { kind: pair, inside: { kind: dictionary, nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(FirstDifferenceOLS)$' }] }
@@ -62,7 +62,7 @@ rule:
         field: arguments
         has:
           any:
-            - { nthChild: 2, kind: call, has: { field: function, regex: '(^|\.)add_constant$' } }
+            - { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: call, has: { field: function, regex: '(^|\.)add_constant$' } }
             - { kind: keyword_argument, all: [{ has: { field: name, regex: '^exog$' } }, { has: { field: value, kind: call, has: { field: function, regex: '(^|\.)add_constant$' } } }] }
     - not: { matches: expected-to-raise }
 utils:
