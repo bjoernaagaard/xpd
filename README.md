@@ -165,17 +165,19 @@ xpd mcp
 │   ├── check, fix                 lint, and write fixes after the user confirms unsafe ones
 │   ├── graph, profile, equiv      the commands of the same names
 │   ├── rules, rule                list the rules, and read one with its examples
+│   ├── contract, gates            judge a run from a data file to a saved model
 │   └── show_issues, show_dataflow, show_columns    tables and a chart, in hosts that draw them
 ├── resources
 │   ├── xpd://rules/{package}/{rule}    one rule's documentation
 │   └── skill://<name>/SKILL.md         each skill that ships with xpd
 └── prompts
-    └── lint_and_fix, review, refactor_data_logic, add_to_dataflow
+    └── lint_and_fix, review, refactor_data_logic, add_to_dataflow, build_pipeline
 ```
 
 The server takes every rule and every result from the xpd binary, so it matches the installed
 version. The [MCP page](https://bjoernaagaard.github.io/xpd/mcp/) covers other clients, the
-settings and HTTP.
+settings and HTTP. The [code mode page](https://bjoernaagaard.github.io/xpd/code-mode/) is a
+first draft of a run from a data file to a saved scikit-learn model in one call.
 
 ### Skills
 

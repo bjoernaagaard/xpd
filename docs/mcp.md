@@ -7,7 +7,8 @@ it always matches the installed version. The server is built on
 
 ```text
 xpd mcp
-├── tools        lint, fix, read the dataflow, profile data, compare two scripts, read the rules
+├── tools        lint, fix, read the dataflow, profile data, compare two scripts, read the rules,
+│                and judge a run from a data file to a saved model
 ├── resources    every rule with its section of the Rules page, and the three agent skills
 ├── prompts      the workflows of the xpd skill
 └── apps         tables and a dataflow chart, in hosts that render MCP Apps
@@ -18,7 +19,9 @@ xpd mcp
 The server holds no rules and no results of its own. It loads the rules and the skills from the
 xpd binary when it starts. A tool that reads project files first checks its paths, and then runs
 the binary in the project root. The data tools return the JSON that the binary prints as a typed
-result, and the `show_` tools also return a table or a chart.
+result, and the `show_` tools also return a table or a chart. `contract` and `gates` are the
+exception. They run no binary: `contract` reads a JSON file of the project, and `gates` holds
+its own requirements and judges results that the other tools returned.
 
 ```mermaid
 sequenceDiagram
@@ -100,6 +103,8 @@ Every path is relative to the project root, and a path outside it is refused.
 | `equiv` | `old`, `new` | Runs two scripts and compares their `result`, as [`xpd equiv`](commands.md#equiv) | Whatever the scripts do |
 | `rules` | `package`, `severity`, `fixable`, `query`, all optional | Lists the rules that match every filter given. `package` is a module name, such as `numpy` or `sklearn` | No |
 | `rule` | `package`, `rule` | Shows one rule with its documentation and examples | No |
+| `contract` | `file` | Reads the contract that a training script saved beside its model, as [Code mode](code-mode.md#the-stages) describes | No |
+| `gates` | `profile`, `contract`, `proof` | Judges a run from a data file to a saved model, from the results of the other tools. See [the gates](code-mode.md#the-gates) | No |
 | `show_issues` | `paths` (default: the root) | Shows what `check` finds as a table | No |
 | `show_dataflow` | `paths` | Shows what `graph` reads as a chart and a table | No |
 | `show_columns` | `file` | Shows what `profile` reads as a table | No |
@@ -108,7 +113,7 @@ Every path is relative to the project root, and a path outside it is refused.
 nearest `.venv` above the project root, then `python3` on `PATH`. Install pandas there. Both
 scripts that `equiv` runs must assign their output to `result`.
 
-The tools from `check` to `rule` return structured results with an output schema. The `show_` tools return a UI
+The tools from `check` to `gates` return structured results with an output schema. The `show_` tools return a UI
 for hosts that render [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps), and the
 same JSON as text for hosts that do not.
 
@@ -162,6 +167,7 @@ the package already chosen. Clients that support the Skills extension also list 
 | `review` | `target`, `package`, `rule` | Reviews a path or a git range with the review skill and `check` |
 | `refactor_data_logic` | `path`, `goal` | Refactors a script and proves with `equiv` that its result did not change |
 | `add_to_dataflow` | `path`, `change` | Adds a step or node, with `graph` before and after |
+| `build_pipeline` | `data`, `target` | Builds a scikit-learn model from a data file, saves it with its contract, and runs the stages until `gates` passes |
 
 `package` and `rule` complete as they do in resource URIs.
 
@@ -172,7 +178,7 @@ Each flag has an environment setting, for clients that start the server without 
 | Flag | Environment | Default | Effect |
 | --- | --- | --- | --- |
 | `--root PATH` | `XPD_MCP_ROOT` | The working directory, or the client's first root when xpd is a plugin | The project root. Every path must be inside it |
-| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute`. |
+| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Shows the tools through FastMCP's [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) as `search`, `get_schema` and `execute`. [Code mode](code-mode.md) shows a run. |
 | `--transport stdio\|http` | `FASTMCP_TRANSPORT` | `stdio` | How clients connect |
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to bind for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
