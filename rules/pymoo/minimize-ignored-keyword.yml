@@ -1,0 +1,61 @@
+# minimize hands every keyword it does not know to algorithm.setup, which stores it as an
+# attribute and reads it nowhere. A stopping rule or a seed given under another name is accepted
+# and does nothing. On pymoo 0.6.2, minimize given each of n_gen=7, n_eval=100, n_evals=100,
+# n_iter=7, n_max_gen=7, max_gen=7 and generations=7 ran NSGA2 for 1,000 generations and 20,000
+# evaluations, which is where the default termination stops.
+#
+# The call must be the minimize that the file imports from pymoo.optimize.
+id: minimize-ignored-keyword
+language: python
+severity: error
+message: minimize does not read $K. It stores the value on the algorithm and stops by the default termination, so a run given n_gen=7 went on for 1,000 generations. Pass the stopping rule as termination, such as termination=("n_gen", 7).
+rule:
+  kind: keyword_argument
+  regex: '^(n_gen|n_eval|n_evals|n_iter|n_max_gen|max_gen|generations)\s*='
+  all:
+    - has: { field: name, pattern: $K }
+    - inside: { kind: argument_list, inside: { matches: pymoo-minimize } }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+---
+# random_state and random_seed are the names other libraries use for the seed. Two runs with
+# each of them set to 1 returned different fronts, and two runs with seed=1 the same front.
+id: minimize-ignored-keyword
+language: python
+severity: error
+message: minimize does not read $K, and its seed is named seed. Two runs with $K=1 returned different fronts, where two runs with seed=1 returned the same front. Write seed.
+rule:
+  kind: identifier
+  pattern: $K
+  regex: '^(random_state|random_seed)$'
+  inside:
+    kind: keyword_argument
+    field: name
+    inside:
+      kind: argument_list
+      all:
+        - not: { has: { kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+        - inside: { matches: pymoo-minimize }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+# Unsafe: the fixed run is seeded, so it returns another front than the unseeded one did.
+fix: seed
+metadata: { fix: unsafe }

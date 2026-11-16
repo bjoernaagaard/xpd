@@ -1,0 +1,47 @@
+# MOEAD keeps one solution per reference direction, and it sets pop_size itself. Both forms ran
+# on pymoo 0.4.2.2 and raised on 0.5.0 and on 0.6.2. The class must be the MOEAD that the file
+# imports from pymoo.
+
+# MOEAD(ref_dirs, pop_size=50) raised TypeError when it was built, "got multiple values for
+# keyword argument 'pop_size'".
+id: moead-arguments
+language: python
+severity: error
+message: MOEAD sets pop_size to the number of reference directions since pymoo 0.5.0, and passing it raises TypeError, "got multiple values for keyword argument 'pop_size'". Drop pop_size, and change the number of directions to change the population.
+rule:
+  kind: keyword_argument
+  regex: '^pop_size\s*='
+  inside: { kind: argument_list, inside: { matches: moead-call } }
+utils:
+  moead-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(MOEAD|ParallelMOEAD)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.algorithms(\.\w+)*\s+import\b[^#]*\bMOEAD\b' }
+metadata: { since: "0.5" }
+---
+# pymoo 0.4 took the decomposition as a text such as "pbi". Since 0.5.0 it must be an object,
+# and a text raised AttributeError in the first generation, "'str' object has no attribute 'do'".
+id: moead-arguments
+language: python
+severity: error
+message: MOEAD takes the decomposition as an object since pymoo 0.5.0, and $V raises AttributeError in the first generation, "'str' object has no attribute 'do'". Pass an object, such as PBI() from pymoo.decomposition.pbi or Tchebicheff() from pymoo.decomposition.tchebicheff.
+rule:
+  kind: keyword_argument
+  regex: '^decomposition\s*='
+  all:
+    - has: { field: value, kind: string, pattern: $V }
+    - inside: { kind: argument_list, inside: { matches: moead-call } }
+utils:
+  moead-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(MOEAD|ParallelMOEAD)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.algorithms(\.\w+)*\s+import\b[^#]*\bMOEAD\b' }
+metadata: { since: "0.5" }

@@ -1,0 +1,22 @@
+# The checkpoint recipe of pymoo 0.4 and 0.5 loaded a finished algorithm and set
+# has_terminated = False to let it run on. Since 0.6.0 nothing reads that attribute, and the
+# termination object decides. On pymoo 0.6.2 an NSGA2 that had finished its 5 generations ran 0
+# more generations after has_terminated = False, and 15 more after it got
+# MaximumGenerationTermination(20) as its termination.
+#
+# The file must load an object with np.load, pickle or dill, as the recipe does. An attribute of
+# self is the class's own and is left alone.
+id: has-terminated-assignment
+language: python
+severity: error
+message: has_terminated is not read since pymoo 0.6.0, so a loaded algorithm that had finished stays finished. It ran 0 more generations after this line, and 15 more after it got a new termination. Write $A.termination = MaximumGenerationTermination(n), with the class from pymoo.termination.max_gen and n the total number of generations.
+rule:
+  kind: assignment
+  all:
+    - has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^has_terminated$' } }, { has: { field: object, kind: identifier, pattern: $A, not: { regex: '^(self|cls)$' } } }] }
+    - has: { field: right, regex: '^False$' }
+    - inside:
+        kind: module
+        stopBy: end
+        has: { stopBy: end, kind: call, has: { field: function, regex: '^((np|numpy|pickle|dill)\.load|load)$' } }
+metadata: { since: "0.6" }

@@ -1,0 +1,81 @@
+# pymoo 0.6.1.6 moved every random draw of the library from NumPy's global generator to a
+# generator that minimize builds from seed and hands to each operator as random_state. Seeding
+# NumPy no longer fixes a run, and an operator that draws from np.random is no longer fixed by
+# seed. Both were run on pymoo 0.6.1.5, where two runs agreed, and on 0.6.1.6 and 0.6.2, where
+# they differed.
+
+# np.random.seed(1) before each of two runs without seed gave two different fronts on 0.6.2. The
+# file must hold a minimize, imported from pymoo.optimize, that gets no seed.
+id: numpy-seed-ignored
+language: python
+severity: warning
+message: np.random.seed does not fix a pymoo run since 0.6.1.6, because pymoo draws from its own generator. Two runs after np.random.seed(1) returned different fronts. Pass seed to minimize.
+rule:
+  pattern: $NP.random.seed($$$S)
+  inside:
+    kind: module
+    stopBy: end
+    has: { stopBy: end, matches: unseeded-minimize }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+  unseeded-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - not:
+          any:
+            - has: { field: arguments, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+            - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(random_state|random_seed)$' } } }
+            - has: { field: arguments, has: { kind: dictionary_splat } }
+            - has: { field: arguments, has: { kind: list_splat } }
+      - matches: pymoo-minimize
+      - not:
+          all:
+            - has: { field: arguments, has: { nthChild: 2, kind: identifier, pattern: $SEEDED } }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $SEEDED }
+                    - has: { field: right, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+metadata: { since: "0.6.1.6" }
+---
+# A sampling, a crossover and a mutation that drew from np.random each gave different results in
+# two runs with seed=1 on 0.6.2. The same three drawing from the random_state that pymoo passes
+# to _do gave the same result twice. The call must be inside _do of a class that inherits from
+# the Sampling, Crossover or Mutation that the file imports from pymoo.core.
+id: numpy-seed-ignored
+language: python
+severity: warning
+message: This operator draws from NumPy's global generator, which seed does not control since pymoo 0.6.1.6. Two runs with seed=1 returned different results. Add random_state=None to the parameters of _do and draw from random_state, as in random_state.random(size).
+rule:
+  kind: call
+  all:
+    - has: { field: function, kind: attribute, regex: '^(np|numpy)\.random\.\w+$', not: { regex: '\.(seed|default_rng|RandomState|Generator|get_state|set_state)$' } }
+    - inside:
+        stopBy: { kind: function_definition }
+        kind: function_definition
+        all:
+          - has: { field: name, regex: '^_do$' }
+          - inside:
+              stopBy: end
+              kind: class_definition
+              all:
+                - has: { field: superclasses, has: { kind: identifier, regex: '^(Sampling|Crossover|Mutation)$' } }
+                - inside:
+                    kind: module
+                    stopBy: end
+                    has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.\w+\s+import\b[^#]*\b(Sampling|Crossover|Mutation)\b' }
+metadata: { since: "0.6.1.6" }

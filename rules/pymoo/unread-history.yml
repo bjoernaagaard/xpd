@@ -1,0 +1,36 @@
+# save_history=True stores a deep copy of the algorithm after every generation. On pymoo 0.6.2,
+# NSGA2 with 100 solutions and 200 generations took 2.6 times as long with it, 1.17 against 0.45
+# seconds, and its result pickled to 20.3 MB against 0.13 MB. Both runs returned the same F.
+#
+# The keyword must be given to the minimize that the file imports from pymoo.optimize, in a
+# statement outside every function, so that no caller gets the result. The file must never name
+# history, as an attribute or in a text, and must not use pickle, dill or joblib, which can store
+# the result for another file to read. So a file that plots the convergence from res.history is
+# left alone. Another file can still read the history of a run, which the rule cannot see, so it
+# is info.
+id: unread-history
+language: python
+severity: info
+message: save_history=True keeps a deep copy of the algorithm for every generation, and this file never reads history. A run of 200 generations with 100 solutions took 2.6 times as long, and its result pickled to 20.3 MB against 0.13 MB, with the same F. Drop save_history, or record the values you need in a Callback.
+rule:
+  kind: keyword_argument
+  regex: '^save_history\s*=\s*True$'
+  all:
+    - inside: { kind: argument_list, inside: { matches: pymoo-minimize } }
+    - not: { inside: { stopBy: end, any: [{ kind: function_definition }, { kind: class_definition }] } }
+    - not:
+        inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, any: [{ kind: attribute, has: { field: attribute, regex: 'history' } }, { kind: string, regex: 'history' }, { kind: identifier, regex: '^(dill|pickle|joblib)$' }] }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }

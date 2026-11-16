@@ -1,0 +1,176 @@
+# Each document finds a form that raises DeprecationWarning on pymoo 0.6.2. Each was run with
+# warnings recorded, where the old form warned and the new form did not, and both gave the same
+# object or the same array. Code inside pytest.warns is meant to warn and stays silent.
+
+# pymoo 0.6.1.6 moved StarmapParallelization to pymoo.parallelization, and on that release the
+# old import raises ImportError. 0.6.2 brought the old path back with a DeprecationWarning. The
+# two paths give the same class on 0.6.2. The fix rewrites a statement that imports only this
+# name.
+id: deprecated-in-pymoo
+language: python
+severity: warning
+message: StarmapParallelization moved to pymoo.parallelization in pymoo 0.6.1.6. The import from pymoo.core.problem raises ImportError on 0.6.1.6 and DeprecationWarning on 0.6.2. Import it from pymoo.parallelization, which gives the same class.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+pymoo\.core\.problem\s+import\s+\(?\s*StarmapParallelization\s*,?\s*\)?$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: from pymoo.parallelization import StarmapParallelization
+metadata: { fix: safe, since: "0.6.1.6" }
+---
+# The same name in a statement that imports other names too.
+id: deprecated-in-pymoo
+language: python
+severity: warning
+message: StarmapParallelization moved to pymoo.parallelization in pymoo 0.6.1.6. The import from pymoo.core.problem raises ImportError on 0.6.1.6 and DeprecationWarning on 0.6.2. Import it from pymoo.parallelization, which gives the same class.
+rule:
+  kind: dotted_name
+  regex: '^StarmapParallelization$'
+  inside:
+    stopBy: end
+    kind: import_from_statement
+    all:
+      - has: { field: module_name, regex: '^pymoo\.core\.problem$' }
+      - not: { regex: '^from\s+pymoo\.core\.problem\s+import\s+\(?\s*StarmapParallelization\s*,?\s*\)?$' }
+  not:
+    any:
+      - inside: { kind: aliased_import, field: alias }
+      - matches: compat-code
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "0.6.1.6" }
+---
+# Population.get("feasible") reads the feasible property of every individual, which warns since
+# pymoo 0.6.1.2. A population of 20 raised 40 warnings. get("FEAS") returned an equal array of
+# the same shape and dtype on 0.6.0 and on 0.6.2, with no warning. This document needs the
+# population of a result: res.pop, res.opt or res.off, where res is a name the file binds to the
+# minimize it imports from pymoo.optimize and to nothing else.
+id: deprecated-in-pymoo
+language: python
+severity: warning
+message: The key "feasible" is deprecated since pymoo 0.6.1.2 and raises a DeprecationWarning for every individual, 40 for a population of 20. Write "FEAS", which returns the same array.
+rule:
+  kind: string
+  regex: '^["'']feasible["'']$'
+  all:
+    - inside: { kind: argument_list, inside: { matches: get-on-a-result } }
+    - not: { matches: expected-to-warn }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+  expected-to-warn: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  get-on-a-result:
+    kind: call
+    all:
+      - has:
+          field: function
+          kind: attribute
+          all:
+            - has: { field: attribute, regex: '^get$' }
+            - has:
+                field: object
+                kind: attribute
+                all:
+                  - has: { field: attribute, regex: '^(pop|opt|off)$' }
+                  - has: { field: object, kind: identifier, pattern: $RES }
+      - not: { has: { field: arguments, has: { all: [{ not: { kind: string } }, { not: { regex: '^[(),]$' } }] } } }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has:
+                stopBy: end
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $RES }
+                  - has: { field: right, matches: pymoo-minimize }
+            - not:
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $RES }
+                    - not: { has: { field: right, kind: call, has: { field: function, regex: '^minimize$' } } }
+fix: '"FEAS"'
+metadata: { fix: safe, since: "0.6.1.2" }
+---
+# The same key on a population that the file does not tie to a result. ast-grep sees no types,
+# so this document reads the name of the object: a variable or an attribute named pop, opt, off
+# or population. A dictionary of that name gets a wrong report, so the document has no fix.
+id: deprecated-in-pymoo
+language: python
+severity: warning
+message: The key "feasible" is deprecated on a pymoo population since 0.6.1.2 and raises a DeprecationWarning for every individual, 40 for a population of 20. Write "FEAS", which returns the same array.
+rule:
+  kind: string
+  regex: '^["'']feasible["'']$'
+  all:
+    - inside:
+        kind: argument_list
+        all:
+          - not: { has: { all: [{ not: { kind: string } }, { not: { regex: '^[(),]$' } }] } }
+          - inside:
+              kind: call
+              all:
+                - has:
+                    field: function
+                    kind: attribute
+                    all:
+                      - has: { field: attribute, regex: '^get$' }
+                      - has: { field: object, regex: '(^|\.)(pop|opt|off|population)$' }
+                - not: { matches: get-on-a-result }
+    - not: { matches: expected-to-warn }
+utils:
+  pymoo-minimize:
+    kind: call
+    all:
+      - has: { field: function, regex: '^minimize$' }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+            - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }
+  expected-to-warn: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
+  get-on-a-result:
+    kind: call
+    all:
+      - has:
+          field: function
+          kind: attribute
+          all:
+            - has: { field: attribute, regex: '^get$' }
+            - has:
+                field: object
+                kind: attribute
+                all:
+                  - has: { field: attribute, regex: '^(pop|opt|off)$' }
+                  - has: { field: object, kind: identifier, pattern: $RES }
+      - not: { has: { field: arguments, has: { all: [{ not: { kind: string } }, { not: { regex: '^[(),]$' } }] } } }
+      - inside:
+          kind: module
+          stopBy: end
+          all:
+            - has:
+                stopBy: end
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $RES }
+                  - has: { field: right, matches: pymoo-minimize }
+            - not:
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $RES }
+                    - not: { has: { field: right, kind: call, has: { field: function, regex: '^minimize$' } } }
+metadata: { since: "0.6.1.2" }

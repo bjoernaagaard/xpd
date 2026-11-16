@@ -1,0 +1,64 @@
+# Picking one solution from a front by weights. Both documents were run on pymoo 0.6.2.
+
+# ASF divides each objective by its weight, so a larger weight makes that objective count less.
+# The pymoo guide passes 1 / weights. With the weights (0.2, 0.8) on five solutions, ASF picked
+# (0.1, 0.9), the one best in the first objective, and with 1 / weights it picked (0.9, 0.1),
+# the one best in the second. The weights must be an array written out in the call, with values
+# that are not all the same, and the object must be built from the ASF that the file imports.
+id: decision-weights
+language: python
+severity: warning
+message: ASF divides each objective by its weight, so the larger weight counts less. With the weights (0.2, 0.8), ASF picked the solution (0.1, 0.9), and with 1 / weights it picked (0.9, 0.1). Pass 1 / $W, as the pymoo guide does, if a larger weight means a more important objective.
+rule:
+  pattern: ASF($$$ARGS).do($F, $W)
+  all:
+    - has:
+        field: arguments
+        has:
+          nthChild: 2
+          pattern: $NP.array([$$$ITEMS])
+          all:
+            - has: { stopBy: end, kind: float }
+            - not:
+                any:
+                  - pattern: $NP.array([$A, $A])
+                  - pattern: $NP.array([$A, $A, $A])
+                  - pattern: $NP.array([$A, $A, $A, $A])
+                  - pattern: $NP.array([$A, $A, $A, $A, $A])
+    - inside:
+        kind: module
+        stopBy: end
+        has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.decomposition\.asf\s+import\b[^#]*\bASF\b' }
+---
+# PseudoWeights turns each solution into weights that sum to 1 and picks the solution nearest to
+# the weights given. With (0.2, 0.8) it picked row 3 of five solutions, and with (2, 8) and
+# (20, 80) it picked row 0. A weight above 1 cannot belong to weights that sum to 1. The class
+# must be the PseudoWeights that the file imports from pymoo.
+id: decision-weights
+language: python
+severity: warning
+message: PseudoWeights compares the weights with shares that sum to 1, and $V is above 1. The weights (2, 8) picked row 0 of five solutions, where (0.2, 0.8) picked row 3. Divide the weights by their sum.
+rule:
+  pattern: $V
+  all:
+    - any:
+        - kind: integer
+          regex: '^([2-9]|[1-9]\d+)$'
+        - kind: float
+          regex: '^(([2-9]|[1-9]\d+)\.\d*|1\.\d*[1-9]\d*)$'
+    - inside:
+        kind: list
+        inside:
+          kind: argument_list
+          any:
+            - inside: { matches: weights-call }
+            - inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.(array|asarray)$' }, inside: { kind: argument_list, inside: { matches: weights-call } } }
+utils:
+  weights-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '^PseudoWeights$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.mcdm\.pseudo_weights\s+import\b[^#]*\bPseudoWeights\b' }

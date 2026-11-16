@@ -1,0 +1,46 @@
+# Up to pymoo 0.5.0 the prob of a mutation was the chance that one variable changes, and code set
+# it to 1 / n_var. Since 0.6.0 prob is the share of individuals that mutate at all, and prob_var
+# is the chance per variable, which defaults to min(0.5, 1 / n_var).
+#
+# On 20,000 individuals of 30 variables, PolynomialMutation(prob=1/30) changed 63 percent of the
+# rows on pymoo 0.5.0 and 2 percent on 0.6.2, where prob_var=1/30 changed 57 percent.
+# BitflipMutation and GaussianMutation measured 2 percent against 64 percent on 0.6.2. So old
+# code now mutates about 30 times less.
+#
+# The class must be one the file imports from pymoo.operators.mutation, the call must not pass
+# prob_var, and prob must be 1 divided by something, or a number of at most 0.2. A share of
+# individuals that low is possible, so the rule is a warning.
+id: mutation-prob-per-individual
+language: python
+severity: warning
+message: prob is the share of individuals that mutate since pymoo 0.6.0, and prob_var is the chance per variable. With prob=1/30 on 30 variables 2 percent of the individuals changed, where prob_var=1/30 changed 57 percent, as prob=1/30 did on pymoo 0.5.0. Write prob_var=$V if $V is the chance per variable.
+rule:
+  kind: identifier
+  regex: '^prob$'
+  inside:
+    kind: keyword_argument
+    field: name
+    all:
+      - has:
+          field: value
+          pattern: $V
+          any:
+            - kind: binary_operator
+              regex: '^1(\.0*)?\s*/'
+            - kind: float
+              regex: '^0?\.(0\d*|1\d*|20*)$'
+      - inside:
+          kind: argument_list
+          all:
+            - not: { has: { kind: keyword_argument, has: { field: name, regex: '^prob_var$' } } }
+            - inside:
+                kind: call
+                all:
+                  - has: { field: function, regex: '^(PM|PolynomialMutation|BFM|BitflipMutation|GM|GaussianMutation)$' }
+                  - inside:
+                      kind: module
+                      stopBy: end
+                      has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.operators\.mutation\.\w+\s+import\b[^#]*\b(PM|PolynomialMutation|BFM|BitflipMutation|GM|GaussianMutation)\b' }
+# Unsafe: the fixed call mutates far more often, as the code did on pymoo 0.5.0.
+fix: prob_var
+metadata: { fix: unsafe, since: "0.6" }

@@ -36,6 +36,7 @@ const PACK_HEADINGS: &[(&str, &str)] = &[
     ("Category Encoders", "category_encoders"),
     ("linearmodels", "linearmodels"),
     ("arch", "arch"),
+    ("pymoo", "pymoo"),
     ("Hamilton", "hamilton"),
     ("Python", "python"),
 ];
