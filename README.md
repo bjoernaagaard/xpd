@@ -96,6 +96,9 @@ xpd
 `find` and `api` search indexes shipped in the binary, including libraries you have not
 installed. Search is offline and uses keywords. For example, run `xpd find "time series bootstrap
 for cross validation"`, then `xpd api mapie.subsample.BlockBootstrap`.
+`find` ranks symbols, rules and recipes separately, returning up to five, three and three.
+JSON is `{"symbols": [...], "rules": [...], "recipes": [...]}`. `--limit` sets the maximum
+per kind and `--kind` selects one kind.
 Use `xpd find "rounded bars" --kind recipe` for worked Python examples. Pass a returned recipe
 name to `xpd api` to read its code, used symbols, pinned source and license. Recipes are harvested
 from library documentation and galleries. The harvester applies safe and unsafe fixes and keeps

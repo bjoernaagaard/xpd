@@ -38,7 +38,7 @@ The design follows what FastMCP documents for code mode, and it uses the default
 | `call_tool` returns the tool's structured result | The script hands one tool's result to the next tool as it is |
 | A tool runs in the server, with the same checks as a direct call | A path outside the project root is still refused |
 | The sandbox stops a script after 30 seconds and 100 MB, and the time a tool takes does not count | A long training run does not stop the script |
-| One `execute` call makes at most 50 tool calls | The pipeline script below makes 14 |
+| One `execute` call makes at most 50 tool calls | The pipeline script below makes up to 20 |
 | Prompts and resources are not tools | The agent reads the `build_pipeline` prompt through its client, before it calls `execute` |
 
 ## What worked before this draft
@@ -207,8 +207,10 @@ CHOICE = "sklearn.linear_model.LogisticRegression"
 REASON = "Class probabilities for the species target."
 SYMBOLS = [CHOICE]
 found = await call_tool("find", {"task": TASK})
-candidates = found["result"]
-inspected = [await call_tool("api", {"name": item["name"]}) for item in candidates]
+inspected = {
+    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+    for kind in ("symbols", "rules", "recipes")
+}
 discovery = {
     "question": {"task": TASK}, "candidates": inspected,
     "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
@@ -426,6 +428,10 @@ Discovery ranks the words in names, signatures, docstring summaries, rule texts 
 This section extends the first draft. The agent first asks `find` about the task and reads
 `api` for the returned candidates. It chooses a symbol or recipe and states its reason.
 The kinds are data, so the scripts keep each kind rather than assuming two kinds.
+The gate counts entries recorded in `candidates.symbols`, `candidates.rules` and
+`candidates.recipes`. An entry read directly through `api` is a candidate too, even if
+`find` did not return it. Add that inspected entry to its kind's list before the gate.
+The gate checks the supplied record, not a session history of tool calls.
 For a recipe, `choice.symbols` names the indexed callable symbols the written example uses.
 The agent says when a required library is missing and asks before adding it through the
 project's dependency manager. Discovery itself works without that library installed.
@@ -437,7 +443,7 @@ One `execute` call performs each complete check. It does not generate or install
 
 ```text
 Discovery.question.task
-Discovery.candidates[].kind, name, signature, summary, rules
+Discovery.candidates.{symbols,rules,recipes}[].kind, name, signature, summary, rules
 Discovery.choice.name, reason, symbols
 Contract.discovery
 Proof.discovery = discovery_gate(paths, discovery)
@@ -470,19 +476,14 @@ commands were run from this worktree, without changing the project's dependencie
 PyArrow and bottleneck satisfy the optional pandas package checks in this environment.
 
 ```sh
-uv venv /var/tmp/xpd-library-verification/venv
-uv pip install --python /var/tmp/xpd-library-verification/venv/bin/python maturin
-/var/tmp/xpd-library-verification/venv/bin/maturin sdist --out /var/tmp/xpd-library-verification/final-sdist
-mkdir -p /var/tmp/xpd-library-verification/final-clean
-tar -xzf /var/tmp/xpd-library-verification/final-sdist/xpd-0.16.0.tar.gz -C /var/tmp/xpd-library-verification/final-clean
-cargo package --list --manifest-path /var/tmp/xpd-library-verification/final-clean/xpd-0.16.0/Cargo.toml
-/var/tmp/xpd-library-verification/venv/bin/maturin build --release --manifest-path /var/tmp/xpd-library-verification/final-clean/xpd-0.16.0/Cargo.toml --out /var/tmp/xpd-library-verification/final-wheels
-uv pip install --python /var/tmp/xpd-library-verification/venv/bin/python /var/tmp/xpd-library-verification/final-wheels/*.whl pandas scikit-learn scikit-lego arch mapie plotly pyarrow bottleneck
+uv venv /var/tmp/xpd-grouped-verification/venv
+uv pip install --python /var/tmp/xpd-grouped-verification/venv/bin/python maturin
+/var/tmp/xpd-grouped-verification/venv/bin/maturin build --release --out /var/tmp/xpd-grouped-verification/wheels
+uv pip install --python /var/tmp/xpd-grouped-verification/venv/bin/python /var/tmp/xpd-grouped-verification/wheels/*.whl pandas scikit-learn scikit-lego arch mapie plotly pyarrow bottleneck
 ```
 
 Paste one complete script below into `CODE` in this client and run it from the repository
-with `/var/tmp/xpd-library-verification/venv/bin/python`. `find` returns its list under `result`, as
-FastMCP's output schema specifies. `api` returns an object directly.
+with `/var/tmp/xpd-grouped-verification/venv/bin/python`. `find` returns an object with `symbols`, `rules` and `recipes` lists directly. `api` returns an object directly.
 
 ```python
 import asyncio
@@ -494,9 +495,9 @@ CODE = """paste one script below here"""
 
 async def main():
     transport = StdioTransport(
-        "/var/tmp/xpd-library-verification/venv/bin/xpd",
+        "/var/tmp/xpd-grouped-verification/venv/bin/xpd",
         ["mcp", "--code-mode", "--root", "samples/pipeline"],
-        env={"VIRTUAL_ENV": "/var/tmp/xpd-library-verification/venv"},
+        env={"VIRTUAL_ENV": "/var/tmp/xpd-grouped-verification/venv"},
     )
     async with Client(transport) as client:
         result = await client.call_tool("execute", {"code": CODE})
@@ -520,11 +521,15 @@ SYMBOLS = ['sklego.meta.GroupedPredictor']
 ARCH = False
 FILE = 'grouped.py'
 found = await call_tool("find", {"task": TASK})
-inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+inspected = {
+    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+    for kind in ("symbols", "rules", "recipes")
+}
 if ARCH:
     blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
-    for item in blocks["result"]:
-        inspected.append(await call_tool("api", {"name": item["name"]}))
+    for kind in ("symbols", "rules", "recipes"):
+        for item in blocks[kind]:
+            inspected[kind].append(await call_tool("api", {"name": item["name"]}))
 discovery = {
     "question": {"task": TASK}, "candidates": inspected,
     "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
@@ -539,7 +544,7 @@ if errors:
 repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
 return {
     "passed": repeat["equivalent"],
-    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for kind in inspected for item in inspected[kind]],
     "choice": discovery["choice"], "api_gate": proof["gate"],
     "lint": lint, "repeat": repeat,
 }
@@ -568,6 +573,30 @@ return {
     {
       "kind": "symbol",
       "name": "pandas.DatetimeIndex"
+    },
+    {
+      "kind": "rule",
+      "name": "sklearn/cross-val-score-per-metric"
+    },
+    {
+      "kind": "rule",
+      "name": "scipy/per-value-scipy-call"
+    },
+    {
+      "kind": "rule",
+      "name": "arch/forecast-per-origin"
+    },
+    {
+      "kind": "recipe",
+      "name": "hamilton/recipe/transform"
+    },
+    {
+      "kind": "recipe",
+      "name": "hamilton/recipe/data-science"
+    },
+    {
+      "kind": "recipe",
+      "name": "arch/recipe/volatility-modeling"
     }
   ],
   "choice": {
@@ -609,11 +638,15 @@ SYMBOLS = ['mapie.subsample.BlockBootstrap', 'arch.bootstrap.StationaryBootstrap
 ARCH = True
 FILE = 'bootstrap.py'
 found = await call_tool("find", {"task": TASK})
-inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+inspected = {
+    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+    for kind in ("symbols", "rules", "recipes")
+}
 if ARCH:
     blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
-    for item in blocks["result"]:
-        inspected.append(await call_tool("api", {"name": item["name"]}))
+    for kind in ("symbols", "rules", "recipes"):
+        for item in blocks[kind]:
+            inspected[kind].append(await call_tool("api", {"name": item["name"]}))
 discovery = {
     "question": {"task": TASK}, "candidates": inspected,
     "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
@@ -628,7 +661,7 @@ if errors:
 repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
 return {
     "passed": repeat["equivalent"],
-    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for kind in inspected for item in inspected[kind]],
     "choice": discovery["choice"], "api_gate": proof["gate"],
     "lint": lint, "repeat": repeat,
 }
@@ -677,6 +710,42 @@ return {
     {
       "kind": "symbol",
       "name": "arch.bootstrap.StationaryBootstrap"
+    },
+    {
+      "kind": "rule",
+      "name": "sklego/group-time-series-split-folds"
+    },
+    {
+      "kind": "rule",
+      "name": "mapie/shuffled-time-series-split"
+    },
+    {
+      "kind": "rule",
+      "name": "sklearn/cross-val-on-fitted-data"
+    },
+    {
+      "kind": "rule",
+      "name": "arch/removed-in-arch"
+    },
+    {
+      "kind": "rule",
+      "name": "arch/arch-unseeded-draws"
+    },
+    {
+      "kind": "rule",
+      "name": "arch/arch-unknown-option"
+    },
+    {
+      "kind": "recipe",
+      "name": "sklego/recipe/cross-validator-that-creates-folds-based-on-provided"
+    },
+    {
+      "kind": "recipe",
+      "name": "mapie/recipe/generate-a-sampling-method-that-block-bootstraps-the"
+    },
+    {
+      "kind": "recipe",
+      "name": "mapie/recipe/plot-nested-cv"
     }
   ],
   "choice": {
@@ -722,11 +791,15 @@ SYMBOLS = ['plotly.express.scatter']
 ARCH = False
 FILE = 'figure.py'
 found = await call_tool("find", {"task": TASK})
-inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+inspected = {
+    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+    for kind in ("symbols", "rules", "recipes")
+}
 if ARCH:
     blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
-    for item in blocks["result"]:
-        inspected.append(await call_tool("api", {"name": item["name"]}))
+    for kind in ("symbols", "rules", "recipes"):
+        for item in blocks[kind]:
+            inspected[kind].append(await call_tool("api", {"name": item["name"]}))
 discovery = {
     "question": {"task": TASK}, "candidates": inspected,
     "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
@@ -741,7 +814,7 @@ if errors:
 repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
 return {
     "passed": repeat["equivalent"],
-    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for kind in inspected for item in inspected[kind]],
     "choice": discovery["choice"], "api_gate": proof["gate"],
     "lint": lint, "repeat": repeat,
 }
@@ -749,18 +822,79 @@ return {
 
 ```json
 {
-  "passed": false,
-  "gate": {
+  "passed": true,
+  "candidates": [
+    {
+      "kind": "symbol",
+      "name": "plotly.figure_factory.create_quiver"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.figure_factory.create_streamline"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.figure_factory.create_hexbin_map"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter"
+    },
+    {
+      "kind": "symbol",
+      "name": "plotly.express.scatter_map"
+    },
+    {
+      "kind": "rule",
+      "name": "plotly/free-facet-scales"
+    },
+    {
+      "kind": "rule",
+      "name": "plotly/boxed-axis-frame"
+    },
+    {
+      "kind": "rule",
+      "name": "plotly/three-d-for-two-d"
+    },
+    {
+      "kind": "recipe",
+      "name": "plotly/recipe/scatter-line-area-and-bar-charts"
+    },
+    {
+      "kind": "recipe",
+      "name": "plotly/recipe/figures-as-dictionaries"
+    },
+    {
+      "kind": "recipe",
+      "name": "plotly/recipe/setting-subplots-on-a-figure-directly"
+    }
+  ],
+  "choice": {
+    "name": "plotly.express.scatter",
+    "reason": "Build a new scatter figure from rows and check the Plotly pack before execution.",
+    "symbols": [
+      "plotly.express.scatter"
+    ]
+  },
+  "api_gate": {
     "name": "indexed-api-calls",
     "stage": "discovery",
     "evidence": [
       "api",
       "source"
     ],
-    "passed": false,
-    "detail": "plotly.express.scatter is not among the recorded candidates."
+    "passed": true,
+    "detail": "Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run."
   },
-  "ran": false
+  "lint": {
+    "fixed": 0,
+    "fixable": 0,
+    "issues": []
+  },
+  "repeat": {
+    "equivalent": true,
+    "detail": null
+  }
 }
 ```
 
@@ -774,11 +908,15 @@ SYMBOLS = ['sklego.meta.GroupedPredictor']
 ARCH = False
 FILE = 'invalid_api.py'
 found = await call_tool("find", {"task": TASK})
-inspected = [await call_tool("api", {"name": item["name"]}) for item in found["result"]]
+inspected = {
+    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+    for kind in ("symbols", "rules", "recipes")
+}
 if ARCH:
     blocks = await call_tool("find", {"task": "block bootstrap", "package": "arch"})
-    for item in blocks["result"]:
-        inspected.append(await call_tool("api", {"name": item["name"]}))
+    for kind in ("symbols", "rules", "recipes"):
+        for item in blocks[kind]:
+            inspected[kind].append(await call_tool("api", {"name": item["name"]}))
 discovery = {
     "question": {"task": TASK}, "candidates": inspected,
     "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
@@ -793,7 +931,7 @@ if errors:
 repeat = await call_tool("equiv", {"old": FILE, "new": FILE})
 return {
     "passed": repeat["equivalent"],
-    "candidates": [{"kind": item["kind"], "name": item["name"]} for item in inspected],
+    "candidates": [{"kind": item["kind"], "name": item["name"]} for kind in inspected for item in inspected[kind]],
     "choice": discovery["choice"], "api_gate": proof["gate"],
     "lint": lint, "repeat": repeat,
 }
@@ -834,18 +972,15 @@ dependencies. `importlib.util.find_spec("sklego")` was `None`. Its real server s
 `sklego.meta.GroupedPredictor` with `estimator`, `groups`, `shrinkage`, `use_global_model`,
 `check_X` and `shrinkage_kwargs` from one code mode `api` call.
 
-The wheel rebuilt from the sdist returns recipe code and attribution through a real
-FastMCP 4.2.0 client. The grouped and bootstrap scripts pass. The Plotly script stops
-before execution because `plotly.express.scatter` is absent from the candidates returned
-for its unchanged question. The API gate correctly refuses that choice. The discovery
-failure remains for investigation. Running `figure.py` directly still prints the figure
-output above.
+The wheel built from this branch returns grouped discovery results through a real
+FastMCP 4.2.0 client. The grouped, bootstrap and Plotly scripts pass the API gate, lint
+and repeatability checks. The invented API script stops at the API gate before execution.
 
 A recipe lookup through the same code mode server returned the following inspected fields.
 
 ```python
 found = await call_tool("find", {"task": "rounded bars", "kind": "recipe"})
-entry = await call_tool("api", {"name": found["result"][0]["name"]})
+entry = await call_tool("api", {"name": found["recipes"][0]["name"]})
 return {"name": entry["name"], "kind": entry["kind"],
         "license": entry["recipe"]["license"],
         "source": entry["recipe"]["source"],

@@ -96,7 +96,7 @@ Every path is relative to the project root, and a path outside it is refused.
 
 | Tool | Arguments | What it does | Changes files |
 | --- | --- | --- | --- |
-| `find` | `task`, optional `package`, `kind` | Searches the binary's index, including libraries not installed | No |
+| `find` | `task`, optional `package`, `kind`, `limit` | Searches the binary's index, including libraries not installed | No |
 | `api` | `name` | Reads one indexed name, its parameter names and guarding rules | No |
 | `discovery_gate` | `paths`, `discovery` | Checks direct imported calls against `api` before execution | No |
 | `check` | `paths` (default: the root), `unsafe_fixes` (default: `false`) | Lints files and folders, as [`xpd check`](commands.md#check). `unsafe_fixes` counts unsafe fixes in `fixable` too | No |
@@ -212,12 +212,14 @@ fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas
 
 ## Library discovery
 
-Call `find(task, package=None, kind=None)` before selecting a library, even if the project has
-not installed it. The result holds up to five entries ranked by keywords. `package`
+Call `find(task, package=None, kind=None, limit=None)` before selecting a library, even if the project has
+not installed it. The result has separately ranked `symbols`, `rules` and `recipes` lists, with default
+limits of five, three and three. `limit` overrides the maximum per kind. Excluded or
+unmatched kinds have empty lists. `package`
 is a Python import name. Read each entry's `kind`, which can include `symbol`, `rule` and
-`recipe`. The server preserves other kinds and fields added by the binary. Call `api(name)` with a returned
+`recipe`. The server preserves entry fields added by the binary. Call `api(name)` with a returned
 name to read its parameter names, docstring summary, own class members and possible guarding
-rules. Both tools call the installed binary. The server holds no symbol index. In code mode, `find` returns its list under `result`.
+rules. Both tools call the installed binary. The server holds no symbol index. In code mode, `find` returns this object directly.
 `api` returns an object directly. Both include `signature`, a display of indexed parameter
 names only. This display has no defaults, parameter kinds or type annotations, and it is
 null for entries that are not callable symbols.
@@ -226,7 +228,9 @@ null for entries that are not callable symbols.
 `signature`, `summary`, `parameters`, `members` and guarding `rules`. `DiscoveryChoice`
 holds the chosen `name`, a `reason` and the callable `symbols` the written code must use.
 For a recipe, list the indexed symbols its example uses. `Discovery` combines those three
-parts. It is the planning input for the pipeline stages, and the training script records
+parts, with candidates grouped as `{"symbols": [...], "rules": [...], "recipes": [...]}`.
+Entries inspected directly through `api` count as candidates when recorded in these lists.
+This record is the planning input for the pipeline stages, and the training script saves
 it in `Contract.discovery`. The server neither chooses a candidate nor installs a package.
 
 `discovery_gate` reads the Python files named in `paths` inside the project root. It resolves
@@ -255,7 +259,7 @@ manager. The default sandbox only calls tools. The agent writes files before the
 `execute` call, which repeats discovery and checks the written choice. See the runnable
 [discovery examples](code-mode.md#discovery-before-execution).
 
-The sdist wheel was run through a real FastMCP 4.2.0 code mode client. The unchanged
+The branch wheel was run through a real FastMCP 4.2.0 code mode client. The grouped discovery
 scripts in [code mode](code-mode.md#run-the-scripts-through-the-server) returned these results.
 
 | Call | Real result |
@@ -263,9 +267,8 @@ scripts in [code mode](code-mode.md#run-the-scripts-through-the-server) returned
 | `find(task="rounded bars", kind="recipe")`, then `api` | `plotly/recipe/rounded-bars`, MIT, 498 bytes of code, source ending `bar-charts.md#L746` |
 | Grouped model `execute` | `passed: true`, one API call checked, no lint issues, `equivalent: true` |
 | Bootstrap `execute` | `passed: true`, five API calls checked, no lint issues, `equivalent: true` |
-| Plotly `execute` | `passed: false`, `ran: false`, `plotly.express.scatter is not among the recorded candidates.` |
+| Plotly `execute` | `passed: true`, one API call checked, no lint issues, `equivalent: true` |
 | Invented API `execute` | `passed: false`, `ran: false`, unknown `group_by` and `ImaginaryPredictor` |
 
-The Plotly discovery question remains unanswered. The gate stops execution instead of
-accepting a choice absent from the recorded candidates. Recipe API output retains `recipe`
+Recipe API output retains `recipe`
 with its title, symbols, source path and line, code, license, attribution and modification flag.

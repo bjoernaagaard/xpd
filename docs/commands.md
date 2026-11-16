@@ -263,12 +263,15 @@ xpd find "small multiples" --kind rule
 xpd find "rounded bars" --kind recipe
 ```
 
-Returns up to five entries in keyword rank order, with summaries and rule links. Class members
-are returned by `api`. The binary includes source indexes for all
-library packs, worked recipes and the rule documentation. No library installation,
-network or Python execution is needed. `--package` takes the Python import name, and `--kind`
-takes `symbol`, `rule` or `recipe`. Empty matches return an empty list and exit 0. Unfiltered results include at most three
-recipes, leaving room for API entries or rules. `--kind recipe` returns up to five recipes.
+Returns separately ranked groups under the text headings `Symbols`, `Rules` and `Recipes`.
+Defaults are up to five symbols, three rules and three recipes. `--limit N` overrides the
+maximum for each kind. `--kind symbol`, `--kind rule` or `--kind recipe` limits the search
+to that group. `--package` takes the Python import name. JSON always has the shape
+`{"symbols": [...], "rules": [...], "recipes": [...]}`, with empty lists for excluded or
+unmatched kinds. Empty matches exit 0. Each entry has a summary and rule links. Class
+members are returned by `api`. The binary includes source indexes for all library packs,
+worked recipes and rule documentation. No library installation, network or Python
+execution is needed.
 
 Discovery ranks the words in names, signatures, docstring summaries, rule texts and recipe titles. It answers "what is the thing called that does X" but does not yet answer questions about a method's properties, such as which linear models need no scaling.
 
@@ -287,7 +290,7 @@ xpd api plotly.express.bar --format json
 ```
 
 Prints the entry's parameter names, first docstring paragraph, public methods and rule
-links. JSON is a list containing one entry, with the same shape as `find`. Missing names exit
+links. JSON is a list containing one entry, with the same entry fields as `find`. Missing names exit
 2. Parameter names come from source and do not include defaults or type annotations. Classes inherit constructor parameters and public
 members from the nearest defining base in the same library, following parsed import aliases. Compiled extension functions and dynamically constructed exports may be absent.
 
@@ -359,5 +362,7 @@ counts candidates rejected before selection. Refresh the source version and pinn
 then rerun the command to regenerate both symbols and recipes.
 
 `xpd find --check indexes/questions.json` runs the real discovery questions and exits 2 if an
-expected entry is absent from the top five. It prints every failure. Lefthook runs this command
-before commits with no tolerated misses. Keep failing questions and improve general ranking.
+expected entry is absent from the top five of its own kind, including five rules or recipes
+regardless of the display defaults. It prints every failure. Lefthook runs this command
+before commits with no tolerated misses. Questions that still fail go to a later ranking
+investigation without changing their wording or adding question-specific ranking rules.
