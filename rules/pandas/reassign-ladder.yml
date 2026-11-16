@@ -1,0 +1,28 @@
+# Three or more statements in a row that each assign a name from a method of itself build one
+# frame in steps, and every step leaves a half-built frame under the final name. A chain runs
+# the same methods in the same order: on pandas 3.1.1, df.dropna().rename(...).assign(...) gave a
+# frame equal to the three statements (samples/pandas/chaining.py). The methods are ones that
+# return a frame or a Series, so that a ladder of str or dict methods is left alone. The rule
+# reports the first statement of the ladder. It has no fix, because the chain joins statements.
+id: reassign-ladder
+language: python
+severity: info
+message: $DF is assigned three or more times in a row, each time from a method of itself, so every line leaves a half-built frame under the final name. Write one chain, as in $DF = $DF.$M1(...).$M2(...).$M3(...), in parentheses with one method per line.
+rule:
+  kind: expression_statement
+  all:
+    - has: { pattern: '$DF = $DF.$M1($$$A1)' }
+    # The next statement, with any comments between the two passed over.
+    - precedes:
+        stopBy: { not: { kind: comment } }
+        kind: expression_statement
+        all:
+          - has: { pattern: '$DF = $DF.$M2($$$A2)' }
+          - precedes: { stopBy: { not: { kind: comment } }, kind: expression_statement, has: { pattern: '$DF = $DF.$M3($$$A3)' } }
+    - not: { follows: { stopBy: { not: { kind: comment } }, kind: expression_statement, has: { pattern: '$DF = $DF.$M0($$$A0)' } } }
+constraints:
+  DF: { kind: identifier }
+  M1: { regex: &frame-method ^(assign|rename|rename_axis|drop|dropna|fillna|ffill|bfill|interpolate|query|merge|join|sort_values|sort_index|reset_index|set_index|set_axis|astype|convert_dtypes|drop_duplicates|pipe|melt|pivot|pivot_table|stack|unstack|explode|filter|reindex|replace|round|clip|where|mask|head|tail|sample|nlargest|nsmallest|add_prefix|add_suffix|droplevel|swaplevel|reorder_levels|tz_localize|tz_convert|asfreq|shift|diff|transform|apply|map|eval|truncate|to_frame|squeeze)$ }
+  M2: { regex: *frame-method }
+  M0: { regex: *frame-method }
+  M3: { regex: *frame-method }

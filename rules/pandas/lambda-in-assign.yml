@@ -1,0 +1,70 @@
+# pd.col, new in pandas 3.0, names a column of the frame an expression is evaluated on. On pandas
+# 3.1.1, assign with pd.col gave a frame equal to the one from the lambda for arithmetic,
+# comparisons, the mask operators, a reversed operand, a method, a reduction, the str accessor, a
+# method that takes another column, a name from the code around it, an earlier keyword of the
+# same assign, and a frame renamed earlier in the chain. df.loc[pd.col("a") > 2] and
+# df[pd.col("a") > 2] were equal to the lambda forms too (research/modern-pandas/probes/col.txt).
+#
+# The lambda must read its frame only as d["name"], with the name a string. A lambda that uses the
+# frame any other way, as d.a, len(d) or d[names], is left alone, and so is one that passes a
+# column to a function, as in f(d["a"]), because the function then gets an expression and not a
+# Series. Another frame read by name inside the lambda, as in other["x"], also ends the match,
+# because the rewrite of d["name"] cannot tell the two apart.
+id: lambda-in-assign
+language: python
+severity: info
+message: pd.col names a column without a lambda, so the expression reads as what it computes. Write $NEW, which gave an equal frame.
+rule:
+  kind: lambda
+  pattern: 'lambda $D: $BODY'
+  any:
+    # A keyword of assign, as in df.assign(total=lambda d: d["a"] * 2).
+    - inside:
+        kind: keyword_argument
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: ^assign$ } } }
+    # A selection, as in df.loc[lambda d: d["a"] > 2] and df[lambda d: d["a"] > 2].
+    - inside: { kind: subscript, field: subscript }
+  all:
+    - has: { stopBy: end, matches: column-of-frame }
+    # The frame used in any other way than d["name"].
+    - not:
+        has:
+          stopBy: end
+          kind: identifier
+          pattern: $D
+          not: { inside: { any: [{ matches: column-of-frame }, { kind: lambda_parameters }] } }
+    # Another object read by a string key, which the rewrite would also turn into pd.col.
+    - not: { has: { stopBy: end, kind: subscript, all: [{ has: { field: subscript, kind: string } }, { has: { field: value, not: { pattern: $D } } }] } }
+    # A function that takes a column, as in f(d["a"]). A method of a column, as in
+    # d["a"].where(d["b"] > 0), is kept.
+    - not:
+        has:
+          stopBy: end
+          kind: call
+          all:
+            - has: { field: arguments, has: { stopBy: end, pattern: $D } }
+            - not: { has: { field: function, has: { stopBy: end, pattern: $D } } }
+    - not: { has: { stopBy: end, any: [{ kind: lambda }, { kind: list_comprehension }, { kind: generator_expression }, { kind: dictionary_comprehension }, { kind: set_comprehension }, { kind: named_expression }, { kind: await }] } }
+utils:
+  # d["name"], a column of the frame the lambda takes.
+  column-of-frame:
+    kind: subscript
+    all:
+      - has: { field: value, kind: identifier, pattern: $D }
+      - has: { field: subscript, kind: string }
+rewriters:
+  - id: column
+    rule:
+      kind: subscript
+      pattern: $V[$K]
+      all:
+        - has: { field: value, kind: identifier }
+        - has: { field: subscript, kind: string }
+    fix: pd.col($K)
+transform:
+  NEW:
+    rewrite: { source: $BODY, rewriters: [column] }
+fix: $NEW
+metadata: { fix: safe, since: "3.0" }

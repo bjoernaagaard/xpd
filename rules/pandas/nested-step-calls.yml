@@ -1,0 +1,34 @@
+# Three functions called one inside the other run from the inside out, so the step that runs
+# first is written last. DataFrame.pipe(f) calls f(frame), so df.pipe(a).pipe(b).pipe(c) is
+# c(b(a(df))) with the steps in the order they run: on pandas 3.1.1 the two gave equal frames
+# (samples/pandas/chaining.py). xpd graph reads the pipe form as a pipeline of steps.
+#
+# xpd must know that the innermost argument is a frame. `holds` in the metadata proves it: the
+# argument is a call such as pd.read_csv(...) or pd.DataFrame(...), or a variable whose nearest
+# earlier assignment is one, or a parameter annotated pd.DataFrame. The three functions are plain
+# names, and no Python builtin, so len(list(set(x))) is left alone.
+#
+# Unsafe: pipe is a method of a frame, a Series and a groupby. When the first or the second
+# function returns anything else, such as a dict or an array, the chain raises AttributeError.
+id: nested-step-calls
+language: python
+severity: info
+message: These calls read from the inside out, so $A runs first and is written last. Write $X.pipe($A).pipe($B).pipe($C), which lists the steps in the order they run and which xpd graph reads as a pipeline.
+rule:
+  pattern: $C($B($A($X)))
+constraints:
+  A: { kind: identifier, not: { regex: &builtin '^(abs|all|any|bool|bytes|dict|enumerate|filter|float|frozenset|id|int|iter|len|list|map|max|min|next|print|range|repr|reversed|round|set|sorted|str|sum|tuple|type|zip|display|hash|isinstance)$' } }
+  B: { kind: identifier, not: { regex: *builtin } }
+  C: { kind: identifier, not: { regex: *builtin } }
+  X: { any: [{ kind: identifier }, { matches: frame-maker }] }
+utils:
+  # A call of pandas that returns a frame.
+  frame-maker:
+    kind: call
+    has: { field: function, kind: attribute, regex: '^(pd|pandas)\.(read_[a-z_]+|DataFrame|concat|merge|json_normalize)$' }
+  # The annotation of a frame, as in df: pd.DataFrame.
+  frame-type:
+    kind: type
+    regex: '^(pd|pandas)\.DataFrame$'
+fix: $X.pipe($A).pipe($B).pipe($C)
+metadata: { fix: unsafe, holds: { X: { any: [{ matches: frame-maker }, { matches: frame-type }] } } }

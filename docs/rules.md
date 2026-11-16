@@ -2131,6 +2131,74 @@ df.to_csv(path, index=False)
 The replacement is advice. xpd does not apply it automatically.
 
 
+### Method chains
+
+These rules ask for one chain of methods where the code builds a frame in separate steps. A
+chain names the frame once, lists the steps in the order they run, and leaves no half-built
+frame under a name.
+
+#### lambda-in-assign
+
+**Severity:** info. **Fix:** safe: `pd.col("a") * 2`. The rule runs on pandas 3.0 and later.
+
+Reports a lambda in `df.assign(name=lambda d: d["a"] * 2)`, `df.loc[lambda d: d["a"] > 2]` and `df[lambda d: d["a"] > 2]` that reads its frame only as `d["name"]`. On pandas 3.1.1, `pd.col` gave an equal frame for arithmetic, comparisons, the mask operators, a method, a reduction, the `str` accessor, a method that takes another column, an earlier keyword of the same `assign` and a frame renamed earlier in the chain. A lambda that uses the frame in another way, as `d.a` or `len(d)`, is left alone. So is one that passes a column to a function, as in `f(d["a"])`, and one that reads another frame by name, as in `other["x"]`.
+
+Example:
+
+```python
+df = df.assign(total=lambda d: d["price"] * d["units"])
+```
+
+Use instead:
+
+```python
+df = df.assign(total=pd.col("price") * pd.col("units"))
+```
+
+#### reassign-ladder
+
+**Severity:** info. **Fix:** none.
+
+Reports the first of three or more statements in a row that each assign one name from a method of itself, as in `df = df.dropna()`. The methods are ones that return a frame or a Series, such as `assign`, `rename`, `dropna`, `merge` and `sort_values`, so a ladder of `str` methods is left alone. The chain gave a frame equal to the three statements. Another statement between two of the lines ends the ladder.
+
+Example:
+
+```python
+df = df.dropna(subset=["price"])
+df = df.rename(columns={"qty": "units"})
+df = df.assign(total=pd.col("price") * pd.col("units"))
+```
+
+Use instead:
+
+```python
+df = (
+    df.dropna(subset=["price"])
+    .rename(columns={"qty": "units"})
+    .assign(total=pd.col("price") * pd.col("units"))
+)
+```
+
+The replacement is advice. xpd does not apply it automatically.
+
+#### nested-step-calls
+
+**Severity:** info. **Fix:** unsafe: `df.pipe(clean).pipe(add_totals).pipe(add_shares)`.
+
+Reports three functions called one inside the other on a frame, as in `add_shares(add_totals(clean(df)))`. xpd must know that the innermost argument is a frame: it is a call such as `pd.read_csv(...)` or `pd.DataFrame(...)`, a variable whose nearest earlier assignment is one, or a parameter annotated `pd.DataFrame`. The three functions are plain names and no Python builtin. `DataFrame.pipe(f)` calls `f(frame)`, and the two forms gave equal frames. The fix is unsafe, because the chain raises `AttributeError` when the first or the second function returns something without `pipe`, such as a dict. [`xpd graph`](commands.md#graph) reads the pipe form as a pipeline of steps.
+
+Example:
+
+```python
+result = add_shares(add_totals(clean(df)))
+```
+
+Use instead:
+
+```python
+result = df.pipe(clean).pipe(add_totals).pipe(add_shares)
+```
+
 ### Charts
 
 pandas draws `df.plot` with matplotlib unless the plotting backend is set. These rules steer a
