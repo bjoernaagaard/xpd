@@ -1,11 +1,12 @@
 //! Walks paths, fixes and lints each Python file with the rule packs that apply to it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use ast_grep_config::CombinedScan;
 use ast_grep_core::source::Edit;
 use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_core::{AstGrep, NodeMatch};
@@ -22,30 +23,6 @@ pub(crate) type Root = AstGrep<StrDoc<SupportLang>>;
 pub(crate) type Node<'t> = ast_grep_core::Node<'t, StrDoc<SupportLang>>;
 
 /// Parses Python source. A syntax error gives a tree with error nodes, not a failure.
-/// The nodes of a parsed file by their kind, each with its place in document order, so every
-/// rule tries only the nodes of its kinds and the tree is walked once.
-pub(crate) struct Candidates<'r> {
-    by_kind: Vec<Vec<(usize, Node<'r>)>>,
-}
-
-impl<'r> Candidates<'r> {
-    pub(crate) fn new(root: &'r Root) -> Self {
-        let mut by_kind: Vec<Vec<(usize, Node<'r>)>> = Vec::new();
-        for (place, node) in root.root().dfs().enumerate() {
-            let kind = usize::from(node.kind_id());
-            if by_kind.len() <= kind {
-                by_kind.resize_with(kind + 1, Vec::new);
-            }
-            by_kind[kind].push((place, node));
-        }
-        Self { by_kind }
-    }
-
-    pub(crate) fn of(&self, kind: usize) -> &[(usize, Node<'r>)] {
-        self.by_kind.get(kind).map_or(&[], Vec::as_slice)
-    }
-}
-
 pub(crate) fn parse(src: &str) -> Root {
     use ast_grep_core::tree_sitter::LanguageExt;
 
@@ -163,9 +140,49 @@ pub(crate) fn scan(
     Ok(Scanned { issues, fixed })
 }
 
-/// The packs whose rules run on the file.
-fn applying<'p>(root: &'p Root, src: &'p str, packs: &'p [Pack]) -> impl Iterator<Item = &'p Pack> {
-    packs.iter().filter(move |pack| pack.applies(root, src))
+struct MatchedRule<'p, 'r> {
+    pack: &'p Pack,
+    rule: &'p Rule,
+    matches: Vec<NodeMatch<'r, StrDoc<SupportLang>>>,
+}
+
+fn matched_rules<'p, 'r>(
+    root: &'r Root,
+    src: &str,
+    file: File<'_>,
+    packs: &'p [Pack],
+) -> Vec<MatchedRule<'p, 'r>> {
+    let selected: Vec<_> = packs
+        .iter()
+        .filter(|pack| pack.applies(root, src))
+        .flat_map(|pack| {
+            pack.rules
+                .iter()
+                .filter(|rule| rule.runs_on(file.path))
+                .map(move |rule| (pack, rule))
+        })
+        .collect();
+    let combined = CombinedScan::new(selected.iter().map(|(_, rule)| &rule.config).collect());
+    let mut matches: HashMap<_, _> = combined
+        .scan(root, false)
+        .matches
+        .into_iter()
+        .map(|(config, matches)| (std::ptr::from_ref(config), matches))
+        .collect();
+    selected
+        .into_iter()
+        .filter_map(|(pack, rule)| {
+            let raw = matches
+                .remove(&std::ptr::from_ref(&rule.config))
+                .unwrap_or_default();
+            let matches = rule.retain_matches(root, raw, file.disk, pack.library(root));
+            (!matches.is_empty()).then_some(MatchedRule {
+                pack,
+                rule,
+                matches,
+            })
+        })
+        .collect()
 }
 
 /// One issue with the place of its match in the source, which a caller that edits the text
@@ -214,36 +231,37 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
     }
     let root = parse(src);
     let imports = aliased_imports(&root);
-    let candidates = Candidates::new(&root);
     let mut found = Vec::new();
-    for pack in applying(&root, src, packs) {
+    for MatchedRule {
+        pack,
+        rule,
+        matches,
+    } in matched_rules(&root, src, file, packs)
+    {
         let unbound = unbound_aliases(pack, &imports);
-        for rule in pack.rules.iter().filter(|rule| rule.runs_on(file.path)) {
-            for m in rule.matches(&root, &candidates, file.disk, pack.library(&root)) {
-                let start = m.start_pos();
-                let edit = usable_edit(rule, &m, &unbound, src);
-                let issue = Issue {
-                    package: pack.module,
-                    rule: rule.config.id.clone(),
-                    file: file.path.to_path_buf(),
-                    position: Some(Position {
-                        line: start.line() + 1,
-                        column: start.column(&m) + 1,
-                    }),
-                    severity: rule.config.severity.clone(),
-                    message: rule.config.get_message(&m),
-                    fix: rule.fix.filter(|_| edit.is_some()),
-                };
-                found.push(Found {
-                    issue,
-                    range: m.range(),
-                    fix: edit.map(|edit| Replacement {
-                        range: edit.position..edit.position + edit.deleted_length,
-                        text: String::from_utf8(edit.inserted_text)
-                            .expect("a fix writes UTF-8 text"),
-                    }),
-                });
-            }
+        for m in matches {
+            let start = m.start_pos();
+            let edit = usable_edit(rule, &m, &unbound, src);
+            let issue = Issue {
+                package: pack.module,
+                rule: rule.config.id.clone(),
+                file: file.path.to_path_buf(),
+                position: Some(Position {
+                    line: start.line() + 1,
+                    column: start.column(&m) + 1,
+                }),
+                severity: rule.config.severity.clone(),
+                message: rule.config.get_message(&m),
+                fix: rule.fix.filter(|_| edit.is_some()),
+            };
+            found.push(Found {
+                issue,
+                range: m.range(),
+                fix: edit.map(|edit| Replacement {
+                    range: edit.position..edit.position + edit.deleted_length,
+                    text: String::from_utf8(edit.inserted_text).expect("a fix writes UTF-8 text"),
+                }),
+            });
         }
     }
     // A stable sort, so issues at one position keep the order of their packs and rules.
@@ -259,17 +277,19 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
     }
     let root = parse(src);
     let imports = aliased_imports(&root);
-    let candidates = Candidates::new(&root);
     let mut edits = Vec::new();
-    for pack in applying(&root, src, packs) {
+    for MatchedRule {
+        pack,
+        rule,
+        matches,
+    } in matched_rules(&root, src, file, packs)
+    {
         let unbound = unbound_aliases(pack, &imports);
-        for rule in &pack.rules {
-            if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(file.path) {
-                continue;
-            }
-            for m in rule.matches(&root, &candidates, file.disk, pack.library(&root)) {
-                edits.extend(usable_edit(rule, &m, &unbound, src));
-            }
+        if rule.fix.is_none_or(|a| a > allowed) || !rule.runs_on(file.path) {
+            continue;
+        }
+        for m in matches {
+            edits.extend(usable_edit(rule, &m, &unbound, src));
         }
     }
     edits.sort_by_key(|e| e.position);
