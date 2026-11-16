@@ -189,8 +189,8 @@ codex plugin add xpd@xpd
 ```
 
 The repository is a plugin in the
-[Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, version 1.0.0. That
-version has no hooks, so you add the hook below yourself.
+[Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, version 1.0.0. Version
+1.0.0 has no hooks, so you add the hook below yourself.
 
 ```text
 xpd, loaded as a plugin
