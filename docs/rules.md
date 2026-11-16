@@ -7808,6 +7808,92 @@ model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]].astype("category"
 
 With 200 firms, a firm effect in the regressor and a true coefficient of 1.0, `absorb` with the integer firm id gave 3.397, where no `absorb` at all gave 3.398, and the same column as a category gave 1.022. No error and no warning was raised. A text column raises `TypeError` on 7.1, and 7.0 took it like the integers. One of the 4 real files that the rule reports turns its columns into text with `astype(str)` right before the call. The code does not show a dtype, so the rule is info, and data that is categorical when it is loaded is reported without need.
 
+### Results
+
+#### statsmodels-result-name
+
+**Severity:** error. **Fix:** unsafe: `summary` for `summary()`, `std_errors` for `bse`, `tstats` for `tvalues`, `resids` for `resid` and `fitted_values` for `fittedvalues`. The other names have no fix.
+
+Reports a name of a statsmodels result read on a linearmodels result: `summary()` called, and `bse`, `tvalues`, `resid`, `fittedvalues`, `aic`, `bic`, `llf`, `fvalue`, `f_pvalue`, `ssr`, `mse_resid`, `cov_params`, `t_test`, `f_test`, `get_robustcov_results`, `summary2`, `save` and 36 more.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+print(result.summary())
+errors = result.bse
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+print(result.summary)
+errors = result.std_errors
+```
+
+`summary` is a property, and on 7.1 and 7.0 `summary()` raised `TypeError: 'Summary' object is not callable` on the result of each of the 19 model classes. The other names are the 53 public names of a statsmodels 0.15.0 OLS result that none of those 19 results has, found with `dir()` and `hasattr`, and each raises `AttributeError`. The results of the factor models have no residuals under either name, so `resid` and `fittedvalues` are not reported on them.
+
+| statsmodels | linearmodels |
+| --- | --- |
+| `summary()` | `summary` |
+| `bse` | `std_errors` |
+| `tvalues` | `tstats` |
+| `resid` | `resids` |
+| `fittedvalues` | `fitted_values` |
+| `cov_params()` | `cov` |
+| `fvalue`, `f_pvalue` | `f_statistic.stat`, `f_statistic.pval` |
+| `ssr` | `resid_ss` |
+| `mse_resid` | `s2` |
+| `llf` | `loglik`, on the panel results |
+| `t_test`, `f_test` | `wald_test`, on the panel and instrument results |
+| `get_robustcov_results` | a new `fit(cov_type=...)` |
+
+On `OLS` with the mroz data, each pair of the table from `bse` to `mse_resid` was equal to 1e-11 for an unadjusted fit with `debiased=True`, and `loglik` of `PooledOLS` was equal to `llf`. The rule reports 15 reads in 6 of the 950 real files. `.summary()` is called in 171 of those files, and the rule reports it in the 3 where the result can be followed to a linearmodels model. Code under a `hasattr` check is a compatibility path and stays silent.
+
+#### invalid-compare-precision
+
+**Severity:** error. **Fix:** none.
+
+Reports `compare(..., precision=...)` of `linearmodels.panel` or `linearmodels.iv` with a string other than `"tstats"`, `"std_errors"`, `"std-errors"` and `"pvalues"`.
+
+Example:
+
+```python
+table = compare({"pooled": pooled, "fixed": fixed}, precision="se")
+```
+
+Use instead:
+
+```python
+table = compare({"pooled": pooled, "fixed": fixed}, precision="std_errors")
+```
+
+On 7.1 and 7.0 both functions took the four strings in any case, and raised `ValueError: Unknown precision value. Must be one of 'tstats', 'std_errors' or 'pvalues'.` for `"se"`, `"stderr"`, `"t"`, `"p"`, `"tstat"`, `"std_err"`, `"pvalue"`, `"t-stats"` and `"bse"`. The four strings were also read from the source. The rule reads `compare` only when the file imports it from linearmodels or calls it through the module.
+
+#### hand-written-hausman
+
+**Severity:** info. **Fix:** none. Needs linearmodels 7.1.
+
+Reports a function whose name starts with `hausman`. 7.1 added the Hausman test of random effects against fixed effects as a method of the random effects result, and the instrument results have had `wu_hausman()` for longer.
+
+Example:
+
+```python
+def hausman(fe, re):
+    b = fe.params - re.params
+    v = fe.cov - re.cov
+    return float(b @ np.linalg.inv(v) @ b)
+```
+
+Use instead:
+
+```python
+test = random_effects_result.hausman(fixed_effects_result)
+```
+
+On 7.1 the method returned a `HausmanTestResults` with the fields `statistic` and `estimates`, and 7.0 has no such method. The rule reports 27 functions in 27 of the 950 real files. It cannot see what a function tests, so it is info, and the message names both tests.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
