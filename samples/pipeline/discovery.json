@@ -42,11 +42,16 @@
         "summary": "Logistic Regression (aka logit, MaxEnt) classifier.",
         "members": [
           {
-            "name": "set_callbacks",
+            "name": "decision_function",
             "parameters": [
-              "callbacks"
+              "X"
             ],
-            "summary": "Set callbacks for the estimator."
+            "summary": "Predict confidence scores for samples."
+          },
+          {
+            "name": "densify",
+            "parameters": [],
+            "summary": "Convert coefficient matrix to dense array format."
           },
           {
             "name": "fit",
@@ -58,42 +63,9 @@
             "summary": "Fit the model according to the given training data."
           },
           {
-            "name": "predict_proba",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Probability estimates."
-          },
-          {
-            "name": "predict_log_proba",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Predict logarithm of probability estimates."
-          },
-          {
-            "name": "decision_function",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Predict confidence scores for samples."
-          },
-          {
-            "name": "predict",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Predict class labels for samples in X."
-          },
-          {
-            "name": "densify",
+            "name": "get_metadata_routing",
             "parameters": [],
-            "summary": "Convert coefficient matrix to dense array format."
-          },
-          {
-            "name": "sparsify",
-            "parameters": [],
-            "summary": "Convert coefficient matrix to sparse format."
+            "summary": "Get metadata routing of this object."
           },
           {
             "name": "get_params",
@@ -103,11 +75,25 @@
             "summary": "Get parameters for this estimator."
           },
           {
-            "name": "set_params",
+            "name": "predict",
             "parameters": [
-              "params"
+              "X"
             ],
-            "summary": "Set the parameters of this estimator."
+            "summary": "Predict class labels for samples in X."
+          },
+          {
+            "name": "predict_log_proba",
+            "parameters": [
+              "X"
+            ],
+            "summary": "Predict logarithm of probability estimates."
+          },
+          {
+            "name": "predict_proba",
+            "parameters": [
+              "X"
+            ],
+            "summary": "Probability estimates."
           },
           {
             "name": "score",
@@ -119,9 +105,93 @@
             "summary": "Return :ref:`accuracy <accuracy_score>` on provided data and labels."
           },
           {
-            "name": "get_metadata_routing",
+            "name": "set_callbacks",
+            "parameters": [
+              "callbacks"
+            ],
+            "summary": "Set callbacks for the estimator."
+          },
+          {
+            "name": "set_decision_function_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_fit_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_inverse_transform_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_params",
+            "parameters": [
+              "params"
+            ],
+            "summary": "Set the parameters of this estimator."
+          },
+          {
+            "name": "set_partial_fit_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_predict_log_proba_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_predict_proba_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_predict_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_score_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_split_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_transform_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "sparsify",
             "parameters": [],
-            "summary": "Get metadata routing of this object."
+            "summary": "Convert coefficient matrix to sparse format."
           }
         ],
         "rules": [
@@ -157,6 +227,18 @@
         "summary": "Logistic Regression CV (aka logit, MaxEnt) classifier.",
         "members": [
           {
+            "name": "decision_function",
+            "parameters": [
+              "X"
+            ],
+            "summary": "Predict confidence scores for samples."
+          },
+          {
+            "name": "densify",
+            "parameters": [],
+            "summary": "Convert coefficient matrix to dense array format."
+          },
+          {
             "name": "fit",
             "parameters": [
               "X",
@@ -165,6 +247,39 @@
               "params"
             ],
             "summary": "Fit the model according to the given training data."
+          },
+          {
+            "name": "get_metadata_routing",
+            "parameters": [],
+            "summary": "Get metadata routing of this object."
+          },
+          {
+            "name": "get_params",
+            "parameters": [
+              "deep"
+            ],
+            "summary": "Get parameters for this estimator."
+          },
+          {
+            "name": "predict",
+            "parameters": [
+              "X"
+            ],
+            "summary": "Predict class labels for samples in X."
+          },
+          {
+            "name": "predict_log_proba",
+            "parameters": [
+              "X"
+            ],
+            "summary": "Predict logarithm of probability estimates."
+          },
+          {
+            "name": "predict_proba",
+            "parameters": [
+              "X"
+            ],
+            "summary": "Probability estimates."
           },
           {
             "name": "score",
@@ -177,11 +292,6 @@
             "summary": "Score using the `scoring` option on the given test data and labels."
           },
           {
-            "name": "get_metadata_routing",
-            "parameters": [],
-            "summary": "Get metadata routing of this object."
-          },
-          {
             "name": "set_callbacks",
             "parameters": [
               "callbacks"
@@ -189,39 +299,25 @@
             "summary": "Set callbacks for the estimator."
           },
           {
-            "name": "predict_proba",
+            "name": "set_decision_function_request",
             "parameters": [
-              "X"
+              "kwargs"
             ],
-            "summary": "Probability estimates."
+            "summary": ""
           },
           {
-            "name": "predict_log_proba",
+            "name": "set_fit_request",
             "parameters": [
-              "X"
+              "kwargs"
             ],
-            "summary": "Predict logarithm of probability estimates."
+            "summary": ""
           },
           {
-            "name": "decision_function",
+            "name": "set_inverse_transform_request",
             "parameters": [
-              "X"
+              "kwargs"
             ],
-            "summary": "Predict confidence scores for samples."
-          },
-          {
-            "name": "predict",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Predict class labels for samples in X."
-          },
-          {
-            "name": "get_params",
-            "parameters": [
-              "deep"
-            ],
-            "summary": "Get parameters for this estimator."
+            "summary": ""
           },
           {
             "name": "set_params",
@@ -231,9 +327,53 @@
             "summary": "Set the parameters of this estimator."
           },
           {
-            "name": "densify",
-            "parameters": [],
-            "summary": "Convert coefficient matrix to dense array format."
+            "name": "set_partial_fit_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_predict_log_proba_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_predict_proba_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_predict_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_score_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_split_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
+          },
+          {
+            "name": "set_transform_request",
+            "parameters": [
+              "kwargs"
+            ],
+            "summary": ""
           },
           {
             "name": "sparsify",
@@ -269,45 +409,18 @@
       {
         "kind": "symbol",
         "package": "sklego",
-        "name": "sklego.meta.SubjectiveClassifier",
+        "name": "sklego.linear_model.EqualOpportunityClassifier",
         "callable": "class",
         "parameters": [
-          "estimator",
-          "prior",
-          "evidence"
+          "args",
+          "multi_class",
+          "n_jobs",
+          "kwargs"
         ],
-        "summary": "Corrects predictions of the inner classifier by taking into account a (subjective) prior distribution of the classes.",
-        "members": [
-          {
-            "name": "fit",
-            "parameters": [
-              "X",
-              "y"
-            ],
-            "summary": "Fit the inner classifier using `X` and `y` as training data by fitting the underlying estimator and computing the posterior probabilities."
-          },
-          {
-            "name": "predict_proba",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Predict probability distribution of the class, based on the provided data."
-          },
-          {
-            "name": "predict",
-            "parameters": [
-              "X"
-            ],
-            "summary": "Predict target values for `X` using fitted estimator."
-          },
-          {
-            "name": "classes_",
-            "parameters": [],
-            "summary": "Alias for `.classes_` attribute of the underlying estimator."
-          }
-        ],
+        "summary": "`EqualOpportunityClassifier` is a logistic regression classifier which can be constrained on equal opportunity score.",
+        "members": [],
         "rules": [],
-        "signature": "sklego.meta.SubjectiveClassifier(estimator, prior, evidence)"
+        "signature": "sklego.linear_model.EqualOpportunityClassifier(args, multi_class, n_jobs, kwargs)"
       }
     ],
     "rules": [

@@ -355,7 +355,7 @@ asyncio.run(main())
 
 The outputs on the page came from xpd 0.30.0 built from the repository and FastMCP 4.2.0,
 with Python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, NumPy 2.5.5 and joblib 1.6.0 in the
-project's Python. The run took 12.6 seconds, and the table shows its `gates` list.
+project's Python. The run took 12.1 seconds and returned `passed: true`, and the table shows its `gates` list.
 
 | Gate | Passed | Detail |
 | --- | --- | --- |
@@ -373,13 +373,7 @@ project's Python. The run took 12.6 seconds, and the table shows its `gates` lis
 | `saved-model-predicts` | Yes | The prediction script, in its own Python process, leaves the `result` that the training script left. |
 | `versions-recorded` | Yes | The contract records python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, numpy 2.5.5, joblib 1.6.0. |
 | `indexed-api-calls` | Yes | Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run. |
-| `discovery-is-recorded` | No | The contract and proof record different discovery choices. |
-
-`discovery-is-recorded` failed, so `passed` was `false`. The fifth symbol candidate in
-`discovery.json` is `sklego.meta.SubjectiveClassifier`, and `find` now returns
-`sklego.linear_model.EqualOpportunityClassifier` in that place. The fix is the one the
-discovery section gives, which is to save the record that the script builds in
-`discovery.json` and run `train.py` again.
+| `discovery-is-recorded` | Yes | The contract records the discovery question, candidates and reason of the proof. |
 
 The report's `refit` part follows.
 
