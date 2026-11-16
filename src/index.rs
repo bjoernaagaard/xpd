@@ -273,6 +273,8 @@ struct Stored {
     package: &'static str,
     kind: Kind,
     summary: &'static str,
+    /// The hash of the name and the summary, which build.rs computes.
+    text: u64,
     start: u32,
     len: u16,
 }
@@ -320,10 +322,11 @@ fn decode(data: &mut &[u8]) -> serde_json::Value {
 const POSTINGS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/postings.bin"));
 const TABLE: &[(&str, u32, u32)] = include!(concat!(env!("OUT_DIR"), "/search.rs"));
 const RECORDS: &[Stored] = include!(concat!(env!("OUT_DIR"), "/records.rs"));
-/// `DIMENSIONS` signed bytes for each of `RECORDS`, all zero for a record without a vector.
+/// `DIMENSIONS` signed bytes for each of `RECORDS`, all zero for a record that has no vector
+/// of its current text.
 const VECTORS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/vectors.bin"));
 /// The start of `indexes/vectors.bin`, which build.rs reads.
-const VECTORS_HEADER: &[u8] = b"xpd vectors 256\n";
+const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
 /// Reciprocal rank fusion adds `weight / (FUSION_K + rank)` from each ranking.
 const FUSION_K: f64 = 60.0;
 
@@ -505,8 +508,8 @@ pub(crate) fn records_without_vector() -> Vec<&'static str> {
 }
 
 /// Writes the vector of every embedded record to `path`, as build.rs reads it. A record keeps
-/// the vector that this build holds for it, and only the records without one are embedded, so
-/// a new rule costs one text. Each vector is scaled so its largest value is 127. Search
+/// the vector that this build holds for it. build.rs drops the vector of a record whose text
+/// changed, so only new and changed records are embedded, and a new rule costs one text. Each vector is scaled so its largest value is 127. Search
 /// compares directions, so the scale drops out.
 pub(crate) fn write_vectors(path: &Path) -> Result<()> {
     let stored = VECTORS.as_chunks::<DIMENSIONS>().0;
@@ -525,6 +528,7 @@ pub(crate) fn write_vectors(path: &Path) -> Result<()> {
     for (record, vector) in RECORDS.iter().zip(stored) {
         data.extend(u16::try_from(record.name.len())?.to_le_bytes());
         data.extend(record.name.as_bytes());
+        data.extend(record.text.to_le_bytes());
         if vector.iter().any(|&v| v != 0) {
             data.extend(vector);
             continue;

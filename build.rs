@@ -31,9 +31,9 @@ const PLUGIN: &str = "plugin.json";
 const PLUGIN_MCP: &str = "mcp.json";
 /// The vector of each index record, by the record's name. `xpd find --write-vectors` writes it.
 const VECTORS: &str = "indexes/vectors.bin";
-/// The start of `VECTORS`. Each record follows as its name's length (u16 LE), its name, and
-/// `DIMENSIONS` signed bytes.
-const VECTORS_HEADER: &[u8] = b"xpd vectors 256\n";
+/// The start of `VECTORS`. Each record follows as its name's length (u16 LE), its name, the
+/// hash of its text (u64 LE, as `text_hash` gives it), and `DIMENSIONS` signed bytes.
+const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
 const DIMENSIONS: usize = 256;
 /// The `## ` headings of the rules page that hold a pack's sections, each with the pack's
 /// module. A heading names the library as its project writes it, which is not always the name
@@ -379,6 +379,7 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
             _ => "Symbol",
         };
         let summary = entry["summary"].as_str().unwrap_or_default();
+        let text = text_hash(name, summary);
         let mut output = entry.clone();
         output
             .as_object_mut()
@@ -389,7 +390,11 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
         let len = u16::try_from(data.len() - start)?;
         writeln!(
             records,
-            "Stored {{name:{name:?},package:{package:?},kind:Kind::{kind},summary:{summary:?},start:0x{:04x}_{:04x},len:{len}}},",
+            "Stored {{name:{name:?},package:{package:?},kind:Kind::{kind},summary:{summary:?},text:0x{:04x}_{:04x}_{:04x}_{:04x},start:0x{:04x}_{:04x},len:{len}}},",
+            text >> 48,
+            (text >> 32) & 0xffff,
+            (text >> 16) & 0xffff,
+            text & 0xffff,
             start >> 16,
             start & 0xffff
         )?;
@@ -406,8 +411,20 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
     search_source(out, &entries)
 }
 
+/// The FNV-1a hash of the text that a record's vector is made from, which is its name and its
+/// summary. A record whose text changed gets another hash, so its stored vector is dropped.
+fn text_hash(name: &str, summary: &str) -> u64 {
+    name.bytes()
+        .chain([0])
+        .chain(summary.bytes())
+        .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+        })
+}
+
 /// Writes `OUT_DIR/vectors.bin`, the vector of each entry in the order of the entries. An entry
-/// that `VECTORS` has no vector for gets zeros, and `xpd find --check` fails on it.
+/// gets zeros when `VECTORS` has no vector for it, or has one made from another text, and
+/// `xpd find --check` fails on it.
 fn vectors_source(out: &Path, entries: &[serde_json::Value]) -> Result<()> {
     let bytes = if Path::new(VECTORS).exists() {
         fs::read(VECTORS).with_context(|| format!("cannot read {VECTORS}"))?
@@ -422,19 +439,28 @@ fn vectors_source(out: &Path, entries: &[serde_json::Value]) -> Result<()> {
         let (name, tail) = tail
             .split_at_checked(usize::from(u16::from_le_bytes(*length)))
             .with_context(|| format!("{VECTORS} ends inside a name"))?;
+        let (hash, tail) = tail
+            .split_first_chunk::<8>()
+            .with_context(|| format!("{VECTORS} ends inside a text hash"))?;
         let (vector, tail) = tail
             .split_at_checked(DIMENSIONS)
             .with_context(|| format!("{VECTORS} ends inside a vector"))?;
-        found.insert(std::str::from_utf8(name)?, vector);
+        found.insert(
+            std::str::from_utf8(name)?,
+            (u64::from_le_bytes(*hash), vector),
+        );
         rest = tail;
     }
     ensure!(rest.is_empty(), "{VECTORS} ends inside a name length");
     let mut data = Vec::with_capacity(entries.len() * DIMENSIONS);
     for entry in entries {
         let name = entry["name"].as_str().context("entry name")?;
+        let summary = entry["summary"].as_str().unwrap_or_default();
         match found.get(name) {
-            Some(vector) => data.extend_from_slice(vector),
-            None => data.resize(data.len() + DIMENSIONS, 0),
+            Some((hash, vector)) if *hash == text_hash(name, summary) => {
+                data.extend_from_slice(vector);
+            }
+            _ => data.resize(data.len() + DIMENSIONS, 0),
         }
     }
     fs::write(out.join("vectors.bin"), data)?;

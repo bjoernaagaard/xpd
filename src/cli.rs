@@ -120,9 +120,9 @@ enum Cmd {
         /// Run real discovery questions and fail if an expected entry misses the top five.
         #[arg(long, conflicts_with = "query")]
         check: Option<PathBuf>,
-        /// Embed the index records that have no vector yet and write all vectors to this file,
-        /// which is indexes/vectors.bin in the repository. Remove the file and build again to
-        /// embed every record.
+        /// Embed the index records that are new or whose text changed, and write all vectors to
+        /// this file, which is indexes/vectors.bin in the repository. Remove the file and build
+        /// again to embed every record.
         #[arg(long, hide = true, conflicts_with_all = ["query", "check", "index"])]
         write_vectors: Option<PathBuf>,
     },
@@ -956,7 +956,7 @@ fn check_ranking(index: Option<&std::path::Path>, path: &std::path::Path) -> Res
     let missing = index::records_without_vector();
     if let Some(first) = missing.first() {
         println!(
-            "{} records have no vector in indexes/vectors.bin, such as {first}. Write it again with xpd find --write-vectors indexes/vectors.bin",
+            "{} records have no vector of their current text in indexes/vectors.bin, such as {first}. Write it again with xpd find --write-vectors indexes/vectors.bin",
             missing.len()
         );
     }

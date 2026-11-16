@@ -885,14 +885,14 @@ $ xpd find --check indexes/questions.json
 | `"open": true` | Records what a user asked and the answer they expect, for later work on search. The check skips it |
 
 The check prints every failure. It looks at the top five also for rules and recipes, whatever
-the display defaults are, and it also exits 2 when an index entry has no vector. Lefthook runs the
+the display defaults are, and it also exits 2 when an index entry has no vector of its current text. Lefthook runs the
 check before a commit that changes `indexes/*.json` or a Rust file, and it tolerates no miss. A
 question that still fails stays as it is, without a change to its wording and without a ranking
 rule for that question.
 
-After a change to `indexes/`, write the missing vectors with
+After a change to `indexes/` or to a rule's text, write the vectors with
 `xpd find --write-vectors indexes/vectors.bin`. The flag is hidden from `--help`. It embeds the
-entries that have no vector yet, so remove the file first to embed every entry again.
+entries that are new or whose text changed, and it keeps the vector of every other entry.
 
 ## new
 

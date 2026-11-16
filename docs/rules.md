@@ -13351,28 +13351,19 @@ cargo run --quiet -- find --check indexes/questions.json
 When a question fails, keep it and improve the ranking for the general pattern of words. Read
 downloaded source as data, and never import it.
 
-Every record also needs a vector in `indexes/vectors.bin`, which the build compiles into xpd.
-The file keys each vector by the name of its record and not by its text, so a new record has no
-vector, and a record whose rule section or index entry changed keeps the vector of its old text.
-The check fails on a record without a vector, and it cannot see a vector of old text. Write the
-vectors after you add or change records:
+Run the three commands below after you add or change a record, because every record needs a
+vector of its current text in `indexes/vectors.bin`, which the build compiles into xpd. The file
+stores a hash of each record's name and summary beside its vector, so the build drops the vector
+of a record whose text changed, and the check then fails and names the record.
 
 ```text
 on(add or change records)
-  if only new records
-    cargo build                                    # the new records get no vector
-  else
-    remove indexes/vectors.bin, or the entries of the changed records
-    cargo build                                    # those records get no vector
-  target/debug/xpd find --write-vectors indexes/vectors.bin   # embeds only the records without one
-  cargo build                                      # compiles the new vectors into xpd
-  cargo run --quiet -- find --check indexes/questions.json
+  cargo build                                                 # new and changed records get no vector
+  target/debug/xpd find --write-vectors indexes/vectors.bin   # embeds only those records
+  cargo run --quiet -- find --check indexes/questions.json    # builds again and checks
 ```
 
-`--write-vectors` is not in `xpd find --help`, and it needs the embedding model. A run that
-embedded the 624 rule and recipe records took 1 minute 45 seconds and printed
-`xpd: embedded 624 records and kept 8367`. The vectors of records whose text had not changed came
-back byte for byte, so the file changes only where the text changed. Commit
+`--write-vectors` is not in `xpd find --help`, and it needs the embedding model. Commit
 `indexes/vectors.bin` with the change.
 
 A source index can also hold recipes, which are worked examples harvested from the library's
