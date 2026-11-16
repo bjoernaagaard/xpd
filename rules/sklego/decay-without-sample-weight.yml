@@ -1,0 +1,45 @@
+# DecayEstimator passes its weights to the inner model as fit(X, y, sample_weight=...). A
+# scikit-learn Pipeline takes no sample_weight and raises ValueError "Pipeline.fit does not
+# accept the sample_weight parameter". The estimators named in the second document have no
+# sample_weight in fit on scikit-learn 1.9.1, and DecayEstimator raises TypeError "Model
+# KNeighborsRegressor.fit() does not have 'sample_weight'" for them. The list is every
+# classifier and regressor of scikit-learn 1.9.1 that takes no argument to build and whose fit
+# raised TypeError inside a DecayEstimator.
+
+id: decay-without-sample-weight
+language: python
+severity: error
+message: DecayEstimator passes sample_weight to the model's fit, and a Pipeline raises ValueError "Pipeline.fit does not accept the sample_weight parameter". Put the DecayEstimator around the last step, inside the pipeline.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)DecayEstimator$' }
+    - has:
+        field: arguments
+        any:
+          - has: { nthChild: 1, matches: pipeline }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^model$' } }, { has: { field: value, matches: pipeline } }] }
+utils:
+  pipeline:
+    kind: call
+    has: { field: function, regex: '(^|\.)(make_pipeline|Pipeline|make_debug_pipeline|DebugPipeline)$' }
+---
+id: decay-without-sample-weight
+language: python
+severity: error
+message: DecayEstimator passes sample_weight to the model's fit, which $M does not take, so fit raises TypeError "does not have 'sample_weight'". Use a model that takes sample_weight.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)DecayEstimator$' }
+    - has:
+        field: arguments
+        any:
+          - has: { nthChild: 1, matches: unweighted }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^model$' } }, { has: { field: value, matches: unweighted } }] }
+utils:
+  unweighted:
+    kind: call
+    has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $M } }, { pattern: $M }] }
+constraints:
+  M: { regex: '^(ARDRegression|GaussianProcessClassifier|GaussianProcessRegressor|KNeighborsClassifier|KNeighborsRegressor|LabelPropagation|LabelSpreading|Lars|LassoLars|LassoLarsIC|LinearDiscriminantAnalysis|NearestCentroid|OrthogonalMatchingPursuit|PLSRegression|QuadraticDiscriminantAnalysis|RadiusNeighborsClassifier|RadiusNeighborsRegressor|TheilSenRegressor)$' }

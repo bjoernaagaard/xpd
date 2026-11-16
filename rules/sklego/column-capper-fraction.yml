@@ -1,0 +1,22 @@
+# ColumnCapper reads quantile_range in percent, as its default (5.0, 95.0) shows, and divides it
+# by 100. A pair of fractions is a valid range of percentiles below 1, so nothing raises. On
+# 10,000 normal values (0.05, 0.95) changed 9,910 of them and left 92 distinct values between
+# -3.272 and -2.379, where (5, 95) changed 1,000 and kept the range -1.628 to 1.640.
+
+id: column-capper-fraction
+language: python
+severity: error
+message: ColumnCapper reads quantile_range in percent, so this range caps at percentiles below 1. On 10,000 normal values (0.05, 0.95) changed 9,910 of them, where (5, 95) changed 1,000. Multiply both numbers by 100.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)ColumnCapper$' }
+    - has:
+        field: arguments
+        any:
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^quantile_range$' } }, { has: { field: value, matches: fractions } }] }
+          - has: { nthChild: 1, matches: fractions }
+utils:
+  fractions:
+    any: [{ kind: tuple }, { kind: list }]
+    regex: '^[\(\[]\s*(0|0?\.\d+)\s*,\s*(0?\.\d+|1|1\.0*)\s*,?\s*[\)\]]$'

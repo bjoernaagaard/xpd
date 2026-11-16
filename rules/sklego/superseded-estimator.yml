@@ -1,0 +1,45 @@
+# Since 0.9.8 scikit-lego itself points away from these classes: building one raises a
+# UserWarning that names the class to use instead. The rule reports the call that builds it.
+# The replacement is another model with other parameter names, so there is no fix.
+
+id: superseded-estimator
+language: python
+severity: warning
+message: $C warns on scikit-lego 0.9.8 and later and asks for scikit-learn's QuantileRegressor. Use sklearn.linear_model.QuantileRegressor, which takes quantile= and alpha= and solves the same loss with a linear program.
+rule:
+  pattern: $F($$$A)
+  has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+constraints:
+  C: { regex: '^(QuantileRegression|LADRegression)$' }
+metadata: { since: "0.9.8" }
+---
+id: superseded-estimator
+language: python
+severity: warning
+message: RepeatingBasisFunction warns on scikit-lego 0.9.8 and later and asks for scikit-learn's SplineTransformer. Use SplineTransformer(extrapolation="periodic") on the column, inside a ColumnTransformer.
+rule:
+  pattern: $F($$$A)
+  has: { field: function, regex: '(^|\.)RepeatingBasisFunction$' }
+metadata: { since: "0.9.8" }
+---
+id: superseded-estimator
+language: python
+severity: warning
+message: $C warns on scikit-lego 0.9.8 and later and asks for fairlearn's ThresholdOptimizer around a scikit-learn LogisticRegression. Use ThresholdOptimizer with the constraint the warning names.
+rule:
+  pattern: $F($$$A)
+  has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+constraints:
+  C: { regex: '^(DemographicParityClassifier|EqualOpportunityClassifier)$' }
+metadata: { since: "0.9.8" }
+---
+# FunctionTransformer() with no function returns its input, as IdentityTransformer() does. With
+# check_X=True the class also validates the input, which FunctionTransformer(validate=True)
+# does, so only the call without arguments is reported.
+id: superseded-estimator
+language: python
+severity: info
+message: IdentityTransformer() returns its input, which scikit-learn's FunctionTransformer() also does. Both returned the same array. Use FunctionTransformer(), or "passthrough" in a ColumnTransformer or FeatureUnion.
+rule:
+  pattern: $F()
+  has: { field: function, regex: '(^|\.)IdentityTransformer$' }

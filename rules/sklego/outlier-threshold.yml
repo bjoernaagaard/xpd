@@ -1,0 +1,65 @@
+# The outlier detectors each read threshold in their own way, and two of the readings fail.
+#
+# PCAOutlierDetection and UMAPOutlierDetection default to threshold=None and raise ValueError
+# "The `threshold` value cannot be `None`." in fit. A call inside a search is left alone, because
+# the search may set the threshold.
+#
+# GMMOutlierDetector and BayesianGMMOutlierDetector with the default method="quantile" read
+# threshold as the share of training rows to keep, so the default 0.99 flags 1 percent. A small
+# number, written as if it were the share of outliers, flags nearly every row: 0.05 flagged 380
+# of 400 training rows and 0.95 flagged 20. A number above 1 raises ValueError.
+
+id: outlier-threshold
+language: python
+severity: error
+message: $C has no default threshold, and fit raises ValueError "The `threshold` value cannot be `None`." Pass threshold=.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^threshold$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+    - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+    - not: { inside: { stopBy: end, kind: call, has: { field: function, regex: '(SearchCV|clone)$' } } }
+constraints:
+  C: { regex: '^(PCAOutlierDetection|UMAPOutlierDetection)$' }
+---
+id: outlier-threshold
+language: python
+severity: error
+message: $C with method="quantile" keeps the share threshold of the training rows as inliers, so a small threshold flags nearly every row. 0.05 flagged 380 of 400 training rows, where 0.95 flagged 20. Pass 1 minus the share of outliers.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - has:
+        field: arguments
+        any:
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: small-share } }] }
+          - has: { nthChild: 1, matches: small-share }
+    - not: { has: { field: arguments, regex: 'stddev' } }
+constraints:
+  C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
+utils:
+  small-share: { kind: float, regex: '^0?\.([0-4]\d*|50*)$' }
+---
+id: outlier-threshold
+language: python
+severity: error
+message: $C with method="quantile" reads threshold as a share between 0 and 1, and fit raises ValueError on a larger number. Pass a share, or method="stddev" to count standard deviations.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - has:
+        field: arguments
+        any:
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: above-one } }] }
+          - has: { nthChild: 1, matches: above-one }
+    - not: { has: { field: arguments, regex: 'stddev' } }
+constraints:
+  C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
+utils:
+  above-one:
+    any:
+      - { kind: integer, regex: '^([2-9]|[1-9]\d+)$' }
+      - { kind: float, regex: '^([2-9]|[1-9]\d+)\.\d*$|^1\.\d*[1-9]\d*$' }

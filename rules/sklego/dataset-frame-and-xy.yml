@@ -1,0 +1,18 @@
+# The loaders of sklego.datasets test as_frame first and return the whole frame, target column
+# included, so return_X_y=True is ignored. scikit-learn's loaders return (X, y) as frames for
+# the same two keywords. Unpacking the result raises ValueError "too many values to unpack
+# (expected 2)" for all six loaders. fetch_creditcard passes both keywords to fetch_openml and
+# works.
+
+id: dataset-frame-and-xy
+language: python
+severity: error
+message: $F ignores return_X_y=True when as_frame=True and returns one DataFrame with the target in it, so unpacking into X and y raises ValueError "too many values to unpack". Drop return_X_y and take the target column from the frame.
+rule:
+  pattern: $C($$$A)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }] }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^return_X_y\s*=\s*True$' } }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^as_frame\s*=\s*True$' } }
+constraints:
+  F: { regex: '^load_(penguins|arrests|chicken|abalone|heroes|hearts)$' }

@@ -1,0 +1,46 @@
+# Thresholder.score calls the score of the inner model, so it is the accuracy at 0.5 whatever
+# threshold is set. A search or cross-validation without scoring= uses that method. On 400 rows
+# with 20 percent positives, a 5-fold grid search over the thresholds 0.1, 0.5 and 0.9 gave 0.875
+# three times, and 0.700, 0.875 and 0.850 with scoring="accuracy".
+
+id: thresholder-score
+language: python
+severity: error
+message: Thresholder.score returns the score of the inner model and ignores threshold, so $F scores every threshold the same. A grid search over 0.1, 0.5 and 0.9 gave 0.875 three times, and 0.700, 0.875 and 0.850 with scoring="accuracy". Pass scoring=, or use scikit-learn's FixedThresholdClassifier.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: arguments, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)Thresholder$' } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^scoring$' } }, { kind: dictionary_splat }] } } }
+constraints:
+  F: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|cross_val_score|cross_validate|learning_curve|validation_curve|permutation_importance)$' }
+---
+id: thresholder-score
+language: python
+severity: error
+message: Thresholder.score returns the score of the inner model and ignores threshold. At the thresholds 0.1, 0.5 and 0.9 it returned 0.890 three times, where the accuracy of predict was 0.770, 0.890 and 0.810. Score the output of predict, or use scikit-learn's FixedThresholdClassifier.
+rule:
+  any:
+    - pattern: $T($$$A).fit($$$B).score($$$C)
+    - pattern: $T($$$A).score($$$C)
+constraints:
+  T: { regex: '(^|\.)Thresholder$' }
+---
+# The same call on a name that the file assigns a Thresholder to.
+id: thresholder-score
+language: python
+severity: error
+message: Thresholder.score returns the score of the inner model and ignores threshold. At the thresholds 0.1, 0.5 and 0.9 it returned 0.890 three times, where the accuracy of predict was 0.770, 0.890 and 0.810. Score the output of predict, or use scikit-learn's FixedThresholdClassifier.
+rule:
+  pattern: $V.score($$$C)
+  inside:
+    stopBy: end
+    kind: module
+    has:
+      stopBy: end
+      kind: assignment
+      all:
+        - has: { field: left, pattern: $V }
+        - has: { field: right, kind: call, regex: '^(\w+\.)*Thresholder\(' }
+constraints:
+  V: { kind: identifier }

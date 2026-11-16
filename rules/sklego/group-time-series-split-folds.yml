@@ -1,0 +1,21 @@
+# GroupTimeSeriesSplit tries every combination of n_splits split points over the groups to find
+# the most even folds, so the work grows with the number of groups to the power n_splits. On
+# 3,000 rows in 60 groups, split took 0.09 s at n_splits=4, 1.08 s at 5 and 10.48 s at 6, and
+# with 40 groups 0.21 s at 5 and 1.07 s at 6. The class warns itself from 30 groups on at
+# n_splits above 5. With a few groups the search is short, so the rule is a warning.
+
+id: group-time-series-split-folds
+language: python
+severity: warning
+message: GroupTimeSeriesSplit tries every combination of split points, so each extra fold multiplies the time. With 60 groups split took 1.08 s at n_splits=5 and 10.48 s at n_splits=6. Use 5 folds or fewer, or merge the groups into coarser periods first.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)GroupTimeSeriesSplit$' }
+    - has:
+        field: arguments
+        any:
+          - has: { nthChild: 1, matches: many }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^n_splits$' } }, { has: { field: value, matches: many } }] }
+utils:
+  many: { kind: integer, regex: '^([6-9]|[1-9]\d+)$' }

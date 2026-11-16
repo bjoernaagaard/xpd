@@ -1,0 +1,29 @@
+# log_callback="default" logs each step at level INFO to the logger sklego.pipeline. Python's
+# root logger shows WARNING and above until logging is set up, so the pipeline printed 0
+# characters, and after logging.basicConfig(level=logging.INFO) it logged one line per step.
+# The rule reports the keyword in a file that neither imports logging nor uses pytest's caplog,
+# which captures the records. Logging may be set up in another module, so the rule is info.
+
+id: debug-pipeline-default-log
+language: python
+severity: info
+message: log_callback="default" logs at level INFO, which Python hides until logging is set up, so the pipeline printed 0 characters. Call logging.basicConfig(level=logging.INFO) first, or pass a callback that prints.
+rule:
+  kind: keyword_argument
+  regex: '^log_callback\s*=\s*["'']default["'']$'
+  all:
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has: { field: function, regex: '(^|\.)(DebugPipeline|make_debug_pipeline)$' }
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            any:
+              - { kind: import_statement, regex: '\blogging\b' }
+              - { kind: import_from_statement, regex: '^from\s+logging\b' }
+              - { kind: identifier, regex: '^caplog$' }

@@ -1,0 +1,11 @@
+# The scikit-lego pack, for files that import sklego. Every other .yml file in this folder is a
+# rule.
+
+# No fix in this pack writes a short name such as `np.`, so the pack lists no alias.
+aliases: {}
+
+# The pack has no package checks. cvxpy, umap-learn and formulaic are extras that only some
+# estimators need, and a package check cannot see which estimators a project uses, so a check
+# would warn projects that never use them. scikit-lego itself raises an ImportError that names
+# the extra when one is missing.
+packages: []

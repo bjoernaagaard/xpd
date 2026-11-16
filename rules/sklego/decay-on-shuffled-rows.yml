@@ -1,0 +1,20 @@
+# DecayEstimator weights each row by its position, the last row most, and never reads a date. It
+# is right only when the rows it is fitted on are in time order. train_test_split shuffles them
+# by default. On 2,000 rows whose slope changed from 1 to 3 at row 1,000, the model fitted on the
+# first 1,500 rows in order had the slope 2.989 and a mean absolute error of 0.079 on the last
+# 500 rows. Fitted on the same 1,500 rows in shuffled order it had the slope 1.648 and an error
+# of 1.135, as the mean of 30 shuffles.
+#
+# The rule reports a train_test_split that may shuffle in a file that builds a DecayEstimator. A
+# pattern cannot see which rows the estimator is fitted on, so the rule is a warning.
+
+id: decay-on-shuffled-rows
+language: python
+severity: warning
+message: DecayEstimator weights rows by position, the last row most, and train_test_split shuffles the rows. On data whose slope changed from 1 to 3, the model fitted on shuffled rows had the slope 1.65 as the mean of 30 shuffles, where the same rows in time order gave 2.99. Pass shuffle=False, or sort the training rows by time before the fit.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)train_test_split$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, regex: '^shuffle\s*=\s*False$' }, { kind: dictionary_splat }] } } }
+    - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)DecayEstimator$' } } }

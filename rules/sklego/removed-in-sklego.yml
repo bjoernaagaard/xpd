@@ -1,0 +1,185 @@
+# Each document finds a scikit-lego form that raises on 0.9.10: a name or module that a release
+# removed, or a keyword that a signature no longer has. Code inside a try block that catches the
+# error is a compatibility path and stays silent.
+#
+# A fix here turns code that raises into code that runs, so every fix is unsafe.
+
+id: removed-in-sklego
+language: python
+severity: error
+message: PatsyTransformer was removed in scikit-lego 0.8.0, and the import raises ImportError. Use FormulaicTransformer, which reads the formula with formulaic, and check the formula, because formulaic is not patsy.
+rule:
+  kind: dotted_name
+  regex: ^PatsyTransformer$
+  inside:
+    stopBy: end
+    kind: import_from_statement
+    regex: '^from\s+sklego\.preprocessing(\.patsytransformer)?\s+import\b'
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+metadata: { since: "0.8" }
+---
+# FairClassifier was a subclass of DemographicParityClassifier that added nothing, so the new
+# name takes the same arguments. The fix renames the import and every use in the file.
+id: removed-in-sklego
+language: python
+severity: error
+message: FairClassifier was removed in scikit-lego 0.8.0, and the import raises ImportError. It was another name for DemographicParityClassifier, which takes the same arguments.
+rule:
+  kind: identifier
+  regex: ^FairClassifier$
+  inside:
+    stopBy: end
+    kind: module
+    has: { stopBy: end, kind: import_from_statement, regex: '^from\s+sklego\.linear_model\s+import\b[^#]*\bFairClassifier\b' }
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+fix: DemographicParityClassifier
+metadata: { fix: unsafe, since: "0.8" }
+---
+# GroupedEstimator was renamed to GroupedPredictor in 0.5.2 and the old name went away in 0.8.0.
+id: removed-in-sklego
+language: python
+severity: error
+message: GroupedEstimator was removed in scikit-lego 0.8.0, and the import raises ImportError. Use GroupedPredictor, or GroupedRegressor and GroupedClassifier.
+rule:
+  kind: identifier
+  regex: ^GroupedEstimator$
+  inside:
+    stopBy: end
+    kind: module
+    has: { stopBy: end, kind: import_from_statement, regex: '^from\s+sklego\.meta\s+import\b[^#]*\bGroupedEstimator\b' }
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+fix: GroupedPredictor
+metadata: { fix: unsafe, since: "0.8" }
+---
+# OutlierRemover moved from sklego.meta to sklego.preprocessing. The fix covers the import that
+# names nothing else.
+id: removed-in-sklego
+language: python
+severity: error
+message: OutlierRemover left sklego.meta in scikit-lego 0.8.0, and the import raises ImportError. Import it from sklego.preprocessing.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+sklego\.meta\s+import\s+OutlierRemover\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+fix: from sklego.preprocessing import OutlierRemover
+metadata: { fix: unsafe, since: "0.8" }
+---
+id: removed-in-sklego
+language: python
+severity: error
+message: OutlierRemover left sklego.meta in scikit-lego 0.8.0, and the import raises ImportError. Import it from sklego.preprocessing.
+rule:
+  kind: dotted_name
+  regex: ^OutlierRemover$
+  inside:
+    stopBy: end
+    kind: import_from_statement
+    all:
+      - regex: '^from\s+sklego\.meta\s+import\b'
+      - not: { regex: '^from\s+sklego\.meta\s+import\s+OutlierRemover\s*$' }
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+metadata: { since: "0.8" }
+---
+# The module that held it. Every name it had is in sklego.preprocessing.
+id: removed-in-sklego
+language: python
+severity: error
+message: sklego.meta.outlier_remover was removed in scikit-lego 0.8.0, and the import raises ModuleNotFoundError. OutlierRemover is in sklego.preprocessing.
+rule:
+  kind: dotted_name
+  regex: '^sklego\.meta\.outlier_remover$'
+  inside: { kind: import_from_statement, field: module_name }
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+fix: sklego.preprocessing
+metadata: { fix: unsafe, since: "0.8" }
+---
+# The other modules that went away with those names.
+id: removed-in-sklego
+language: python
+severity: error
+message: $M was removed in scikit-lego 0.8.0, and the import raises ModuleNotFoundError. GroupedPredictor is in sklego.meta, and FormulaicTransformer in sklego.preprocessing replaces PatsyTransformer.
+rule:
+  kind: dotted_name
+  pattern: $M
+  regex: '^sklego\.(meta\.grouped_estimator|preprocessing\.patsytransformer)$'
+  any: [{ inside: { kind: import_from_statement, field: module_name } }, { inside: { kind: import_statement } }, { inside: { kind: aliased_import, inside: { kind: import_statement } } }]
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+metadata: { since: "0.8" }
+---
+# The dataset loaders renamed give_pandas= to as_frame= and dropped the old keyword in 0.6.6.
+id: removed-in-sklego
+language: python
+severity: error
+message: $F no longer takes give_pandas= and raises TypeError since scikit-lego 0.6.6. Pass as_frame= instead.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^give_pandas$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }] }
+  not: { matches: compat-code }
+constraints:
+  F: { regex: '^(load_(penguins|arrests|chicken|abalone|heroes|hearts)|make_simpleseries)$' }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+fix: as_frame=$V
+metadata: { fix: unsafe, since: "0.6.6" }
+---
+# DecayEstimator took decay= until 0.7.0, which built the weights decay ** (n - i). The
+# exponential decay function now takes that number as decay_rate through decay_kwargs.
+id: removed-in-sklego
+language: python
+severity: error
+message: 'DecayEstimator no longer takes decay= and raises TypeError since scikit-lego 0.7.0. Pass decay_kwargs={"decay_rate": $V}, which gives the same weights to rounding with the default decay_func.'
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^decay$ }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    not: { has: { kind: keyword_argument, has: { field: name, regex: '^(decay_func|decay_kwargs)$' } } }
+    inside:
+      kind: call
+      has: { field: function, regex: '(^|\.)DecayEstimator$' }
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+fix: 'decay_kwargs={"decay_rate": $V}'
+metadata: { fix: unsafe, since: "0.7" }
+---
+id: removed-in-sklego
+language: python
+severity: error
+message: DecayEstimator no longer takes decay= and raises TypeError since scikit-lego 0.7.0. Pass the settings of the decay function in decay_kwargs.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: ^decay$ }
+  inside:
+    kind: argument_list
+    has: { kind: keyword_argument, has: { field: name, regex: '^(decay_func|decay_kwargs)$' } }
+    inside:
+      kind: call
+      has: { field: function, regex: '(^|\.)DecayEstimator$' }
+  not: { matches: compat-code }
+utils:
+  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
+metadata: { since: "0.7" }

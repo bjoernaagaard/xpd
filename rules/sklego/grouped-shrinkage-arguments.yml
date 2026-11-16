@@ -1,0 +1,55 @@
+# The grouped and hierarchical meta estimators take the settings of the shrinkage function in
+# one dict, shrinkage_kwargs. Three other spellings fail, one of them without an error.
+#
+# GroupedClassifier ends its signature with **shrinkage_kwargs and does nothing with it, so
+# shrinkage= or any other extra keyword is dropped. With shrinkage="relative" its probabilities
+# were equal to those without it, bit for bit, and differed by up to 0.17 from
+# HierarchicalClassifier(shrinkage="relative"), which does shrink.
+
+id: grouped-shrinkage-arguments
+language: python
+severity: error
+message: GroupedClassifier drops $K= without an error, because its signature ends in **shrinkage_kwargs and never reads it. With shrinkage="relative" the probabilities were bit equal to those without it. Use HierarchicalClassifier, which takes shrinkage=, or remove the keyword.
+rule:
+  kind: keyword_argument
+  has: { field: name, pattern: $K, not: { regex: '^(estimator|groups|use_global_model|check_X)$' } }
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      has: { field: function, regex: '(^|\.)GroupedClassifier$' }
+---
+# The constant and min_n_obs functions each need one setting, and fit raises TypeError without
+# it: "constant_shrinkage() missing 1 required positional argument: 'alpha'".
+id: grouped-shrinkage-arguments
+language: python
+severity: error
+message: 'shrinkage=$S needs a setting, and fit raises TypeError "missing 1 required positional argument" without it. Pass shrinkage_kwargs={"alpha": ...} for "constant" or shrinkage_kwargs={"min_n_obs": ...} for "min_n_obs".'
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)(GroupedPredictor|GroupedRegressor|HierarchicalPredictor|HierarchicalRegressor|HierarchicalClassifier)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^shrinkage$' } }, { has: { field: value, pattern: $S, regex: '^["''](constant|min_n_obs)["'']$' } }] } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(shrinkage_kwargs|alpha|min_n_obs)$' } }, { kind: dictionary_splat }] } } }
+---
+# Until 0.9.2 GroupedPredictor took the setting as a bare keyword, alpha=0.1. It now raises
+# TypeError "got an unexpected keyword argument 'alpha'", as the hierarchical classes always did.
+id: grouped-shrinkage-arguments
+language: python
+severity: error
+message: '$C no longer takes $K= as a keyword and raises TypeError since scikit-lego 0.9.2. Pass shrinkage_kwargs={"$K": $V}.'
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, pattern: $K, regex: '^(alpha|min_n_obs)$' }
+    - has: { field: value, pattern: $V }
+  inside:
+    kind: argument_list
+    not: { has: { kind: keyword_argument, has: { field: name, regex: '^shrinkage_kwargs$' } } }
+    inside:
+      kind: call
+      has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+constraints:
+  C: { regex: '^(GroupedPredictor|GroupedRegressor|HierarchicalPredictor|HierarchicalRegressor|HierarchicalClassifier)$' }
+fix: 'shrinkage_kwargs={"$K": $V}'
+metadata: { fix: unsafe, since: "0.9.2" }

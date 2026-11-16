@@ -1,7 +1,7 @@
 # Rules
 
-xpd has six rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
-[scikit-learn](#scikit-learn), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
+xpd has seven rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+[scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files that import it. The
 Python rules run on every file.
 
 ## pandas
@@ -5301,6 +5301,702 @@ call with `shuffle=False` or `**`, a `train_test_split` whose result is thrown a
 constructor that only `isinstance` reads. Of 527 held-back reports, 52 were labelled, and each
 reader called 1 wrong. Recall was 79 of 80.
 
+## scikit-lego
+
+These rules run on files that import `sklego`, the module of scikit-lego. They report arguments
+that give a wrong number without an error, steps that read the wrong rows or cannot be fitted,
+and code that raises or warns on scikit-lego 0.9.10. Every number in this section was measured
+on scikit-lego 0.9.10 with scikit-learn 1.9.1, NumPy 2.5.5 and pandas 3.1.1. Examples assume that
+the names they use are imported. Names such as `X_train`, `y_test` and `model` represent values
+supplied by your program.
+
+A rule document whose advice needs a newer release of scikit-lego carries `since`. xpd reads the
+installed version from the project's venv, as it does for pandas, and skips that document on an
+older release. When the venv has no scikit-lego, or there is no venv, every document runs.
+
+The pack has no package checks. cvxpy, umap-learn and formulaic are extras that only some
+estimators need, and a package check cannot see which estimators a project uses. scikit-lego
+raises an ImportError that names the extra when one is missing.
+
+### How a rule earns its place
+
+Every rule is an `error` only when real code was run that shows the wrong number or the
+exception, and its message quotes what was measured. A proof is one of three kinds:
+
+- A number proof runs the old and the new form on the same data and compares what they return.
+- An interpreter proof runs the old form and records the exception, or the warning under
+  `python -W error`, and runs the new form clean.
+- A speed proof times the old form at two settings.
+
+A rule is a `warning` when the proof passed and a pattern cannot see whether the code wants the
+old form, and `info` when no proof of the three kinds applies.
+
+The rules were then run over scikit-lego's own source, docs scripts and tests at the 0.9.10 tag,
+134 Python files, and every report was read. The pack made 46 reports there. 42 are on a form the
+rule describes, most of them in tests that build a deprecated or superseded class or check that a
+wrong call raises. 4 are on code that is right as it stands: the package's own export of
+`PandasTypeSelector`, two tests of `add_lags` with a positive lag, and one test that passes
+`threshold=0.1` to `GMMOutlierDetector` only to build an object. Two rules were narrowed after
+that reading. `debug-pipeline-default-log` now leaves a file alone when it imports `logging` or
+uses pytest's `caplog`, which removed 5 reports, and `unseeded-random-estimator` leaves test
+files alone, which removed 7.
+
+| Rule | Severity | Proof | Reports on scikit-lego's files | On code that is right | Fix |
+| --- | --- | --- | --- | --- | --- |
+| [`thresholder-score`](#thresholder-score) | error | number: 0.875 at three thresholds against 0.700, 0.875 and 0.850 | 0 | 0 | none |
+| [`estimator-transformer-proba`](#estimator-transformer-proba) | error | number: shape (800, 1) for 400 rows | 0 | 0 | none |
+| [`column-capper-fraction`](#column-capper-fraction) | error | number: 9,910 of 10,000 values changed against 1,000 | 0 | 0 | none |
+| [`dict-mapper-not-int`](#dict-mapper-not-int) | error | number: 0.5 and 1.7 became 0 and 1. Interpreter: ValueError | 0 | 0 | none |
+| [`regression-outlier-column-name`](#regression-outlier-column-name) | error | number: coefficients 0, 0 and 1, and 30 rows flagged against 10 | 2 | 0 | none |
+| [`pca-outlier-after-scaler`](#pca-outlier-after-scaler) | error | number: 287 rows flagged against 20 | 0 | 0 | none |
+| [`outlier-threshold`](#outlier-threshold) | error | interpreter: ValueError. Number: 380 of 400 rows flagged against 20 | 1 | 1 | none |
+| [`grouped-shrinkage-arguments`](#grouped-shrinkage-arguments) | error | number: probabilities bit equal with and without the keyword. Interpreter: TypeError | 0 | 0 | unsafe |
+| [`add-lags-positive`](#add-lags-positive) | warning | number: accuracy 0.992 against 0.531 on noise | 2 | 2 | none |
+| [`decay-on-shuffled-rows`](#decay-on-shuffled-rows) | warning | number: slope 1.648 against 2.989 | 0 | 0 | none |
+| [`outlier-remover-before-model`](#outlier-remover-before-model) | error | interpreter: ValueError | 0 | 0 | none |
+| [`decay-without-sample-weight`](#decay-without-sample-weight) | error | interpreter: ValueError, TypeError | 0 | 0 | none |
+| [`zero-inflated-roles`](#zero-inflated-roles) | error | interpreter: ValueError | 2 | 0 | none |
+| [`scorer-called-as-metric`](#scorer-called-as-metric) | error | interpreter: IndexError, TypeError. Number: a function where a score is expected | 0 | 0 | unsafe |
+| [`dataset-frame-and-xy`](#dataset-frame-and-xy) | error | interpreter: ValueError | 0 | 0 | none |
+| [`log-step-extra-bare`](#log-step-extra-bare) | error | number: a function where a frame is expected. Interpreter: ValueError | 1 | 0 | none |
+| [`selector-without-feature-names`](#selector-without-feature-names) | error | interpreter: ValueError, AttributeError | 0 | 0 | none |
+| [`debug-pipeline-default-log`](#debug-pipeline-default-log) | info | number: 0 characters printed | 0 | 0 | none |
+| [`removed-in-sklego`](#removed-in-sklego) | error | interpreter: ImportError, ModuleNotFoundError, TypeError | 0 | 0 | unsafe |
+| [`deprecated-in-sklego`](#deprecated-in-sklego) | warning | interpreter: DeprecationWarning | 10 | 1 | safe |
+| [`superseded-estimator`](#superseded-estimator) | warning, info | interpreter: UserWarning | 28 | 0 | none |
+| [`group-time-series-split-folds`](#group-time-series-split-folds) | warning | speed: 1.08 s at 5 folds against 10.48 s at 6 | 0 | 0 | none |
+| [`unseeded-random-estimator`](#unseeded-random-estimator) | info | none of the three | 0 | 0 | none |
+
+A rule with no report on scikit-lego's files was checked only on the pack's sample files, so its
+rate of wrong reports on real code is not measured. The pack was not judged on held-back files
+from other projects, and it has no recall number.
+
+### Arguments that give a wrong number
+
+Each old form below runs without an error and returns a number that is not the one the code asks
+for, or raises where the argument is read.
+
+#### thresholder-score
+
+**Severity:** error. **Fix:** none.
+
+Reports `GridSearchCV`, `RandomizedSearchCV`, `cross_val_score`, `cross_validate` and the other search and validation functions when they hold a `Thresholder(...)` and no `scoring=`, and reports `.score(...)` on a `Thresholder`. `Thresholder.score` returns the score of the inner model, so it does not change with `threshold`.
+
+Example:
+
+```python
+search = GridSearchCV(Thresholder(LogisticRegression(), threshold=0.5), {"threshold": [0.1, 0.5, 0.9]})
+accuracy = Thresholder(LogisticRegression(), threshold=0.1).fit(X_train, y_train).score(X_test, y_test)
+```
+
+Use instead:
+
+```python
+search = GridSearchCV(Thresholder(LogisticRegression(), threshold=0.5), {"threshold": [0.1, 0.5, 0.9]}, scoring="accuracy")
+model = FixedThresholdClassifier(LogisticRegression(), threshold=0.1, response_method="predict_proba")
+accuracy = model.fit(X_train, y_train).score(X_test, y_test)
+```
+
+The replacement is advice. xpd does not apply it automatically. On 400 rows with 20 percent
+positives, the grid search gave a mean test score of 0.875 at each of the three thresholds, and
+0.700, 0.875 and 0.850 with `scoring="accuracy"`. `score` on the test rows gave 0.890 at each
+threshold, where the accuracy of `predict` was 0.770, 0.890 and 0.810. scikit-learn's
+`FixedThresholdClassifier` made the same predictions as `Thresholder` at each threshold, and its
+`score` gave 0.770, 0.890 and 0.810.
+
+#### estimator-transformer-proba
+
+**Severity:** error. **Fix:** none.
+
+Reports `EstimatorTransformer(..., predict_func="predict_proba")` and `"predict_log_proba"`. The transformer reshapes the output to one column when the target has one dimension, so the probabilities of the two classes are stacked into twice as many rows.
+
+Example:
+
+```python
+features = EstimatorTransformer(LogisticRegression(), predict_func="predict_proba")
+```
+
+Use instead:
+
+```python
+features = EstimatorTransformer(LogisticRegression(), predict_func="decision_function")
+stack = StackingClassifier([("lr", LogisticRegression())], stack_method="predict_proba")
+```
+
+The replacement is advice. xpd does not apply it automatically. A binary model on 400 rows came
+back from `transform` with the shape (800, 1). Inside a `FeatureUnion` and inside a pipeline
+before a model, `fit` raised ValueError on the row counts. `decision_function` gave (400, 1), and
+`StackingClassifier(stack_method="predict_proba").transform` gave one row per input row.
+
+#### column-capper-fraction
+
+**Severity:** error. **Fix:** none.
+
+Reports `ColumnCapper(quantile_range=(0.05, 0.95))` and other ranges whose upper number is 1 or less. `ColumnCapper` reads the range in percent, as its default `(5.0, 95.0)` shows, so fractions cap every value at a percentile below 1.
+
+Example:
+
+```python
+capper = ColumnCapper(quantile_range=(0.05, 0.95))
+```
+
+Use instead:
+
+```python
+capper = ColumnCapper(quantile_range=(5, 95))
+```
+
+The replacement is advice. xpd does not apply it automatically. On 10,000 normal values
+`(0.05, 0.95)` changed 9,910 of them and left 92 distinct values between -3.272 and -2.379.
+`(5, 95)` changed 1,000 values and kept the range -1.628 to 1.640.
+
+#### dict-mapper-not-int
+
+**Severity:** error. **Fix:** none.
+
+Reports `DictMapper` with a dict literal that maps to a float with a fraction or to text, and a `default` that is such a float, text or NaN. `DictMapper` casts every mapped value and the default to int.
+
+Example:
+
+```python
+mapper = DictMapper({"low": 0.5, "high": 1.7}, default=-1)
+```
+
+Use instead:
+
+```python
+mapper = DictMapper({"low": 0, "high": 1}, default=-1)
+weights = frame["level"].map({"low": 0.5, "high": 1.7}).fillna(-1)
+```
+
+The replacement is advice. xpd does not apply it automatically. `{"a": 0.5, "b": 1.7}` with
+`default=-1` came back as 0, 1 and -1 with no warning. A text value raised ValueError "invalid
+literal for int() with base 10", and `default=np.nan` raised ValueError "cannot convert float NaN
+to integer". A float with no fraction, such as `1.0`, keeps its value, and the rule leaves it
+alone.
+
+#### regression-outlier-column-name
+
+**Severity:** error. **Fix:** none.
+
+Reports `RegressionOutlierDetector(model, column="y")`, where the column is a name. The detector finds the target of a frame by name, and then drops the column whose position equals `column` from the features. A name equals no position, so the target stays among the features and the inner model predicts it from itself.
+
+Example:
+
+```python
+detector = RegressionOutlierDetector(LinearRegression(), column="y").fit(frame)
+```
+
+Use instead:
+
+```python
+position = frame.columns.get_loc("y")
+detector = RegressionOutlierDetector(LinearRegression(), column=position).fit(frame.to_numpy())
+```
+
+The replacement is advice. xpd does not apply it automatically. On 500 rows with 10 planted
+outliers, `column="y"` on the frame fitted 3 features with the coefficients 0, 0 and 1, had a
+residual spread of 8.08e-16, and flagged 30 rows. `column=2` on `frame.to_numpy()` fitted 2
+features, had a spread of 1.48, and flagged the 10 planted rows and no other. A position on a
+frame is wrong in another way, which a pattern cannot see: the detector compares the frame's
+column names with the number, none matches, and the first column becomes the target. scikit-lego's
+own test of the name form passes because the planted rows have the largest rounding errors.
+
+#### pca-outlier-after-scaler
+
+**Severity:** error. **Fix:** none.
+
+Reports `PCAOutlierDetection` and `UMAPOutlierDetection` without `variant="absolute"` in a pipeline that holds `StandardScaler`, `RobustScaler` or `PowerTransformer`. The default `variant="relative"` divides the reconstruction error of a row by the sum of the row's values, which a centring step puts near zero.
+
+Example:
+
+```python
+detector = make_pipeline(StandardScaler(), PCAOutlierDetection(n_components=1, threshold=0.05))
+```
+
+Use instead:
+
+```python
+detector = make_pipeline(StandardScaler(), PCAOutlierDetection(n_components=1, threshold=2.0, variant="absolute"))
+```
+
+The replacement is advice. xpd does not apply it automatically, because the threshold has other
+units. On 1,000 rows with 20 planted outliers the relative variant flagged the 20 planted rows on
+the raw data. After `StandardScaler` it flagged 287 rows, 10 of them planted, and 505 rows had a
+negative ratio. `variant="absolute"` flagged the 20 planted rows in both cases. A scaler built
+with `with_mean=False`, `with_centering=False` or `standardize=False` does not centre, and the
+rule leaves it alone.
+
+#### outlier-threshold
+
+**Severity:** error. **Fix:** none.
+
+Reports `PCAOutlierDetection` and `UMAPOutlierDetection` built without a `threshold`, and `GMMOutlierDetector` and `BayesianGMMOutlierDetector` whose `threshold` is 0.5 or less, or above 1, with the default `method="quantile"`.
+
+Example:
+
+```python
+pca = PCAOutlierDetection(n_components=2)
+gmm = GMMOutlierDetector(threshold=0.05)
+```
+
+Use instead:
+
+```python
+pca = PCAOutlierDetection(n_components=2, threshold=0.1)
+gmm = GMMOutlierDetector(threshold=0.95)
+```
+
+The replacement is advice. xpd does not apply it automatically. Without a threshold, `fit` of the
+PCA and UMAP detectors raised ValueError "The `threshold` value cannot be `None`." The mixture
+detectors keep the share `threshold` of the training rows as inliers. `threshold=0.05` flagged 380
+of 400 training rows, 0.95 flagged 20, and the default 0.99 flagged 4. `threshold=2` raised
+ValueError, and ran with `method="stddev"`, which counts standard deviations. A detector inside a
+search is left alone, because the search may set the threshold.
+
+#### grouped-shrinkage-arguments
+
+**Severity:** error. **Fix:** unsafe: `shrinkage_kwargs={"alpha": 0.1}` for `alpha=0.1`, and the same for `min_n_obs=`. The other forms have no fix.
+
+Reports three spellings of shrinkage that fail on the grouped and hierarchical meta estimators: any extra keyword on `GroupedClassifier`, which drops it, `shrinkage="constant"` or `"min_n_obs"` without `shrinkage_kwargs`, and a bare `alpha=` or `min_n_obs=` keyword.
+
+Example:
+
+```python
+classifier = GroupedClassifier(LogisticRegression(), groups=["shop"], shrinkage="relative")
+regressor = GroupedRegressor(LinearRegression(), groups=["region", "shop"], shrinkage="constant", alpha=0.1)
+```
+
+Use instead:
+
+```python
+classifier = HierarchicalClassifier(LogisticRegression(), groups=["shop"], shrinkage="relative")
+regressor = GroupedRegressor(LinearRegression(), groups=["region", "shop"], shrinkage="constant", shrinkage_kwargs={"alpha": 0.1})
+```
+
+`GroupedClassifier` ends its signature with `**shrinkage_kwargs` and never reads it. With
+`shrinkage="relative"` its probabilities were bit equal to those without the keyword, and they
+differed by up to 0.17 from `HierarchicalClassifier(shrinkage="relative")`, which does shrink.
+`shrinkage="constant"` without a setting raised TypeError "constant_shrinkage() missing 1 required
+positional argument: 'alpha'" in `fit`. The bare keyword raised TypeError "got an unexpected
+keyword argument 'alpha'". `GroupedPredictor` took it until scikit-lego 0.9.2, so that document
+carries `since: "0.9.2"`.
+
+### Rows and fits
+
+Each old form below fits a step on rows it should not see in that order, or builds a meta
+estimator around a model it cannot fit.
+
+#### add-lags-positive
+
+**Severity:** warning. **Fix:** none.
+
+Reports `add_lags` with a positive lag, as a number, in a list or from `range`. `add_lags` shifts by the negative of the lag, so lag 1 puts the value of the next row on each row. pandas `shift(1)` goes the other way.
+
+Example:
+
+```python
+features = add_lags(frame, "sales", [1, 2])
+```
+
+Use instead:
+
+```python
+features = add_lags(frame, "sales", [-1, -2])
+```
+
+The replacement is advice. xpd does not apply it automatically. On a frame with sales 10 to 50,
+`add_lags(frame, "sales", 1)` gave `sales1` = 20, 30, 40, 50, and lag -1 gave 10, 20, 30, 40 from
+the second row on. On a series of pure noise, a model given the column from lag 1 predicted the
+sign of the next row with accuracy 0.992, and a model given the column from lag -1 predicted the
+sign of its own row with accuracy 0.531. A positive lag is right when the new column is the
+target of a forecast, so the rule is a warning.
+
+#### decay-on-shuffled-rows
+
+**Severity:** warning. **Fix:** none.
+
+Reports `train_test_split` without `shuffle=False` in a file that builds a `DecayEstimator`. The estimator weights each row by its position, the last row most, and never reads a date, so it is right only on rows in time order.
+
+Example:
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+model = DecayEstimator(Ridge(), decay_kwargs={"decay_rate": 0.99}).fit(X_train, y_train)
+```
+
+Use instead:
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False)
+model = DecayEstimator(Ridge(), decay_kwargs={"decay_rate": 0.99}).fit(X_train, y_train)
+```
+
+The replacement is advice. xpd does not apply it automatically. On 2,000 rows whose slope changed
+from 1 to 3 at row 1,000, the model fitted on the first 1,500 rows in order had the slope 2.989
+and a mean absolute error of 0.079 on the last 500 rows. Fitted on the same 1,500 rows in
+shuffled order it had the slope 1.648 and an error of 1.135, as the mean of 30 shuffles. A
+pattern cannot see which rows the estimator is fitted on, so the rule is a warning.
+
+#### outlier-remover-before-model
+
+**Severity:** error. **Fix:** none.
+
+Reports `OutlierRemover` in a pipeline that also holds a step named like a regressor or a classifier. The remover drops rows of X while the pipeline is fitted, and a scikit-learn pipeline cannot drop the same rows of y.
+
+Example:
+
+```python
+pipeline = make_pipeline(OutlierRemover(IsolationForest(), refit=True), LinearRegression())
+pipeline.fit(X, y)
+```
+
+Use instead:
+
+```python
+kept = IsolationForest().fit_predict(X) != -1
+model = LinearRegression().fit(X[kept], y[kept])
+```
+
+The replacement is advice. xpd does not apply it automatically. `fit` raised ValueError "Found
+input variables with inconsistent numbers of samples: [356, 400]". A pipeline that ended in
+`KMeans`, which reads no y, fitted on the 356 kept rows, and the rule leaves it alone.
+
+#### decay-without-sample-weight
+
+**Severity:** error. **Fix:** none.
+
+Reports `DecayEstimator` around a `Pipeline`, and around a scikit-learn model whose `fit` takes no `sample_weight`, such as `KNeighborsRegressor`, `GaussianProcessRegressor` and `LinearDiscriminantAnalysis`. `DecayEstimator` passes its weights as `fit(X, y, sample_weight=...)`.
+
+Example:
+
+```python
+model = DecayEstimator(make_pipeline(StandardScaler(), Ridge()))
+```
+
+Use instead:
+
+```python
+model = make_pipeline(StandardScaler(), DecayEstimator(Ridge()))
+```
+
+The replacement is advice. xpd does not apply it automatically. The pipeline raised ValueError
+"Pipeline.fit does not accept the sample_weight parameter", and `KNeighborsRegressor` raised
+TypeError "Model KNeighborsRegressor.fit() does not have 'sample_weight'". The list of models is
+every classifier and regressor of scikit-learn 1.9.1 that takes no argument to build and whose
+`fit` raised TypeError inside a `DecayEstimator`. With the `DecayEstimator` around the last step,
+the pipeline fitted.
+
+#### zero-inflated-roles
+
+**Severity:** error. **Fix:** none.
+
+Reports `ZeroInflatedRegressor` with a class named like a regressor as the classifier, or a class named like a classifier as the regressor. The classifier comes first and decides zero or not, and the regressor comes second.
+
+Example:
+
+```python
+model = ZeroInflatedRegressor(LinearRegression(), LogisticRegression())
+```
+
+Use instead:
+
+```python
+model = ZeroInflatedRegressor(classifier=LogisticRegression(), regressor=LinearRegression())
+```
+
+The replacement is advice. xpd does not apply it automatically. `fit` raised ValueError
+"`classifier` has to be a classifier" and, with a classifier in second place, "`regressor` has to
+be a regressor". The rule reads the class names, and it knows that `LogisticRegression` is a
+classifier.
+
+### Scorers, datasets and helpers
+
+#### scorer-called-as-metric
+
+**Severity:** error. **Fix:** unsafe: `p_percent_score("sex")` for `make_scorer(p_percent_score("sex"))`. The other forms have no fix.
+
+Reports `make_scorer` around `p_percent_score`, `equal_opportunity_score`, `correlation_score` or `subset_score`, and reports `p_percent_score(y_true, y_pred)` and `equal_opportunity_score(y_true, y_pred)`. Each function takes the column to look at and returns a scorer with the signature `(estimator, X, y)`.
+
+Example:
+
+```python
+search = GridSearchCV(model, grid, scoring=make_scorer(p_percent_score("sex")))
+fairness = p_percent_score(y_test, y_pred)
+```
+
+Use instead:
+
+```python
+search = GridSearchCV(model, grid, scoring=p_percent_score("sex"))
+fairness = p_percent_score("sex")(model, X_test, y_test)
+```
+
+`make_scorer` calls the scorer with `(y_true, y_pred)`, which raised IndexError for three of the
+functions and TypeError for `equal_opportunity_score`. Inside `GridSearchCV` scikit-learn caught
+the error and the best score was NaN. `p_percent_score(y, y_pred)` raised nothing and returned a
+function. The scorer itself, given to `scoring=`, gave a score.
+
+#### dataset-frame-and-xy
+
+**Severity:** error. **Fix:** none.
+
+Reports `load_penguins`, `load_arrests`, `load_chicken`, `load_abalone`, `load_heroes` and `load_hearts` called with both `return_X_y=True` and `as_frame=True`. The loaders test `as_frame` first and return the whole frame, with the target in it.
+
+Example:
+
+```python
+X, y = load_penguins(return_X_y=True, as_frame=True)
+```
+
+Use instead:
+
+```python
+frame = load_penguins(as_frame=True)
+X, y = frame.drop(columns="species"), frame["species"]
+```
+
+The replacement is advice. xpd does not apply it automatically. Unpacking raised ValueError "too
+many values to unpack (expected 2)" for all six loaders. scikit-learn's own loaders return a pair
+of frames for the same two keywords. `fetch_creditcard` passes both keywords to `fetch_openml`
+and is left alone.
+
+#### log-step-extra-bare
+
+**Severity:** error. **Fix:** none.
+
+Reports `@log_step_extra` without arguments, as a bare decorator or with empty parentheses. `log_step` works both ways. `log_step_extra` takes the log functions as its arguments, so as a bare decorator it takes the decorated function as a log function.
+
+Example:
+
+```python
+@log_step_extra
+def add_total(frame):
+    return frame.assign(total=frame["price"] * frame["count"])
+```
+
+Use instead:
+
+```python
+@log_step_extra(len)
+def add_total(frame):
+    return frame.assign(total=frame["price"] * frame["count"])
+```
+
+The replacement is advice. xpd does not apply it automatically. Calling the function under the
+bare decorator returned another function, not a frame, and raised nothing. `@log_step_extra()`
+raised ValueError "Supply at least one log_function for log_step_extra".
+
+#### selector-without-feature-names
+
+**Severity:** error. **Fix:** none.
+
+Reports `set_output(...)` and `get_feature_names_out()` on a pipeline that holds `ColumnSelector`, `ColumnDropper` or `TypeSelector`, called on the pipeline itself or on a name the file assigns it to. The three classes have `get_feature_names` and neither of the two scikit-learn methods.
+
+Example:
+
+```python
+pipeline = make_pipeline(ColumnSelector(["age", "fare"]), StandardScaler())
+pipeline.set_output(transform="pandas")
+```
+
+Use instead:
+
+```python
+pipeline = make_pipeline(ColumnTransformer([("keep", "passthrough", ["age", "fare"])]), StandardScaler())
+pipeline.set_output(transform="pandas")
+```
+
+The replacement is advice. xpd does not apply it automatically. `set_output` raised ValueError
+"Unable to configure output for ColumnSelector(...) because `set_output` is not available." and
+`get_feature_names_out` raised AttributeError "Estimator columnselector does not provide
+get_feature_names_out" for each of the three classes. The `ColumnTransformer` form did both, and
+names the columns `keep__age` and `keep__fare`.
+
+#### debug-pipeline-default-log
+
+**Severity:** info. **Fix:** none.
+
+Reports `log_callback="default"` on `DebugPipeline` and `make_debug_pipeline` in a file that neither imports `logging` nor uses pytest's `caplog`. The default callback logs each step at level INFO, which Python hides until logging is set up.
+
+Example:
+
+```python
+pipeline = DebugPipeline(steps, log_callback="default")
+```
+
+Use instead:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+pipeline = DebugPipeline(steps, log_callback="default")
+```
+
+The replacement is advice. xpd does not apply it automatically. Without the setup, fitting the
+pipeline printed 0 characters. After `logging.basicConfig(level=logging.INFO)` it logged one line
+for each step, such as `[StandardScaler()] shape=(400, 6) time=0s`. Logging may be set up in
+another module, so the rule is info.
+
+### Removed, deprecated and superseded forms
+
+Each form below raises or warns on scikit-lego 0.9.10. The removed forms were run and raised. The
+deprecated and superseded forms were run under `python -W error`, where the old form raised its
+warning and the new form ran clean. The messages take each replacement from the text of the
+warning or from the release that made the change. Every fix of a removed form turns code that
+raises into code that runs, so none of those fixes is safe.
+
+#### removed-in-sklego
+
+**Severity:** error. **Fix:** unsafe: `DemographicParityClassifier` for `FairClassifier`, `GroupedPredictor` for `GroupedEstimator`, `from sklego.preprocessing import OutlierRemover` for the import from `sklego.meta`, `as_frame=` for `give_pandas=`, and `decay_kwargs={"decay_rate": 0.99}` for `decay=0.99`. The other forms have no fix.
+
+Reports imports of `PatsyTransformer`, `FairClassifier`, `GroupedEstimator` and `sklego.meta.OutlierRemover` and of the modules that held them, which scikit-lego 0.8.0 removed, the `give_pandas=` keyword of the dataset loaders, which 0.6.6 removed, and the `decay=` keyword of `DecayEstimator`, which 0.7.0 removed. An import inside a `try` block that catches the error is left alone.
+
+Example:
+
+```python
+from sklego.meta import GroupedEstimator
+from sklego.meta import OutlierRemover
+
+frame = load_chicken(give_pandas=True)
+model = DecayEstimator(Ridge(), decay=0.99)
+```
+
+Use instead:
+
+```python
+from sklego.meta import GroupedPredictor
+from sklego.preprocessing import OutlierRemover
+
+frame = load_chicken(as_frame=True)
+model = DecayEstimator(Ridge(), decay_kwargs={"decay_rate": 0.99})
+```
+
+The imports raised ImportError or ModuleNotFoundError, and the keywords raised TypeError.
+`PatsyTransformer` has no fix, because `FormulaicTransformer` reads the formula with formulaic
+and not with patsy. The weights that `decay=0.97` gave in scikit-lego 0.6 are equal to those of
+`decay_kwargs={"decay_rate": 0.97}` to rounding, and not bit for bit. Each document carries
+`since` with the release that removed its form.
+
+#### deprecated-in-sklego
+
+**Severity:** warning. **Fix:** safe: `ClusterFoldValidation` for `KlusterFoldValidation`, `TypeSelector` for `PandasTypeSelector`, `date_series=` for `date_serie=`, `n_features_in_` for `dim_`, `num_fit_cols_`, `n_columns_` and `num_cols_`, `n_fitted_levels_` for `n_levels_`, `coef_` for `coefs_`, and `penalty=None` for `penalty="none"`. `allowed_strategies`, `allowed_methods` and `allowed_effects` have no fix.
+
+Reports the names, keywords and fitted attributes that raise a DeprecationWarning: `KlusterFoldValidation`, `PandasTypeSelector`, `TimeGapSplit(date_serie=)`, the attributes `dim_`, `num_fit_cols_`, `n_columns_`, `num_cols_`, `n_levels_` and `coefs_`, the properties `allowed_strategies`, `allowed_methods` and `allowed_effects`, and `penalty="none"` on the fairness classifiers.
+
+Example:
+
+```python
+folds = KlusterFoldValidation(cluster_method=KMeans(3))
+splitter = TimeGapSplit(date_serie=dates, train_duration=timedelta(days=10), valid_duration=timedelta(days=5))
+width = capper.n_columns_
+```
+
+Use instead:
+
+```python
+folds = ClusterFoldValidation(cluster_method=KMeans(3))
+splitter = TimeGapSplit(date_series=dates, train_duration=timedelta(days=10), valid_duration=timedelta(days=5))
+width = capper.n_features_in_
+```
+
+Every fix was run before and after on the pack's sample file, and the folds, the selected
+columns, the attribute values, the coefficients and the predictions were equal. An attribute on
+`self`, an assignment to the name, and the definition of a function or class of the name are the
+file's own and stay silent. `coefs_` is reported only in a file that names `ProbWeightRegression`
+or `DeadZoneRegressor` and no MLP, because scikit-learn's MLP models have a real `coefs_`. Each
+document carries `since` with the release that began to warn.
+
+#### superseded-estimator
+
+**Severity:** warning for the classes that warn, and info for `IdentityTransformer()`. **Fix:** none.
+
+Reports the classes that scikit-lego itself points away from since 0.9.8, where building one raises a UserWarning that names the replacement: `QuantileRegression` and `LADRegression`, `RepeatingBasisFunction`, and `DemographicParityClassifier` and `EqualOpportunityClassifier`. It also reports `IdentityTransformer()` without arguments.
+
+Example:
+
+```python
+model = QuantileRegression(quantile=0.8)
+season = RepeatingBasisFunction(n_periods=12, column="day_of_year")
+keep = IdentityTransformer()
+```
+
+Use instead:
+
+```python
+model = QuantileRegressor(quantile=0.8, alpha=0)
+season = ColumnTransformer([("season", SplineTransformer(n_knots=13, extrapolation="periodic"), ["day_of_year"])])
+keep = FunctionTransformer()
+```
+
+The replacement is advice. xpd does not apply it automatically, because each replacement is
+another model with other parameter names. The warnings ask for scikit-learn's `QuantileRegressor`
+and `SplineTransformer(extrapolation="periodic")`, and for fairlearn's `ThresholdOptimizer`
+around a `LogisticRegression`. On 500 rows `QuantileRegression(quantile=0.8)` and
+`QuantileRegressor(quantile=0.8, alpha=0)` gave the same coefficients to three decimals. The
+spline is another basis than the radial one, so its columns are other numbers.
+`IdentityTransformer()` and `FunctionTransformer()` returned the same array.
+
+### Speed and repeatable runs
+
+#### group-time-series-split-folds
+
+**Severity:** warning. **Fix:** none.
+
+Reports `GroupTimeSeriesSplit` with 6 or more splits. The class tries every combination of split points over the groups to find the most even folds, so each extra fold multiplies the time.
+
+Example:
+
+```python
+folds = GroupTimeSeriesSplit(n_splits=6)
+```
+
+Use instead:
+
+```python
+folds = GroupTimeSeriesSplit(n_splits=5)
+```
+
+The replacement is advice. xpd does not apply it automatically. On 3,000 rows in 60 groups,
+`split` took 0.09 s at 4 splits, 1.08 s at 5 and 10.48 s at 6. With 40 groups it took 0.21 s at 5
+and 1.07 s at 6. The class warns itself above 5 splits from 30 groups on. With a few groups the
+search is short, so the rule is a warning.
+
+#### unseeded-random-estimator
+
+**Severity:** info. **Fix:** none.
+
+Reports `RandomRegressor` and `RandomAdder` built without `random_state`, outside test files. Each call then draws new numbers.
+
+Example:
+
+```python
+baseline = RandomRegressor(strategy="normal")
+```
+
+Use instead:
+
+```python
+baseline = RandomRegressor(strategy="normal", random_state=0)
+```
+
+The replacement is advice. xpd does not apply it automatically. Two `predict` calls of one fitted
+`RandomRegressor()` differed, and so did two `transform` calls of one `RandomAdder()` on its
+training rows. Both pairs were equal with `random_state=0`.
+
+### Habits the pack does not report
+
+- `MaximumRelevanceMinimumRedundancy` with the default `kind="auto"` scores a whole-number
+  regression target as classes. On one such target it picked the features 1, 2 and 3, and 1, 2
+  and 5 with `kind="regression"`. A pattern cannot see the target, and a rule on every call
+  without `kind` would report the library's own tests.
+- `RegressionOutlierDetector` with a column position on a frame, and `TimeGapSplit`,
+  `RandomAdder` and `OutlierRemover` given an input type they do not take, depend on what `fit`
+  is given, which a pattern cannot see.
+- The extras cvxpy, umap-learn and formulaic have no rule, for the reason at the top of this
+  section.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
@@ -5756,7 +6452,7 @@ target/release/xpd check samples/bad.py
 cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --unsafe-fixes
 ```
 
-The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/hamilton/` and
+The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`, `samples/sklego/`, `samples/hamilton/` and
 `samples/python/` mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to

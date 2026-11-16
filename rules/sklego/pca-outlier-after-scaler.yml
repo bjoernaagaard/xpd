@@ -1,0 +1,31 @@
+# PCAOutlierDetection and UMAPOutlierDetection default to variant="relative", which divides the
+# reconstruction error of a row by the sum of the row's values. After a step that centres the
+# columns that sum is near zero and negative for half the rows, so the ratio is meaningless. On
+# 1,000 rows with 20 planted outliers the relative variant flagged the 20 planted rows on the raw
+# data and 287 rows, 10 of them planted, after StandardScaler, where 505 rows had a negative
+# ratio. variant="absolute" flagged the 20 planted rows in both cases.
+
+id: pca-outlier-after-scaler
+language: python
+severity: error
+message: $C divides the reconstruction error by the sum of each row, which a centring step puts near zero. With 20 planted outliers in 1,000 rows it flagged 287 rows after StandardScaler and found 10 of the planted ones, where variant="absolute" flagged exactly the 20. Pass variant="absolute" and a threshold in the units of the scaled data.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - not: { has: { field: arguments, regex: 'absolute' } }
+    - inside:
+        stopBy: end
+        kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)(make_pipeline|Pipeline|make_debug_pipeline|DebugPipeline)$' }
+          - has:
+              field: arguments
+              has:
+                stopBy: end
+                kind: call
+                all:
+                  - has: { field: function, regex: '(^|\.)(StandardScaler|RobustScaler|PowerTransformer)$' }
+                  - not: { regex: '(with_mean|with_centering|standardize)\s*=\s*False' }
+constraints:
+  C: { regex: '^(PCAOutlierDetection|UMAPOutlierDetection)$' }

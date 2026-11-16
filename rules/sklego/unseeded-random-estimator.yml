@@ -1,0 +1,19 @@
+# RandomRegressor draws its predictions and RandomAdder its noise from the generator that
+# random_state names. Without it each call draws new numbers: two predict calls of one fitted
+# RandomRegressor() differed, and so did two transform calls of one RandomAdder(), and both
+# pairs were equal with random_state=0. No proof of a wrong number applies, so the rule is info.
+# A test that checks a shape or a type needs no seed, so test files are left alone.
+
+id: unseeded-random-estimator
+language: python
+severity: info
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+message: $C without random_state draws new numbers on every call, so two calls on one fitted object gave different results. Pass random_state= to make the run repeatable.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^random_state$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+    - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+constraints:
+  C: { regex: '^(RandomRegressor|RandomAdder)$' }

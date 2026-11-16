@@ -1,0 +1,21 @@
+# log_step works with and without parentheses. log_step_extra does not: it takes the log
+# functions as its arguments, so as a bare decorator it takes the decorated function as a log
+# function and puts a decorator in its place. Calling the function then returns another function
+# where the code expects a frame, and nothing raises until the result is used. With empty
+# parentheses it raises ValueError "Supply at least one log_function for log_step_extra".
+
+id: log-step-extra-bare
+language: python
+severity: error
+message: A bare @log_step_extra takes the decorated function as a log function, so calling the function returned another function, not a frame. Pass the log functions, as in @log_step_extra(len).
+rule:
+  kind: decorator
+  regex: '^@\s*(\w+\.)*log_step_extra\s*(#[^\n]*)?$'
+---
+id: log-step-extra-bare
+language: python
+severity: error
+message: log_step_extra without a log function raises ValueError "Supply at least one log_function for log_step_extra". Pass the log functions, as in @log_step_extra(len), or use @log_step.
+rule:
+  pattern: $F()
+  has: { field: function, regex: '(^|\.)log_step_extra$' }
