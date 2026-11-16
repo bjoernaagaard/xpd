@@ -1,9 +1,9 @@
 # xpd
 
 xpd checks Python code for slow operations and wrong results. It checks code that uses pandas,
-NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo or
-Apache Hamilton. xpd can rewrite many of the lines it reports, and a coding agent can run it after
-every edit.
+NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo,
+plotly or Apache Hamilton. xpd can rewrite many of the lines it reports, and a coding agent can
+run it after every edit.
 
 ## What xpd reports
 
@@ -60,6 +60,7 @@ runs only on files that import the library. The Python pack runs on every file.
 | linearmodels | `clustered-without-clusters` | `cov_type="clustered"` without clusters gives the robust standard errors under another name |
 | arch | `unscaled-returns` | Returns as decimals made the optimizer stop with code 4 and give a mean of 4.02 where 0.056 was right |
 | pymoo | `objectives-stacked-by-row` | `out["F"] = np.array([f1, f2])` in a `Problem` gives each solution the wrong values, and a least `f2` of 0.003 came back where the true least is 10 |
+| plotly | `marker-size-diameter` | A marker's `size` is its diameter, so markers for 10 and 20 were drawn with areas of 78.5 and 314.2 square pixels |
 | Hamilton | `node-mutates-input` | A node writes to one of its parameters, and Hamilton hands the same object to other nodes |
 | Python | `dict-str-any` | `dict[str, Any]` in a signature hides the keys the function uses |
 

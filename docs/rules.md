@@ -1,10 +1,10 @@
 # Rules
 
-xpd has twelve rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+xpd has thirteen rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
 [Category Encoders](#category-encoders), [linearmodels](#linearmodels), [arch](#arch),
-[pymoo](#pymoo), [Hamilton](#hamilton) and [Python](#python). A library's rules run only on files
-that import it. The Python rules run on every file.
+[pymoo](#pymoo), [plotly](#plotly), [Hamilton](#hamilton) and [Python](#python). A library's rules
+run only on files that import it. The Python rules run on every file.
 
 ## pandas
 
@@ -10515,8 +10515,8 @@ cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --un
 
 The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
 `samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/linearmodels/`,
-`samples/arch/`, `samples/pymoo/`, `samples/hamilton/` and `samples/python/` mark each line a rule
-reports with a comment that names the rules.
+`samples/arch/`, `samples/pymoo/`, `samples/plotly/`, `samples/hamilton/` and `samples/python/`
+mark each line a rule reports with a comment that names the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the
