@@ -132,8 +132,9 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.prompt(tags={"pipeline"})
     def build_pipeline(data: str, target: str) -> str:
-        """Build a scikit-learn model from a data file, save it with its contract, and prove
-        with `gates` that the run has no leakage, repeats, and predicts from the saved file.
+        """Build a scikit-learn model from a data file, save it with its contract, and show
+        with `gates` that `check` reports no error, that the run repeats, and that a new Python
+        process predicts from the saved file.
 
         Args:
             data: The data file, inside the project root.
@@ -157,16 +158,25 @@ project root, which is where each of them runs, and save the model in the folder
      on the training rows and score the held out rows once. Choose no setting by that score.
    - Save the Pipeline with joblib to model/model.joblib, and save model/contract.json in
      the shape below.
-   - Leave the predictions for the held out rows in `result`, as a Series with the rows'
-     index.
-4. Write predict.py. It reads only model/contract.json. It raises when the input columns or
-   dtypes of {data} differ from the contract, or when scikit-learn is another version. It
-   repeats the split from the contract, loads the model, and leaves the predictions for the
-   held out rows in `result`, as train.py does.
+   - List features.py under `code` in the contract's `model`. The saved Pipeline holds the
+     function by its module and name, so the model loads only where features.py can be
+     imported.
+   - Leave what the model says about the held out rows in `result`, with the rows' index: the
+     class probabilities as a DataFrame, or the predictions of a regressor as a Series. Two
+     models with other fitted values then leave another `result`, where their classes could
+     still agree.
+4. Write predict.py. It reads model/contract.json and the files the contract names. It
+   raises when the input columns or dtypes of {data} differ from the contract, when
+   scikit-learn is another version, or when a file under `code` is missing. It repeats the
+   split from the contract, loads the model, and leaves the same in `result` as train.py
+   does.
 5. Run the stages. With code mode on, call `execute` once with the script below. Without it,
    call the same tools in the same order.
 6. The run is done when `passed` is true. For a gate that failed, read its `detail`, fix the
    scripts and run the stages again. Never edit the contract by hand.
+7. The gates find no leak that `check` has no rule for. Read train.py once more yourself:
+   every fit and every choice of a setting uses the training rows only, and nothing changes
+   a column before the split.
 
 The contract, with the values of the run in place of these:
 
@@ -180,7 +190,8 @@ The contract, with the values of the run in place of these:
   "model": {{
     "file": "model/model.joblib",
     "type": "sklearn.pipeline.Pipeline",
-    "versions": {{"python": "3.13.1", "scikit-learn": "1.8.0", "pandas": "3.0.0"}}
+    "versions": {{"python": "3.13.1", "scikit-learn": "1.8.0", "pandas": "3.0.0"}},
+    "code": ["features.py"]
   }}
 }}
 ```

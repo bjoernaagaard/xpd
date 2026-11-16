@@ -179,7 +179,7 @@ class SkillSource(Output):
 #   model             FittedStep    the last step
 #   validation        Validation    scores on folds of the training rows, one on the held out rows
 #   proof             Proof         what check, graph and equiv found
-#   persisted model   SavedModel    the file and the versions that wrote it
+#   persisted model   SavedModel    the file, the versions that wrote it and the code it imports
 #   verdict           GateReport    one Gate per requirement
 Stage = Literal[
     "raw data",
@@ -234,14 +234,20 @@ class FittedStep(Written):
 class Validation(Written):
     scoring: str = Field(description="The scorer name, such as accuracy.")
     folds: int
-    cv_scores: list[float] = Field(description="One score per fold of the training rows.")
-    test_score: float = Field(description="The score on the held out rows, computed once.")
+    cv_scores: list[float] = Field(description="One score per fold.")
+    test_score: float = Field(description="The score on the held out rows.")
 
 
 class SavedModel(Written):
     file: str = Field(description="The saved model, relative to the project root.")
     type: str = Field(description="The class of the saved object, with its module.")
     versions: dict[str, str] = Field(description="Python and each library that wrote the file.")
+    code: list[str] = Field(
+        default_factory=list,
+        description="The project files the model imports when it loads, relative to the "
+        "project root. A Pipeline saves a function such as the one in a FunctionTransformer "
+        "by its module and name, so the model loads only where that module can be imported.",
+    )
 
 
 class Contract(Written):

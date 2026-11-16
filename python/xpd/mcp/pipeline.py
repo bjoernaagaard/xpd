@@ -39,6 +39,8 @@ PIPELINE = "sklearn.pipeline.Pipeline"
 # What a later run needs to rebuild the environment that wrote the model.
 VERSIONS = ("python", "scikit-learn", "pandas")
 MIN_FOLDS = 2
+# The libraries that SEED_RULES covers, as the detail of `split-is-seeded` names them.
+SEED_LIBRARIES = "scikit-learn, scikit-lego, MAPIE or Category Encoders"
 
 
 def gate(
@@ -89,25 +91,34 @@ def split_is_seeded(lint: CheckReport, contract: Contract) -> Gate:
         for issue in lint.issues
         if issue.rule in SEED_RULES.get(issue.package, ())
     ]
-    found = f"The split has the seed {contract.split.seed}, and check reports no unseeded draw."
+    found = (
+        f"The contract records the seed {contract.split.seed}, and check reports no unseeded "
+        f"{SEED_LIBRARIES} draw."
+    )
     return gate("split-is-seeded", "split", ["check", "contract"], failures, found)
 
 
-def no_leakage(lint: CheckReport) -> Gate:
+def check_reports_no_error(lint: CheckReport) -> Gate:
     """Every error of every pack counts, and not a list of rules. The leaks among them are
     `fit-before-split`, `fit-on-test` and `tune-on-test` of sklearn, `calibrate-on-training-rows`
     and `coverage-on-seen-rows` of mapie, and `encode-before-split` and
     `transform-with-test-target` of category_encoders. sklego has no rule about a leak, and its
-    errors fail the gate as wrong results."""
+    errors fail the gate as wrong results.
+
+    The gate does not show that a run has no leak. A rule reads the code and knows the held out
+    rows by names such as `X_test`, so it misses a leak under another name and a leak that no
+    rule describes."""
     failures = [
         f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
         for issue in lint.issues
         if issue.severity == "error"
     ]
-    return gate("no-leakage", "validation", ["check"], failures, "check reports no error.")
+    return gate("check-reports-no-error", "proof", ["check"], failures, "check reports no error.")
 
 
-def inputs_are_raw_columns(profile: Profile, contract: Contract) -> Gate:
+def inputs_are_file_columns(profile: Profile, contract: Contract) -> Gate:
+    """Compares names and dtypes. It does not compare values, so a column that the training
+    script overwrites before the split passes."""
     raw = {column.column: column.dtype for column in profile.columns}
     failures = []
     for column in contract.inputs:
@@ -115,8 +126,8 @@ def inputs_are_raw_columns(profile: Profile, contract: Contract) -> Gate:
             failures.append(f"The target {column.column} is an input.")
         elif column.column not in raw:
             failures.append(
-                f"The input {column.column} is no column of {profile.file}, so a step outside "
-                "the Pipeline made it."
+                f"The input {column.column} is no column of {profile.file}, so code outside the "
+                "Pipeline made it."
             )
         elif raw[column.column] != column.dtype:
             failures.append(
@@ -125,8 +136,13 @@ def inputs_are_raw_columns(profile: Profile, contract: Contract) -> Gate:
             )
     if not contract.inputs:
         failures.append("The contract lists no input column.")
-    found = f"The model takes {len(contract.inputs)} columns of {profile.file} as they are read."
-    return gate("inputs-are-raw-columns", "preprocessing", ["profile", "contract"], failures, found)
+    found = (
+        f"The {len(contract.inputs)} inputs of the contract have the names and dtypes of columns "
+        f"of {profile.file}."
+    )
+    return gate(
+        "inputs-are-file-columns", "preprocessing", ["profile", "contract"], failures, found
+    )
 
 
 def one_pipeline(contract: Contract) -> Gate:
@@ -165,6 +181,8 @@ def dataflow_connects(dataflow: GraphReport, contract: Contract) -> Gate:
 
 
 def cross_validated(contract: Contract) -> Gate:
+    """Reads the scores as the contract records them. No gate checks which rows the folds or
+    the held out score were computed on."""
     validation = contract.validation
     failures = []
     if validation.folds < MIN_FOLDS:
@@ -174,9 +192,9 @@ def cross_validated(contract: Contract) -> Gate:
             f"The contract has {len(validation.cv_scores)} scores for {validation.folds} folds."
         )
     found = (
-        f"{validation.scoring} is {min(validation.cv_scores, default=0)} to "
-        f"{max(validation.cv_scores, default=0)} on {validation.folds} folds of the training "
-        f"rows, and {validation.test_score} on the held out rows."
+        f"The contract records {validation.scoring} {min(validation.cv_scores, default=0)} to "
+        f"{max(validation.cv_scores, default=0)} on {validation.folds} folds, and "
+        f"{validation.test_score} as the held out score."
     )
     return gate("cross-validated", "validation", ["contract"], failures, found)
 
@@ -205,22 +223,24 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
         data_is_profiled(profile, contract),
         split_covers_every_row(profile, contract),
         split_is_seeded(proof.lint, contract),
-        inputs_are_raw_columns(profile, contract),
+        inputs_are_file_columns(profile, contract),
         dataflow_connects(proof.dataflow, contract),
         one_pipeline(contract),
-        no_leakage(proof.lint),
+        check_reports_no_error(proof.lint),
         cross_validated(contract),
         equivalent(
             "reproducible",
             "proof",
             proof.reproducible,
-            "Two runs of the training script predict the same for the held out rows.",
+            "Two runs of the training script, each in its own Python process, leave an equal "
+            "`result`.",
         ),
         equivalent(
             "saved-model-predicts",
             "persisted model",
             proof.served,
-            "The model loaded from disk predicts what the fitted one did for the held out rows.",
+            "The prediction script, in its own Python process, leaves the `result` that the "
+            "training script left.",
         ),
         versions_recorded(profile, contract),
     ]
@@ -238,10 +258,11 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
     async def contract(ctx: Context, file: str) -> Contract | InputRequiredResult:
         """Read the contract that a training script saved beside its model: the data file and
         target, the split, the input columns, the steps of the Pipeline, the validation scores,
-        and the model file with the versions that wrote it. Changes no file.
+        and the model file with the versions that wrote it and the project files it imports
+        when it loads. Changes no file.
 
-        It fails when the file does not have that shape, or when the data file or the model
-        file it names is not in the project. Pass the result to `gates`.
+        It fails when the file does not have that shape, or when the data file, the model file
+        or a code file it names is not in the project. Pass the result to `gates`.
 
         Args:
             file: The contract, a JSON file inside the project root.
@@ -263,16 +284,16 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
             msg = f"{file} is not a contract. {fields}"
             raise ToolError(msg) from error
         # The paths are compared with those of the other tools, which are relative to the root.
-        named = {"data": read.data.file, "model": read.model.file}
-        inside = {part: root.inside(raw) for part, raw in named.items()}
-        for raw in inside.values():
+        data, model = root.inside(read.data.file), root.inside(read.model.file)
+        code = [root.inside(raw) for raw in read.model.code]
+        for raw in (data, model, *code):
             if not (root.path / raw).is_file():
                 msg = f"{file} names {raw}, which is no file in the project."
                 raise ToolError(msg)
         return read.model_copy(
             update={
-                "data": read.data.model_copy(update={"file": inside["data"]}),
-                "model": read.model.model_copy(update={"file": inside["model"]}),
+                "data": read.data.model_copy(update={"file": data}),
+                "model": read.model.model_copy(update={"file": model, "code": code}),
             }
         )
 
@@ -282,13 +303,17 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         with the tools whose results decide it. The run is done when `passed` is true. Changes
         no file and runs nothing, so pass results of this run.
 
-        The gates: the data is the profiled file and its target has no nulls, the split is
-        seeded and covers every row, the model takes raw columns, one Pipeline holds every
-        step, the feature steps connect, `check` reports no error such as leakage, the scores
-        come from folds of the training rows, two training runs agree, the saved model predicts
-        what the fitted one did, and the versions are recorded. The seed and the errors are read
-        from every pack, so the scikit-lego, MAPIE and Category Encoders rules count as the
-        scikit-learn rules do.
+        The gates: the data is the profiled file and its target has no nulls, the split
+        covers every row, `check` reports no draw without a seed in scikit-learn, scikit-lego,
+        MAPIE or Category Encoders code, the inputs have the names and dtypes of columns of the
+        file, one Pipeline holds every step, the feature steps connect, `check` reports no
+        error, the contract has a score for each fold, two training runs leave an equal
+        `result`, the prediction script leaves that `result` too, and the versions are
+        recorded.
+
+        A passed report is no proof that the run has no leak. `check` reads the code and finds
+        the leaks its rules describe, by names such as `X_test`. No gate checks which rows a
+        step was fitted or scored on, or that an input still holds the values of the file.
 
         Args:
             profile: The result of `profile` on the data file.
