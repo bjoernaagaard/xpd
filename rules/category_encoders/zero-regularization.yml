@@ -1,0 +1,30 @@
+# WOEEncoder adds regularization, 1.0 by default, to the counts of both classes before it takes
+# the logarithm of their ratio. With regularization=0 a category that holds one class alone
+# divides by zero: on 2.11.2 a category of five rows of class 1 was coded inf, with no error and
+# no warning, where the default gave 1.204. An inf in a feature makes most models raise at fit.
+id: zero-regularization
+language: python
+severity: error
+message: WOEEncoder(regularization=0) codes a category that holds one class alone as inf, with no error. A category of five rows of class 1 came out as inf, against 1.204 with the default 1.0. Pass a regularization above 0.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)WOEEncoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^regularization\s*=\s*0(\.0*)?$' } }
+---
+# CountTargetEncoder, added in 2.11, checks its smoothing at fit: "ValueError: smoothing must be
+# strictly bigger than 0."
+id: zero-regularization
+language: python
+severity: error
+message: CountTargetEncoder(smoothing=0) raises ValueError at fit on category_encoders 2.11.2, because the smoothing must be above 0. Pass a small positive number.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)CountTargetEncoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^smoothing\s*=\s*0(\.0*)?$' } }
+metadata: { since: "2.11" }

@@ -1,0 +1,25 @@
+# HashingEncoder hashes every value into n_components columns, 8 by default, and all encoded
+# columns share them. On 2.11.2 a column of 100 distinct values gave 8 distinct encoded rows with
+# the default, 48 with n_components=64 and 95 with n_components=1024. Two columns encoded by one
+# HashingEncoder() gave 8 output columns in all, and the rows (x, y) and (y, x) got the same
+# code, so the encoder also loses which column a value came from. The default is a choice the
+# code should state, so the rule is a warning. It has no fix, because the right number depends
+# on how many distinct values the columns hold.
+id: hashing-default-components
+language: python
+severity: warning
+message: HashingEncoder hashes into 8 columns by default, shared by all encoded columns. A column of 100 distinct values gave 8 distinct encoded rows, against 95 with n_components=1024. Pass n_components.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)HashingEncoder$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_components$' } } }
+          - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+          # n_components is the fourth positional parameter.
+          - has: { field: arguments, has: { nthChild: 4, not: { kind: keyword_argument } } }
+          - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^isinstance$' } } }
+          # hashing_trick takes the number of columns as its own argument N.
+          - inside: { kind: attribute, has: { field: attribute, regex: '^hashing_trick$' } }

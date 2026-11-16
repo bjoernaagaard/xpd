@@ -82,8 +82,8 @@ def register(mcp: FastMCP, catalog: Catalog) -> None:
         optional, and they combine. Use `rule` to read one rule with examples.
 
         Args:
-            package: Only this pack, by module name, such as pandas, numpy, scipy, sklearn
-                or mapie.
+            package: Only this pack, by module name, such as pandas, numpy, scipy, sklearn,
+                sklego, mapie or category_encoders.
             severity: Only rules of this severity.
             fixable: True for rules with a fix, False for rules without one.
             query: Only rules whose id, message or documentation contains this text, in any

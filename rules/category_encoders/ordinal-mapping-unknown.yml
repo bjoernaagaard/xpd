@@ -1,0 +1,18 @@
+# An OrdinalEncoder with a mapping codes every category the mapping does not name as -1, with
+# no error and no warning: with {"a": 1, "b": 2} the column a, b, c came out as 1.0, 2.0, -1.0 on
+# 2.11.2. A key with a typing error, or a category that appears later, then reaches the model
+# as -1, below every real code. With handle_unknown="error" the same fit raised "ValueError:
+# Unexpected categories found in column c". Whether the mapping names every category cannot be
+# read from the code, so the rule is info. No scikit-learn class has a mapping keyword.
+id: ordinal-mapping-unknown
+language: python
+severity: info
+message: A category that the mapping does not name is coded -1 in silence, as c was when the mapping named only a and b. Pass handle_unknown="error" to raise on such a category, or state the handle_unknown you want.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)OrdinalEncoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mapping$' } }, { not: { has: { field: value, kind: none } } }] } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^handle_unknown$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }

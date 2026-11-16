@@ -1,0 +1,53 @@
+# The supervised encoders of category_encoders take the target in transform, which scikit-learn
+# transformers never do. It is meant for the training rows. On the test rows a
+# LeaveOneOutEncoder then takes each row's own label out of its category mean, so the code
+# tells the model the label. On data with no signal that scored 0.582 AUC over 30 seeds, 7.3
+# standard errors above 0.5, against 0.498 for transform(X_test). The rule reads the name of
+# the first argument, and it needs the encoder assigned from LeaveOneOutEncoder in the same
+# function, or in the module for code outside a function.
+# Unsafe: the fix changes the codes of the test rows, which is the point.
+id: transform-with-test-target
+language: python
+severity: error
+message: transform($X, $Y) gives a LeaveOneOutEncoder the test labels, and it takes each row's own label out of its code. It scored 0.582 AUC on data with no signal, against 0.498 without the labels. Call $E.transform($X).
+rule:
+  any:
+    # The keyword form comes first, because ast-grep keeps the first branch that matches.
+    - pattern: $E.transform($X, y=$Y)
+    - pattern: $E.transform($X, $Y)
+  inside:
+    stopBy: { kind: function_definition }
+    any: [{ kind: function_definition }, { kind: module }]
+    has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { has: { field: right, regex: '(^|[^\w])LeaveOneOutEncoder\(' } }] }
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|df|data)_)(val|valid|validation)([^a-z]|$)', not: { regex: '(?i)train|concat|append|stack' } }
+  Y: { not: { any: [{ kind: keyword_argument }, { regex: '^(True|False|None)$' }] } }
+fix: $E.transform($X)
+metadata: { fix: unsafe }
+---
+# The other supervised encoders read the target in transform only to add the noise of
+# randomized=True or sigma, which belongs on the training rows. CatBoostEncoder scored 0.507
+# with the test labels, 0.8 standard errors from 0.5, and TargetEncoder, WOEEncoder,
+# JamesSteinEncoder, MEstimateEncoder, QuantileEncoder and CountTargetEncoder gave the same
+# score with and without them, so this document is info.
+# Unsafe: with randomized=True or sigma the fix takes the noise off the test rows.
+id: transform-with-test-target
+language: python
+severity: info
+message: transform($X, $Y) passes the test labels to the encoder. The target in transform is for the training rows, where it adds the noise of sigma or randomized=True. Call $E.transform($X).
+rule:
+  any:
+    # The keyword form comes first, because ast-grep keeps the first branch that matches.
+    - pattern: $E.transform($X, y=$Y)
+    - pattern: $E.transform($X, $Y)
+  inside:
+    stopBy: { kind: function_definition }
+    any: [{ kind: function_definition }, { kind: module }]
+    all:
+      - has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { has: { field: right, regex: '(^|[^\w])(CatBoostEncoder|CountTargetEncoder|GLMMEncoder|JamesSteinEncoder|MEstimateEncoder|QuantileEncoder|SummaryEncoder|TargetEncoder|WOEEncoder|PolynomialWrapper)\(' } }] }
+      - not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $E } }, { has: { field: right, regex: '(^|[^\w])LeaveOneOutEncoder\(' } }] } }
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|df|data)_)(val|valid|validation)([^a-z]|$)', not: { regex: '(?i)train|concat|append|stack' } }
+  Y: { not: { any: [{ kind: keyword_argument }, { regex: '^(True|False|None)$' }] } }
+fix: $E.transform($X)
+metadata: { fix: unsafe }

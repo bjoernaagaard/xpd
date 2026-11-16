@@ -1,0 +1,63 @@
+# Some encoders add random noise to the codes of the training rows, and without random_state
+# they draw it from a new seed on every run. On 2.11.2 two fit_transform calls on the same 400
+# rows differed by up to 0.07 with WOEEncoder(randomized=True), 0.11 with JamesSteinEncoder, 0.13
+# with MEstimateEncoder, 0.14 with LeaveOneOutEncoder(sigma=0.05) and 0.12 with
+# CatBoostEncoder(sigma=0.05). With random_state=0 the two calls were equal. A seed does not move
+# the expected score, so the rule is info, as missing-random-state of the scikit-learn pack is. A
+# file that calls np.random.seed is left alone, because the encoders then draw from that seed.
+id: encoder-noise-without-seed
+language: python
+severity: info
+message: $C(randomized=True) adds noise from a new seed on every run, so the codes change from run to run. Pass random_state.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(GLMMEncoder|JamesSteinEncoder|MEstimateEncoder|WOEEncoder)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^randomized\s*=\s*True$' } }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
+---
+# LeaveOneOutEncoder and CatBoostEncoder have no randomized keyword. A sigma that is not None
+# turns their noise on.
+id: encoder-noise-without-seed
+language: python
+severity: info
+message: $C(sigma=) adds noise from a new seed on every run, so the codes change from run to run. Pass random_state.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(LeaveOneOutEncoder|CatBoostEncoder)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^sigma$' } }, { not: { has: { field: value, any: [{ kind: none }, { regex: '^0(\.0*)?$' }] } } }] } }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
+---
+# NestedCVWrapper builds StratifiedKFold(shuffle=True) from a whole-number cv, 5 by default, so
+# its folds change from run to run: two fit_transform calls differed by up to 0.07. With
+# random_state=0 or shuffle=False they were equal. A splitter passed as cv brings its own seed.
+id: encoder-noise-without-seed
+language: python
+severity: info
+message: NestedCVWrapper shuffles its folds with a new seed on every run, so the codes change from run to run. Pass random_state.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)NestedCVWrapper$' }
+    - not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*False$' } }
+          - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^cv$' } }, { not: { has: { field: value, kind: integer } } }] } }
+          # cv is the second positional parameter.
+          - has: { field: arguments, has: { nthChild: 2, not: { any: [{ kind: keyword_argument }, { kind: integer }] } } }
+          - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
+          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }

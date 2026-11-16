@@ -1,0 +1,114 @@
+# Each document finds a form that category_encoders 2.11.2 raises on because a release removed
+# it. The release was found by reading the constructor of every class in the wheels of 1.3.0,
+# 2.2.2, 2.5.1, 2.6.4, 2.7.0, 2.8.0, 2.8.1, 2.9.0, 2.10.0 and 2.11.2, and the exception was
+# raised on 2.11.2. Code inside assertRaises, pytest.raises or a try block with an except clause
+# expects the error or handles both releases, and stays silent.
+
+# impute_missing was a keyword of every encoder until 2.0, which replaced it with
+# handle_missing. On 2.11.2: "TypeError: OneHotEncoder.__init__() got an unexpected keyword
+# argument 'impute_missing'". No other library has the keyword.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: impute_missing was removed in category_encoders 2.0, and $C raises TypeError on it. Use handle_missing="value", the default, in place of impute_missing=True, or handle_missing="return_nan" to keep the missing value.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: 'Encoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^impute_missing$' } } }
+metadata: { since: "2.0" }
+---
+# LeaveOneOutEncoder(randomized=True, sigma=0.05) was the 1.x way to add noise. Since 2.0 sigma
+# alone turns the noise on. The other encoders with noise still take randomized.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: LeaveOneOutEncoder(randomized=) was removed in category_encoders 2.0 and raises TypeError. Pass sigma alone, such as sigma=0.05, to add the noise.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)LeaveOneOutEncoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^randomized$' } } }
+metadata: { since: "2.0" }
+---
+# utils.get_obj_cols was replaced by get_categorical_cols in 2.6.
+# Unsafe: get_obj_cols named the object columns, and get_categorical_cols also names columns
+# of the category and string dtypes.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: get_obj_cols was removed from category_encoders.utils in 2.6 and raises AttributeError. Call get_categorical_cols, which also names category and string columns.
+rule:
+  kind: identifier
+  regex: '^get_obj_cols$'
+  not:
+    any:
+      - inside: { kind: function_definition, field: name }
+      - inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
+      - inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } }
+      - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: function_definition, has: { field: name, regex: '^get_obj_cols$' } } }
+fix: get_categorical_cols
+metadata: { fix: unsafe, since: "2.6" }
+---
+# The mixin of the supervised encoders was renamed in 2.5 and the old name was dropped in 2.8.0.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: TransformerWithTargetMixin was removed from category_encoders.utils in 2.8 and raises AttributeError or ImportError. Use SupervisedTransformerMixin.
+rule:
+  kind: identifier
+  regex: '^TransformerWithTargetMixin$'
+  not: { any: [{ inside: { kind: class_definition, field: name } }, { inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+fix: SupervisedTransformerMixin
+metadata: { fix: unsafe, since: "2.8" }
+---
+# Until 2.6 the four contrast encoders added a column named intercept that holds 1 on every
+# row, and code dropped it by name. 2.7 stopped adding it, so the drop raises "KeyError:
+# ['intercept'] not found in axis". The rule needs a contrast encoder named in the same file.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: The contrast encoders stopped adding the intercept column in category_encoders 2.7, so this drop raises KeyError. Remove the drop.
+rule:
+  any:
+    - pattern: $DF.drop($$$A)
+    - pattern: del $DF["intercept"]
+    - pattern: $DF.pop("intercept")
+  all:
+    - any:
+        - regex: '^del |\.pop\('
+        - has: { field: arguments, has: { stopBy: end, kind: string, regex: '^["'']intercept["'']$' } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, regex: '^errors\s*=\s*["'']ignore["'']$' } } }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - inside: { kind: module, stopBy: end, regex: '(BackwardDifference|Helmert|Polynomial|Sum)Encoder' }
+metadata: { since: "2.7" }
+---
+# feature_names_out_ and the result of get_feature_names_out were lists until 2.6 and are NumPy
+# arrays since 2.7, which have no list methods: "AttributeError: 'numpy.ndarray' object has no
+# attribute 'index'". feature_names_in_ is still a list. No scikit-learn estimator has
+# feature_names_out_.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: feature_names_out_ is a NumPy array since category_encoders 2.7 and has no $M method, so this raises AttributeError. Call list($E.feature_names_out_) first.
+rule:
+  pattern: $E.feature_names_out_.$M($$$A)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  M: { regex: '^(index|remove|append|extend|insert|count|pop)$' }
+metadata: { since: "2.7" }
+---
+id: removed-in-category-encoders
+language: python
+severity: error
+message: get_feature_names_out returns a NumPy array since category_encoders 2.7, which has no $M method, so this raises AttributeError. Call list($E.get_feature_names_out()) first.
+rule:
+  pattern: $E.get_feature_names_out().$M($$$A)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  M: { regex: '^(index|remove|append|extend|insert|count|pop)$' }
+metadata: { since: "2.7" }

@@ -33,6 +33,7 @@ const PACK_HEADINGS: &[(&str, &str)] = &[
     ("scikit-learn", "sklearn"),
     ("scikit-lego", "sklego"),
     ("MAPIE", "mapie"),
+    ("Category Encoders", "category_encoders"),
     ("Hamilton", "hamilton"),
     ("Python", "python"),
 ];

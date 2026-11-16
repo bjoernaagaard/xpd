@@ -1,0 +1,99 @@
+# A target encoder fitted on every row has seen the labels of the test rows. fit-before-split
+# and cross-val-on-fitted-data of the scikit-learn pack report that for every step but one: a
+# bare TargetEncoder(...) built in the same expression, which they take for the scikit-learn
+# class, because that class cross-fits. This rule reports the same form when the file imports
+# TargetEncoder from category_encoders, whose fit_transform does not cross-fit. On data with no
+# signal, over 30 seeds, it scored 0.624 AUC before a split against 0.500 after it, and 0.610
+# before cross_val_score against 0.495 in a Pipeline.
+id: encode-before-split
+language: python
+severity: error
+message: The category_encoders TargetEncoder learned from the target on every row, and $V is split afterwards, so each test row carries its own label in its code. It scored 0.624 AUC on data with no signal. Split first, call fit_transform on the training part and transform on the test part.
+rule:
+  any:
+    - pattern: $V[$COLS] = TargetEncoder($$$A).fit_transform($X, $Y)
+    - pattern: $V = TargetEncoder($$$A).fit_transform($X, $Y)
+  all:
+    - inside:
+        kind: expression_statement
+        precedes:
+          stopBy: end
+          has: { stopBy: end, any: [{ pattern: 'train_test_split($$$B, $V, $$$C)' }, { pattern: 'train_test_split($$$B, $V)' }] }
+    - matches: imported-from-category-encoders
+constraints:
+  V: { kind: identifier, not: { regex: '^(y|Y|target|targets|label|labels)(_|$)' } }
+  Y: { not: { kind: keyword_argument } }
+utils:
+  imported-from-category-encoders:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        kind: import_from_statement
+        all:
+          - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+          - any: [{ has: { kind: dotted_name, regex: '^TargetEncoder$' } }, { has: { kind: wildcard_import } }]
+      # A second import of TargetEncoder from another library leaves open which class a call builds.
+      not: { has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, regex: '^TargetEncoder$' } }] } }
+---
+id: encode-before-split
+language: python
+severity: error
+message: The category_encoders TargetEncoder learned from the target on every row before cross-validation, so each fold was scored on rows whose labels are in their codes. It scored 0.610 AUC on data with no signal. Put the encoder and the model in one Pipeline and cross-validate the Pipeline.
+rule:
+  pattern: $V = TargetEncoder($$$A).fit_transform($X, $Y)
+  all:
+    - inside:
+        kind: expression_statement
+        precedes:
+          stopBy: end
+          has:
+            stopBy: end
+            kind: call
+            all:
+              - has: { field: function, regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+              - has: { field: arguments, has: { nthChild: 2, pattern: $V } }
+    - matches: imported-from-category-encoders
+constraints:
+  V: { kind: identifier, not: { regex: '^(y|Y|target|targets|label|labels)(_|$)' } }
+  Y: { not: { kind: keyword_argument } }
+utils:
+  imported-from-category-encoders:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        kind: import_from_statement
+        all:
+          - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+          - any: [{ has: { kind: dotted_name, regex: '^TargetEncoder$' } }, { has: { kind: wildcard_import } }]
+      # A second import of TargetEncoder from another library leaves open which class a call builds.
+      not: { has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, regex: '^TargetEncoder$' } }] } }
+---
+id: encode-before-split
+language: python
+severity: error
+message: The category_encoders TargetEncoder learned from the target on every row before cross-validation, so each fold was scored on rows whose labels are in their codes. It scored 0.610 AUC on data with no signal. Put the encoder and the model in one Pipeline and cross-validate the Pipeline.
+rule:
+  any:
+    - pattern: $CV($M, TargetEncoder($$$A).fit_transform($X, $Y), $$$C)
+    - pattern: $CV($M, TargetEncoder($$$A).fit_transform($X, $Y))
+  matches: imported-from-category-encoders
+constraints:
+  CV: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+  Y: { not: { kind: keyword_argument } }
+utils:
+  imported-from-category-encoders:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        kind: import_from_statement
+        all:
+          - has: { field: module_name, regex: '^category_encoders(\.|$)' }
+          - any: [{ has: { kind: dotted_name, regex: '^TargetEncoder$' } }, { has: { kind: wildcard_import } }]
+      # A second import of TargetEncoder from another library leaves open which class a call builds.
+      not: { has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, regex: '^TargetEncoder$' } }] } }
