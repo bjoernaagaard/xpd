@@ -51,6 +51,9 @@ struct Metadata {
     /// a value of the rule's shape.
     #[serde(default)]
     holds: BTreeMap<String, SerializableRule>,
+    /// Drops a match when the same proof as `holds` succeeds, for fallback advice.
+    #[serde(default)]
+    unless_holds: BTreeMap<String, SerializableRule>,
     /// `unlessImported: <rule>` drops the matches in a file that imports a module of its
     /// project with a node of the rule's shape.
     unless_imported: Option<SerializableRule>,
@@ -75,6 +78,8 @@ pub(crate) struct Rule {
     /// kept, so a rule can match `px.bar(...).update_xaxes(...)` and `fig.update_xaxes(...)`
     /// in one `any`.
     holds: Vec<(String, Shape)>,
+    /// The complement of `holds`, so fallback advice survives an unknown binding.
+    unless_holds: Vec<(String, Shape)>,
     /// From `metadata.unlessImported`: a shape that silences the rule on a file when a module
     /// the file loads has it, such as a module that sets a default for the whole process.
     unless_imported: Option<Shape>,
@@ -122,7 +127,7 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
             Some(metadata) => serde_json::to_value(metadata)
                 .and_then(serde_json::from_value)
                 .context(
-                    "metadata may hold fix: safe or unsafe, since: \"<version>\", until: \"<version>\", holds: { <VARIABLE>: <rule> } and unlessImported: <rule>",
+                    "metadata may hold fix: safe or unsafe, since: \"<version>\", until: \"<version>\", holds: { <VARIABLE>: <rule> }, unlessHolds: { <VARIABLE>: <rule> } and unlessImported: <rule>",
                 )?,
             None => Metadata::default(),
         };
@@ -142,16 +147,22 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
             shape.verify_util()?;
             Ok(shape)
         };
-        let holds = (metadata.holds.into_iter())
-            .map(|(variable, rule)| {
-                ensure!(
-                    config.matcher.defined_vars().contains(variable.as_str()),
-                    "metadata.holds names ${variable}, which the rule does not match"
-                );
-                let shape = shape(rule).with_context(|| format!("metadata.holds.{variable}"))?;
-                Ok((variable, shape))
-            })
-            .collect::<Result<_>>()?;
+        let held_shapes = |conditions: BTreeMap<String, SerializableRule>, key: &str| {
+            conditions
+                .into_iter()
+                .map(|(variable, rule)| {
+                    ensure!(
+                        config.matcher.defined_vars().contains(variable.as_str()),
+                        "metadata.{key} names ${variable}, which the rule does not match"
+                    );
+                    let shape =
+                        shape(rule).with_context(|| format!("metadata.{key}.{variable}"))?;
+                    Ok((variable, shape))
+                })
+                .collect::<Result<_>>()
+        };
+        let holds = held_shapes(metadata.holds, "holds")?;
+        let unless_holds = held_shapes(metadata.unless_holds, "unlessHolds")?;
         let unless_imported =
             (metadata.unless_imported.map(shape).transpose()).context("metadata.unlessImported")?;
         Ok(Self {
@@ -162,6 +173,7 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
             files,
             ignores,
             holds,
+            unless_holds,
             unless_imported,
         })
     }
@@ -197,13 +209,17 @@ impl Rule {
         root: &'r Root,
         disk: Option<&Path>,
     ) -> Vec<NodeMatch<'r, StrDoc<SupportLang>>> {
-        let proven = |found: &NodeMatch<'r, StrDoc<SupportLang>>| {
-            self.holds.iter().all(|(variable, shape)| {
+        let proven = |found: &NodeMatch<'r, StrDoc<SupportLang>>,
+                      conditions: &[(String, Shape)]| {
+            conditions.iter().all(|(variable, shape)| {
                 (found.get_env().get_match(variable)).is_none_or(|usage| names::holds(usage, shape))
             })
         };
         let found: Vec<_> = (root.root().find_all(&self.config.matcher))
-            .filter(proven)
+            .filter(|found| {
+                proven(found, &self.holds)
+                    && (self.unless_holds.is_empty() || !proven(found, &self.unless_holds))
+            })
             .collect();
         let silenced = !found.is_empty()
             && (self.unless_imported.as_ref().zip(disk)).is_some_and(|(setting, disk)| {
