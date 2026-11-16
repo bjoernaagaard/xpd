@@ -38,7 +38,7 @@ pub(crate) fn any_loaded(path: &Path, root: &Root, found: impl Fn(&Root) -> bool
 }
 
 /// The files that the module at `path` loads itself: the `__init__.py` of each package it is in,
-/// and each module it imports that is a file of the same project.
+/// and each module it imports unconditionally at module level that is in the same project.
 fn loaded_by(path: &Path, root: &Root) -> Vec<PathBuf> {
     let package = path.parent().unwrap_or(Path::new(""));
     let mut loaded = Vec::new();
@@ -52,7 +52,7 @@ fn loaded_by(path: &Path, root: &Root) -> Vec<PathBuf> {
         };
         top = above;
     }
-    for import in root.root().dfs() {
+    for import in root.root().children() {
         match &*import.kind() {
             "import_statement" => {
                 for name in import.field_children("name") {

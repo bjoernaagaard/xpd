@@ -52,7 +52,7 @@ struct Metadata {
     #[serde(default)]
     holds: BTreeMap<String, SerializableRule>,
     /// `unlessImported: <rule>` drops the matches in a file that imports a module of its
-    /// project with a node of the rule's shape.
+    /// project with a direct module statement or expression of the rule's shape.
     unless_imported: Option<SerializableRule>,
 }
 
@@ -76,7 +76,7 @@ pub(crate) struct Rule {
     /// in one `any`.
     holds: Vec<(String, Shape)>,
     /// From `metadata.unlessImported`: a shape that silences the rule on a file when a module
-    /// the file loads has it, such as a module that sets a default for the whole process.
+    /// the file loads has it at module level, outside any branch or definition body.
     unless_imported: Option<Shape>,
 }
 
@@ -207,7 +207,13 @@ impl Rule {
             .collect();
         let silenced = !found.is_empty()
             && (self.unless_imported.as_ref().zip(disk)).is_some_and(|(setting, disk)| {
-                imports::any_loaded(disk, root, |module| module.root().find(setting).is_some())
+                imports::any_loaded(disk, root, |module| {
+                    module.root().find_all(setting).any(|setting| {
+                        setting.ancestors().all(|parent| {
+                            matches!(&*parent.kind(), "expression_statement" | "module")
+                        })
+                    })
+                })
             });
         if silenced { Vec::new() } else { found }
     }
