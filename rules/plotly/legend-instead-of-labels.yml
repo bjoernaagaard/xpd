@@ -19,7 +19,7 @@ message: This figure names its few lines in a legend, so the reader looks back a
 rule:
   kind: call
   all:
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
     - has:
         field: arguments
         any:
@@ -28,23 +28,6 @@ rule:
     - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
 utils:
-  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
-  go:
-    any:
-      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
-      - kind: identifier
-        pattern: $GO
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $GO }
-              - any:
-                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
-                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
   # A list of two to four go.Scatter calls, each with a name and none drawn as markers alone.
   named-lines:
     kind: list
@@ -57,7 +40,7 @@ utils:
   named-line:
     kind: call
     all:
-      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(name)$' } } }
       - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } } }
       - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
@@ -89,28 +72,11 @@ rule:
     - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
 utils:
-  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
-  go:
-    any:
-      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
-      - kind: identifier
-        pattern: $GO
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $GO }
-              - any:
-                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
-                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
   # An empty go.Figure, so every trace it draws is added later.
   new-figure:
     kind: call
     all:
-      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
       - not: { has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } } }
       - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(data)$' } } } }
   # A statement that adds one named line to $FIG and puts it in no cell or second axis.
@@ -156,7 +122,7 @@ utils:
   named-line:
     kind: call
     all:
-      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: go } }] }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(name)$' } } }
       - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } } }
       - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
@@ -187,7 +153,7 @@ message: px.line with $C names each line in a legend, so the reader looks back a
 rule:
   kind: call
   all:
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(line)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(line)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
     - has:
         field: arguments
         has:
@@ -210,62 +176,3 @@ rule:
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
-utils:
-  # A file that makes plotly the plotting backend of pandas and names no other backend. There
-  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
-  pandas-draws-with-plotly:
-    kind: module
-    all:
-      - has:
-          stopBy: end
-          any:
-            - kind: assignment
-              all:
-                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
-            - kind: call
-              all:
-                - has: { field: function, regex: '(^|\.)set_option$' }
-                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
-      - not:
-          has:
-            stopBy: end
-            any:
-              - kind: assignment
-                all:
-                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
-              - kind: call
-                all:
-                  - has: { field: function, regex: '(^|\.)set_option$' }
-                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
-                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
-              - kind: keyword_argument
-                all:
-                  - has: { field: name, regex: '^backend$' }
-                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
-  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
-  # or the plot accessor of pandas in a file that draws with plotly.
-  px:
-    any:
-      - { kind: attribute, regex: '^plotly\.express$' }
-      - kind: attribute
-        all:
-          - has: { field: attribute, regex: '^plot$' }
-          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
-          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
-          # is another argument in the two. Only a call with every argument named is read.
-          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
-      - kind: identifier
-        pattern: $PX
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $PX }
-              - any:
-                  - has: { field: name, regex: '^plotly\.express$' }
-                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

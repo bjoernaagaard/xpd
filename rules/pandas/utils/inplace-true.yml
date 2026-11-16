@@ -1,0 +1,7 @@
+id: inplace-true
+language: python
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^inplace$ }
+    - has: { field: value, regex: ^True$ }

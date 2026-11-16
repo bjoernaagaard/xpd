@@ -21,10 +21,6 @@ constraints:
   ROW: { not: { any: [{ kind: slice }, { kind: string }] } }
   DF: { not: { matches: indexer } }
 utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
 fix: $DF.loc[$ROW, $COL]
 metadata: { fix: unsafe }
@@ -42,10 +38,6 @@ constraints:
   MASK: { matches: mask }
   DF: { not: { matches: indexer } }
 utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
   mask:
     any:
@@ -96,10 +88,6 @@ constraints:
   MASK: { kind: identifier }
   DF: { not: { matches: indexer } }
 utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
   mask:
     any:
@@ -131,10 +119,6 @@ constraints:
   MASK: { matches: mask }
   DF: { not: { matches: indexer } }
 utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
   mask:
     any:
@@ -183,10 +167,6 @@ constraints:
   MASK: { kind: identifier }
   DF: { not: { matches: indexer } }
 utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
   mask:
     any:
@@ -214,11 +194,6 @@ rule:
   matches: assignment-target
 constraints:
   COL: { kind: string }
-utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
 fix: $DF.loc[$ROW, $COL]
 metadata: { fix: unsafe }
 ---
@@ -242,10 +217,6 @@ rule:
       - matches: loc-then-column
       - matches: plain-keys
 utils:
-  assignment-target:
-    any:
-      - inside: { kind: assignment, field: left }
-      - inside: { kind: augmented_assignment, field: left }
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
   mask:
     any:

@@ -1,0 +1,8 @@
+id: pandas-import
+language: python
+rule:
+  any:
+    - kind: import_statement
+      has: { any: [{ kind: dotted_name, regex: '^pandas(\.|$)' }, { kind: aliased_import, has: { field: name, regex: '^pandas(\.|$)' } }] }
+    - kind: import_from_statement
+      has: { field: module_name, regex: '^pandas(\.|$)' }

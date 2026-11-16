@@ -1,0 +1,12 @@
+id: pymoo-minimize
+language: python
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '^minimize$' }
+    - inside:
+        kind: module
+        stopBy: end
+        all:
+          - has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.optimize\s+import\b[^#]*\bminimize\b' }
+          - not: { has: { stopBy: end, kind: import_from_statement, regex: '^from\s+scipy(\.\w+)*\s+import\b[^#]*\bminimize\b' } }

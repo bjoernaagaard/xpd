@@ -48,7 +48,7 @@ use serde_json::Value;
 use self::project::{Place, Workspace};
 use self::text::{Encoding, Lines};
 use crate::catalog;
-use crate::pack::Pack;
+use crate::catalog::Catalog;
 use crate::report::Issue;
 use crate::rule::Applicability;
 use crate::scan::{self, Found, Replacement};
@@ -347,7 +347,7 @@ struct Document {
 /// A document's issues, with the rules that found them.
 #[derive(Debug)]
 struct Linted {
-    packs: Rc<[Pack]>,
+    catalog: Rc<Catalog>,
     found: Vec<Found>,
 }
 
@@ -358,14 +358,40 @@ fn lint<'d>(
     document: &'d mut Document,
 ) -> Result<(&'d Document, &'d Linted)> {
     if document.linted.is_none() {
-        let packs = Rc::clone(&workspace.project(&document.place.root)?.packs);
+        let project = workspace.project(&document.place.root)?;
+        let catalog = Rc::clone(&project.catalog);
         let disk = document.place.disk();
         let file = scan::File {
             path: &document.place.path,
             disk: Some(&disk),
         };
-        let found = scan::lint_source(file, &document.text, &packs);
-        document.linted = Some(Linted { packs, found });
+        let mut found = scan::lint_source(file, &document.text, &catalog.packs);
+        if disk
+            .extension()
+            .is_some_and(|ext| ext == "yml" || ext == "yaml")
+        {
+            let error = catalog
+                .validate_document(&disk, &document.text)
+                .err()
+                .map(|error| format!("{error:#}"))
+                .or_else(|| project.load_error.clone());
+            if let Some(message) = error {
+                found.push(Found {
+                    issue: Issue {
+                        package: "xpd".into(),
+                        rule: "invalid-rule".into(),
+                        file: document.place.path.clone(),
+                        position: Some(crate::report::Position { line: 1, column: 1 }),
+                        severity: Severity::Error,
+                        message,
+                        fix: None,
+                    },
+                    range: 0..document.text.lines().next().map_or(0, str::len),
+                    fix: None,
+                });
+            }
+        }
+        document.linted = Some(Linted { catalog, found });
     }
     let document: &'d Document = document;
     let linted = document
@@ -954,6 +980,7 @@ impl<'c> Server<'c> {
             }
             let issue = &found.issue;
             let Some(doc) = linted
+                .catalog
                 .packs
                 .iter()
                 .find(|pack| pack.module == issue.package)
@@ -1046,7 +1073,7 @@ impl<'c> Server<'c> {
                 disk: Some(&disk),
             };
             let (fixed, count) =
-                scan::fix_source(file, document.text.clone(), &linted.packs, allowed);
+                scan::fix_source(file, document.text.clone(), &linted.catalog.packs, allowed);
             if count > 0 {
                 let change = changed_part(&document.text, &fixed);
                 actions.push(CodeAction {

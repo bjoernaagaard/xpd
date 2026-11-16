@@ -9,7 +9,8 @@ use anyhow::{Context, Result};
 use lsp_types::Uri;
 
 use super::uri;
-use crate::pack::{self, Pack};
+use crate::catalog::{Catalog, LocalProject};
+use crate::pack;
 use crate::package_check;
 use crate::report::Issue;
 use crate::venv::Venv;
@@ -36,7 +37,8 @@ impl Place {
 #[derive(Debug)]
 pub(crate) struct Project {
     /// The rules for the library versions in the project's venv.
-    pub(crate) packs: Rc<[Pack]>,
+    pub(crate) catalog: Rc<Catalog>,
+    pub(crate) load_error: Option<String>,
     /// One warning for each package the venv lacks, as `xpd check` adds them to a run.
     pub(crate) package_issues: Vec<Issue>,
 }
@@ -47,7 +49,7 @@ pub(crate) struct Workspace {
     folders: Vec<PathBuf>,
     /// The packs for each set of installed library versions. Parsing the rules takes about
     /// half a second, so projects with the same versions share one set.
-    loaded: HashMap<Vec<Option<Version>>, Rc<[Pack]>>,
+    loaded: HashMap<Vec<Option<Version>>, Rc<Catalog>>,
     projects: HashMap<PathBuf, Project>,
 }
 
@@ -101,26 +103,43 @@ impl Workspace {
         let venv = Venv::find_from(root);
         let installed = venv.as_ref().map(Venv::distributions);
         let versions = pack::installed_versions(installed.as_ref());
-        let packs = if let Some(packs) = self.loaded.get(&versions) {
-            Rc::clone(packs)
+        // A project with its own rules reads them again each time, and the others share the
+        // embedded rules for their versions.
+        let loaded = if let Some(config) = LocalProject::find(root)? {
+            Catalog::load_config(&config, installed.as_ref()).map(Rc::new)
+        } else if let Some(catalog) = self.loaded.get(&versions) {
+            Ok(Rc::clone(catalog))
         } else {
-            let packs: Rc<[Pack]> = pack::load(installed.as_ref())
-                .context("invalid embedded rules")?
-                .into();
-            self.loaded.insert(versions, Rc::clone(&packs));
-            packs
+            let catalog = Rc::new(Catalog::embedded(installed.as_ref())?);
+            self.loaded.insert(versions, Rc::clone(&catalog));
+            Ok(catalog)
+        };
+        let (catalog, load_error) = match loaded {
+            Ok(catalog) => (catalog, None),
+            Err(error) => {
+                let catalog = match self.projects.get(root) {
+                    Some(previous) => Rc::clone(&previous.catalog),
+                    None => Rc::new(Catalog::embedded(installed.as_ref())?),
+                };
+                (catalog, Some(format!("{error:#}")))
+            }
         };
         let package_issues = match (&venv, &installed) {
-            (Some(venv), Some(installed)) => package_check::missing(&packs, venv, installed, root),
+            (Some(venv), Some(installed)) => {
+                package_check::missing(&catalog.packs, venv, installed, root)
+            }
             _ => Vec::new(),
         };
         let project = Project {
-            packs,
+            catalog,
+            load_error,
             package_issues,
         };
         let before = self.projects.insert(root.to_path_buf(), project);
         let now = &self.projects[root];
-        Ok(before.is_some_and(|before| !Rc::ptr_eq(&before.packs, &now.packs)))
+        Ok(before.is_some_and(|before| {
+            !Rc::ptr_eq(&before.catalog, &now.catalog) || before.load_error != now.load_error
+        }))
     }
 
     /// Drops the project in `root`, after its last document closed.

@@ -111,25 +111,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   R1:
     replace:
@@ -168,25 +149,6 @@ rule:
         regex: ^scipy\.integrate$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   R1:
     replace:
@@ -227,25 +189,6 @@ rule:
           regex: ^scipy\.integrate$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   R1:
     replace:
@@ -376,25 +319,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   NEW:
     replace:
@@ -423,25 +347,6 @@ rule:
         regex: ^scipy\.linalg$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   NEW:
     replace:
@@ -472,25 +377,6 @@ rule:
           regex: ^scipy\.linalg$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   NEW:
     replace:
@@ -611,25 +497,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   NEW:
     replace:
@@ -658,25 +525,6 @@ rule:
         regex: ^scipy\.sparse$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   NEW:
     replace:
@@ -707,25 +555,6 @@ rule:
           regex: ^scipy\.sparse$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   NEW:
     replace:
@@ -846,25 +675,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   R1:
     replace:
@@ -898,25 +708,6 @@ rule:
         regex: ^scipy\.stats$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   R1:
     replace:
@@ -952,25 +743,6 @@ rule:
           regex: ^scipy\.stats$
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   R1:
     replace:
@@ -1096,25 +868,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 fix: $OBJ.windows.$N
 metadata:
   fix: unsafe
@@ -1152,25 +905,6 @@ rule:
             regex: ^scipy\.signal$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 
 ---
 # Both live in scipy.stats.mstats, by runs/relocate.jsonl. The fix is unsafe because the old
@@ -1282,25 +1016,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 fix: $OBJ.mstats.$N
 metadata:
   fix: unsafe
@@ -1338,25 +1053,6 @@ rule:
             regex: ^scipy\.stats$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 
 ---
 id: removed-in-scipy
@@ -1466,25 +1162,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -1534,25 +1211,6 @@ rule:
             regex: ^scipy\.integrate$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -1681,25 +1339,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -1746,25 +1385,6 @@ rule:
             regex: ^scipy\.interpolate$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -1886,25 +1506,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -1959,25 +1560,6 @@ rule:
             regex: ^scipy\.signal$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2108,25 +1690,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2227,25 +1790,6 @@ rule:
             regex: ^scipy\.special$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2422,25 +1966,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2530,25 +2055,6 @@ rule:
             regex: ^scipy\.stats$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2714,25 +2220,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2802,25 +2289,6 @@ rule:
             regex: ^scipy\.linalg$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -2966,25 +2434,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -3029,25 +2478,6 @@ rule:
             regex: ^scipy\.sparse$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -3220,25 +2650,6 @@ rule:
               any: *id008
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -3283,25 +2694,6 @@ rule:
             regex: ^scipy\.spatial\.distance$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -3422,25 +2814,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -3485,25 +2858,6 @@ rule:
             regex: ^scipy\.optimize$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -3624,25 +2978,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   HINT:
     replace:
@@ -3682,25 +3017,6 @@ rule:
             regex: ^scipy\.ndimage$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   HINT:
     replace:
@@ -3732,25 +3048,6 @@ rule:
     - inside:
         kind: import_from_statement
         field: module_name
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 
 ---
 id: removed-in-scipy
@@ -3785,25 +3082,6 @@ rule:
             regex: ^scipy$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 
 ---
 id: removed-in-scipy
@@ -3913,25 +3191,6 @@ rule:
               any: *id005
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -4049,25 +3308,6 @@ rule:
               any: *id002
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 fix: np.$N
 metadata:
   fix: unsafe
@@ -4105,25 +3345,6 @@ rule:
             regex: ^scipy$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 
 ---
 id: removed-in-scipy
@@ -4181,25 +3402,6 @@ rule:
               any: *id002
   - not:
       matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:
@@ -4289,25 +3491,6 @@ rule:
             regex: ^scipy$
     - not:
         matches: compat-code
-utils:
-  compat-code:
-    any:
-    - inside:
-        kind: if_statement
-        stopBy: end
-        has:
-          field: condition
-          regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: conditional_expression
-        stopBy: end
-        regex: __version__|SCIPY_|scipy_version|sp_version|SP_VERSION|SCIPY_VERSION|parse_version|hasattr\((scipy|sp|stats|special|linalg|integrate|signal|sparse|optimize|interpolate|ndimage|spatial|misc)\b
-    - inside:
-        kind: try_statement
-        stopBy: end
-        has:
-          kind: except_clause
-          regex: ^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError|DeprecationWarning)
 transform:
   H1:
     replace:

@@ -12,7 +12,7 @@ use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::rule::Rule;
+use crate::rule::{Origin, Rule};
 use crate::version::Version;
 
 /// The name of a rule or utility, which is also its file name: lowercase ASCII letters, digits,
@@ -250,12 +250,19 @@ impl RuleDoc {
             config.id == self.id.to_string() && config.language == self.language,
             "the new rule does not keep its id and language"
         );
-        // rule::Rule reads every metadata key but publicId, which only names the rule.
-        let without_public_id = self.yaml(None)?;
-        let config = ast_grep_config::from_yaml_string::<SupportLang>(&without_public_id, utils)?
-            .pop()
-            .context("the new rule is empty")?;
-        let rule = Rule::try_from(config).context("xpd does not read the new rule")?;
+        let origin = if self.id.pack.is_some() {
+            Origin::LocalPack
+        } else {
+            Origin::Structural
+        };
+        let rule = Rule::new(
+            config,
+            origin,
+            self.id.pack.as_deref(),
+            self.id.to_string().into(),
+            1,
+        )
+        .context("xpd does not read the new rule")?;
         if let (Some(since), Some(until)) = (&rule.since, &rule.until) {
             ensure!(
                 since < until,

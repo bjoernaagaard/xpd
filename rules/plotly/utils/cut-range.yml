@@ -1,0 +1,18 @@
+# A range written as two numbers above zero, such as [90, 101], whose lower end has as many
+# digits before the point as the upper end, or one fewer. So [90, 101] and [2, 5] are read,
+# and [1, 100] is not, because it cuts a hundredth off the longest bar. A name, a zero, a
+# negative number or a number below 1 at the lower end is left alone.
+id: cut-range
+language: python
+rule:
+  kind: list
+  all:
+    - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
+    - any:
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{0,1}([.][0-9]*)?$' } }]
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{1,2}([.][0-9]*)?$' } }]
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{2,3}([.][0-9]*)?$' } }]
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{3,4}([.][0-9]*)?$' } }]
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{4,5}([.][0-9]*)?$' } }]
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{5,6}([.][0-9]*)?$' } }]
+        - all: [{ has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6}([.][0-9]*)?$' } }, { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, any: [{ kind: integer }, { kind: float }], regex: '^[1-9][0-9]{6,7}([.][0-9]*)?$' } }]

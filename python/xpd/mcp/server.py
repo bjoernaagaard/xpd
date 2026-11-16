@@ -10,7 +10,7 @@ from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
 from xpd.mcp import catalog, discovery, pipeline, prompts, structure, tools, views
-from xpd.mcp.binary import RULES, SKILLS, Xpd, find_binary
+from xpd.mcp.binary import BUILTIN_RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
 
@@ -47,7 +47,7 @@ skill://python-review/SKILL.md hold the style a linter cannot check."""
 def build(settings: Settings) -> FastMCP:
     project = Project(Root.at(settings.root) if settings.root else None)
     xpd = Xpd(find_binary())
-    fallback_rules = catalog.Catalog(tuple(xpd.run_now(RULES)))
+    fallback_rules = catalog.Catalog(tuple(xpd.run_now(BUILTIN_RULES)))
     skills = [
         Skill.from_files({file.path: file.text for file in skill.files})
         for skill in xpd.run_now(SKILLS)

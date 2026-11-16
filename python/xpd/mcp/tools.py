@@ -11,6 +11,7 @@ from mcp.types import (
     InputRequiredResult,
     ToolAnnotations,
 )
+from pydantic import BaseModel, Field
 
 from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, REFIT, Command, T, Xpd
 from xpd.mcp.models import (
@@ -21,6 +22,7 @@ from xpd.mcp.models import (
     GraphReport,
     Profile,
     Refit,
+    Severity,
 )
 from xpd.mcp.protocol import uses_handshake
 from xpd.mcp.root import Project, Root
@@ -86,11 +88,9 @@ async def confirmed(ctx: Context, message: str) -> bool | InputRequiredResult:
 
 
 async def unsafe_confirmed(
-    ctx: Context, xpd: Xpd, project: Project, root: Root, paths: Sequence[str]
+    ctx: Context, project: Project, paths: Sequence[str], preview: CheckReport
 ) -> bool | InputRequiredResult:
-    """Whether `fix` may write the unsafe fixes in `paths`. It asks the user only when there
-    are some."""
-    preview = await run(ctx, xpd, CHECK, root, paths, "--unsafe-fixes")
+    """Ask only when the selected rules propose unsafe fixes."""
     count = sum(issue.fix == "unsafe" for issue in preview.issues)
     if not count:
         return True
@@ -114,10 +114,28 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     register_data(mcp, xpd, project)
 
 
+class CheckOptions(BaseModel):
+    rules: list[str] = Field(default_factory=list, description="Packages or public rule names.")
+    severity: Severity | None = None
+    config: str | None = None
+
+    def flags(self, root: Root) -> list[str]:
+        flags = [part for name in self.rules for part in ("--rule", name)]
+        if self.severity is not None:
+            flags.extend(("--severity", self.severity))
+        if self.config is not None:
+            flags.extend(("--config", root.inside(self.config)))
+        return flags
+
+
 def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"lint"}, annotations=READS, task=True)
     async def check(
-        ctx: Context, paths: list[str] | None = None, *, unsafe_fixes: bool = False
+        ctx: Context,
+        paths: list[str] | None = None,
+        *,
+        unsafe_fixes: bool = False,
+        options: CheckOptions | None = None,
     ) -> CheckReport | InputRequiredResult:
         """Lint Python files for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn,
         scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly, Apache Hamilton
@@ -138,12 +156,18 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         if isinstance(root, InputRequiredResult):
             return root
         args = root.all_inside(paths or ["."])
-        flags = ["--unsafe-fixes"] if unsafe_fixes else []
+        flags = (options or CheckOptions()).flags(root)
+        if unsafe_fixes:
+            flags.append("--unsafe-fixes")
         return await run(ctx, xpd, CHECK, root, args, *flags)
 
     @mcp.tool(tags={"lint", "fix"}, annotations=WRITES, task=True)
     async def fix(
-        ctx: Context, paths: list[str] | None = None, *, unsafe: bool = False
+        ctx: Context,
+        paths: list[str] | None = None,
+        *,
+        unsafe: bool = False,
+        options: CheckOptions | None = None,
     ) -> CheckReport | InputRequiredResult:
         """Write xpd's fixes into the files, then lint what is left.
 
@@ -158,12 +182,14 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         if isinstance(root, InputRequiredResult):
             return root
         args = root.all_inside(paths or ["."])
+        flags = (options or CheckOptions()).flags(root)
         if unsafe:
-            answer = await unsafe_confirmed(ctx, xpd, project, root, args)
+            preview = await run(ctx, xpd, CHECK, root, args, "--unsafe-fixes", *flags)
+            answer = await unsafe_confirmed(ctx, project, args, preview)
             if isinstance(answer, InputRequiredResult):
                 return answer
             unsafe = answer
-        flags = ["--fix", "--unsafe-fixes"] if unsafe else ["--fix"]
+        flags.extend(["--fix", "--unsafe-fixes"] if unsafe else ["--fix"])
         return await run(ctx, xpd, CHECK, root, args, *flags)
 
 

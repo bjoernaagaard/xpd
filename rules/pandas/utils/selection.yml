@@ -1,0 +1,7 @@
+id: selection
+language: python
+rule:
+  kind: subscript
+  any:
+    - has: { field: subscript, any: [{ kind: string }, { kind: list }, { kind: identifier }] }
+    - has: { field: value, kind: attribute, has: { field: attribute, regex: ^(loc|iloc)$ } }

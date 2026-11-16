@@ -33,7 +33,6 @@ rule:
               - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: identifier, pattern: $S, not: { any: [{ inside: { kind: attribute } }, { inside: { kind: assignment, field: left } }, { inside: { kind: keyword_argument, field: name } }] } } } }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   comparison-call:
     kind: call
     has:

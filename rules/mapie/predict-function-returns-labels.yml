@@ -23,7 +23,5 @@ rule:
           kind: argument_list
           inside: { kind: call, has: { field: function, regex: '(^|\.)BinaryClassificationController$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: $M.predict_proba
 metadata: { fix: unsafe }

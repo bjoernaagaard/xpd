@@ -1,0 +1,12 @@
+# A call that makes a plotly figure.
+id: new-figure
+language: python
+arguments: [PX, GO]
+rule:
+  kind: call
+  any:
+    - has: { field: function, kind: attribute, has: { field: object, matches: PX } }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: GO } }] }
+    - all:
+        - has: { field: function, regex: '(^|\.)make_subplots$' }
+        - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }

@@ -34,8 +34,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(arch_model)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # A GJR-GARCH is vol="garch" with o=1, and a TARCH adds power=1.0. Neither has a name of its own.
 id: arch-unknown-option
@@ -59,8 +57,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(arch_model)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -83,8 +79,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(arch_model)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # trend is "n" for no deterministic term in arch. "nc" is the old statsmodels name and is not
 # accepted. Each test has its own list, because not every test has critical values for every trend.
@@ -109,8 +103,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(ADF|engle_granger|phillips_ouliaris|DynamicOLS|FullyModifiedOLS|CanonicalCointegratingReg)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -133,8 +125,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(DFGLS|KPSS)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -157,8 +147,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(PhillipsPerron)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -181,8 +169,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(VarianceRatio)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -205,8 +191,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(ZivotAndrews)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # method picks how the lag length is chosen. It is not the trend: ZivotAndrews(y, method="c") raises.
 id: arch-unknown-option
@@ -230,8 +214,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(ADF|DFGLS|ZivotAndrews|engle_granger)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -254,8 +236,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(DynamicOLS)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # On arch 4.19, 5.0, 6.1.0, 6.2.0 and 8.0.0, test_type="z" gave the statistic of "tau", -1.136 on
 # 1,000 log prices, where "rho" gave -2.0998, so a misspelt "rho" was read as "tau" without a word.
@@ -280,8 +260,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(PhillipsPerron)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -304,8 +282,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(phillips_ouliaris)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -328,8 +304,6 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(auto_bandwidth)$' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # On arch 5.0, 6.1.0, 6.2.0 and 8.0.0, method="range" gave the p-values of "max" and not those of
 # "R", so a misspelt range statistic was read as the max statistic without a word.
@@ -364,8 +338,6 @@ rule:
                     stopBy: end
                     has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 id: arch-unknown-option
 language: python
@@ -398,8 +370,6 @@ rule:
                     stopBy: end
                     has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 ---
 # The options of fit, forecast and hedgehog_plot are read only on a model that the file builds
 # from arch_model or a mean class of arch, and on a result that it gets from fit or fix of such a
@@ -429,7 +399,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -464,7 +433,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -498,7 +466,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -543,7 +510,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -587,7 +553,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^hedgehog_plot$' } }, { has: { field: object, matches: result } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -631,7 +596,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^hedgehog_plot$' } }, { has: { field: object, matches: result } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -676,7 +640,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conf_int$' } }, { has: { field: object, matches: bootstrap } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   bootstrap-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   bootstrap:
     any:
@@ -710,7 +673,6 @@ rule:
             has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^conf_int$' } }, { has: { field: object, matches: bootstrap } }] }
   not: { matches: expected-to-raise }
 utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
   bootstrap-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   bootstrap:
     any:

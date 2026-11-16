@@ -60,6 +60,7 @@ PROFILE = Command(("profile",), TypeAdapter(Profile), SUCCESS)
 REFIT = Command(("refit",), TypeAdapter(Refit), FINDINGS)
 EQUIV = Command(("equiv",), TypeAdapter(Equivalence), FINDINGS)
 RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]), SUCCESS)
+BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.output, SUCCESS)
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]), SUCCESS)
 
 

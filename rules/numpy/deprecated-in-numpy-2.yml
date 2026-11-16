@@ -19,21 +19,6 @@ rule:
         - inside: { kind: import_statement }
         - inside: { kind: aliased_import, inside: { kind: import_statement } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 metadata: { since: "2.0" }
 ---
 id: deprecated-in-numpy-2
@@ -51,21 +36,6 @@ rule:
             field: name
             inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 metadata: { since: "2.0" }
 ---
 # np.core.<name> was the same object as np.<name> for the public names. The fix is unsafe,
@@ -79,21 +49,6 @@ rule:
     - pattern: $NP.core.$N
       not: { inside: { kind: assignment, field: left } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^[a-zA-Z]\w*$', not: { regex: '^(records|defchararray|multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits|overrides|umath_tests)$' } }
@@ -112,21 +67,6 @@ rule:
     - pattern: $NP.core.$N
       not: { inside: { kind: assignment, field: left } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^(records|defchararray)$' }
@@ -145,21 +85,6 @@ rule:
     - pattern: $NP.core.$N
       not: { inside: { kind: assignment, field: left } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits|overrides)$' }
@@ -180,21 +105,6 @@ rule:
           # trunc takes its input by position only, so fix(x=...) is left alone.
           - inside: { kind: call, field: function, has: { field: arguments, has: { kind: keyword_argument } } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.trunc
@@ -208,21 +118,6 @@ rule:
   all:
     - { pattern: $NP.ma.round_ }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.ma.round
@@ -238,21 +133,6 @@ rule:
   all:
     - { pattern: $NP.typename }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
@@ -266,21 +146,6 @@ rule:
   all:
     - { pattern: $NP.char.$N }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^(chararray|array|asarray)$' }
@@ -304,21 +169,6 @@ rule:
             field: name
             inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.char$' } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
 metadata: { since: "2.0" }
@@ -345,21 +195,6 @@ rule:
                 field: name
                 inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy\.testing$' } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   T1: { replace: { source: $N, replace: '^assert_warns$', by: pytest.warns or warnings.catch_warnings(record=True) } }
   NEW: { replace: { source: $T1, replace: '^suppress_warnings$', by: warnings.catch_warnings with warnings.filterwarnings } }
@@ -374,21 +209,6 @@ rule:
   all:
     - { pattern: '$F($A, $B, $C)' }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   F: { regex: '^(np|numpy)\.(maximum|minimum)$' }
   A: { not: { any: [{ kind: list_splat }, { kind: keyword_argument }] } }
@@ -411,21 +231,6 @@ rule:
   all:
     - { pattern: '$R.random_integers($LO, $HI, $SIZE)' }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   HI: { any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] }
   SIZE: { not: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
@@ -440,21 +245,6 @@ rule:
   all:
     - { pattern: '$R.random_integers($LO, $HI)' }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   HI: { any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] }
   LO: { not: { any: [{ kind: list_splat }, { kind: keyword_argument }] } }
@@ -479,21 +269,6 @@ rule:
               - has: { field: arguments, has: { nthChild: 2, any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
               - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 ---
 # NumPy 2.5 deprecated the generic timedelta64 unit, which a bare number or "NaT" gets.
 id: deprecated-in-numpy-2
@@ -508,21 +283,6 @@ rule:
             - pattern: $NP.timedelta64($X)
             - has: { field: arguments, has: { any: [{ kind: integer }, { kind: unary_operator, has: { kind: integer } }, { kind: string, regex: '^[bru]?["'']NaT["'']$' }] } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
@@ -542,21 +302,6 @@ rule:
                 kind: argument_list
                 inside: { kind: call, has: { field: function, regex: '^((np|numpy)\.dtype|.*\.astype)$' } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 ---
 # NumPy stores no time zone and warns when the string has one. "Z" means UTC, which is what the
 # value already is without it.
@@ -572,21 +317,6 @@ rule:
       nthChild: 1
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.datetime64$' } } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 transform:
   NEW: { replace: { source: $S, replace: 'Z(["''])$', by: '$1' } }
 fix: $NEW
@@ -603,21 +333,6 @@ rule:
       nthChild: 1
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.datetime64$' } } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 ---
 # NumPy 2.0 deprecated s= without axes= on the n-dimensional transforms. Today s applies to the
 # last len(s) axes, and a later release will apply it to the axes given.
@@ -637,21 +352,6 @@ rule:
           - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
           - has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
     - not: { matches: compat-code }
-utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
 constraints:
   F: { regex: '^(np|numpy)\.fft\.(fftn|ifftn|rfftn|irfftn)$' }
 ---
@@ -669,20 +369,6 @@ rule:
       matches: numpy-array
     - not: { matches: compat-code }
 utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-array:
     inside:
       kind: function_definition
@@ -708,20 +394,6 @@ rule:
       matches: numpy-array
     - not: { matches: compat-code }
 utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-array:
     inside:
       kind: function_definition
@@ -747,20 +419,6 @@ rule:
       matches: numpy-array
     - not: { matches: compat-code }
 utils:
-  compat-code:
-    any:
-      - inside:
-          kind: if_statement
-          stopBy: end
-          has: { field: condition, regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version' }
-      - inside:
-          kind: conditional_expression
-          stopBy: end
-          regex: '__version__|NumpyVersion|hasattr\((np|numpy)\b|\bNP_|NUMPY_|numpy_version|np_version'
-      - inside:
-          kind: try_statement
-          stopBy: end
-          has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(ImportError|AttributeError|ModuleNotFoundError)' }
   numpy-array:
     inside:
       kind: function_definition

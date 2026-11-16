@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{pack, scan};
+use crate::{catalog::Catalog, pack, scan, venv::Venv};
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub(crate) enum Engine {
@@ -61,20 +61,6 @@ struct Case {
     path: Option<PathBuf>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Config {
-    #[serde(default)]
-    test_configs: Vec<TestConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TestConfig {
-    test_dir: PathBuf,
-    snapshot_dir: Option<PathBuf>,
-}
-
 #[derive(Debug, Default, Deserialize, Serialize)]
 struct Snapshots {
     id: String,
@@ -98,8 +84,25 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
         !options.interactive || io::stdin().is_terminal(),
         "--interactive needs a terminal"
     );
-    let packs = pack::load(None)?;
-    let directories = directories(options)?;
+    let root = std::env::current_dir()?;
+    let venv = Venv::find_from(
+        options
+            .config
+            .as_deref()
+            .and_then(Path::parent)
+            .unwrap_or(&root),
+    );
+    let installed = venv.as_ref().map(Venv::distributions);
+    let catalog = match &options.config {
+        Some(config) => Catalog::load_config(config, installed.as_ref())?,
+        None => Catalog::load(&root, installed.as_ref())?,
+    };
+    let directories = directories(options, &catalog)?;
+    let source_root = catalog
+        .project
+        .as_ref()
+        .map_or(root.as_path(), |project| project.root.as_path());
+    let packs = &catalog.packs;
     let mut outcomes = Vec::new();
     for (directory, snapshot_dir) in directories {
         ensure!(
@@ -136,7 +139,14 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
             {
                 continue;
             }
-            outcomes.extend(run_case(options, &packs, &case, &path, &snapshot_dir)?);
+            outcomes.extend(run_case(
+                options,
+                packs,
+                &case,
+                &path,
+                &snapshot_dir,
+                source_root,
+            )?);
         }
     }
     ensure!(!outcomes.is_empty(), "no cases matched");
@@ -168,8 +178,10 @@ fn run_case(
     case: &Case,
     path: &Path,
     snapshot_dir: &Path,
+    root: &Path,
 ) -> Result<Vec<Outcome>> {
     let filename = source_path(packs, case)?;
+    let disk = root.join(&filename);
     let snapshot_path = snapshot_file(path, snapshot_dir, &case.id)?;
     let mut snapshots: Snapshots = if snapshot_path.exists() {
         serde_saphyr::from_str(&fs::read_to_string(&snapshot_path)?)?
@@ -195,7 +207,7 @@ fn run_case(
         let found = scan::lint_source(
             scan::File {
                 path: &filename,
-                disk: None,
+                disk: Some(&disk),
             },
             source,
             packs,
@@ -253,10 +265,9 @@ fn source_path(packs: &[pack::Pack], case: &Case) -> Result<PathBuf> {
     let rule = packs
         .iter()
         .find_map(|pack| {
-            pack.rules.iter().find(|rule| {
-                rule.config.id == case.id
-                    || format!("{}/{}", pack.module, rule.config.id) == case.id
-            })
+            pack.rules
+                .iter()
+                .find(|rule| rule.id == case.id || rule.config.id == case.id)
         })
         .with_context(|| format!("no rule matches case id {}", case.id))?;
     let file_types = rule.config.language.file_types();
@@ -296,24 +307,23 @@ fn snapshot_file(path: &Path, snapshot_dir: &Path, id: &str) -> Result<PathBuf> 
     Ok(snapshot_path)
 }
 
-fn directories(options: &Options) -> Result<Vec<(PathBuf, PathBuf)>> {
+fn directories(options: &Options, catalog: &Catalog) -> Result<Vec<(PathBuf, PathBuf)>> {
     if let Some(directory) = &options.test_dir {
         return Ok(vec![(directory.clone(), options.snapshot_dir.clone())]);
     }
-    let config = options
-        .config
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("sgconfig.yml"));
-    let parsed: Config = serde_saphyr::from_str(&fs::read_to_string(&config)?)?;
-    let root = config.parent().context("config has no parent")?;
-    Ok(parsed
+    let project = catalog
+        .project
+        .as_ref()
+        .context("no sgconfig.yml found; supply --test-dir")?;
+    Ok(project
         .test_configs
-        .into_iter()
+        .iter()
         .map(|entry| {
             (
-                root.join(entry.test_dir),
+                entry.test_dir.clone(),
                 entry
                     .snapshot_dir
+                    .clone()
                     .unwrap_or_else(|| options.snapshot_dir.clone()),
             )
         })

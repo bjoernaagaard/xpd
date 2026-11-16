@@ -1,0 +1,28 @@
+# The name the file binds to plotly.express: the dotted module itself, the alias of its import,
+# or the plot accessor of pandas in a file that draws with plotly.
+id: px
+language: python
+arguments: [ALIAS]
+rule:
+  any:
+    - { kind: attribute, regex: '^plotly\.express$' }
+    - kind: attribute
+      all:
+        - has: { field: attribute, regex: '^plot$' }
+        - inside: { stopBy: end, matches: pandas-draws-with-plotly }
+        # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
+        # is another argument in the two. Only a call with every argument named is read.
+        - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
+    - kind: identifier
+      matches: ALIAS
+      inside:
+        stopBy: end
+        kind: module
+        has:
+          stopBy: end
+          kind: aliased_import
+          all:
+            - has: { field: alias, matches: ALIAS }
+            - any:
+                - has: { field: name, regex: '^plotly\.express$' }
+                - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]

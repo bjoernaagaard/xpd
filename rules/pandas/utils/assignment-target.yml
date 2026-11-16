@@ -1,0 +1,6 @@
+id: assignment-target
+language: python
+rule:
+  any:
+    - inside: { kind: assignment, field: left }
+    - inside: { kind: augmented_assignment, field: left }

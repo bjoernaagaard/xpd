@@ -6,6 +6,7 @@ use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    catalog::Catalog,
     index::{Entry, Kind},
     pack,
     rule::Applicability,
@@ -536,7 +537,7 @@ pub(crate) fn harvest(
     entries: &mut Vec<Entry>,
 ) -> Result<Stats> {
     let attribution = Attribution::read(source)?;
-    let packs = pack::load(None)?;
+    let packs = Catalog::embedded(None)?.packs;
     let mut files = Vec::new();
     paths(source.root, &mut files)?;
     files.sort();

@@ -17,8 +17,6 @@ rule:
       - inside: { kind: class_definition, field: name }
       - inside: { kind: aliased_import, field: alias }
       - matches: expected-to-raise
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: BinaryRisk
 metadata: { fix: safe, since: "1.4" }
 ---
@@ -38,8 +36,6 @@ rule:
       kind: argument_list
       inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(predict|predict_interval)$' } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: aggregate_point_predictions
 metadata: { fix: safe, since: "1.4.1" }
 ---
@@ -83,8 +79,6 @@ rule:
                     - has: { field: right, regex: '^(\w+\.)*[A-Z]\w*\(' }
                     - not: { has: { field: right, regex: '^(\w+\.)*JackknifeAfterBootstrapRegressor\(' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: aggregate_point_predictions
 metadata: { fix: safe, since: "1.4.1" }
 ---
@@ -115,6 +109,4 @@ rule:
                     - has: { field: left, pattern: $M }
                     - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.3" }

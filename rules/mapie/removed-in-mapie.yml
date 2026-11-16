@@ -251,8 +251,6 @@ message: regression_coverage_score takes the intervals as one array since MAPIE 
 rule:
   pattern: $F($Y, $LOW, $UP)
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 constraints:
   Y: { not: { kind: keyword_argument } }
   LOW: { not: { kind: keyword_argument } }
@@ -268,8 +266,6 @@ message: regression_mean_width_score takes the intervals as one array of shape (
 rule:
   pattern: $F($LOW, $UP)
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 constraints:
   LOW: { not: { kind: keyword_argument } }
   UP: { not: { kind: keyword_argument } }
@@ -294,8 +290,6 @@ rule:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $F, regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -312,8 +306,6 @@ rule:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $F, regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.0" }
 ---
 # The constructors of MAPIE 1 take confidence_level, and no method takes alpha.
@@ -330,8 +322,6 @@ rule:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -349,8 +339,6 @@ rule:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.0" }
 ---
 id: removed-in-mapie
@@ -364,8 +352,6 @@ rule:
     kind: argument_list
     inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(predict_interval|predict_set)$' } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.0" }
 ---
 # TimeSeriesRegressor.predict passes alpha on to a method that already has it, so it raises
@@ -395,8 +381,6 @@ rule:
                     - has: { field: left, pattern: $M }
                     - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -427,8 +411,6 @@ rule:
                     - has: { field: left, pattern: $M }
                     - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.0" }
 ---
 # predict of the other MAPIE 1 classes takes no alpha and no confidence_level, because the
@@ -457,8 +439,6 @@ rule:
                     - has: { field: left, pattern: $M }
                     - has: { field: right, regex: '^(\w+\.)*((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.0" }
 ---
 # The cross classes and the jackknife class fit and conformalize in one call, so they have no
@@ -496,8 +476,6 @@ rule:
   not: { matches: expected-to-raise }
 constraints:
   M: { kind: identifier }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 metadata: { since: "1.0" }
 ---
 # The split classes take prefit and no cv, and the cross classes refuse a string.
@@ -509,8 +487,6 @@ rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cv$' } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 constraints:
   C: { regex: '(^|\.)(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor)$' }
 metadata: { since: "1.0" }
@@ -523,8 +499,6 @@ rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, regex: '^cv\s*=\s*["''](prefit|split)["'']$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 constraints:
   C: { regex: '(^|\.)(CrossConformal(Regressor|Classifier)|CrossConformalizedQuantileRegressor)$' }
 metadata: { since: "1.0" }
@@ -538,8 +512,6 @@ rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^method$' } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 constraints:
   C: { regex: '(^|\.)((Split|Cross)ConformalClassifier|SplitConformalRegressor|TopLabelCalibrator)$' }
 metadata: { since: "1.0" }
@@ -552,8 +524,6 @@ rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["'']naive["'']$' } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 constraints:
   C: { regex: '(^|\.)(CrossConformalRegressor|JackknifeAfterBootstrapRegressor|CrossConformalizedQuantileRegressor)$' }
 metadata: { since: "1.0" }
@@ -574,8 +544,6 @@ rule:
           - not: { has: { kind: keyword_argument, has: { field: name, regex: '^fit_params$' } } }
           - inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit_conformalize$' } } }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: 'fit_params={"sample_weight": $W}'
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -608,8 +576,6 @@ rule:
                         - has: { field: left, pattern: $M }
                         - has: { field: right, regex: '^(\w+\.)*(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor)\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: 'fit_params={"sample_weight": $W}'
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -643,8 +609,6 @@ rule:
                         - has: { field: left, pattern: $M }
                         - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: 'fit_params={"sample_weight": $W}'
 metadata: { fix: unsafe, since: "1.4.1" }
 ---
@@ -669,7 +633,5 @@ rule:
             - has: { field: left, pattern: $M }
             - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
   not: { matches: expected-to-raise }
-utils:
-  expected-to-raise: { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }
 fix: $M.update
 metadata: { fix: unsafe, since: "1.2" }

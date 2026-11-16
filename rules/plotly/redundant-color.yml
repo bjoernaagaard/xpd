@@ -14,68 +14,9 @@ message: color=$C repeats the column that $A already shows, so the chart encodes
 rule:
   kind: call
   all:
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|density_contour|ecdf|funnel|histogram|line|line_3d|scatter|scatter_3d|strip|violin)$' } }, { has: { field: object, matches: px } }] }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|density_contour|ecdf|funnel|histogram|line|line_3d|scatter|scatter_3d|strip|violin)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(color)$' } }, { has: { field: value, kind: string, pattern: $C } }] } }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, pattern: $A, regex: '^[xy]$' } }, { has: { field: value, kind: string, pattern: $C } }] } }
-utils:
-  # A file that makes plotly the plotting backend of pandas and names no other backend. There
-  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
-  pandas-draws-with-plotly:
-    kind: module
-    all:
-      - has:
-          stopBy: end
-          any:
-            - kind: assignment
-              all:
-                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
-            - kind: call
-              all:
-                - has: { field: function, regex: '(^|\.)set_option$' }
-                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
-      - not:
-          has:
-            stopBy: end
-            any:
-              - kind: assignment
-                all:
-                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
-              - kind: call
-                all:
-                  - has: { field: function, regex: '(^|\.)set_option$' }
-                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
-                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
-              - kind: keyword_argument
-                all:
-                  - has: { field: name, regex: '^backend$' }
-                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
-  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
-  # or the plot accessor of pandas in a file that draws with plotly.
-  px:
-    any:
-      - { kind: attribute, regex: '^plotly\.express$' }
-      - kind: attribute
-        all:
-          - has: { field: attribute, regex: '^plot$' }
-          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
-          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
-          # is another argument in the two. Only a call with every argument named is read.
-          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
-      - kind: identifier
-        pattern: $PX
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $PX }
-              - any:
-                  - has: { field: name, regex: '^plotly\.express$' }
-                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
 ---
 # The same double encoding on go.Bar: marker_color, or color in marker, set to the same expression
 # as x or y. On plotly 7.1.0 go.Bar(x=["a", "b", "c"], y=v, marker_color=v) with v = [1, 2, 4]
@@ -90,7 +31,7 @@ message: The marker color $C repeats the values or categories used for coordinat
 rule:
   kind: call
   all:
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: go } }] }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
     - any:
         - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_color)$' } }, { has: { field: value, pattern: $C } }] } }
         - has:
@@ -110,23 +51,5 @@ rule:
                         has: { kind: pair, all: [{ has: { field: key, regex: '^["'']color["'']$' } }, { has: { field: value, pattern: $C } }] }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, pattern: $A, regex: '^[xy]$' } }, { has: { field: value, pattern: $C } }] } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
-utils:
-  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
-  go:
-    any:
-      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
-      - kind: identifier
-        pattern: $GO
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $GO }
-              - any:
-                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
-                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
 constraints:
   C: { not: { any: [{ kind: string }, { kind: integer }, { kind: float }, { kind: none }, { kind: 'true' }, { kind: 'false' }] } }

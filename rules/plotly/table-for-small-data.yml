@@ -28,89 +28,14 @@ rule:
   kind: call
   all:
     - any:
-        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: px } }] }
-        - all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: go } }] } }, { matches: only-trace }]
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+        - all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } }, { matches: only-trace }]
     - any:
         - all: [{ has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(y)$' } }, { has: { field: value, pattern: $V, matches: few-numbers } }] } } }, { not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(orientation)$' } }, { has: { field: value, regex: '^["'']h["'']$'  } }] } } } }]
         - all: [{ has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(x)$' } }, { has: { field: value, pattern: $V, matches: few-numbers } }] } } }, { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(orientation)$' } }, { has: { field: value, regex: '^["'']h["'']$'  } }] } } }]
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - not: { any: [{ has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(text|texttemplate|textinfo|text_auto)$' } } } }, { inside: { stopBy: end, kind: module, regex: 'textinfo|texttemplate|text_auto|textposition' } }] }
 utils:
-  # A file that makes plotly the plotting backend of pandas and names no other backend. There
-  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
-  pandas-draws-with-plotly:
-    kind: module
-    all:
-      - has:
-          stopBy: end
-          any:
-            - kind: assignment
-              all:
-                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
-            - kind: call
-              all:
-                - has: { field: function, regex: '(^|\.)set_option$' }
-                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
-      - not:
-          has:
-            stopBy: end
-            any:
-              - kind: assignment
-                all:
-                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
-              - kind: call
-                all:
-                  - has: { field: function, regex: '(^|\.)set_option$' }
-                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
-                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
-              - kind: keyword_argument
-                all:
-                  - has: { field: name, regex: '^backend$' }
-                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
-  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
-  # or the plot accessor of pandas in a file that draws with plotly.
-  px:
-    any:
-      - { kind: attribute, regex: '^plotly\.express$' }
-      - kind: attribute
-        all:
-          - has: { field: attribute, regex: '^plot$' }
-          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
-          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
-          # is another argument in the two. Only a call with every argument named is read.
-          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
-      - kind: identifier
-        pattern: $PX
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $PX }
-              - any:
-                  - has: { field: name, regex: '^plotly\.express$' }
-                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
-  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
-  go:
-    any:
-      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
-      - kind: identifier
-        pattern: $GO
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $GO }
-              - any:
-                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
-                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
   # A list or tuple of 1 to 20 written numbers, counted without comments.
   few-numbers:
     any: [{ kind: list }, { kind: tuple }]
@@ -130,8 +55,8 @@ utils:
       - inside: { any: [{ kind: list }, { kind: tuple }], not: { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }, matches: figure-data }
   figure-data:
     any:
-      - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }
-      - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }] }
+      - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }
+      - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }] }
 ---
 # Tufte, vdqi.md line 1521, printed page 56: "Tables usually outperform graphics in reporting on
 # small data sets of 20 numbers or less." Line 7166, printed page 178: "Tables are clearly the
@@ -164,87 +89,12 @@ rule:
   kind: call
   all:
     - any:
-        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(pie)$' } }, { has: { field: object, matches: px } }] }
-        - all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: go } }] } }, { matches: only-trace }]
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(pie)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+        - all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Pie)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } }, { matches: only-trace }]
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(values)$' } }, { has: { field: value, pattern: $V, matches: few-numbers } }] } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - not: { any: [{ has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(text|texttemplate|textinfo|text_auto)$' } } } }, { inside: { stopBy: end, kind: module, regex: 'textinfo|texttemplate|text_auto|textposition' } }] }
 utils:
-  # A file that makes plotly the plotting backend of pandas and names no other backend. There
-  # df.plot.bar(...) returned the same figure as px.bar(df, ...) on pandas 3.1.1 with plotly 7.1.0.
-  pandas-draws-with-plotly:
-    kind: module
-    all:
-      - has:
-          stopBy: end
-          any:
-            - kind: assignment
-              all:
-                - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                - has: { field: right, kind: string, regex: '^["'']plotly["'']$' }
-            - kind: call
-              all:
-                - has: { field: function, regex: '(^|\.)set_option$' }
-                - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' }
-      - not:
-          has:
-            stopBy: end
-            any:
-              - kind: assignment
-                all:
-                  - has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
-                  - not: { has: { field: right, kind: string, regex: '^["'']plotly["'']$' } }
-              - kind: call
-                all:
-                  - has: { field: function, regex: '(^|\.)set_option$' }
-                  - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
-                  - not: { has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']\s*,\s*["'']plotly["'']\s*\)$' } }
-              - kind: keyword_argument
-                all:
-                  - has: { field: name, regex: '^backend$' }
-                  - not: { has: { field: value, kind: string, regex: '^["'']plotly["'']$' } }
-  # The name the file binds to plotly.express: the dotted module itself, the alias of its import,
-  # or the plot accessor of pandas in a file that draws with plotly.
-  px:
-    any:
-      - { kind: attribute, regex: '^plotly\.express$' }
-      - kind: attribute
-        all:
-          - has: { field: attribute, regex: '^plot$' }
-          - inside: { stopBy: end, matches: pandas-draws-with-plotly }
-          # px.bar takes the frame first, and df.plot.bar does not, so an argument given by position
-          # is another argument in the two. Only a call with every argument named is read.
-          - not: { inside: { kind: attribute, inside: { kind: call, has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } } }
-      - kind: identifier
-        pattern: $PX
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $PX }
-              - any:
-                  - has: { field: name, regex: '^plotly\.express$' }
-                  - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
-  # The name the file binds to plotly.graph_objects or plotly.graph_objs: the dotted module itself, or the alias of its import.
-  go:
-    any:
-      - { kind: attribute, regex: '^plotly\.graph_obj(ect)?s$' }
-      - kind: identifier
-        pattern: $GO
-        inside:
-          stopBy: end
-          kind: module
-          has:
-            stopBy: end
-            kind: aliased_import
-            all:
-              - has: { field: alias, pattern: $GO }
-              - any:
-                  - has: { field: name, regex: '^plotly\.graph_obj(ect)?s$' }
-                  - all: [{ has: { field: name, regex: '^graph_obj(ect)?s$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
   # A list or tuple of 1 to 20 written numbers, counted without comments.
   few-numbers:
     any: [{ kind: list }, { kind: tuple }]
@@ -264,5 +114,5 @@ utils:
       - inside: { any: [{ kind: list }, { kind: tuple }], not: { has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }, matches: figure-data }
   figure-data:
     any:
-      - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }
-      - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: go } }] } } } }] }
+      - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }
+      - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }] }

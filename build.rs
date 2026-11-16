@@ -3,8 +3,9 @@
 //!
 //! Each folder `rules/<module>/` is the pack for the Python library imported as `<module>`, or
 //! for Python itself when its manifest says `everyFile: true`.
-//! `pack.yml` is the pack's manifest, and every other file is `<rule id>.yml`, the documents of
-//! one rule. This script writes `OUT_DIR/packs.rs`, which src/pack.rs includes, so a new rule or
+//! `pack.yml` is the pack's manifest, every other file is `<rule id>.yml`, the documents of one
+//! rule, and the folder `utils/` holds `<utility id>.yml`, one utility rule that every rule of
+//! the pack can name with `matches`. This script writes `OUT_DIR/packs.rs`, which src/pack.rs includes, so a new rule or
 //! a new pack needs no Rust change. It also writes `OUT_DIR/skills.rs`, which src/skills.rs
 //! includes.
 
@@ -20,6 +21,8 @@ mod search;
 
 /// The file in a pack folder that is the manifest and not a rule.
 const MANIFEST: &str = "pack.yml";
+/// The folder in a pack folder that holds the pack's shared utility rules.
+const UTILS: &str = "utils";
 /// The page with one `#### <rule id>` section for every rule and package check.
 const RULES_PAGE: &str = "docs/rules.md";
 /// The manifest of the agent plugin that this repository is.
@@ -111,11 +114,16 @@ fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>)
     );
     let mut manifest = String::from("None");
     let mut rules = Vec::new();
+    let mut utils = Vec::new();
     let mut ids = Vec::new();
     for file in sorted_entries(pack)? {
         let name = utf8_name(&file)?;
         // Hidden files, such as the ones a file manager leaves, are not part of the pack.
         if name.starts_with('.') {
+            continue;
+        }
+        if name == UTILS && file.is_dir() {
+            utils = util_sources(module, &file)?;
             continue;
         }
         let include = include(&format!("/rules/{module}/{name}"));
@@ -138,8 +146,9 @@ fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>)
                 found.all(|found| found.trim() == id),
                 "rules/{module}/{name}: every rule document in the file must have the id {id:?}"
             );
+            let path = format!("rules/{module}/{name}");
             rules.push(format!(
-                "            RuleSource {{ id: {id:?}, yaml: {include} }},\n"
+                "            RuleSource {{ path: {path:?}, yaml: {include} }},\n"
             ));
             ids.push(id.to_owned());
         }
@@ -161,10 +170,38 @@ fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>)
         bail!("{RULES_PAGE}: the section {stray} names no rule or package check of rules/{module}");
     }
     Ok(format!(
-        "    PackSource {{\n        module: {module:?},\n        manifest: {manifest},\n        rules: &[\n{}        ],\n        docs: &[\n{}        ],\n    }},\n",
+        "    PackSource {{\n        module: {module:?},\n        manifest: {manifest},\n        rules: &[\n{}        ],\n        utils: &[\n{}        ],\n        docs: &[\n{}        ],\n    }},\n",
         rules.concat(),
+        utils.concat(),
         pack_docs.concat()
     ))
+}
+
+/// The `RuleSource` literals for the utility rules in the `utils` folder of the pack `module`.
+fn util_sources(module: &str, utils: &Path) -> Result<Vec<String>> {
+    let mut sources = Vec::new();
+    for file in sorted_entries(utils)? {
+        let name = utf8_name(&file)?;
+        if name.starts_with('.') {
+            continue;
+        }
+        let path = format!("rules/{module}/{UTILS}/{name}");
+        let id = name
+            .strip_suffix(".yml")
+            .with_context(|| format!("{path}: the folder holds <utility id>.yml files"))?;
+        let yaml =
+            fs::read_to_string(&file).with_context(|| format!("cannot read {}", file.display()))?;
+        let mut found = yaml.lines().filter_map(|line| line.strip_prefix("id: "));
+        ensure!(
+            found.next().map(str::trim) == Some(id) && found.next().is_none(),
+            "{path}: the file must hold one utility rule with the id {id:?}"
+        );
+        let include = include(&format!("/{path}"));
+        sources.push(format!(
+            "            RuleSource {{ path: {path:?}, yaml: {include} }},\n"
+        ));
+    }
+    Ok(sources)
 }
 
 /// The `#### <id>` sections of the rules page, by the module of the pack heading they are
