@@ -96,7 +96,7 @@ def columns_that_stay():
     path = stored()
     wanted = ["id", "price"]
     by_name = pd.read_parquet(path)[wanted]
-    masked = pd.read_parquet(path)[lambda d: d["id"] < 10]
+    masked = pd.read_parquet(path)[lambda d: d["id"] < 10]  # xpd: lambda-in-assign
     named = pd.read_parquet(path, columns=["id", "price"])[["id"]]
     return by_name, masked, named
 
