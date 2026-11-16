@@ -3979,20 +3979,27 @@ ones = np.bitwise_count(masks).sum()
 
 ## SciPy
 
-These rules run on files that import `scipy`. Examples assume `import numpy as np`. The rules
-follow SciPy 1.18. Every claim was run on SciPy 1.18.1 with NumPy 2.5.4. A form that is called
-removed or deprecated raises there under `python -W error`. A form that is called inexact lost at
-least 3 decimal digits against mpmath at 50 digits, where the form to write lost fewer than 1. Each
-speedup is the range over repeated runs on one core, at 1,000,000 values unless the entry says
-otherwise, and the faster form was not slower at 1,000. A rule with severity info states only
-what SciPy's own source calls legacy or prefers, and claims nothing about speed or accuracy.
+The SciPy rules report code that raises or warns on SciPy 1.18.1, code that loses digits, and
+SciPy calls made once per value, in each file that imports `scipy`. The examples assume
+`import numpy as np`.
 
-A rule reports a name only when it is rooted at `scipy` or the file's own imports bind it from
-`scipy`. A form made only of NumPy names, such as `np.linalg.inv(a) @ b`, belongs to the
-[NumPy](#numpy) rules. A safe fix gives the same object or a bit equal value of the same type, and
-is not offered where the file binds the name again or the call spreads `*args` or `**kwargs`. An
-unsafe fix names what can differ. A rule that asks for an API newer than the project's SciPy is
-skipped.
+Each word in a message stands for a measurement on SciPy 1.18.1 with NumPy 2.5.4:
+
+| Word in the message | What was measured |
+| --- | --- |
+| removed, deprecated | The old form raises under `python -W error`. |
+| inexact | The old form lost at least 3 decimal digits against mpmath at 50 digits, and the form to write lost fewer than 1. |
+| faster | The range over repeated runs on one core, at 1,000,000 values unless the rule says otherwise. The faster form was not slower at 1,000 values. |
+| legacy, preferred | SciPy's own source calls the old form legacy or prefers the new one. Such rules have severity info and claim nothing about speed or accuracy. |
+
+A rule reports a name only when the name starts at `scipy`, or when the file's own imports bind
+it from `scipy`. A form made only of NumPy names, such as `np.linalg.inv(a) @ b`, belongs to the
+[NumPy](#numpy) rules. A rule that asks for an API newer than the project's SciPy is skipped.
+
+| Fix | What it promises |
+| --- | --- |
+| safe | The same object, or a bit equal value of the same type. xpd offers no safe fix where the file binds the name again or the call spreads `*args` or `**kwargs`. |
+| unsafe | The message names what can differ. |
 
 ### Names that are gone or that warn
 
@@ -4000,7 +4007,18 @@ skipped.
 
 **Severity:** error. **Fix:** unsafe: `trapezoid`, `cumulative_trapezoid` and `simpson` for `trapz`, `cumtrapz` and `simps`, `pinv` for `pinv2`, `eye` for `speye`, `median_abs_deviation` and `gibrat` for `median_absolute_deviation` and `gilbrat`, each in the module the code already names, `from scipy.integrate import trapezoid as trapz` for an import of the old name, `scipy.signal.windows.<name>` for a window on the `scipy.signal` namespace, `stats.mstats.find_repeats` and `kendalltau_seasonal`, and `np.<name>` for a NumPy name on the `scipy` namespace. Each is unsafe because the old body is not in SciPy 1.18.1, so the fix cannot be shown to give the same result. The other forms have no fix.
 
-Reports the SciPy names that raise on SciPy 1.18.1, each with what to write instead: the integration, window, wavelet, Legendre, spherical Bessel, statistics and linear algebra functions that SciPy removed, `interp2d`, which raises `NotImplementedError` when called, everything in `scipy.misc`, which is empty and warns when imported, and the NumPy functions and constants that the `scipy` namespace no longer re-exports. A name without a public replacement says so. Code under a SciPy version check, a `hasattr` check, or a `try` that catches `ImportError` or `AttributeError` is left alone, because it exists for old SciPy.
+The rule reports SciPy names that raise on SciPy 1.18.1. Its message says what to write
+instead, or says that SciPy has no public replacement.
+
+| Old names | On SciPy 1.18.1 |
+| --- | --- |
+| Removed functions for integration, windows, wavelets, Legendre polynomials, spherical Bessel functions, statistics and linear algebra | The name is gone. |
+| `interp2d` | A call raises `NotImplementedError`. |
+| Everything in `scipy.misc` | The module is empty and warns when imported. |
+| NumPy functions and constants on the `scipy` namespace, such as `scipy.pi` | The name is gone. |
+
+The rule leaves alone code under a SciPy version check, a `hasattr` check, or a `try` that
+catches `ImportError` or `AttributeError`, because such code exists for old SciPy.
 
 Example:
 
@@ -4028,7 +4046,14 @@ angle = np.pi * frac
 
 **Severity:** warning. **Fix:** safe: the public namespace for a name taken from one of the 107 private modules that SciPy deprecated, such as `scipy.sparse.csr_matrix` for `scipy.sparse.csr.csr_matrix` and `from scipy.ndimage import gaussian_filter` for `from scipy.ndimage.filters import gaussian_filter`, which give the same object, and `tri.find_simplex(xi)` for `scipy.spatial.tsearch(tri, xi)`, which is what `tsearch` returns. The other forms have no fix.
 
-Reports the names that warn with `DeprecationWarning` on SciPy 1.18.1: every name taken from a private module such as `scipy.stats.stats`, `scipy.linalg.basic`, `scipy.ndimage.filters` or `scipy.sparse.linalg.isolve`, an import of such a module, `scipy.odr`, which goes away in SciPy 1.19, and calls of `minkowski_distance`, `minkowski_distance_p`, `distance_matrix`, `tsearch`, `lagrange`, `pade`, `approximate_taylor_polynomial` and `py_vq`, each with the replacement that SciPy's warning names.
+The rule reports names that warn with `DeprecationWarning` on SciPy 1.18.1, and its message
+names the replacement that SciPy's warning names. The names are:
+
+- every name taken from a private module, such as `scipy.stats.stats`, `scipy.linalg.basic`,
+  `scipy.ndimage.filters` or `scipy.sparse.linalg.isolve`, and an import of such a module
+- `scipy.odr`, which SciPy 1.19 removes
+- calls of `minkowski_distance`, `minkowski_distance_p`, `distance_matrix`, `tsearch`,
+  `lagrange`, `pade`, `approximate_taylor_polynomial` and `py_vq`
 
 Example:
 
@@ -4056,7 +4081,22 @@ D = scipy.spatial.distance.cdist(X, Y)
 
 **Severity:** error. **Fix:** unsafe: `rtol=` for `tol=` on the sparse.linalg solvers, because the old tol came with an atol default that SciPy 1.18 rejects, `restart=` for gmres `restrt=`, `assume_a='pos'` for linalg.solve `sym_pos=True`, `subset_by_index=` for eigh and eigvalsh `eigvals=`, `workers=` for `n_jobs=` on the KDTree and cKDTree query methods, and `scale=1.0` for iqr and median_abs_deviation `scale='raw'`, because no source on SciPy 1.18 shows the old code. The other forms have no fix.
 
-Reports keywords and argument values that SciPy removed and that raise on SciPy 1.18.1: `tol=`, `atol='legacy'` and a fourth positional argument on cg, gmres and the other iterative solvers, gmres `restrt=`, linalg.solve `sym_pos=`, eigh and eigvalsh `eigvals=` and `turbo=`, pinv and pinvh `cond=` and `rcond=`, integrate.simpson `even=`, cumulative_trapezoid with an `initial` other than 0, `n_jobs=` on the methods of a KDTree or cKDTree, kendalltau `initial_lexsort=`, iqr and median_abs_deviation `scale='raw'`, fmin_l_bfgs_b `iprint=` and `disp=`, and the metric `'wminkowski'` of cdist and pdist.
+The rule reports keywords and argument values that SciPy removed and that raise on SciPy 1.18.1.
+
+| Function | Removed form | Fix |
+| --- | --- | --- |
+| `cg`, `gmres` and the other iterative solvers of `scipy.sparse.linalg` | `tol=`, `atol='legacy'`, a fourth positional argument | `rtol=` for `tol=` |
+| `gmres` | `restrt=` | `restart=` |
+| `linalg.solve` | `sym_pos=` | `assume_a='pos'` for `sym_pos=True` |
+| `linalg.eigh`, `linalg.eigvalsh` | `eigvals=`, `turbo=` | `subset_by_index=` for `eigvals=` |
+| `linalg.pinv`, `linalg.pinvh` | `cond=`, `rcond=` | none |
+| `integrate.simpson` | `even=` | none |
+| `integrate.cumulative_trapezoid` | an `initial` other than 0 | none |
+| the query methods of `KDTree` and `cKDTree` | `n_jobs=` | `workers=` |
+| `stats.kendalltau` | `initial_lexsort=` | none |
+| `stats.iqr`, `stats.median_abs_deviation` | `scale='raw'` | `scale=1.0` |
+| `optimize.fmin_l_bfgs_b` | `iprint=`, `disp=` | none |
+| `spatial.distance.cdist`, `spatial.distance.pdist` | the metric `'wminkowski'` | none |
 
 Example:
 
@@ -4078,7 +4118,15 @@ dist, idx = tree.query(points, k=3, workers=-1)
 
 **Severity:** warning. **Fix:** none.
 
-Reports arguments that warn on SciPy 1.18.1 and that SciPy will remove: lombscargle `precenter=` and a fourth or fifth positional argument, linalg.qr `lwork=` by keyword or by position, anderson_ksamp `midrank=` by keyword or by position, and linprog with `method='simplex'`, `'interior-point'` or `'revised simplex'`. The rules that name `variant=` are skipped on SciPy older than 1.17.
+The rule reports arguments that warn on SciPy 1.18.1 and that SciPy will remove. The documents
+whose message names `variant=` are skipped on SciPy older than 1.17.
+
+| Function | Argument that warns |
+| --- | --- |
+| `signal.lombscargle` | `precenter=`, and a fourth or fifth positional argument |
+| `linalg.qr` | `lwork=`, by keyword or by position |
+| `stats.anderson_ksamp` | `midrank=`, by keyword or by position |
+| `optimize.linprog` | `method='simplex'`, `'interior-point'` or `'revised simplex'` |
 
 Example:
 
@@ -4098,7 +4146,16 @@ res = optimize.linprog(c, A_ub=A, b_ub=b, method="highs")
 
 **Severity:** warning. **Fix:** safe: `callback_type='legacy'` for gmres with a callback, and `spmatrix=True` for hb_read and mmread. Each is what SciPy 1.18.1 does after it warns. The other forms have no fix.
 
-Reports calls that rely on a default that warns on SciPy 1.18.1: gmres with `callback=` and no `callback_type=`, stats.anderson without `method=`, anderson_ksamp without `variant=`, io.hb_read and io.mmread without `spmatrix=`, and ndimage.zoom with `grid_mode=True` and mode `'constant'`, the default, or `'wrap'`. The rules that name an argument added in SciPy 1.17 or 1.18 are skipped on an older SciPy.
+The rule reports calls that rely on a default that warns on SciPy 1.18.1. A document that names
+an argument added in SciPy 1.17 or 1.18 is skipped on an older SciPy.
+
+| Call | Default that warns | Fix |
+| --- | --- | --- |
+| `gmres` with `callback=` | no `callback_type=` | `callback_type='legacy'` |
+| `stats.anderson` | no `method=` | none |
+| `stats.anderson_ksamp` | no `variant=` | none |
+| `io.hb_read`, `io.mmread` | no `spmatrix=` | `spmatrix=True` |
+| `ndimage.zoom` with `grid_mode=True` | mode `'constant'`, the default, or `'wrap'` | none |
 
 Example:
 
@@ -4120,7 +4177,11 @@ result = stats.anderson(sample, method="interpolate")
 
 **Severity:** warning. **Fix:** none.
 
-Reports a key in the `options=` dict of `optimize.minimize` that the chosen `method=` does not take, when another method takes it. Each such pair warns OptimizeWarning and is ignored on SciPy 1.18.1, or raises TypeError for `'trust-constr'`. Examples are `disp` and `iprint` for L-BFGS-B, `maxiter` for TNC and `maxfun` for BFGS. The keys of every method were measured by running each pair.
+The rule reports a key in the `options=` dict of `optimize.minimize` that the chosen `method=`
+doesn't take, when another method takes it, such as `disp` and `iprint` for L-BFGS-B, `maxiter`
+for TNC and `maxfun` for BFGS. On SciPy 1.18.1, minimize warns OptimizeWarning and ignores such a
+key, and with `'trust-constr'` it raises TypeError. The keys of each method come from a run of
+each pair of method and key.
 
 Example:
 
@@ -4138,7 +4199,15 @@ res = minimize(f, x0, method="L-BFGS-B", options={"maxiter": 200})
 
 **Severity:** warning. **Fix:** none.
 
-Reports `jac=` with Nelder-Mead, Powell, COBYLA or COBYQA, `hess=` and `hessp=` with a method that uses no Hessian, `constraints=` with a method that cannot handle them, and `bounds=` with CG, BFGS, Newton-CG or a trust-region method other than trust-constr. minimize ignores the argument and warns RuntimeWarning on SciPy 1.18.1.
+The rule reports an argument of `optimize.minimize` that the chosen method ignores. On SciPy
+1.18.1, minimize warns RuntimeWarning and goes on without the argument.
+
+| Argument | Methods that ignore it |
+| --- | --- |
+| `jac=` | Nelder-Mead, Powell, COBYLA, COBYQA |
+| `hess=`, `hessp=` | each method that uses no Hessian |
+| `constraints=` | each method that can't handle constraints |
+| `bounds=` | CG, BFGS, Newton-CG, and the trust-region methods other than trust-constr |
 
 Example:
 
@@ -4156,7 +4225,16 @@ res = minimize(f, x0, method="L-BFGS-B", jac=grad, bounds=[(0, 1)] * n)
 
 **Severity:** info. **Fix:** none. The same integer gives a different stream under `rng=` than under `random_state=` or `seed=`.
 
-Reports `random_state=` and `seed=` passed by keyword to the functions and classes that SciPy 1.15 moved to `rng=`, such as sparse.random, svds, bootstrap, permutation_test, kmeans2, differential_evolution, basinhopping, dual_annealing, directed_hausdorff, Rotation.random and the qmc engines. SciPy's docs say new code should pass `rng`. The old keywords run without a warning on SciPy 1.18.1. A call under a SciPy version check is left alone, because it is kept for an older SciPy, where `rng=` raises. The message says to keep the old keyword when the code must also run on a SciPy older than 1.15, because xpd reads only the installed SciPy and cannot see which versions a library supports. Skipped on SciPy older than 1.15.
+The rule reports `random_state=` and `seed=` passed by keyword to the functions and classes that
+SciPy 1.15 moved to `rng=`, because SciPy's docs say new code should pass `rng`. Examples are
+`sparse.random`, `svds`, `bootstrap`, `permutation_test`, `kmeans2`, `differential_evolution`,
+`basinhopping`, `dual_annealing`, `directed_hausdorff`, `Rotation.random` and the qmc engines.
+The old keywords run without a warning on SciPy 1.18.1.
+
+The rule is skipped on SciPy older than 1.15. It leaves alone a call under a SciPy version check,
+because `rng=` raises on an older SciPy. xpd reads only the installed SciPy and can't see which
+SciPy versions a library supports, so the message says to keep the old keyword when the code
+must also run on SciPy older than 1.15.
 
 Example:
 
@@ -4176,7 +4254,18 @@ X = sparse.random(1000, 100, density=0.01, rng=0)
 
 **Severity:** info. **Fix:** none, because the newer functions take other argument names and return an OptimizeResult.
 
-Reports the functions that scipy.optimize lists as legacy and not recommended for new scripts: fmin, fmin_powell, fmin_cg, fmin_bfgs, fmin_ncg, fmin_l_bfgs_b, fmin_tnc, fmin_cobyla, fmin_slsqp, fminbound, brent, golden, leastsq, fsolve, broyden1, broyden2, newton_krylov, anderson, excitingmixing, linearmixing and diagbroyden. The message names the `minimize`, `minimize_scalar`, `least_squares` or `root` call that replaces each.
+The rule reports the functions that `scipy.optimize` lists as legacy and not recommended for new
+scripts. Its message names the call that replaces each one:
+
+| Legacy function | Write instead |
+| --- | --- |
+| `fmin`, `fmin_powell`, `fmin_cg`, `fmin_bfgs`, `fmin_ncg`, `fmin_l_bfgs_b`, `fmin_tnc`, `fmin_cobyla`, `fmin_slsqp` | `minimize(fun, x0, method=...)` with `'Nelder-Mead'`, `'Powell'`, `'CG'`, `'BFGS'`, `'Newton-CG'`, `'L-BFGS-B'`, `'TNC'`, `'COBYLA'` or `'SLSQP'` |
+| `fminbound` | `minimize_scalar(fun, bounds=(a, b), method='bounded')` |
+| `brent`, `golden` | `minimize_scalar(fun, method='brent')` or `method='golden'` |
+| `leastsq` | `least_squares(fun, x0)` |
+| `fsolve` | `root(fun, x0)` |
+| `broyden1`, `broyden2`, `anderson`, `excitingmixing`, `linearmixing`, `diagbroyden` | `root(fun, x0, method=...)` with the same name |
+| `newton_krylov` | `root(fun, x0, method='krylov')` |
 
 Example:
 
@@ -4194,7 +4283,14 @@ xopt = optimize.minimize(f, x0, jac=grad, method="BFGS").x
 
 **Severity:** info. **Fix:** none, because solve_ivp calls `fun(t, y)` where odeint calls `func(y, t)`, and returns an object.
 
-Reports `integrate.odeint`, which SciPy's docs ask new code to replace with `solve_ivp`. Neither solver was faster on every problem measured, so the message makes no speed claim. It says that solve_ivp raises ValueError when `t_eval` repeats a time, which odeint accepts, and that the values differ in the last digits. It says to keep solve_ivp's default method for a large system, because `method='LSODA'` stores a full Jacobian and raised MemoryError at 1,000,000 equations.
+The rule reports `integrate.odeint`, because SciPy's docs ask new code to use `solve_ivp`.
+Neither solver was faster on every problem measured, so the message makes no claim about speed.
+The message also tells you what changes when you switch:
+
+- `solve_ivp` raises ValueError when `t_eval` repeats a time, which `odeint` accepts.
+- The values differ in the last digits.
+- Keep the default method of `solve_ivp` for a large system, because `method='LSODA'` stores a
+  full Jacobian and raised MemoryError at 1,000,000 equations.
 
 Example:
 
@@ -4212,7 +4308,25 @@ ys = solve_ivp(lambda t, y: -k * y, (t[0], t[-1]), y0, t_eval=t).y.T
 
 **Severity:** info. **Fix:** none, because each replacement takes other arguments and returns a BSpline or another object.
 
-Reports the interpolation classes and functions that SciPy marks as legacy: interp1d, Rbf, UnivariateSpline, InterpolatedUnivariateSpline, LSQUnivariateSpline, splrep, splprep, splev, splint, sproot, spalde, splder and splantider. The message names the replacement SciPy recommends, such as make_splrep for splrep and RBFInterpolator for Rbf. For interp1d it names `make_interp_spline(x, y, k=1)`, with `axis=-1` when `y` has more than one dimension, and says that outside the data interp1d raises where make_interp_spline extrapolates and `numpy.interp` repeats the end value. For splev it says to pass `nu=n` where splev took `der=n`. Documents that name an API added in SciPy 1.7 or 1.15 are skipped on an older SciPy.
+The rule reports the interpolation classes and functions that SciPy marks as legacy, and its
+message names the replacement that SciPy recommends:
+
+| Legacy name | Write instead |
+| --- | --- |
+| `interp1d` | `make_interp_spline(x, y, k=1)` for linear interpolation, with `axis=-1` when `y` has more than one dimension |
+| `Rbf` | `RBFInterpolator`, which takes the points as one (n, d) array |
+| `UnivariateSpline`, `splrep` | `make_splrep` |
+| `InterpolatedUnivariateSpline` | `make_interp_spline` |
+| `LSQUnivariateSpline` | `make_lsq_spline` |
+| `splprep` | `make_splprep` |
+| `splev` | a `BSpline` that you call, with `nu=n` where `splev` took `der=n` |
+| `splint`, `splder`, `splantider` | the `integrate`, `derivative` and `antiderivative` methods of a `BSpline` |
+| `spalde` | the derivative of a `BSpline` |
+| `sproot` | `PPoly.from_spline(spl).roots()` |
+
+Outside the data, `interp1d` raises, `make_interp_spline` extrapolates, and `numpy.interp`
+repeats the end value, and the message for `interp1d` says so. A document that names an API
+added in SciPy 1.7 or 1.15 is skipped on an older SciPy.
 
 Example:
 
@@ -4232,7 +4346,9 @@ smooth = spline(grid)
 
 **Severity:** info. **Fix:** safe: `freqz_sos` for `sosfreqz`, whose body only calls freqz_sos. The other forms have no fix.
 
-Reports signal.stft, istft, spectrogram and check_COLA, which SciPy marks as legacy in favor of the ShortTimeFFT class, and signal.sosfreqz, a legacy alias of freqz_sos. The sosfreqz document is skipped on SciPy older than 1.15.
+The rule reports `signal.stft`, `istft`, `spectrogram` and `check_COLA`, which SciPy marks as
+legacy in favor of the `ShortTimeFFT` class. It also reports `signal.sosfreqz`, a legacy alias
+of `freqz_sos`, and skips that document on SciPy older than 1.15.
 
 Example:
 
@@ -4250,7 +4366,13 @@ w, h = signal.freqz_sos(sos, worN=512)
 
 **Severity:** info. **Fix:** safe: `ndimage.sum_labels` for `ndimage.sum`, whose body only calls sum_labels. The other forms have no fix.
 
-Reports ndimage.sum, which SciPy keeps for backwards compatibility, stats.ranksums, which SciPy marks as legacy in favor of mannwhitneyu with the same p-value and the U statistic in place of z, and sparse.bmat, which returns a sparse matrix where block_array returns a sparse array.
+The rule reports names that SciPy keeps for old code:
+
+| Name | What SciPy says | Write instead |
+| --- | --- | --- |
+| `ndimage.sum` | kept for backwards compatibility | `ndimage.sum_labels` |
+| `stats.ranksums` | legacy | `stats.mannwhitneyu`, which gives the same p-value and the U statistic in place of z |
+| `sparse.bmat` | returns a sparse matrix | `sparse.block_array`, which returns a sparse array |
 
 Example:
 
@@ -4270,9 +4392,19 @@ u, p = stats.mannwhitneyu(x, y, use_continuity=False, method="asymptotic")
 
 #### log-of-special
 
-**Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5.
+**Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5. A function imported by name has no fix.
 
-Reports `np.log` of `special.ndtr`, `special.gamma`, `special.factorial`, `special.beta`, `special.expit` and `special.softmax`, through any import of `scipy.special`, and without a fix when the function was imported by name.
+The rule reports `np.log` of a `scipy.special` function that has a log form of its own. It reads
+any import of `scipy.special`. Where the old form overflowed or lost digits:
+
+| Old form | Where the old form failed | Write instead |
+| --- | --- | --- |
+| `np.log(special.ndtr(x))` | -inf below -37.75 | `special.log_ndtr(x)` |
+| `np.log(special.gamma(x))` | inf at 200 | `special.gammaln(x)` |
+| `np.log(special.factorial(n))` | inf at 200 | `special.gammaln(n + 1)` |
+| `np.log(special.beta(a, b))` | -inf at a = b = 1e6 | `special.betaln(a, b)` |
+| `np.log(special.expit(x))` | 3 or more digits lost above 8 and below -710 | `special.log_expit(x)` |
+| `np.log(special.softmax(x))` | -inf for an entry more than 745 below the largest | `special.log_softmax(x)` |
 
 Example:
 
@@ -4290,7 +4422,11 @@ loglike = special.log_ndtr(q * xb).sum()
 
 **Severity:** warning. **Fix:** unsafe: `dist.logpdf(...)`, `dist.logpmf(...)`, `dist.logcdf(...)`, `dist.logsf(...)`.
 
-Reports `np.log` of the `pdf`, `pmf`, `cdf` or `sf` of a `scipy.stats` distribution, written as `stats.norm`, imported by name as `norm`, or frozen in the same expression as `stats.norm(0, 2)`. Each method has its own list of distributions, measured one by one, so `np.log(stats.binom.pmf(k, n, p))` is not reported.
+The rule reports `np.log` of the `pdf`, `pmf`, `cdf` or `sf` of a `scipy.stats` distribution,
+written as `stats.norm`, imported by name as `norm`, or frozen in the same expression as
+`stats.norm(0, 2)`. Each method has its own list of distributions, measured one by one in a
+tail. `np.log(stats.binom.pmf(k, n, p))` is not reported, because `binom.logpmf` lost up to 3.6
+digits more near the mode.
 
 Example:
 
@@ -4308,7 +4444,10 @@ ll = stats.norm.logpdf(resid, scale=sigma).sum()
 
 **Severity:** warning. **Fix:** unsafe: `dist.sf(...)`, `dist.cdf(...)`.
 
-Reports `1 - dist.cdf(...)` and `1 - dist.sf(...)` for a `scipy.stats` distribution from a measured list.
+The rule reports `1 - dist.cdf(...)` and `1 - dist.sf(...)` for a `scipy.stats` distribution
+from a measured list. For `stats.norm`, `1 - cdf` lost 3 or more digits above 4.25 and gave 0
+above 8.3. `lognorm`, `f`, `poisson`, `binom`, `nbinom` and `geom` are not on the list, because
+their `sf` lost digits too.
 
 Example:
 
@@ -4324,9 +4463,20 @@ pvalue = 2 * stats.norm.sf(np.abs(z))
 
 #### special-complement
 
-**Severity:** warning. **Fix:** unsafe: `special.erfc(x)`, `special.erf(x)`, `special.gammaincc(a, x)`, `special.gammainc(a, x)`, `special.betaincc(a, b, x)`, `special.erfc(-x)`, `special.ndtr(-x)`, `special.expit(-x)`. `betaincc` needs SciPy 1.11.
+**Severity:** warning. **Fix:** unsafe: `special.erfc(x)`, `special.erf(x)`, `special.gammaincc(a, x)`, `special.gammainc(a, x)`, `special.betaincc(a, b, x)`, `special.erfc(-x)`, `special.ndtr(-x)`, `special.expit(-x)`. `betaincc` needs SciPy 1.11. `erf`, `erfc`, `gammainc`, `gammaincc` and `betainc` imported by name have no fix, because the new name is not imported.
 
-Reports `1 - special.erf(x)`, `1 - special.erfc(x)`, `1 - special.gammainc(a, x)`, `1 - special.gammaincc(a, x)`, `1 - special.betainc(a, b, x)`, `1 + special.erf(x)`, `1 - special.ndtr(x)` and `1 - special.expit(x)`.
+The rule reports 1 plus or minus a `scipy.special` function, where SciPy has a function that
+keeps the digits of a small result. The old form lost 3 or more digits in the following ranges:
+
+| Old form | Digits lost for | Write instead |
+| --- | --- | --- |
+| `1 - special.erf(x)` | x from 2.75 to 26.5 | `special.erfc(x)` |
+| `1 - special.erfc(x)` | x below 6e-5 | `special.erf(x)` |
+| `1 - special.gammainc(a, x)`, `1 - special.gammaincc(a, x)` | the tails, where the result falls below about 1e-4 | `special.gammaincc(a, x)`, `special.gammainc(a, x)` |
+| `1 - special.betainc(a, b, x)` | x from 0.32 to 0.95, with a = 2 and b = 30 | `special.betaincc(a, b, x)` |
+| `1 + special.erf(x)` | x below -2.75 | `special.erfc(-x)` |
+| `1 - special.ndtr(x)` | x above 4.25 | `special.ndtr(-x)` |
+| `1 - special.expit(x)` | x above 8 | `special.expit(-x)` |
 
 Example:
 
@@ -4344,7 +4494,10 @@ cdf = 0.5 * special.erfc(-x / np.sqrt(2))
 
 **Severity:** warning. **Fix:** unsafe: `dist.isf(p, ...)`, `dist.ppf(p, ...)`, `-special.ndtri(p)`.
 
-Reports `dist.ppf(1 - p, ...)` and `dist.isf(1 - p, ...)` for a continuous `scipy.stats` distribution from a measured list, and `special.ndtri(1 - p)`. A probability written as a number, such as `1 - 0.05`, is left alone unless it is below 5e-7.
+The rule reports `dist.ppf(1 - p, ...)` and `dist.isf(1 - p, ...)` for a continuous
+`scipy.stats` distribution from a measured list, and `special.ndtri(1 - p)`. The old form lost 3
+or more digits for every p below 5e-7. A probability written as a number, such as `1 - 0.05`,
+is left alone unless it is below 5e-7.
 
 Example:
 
@@ -4360,9 +4513,11 @@ crit = stats.norm.isf(alpha / 2)
 
 #### comb-by-factorials
 
-**Severity:** warning. **Fix:** unsafe: `special.comb(n, k)`.
+**Severity:** warning. **Fix:** unsafe: `special.comb(n, k)`. `factorial` imported by name has no fix, because `comb` is not imported.
 
-Reports `special.factorial(n) / (special.factorial(k) * special.factorial(n - k))` and the same with the factors in another order or divided one at a time.
+The rule reports `special.factorial(n) / (special.factorial(k) * special.factorial(n - k))`, and
+the same with the factors in another order or divided one at a time. `factorial` overflows to inf
+above 170, so at n = 200 and k = 3 the ratio gave nan, where `comb` lost no digits.
 
 Example:
 
@@ -4380,7 +4535,11 @@ ways = special.comb(n, k)
 
 **Severity:** warning. **Fix:** unsafe: `np.linalg.slogdet(a)[1]`.
 
-Reports `np.log(linalg.det(a))`, `np.log(np.abs(linalg.det(a)))` and `np.log(abs(linalg.det(a)))` where `linalg` is `scipy.linalg`, or `det` was imported from it. `np.log(np.linalg.det(a))` belongs to the NumPy rule `log-of-det`.
+The rule reports `np.log(linalg.det(a))`, `np.log(np.abs(linalg.det(a)))` and
+`np.log(abs(linalg.det(a)))`, where `linalg` is `scipy.linalg` or `det` was imported from it. On
+covariance matrices of 120 features at scale 1e-3 and of 80 features at scale 1e4 the old form
+gave -inf and inf, where `slogdet` lost 0.54 and 0.27 digits. `np.log(np.linalg.det(a))` belongs
+to the NumPy rule `log-of-det`.
 
 Example:
 
@@ -4396,13 +4555,18 @@ logdet = np.linalg.slogdet(cov)[1]
 
 ### SciPy calls made once per value or once per pair
 
-Each old form calls SciPy from Python once per value, once per pair of points or once per pass of a loop, where one call on whole arrays does the same work in compiled code. Speedups are medians of 7 runs on one core with SciPy 1.18.1, on float64 and float32, at 1,000,000 values unless the entry says what the 1,000,000 counts.
+Each rule in the group reports a SciPy call made from Python once per value, once per pair of
+points or once per pass of a loop, where one call on whole arrays does the same work in compiled
+code. Each speedup is a median of 7 runs on one core with SciPy 1.18.1, on float64 and float32,
+at 1,000,000 values unless the rule says what the 1,000,000 counts.
 
 #### distance-per-pair
 
 **Severity:** warning. **Fix:** none.
 
-Reports a metric function of `scipy.spatial.distance`, such as `euclidean`, `cityblock` or `cosine`, called inside a comprehension, a generator or a loop body. `cdist` ran 960 to 9,600 times faster on 1,000 by 1,000 points.
+The rule reports a metric function of `scipy.spatial.distance`, such as `euclidean`, `cityblock`
+or `cosine`, called inside a comprehension, a generator or a loop body. On 1,000 by 1,000 points,
+`cdist` ran 960 to 9,600 times faster.
 
 Example:
 
@@ -4420,7 +4584,9 @@ D = distance.cdist(X, Y, "euclidean")
 
 **Severity:** warning. **Fix:** unsafe: the metric's name as a string. `cosine` and `correlation` differ in the last bits, and complex input is cast to float.
 
-Reports a metric function of `scipy.spatial.distance` passed to `cdist` or `pdist` as the metric, by position or as `metric=`. The name runs the same metric in C, 720 to 7,600 times faster on 1,000 by 1,000 points.
+The rule reports a metric function of `scipy.spatial.distance` passed to `cdist` or `pdist` as
+the metric, by position or as `metric=`. The name runs the same metric in C, and on 1,000 by
+1,000 points it ran 720 to 7,600 times faster.
 
 Example:
 
@@ -4438,7 +4604,16 @@ D = cdist(X, Y, "euclidean")
 
 **Severity:** warning. **Fix:** none.
 
-Reports a comprehension or generator whose element is a call to a `scipy.special` ufunc, a `scipy.stats` distribution method such as `norm.cdf`, a distribution frozen from the loop name such as `norm(m, 2.0).pdf(x)`, or `stats.scoreatpercentile(x, p)` over the percentiles, with the loop name as an argument. One call on the array ran 7 to 23 times faster for `special`, 34 to 1,045 times faster for `stats` methods, 4.9 to 23 times faster for frozen distributions, and 2.1 to 3.2 times faster for 1,000 percentiles, because `scoreatpercentile` sorts the data on every call. A filter with `if`, a second `for` and an element that does more than the call are left alone.
+The rule reports a comprehension or generator whose element is one SciPy call with the loop name
+as an argument. A filter with `if`, a second `for`, and an element that does more than the call
+are left alone.
+
+| Element of the comprehension | One call on the array was faster by |
+| --- | --- |
+| a `scipy.special` ufunc | 7 to 23 times |
+| a `scipy.stats` distribution method, such as `norm.cdf` | 34 to 1,045 times |
+| a distribution frozen from the loop name, such as `norm(m, 2.0).pdf(x)` | 4.9 to 23 times |
+| `stats.scoreatpercentile(x, p)` over 1,000 percentiles, which sorts the data on every call | 2.1 to 3.2 times |
 
 Example:
 
@@ -4456,7 +4631,10 @@ p = stats.norm.cdf(x)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `tree.query(q)` inside a comprehension or a `for` loop, where `q` is the loop name or a row indexed by it and `tree` comes from a `KDTree` or `cKDTree` call in the same function. One query of all points ran 17 to 36 times faster for 1,000,000 points on a tree of 10,000.
+The rule reports `tree.query(q)` inside a comprehension or a `for` loop, where `q` is the loop
+name or a row indexed by it, and `tree` comes from a `KDTree` or `cKDTree` call in the same
+function. For 1,000,000 points on a tree of 10,000, one query of all points ran 17 to 36 times
+faster.
 
 Example:
 
@@ -4476,7 +4654,14 @@ nearest = tree.query(queries)[1]
 
 **Severity:** warning. **Fix:** none.
 
-Reports `scipy.sparse.linalg.spsolve(A, b)` and `scipy.linalg.solve(A, b)` inside a comprehension or a loop that does not assign `A` or take it as its loop name. Each call factors `A` again. Factoring once ran 17 to 20 times faster for 100 right sides of a sparse matrix of 10,000 rows, and 18 to 23 times faster for 20 right sides of a dense 1,000 by 1,000 matrix.
+The rule reports `scipy.sparse.linalg.spsolve(A, b)` and `scipy.linalg.solve(A, b)` inside a
+comprehension or a loop that doesn't assign `A` or take it as its loop name. Each call factors
+`A` again, and factoring once was faster:
+
+| Matrix | Right sides | Factoring once was faster by |
+| --- | --- | --- |
+| sparse, 10,000 rows | 100 | 17 to 20 times |
+| dense, 1,000 by 1,000 | 20 | 18 to 23 times |
 
 Example:
 
@@ -4495,7 +4680,9 @@ xs = [lu.solve(b) for b in sides]
 
 **Severity:** warning. **Fix:** unsafe: `spla.spsolve(A, b)` when `inv` is reached through its module. The last bits change, and a `b` of shape `(n, 1)` gives a 1-D result. `inv` imported by name has no fix.
 
-Reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`. The inverse of most sparse matrices is dense. `spsolve` ran 260 to 620 times faster on a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000 values.
+The rule reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`. The inverse of most
+sparse matrices is dense. On a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000
+values, `spsolve` ran 260 to 620 times faster.
 
 Example:
 
@@ -4515,7 +4702,11 @@ x = spla.spsolve(A, b)
 
 **Severity:** warning. **Fix:** none.
 
-Reports a write into a `csr_matrix`, `csc_matrix`, `csr_array` or `csc_array` built from a shape alone, as in `A = csr_matrix((n, m))` followed by `A[i, j] = v`, `A[i, j] += v` or a slice write, in a function that does not assign `A` again. Each write adds a stored value, which emits `SparseEfficiencyWarning` and raises under `python -W error` on SciPy 1.18.1, and copies the whole matrix. 1,000 writes ran 30 times slower than into a `lil_matrix`.
+The rule reports a write into a `csr_matrix`, `csc_matrix`, `csr_array` or `csc_array` built from
+a shape alone, as in `A = csr_matrix((n, m))` followed by `A[i, j] = v`, `A[i, j] += v` or a slice
+write, in a function that doesn't assign `A` again. Each write adds a stored value and copies the
+whole matrix. On SciPy 1.18.1 it emits `SparseEfficiencyWarning`, which raises under
+`python -W error`, and 1,000 writes ran 30 times slower than into a `lil_matrix`.
 
 Example:
 
@@ -4538,7 +4729,16 @@ A = A.tocsr()
 
 **Severity:** info. **Fix:** none, because `*` and `**` work elementwise on a sparse array, a row slice of one is 1-D and `todense` gives an ndarray. Skipped on SciPy older than 1.8 for the classes and 1.12 for the builder functions.
 
-Reports a call to `csr_matrix`, `csc_matrix`, `coo_matrix`, `lil_matrix`, `dok_matrix`, `bsr_matrix` or `dia_matrix`, whose SciPy docstrings say the sparse matrix interface is expected to be deprecated, and to `eye`, `identity`, `diags`, `spdiags`, `rand`, `random` and `bmat`, whose docstrings encourage `eye_array`, `diags_array`, `dia_array`, `random_array` and `block_array`. A function that also names a sparse array class, and a branch taken on a condition that mentions a matrix, are left alone, because such code builds the matrix on purpose.
+The rule reports a call to a sparse matrix class or builder whose SciPy docstring points to the
+sparse array API:
+
+| Old call | What the docstring says |
+| --- | --- |
+| `csr_matrix`, `csc_matrix`, `coo_matrix`, `lil_matrix`, `dok_matrix`, `bsr_matrix`, `dia_matrix` | the sparse matrix interface is expected to be deprecated |
+| `eye`, `identity`, `diags`, `spdiags`, `rand`, `random`, `bmat` | it encourages `eye_array`, `diags_array`, `dia_array`, `random_array` and `block_array` |
+
+A function that also names a sparse array class, and a branch taken on a condition that mentions
+a matrix, are left alone, because such code builds the matrix on purpose.
 
 Example:
 
@@ -4560,7 +4760,8 @@ I = sparse.eye_array(n)
 
 **Severity:** info. **Fix:** none, because the default `leafsize` differs, 16 against 10. Skipped on SciPy older than 1.6.
 
-Reports a call to `cKDTree`. Its docstring says it is functionally identical to `KDTree` and kept only for backward compatibility.
+The rule reports a call to `cKDTree`, whose docstring says it is functionally identical to
+`KDTree` and kept only for backward compatibility.
 
 Example:
 
@@ -4578,7 +4779,9 @@ tree = KDTree(points)
 
 **Severity:** info. **Fix:** none, because `rfft` packs its output differently and the pseudo differential operators have no `scipy.fft` form.
 
-Reports an import of `scipy.fftpack`, whose module docstring is a legacy directive that says new code should use `scipy.fft`. `scipy.fft` was no faster in the measurements, so the rule claims only the preference.
+The rule reports an import of `scipy.fftpack`, whose module docstring is a legacy directive that
+says new code should use `scipy.fft`. `scipy.fft` was no faster in the measurements, so the rule
+claims only the preference.
 
 Example:
 
@@ -4596,43 +4799,44 @@ y = fft.dct(x)
 
 ## scikit-learn
 
-These rules run on files that import `sklearn`. They report code that gives a leaked or wrong
-score, code that raises or warns on scikit-learn 1.9.1, and code that does the same work twice.
-Every number in this section was measured on scikit-learn 1.9.1. Examples assume that the
-scikit-learn names they use are imported. Names such as `X_train`, `y_test` and `model` represent
-values supplied by your program.
+The scikit-learn rules report code that gives a leaked or wrong score, code that raises or warns
+on scikit-learn 1.9.1, and code that does the same work twice, in each file that imports
+`sklearn`. Every number about the scikit-learn rules was measured on scikit-learn 1.9.1. The examples assume
+that the scikit-learn names they use are imported, and names such as `X_train`, `y_test` and
+`model` stand for values from your program.
 
 Several rules read the names of variables, such as `X_test` and `y_pred`, because a pattern sees
-nothing else, so a name that misleads gives a wrong report. A rule document whose advice needs a
-newer release of scikit-learn carries `since`. xpd reads the installed version from the project's
-venv, as it does for pandas, and skips that document on an older release. When the venv has no
-scikit-learn, or there is no venv, every document runs.
+nothing else. A name that misleads therefore gives a wrong report.
+
+A rule document whose advice needs a newer release of scikit-learn carries `since`. xpd reads the
+installed version from the project's venv and skips that document on an older release. When the
+venv has no scikit-learn, or there is no venv, every document runs.
 
 ### How a rule earns its place
 
-Every rule document ships on a saved proof that its old form is wrong, and a proof is one of
-three kinds:
+Each rule document ships only with a saved proof that its old form is wrong. A proof is one of
+the following kinds:
 
-- A score proof runs the old and the new form over 30 seeds on data with no signal, where the
-  honest score is 0.5. It passes when the old form's mean is more than three standard errors
-  above the honest score and the new form's mean is within 0.02 of it.
-- An interpreter proof runs the old form under `python -W error`. It passes when the old form
-  raises an exception or a warning and the new form runs clean.
-- A speed proof times both forms on one thread, as the median of 7 runs, at two data sizes. It
-  passes when the new form is at least 1.5 times faster at both sizes.
+| Proof | What runs | When it passes |
+| --- | --- | --- |
+| score | The old and the new form, over 30 seeds on data with no signal, where the honest score is 0.5. | The old form's mean is more than three standard errors above the honest score, and the new form's mean is within 0.02 of it. |
+| interpreter | The old form under `python -W error`. | The old form raises an exception or a warning, and the new form runs clean. |
+| speed | Both forms on one thread, as the median of 7 runs, at two data sizes. | The new form is at least 1.5 times faster at both sizes. |
 
-A document is `info` when no proof of the three kinds passed for it. Either it changes a score in
-a way the three proofs cannot show, such as a ranking metric given class labels, which scores
-0.5 on data with no signal in both forms, or it changes nothing that can be measured, such as a
-missing seed.
+A document is `info` when no proof passed for it. Such a document either changes a score in a
+way the proofs can't show, or changes nothing that can be measured. For example, a ranking metric
+given class labels scores 0.5 on data with no signal in both forms, and a missing seed changes
+nothing that can be measured.
 
 The rules were then judged on 1,414 held-back files from 268 public repositories, which were set
-aside before any rule was written. Two readers who did not write the rules labelled 478 reports
-of the rules as they stood then, each apart from the other, and marked every report whose advice
-was wrong. Recall was measured by planting 2,749 old forms in copies of the held-back files and
-counting the plants that a rule reported. Every fix was run before and after, on its held-back
-sites and on cases built for each form, and the fitted model and its predictions were compared
-bit for bit.
+aside before any rule was written. The judging had the following parts:
+
+1. Two readers who did not write the rules labelled the same 478 reports, each without the
+   other, and marked every report whose advice was wrong.
+2. Recall was measured by planting 2,749 old forms in copies of the held-back files and counting
+   the plants that a rule reported.
+3. Every fix was run before and after, on its held-back sites and on cases built for each form,
+   and the fitted model and its predictions were compared bit for bit.
 
 | Rule | Severity | Proof | Held-back reports | Wrong advice | Recall | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -4669,33 +4873,38 @@ bit for bit.
 | [`random-state-without-shuffle`](#random-state-without-shuffle) | error | interpreter: ValueError | 9 | 0 and 0 of 9 | 54 of 54 | none |
 | [`missing-random-state`](#missing-random-state) | info | none of the three | 527 | 1 and 1 of 52 | 79 of 80 | none |
 
-A score proof gives the old form's mean against the new form's mean. A speed proof gives the
-lowest ratio over the classes the rule reports and both sizes. Wrong advice gives the reports
-that reader A and reader B called wrong, out of the reports they labelled. A rule with more
-reports than labels was sampled.
+| Column | What it gives |
+| --- | --- |
+| Proof | A score proof gives the old form's mean against the new form's mean. A speed proof gives the lowest ratio over the classes the rule reports and both sizes. |
+| Wrong advice | The reports that reader A and reader B called wrong, out of the reports they labelled. A rule with more reports than labels was sampled. A rule with no report on the held-back files has no number. |
+| Recall | The plants that the rule reported, out of the plants made for it. |
 
-The rules were narrowed after the readers' labels came in, so the wrong advice of a narrowed rule
-counts how many of its labelled reports are still made and still wrong, and it is not a clean
-measurement. Recall was measured on the rules before that narrowing. Most plants were inserted
-into a file in shapes the judges chose, which sit closer to the documented examples than real
-code does, so recall on real code is likely lower. For the metric and pipeline rules, recall was
-190 of 280 on plants turned from a right form already in the file, against 311 of 357 on inserted
-plants. A rule with no report on the held-back files has no wrong-advice number.
+The rules were narrowed after the readers' labels came in. For a narrowed rule, wrong advice
+counts the labelled reports that the rule still makes and that are still wrong, so the number is
+not a clean measurement. Recall was measured on the rules before that narrowing.
+
+Recall on real code is likely lower than the table says. Most plants were inserted into a file
+in shapes the judges chose, and such shapes sit closer to the documented examples than real code
+does. For the metric and pipeline rules, recall was 190 of 280 on plants turned from a right
+form already in the file, against 311 of 357 on inserted plants.
 
 ### Leakage
 
-Each old form below lets the test rows, or every row, shape what the model learns, so a score on
-the test rows is too high. The score proofs in this group use data whose target is drawn apart
-from every feature, where an honest AUC is 0.5, and give the mean over 30 seeds. A step that does
-not read the target, such as a scaler, an imputer, PCA, a binner, a one-hot encoder or a text
-vectorizer, moved the test AUC by at most 0.006 when it was fitted before the split, so these
-rules leave it alone.
+Each rule in the group reports a form that lets the test rows, or every row, shape what the
+model learns. The score on the test rows is then too high. The score proofs use data whose target
+is drawn apart from every feature, where an honest AUC is 0.5, and give the mean over 30 seeds.
+
+A step that doesn't read the target moved the test AUC by at most 0.006 when it was fitted before
+the split, so the rules leave it alone. Such steps are a scaler, an imputer, PCA, a binner, a
+one-hot encoder and a text vectorizer.
 
 #### fit-on-test
 
 **Severity:** error for `fit` with a target and for `partial_fit`, and info for `fit_transform` and for `fit` without a target. **Fix:** unsafe: `scaler.transform(X_test)`. The other forms have no fix.
 
-Reports `model.fit(X_test, y_test)` and `model.partial_fit(X_test, y_test)`, which train on the test rows, and `scaler.fit_transform(X_test)` and `scaler.fit(X_test)`, which refit a step on them.
+The rule reports `model.fit(X_test, y_test)` and `model.partial_fit(X_test, y_test)`, which train
+on the test rows. It also reports `scaler.fit_transform(X_test)` and `scaler.fit(X_test)`, which
+refit a step on them.
 
 Example:
 
@@ -4711,11 +4920,47 @@ model = LogisticRegression().fit(X_train, y_train)
 X_test = scaler.transform(X_test)
 ```
 
+The rule reads the name of the first argument. For `fit` the name must hold `test`. For
+`partial_fit` and `fit_transform` it may also hold `holdout`, or be a validation name such as
+`X_val`. The `fit_transform` forms also read the step's name, such as `scaler`, `imputer`,
+`encoder`, `ohe` or `tfidf`, because `PolynomialFeatures` and plots refit on purpose.
+
+A refitted step can't move a score on data with no signal, so the forms without a target are
+info. With the target, only some steps leaked, so `fit_transform` with a target is info as well.
+
+| Form | Data | Result |
+| --- | --- | --- |
+| `LogisticRegression` fitted on 60 test rows and scored on them | no signal | 0.997 AUC, against 0.525 when fitted on the training rows |
+| five `partial_fit` calls on the test rows | no signal | 0.924 AUC, against 0.518 |
+| category_encoders `TargetEncoder` refitted on the test rows with the target | no signal | 0.992 AUC |
+| `SelectKBest` refitted on the test rows with the target | no signal | 0.438 AUC |
+| scikit-learn `TargetEncoder` refitted on the test rows with the target | no signal | 0.499 AUC |
+| `StandardScaler` refitted on batches of 5 test rows | signal | 0.048 AUC lost |
+| `OrdinalEncoder` refitted on 30 test rows | signal | 0.058 AUC lost |
+
+The rule leaves alone `PermutationImportance` and `permutation_importance`, a fit on train and
+test rows joined, a `LabelBinarizer` or `MultiLabelBinarizer`, and a `LabelEncoder` whose result
+goes straight into another call, such as a plot.
+
+The fix scales or codes the test rows with the statistics of the training rows. It changed the
+test matrix by up to 0.43 and the predicted probabilities by up to 0.18, and a test level that the
+step hasn't seen now raises. At 4 of 17 held-back sites the fixed code raised, because the scaler
+was built again on the line before, or one `LabelEncoder` was last fitted on another column.
+
+The rule as the readers saw it gave wrong advice in 3 and 3 of 23 labelled reports, and the
+narrowed rule no longer makes the reports. Recall was 41 of 45 for the error forms and 62 of 85
+for the info forms. The rule misses a step whose name it doesn't read, such as
+`rs = RobustScaler()` or `imp`, and a test name with no separator, such as `Xtest`. It also
+misses held-out rows named `X_dev`, `X_te` or `X_cv`.
+
 #### fit-before-split
 
 **Severity:** error. **Fix:** none.
 
-Reports a step that learns from the target and is fitted on every row before `train_test_split`, such as `selector.fit_transform(X, y)`, `encoder.fit(X, y).transform(X)`, `fit_resample`, `resample(..., replace=True)`, a target mean per group from `groupby(...)[target].transform("mean")`, and columns picked by `df.corr()[target]`.
+The rule reports a step that learns from the target and is fitted on every row before
+`train_test_split`, such as `selector.fit_transform(X, y)`, `encoder.fit(X, y).transform(X)`,
+`fit_resample`, `resample(..., replace=True)`, a target mean per group from
+`groupby(...)[target].transform("mean")`, and columns picked by `df.corr()[target]`.
 
 Example:
 
@@ -4734,11 +4979,46 @@ X_test = selector.transform(X_test)
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule reports the fit when a later statement of the same block passes its result to
+`train_test_split`. Mean test AUC on data with no signal:
+
+| Step fitted on every row | Before the split, against after | Reported |
+| --- | --- | --- |
+| `SelectKBest` | 0.771 against 0.497 | yes |
+| `SelectFromModel` | 0.684 against 0.519 | yes |
+| `RFE` | 0.750 against 0.495 | yes |
+| `RFECV` | 0.739 against 0.506 | yes |
+| `SequentialFeatureSelector` | 0.551 against 0.477 | yes |
+| category_encoders `TargetEncoder` | 0.880 against 0.495 | yes |
+| `TargetEncoder().fit(X, y).transform(X)` | 0.889 against 0.509 | yes |
+| a target mean per group | 0.887 against 0.497 | yes |
+| 10 columns picked by `df.corr()` | 0.771 against 0.497 | yes |
+| `SMOTE` | 0.815, against 0.478 to 0.493 for the samplers after the split | yes |
+| `RandomOverSampler` | 0.737 | yes |
+| `ADASYN` | 0.819 | yes |
+| `EditedNearestNeighbours` | 0.678 | yes |
+| `resample(replace=True)` | 0.970 | yes |
+| `RandomUnderSampler` | 0.512 against 0.491 | no, it only drops rows |
+| `NearMiss` | 0.448 | no, it only drops rows |
+| `TomekLinks` | 0.516 | no, it only drops rows |
+| scikit-learn `TargetEncoder.fit_transform`, which cross-fits | 0.522 against 0.504 | no |
+
+The rule leaves alone a label encoder on the target, when the result is named `y`, `target` or
+`labels`, or the encoder's name holds `label`. The target mean and the `df.corr()` forms need the
+same column to become the target later in the block, as in `y = df["target"]`.
+
+The rule as the readers saw it gave wrong advice in 2 and 0 of 26 labelled reports. Recall was 91
+of 162. The rule found none of 24 columns picked by correlation in other shapes, such as
+`corr.index[1:11]` read back as `df[top_features]`. It also misses a target mean written with
+`.map` or `.mean()`, `resample` imported under another name, and `SelectFromModel` fitted in one
+statement and applied in the next.
+
 #### cross-val-on-fitted-data
 
 **Severity:** error. **Fix:** none.
 
-Reports a step that learns from the target, or `fit_resample`, on every row before `cross_val_score`, another cross-validation function, or a search fitted on the result.
+The rule reports a step that learns from the target, or `fit_resample`, run on every row before
+`cross_val_score`, another cross-validation function, or a search fitted on the result.
 
 Example:
 
@@ -4756,11 +5036,30 @@ scores = cross_val_score(pipeline, X, y, cv=5)
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule covers `cross_val_score`, `cross_validate`, `cross_val_predict`, `learning_curve`,
+`validation_curve` and `permutation_test_score` when the fitted result is the second argument. It
+also covers a `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` or
+`HalvingRandomSearchCV` that is assigned in the same file and fitted on the result.
+
+| Step fitted on every row | Cross-validated AUC | With the step inside the folds |
+| --- | --- | --- |
+| `SelectKBest`, then `cross_val_score` | 0.764 | 0.518 for a Pipeline |
+| `SMOTE`, then `cross_val_score` | 0.838 | 0.510 |
+| `SelectKBest`, then a search, as `best_score_` | 0.770 | 0.522 |
+| `SMOTE`, then a search, as `best_score_` | 0.854 | 0.521 |
+| `RandomUnderSampler`, left alone | 0.519 | 0.511 |
+| `NearMiss`, left alone | 0.458 | 0.508 |
+| `TomekLinks`, left alone | 0.530 | 0.508 |
+
+The three under-samplers didn't pass the proof, so the rule leaves them alone. The rule as the
+readers saw it gave wrong advice in 1 and 0 of 11 labelled reports.
+
 #### tune-on-test
 
 **Severity:** error. **Fix:** none.
 
-Reports a loop that builds one model per setting, scores each model on the test rows and keeps the best score.
+The rule reports a loop that builds one model per setting, scores each model on the test rows and
+keeps the best score.
 
 Example:
 
@@ -4781,11 +5080,31 @@ test_score = search.score(X_test, y_test)
 
 The replacement is advice. xpd does not apply it automatically.
 
+The best of 30 test accuracies for `n_neighbors` from 1 to 30 was 0.597, where a `GridSearchCV`
+on the training rows gave 0.507. The rule needs all of the following in the loop:
+
+1. The loop variable is a keyword of the call that built the scored model.
+2. A `score`, `predict` or `predict_proba` runs on a name with `test` in it.
+3. The loop picks a setting. A pick is a `>` comparison that reads or sets a name with `best` or
+   `max` in it, or whose branch reads the setting. A later `max`, `argmax` or `idxmax` of the
+   list that the loop appends to is a pick too.
+
+A keyword named like `random_state`, `seed`, `method` or `model` is left alone, because such a
+loop compares or averages.
+
+The rule as the readers saw it gave wrong advice in 2 and 2 of 3 labelled reports, on loops that
+printed whether the training score was far above the test score. The narrowed rule no longer
+makes the reports. Recall was 15 of 50. The rule found none of 20 thresholds picked by the test
+score. It also misses scores kept in a dict and picked with `max(results, key=results.get)`, a
+loop over `ParameterGrid` that builds the model with `**params`, and a list comprehension picked
+with `np.argmax`.
+
 #### stateful-function-transformer
 
 **Severity:** info. **Fix:** none.
 
-Reports `FunctionTransformer(lambda X: (X - X.mean(axis=0)) / X.std(axis=0))`, a function that takes statistics of the rows it gets, so at predict time it scales by the test rows.
+The rule reports `FunctionTransformer(lambda X: (X - X.mean(axis=0)) / X.std(axis=0))`, a function
+that takes statistics of the rows it gets. At predict time it then scales by the test rows.
 
 Example:
 
@@ -4801,90 +5120,29 @@ pipe = make_pipeline(StandardScaler(), model)
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule is info, because on data with no signal it doesn't move a score. Predicted in batches of
+5 rows it scored 0.484 against 0.494 for `StandardScaler`. On data with signal, over 30 seeds,
+`LogisticRegression` scored lower behind the function:
 
-`fit-on-test` reads the name of the first argument. For `fit` the name must hold `test`. For
-`partial_fit` and `fit_transform` it may also hold `holdout`, or be a validation name such as
-`X_val`. A `LogisticRegression` fitted on 60 test rows and scored
-on them gave 0.997 AUC, where the fit on the training rows gave 0.525. Five `partial_fit` calls on
-the test rows gave 0.924 against 0.518. A refitted scaler cannot move a score on data with no
-signal, so the forms without a target are info. On data with signal, a `StandardScaler` refitted
-on batches of 5 test rows lost 0.048 AUC, and an `OrdinalEncoder` refitted on 30 test rows lost
-0.058. With the target, a category_encoders `TargetEncoder` refitted on the test rows scored 0.992
-on noise, but `SelectKBest` scored 0.438 and the scikit-learn `TargetEncoder` 0.499, so that form
-is info as well. The `fit_transform` forms read the step's name too, such as `scaler`, `imputer`,
-`encoder`, `ohe` or `tfidf`, because `PolynomialFeatures` and plots refit on purpose. The rule
-leaves alone `PermutationImportance` and `permutation_importance`, a fit on train and test rows
-joined, a `LabelBinarizer` or `MultiLabelBinarizer`, and a `LabelEncoder` whose result goes
-straight into another call, such as a plot. The fix scales or codes the test rows with the
-statistics of the training rows, so it changes the test matrix by up to 0.43 and the predicted
-probabilities by up to 0.18, and a test level the step has not seen now raises. At 4 of 17
-held-back sites the fixed code raised, because the scaler was built again on the line before, or
-one `LabelEncoder` was last fitted on another column. The frozen rule gave wrong advice in 3 and
-3 of 23 labelled reports, and the narrowed rule no longer makes those reports. Recall was 41 of
-45 for the error forms and 62 of 85 for the info forms. The rule misses a step whose name it does
-not read, such as `rs = RobustScaler()` or `imp`, a test name with no separator such as `Xtest`,
-and held-out rows named `X_dev`, `X_te` or `X_cv`.
+| Batch of test rows | Behind the function | Behind `StandardScaler` |
+| --- | --- | --- |
+| 5 | 0.773 | 0.847 |
+| 20 | 0.824 | 0.847 |
 
-`fit-before-split` reports the fit when a later statement of the same block passes its result to
-`train_test_split`. Before the split, `SelectKBest` scored 0.771 against 0.497, `SelectFromModel`
-0.684 against 0.519, `RFE` 0.750 against 0.495, `RFECV` 0.739 against 0.506,
-`SequentialFeatureSelector` 0.551 against 0.477, and a category_encoders `TargetEncoder` 0.880
-against 0.495. `SMOTE` scored 0.815, `RandomOverSampler` 0.737, `ADASYN` 0.819,
-`EditedNearestNeighbours` 0.678 and `resample(replace=True)` 0.970, against 0.478 to 0.493 after
-the split. `TargetEncoder().fit(X, y).transform(X)` scored 0.889 against 0.509, a target mean per
-group 0.887 against 0.497, and 10 columns picked by `df.corr()` 0.771 against 0.497. The rule
-leaves three under-samplers alone, because they only drop rows and did not pass the proof:
-`RandomUnderSampler` scored 0.512 against 0.491, `NearMiss` 0.448 and `TomekLinks` 0.516. It
-leaves the scikit-learn `TargetEncoder.fit_transform` alone too, which cross-fits and scored 0.522
-against 0.504. A label
-encoder on the target is left alone, when the result is named `y`, `target` or `labels`, or the
-encoder's name holds `label`. The target mean and the `df.corr()` forms need the same column to
-become the target later in the block, as in `y = df["target"]`. The frozen rule gave wrong advice
-in 2 and 0 of 26 labelled reports. Recall was 91 of 162. The rule found none of 24 columns picked
-by correlation in other shapes, such as `corr.index[1:11]` read back as `df[top_features]`. It
-also misses a target mean written with `.map` or `.mean()`, `resample` imported under another
-name, and `SelectFromModel` fitted in one statement and applied in the next.
-
-`cross-val-on-fitted-data` covers `cross_val_score`, `cross_validate`, `cross_val_predict`,
-`learning_curve`, `validation_curve` and `permutation_test_score` when the fitted result is the
-second argument, and a `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` or
-`HalvingRandomSearchCV` that is assigned in the same file and fitted on the result.
-Cross-validated AUC after `SelectKBest` on every row was 0.764 against 0.518 for a Pipeline.
-`SMOTE` before `cross_val_score` gave 0.838 against 0.510. `best_score_` after `SelectKBest` was
-0.770 against 0.522, and after `SMOTE` 0.854 against 0.521. `RandomUnderSampler` before the folds
-scored 0.519 against 0.511, `NearMiss` 0.458 and `TomekLinks` 0.530 against 0.508, which did not
-pass the proof, so the rule leaves the three alone. The frozen rule gave wrong advice in 1 and 0 of
-11 labelled reports.
-
-`tune-on-test` needs the loop variable as a keyword of the call that built the scored model, a
-`score`, `predict` or `predict_proba` on a name with `test` in it, and a pick. A pick is a `>`
-comparison that reads or sets a name with `best` or `max` in it, or whose branch reads the
-setting, or a later `max`, `argmax` or `idxmax` of the list the loop appends to. A keyword named
-like `random_state`, `seed`, `method` or `model` is left alone, because such a loop compares or
-averages. The best of 30 test accuracies for `n_neighbors` from 1 to 30 was 0.597, where a
-`GridSearchCV` on the training rows gave 0.507. The frozen rule gave wrong advice in 2 and 2 of 3
-labelled reports, on loops that printed whether the training score was far above the test score,
-and the narrowed rule no longer makes those reports. Recall was 15 of 50. The rule found none of
-20 thresholds picked by the test score. It also misses scores kept in a dict and picked with
-`max(results, key=results.get)`, a loop over `ParameterGrid` that builds the model with
-`**params`, and a list comprehension picked with `np.argmax`.
-
-`stateful-function-transformer` is info, because on data with no signal it does not move a
-score. Predicted in batches of 5 rows it scored 0.484 against 0.494 for `StandardScaler`. On data
-with signal, `LogisticRegression` scored 0.773 against 0.847 with batches of 5 test rows, and
-0.824 against 0.847 with batches of 20, over 30 seeds. A reduction along axis 1 works per row
-and is left alone. Recall was 24 of 30. The rule found none of 6 functions defined with `def` and
-passed by name.
+A reduction along axis 1 works per row and is left alone. Recall was 24 of 30. The rule found
+none of 6 functions defined with `def` and passed by name.
 
 ### Splits and groups
 
-Each old form below splits the rows in a way that leaks or gives no score.
+Each rule in the group reports a split of the rows that leaks or gives no score.
 
 #### groups-ignored
 
 **Severity:** error. **Fix:** none.
 
-Reports `groups=` given to a cross-validation function or a search whose `cv` ignores it, and the groups given to `split` on a splitter that ignores them, such as `KFold(5).split(X, y, g)`.
+The rule reports `groups=` given to a cross-validation function or a search whose `cv` ignores
+it. It also reports the groups given to `split` on a splitter that ignores them, such as
+`KFold(5).split(X, y, g)`.
 
 Example:
 
@@ -4900,11 +5158,34 @@ scores = cross_val_score(model, X, y, groups=patient_id, cv=GroupKFold(n_splits=
 
 The replacement is advice. xpd does not apply it automatically.
 
+scikit-learn warns "The groups parameter is ignored by KFold" and splits the rows as if no groups
+were given. How much the score leaks depends on the row order:
+
+| Data | Model | `cv=5` with `groups=` | `GroupKFold(5)` |
+| --- | --- | --- | --- |
+| 60 groups of 8 rows in random order, one label per group drawn apart from the features | `RandomForestClassifier` | 0.849 accuracy | 0.480 |
+| the same groups with the rows of each group next to each other, and folds that are not shuffled | `RandomForestClassifier` | 0.497 | not given |
+| 40 groups of 5 near copies | 1-nearest-neighbour | 0.998 | 0.487 |
+
+The rule covers `cross_val_score`, `cross_validate`, `cross_val_predict`, `learning_curve`,
+`validation_curve` and `permutation_test_score` with `groups=` and a `cv` that ignores groups. Such
+a `cv` is missing, a whole number, or one of `KFold`, `StratifiedKFold`, `ShuffleSplit`,
+`StratifiedShuffleSplit`, `RepeatedKFold`, `RepeatedStratifiedKFold`, `TimeSeriesSplit`,
+`LeaveOneOut`, `LeavePOut` and `PredefinedSplit`, given in the call or assigned to a name earlier.
+The rule also covers a `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` or
+`HalvingRandomSearchCV` built in the same block as a `fit` that gets `groups=`, and such a
+splitter's `split(X, y, groups)`, called directly or through a name.
+
+A `cv` held in a name that xpd can't trace to one of the listed splitters is left alone. Recall was 56
+of 57.
+
 #### missing-groups
 
 **Severity:** error. **Fix:** none.
 
-Reports a group splitter that gets no groups, such as `cross_val_score(model, X, y, cv=GroupKFold(5))` or `GroupKFold(5).split(X, y)`, which raises ValueError.
+The rule reports a group splitter that gets no groups, such as
+`cross_val_score(model, X, y, cv=GroupKFold(5))` or `GroupKFold(5).split(X, y)`, which raises
+ValueError.
 
 Example:
 
@@ -4922,11 +5203,27 @@ search.fit(X, y, groups=patient_id)
 
 The replacement is advice. xpd does not apply it automatically.
 
+On scikit-learn 1.9.1 each form raises "The 'groups' parameter should not be None", and
+`StratifiedGroupKFold` raises that it found 1 group. The rule covers `GroupKFold`,
+`StratifiedGroupKFold`, `GroupShuffleSplit`, `LeaveOneGroupOut` and `LeavePGroupsOut` in the
+following places:
+
+- as `cv` of `cross_val_score`, `cross_validate`, `cross_val_predict`, `learning_curve`,
+  `validation_curve` and `permutation_test_score`
+- in their own `split(X, y)`, called directly or through a name
+- in a `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV`, `HalvingRandomSearchCV` or
+  `RFECV` whose `fit` gets no `groups=`
+
+A call with `params=` or `**` is left alone, because it can carry the groups.
+`SequentialFeatureSelector` and `LogisticRegressionCV` take groups only through metadata routing,
+so the rule doesn't read them. Recall was 48 of 50.
+
 #### leave-one-out-score
 
 **Severity:** error. **Fix:** none.
 
-Reports `cv=LeaveOneOut()` with a score that needs more than one row, which is R2 or ROC AUC given as `scoring`, or the R2 that a regressor scores by default.
+The rule reports `cv=LeaveOneOut()` with a score that needs more than one row. Such a score is R2
+or ROC AUC given as `scoring`, or the R2 that a regressor scores by default.
 
 Example:
 
@@ -4942,56 +5239,38 @@ r2 = r2_score(y, cross_val_predict(Ridge(), X, y, cv=LeaveOneOut()))
 
 The replacement is advice. xpd does not apply it automatically.
 
+With one row per fold, each fold warns and scores nan, and a search over nan scores picks its first
+candidate. Under `python -W error` each warning is an `UndefinedMetricWarning` that raises.
 
-`groups-ignored` covers `cross_val_score`, `cross_validate`, `cross_val_predict`,
-`learning_curve`, `validation_curve` and `permutation_test_score` with `groups=` and a `cv` that
-is missing, a whole number, or one of `KFold`, `StratifiedKFold`, `ShuffleSplit`,
-`StratifiedShuffleSplit`, `RepeatedKFold`, `RepeatedStratifiedKFold`, `TimeSeriesSplit`,
-`LeaveOneOut`, `LeavePOut` and `PredefinedSplit`, given in the call or assigned to a name earlier.
-It covers `GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` and `HalvingRandomSearchCV`
-built in the same block as a `fit` that gets `groups=`, and such a splitter's
-`split(X, y, groups)`, called directly or through a name. scikit-learn warns "The groups parameter
-is ignored by KFold" and splits the rows as if no groups were given. On 60 groups of 8 rows, with
-one label per group drawn apart from the features and the rows in random order, a
-`RandomForestClassifier` scored 0.849 accuracy with `cv=5` and `groups=`, where `GroupKFold(5)`
-scored 0.480. When the rows of each group sit next to each other, folds that are not shuffled keep
-most groups whole and the score was 0.497, so the leak depends on the row order. On 40 groups of 5
-near copies, a 1-nearest-neighbour model scored 0.998 with `cv=5` and 0.487 with `GroupKFold(5)`.
-A `cv` held in a name that xpd cannot trace to one of these splitters is left alone. Recall was
-56 of 57.
+| Scoring | Warning on a fold of one row |
+| --- | --- |
+| R2 | "R^2 score is not well-defined with less than two samples" |
+| ROC AUC | "Only one class is present in y_true" |
 
-`missing-groups` covers `GroupKFold`, `StratifiedGroupKFold`, `GroupShuffleSplit`,
-`LeaveOneGroupOut` and `LeavePGroupsOut` given as `cv` to the six cross-validation functions
-above, their own `split(X, y)` called directly or through a name, and `GridSearchCV`,
-`RandomizedSearchCV`, `HalvingGridSearchCV`, `HalvingRandomSearchCV` and `RFECV` whose `fit` gets
-no `groups=`. Each raises "The 'groups' parameter should not be None" on scikit-learn 1.9.1, and
-`StratifiedGroupKFold` raises that it found 1 group. A call with `params=` or `**` is left alone,
-because it can carry the groups. `SequentialFeatureSelector` and `LogisticRegressionCV` take
-groups only through metadata routing, so they are not listed. Recall was 48 of 50.
+The rule covers `cross_val_score`, `cross_validate`, `GridSearchCV`, `RandomizedSearchCV`,
+`validation_curve`, `learning_curve`, `permutation_test_score` and `RFECV`. It knows a regressor
+only by its class name in the same call. `explained_variance` and `average_precision` score 1 or 0
+on a fold of one row and give no nan, so they are left alone. `cv=len(X)`, which is leave one out
+under another name, is left alone by design.
 
-`leave-one-out-score` covers `cross_val_score`, `cross_validate`, `GridSearchCV`,
-`RandomizedSearchCV`, `validation_curve`, `learning_curve`, `permutation_test_score` and `RFECV`.
-With one row per fold, R2 warns "R^2 score is not well-defined with less than two samples" and
-ROC AUC warns "Only one class is present in y_true", every fold scores nan, and a search over nan
-scores picks its first candidate. Under `python -W error` each warning is an
-`UndefinedMetricWarning` that raises. The rule knows a regressor only by its class name in the
-same call. `explained_variance` and `average_precision` score 1 or 0 on a fold of one row and give
-no nan, so they are left alone. Recall was 14 of 33, and the plants included those two scorings,
-which the rule left out after the recall run. The rule misses a splitter kept in a name, as in
-`loo = LeaveOneOut()` and `cv=loo`, `LeaveOneOut` imported under another name, and a regressor
-passed by a variable with no `scoring`. `cv=len(X)`, which is leave one out under another name,
-is left alone by design.
+Recall was 14 of 33, and the plants included the two scorings that the rule left out after the
+recall run. The rule misses a splitter kept in a name, as in `loo = LeaveOneOut()` and `cv=loo`,
+and `LeaveOneOut` imported under another name. It also misses a regressor passed by a variable
+with no `scoring`.
 
 ### Metrics and scoring
 
-Each old form below passes a metric the wrong thing, scores the wrong rows, or names a scorer that
-does not exist.
+Each rule in the group reports a metric given the wrong values, a score on the wrong rows, or a
+scorer name that doesn't exist.
 
 #### auc-from-labels
 
 **Severity:** error for `log_loss` and `brier_score_loss` given labels, for the whole `predict_proba` matrix where one score per row is needed, for `decision_function` given to a loss, and for `roc_auc_score` with `multi_class` given labels, and info for ranking metrics given labels, column 0 of `predict_proba`, and `make_scorer(roc_auc_score)` without `response_method`. **Fix:** unsafe: `log_loss(y_test, model.predict_proba(X_test))`. The other forms have no fix.
 
-Reports `log_loss(y_test, model.predict(X_test))`, `roc_auc_score(y_test, model.predict_proba(X_test))` and `roc_auc_score(y_test, model.predict(X_test))`, where a metric that needs one probability or score per row gets class labels or a whole matrix.
+The rule reports a metric that needs one probability or score per row and gets class labels or a
+whole matrix, such as `log_loss(y_test, model.predict(X_test))`,
+`roc_auc_score(y_test, model.predict_proba(X_test))` and
+`roc_auc_score(y_test, model.predict(X_test))`.
 
 Example:
 
@@ -5007,11 +5286,47 @@ loss = log_loss(y_test, model.predict_proba(X_test))
 auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
 ```
 
+The rule was measured with `LogisticRegression` over 30 seeds:
+
+| Form | Data | Old form | Right form |
+| --- | --- | --- | --- |
+| `log_loss` given the labels | no signal | 17.998 | 0.699, where the honest loss is ln 2, 0.693 |
+| `brier_score_loss` given the labels | no signal | 0.499 | 0.253, where the honest loss is 0.25 |
+| a ranking metric given the labels | no signal | 0.495 | 0.498 |
+| AUC from the labels | signal | 0.735 | 0.822 |
+| average precision from the labels | signal | 0.677 | 0.827 |
+| AUC from column 0 of `predict_proba` | signal | 0.178 | not given |
+| `make_scorer(roc_auc_score)` without `response_method`, in `cross_val_score` | signal | 0.739 | 0.824 |
+
+Ranking metrics given labels are info, because on noise the labels and the probabilities scored
+about the same. The following forms raise ValueError:
+
+- the whole `predict_proba` matrix given to `roc_auc_score` without `multi_class`, or to
+  `roc_curve`, `precision_recall_curve` or `det_curve`
+- `roc_auc_score(multi_class="ovr")` given labels on three classes
+- `decision_function` given to `log_loss` or `brier_score_loss`
+
+The variable form reports `y_pred = model.predict(X_test)` when a later line passes `y_pred` to the
+metric. The rule leaves alone a `predict` on a Booster that `xgb.train` or `lgb.train` returned,
+and a `predict` whose argument is named like predictions or probabilities, as on a calibrator. It
+also leaves alone files that import keras, tensorflow or torch, because `predict` returns
+probabilities there.
+
+The fix changes the loss on purpose, from 12.0 to 0.63 on the case built for it. On three classes
+the old form raised and the fixed form runs, and on an `SVC` without probabilities the fixed form
+raises AttributeError.
+
+The readers called 2 and 2 of the 20 held-back reports wrong advice. Recall was 55 of 72. The rule
+found none of 13 plants that keep column 0 or the whole `predict_proba` matrix in a variable
+before the metric. It also misses a `predict` variable whose argument is wrapped, as in
+`model.predict(np.array(X_test.values))`.
+
 #### metric-arguments-swapped
 
 **Severity:** error for `precision_score`, `classification_report` and `precision_recall_fscore_support`, and for scores passed first to a ranking metric or a loss, and info for the other metrics that change with the order. **Fix:** unsafe: `precision_score(y_test, y_pred)`. The scores-first form has no fix.
 
-Reports `precision_score(y_pred, y_test)` and `roc_auc_score(y_score, y_test)`, where the predictions come first.
+The rule reports a metric whose predictions come first, such as `precision_score(y_pred, y_test)`
+and `roc_auc_score(y_score, y_test)`.
 
 Example:
 
@@ -5025,11 +5340,39 @@ Use instead:
 precision = precision_score(y_test, y_pred)
 ```
 
+The rule reports when the first name holds `pred` or `hat`, and the second holds `true`, `test`,
+`val`, `actual`, `target` or `label`, or is `y`. With the arguments swapped, the precision a metric
+reports is the recall. On noise where 30 percent of the rows are positive,
+`LogisticRegression(class_weight="balanced")` gave the following numbers:
+
+| Metric | Swapped | Right order | Severity |
+| --- | --- | --- | --- |
+| precision, and `classification_report` for class 1 | 0.471 | 0.294 | error |
+| recall | 0.294 | 0.471 | info |
+| balanced accuracy | 0.496 | 0.495 | info |
+| R2 | -186.06 | -0.022 | info |
+| R2, on data with signal | -0.069 | 0.486 | info |
+
+The metrics other than precision are info, because their swapped numbers on noise are not above
+the right value. Scores passed first to `roc_auc_score`, `average_precision_score`, `roc_curve`,
+`precision_recall_curve`, `log_loss` or `brier_score_loss` raise ValueError, because the true
+values then look continuous. `accuracy_score`, `f1_score`, `jaccard_score`, `matthews_corrcoef`,
+`cohen_kappa_score` and the error metrics such as `mean_squared_error` return the same number in
+either order, so they are left alone.
+
+The fix changes the number on purpose. Precision becomes the old recall, and a confusion matrix is
+transposed. Of 43 held-back reports, 30 were labelled, and neither reader called one wrong.
+Recall was 66 of 100. The rule found none of 9 swapped keyword values, such as
+`confusion_matrix(y_true=y_pred, y_pred=y_true)`, and 2 of 7 `log_loss` calls with the scores
+first. It also misses a column slice first, such as `roc_auc_score(y_prob[:, 1], y_test)`, and
+true values named with `train` or `Y_`.
+
 #### score-on-training-rows
 
 **Severity:** error. **Fix:** none.
 
-Reports `model.score(X_train, y_train)` and `accuracy_score(y_train, model.predict(X_train))` when nothing around them scores held-out rows.
+The rule reports `model.score(X_train, y_train)` and
+`accuracy_score(y_train, model.predict(X_train))` when nothing around them scores held-out rows.
 
 Example:
 
@@ -5047,11 +5390,29 @@ print(model.score(X_test, y_test))
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule reads the names of the rows. On noise, each model scored higher on its training rows:
+
+| Model | Accuracy on the training rows | On the test rows |
+| --- | --- | --- |
+| `DecisionTreeClassifier` with default settings | 1.000 | 0.510 |
+| 1-nearest-neighbour | 1.000 | 0.495 |
+| `LogisticRegression` | 0.545 | 0.501 |
+
+The rule stays silent when code nearby scores a name with `test`, `val` or `holdout` in it, or
+calls cross-validation or a search. Nearby means the function around the score, the functions next
+to it, or the file for code outside functions.
+
+Recall was 10 of 27. The rule found none of 9 metrics given a `predict` variable of the training
+rows, as in `y_pred = knn.predict(X_train)` and `accuracy_score(y_train, y_pred)`. It also misses
+rows whose names don't say train, as in `model.score(X, y)` after `model.fit(X, y)`.
+
 #### unknown-scoring-name
 
 **Severity:** error. **Fix:** none.
 
-Reports `scoring="mean_squared_error"` and any other string that `get_scorer` refuses, in a search, `cross_val_score`, `cross_validate`, the other scikit-learn functions that take `scoring`, and `get_scorer` itself.
+The rule reports `scoring="mean_squared_error"` and any other string that `get_scorer` refuses. It
+reads `scoring` in a search, `cross_val_score`, `cross_validate` and the other scikit-learn
+functions that take it, and the argument of `get_scorer` itself.
 
 Example:
 
@@ -5067,80 +5428,37 @@ scores = cross_val_score(model, X, y, scoring="neg_mean_squared_error")
 
 The replacement is advice. xpd does not apply it automatically.
 
-
-`auc-from-labels` was measured with `LogisticRegression` over 30 seeds. On data with no signal,
-`log_loss` given the labels came out at 17.998, where the probabilities gave 0.699 and the honest
-loss is ln 2, 0.693. `brier_score_loss` given the labels came out at 0.499 against 0.253, where
-the honest loss is 0.25. Passing the whole `predict_proba` matrix to `roc_auc_score` without
-`multi_class`, or to `roc_curve`, `precision_recall_curve` or `det_curve`, raises ValueError. So
-does `roc_auc_score(multi_class="ovr")` given labels on three classes, and `decision_function`
-given to `log_loss` or `brier_score_loss`. Ranking metrics given labels are info, because on
-noise the labels scored 0.495 and the probabilities 0.498. On data with signal the labels gave an
-AUC of 0.735 against 0.822 and an average precision of 0.677 against 0.827, and column 0 of
-`predict_proba` gave an AUC of 0.178. `make_scorer(roc_auc_score)` without `response_method`
-scored 0.739 in `cross_val_score` against 0.824. The variable form reports
-`y_pred = model.predict(X_test)` when a later line passes `y_pred` to the metric. The rule leaves
-alone a `predict` on a Booster that `xgb.train` or `lgb.train` returned, a `predict` whose
-argument is named like predictions or probabilities, as on a calibrator, and files that import
-keras, tensorflow or torch, because `predict` returns probabilities there. The fix changes the
-loss on purpose, from 12.0 to 0.63 on the case built for it. On three classes the old form raised
-and the fixed form runs, and on an `SVC` without probabilities the fixed form raises
-AttributeError. The readers called 2 and 2 of the 20 held-back reports wrong advice. Recall was
-55 of 72. The rule found none of 13 plants that keep column 0 or the whole `predict_proba` matrix
-in a variable before the metric. It also misses a `predict` variable whose argument is wrapped, as
-in `model.predict(np.array(X_test.values))`.
-
-`metric-arguments-swapped` reports when the first name holds `pred` or `hat` and the second holds
-`true`, `test`, `val`, `actual`, `target` or `label`, or is `y`. With the arguments swapped, the
-precision a metric reports is the recall. On noise where 30 percent of the rows are positive, a
-`LogisticRegression(class_weight="balanced")` gave a swapped precision of 0.471, where the honest
-precision was 0.294, and `classification_report` gave the same numbers for class 1. The other
-documents are info, because their swapped numbers on noise are not above the honest value. The
-swapped recall was 0.294 against 0.471, the balanced accuracy 0.496 against 0.495, and R2 -186.06
-against -0.022. On data
-with signal a swapped R2 was -0.069 against 0.486. `accuracy_score`, `f1_score`, `jaccard_score`,
-`matthews_corrcoef`, `cohen_kappa_score` and the error metrics such as `mean_squared_error` return
-the same number in either order, so they are left alone. Scores passed first to `roc_auc_score`,
-`average_precision_score`, `roc_curve`, `precision_recall_curve`, `log_loss` or
-`brier_score_loss` raise ValueError, because the true values then look continuous. The fix
-changes the number on purpose. Precision becomes the old recall, and a confusion matrix is
-transposed. Of 43 held-back reports, 30 were labelled, and neither reader called one wrong.
-Recall was 66 of 100. The rule found none of 9 swapped keyword values such as
-`confusion_matrix(y_true=y_pred, y_pred=y_true)`, and 2 of 7 `log_loss` calls with the scores
-first. It also misses a column slice first, such as `roc_auc_score(y_prob[:, 1], y_test)`, and
-true values named with `train` or `Y_`.
-
-`score-on-training-rows` reads the names of the rows. On noise, a `DecisionTreeClassifier` with
-default settings scored 1.000 accuracy on its training rows, where the test rows gave 0.510, and a
-1-nearest-neighbour model scored 1.000 against 0.495. A `LogisticRegression` scored 0.545 on its
-training rows against 0.501. The rule stays silent when the function around the score, the
-functions next to it, or the file for code outside functions, scores a name with `test`, `val` or
-`holdout` in it, or calls cross-validation or a search. Recall was 10 of 27. The rule found none of
-9 metrics given a `predict` variable of the training rows, as in `y_pred = knn.predict(X_train)`
-and `accuracy_score(y_train, y_pred)`. It also misses rows whose names do not say train, as in
-`model.score(X, y)` after `model.fit(X, y)`.
-
-`unknown-scoring-name` checks each string against `sklearn.metrics.get_scorer_names()` on
-scikit-learn 1.9.1. `scoring="mean_squared_error"`, `scoring="log_loss"` and `scoring="auc"`
-raise InvalidParameterError, and `"roc_auc_score"` in a list given to `cross_validate` raises
-ValueError. A string with `{` or `%` in it, or an f-string, is left alone, because code fills it
-in later. Recall was 16 of 32. The rule found none of 16 scoring strings or dicts of scorer names
-kept in a variable.
+The rule checks each string against `sklearn.metrics.get_scorer_names()` on scikit-learn 1.9.1.
+`scoring="mean_squared_error"`, `scoring="log_loss"` and `scoring="auc"` raise
+InvalidParameterError, and `"roc_auc_score"` in a list given to `cross_validate` raises
+ValueError. A string with `{` or `%` in it, or an f-string, is left alone, because code fills it in
+later. Recall was 16 of 32. The rule found none of 16 scoring strings or dicts of scorer names kept
+in a variable.
 
 ### Removed and deprecated forms
 
-Each form below raises or warns on scikit-learn 1.9.1. Each was run under `python -W error`, where
-the old form raised and the new form ran clean. The messages take each replacement from the 1.9.1
-source, such as the docstring that says `sparse` was renamed `sparse_output` in 1.2, or from the
-error text. Every fix of a removed form turns code that raises into code that runs, so none of
-those fixes can be bit equal and none is safe. A fix that drops a keyword deletes the comments
-inside the argument list and joins a call written over several lines onto one line.
+Each rule in the group reports a form that raises or warns on scikit-learn 1.9.1. Each form was
+run under `python -W error`, where the old form raised and the new form ran clean. The messages
+take each replacement from the 1.9.1 source or from the error text, such as the docstring that
+says `sparse` was renamed `sparse_output` in 1.2.
+
+A fix of a removed form turns code that raises into code that runs, so it can't be bit equal, and
+no such fix is safe. A fix that drops a keyword deletes the comments inside the argument
+list, and it joins a call written over several lines onto one line.
 
 #### removed-in-sklearn
 
 **Severity:** error. **Fix:** unsafe: `sklearn.model_selection` for `sklearn.cross_validation`, `sklearn.grid_search` and `sklearn.learning_curve`, `import joblib`, the public module for a private module path such as `sklearn.linear_model.logistic`, `get_feature_names_out()`, renamed keywords such as `sparse_output=`, `estimator=`, `max_iter=`, `store_cv_results=`, `ensure_all_finite=`, `metric=`, `alphas=` and `n_splits=`, dropped keywords such as `n_jobs`, `behaviour`, `algorithm`, `iid`, `multi_class`, `min_impurity_split=None` and `normalize=False`, and new values for refused ones, such as `max_features="sqrt"` or `1.0` for `"auto"`, `loss="log_loss"`, `criterion="squared_error"` and `"absolute_error"`, and `loss="squared_error"`. The other forms have no fix.
 
-Reports imports of removed modules and names, such as `sklearn.cross_validation`, `sklearn.externals.joblib` and `six`, `load_boston`, `preprocessing.Imputer`, private module paths and `sklearn.feature_extraction.stop_words`, and reports `get_feature_names()`, keywords the signature no longer has, values that parameter validation refuses, positional arguments past the keyword-only marker, and splitters given the data the way `sklearn.cross_validation` took it.
+The rule reports imports of removed modules and names, such as `sklearn.cross_validation`,
+`sklearn.externals.joblib` and `six`, `load_boston`, `preprocessing.Imputer`, private module paths
+and `sklearn.feature_extraction.stop_words`. It also reports the following forms:
+
+- `get_feature_names()`
+- keywords that the signature no longer has
+- values that parameter validation refuses
+- positional arguments past the keyword-only marker
+- splitters given the data the way `sklearn.cross_validation` took it
 
 Example:
 
@@ -5164,11 +5482,60 @@ forest = RandomForestClassifier(max_features="sqrt", random_state=0)
 folds = StratifiedKFold(n_splits=5).split(X, y)
 ```
 
+The rule ran 49 forms on scikit-learn 1.9.1. Each old form raised ModuleNotFoundError,
+ImportError, AttributeError, TypeError for an unexpected keyword or too many positional arguments,
+or InvalidParameterError, and its new form ran clean. A grid with
+`max_features: ["auto", "sqrt"]` raised through the FitFailedWarning that `GridSearchCV` gives. A
+backslash line break inside a call is not counted as a positional argument. `SCORERS`, the
+`plot_*` functions, `jaccard_similarity_score`, `squared=` and `fit_params=` are left to
+[`removed-metric-api`](#removed-metric-api) and [`fit-params-keyword`](#fit-params-keyword).
+
+Every fixed form ran on the case built for it, and each renamed keyword and refused value gave the
+same model as a reference written from the 1.9.1 docstrings. Some fixes change what the code
+means:
+
+| Fix | What changes |
+| --- | --- |
+| `get_feature_names_out()` | It returns an array where `get_feature_names()` returned a list, so `print` shows `array([...])`. At 1 held-back site the fix broke a project class that defined its own `get_feature_names`. |
+| dropping `multi_class` | Every multiclass fit uses the multinomial loss. With liblinear on three or more classes the fixed call raises ValueError. |
+| dropping `algorithm="SAMME.R"` | A SAMME.R model becomes a SAMME model. |
+| `OneHotEncoder(sparse_output=False, dtype=np.int)` | At 2 held-back sites the fixed call still raised, because `np.int` is gone from NumPy. |
+
+Of 321 held-back reports, 58 were labelled, and reader A called 1 wrong. Recall was 517 of 600.
+Of the misses, 36 were `SCORERS`, the `plot_*` functions and `jaccard_similarity_score`, which
+`removed-metric-api` reports. The rule found none of 18 refused values in a parameter grid for
+keywords other than `max_features`, and none of 16 refused values held in a variable. It also
+misses `sklearn.feature_extraction.stop_words` imported as a module.
+
 #### deprecated-in-sklearn
 
 **Severity:** warning. **Fix:** safe: drop `probability=False` from `SVC` and `NuSVC`, drop `penalty="elasticnet"` beside an `l1_ratio`, drop `n_jobs=` from `LogisticRegression`, `criterion="squared_error"` for `"friedman_mse"` on regression trees and forests, drop `criterion=` from GradientBoosting, `metric=` for MDS `dissimilarity=`, `metric_mds=` for MDS `metric=True` or `False`, `alphas=` for `n_alphas=`, and `alphas=100` for `alphas=None`. Unsafe: drop `penalty="l2"`, `l1_ratio=1` for `penalty="l1"`, and `l1_ratio=0` for `l1_ratio=None` on `LogisticRegression`. The other forms have no fix.
 
-Reports `SVC(probability=)` and `NuSVC(probability=)`, `probA_` and `probB_`, `penalty=`, `l1_ratio=None` and `n_jobs=` on `LogisticRegression`, `penalty=` and the three defaults that warn on `LogisticRegressionCV`, `criterion="friedman_mse"`, GradientBoosting `criterion=`, the PassiveAggressive classes, `TargetEncoder(shuffle=, random_state=)`, MDS `dissimilarity=`, `metric=True` and a missing `init`, `HDBSCAN` without `copy`, `n_alphas=` and `alphas=None` on the path functions, a negative `power_t`, and `stable_cumsum`.
+The rule reports forms that warn FutureWarning on scikit-learn 1.9.1. Its message gives the
+release that removes each form or changes its default:
+
+| Form | Removed or changed in | Write instead |
+| --- | --- | --- |
+| `SVC(probability=True)`, `NuSVC(probability=True)` | 1.11 | `CalibratedClassifierCV(SVC(), ensemble=False)` |
+| `probability=False` on `SVC` and `NuSVC` | 1.11 | nothing, because it is the default |
+| `probA_`, `probB_` | 1.11 | the calibrators of `CalibratedClassifierCV(ensemble=False)` |
+| `LogisticRegression(penalty=...)` | 1.10 | `l1_ratio`, 0 for L2, 1 for L1 and a value between for elasticnet, and `C=np.inf` for no penalty |
+| `LogisticRegression(l1_ratio=None)` | 1.10 | `l1_ratio=0` |
+| `LogisticRegression(n_jobs=...)` | 1.10 | nothing, because it has had no effect since 1.8 |
+| `LogisticRegressionCV(penalty=...)` | 1.10 | `l1_ratios`, `(0,)` for L2 and `(1,)` for L1 |
+| `LogisticRegressionCV` without `l1_ratios`, `scoring` and `use_legacy_attributes` | 1.10 and 1.11 | all three set |
+| `criterion="friedman_mse"` on regression trees and forests | 1.11 | `criterion="squared_error"` |
+| `criterion=` on GradientBoosting | 1.11 | nothing, because it has no effect |
+| `PassiveAggressiveClassifier`, `PassiveAggressiveRegressor` | 1.10 | `SGDClassifier(loss="hinge", penalty=None, learning_rate="pa1", eta0=1.0)`, or `SGDRegressor` with `loss="epsilon_insensitive"` |
+| `TargetEncoder(shuffle=, random_state=)` | 1.11 | a splitter as `cv`, such as `cv=KFold(5, shuffle=True, random_state=0)` |
+| `MDS(dissimilarity=)` | 1.10 | `metric=` |
+| `MDS(metric=True)` or `metric=False` | 1.10 | `metric_mds=` |
+| `MDS` without `init` | 1.10 | `init="random"` to keep the current result |
+| `HDBSCAN` without `copy` | 1.10 | `copy=False` to keep the current behavior, or `copy=True` |
+| `n_alphas=` on the path functions | 1.11 | `alphas=` |
+| `alphas=None` | 1.11 | `alphas=100` |
+| a negative `power_t` | 1.10 | a value of 0 or more |
+| `sklearn.utils.extmath.stable_cumsum` | 1.10 | `np.cumulative_sum` |
 
 Example:
 
@@ -5186,11 +5553,51 @@ svm = CalibratedClassifierCV(SVC(), ensemble=False).fit(X_train, y_train)
 tree = DecisionTreeRegressor(criterion="squared_error", random_state=0)
 ```
 
+The rule ran 30 forms on scikit-learn 1.9.1, and each old form raised its FutureWarning under
+`-W error` while its new form ran clean. `LogisticRegression(n_jobs=None)` gives no warning and is
+left alone.
+
+Every safe fix gave a bit equal fitted model and bit equal predictions in every run. A fix that
+drops a keyword changes the stored constructor parameter, which is not counted as a change of the
+model.
+
+| Safe fix | Runs |
+| --- | --- |
+| dropping `probability=False` | 16 |
+| dropping `penalty="elasticnet"` | 16 |
+| dropping `n_jobs` | 38 |
+| `criterion="squared_error"` for `"friedman_mse"` | 16 |
+| dropping the GradientBoosting `criterion` | 6 |
+| the two MDS renames | 4 and 6 |
+| `alphas=` for `n_alphas=` | 8 |
+| `alphas=100` for `alphas=None` | 6 |
+
+The three unsafe fixes were bit equal in 48 runs, 32 runs and 8 runs. They differ only with
+`C=np.inf`, which 1.9.1 turns into no penalty only when `penalty` is left at its default:
+
+| Unsafe fix | With `C=np.inf` |
+| --- | --- |
+| `l1_ratio=1` for `penalty="l1"`, with liblinear | The fixed form raises where the old form ran. |
+| dropping `penalty="l2"`, with liblinear | The fixed form raises ValueError where the old form didn't finish in 60 s. |
+| `l1_ratio=0` for `l1_ratio=None`, with saga | The fixed form runs where the old form raised TypeError. |
+
+Of 101 held-back reports, 57 were labelled, and reader A called 3 wrong. Recall was 274 of 308. Of
+the misses, 12 were `sklearn.metrics.cluster.entropy`, which
+[`deprecated-metric-api`](#deprecated-metric-api) reports. The rule also misses `HDBSCAN`,
+`stable_cumsum` and the PassiveAggressive classes reached through a module or another name, and a
+deprecated value in a parameter grid or a variable.
+
 #### removed-metric-api
 
 **Severity:** error. **Fix:** none.
 
-Reports metric APIs that scikit-learn removed: `SCORERS`, `plot_confusion_matrix` and the other `plot_*` functions, `jaccard_similarity_score`, `squared=` on `mean_squared_error` and `mean_squared_log_error`, `eps=` on `log_loss`, `squared=`, `needs_proba=` and `needs_threshold=` passed to `make_scorer`, and the `RocCurveDisplay` keywords that 1.7 replaced.
+The rule reports metric APIs that scikit-learn removed:
+
+- `SCORERS`, `plot_confusion_matrix` and the other `plot_*` functions, and
+  `jaccard_similarity_score`
+- `squared=` on `mean_squared_error` and `mean_squared_log_error`, and `eps=` on `log_loss`
+- `squared=`, `needs_proba=` and `needs_threshold=` passed to `make_scorer`
+- the `RocCurveDisplay` keywords that 1.7 replaced
 
 Example:
 
@@ -5208,11 +5615,35 @@ scorer = make_scorer(roc_auc_score, response_method="predict_proba")
 
 The replacement is advice. xpd does not apply it automatically.
 
+Every form raises on scikit-learn 1.9.1. `SCORERS`, the `plot_*` functions and
+`jaccard_similarity_score` raise ImportError, and the keywords raise TypeError. `make_scorer`
+passes `squared=`, `needs_proba=` and `needs_threshold=` on to the metric, so the error comes when
+the scorer runs. A search with the default `error_score` then scores every fold as nan.
+
+The rule reports `squared=` and `eps=` only on the scikit-learn functions, imported from
+`sklearn.metrics` or called as `metrics.<name>`, because torchmetrics has a `mean_squared_error`
+with `squared=`. Old module paths such as `sklearn.metrics.ranking` are left to
+[`removed-in-sklearn`](#removed-in-sklearn).
+
+The four `RocCurveDisplay` forms raised TypeError in the first run, with matplotlib 3.11.2 added
+to scikit-learn 1.9.1. The saved rerun had no matplotlib, so the saved results hold no passing
+proof for them. The forms raise, so a fix couldn't be compared bit for bit, and they have none.
+Neither reader called one of the 13 held-back reports wrong. Recall was 74 of 74.
+
 #### deprecated-metric-api
 
 **Severity:** warning. **Fix:** safe: `log_loss(y_test, y_proba=proba)` and `PrecisionRecallDisplay(precision=precision, recall=recall, name="model")`. The other forms have no fix.
 
-Reports metric APIs that warn on scikit-learn 1.9.1: `y_pred=` on `log_loss` and `d2_log_loss_score`, `estimator_name=` on `PrecisionRecallDisplay`, `y_pred=` on `PrecisionRecallDisplay.from_predictions` and `DetCurveDisplay.from_predictions`, matplotlib keywords passed straight to `PrecisionRecallDisplay`, and `sklearn.metrics.cluster.entropy`.
+The rule reports metric APIs that warn on scikit-learn 1.9.1. Its message gives the release that
+removes each form, from the warning text:
+
+| Form | Removed in | Write instead |
+| --- | --- | --- |
+| `y_pred=` on `log_loss` and `d2_log_loss_score` | 1.11 | `y_proba=` |
+| `estimator_name=` on `PrecisionRecallDisplay` | 1.10 | `name=` |
+| `y_pred=` on `PrecisionRecallDisplay.from_predictions` and `DetCurveDisplay.from_predictions` | 1.10 | `y_score=` |
+| matplotlib keywords passed straight to `PrecisionRecallDisplay` | 1.11 | `curve_kwargs={...}` |
+| `sklearn.metrics.cluster.entropy` | 1.10 | `scipy.stats.entropy` of the class counts |
 
 Example:
 
@@ -5226,11 +5657,18 @@ Use instead:
 loss = log_loss(y_test, y_proba=proba)
 ```
 
+The four display forms passed in the first run with matplotlib 3.11.2, and the saved rerun had no
+matplotlib. The two fixes rename a keyword and gave bit equal results, the `log_loss` rename in 12
+of 12 runs and the `PrecisionRecallDisplay` rename in 2 of 2 with the same plot label.
+`scipy.stats.entropy` of the class counts differs from `entropy` in the last bits, so that form
+has no fix. Recall was 48 of 48.
+
 #### fit-params-keyword
 
 **Severity:** error. **Fix:** none.
 
-Reports `fit_params=` on `cross_val_score`, `cross_validate`, `cross_val_predict`, `learning_curve`, `validation_curve`, `permutation_test_score` and the four search classes.
+The rule reports `fit_params=` on `cross_val_score`, `cross_validate`, `cross_val_predict`,
+`learning_curve`, `validation_curve`, `permutation_test_score` and the four search classes.
 
 Example:
 
@@ -5246,11 +5684,19 @@ scores = cross_val_score(model, X, y, params={"sample_weight": w})
 
 The replacement is advice. xpd does not apply it automatically.
 
+The keyword raises TypeError on scikit-learn 1.9.1. The documents for `cross_val_score`,
+`cross_validate` and `cross_val_predict` carry `since: "1.4"`, the release that added `params`,
+and the documents for the other three functions carry `since: "1.6"`. On `GridSearchCV`,
+`RandomizedSearchCV`, `HalvingGridSearchCV` and `HalvingRandomSearchCV` the message says to drop
+the keyword and pass the values to `fit`. A rename has no fix, because the old form raises and
+leaves nothing to compare. Neither reader called one of the 4 held-back reports wrong. Recall was
+32 of 32.
+
 #### column-transformer-removed
 
 **Severity:** error. **Fix:** none.
 
-Reports `force_int_remainder_cols=` on `ColumnTransformer` and `make_column_transformer`.
+The rule reports `force_int_remainder_cols=` on `ColumnTransformer` and `make_column_transformer`.
 
 Example:
 
@@ -5266,90 +5712,24 @@ ColumnTransformer(transformers, remainder="passthrough")
 
 The replacement is advice. xpd does not apply it automatically.
 
-
-`removed-in-sklearn` ran 49 forms on scikit-learn 1.9.1. Each old form raised
-ModuleNotFoundError, ImportError, AttributeError, TypeError for an unexpected keyword or too many
-positional arguments, or InvalidParameterError, and its new form ran clean. A grid with
-`max_features: ["auto", "sqrt"]` raised through the FitFailedWarning that `GridSearchCV` gives.
-`SCORERS`, the `plot_*` functions, `jaccard_similarity_score`, `squared=` and `fit_params=` are
-left to `removed-metric-api` and `fit-params-keyword`. A backslash line break inside a call is
-not counted as a positional argument. Every fixed form ran on the case built for it, and each
-renamed keyword and refused value gave the same model as a reference written from the 1.9.1
-docstrings. Some fixes change what the code means. `get_feature_names_out()` returns an array
-where `get_feature_names()` returned a list, so `print` shows `array([...])`, and at 1 held-back
-site the fix broke a project class that defined its own `get_feature_names`. Dropping
-`multi_class` makes every multiclass fit use the multinomial loss, and with liblinear on three or
-more classes the fixed call raises ValueError. Dropping `algorithm="SAMME.R"` turns a SAMME.R
-model into a SAMME model. At 2 held-back sites the fixed `OneHotEncoder(sparse_output=False,
-dtype=np.int)` still raised, because `np.int` is gone from NumPy. Of 321 held-back reports, 58
-were labelled, and reader A called 1 wrong. Recall was 517 of 600. Of the misses, 36 were
-`SCORERS`, the `plot_*` functions and `jaccard_similarity_score`, which `removed-metric-api`
-reports. The rule found none of 18 refused values in a parameter grid for keywords other than
-`max_features`, and none of 16 refused values held in a variable. It also misses
-`sklearn.feature_extraction.stop_words` imported as a module.
-
-`deprecated-in-sklearn` ran 30 forms on scikit-learn 1.9.1, and each old form raised its
-FutureWarning under `-W error` while its new form ran clean. The warning gives the release that
-removes each form, 1.10 or 1.11. `LogisticRegression(n_jobs=None)` gives no warning and is left
-alone. Every safe fix gave a bit equal fitted model and bit equal predictions in every run. The
-runs were 16 for dropping `probability=False`, 16 for dropping `penalty="elasticnet"`, 38 for
-dropping `n_jobs`, 16 for `friedman_mse`, 6 for the GradientBoosting `criterion`, 4 and 6 for the
-two MDS renames, 8 for `n_alphas`, and 6 for `alphas=None`. The stored constructor parameter
-changes in a fix that drops a keyword, which is not counted as a change of the model. The three
-unsafe fixes were bit equal in 48 runs, 32 runs and 8 runs, and they differ only with `C=np.inf`,
-which 1.9.1 turns into no penalty only when `penalty` is left at its default. With liblinear and
-`C=np.inf`, the fixed `l1_ratio=1` raises where the old form ran, and the fixed form of
-`penalty="l2"` raises ValueError where the old form did not finish in 60 s. With saga and
-`C=np.inf`, the fixed `l1_ratio=0` runs where the old form raised TypeError. Of 101 held-back
-reports, 57 were
-labelled, and reader A called 3 wrong. Recall was 274 of 308. Of the misses, 12 were
-`sklearn.metrics.cluster.entropy`, which `deprecated-metric-api` reports. The rule also misses
-`HDBSCAN`, `stable_cumsum` and the PassiveAggressive classes reached through a module or another
-name, and a deprecated value in a parameter grid or a variable.
-
-`removed-metric-api` raises on scikit-learn 1.9.1 for every form, ImportError for `SCORERS`, the
-`plot_*` functions and `jaccard_similarity_score`, and TypeError for the keywords. `make_scorer`
-passes `squared=`, `needs_proba=` and `needs_threshold=` on to the metric, so the error comes when
-the scorer runs, and a search with the default `error_score` then scores every fold as nan. The
-rule reports `squared=` and `eps=` only on the scikit-learn functions, imported from
-`sklearn.metrics` or called as `metrics.<name>`, because torchmetrics has a `mean_squared_error`
-with `squared=`. Old module paths such as `sklearn.metrics.ranking` are left to
-`removed-in-sklearn`. The four `RocCurveDisplay` forms raised TypeError in the first run, with
-matplotlib 3.11.2 added to scikit-learn 1.9.1, and the saved rerun had no matplotlib, so the
-saved results hold no passing proof for them. The forms raise, so a fix could not be compared bit
-for bit, and they have none. Neither reader called one of the 13 held-back reports wrong. Recall
-was 74 of 74.
-
-`deprecated-metric-api` gives the release that removes each form, from the warning text.
-`y_pred=` on `log_loss` goes in 1.11, `estimator_name=` and the display `y_pred=` go in 1.10, the
-display matplotlib keywords go in 1.11, and `entropy` goes in 1.10. The four display forms passed
-in the first run with matplotlib 3.11.2, and the saved rerun had no matplotlib. The two fixes
-rename a keyword and gave bit equal results, the `log_loss` rename in 12 of 12 runs and the
-`PrecisionRecallDisplay` rename in 2 of 2 with the same plot label. `scipy.stats.entropy` of the
-class counts differs from `entropy` in the last bits, so that form has no fix. Recall was 48 of
-48.
-
-`fit-params-keyword` reports a keyword that raises TypeError on scikit-learn 1.9.1. The documents
-for `cross_val_score`, `cross_validate` and `cross_val_predict` carry `since: "1.4"`, the release
-that added `params`, and the documents for the other three functions carry `since: "1.6"`. On
-`GridSearchCV`, `RandomizedSearchCV`, `HalvingGridSearchCV` and `HalvingRandomSearchCV` the
-message says to drop the keyword and pass the values to `fit`. A rename has no fix, because the
-old form raises and leaves nothing to compare. Neither reader called one of the 4 held-back
-reports wrong. Recall was 32 of 32.
-
-`column-transformer-removed` reports a keyword that raises TypeError on scikit-learn 1.9.1, with
-either value. The remainder columns now come back in the form the other columns were given in.
-Neither reader called one of the 3 held-back reports wrong. Recall was 30 of 30.
+The keyword raises TypeError on scikit-learn 1.9.1, with either value. The remainder columns now
+come back in the form the other columns were given in. Neither reader called one of the 3
+held-back reports wrong. Recall was 30 of 30.
 
 ### Pipeline and metadata routing
 
-Each form below raises at construction or at fit on scikit-learn 1.9.1.
+Each rule in the group reports a form that raises at construction or at fit on scikit-learn
+1.9.1. No held-back file uses metadata routing, a misnamed step, `TransformedTargetRegressor` in a
+wrong mix, or pandas output on a sparse encoder. The rules in the group therefore made no report
+there and have no wrong-advice number.
 
 #### metadata-routing
 
 **Severity:** error. **Fix:** none.
 
-Reports forms that raise because metadata routing is off, such as `set_fit_request` and `Pipeline(transform_input=...)`, and forms that raise because it is on, such as `groups=`, `step__sample_weight=` and `params=` with no request in the file.
+The rule reports forms that raise because metadata routing is off, such as `set_fit_request` and
+`Pipeline(transform_input=...)`. It also reports forms that raise because routing is on, such as
+`groups=`, `step__sample_weight=` and `params=` with no request in the file.
 
 Example:
 
@@ -5368,11 +5748,27 @@ cross_validate(model, X, y, params={"sample_weight": w})
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule counts a file as routed when any call in it passes `enable_metadata_routing` with a value
+other than `False`. A function or a script that never calls a `set_*_request` method has asked
+for nothing.
+
+| Routing | Form | Raises |
+| --- | --- | --- |
+| off | `set_fit_request` and the other request setters | RuntimeError |
+| off | `Pipeline(transform_input=...)` | ValueError at fit |
+| on | `groups=` on a cross-validation function | ValueError |
+| on | a `step__sample_weight` keyword on `fit` | TypeError |
+| on | `params=` when no estimator asked for the metadata | UnsetMetadataPassedError |
+
+On scikit-learn 1.9.1 a weighted `cross_validate` with routing on also needs
+`set_score_request`, or it raises for the scorer. Recall was 34 of 34.
+
 #### pipeline-fit-params
 
 **Severity:** error. **Fix:** none.
 
-Reports `pipe.fit(X, y, sample_weight=w)` on a Pipeline built in the same block, with metadata routing off.
+The rule reports `pipe.fit(X, y, sample_weight=w)` on a Pipeline built in the same block, with
+metadata routing off.
 
 Example:
 
@@ -5390,11 +5786,21 @@ pipe.fit(X, y, logisticregression__sample_weight=w)
 
 The replacement is advice. xpd does not apply it automatically.
 
+With routing off, `Pipeline.fit` raises "ValueError: Pipeline.fit does not accept the
+sample_weight parameter". The rule reads the Pipeline from an assignment earlier in the same
+block, or from the call itself. A file that turns routing on is left alone, because there a plain
+name is the right form.
+
+Recall was 23 of 30. The rule found none of 6 `sample_weight=` keywords given to the `fit` of a
+search over a Pipeline, which raises the same ValueError. It also misses a Pipeline built outside
+a loop and fitted inside it.
+
 #### pipeline-step-form
 
 **Severity:** error. **Fix:** none.
 
-Reports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare estimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.
+The rule reports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare
+estimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.
 
 Example:
 
@@ -5414,11 +5820,29 @@ pipe = Pipeline([("smote", SMOTE()), ("model", LogisticRegression())])
 
 The replacement is advice. xpd does not apply it automatically.
 
+| Form | Error |
+| --- | --- |
+| a step name with two underscores in a row, in the list given to `Pipeline`, `ColumnTransformer` or `FeatureUnion` | ValueError at fit |
+| `make_pipeline([a, b])` | TypeError at fit |
+| `Pipeline([a, b])` | "TypeError: cannot unpack non-iterable" |
+| a sampler such as `SMOTE` before another step | "TypeError: All intermediate steps should be transformers" |
+
+The first three forms are reported only when the name comes from scikit-learn, imported from
+`sklearn.pipeline` or `sklearn.compose` or called through the two modules. Other libraries, such as
+xfeat, have a Pipeline that takes a plain list. The rule as the readers saw it made 4 reports on
+the held-back files, on such Pipelines, and both readers called all 4 wrong. Files that import
+from `imblearn.pipeline` are left alone, and so is a sampler as the last step, which fits.
+
+Recall was 29 of 35, measured before the rule was narrowed to the Pipeline of scikit-learn. The
+rule found 4 of 10 plants of `Pipeline` given bare estimators. It misses them given by `steps=`,
+by names that hold the estimators, or as a single step.
+
 #### transformed-target-pair
 
 **Severity:** error. **Fix:** none.
 
-Reports `TransformedTargetRegressor` with `func` and no `inverse_func`, the other way round, or with both a `transformer` and functions.
+The rule reports `TransformedTargetRegressor` with `func` and no `inverse_func`, with
+`inverse_func` and no `func`, or with both a `transformer` and functions.
 
 Example:
 
@@ -5434,11 +5858,15 @@ model = TransformedTargetRegressor(regressor=Ridge(), func=np.log1p, inverse_fun
 
 The replacement is advice. xpd does not apply it automatically.
 
+Each of the three mixes raises ValueError at fit. Recall was 31 of 36. The rule found none of 5
+plants that import the class under another name, as in `TransformedTargetRegressor as TTR`.
+
 #### pandas-output-sparse
 
 **Severity:** error. **Fix:** none.
 
-Reports pandas output on a OneHotEncoder that keeps its default `sparse_output=True`, set with `set_output` or with `set_config(transform_output="pandas")`.
+The rule reports pandas output on a OneHotEncoder that keeps its default `sparse_output=True`,
+set with `set_output` or with `set_config(transform_output="pandas")`.
 
 Example:
 
@@ -5456,63 +5884,26 @@ encoder.set_output(transform="pandas")
 
 The replacement is advice. xpd does not apply it automatically.
 
-
-No held-back file uses metadata routing, a misnamed step, `TransformedTargetRegressor` in a wrong
-mix, or pandas output on a sparse encoder, so the rules in this group made no report there and
-have no wrong-advice number.
-
-`metadata-routing` counts a file as routed when any call in it passes `enable_metadata_routing`
-with a value other than `False`. With routing off, `set_fit_request` and the other request
-setters raise RuntimeError, and `Pipeline(transform_input=...)` raises ValueError at fit. With
-routing on, `groups=` on a cross-validation function raises ValueError, a `step__sample_weight`
-keyword on `fit` raises TypeError, and `params=` raises UnsetMetadataPassedError when no
-estimator asked for the metadata. A function or a script that never calls a `set_*_request`
-method has asked for nothing. On scikit-learn 1.9.1 a weighted `cross_validate` with routing on
-also needs `set_score_request`, or it raises for the scorer. Recall was 34 of 34.
-
-`pipeline-fit-params` reads the Pipeline from an assignment earlier in the same block, or from
-the call itself. With routing off, `Pipeline.fit` raises "ValueError: Pipeline.fit does not
-accept the sample_weight parameter". A file that turns routing on is left alone, because there a
-plain name is the right form. Recall was 23 of 30. The rule found none of 6 `sample_weight=`
-keywords given to the `fit` of a search over a Pipeline, which raises the same ValueError. It also
-misses a Pipeline built outside a loop and fitted inside it.
-
-`pipeline-step-form` reports a step name with two underscores in a row in the list given to
-`Pipeline`, `ColumnTransformer` or `FeatureUnion`, which raises ValueError at fit.
-`make_pipeline([a, b])` raises TypeError at fit, and `Pipeline([a, b])` raises "TypeError: cannot
-unpack non-iterable". A sampler such as `SMOTE` before another step raises "TypeError: All
-intermediate steps should be transformers" in the Pipeline of scikit-learn. The first three forms
-are reported only when the name comes from scikit-learn, imported from `sklearn.pipeline` or
-`sklearn.compose` or called through those modules, because other libraries such as xfeat have a
-Pipeline that takes a plain list. The frozen rule made 4 reports on the held-back files, on such
-Pipelines, and both readers called all 4 wrong. Files that import from `imblearn.pipeline` are
-left alone, and so is a sampler as the last step, which fits. Recall was 29 of 35, measured
-before the rule was narrowed to the Pipeline of scikit-learn. The rule found 4 of 10 plants of
-`Pipeline` given bare estimators, and it misses them given by `steps=`, by names that hold the
-estimators, or as a single step.
-
-`transformed-target-pair` reports the three mixes that raise ValueError at fit. Recall was 31 of
-36. The rule found none of 5 plants that import the class under another name, as in
-`TransformedTargetRegressor as TTR`.
-
-`pandas-output-sparse` reports `set_output(transform="pandas")` on a OneHotEncoder, or on a
-Pipeline, ColumnTransformer or FeatureUnion that holds one, either in the same expression or
-assigned in an earlier statement of the block. With `set_config` or `config_context` it reports
-every OneHotEncoder in the file. A OneHotEncoder with `sparse_output=False` is left alone. Each
-form raises "ValueError: Pandas output does not support sparse data" on scikit-learn 1.9.1.
-Recall was 29 of 31.
+Each form raises "ValueError: Pandas output does not support sparse data" on scikit-learn 1.9.1.
+The rule reports `set_output(transform="pandas")` on a OneHotEncoder, or on a Pipeline,
+ColumnTransformer or FeatureUnion that holds one, in the same expression or assigned in an
+earlier statement of the block. With `set_config` or `config_context` it reports every
+OneHotEncoder in the file. A OneHotEncoder with `sparse_output=False` is left alone. Recall was 29
+of 31.
 
 ### Work done twice
 
-Each old form below repeats work that scikit-learn already did, and the new form does it once.
-The numbers are speed proofs on scikit-learn 1.9.1, on one thread, as the median of 7 runs of
-each form at two data sizes. A rule reports only the classes where both sizes passed 1.5 times.
+Each rule in the group reports work that scikit-learn already did, and the new form does it once.
+The numbers are speed proofs on scikit-learn 1.9.1, on one thread, as the median of 7 runs of each
+form at two data sizes. A rule reports only the classes where both sizes passed 1.5 times.
 
 #### predict-per-row
 
 **Severity:** warning. **Fix:** none.
 
-Reports `model.predict([row])`, `model.predict_proba(X[i].reshape(1, -1))`, `model.predict(df.iloc[[i]])` and the same calls of `decision_function` and `predict_log_proba` in a loop, a comprehension or a lambda over the rows.
+The rule reports `model.predict([row])`, `model.predict_proba(X[i].reshape(1, -1))`,
+`model.predict(df.iloc[[i]])` and the same calls of `decision_function` and `predict_log_proba` in
+a loop, a comprehension or a lambda over the rows.
 
 Example:
 
@@ -5528,11 +5919,31 @@ labels = model.predict(X_test)
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule reports a call whose rows come from the loop variable, either the row itself or the data
+indexed by it. Each call checks the input and sets up the model again, so one call on all rows was
+faster:
+
+| Model | At 500 rows | At 5,000 rows |
+| --- | --- | --- |
+| `SVC` | 2.77 times | 2.79 times |
+| `RandomForestClassifier` | 216 times | 356 times |
+| `LogisticRegression.predict_proba` | 104 times | 816 times |
+
+The labels were bit equal, and the probabilities of `LogisticRegression` differed by up to
+3.3e-16, so the rule has no fix. A loop that writes into the data it predicts from, as recursive
+forecasting does, is left alone.
+
+Reader B called both held-back reports wrong advice, and reader A called neither wrong. Recall was
+28 of 32. The 4 misses were `DataFrame.apply` with the row's values in a list, as in
+`X_test.apply(lambda row: model.predict([row.values])[0], axis=1)`.
+
 #### score-after-predict
 
 **Severity:** warning. **Fix:** unsafe: `f1_score(y_test, y_pred)`. `model.score(X_test, y_test)` has no fix.
 
-Reports `model.score(X_test, y_test)` and `f1_score(y_test, model.predict(X_test))` after `y_pred = model.predict(X_test)`, when the file builds `model` as a forest, a boosting or bagging model, k-nearest neighbours, an SVM, an MLP or `GaussianNB`.
+The rule reports `model.score(X_test, y_test)` and `f1_score(y_test, model.predict(X_test))` after
+`y_pred = model.predict(X_test)`. It reports them only when the file builds `model` as a forest, a
+boosting or bagging model, k-nearest neighbours, an SVM, an MLP or `GaussianNB`.
 
 Example:
 
@@ -5550,11 +5961,31 @@ y_pred = forest.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 ```
 
+The rule reads the class from the line that builds the model, because `score` costs the most
+where `predict` does. Over the 13 reported classes that were timed, at 1,000 and 10,000 test rows,
+the score call took 1.62 to 879 times as long as the metric alone, and gave the same number.
+`GaussianNB` had the smallest gain, 1.62 times at 1,000 rows. The decision trees fell below 1.5
+times at 1,000 rows in one of two runs:
+
+| Class | First run | Saved rerun |
+| --- | --- | --- |
+| `DecisionTreeClassifier` | 1.45 times | 1.54 times |
+| `DecisionTreeRegressor` | 1.52 times | 1.66 times |
+
+The rule leaves both decision trees alone, as it does `LogisticRegression` and `LinearRegression`.
+A name that the file also binds to another class is left alone.
+
+The fix on the metric form is unsafe, because code between the two lines can change the saved
+predictions. It gave the same score in 12 of 12 runs on both held-back shapes, and the score
+changed only when the model was fitted again between the two lines. Neither reader called one of
+the 17 held-back reports wrong. Recall was 31 of 32.
+
 #### predict-and-predict-proba
 
 **Severity:** warning. **Fix:** none.
 
-Reports `model.predict(X_test)` next to `model.predict_proba(X_test)` when the file builds `model` as a `RandomForestClassifier`, `ExtraTreesClassifier` or `BaggingClassifier`.
+The rule reports `model.predict(X_test)` next to `model.predict_proba(X_test)` when the file builds
+`model` as a `RandomForestClassifier`, `ExtraTreesClassifier` or `BaggingClassifier`.
 
 Example:
 
@@ -5575,11 +6006,18 @@ y_score = proba[:, 1]
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule covers the classes whose `predict` takes the argmax of `predict_proba`. Deriving the
+labels from one `predict_proba` was 1.83 to 2.00 times faster for the three classes at 1,000 and
+10,000 rows, with bit equal labels and probabilities. Other classes decide the label from a raw
+score, and a tie at 0.5 can give another label, so they are left alone. Neither reader called one
+of the 22 held-back reports wrong. Recall was 30 of 30.
+
 #### cross-val-score-per-metric
 
 **Severity:** warning. **Fix:** none.
 
-Reports `cross_val_score(model, X, y, scoring="accuracy")` followed by `cross_val_score(model, X, y, scoring="precision")` on the same model, data and `cv`.
+The rule reports `cross_val_score(model, X, y, scoring="accuracy")` followed by
+`cross_val_score(model, X, y, scoring="precision")` on the same model, data and `cv`.
 
 Example:
 
@@ -5597,11 +6035,17 @@ accuracy, precision = scores["test_accuracy"], scores["test_precision"]
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule reports the first call when a later call in the same block passes the same model, data
+and `cv` with another `scoring`. With `LogisticRegression`, two scorings in one `cross_validate`
+were 1.60 times faster at 2,000 rows and 1.84 times faster at 20,000 rows, and the scores were bit
+equal. Neither reader called one of the 14 held-back reports wrong. Recall was 30 of 30.
+
 #### vectorizer-fit-then-transform
 
 **Severity:** warning. **Fix:** unsafe: `vectorizer.fit_transform(docs)`. The form in two statements has no fix.
 
-Reports `vectorizer.fit(docs).transform(docs)`, and `vectorizer.fit(docs)` followed by `vectorizer.transform(docs)`, on a `CountVectorizer` or `TfidfVectorizer`.
+The rule reports `vectorizer.fit(docs).transform(docs)`, and `vectorizer.fit(docs)` followed by
+`vectorizer.transform(docs)`, on a `CountVectorizer` or `TfidfVectorizer`.
 
 Example:
 
@@ -5617,11 +6061,29 @@ vectorizer = TfidfVectorizer()
 X = vectorizer.fit_transform(docs)
 ```
 
+`fit` of the two vectorizers runs `fit_transform` and drops the matrix, so `fit_transform` was
+faster:
+
+| Vectorizer | At 2,000 documents | At 20,000 documents |
+| --- | --- | --- |
+| `CountVectorizer` | 1.63 times | 2.06 times |
+| `TfidfVectorizer` | 1.82 times | 2.03 times |
+
+The fitted vectorizer is bit equal. The fix is unsafe, because `fit_transform` leaves the column
+indices of each row unsorted, and `TfidfVectorizer` values differ by up to 1.1e-16. A
+`MultinomialNB` fitted on the matrix gave probabilities that differ by up to 3e-15, and a
+`LogisticRegression` gave coefficients that differ by up to 1.3e-15.
+
+Reader B called 4 of the 12 held-back reports wrong advice, and reader A called none wrong. Recall
+was 19 of 25. The 6 misses were a fitted vectorizer assigned back to its own name, as in
+`cv = cv.fit(corpus)` followed by `cv.transform(corpus)`.
+
 #### refit-per-n-estimators
 
 **Severity:** warning. **Fix:** none.
 
-Reports a `RandomForest`, `ExtraTrees`, `GradientBoosting` or `Bagging` model or an `IsolationForest` built with `n_estimators=n` in a loop over `n` and fitted there.
+The rule reports a `RandomForest`, `ExtraTrees`, `GradientBoosting` or `Bagging` model or an
+`IsolationForest` built with `n_estimators=n` in a loop over `n` and fitted there.
 
 Example:
 
@@ -5644,11 +6106,30 @@ for n in [10, 50, 100]:
 
 The replacement is advice. xpd does not apply it automatically.
 
+The new form relies on `warm_start=True`, which keeps the trees already grown and draws every seed
+from `random_state` in the same order. The grown models were bit equal to models fitted from
+scratch, and warm start was faster:
+
+| Trees | Classes | Warm start was faster by |
+| --- | --- | --- |
+| `n_estimators` 10, 20, 50 and 100, at 1,000 and 5,000 rows | `RandomForestClassifier`, `RandomForestRegressor`, `ExtraTreesClassifier`, `GradientBoostingClassifier`, `BaggingClassifier`, `IsolationForest` | 1.64 to 2.75 times |
+| 10 to 100 in steps of 10 | `RandomForestClassifier` | 6.82 and 3.59 times |
+
+The rule leaves the following loops alone:
+
+- a loop whose model is passed to a cross-validation function or to `clone`, which clones it, so
+  warm start can't help
+- a loop with another loop inside it, where another setting changes between fits
+- a loop that reads a clock, because it times each fit
+
+The rule as the readers saw it made 1 report on the held-back files, on a loop that timed each
+fit, and both readers called it wrong. Recall was 30 of 30.
+
 #### tsne-exact
 
 **Severity:** info. **Fix:** none.
 
-Reports `TSNE(method="exact")`.
+The rule reports `TSNE(method="exact")`.
 
 Example:
 
@@ -5664,71 +6145,18 @@ embedding = TSNE(random_state=0).fit_transform(X)
 
 The replacement is advice. xpd does not apply it automatically.
 
-
-`predict-per-row` reports a call whose rows come from the loop variable, either the row itself or
-the data indexed by it. Each call checks the input and sets up the model again. One call on all
-rows measured 2.77 and 2.79 times faster for `SVC` at 500 and 5,000 rows, 216 and 356 times for
-`RandomForestClassifier`, and 104 and 816 times for `LogisticRegression.predict_proba`. The
-labels were bit equal, and the probabilities of `LogisticRegression` differed by up to 3.3e-16,
-so the rule has no fix. A loop that writes into the data it predicts from, as recursive
-forecasting does, is left alone. Reader B called both held-back reports wrong advice, and reader
-A called neither wrong. Recall was 28 of 32. The 4 misses were `DataFrame.apply` with the row's
-values in a list, as in `X_test.apply(lambda row: model.predict([row.values])[0], axis=1)`.
-
-`score-after-predict` reads the class from the line that builds the model, because `score` costs
-the most where `predict` does. The score call measured 1.62 to 879 times the metric alone over
-the 13 reported classes that were timed, at 1,000 and 10,000 test rows, and gave the same number.
-`GaussianNB` was the slowest gain, 1.62 times at 1,000 rows. `DecisionTreeClassifier` measured
-1.45 times at 1,000 rows in the first run and 1.54 times in the saved rerun, and
-`DecisionTreeRegressor` 1.52 and 1.66 times. The rule leaves both decision trees alone, as it does
-`LogisticRegression` and `LinearRegression`. A name the file also binds to another class is left
-alone. The fix on the metric form is unsafe, because code between the two lines can change the
-saved predictions. It gave the same score in 12 of 12 runs on both held-back shapes, and the
-score changed only when the model was fitted again between the two lines. Neither reader called
-one of the 17 held-back reports wrong. Recall was 31 of 32.
-
-`predict-and-predict-proba` covers the classes whose `predict` takes the argmax of
-`predict_proba`. Deriving the labels from one `predict_proba` measured 1.83 to 2.00 times faster
-for `RandomForestClassifier`, `ExtraTreesClassifier` and `BaggingClassifier` at 1,000 and 10,000
-rows, with bit equal labels and probabilities. Other classes decide the label from a raw score,
-and a tie at 0.5 can give another label, so they are left alone. Neither reader called one of the
-22 held-back reports wrong. Recall was 30 of 30.
-
-`cross-val-score-per-metric` reports the first call when a later call in the same block passes the
-same model, data and `cv` with another `scoring`. Two scorings in one `cross_validate` measured
-1.60 and 1.84 times faster at 2,000 and 20,000 rows with `LogisticRegression`, and the scores were
-bit equal. Neither reader called one of the 14 held-back reports wrong. Recall was 30 of 30.
-
-`vectorizer-fit-then-transform` covers `CountVectorizer` and `TfidfVectorizer`, whose `fit` runs
-`fit_transform` and drops the matrix. `fit_transform` measured 1.63 and 2.06 times faster for
-`CountVectorizer` and 1.82 and 2.03 times faster for `TfidfVectorizer`, at 2,000 and 20,000
-documents. The fitted vectorizer is bit equal. The fix is unsafe, because `fit_transform` leaves
-the column indices of each row unsorted, and `TfidfVectorizer` values differ by up to 1.1e-16. A
-`MultinomialNB` fitted on the matrix gave probabilities that differ by up to 3e-15, and a
-`LogisticRegression` coefficients that differ by up to 1.3e-15. Reader B called 4 of the 12
-held-back reports wrong advice, and reader A called none wrong. Recall was 19 of 25. The 6 misses
-were a fitted vectorizer assigned back to its own name, as in `cv = cv.fit(corpus)` followed by
-`cv.transform(corpus)`.
-
-`refit-per-n-estimators` relies on `warm_start=True`, which keeps the trees already grown and
-draws every seed from `random_state` in the same order, so the grown models were bit equal to
-models fitted from scratch. For `n_estimators` 10, 20, 50 and 100, warm start measured 1.64 to
-2.75 times faster at 1,000 and 5,000 rows for `RandomForestClassifier`, `RandomForestRegressor`,
-`ExtraTreesClassifier`, `GradientBoostingClassifier`, `BaggingClassifier` and `IsolationForest`.
-For 10 to 100 trees in steps of 10, it measured 6.82 and 3.59 times faster for
-`RandomForestClassifier`. A model passed to a cross-validation function or to `clone` is cloned,
-so warm start cannot help it, and that loop is left alone. So is a loop with another loop inside
-it, where another setting changes between fits, and a loop that reads a clock, because it times
-each fit. The frozen rule made 1 report on the held-back files, on a loop that timed each fit,
-and both readers called it wrong. Recall was 30 of 30.
-
-`tsne-exact` is info, because the default Barnes-Hut method approximates the forces between
-distant points, so its embedding is another one and no speed proof applies. Over 20 seeds on
+The rule is info, because the default Barnes-Hut method approximates the forces between distant
+points. Its embedding is therefore another one, and no speed proof applies. Over 20 seeds on
 `make_classification` data, Barnes-Hut gave a trustworthiness with 5 neighbours within 0.001 of
-the exact method and fitted a median 2.2 times faster at 300 rows and 4.0 times faster at 1,000
-rows. At 300 rows the slowest seed took 0.39 times as long with the exact method, so the gain is
-not certain on small data. Recall was 21 of 30. The rule misses `TSNE` imported under another
-name and a method held in a variable.
+the exact method:
+
+| Rows | Barnes-Hut was faster, as a median | Slowest seed |
+| --- | --- | --- |
+| 300 | 2.2 times | the exact method took 0.39 times as long |
+| 1,000 | 4.0 times | not given |
+
+The gain is therefore not certain on small data. Recall was 21 of 30. The rule misses `TSNE`
+imported under another name and a method held in a variable.
 
 ### Reproducible results
 
@@ -5736,7 +6164,8 @@ name and a method held in a variable.
 
 **Severity:** error. **Fix:** none.
 
-Reports `KFold(n_splits=5, random_state=42)` without `shuffle=True`, which raises ValueError.
+The rule reports `KFold(n_splits=5, random_state=42)` without `shuffle=True`, which raises
+ValueError.
 
 Example:
 
@@ -5752,11 +6181,21 @@ folds = KFold(n_splits=5, shuffle=True, random_state=42)
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule covers `KFold`, `StratifiedKFold` and `StratifiedGroupKFold`, and `GroupKFold` from
+scikit-learn 1.6, which added its `shuffle`. Each raises "Setting a random_state has no effect
+since shuffle is False" on scikit-learn 1.9.1. A file that imports the removed
+`sklearn.cross_validation` is left alone unless the call passes `n_splits`, because the old classes
+took other arguments and `removed-in-sklearn` reports the import.
+
+The rule as the readers saw it gave wrong advice in 2 and 2 of 11 labelled reports, on such files,
+and the narrowed rule no longer makes the reports. Recall was 54 of 54.
+
 #### missing-random-state
 
 **Severity:** info. **Fix:** none.
 
-Reports `train_test_split(X, y)`, `RandomForestClassifier()` and `KFold(shuffle=True)` without `random_state`.
+The rule reports `train_test_split(X, y)`, `RandomForestClassifier()` and `KFold(shuffle=True)`
+without `random_state`.
 
 Example:
 
@@ -5776,77 +6215,79 @@ The value 0 is only the example. Any fixed number makes the run repeatable.
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule is info, because a seed doesn't move the expected score. A seed changes which model wins
+a comparison. With two models whose true accuracy differs a little, the worse model won more often
+without a seed:
 
-`random-state-without-shuffle` covers `KFold`, `StratifiedKFold` and `StratifiedGroupKFold`, and
-`GroupKFold` from scikit-learn 1.6, which added its `shuffle`. Each raises "Setting a random_state
-has no effect since shuffle is False" on scikit-learn 1.9.1. A file that imports the removed
-`sklearn.cross_validation` is left alone unless the call passes `n_splits`, because the old
-classes took other arguments and `removed-in-sklearn` reports the import. The frozen rule gave
-wrong advice in 2 and 2 of 11 labelled reports, on such files, and the narrowed rule no longer
-makes those reports. Recall was 54 of 54.
+| Split | Worse model won, of 300 trials |
+| --- | --- |
+| each model on its own split, without a seed | 25.0 percent |
+| both models on one shared split | 14.3 percent |
 
-`missing-random-state` is info, because a seed does not move the expected score. What changes is
-which model wins a comparison. With two models whose true accuracy differs a little, the worse
-model won 25.0 percent of 300 trials when each was scored on its own split without a seed, and
-14.3 percent when both were scored on one shared split. The classes the rule names gave another
-output in five fresh runs on scikit-learn 1.9.1. They are the forests, extra trees, bagging,
-gradient boosting, `AdaBoostRegressor`, `IsolationForest`, `RandomTreesEmbedding`, the decision
-trees, `KMeans`, `MiniBatchKMeans`, `SpectralClustering`, `AffinityPropagation`, the MLPs, the SGD
-models, `TruncatedSVD`, `NMF`, `LatentDirichletAllocation`, `FastICA`,
-`MiniBatchDictionaryLearning`, `MDS`, `SpectralEmbedding`, `Nystroem`, `RBFSampler`, the random
-projections, `ShuffleSplit`, `StratifiedShuffleSplit`, `RepeatedKFold` and
-`RepeatedStratifiedKFold`, and `KFold`, `StratifiedKFold`, `GroupKFold` and
-`StratifiedGroupKFold` with `shuffle=True`. `TSNE` with `init="random"`, `SVC(probability=True)`,
-a HistGradientBoosting model with `early_stopping=True`, and a Gaussian mixture with more than one
-component are reported too. A HistGradientBoosting model without `random_state` is reported with
-a message that names 10,000 rows, because above that size it stops early on a validation part
-drawn at random. `LogisticRegression`, `PCA`, `Perceptron`, `AdaBoostClassifier` and `TSNE` with
-its default `init` gave the same output and are not listed. The rule leaves alone a file that
-calls `np.random.seed`, or a seed helper such as `set_seed` or `seed_everything` that the file
-does not define and does not import from TensorFlow, PyTorch or `random`. It also leaves alone a
-call with `shuffle=False` or `**`, a `train_test_split` whose result is thrown away, and a
-constructor that only `isinstance` reads. Of 527 held-back reports, 52 were labelled, and each
-reader called 1 wrong. Recall was 79 of 80.
+The classes that the rule names gave another output in five fresh runs on scikit-learn 1.9.1:
+
+| Kind | Classes |
+| --- | --- |
+| ensembles | the forests, extra trees, bagging, gradient boosting, `AdaBoostRegressor`, `IsolationForest`, `RandomTreesEmbedding` |
+| trees and other models | the decision trees, the MLPs, the SGD models |
+| clustering | `KMeans`, `MiniBatchKMeans`, `SpectralClustering`, `AffinityPropagation` |
+| decomposition and embedding | `TruncatedSVD`, `NMF`, `LatentDirichletAllocation`, `FastICA`, `MiniBatchDictionaryLearning`, `MDS`, `SpectralEmbedding`, `Nystroem`, `RBFSampler`, the random projections |
+| splitters | `ShuffleSplit`, `StratifiedShuffleSplit`, `RepeatedKFold`, `RepeatedStratifiedKFold`, and `KFold`, `StratifiedKFold`, `GroupKFold` and `StratifiedGroupKFold` with `shuffle=True` |
+| classes with a setting | `TSNE` with `init="random"`, `SVC(probability=True)`, a HistGradientBoosting model with `early_stopping=True`, a Gaussian mixture with more than one component |
+
+A HistGradientBoosting model without `random_state` is reported with a message that names 10,000
+rows, because above that size it stops early on a validation part drawn at random.
+`LogisticRegression`, `PCA`, `Perceptron`, `AdaBoostClassifier` and `TSNE` with its default `init`
+gave the same output and are not listed.
+
+The rule leaves alone a file that calls `np.random.seed`, or a seed helper such as `set_seed` or
+`seed_everything` that the file doesn't define and doesn't import from TensorFlow, PyTorch or
+`random`. It also leaves alone a call with `shuffle=False` or `**`, a `train_test_split` whose
+result is thrown away, and a constructor that only `isinstance` reads. Of 527 held-back reports,
+52 were labelled, and each reader called 1 wrong. Recall was 79 of 80.
 
 ## scikit-lego
 
-These rules run on files that import `sklego`, the module of scikit-lego. They report arguments
-that give a wrong number without an error, steps that read the wrong rows or cannot be fitted,
-and code that raises or warns on scikit-lego 0.9.10. Every number in this section was measured
-on scikit-lego 0.9.10 with scikit-learn 1.9.1, NumPy 2.5.5 and pandas 3.1.1. Examples assume that
-the names they use are imported. Names such as `X_train`, `y_test` and `model` represent values
-supplied by your program.
+The scikit-lego rules report arguments that give a wrong number without an error, steps that read
+the wrong rows or can't be fitted, and code that raises or warns on scikit-lego 0.9.10, in each
+file that imports `sklego`. Every number about the scikit-lego rules was measured on scikit-lego 0.9.10 with
+scikit-learn 1.9.1, NumPy 2.5.5 and pandas 3.1.1. The examples assume that the names they use are
+imported, and names such as `X_train`, `y_test` and `model` stand for values from your program.
 
 A rule document whose advice needs a newer release of scikit-lego carries `since`. xpd reads the
-installed version from the project's venv, as it does for pandas, and skips that document on an
-older release. When the venv has no scikit-lego, or there is no venv, every document runs.
+installed version from the project's venv and skips that document on an older release. When the
+venv has no scikit-lego, or there is no venv, every document runs.
 
 The pack has no package checks. cvxpy, umap-learn and formulaic are extras that only some
-estimators need, and a package check cannot see which estimators a project uses. scikit-lego
-raises an ImportError that names the extra when one is missing.
+estimators need, and a package check can't see which estimators a project uses. When an extra is
+missing, scikit-lego raises an ImportError that names it.
 
 ### How a rule earns its place
 
-Every rule is an `error` only when real code was run that shows the wrong number or the
-exception, and its message quotes what was measured. A proof is one of three kinds:
+A rule is an `error` only when real code was run that shows the wrong number or the exception, and
+its message quotes what was measured. A proof is one of the following kinds:
 
-- A number proof runs the old and the new form on the same data and compares what they return.
-- An interpreter proof runs the old form and records the exception, or the warning under
-  `python -W error`, and runs the new form clean.
-- A speed proof times the old form at two settings.
+| Proof | What runs |
+| --- | --- |
+| number | The old and the new form on the same data, and a comparison of what they return. |
+| interpreter | The old form, with its exception or its warning under `python -W error`, and the new form, which runs clean. |
+| speed | The old form, timed at two settings. |
 
-A rule is a `warning` when the proof passed and a pattern cannot see whether the code wants the
-old form, and `info` when no proof of the three kinds applies.
+A rule is a `warning` when the proof passed and a pattern can't see whether the code wants the old
+form. A rule is `info` when no proof of the listed kinds applies.
 
 The rules were then run over scikit-lego's own source, docs scripts and tests at the 0.9.10 tag,
-134 Python files, and every report was read. The pack made 46 reports there. 42 are on a form the
+134 Python files, and every report was read. Of the 46 reports there, 42 are on a form that the
 rule describes, most of them in tests that build a deprecated or superseded class or check that a
-wrong call raises. 4 are on code that is right as it stands: the package's own export of
-`PandasTypeSelector`, two tests of `add_lags` with a positive lag, and one test that passes
-`threshold=0.1` to `GMMOutlierDetector` only to build an object. Two rules were narrowed after
-that reading. `debug-pipeline-default-log` now leaves a file alone when it imports `logging` or
-uses pytest's `caplog`, which removed 5 reports, and `unseeded-random-estimator` leaves test
-files alone, which removed 7.
+wrong call raises. The other 4 are on code that is right as it stands:
+
+- the package's own export of `PandasTypeSelector`
+- two tests of `add_lags` with a positive lag
+- one test that passes `threshold=0.1` to `GMMOutlierDetector` only to build an object
+
+After that reading, `debug-pipeline-default-log` was narrowed to leave a file alone when it
+imports `logging` or uses pytest's `caplog`, which removed 5 reports. `unseeded-random-estimator`
+was narrowed to leave test files alone, which removed 7.
 
 | Rule | Severity | Proof | Reports on scikit-lego's files | On code that is right | Fix |
 | --- | --- | --- | --- | --- | --- |
@@ -5880,14 +6321,17 @@ from other projects, and it has no recall number.
 
 ### Arguments that give a wrong number
 
-Each old form below runs without an error and returns a number that is not the one the code asks
-for, or raises where the argument is read.
+Each rule in the group reports an argument that gives another number than the code asks for,
+without an error, or that raises where the argument is read.
 
 #### thresholder-score
 
 **Severity:** error. **Fix:** none.
 
-Reports `GridSearchCV`, `RandomizedSearchCV`, `cross_val_score`, `cross_validate` and the other search and validation functions when they hold a `Thresholder(...)` and no `scoring=`, and reports `.score(...)` on a `Thresholder`. `Thresholder.score` returns the score of the inner model, so it does not change with `threshold`.
+The rule reports `GridSearchCV`, `RandomizedSearchCV`, `cross_val_score`, `cross_validate` and the
+other search and validation functions when they hold a `Thresholder(...)` and no `scoring=`. It
+also reports `.score(...)` on a `Thresholder`. `Thresholder.score` returns the score of the inner
+model, so it doesn't change with `threshold`.
 
 Example:
 
@@ -5904,18 +6348,27 @@ model = FixedThresholdClassifier(LogisticRegression(), threshold=0.1, response_m
 accuracy = model.fit(X_train, y_train).score(X_test, y_test)
 ```
 
-The replacement is advice. xpd does not apply it automatically. On 400 rows with 20 percent
-positives, the grid search gave a mean test score of 0.875 at each of the three thresholds, and
-0.700, 0.875 and 0.850 with `scoring="accuracy"`. `score` on the test rows gave 0.890 at each
-threshold, where the accuracy of `predict` was 0.770, 0.890 and 0.810. scikit-learn's
-`FixedThresholdClassifier` made the same predictions as `Thresholder` at each threshold, and its
-`score` gave 0.770, 0.890 and 0.810.
+The replacement is advice. xpd does not apply it automatically.
+
+On 400 rows with 20 percent positives, the grid search gave its mean test score, and `score` and
+`predict` ran on the test rows:
+
+| Threshold | Grid search without `scoring` | With `scoring="accuracy"` | `Thresholder.score` | Accuracy of `predict` |
+| --- | --- | --- | --- | --- |
+| 0.1 | 0.875 | 0.700 | 0.890 | 0.770 |
+| 0.5 | 0.875 | 0.875 | 0.890 | 0.890 |
+| 0.9 | 0.875 | 0.850 | 0.890 | 0.810 |
+
+scikit-learn's `FixedThresholdClassifier` made the same predictions as `Thresholder` at each
+threshold, and its `score` gave 0.770, 0.890 and 0.810.
 
 #### estimator-transformer-proba
 
 **Severity:** error. **Fix:** none.
 
-Reports `EstimatorTransformer(..., predict_func="predict_proba")` and `"predict_log_proba"`. The transformer reshapes the output to one column when the target has one dimension, so the probabilities of the two classes are stacked into twice as many rows.
+The rule reports `EstimatorTransformer(..., predict_func="predict_proba")` and
+`"predict_log_proba"`. When the target has one dimension, the transformer reshapes the output to
+one column. The probabilities of the two classes then stack into twice as many rows.
 
 Example:
 
@@ -5930,16 +6383,20 @@ features = EstimatorTransformer(LogisticRegression(), predict_func="decision_fun
 stack = StackingClassifier([("lr", LogisticRegression())], stack_method="predict_proba")
 ```
 
-The replacement is advice. xpd does not apply it automatically. A binary model on 400 rows came
-back from `transform` with the shape (800, 1). Inside a `FeatureUnion` and inside a pipeline
-before a model, `fit` raised ValueError on the row counts. `decision_function` gave (400, 1), and
-`StackingClassifier(stack_method="predict_proba").transform` gave one row per input row.
+The replacement is advice. xpd does not apply it automatically.
+
+A binary model on 400 rows came back from `transform` with the shape (800, 1). Inside a
+`FeatureUnion`, and inside a pipeline before a model, `fit` raised ValueError on the row counts.
+`decision_function` gave (400, 1), and `StackingClassifier(stack_method="predict_proba").transform`
+gave one row per input row.
 
 #### column-capper-fraction
 
 **Severity:** error. **Fix:** none.
 
-Reports `ColumnCapper(quantile_range=(0.05, 0.95))` and other ranges whose upper number is 1 or less. `ColumnCapper` reads the range in percent, as its default `(5.0, 95.0)` shows, so fractions cap every value at a percentile below 1.
+The rule reports `ColumnCapper(quantile_range=(0.05, 0.95))` and other ranges whose upper number is
+1 or less. `ColumnCapper` reads the range in percent, as its default `(5.0, 95.0)` shows, so
+fractions cap every value at a percentile below 1.
 
 Example:
 
@@ -5953,15 +6410,20 @@ Use instead:
 capper = ColumnCapper(quantile_range=(5, 95))
 ```
 
-The replacement is advice. xpd does not apply it automatically. On 10,000 normal values
-`(0.05, 0.95)` changed 9,910 of them and left 92 distinct values between -3.272 and -2.379.
-`(5, 95)` changed 1,000 values and kept the range -1.628 to 1.640.
+The replacement is advice. xpd does not apply it automatically.
+
+| `quantile_range` | Values changed, of 10,000 normal values | Values after capping |
+| --- | --- | --- |
+| `(0.05, 0.95)` | 9,910 | 92 distinct values from -3.272 to -2.379 |
+| `(5, 95)` | 1,000 | from -1.628 to 1.640 |
 
 #### dict-mapper-not-int
 
 **Severity:** error. **Fix:** none.
 
-Reports `DictMapper` with a dict literal that maps to a float with a fraction or to text, and a `default` that is such a float, text or NaN. `DictMapper` casts every mapped value and the default to int.
+The rule reports `DictMapper` with a dict literal that maps to a float with a fraction or to text,
+and a `default` that is such a float, text or NaN. `DictMapper` casts every mapped value and the
+default to int.
 
 Example:
 
@@ -5976,18 +6438,24 @@ mapper = DictMapper({"low": 0, "high": 1}, default=-1)
 weights = frame["level"].map({"low": 0.5, "high": 1.7}).fillna(-1)
 ```
 
-The replacement is advice. xpd does not apply it automatically. `{"a": 0.5, "b": 1.7}` with
-`default=-1` came back as 0, 1 and -1 with no warning. A text value raised ValueError "invalid
-literal for int() with base 10", and `default=np.nan` raised ValueError "cannot convert float NaN
-to integer". A float with no fraction, such as `1.0`, keeps its value, and the rule leaves it
-alone. It also leaves a string that holds a whole number alone: `DictMapper({"a": "1"}, default=0)`
-gave 1.
+The replacement is advice. xpd does not apply it automatically.
+
+| Mapping | Result | Reported |
+| --- | --- | --- |
+| `{"a": 0.5, "b": 1.7}` with `default=-1` | 0, 1 and -1, with no warning | yes |
+| a text value | ValueError "invalid literal for int() with base 10" | yes |
+| `default=np.nan` | ValueError "cannot convert float NaN to integer" | yes |
+| a float with no fraction, such as `1.0` | the same value | no |
+| `{"a": "1"}` with `default=0`, a string that holds a whole number | 1 | no |
 
 #### regression-outlier-column-name
 
 **Severity:** error. **Fix:** none.
 
-Reports `RegressionOutlierDetector(model, column="y")`, where the column is a name. The detector finds the target of a frame by name, and then drops the column whose position equals `column` from the features. A name equals no position, so the target stays among the features and the inner model predicts it from itself.
+The rule reports `RegressionOutlierDetector(model, column="y")`, where the column is a name. The
+detector finds the target of a frame by name, and then drops the column whose position equals
+`column` from the features. A name equals no position, so the target stays among the features and
+the inner model predicts it from itself.
 
 Example:
 
@@ -6002,19 +6470,28 @@ position = frame.columns.get_loc("y")
 detector = RegressionOutlierDetector(LinearRegression(), column=position).fit(frame.to_numpy())
 ```
 
-The replacement is advice. xpd does not apply it automatically. On 500 rows with 10 planted
-outliers, `column="y"` on the frame fitted 3 features with the coefficients 0, 0 and 1, had a
-residual spread of 8.08e-16, and flagged 30 rows. `column=2` on `frame.to_numpy()` fitted 2
-features, had a spread of 1.48, and flagged the 10 planted rows and no other. A position on a
-frame is wrong in another way, which a pattern cannot see: the detector compares the frame's
-column names with the number, none matches, and the first column becomes the target. scikit-lego's
-own test of the name form passes because the planted rows have the largest rounding errors.
+The replacement is advice. xpd does not apply it automatically.
+
+On 500 rows with 10 planted outliers:
+
+| Form | Features | Coefficients | Spread of the residuals | Rows flagged |
+| --- | --- | --- | --- | --- |
+| `column="y"` on the frame | 3 | 0, 0 and 1 | 8.08e-16 | 30 |
+| `column=2` on `frame.to_numpy()` | 2 | not given | 1.48 | the 10 planted rows and no other |
+
+A position on a frame is wrong in another way, which a pattern can't see. The detector compares the
+frame's column names with the number and finds no match, so the first column becomes the target.
+scikit-lego's own test of the name form passes because the planted rows have the largest rounding
+errors.
 
 #### pca-outlier-after-scaler
 
 **Severity:** error. **Fix:** none.
 
-Reports `PCAOutlierDetection` and `UMAPOutlierDetection` without `variant="absolute"` in a pipeline that holds `StandardScaler`, `RobustScaler` or `PowerTransformer`. The default `variant="relative"` divides the reconstruction error of a row by the sum of the row's values, which a centring step puts near zero.
+The rule reports `PCAOutlierDetection` and `UMAPOutlierDetection` without `variant="absolute"` in a
+pipeline that holds `StandardScaler`, `RobustScaler` or `PowerTransformer`. The default
+`variant="relative"` divides the reconstruction error of a row by the sum of the row's values,
+which a centring step puts near zero.
 
 Example:
 
@@ -6029,17 +6506,23 @@ detector = make_pipeline(StandardScaler(), PCAOutlierDetection(n_components=1, t
 ```
 
 The replacement is advice. xpd does not apply it automatically, because the threshold has other
-units. On 1,000 rows with 20 planted outliers the relative variant flagged the 20 planted rows on
-the raw data. After `StandardScaler` it flagged 287 rows, 10 of them planted, and 505 rows had a
-negative ratio. `variant="absolute"` flagged the 20 planted rows in both cases. A scaler built
-with `with_mean=False`, `with_centering=False` or `standardize=False` does not centre, and the
-rule leaves it alone.
+units.
+
+| Data, 1,000 rows with 20 planted outliers | Rows flagged by the relative variant | By `variant="absolute"` |
+| --- | --- | --- |
+| raw | the 20 planted rows | the 20 planted rows |
+| after `StandardScaler` | 287, of which 10 were planted | the 20 planted rows |
+
+After the scaler, 505 rows had a negative ratio. A scaler built with `with_mean=False`,
+`with_centering=False` or `standardize=False` doesn't centre, and the rule leaves it alone.
 
 #### outlier-threshold
 
 **Severity:** error. **Fix:** none.
 
-Reports `PCAOutlierDetection` and `UMAPOutlierDetection` built without a `threshold`, and `GMMOutlierDetector` and `BayesianGMMOutlierDetector` whose `threshold` is below 0.5, or above 1, with `method="quantile"` written out or left as the default.
+The rule reports `PCAOutlierDetection` and `UMAPOutlierDetection` built without a `threshold`. It
+also reports `GMMOutlierDetector` and `BayesianGMMOutlierDetector` whose `threshold` is below 0.5
+or above 1, with `method="quantile"` written out or left as the default.
 
 Example:
 
@@ -6055,20 +6538,34 @@ pca = PCAOutlierDetection(n_components=2, threshold=0.1)
 gmm = GMMOutlierDetector(threshold=0.95)
 ```
 
-The replacement is advice. xpd does not apply it automatically. Without a threshold, `fit` of the
-PCA and UMAP detectors raised ValueError "The `threshold` value cannot be `None`." The mixture
-detectors keep the share `threshold` of the training rows as inliers. `threshold=0.05` flagged 380
-of 400 training rows, 0.4 flagged 240, 0.5 flagged 200, 0.95 flagged 20, and the default 0.99
-flagged 4. `threshold=2` raised ValueError, and ran with `method="stddev"`, which counts standard
-deviations. A call whose `method` is anything but the text `"quantile"`, such as a variable, is
-left alone, because it may be `"stddev"`. A detector inside a search is left alone, because the
-search may set the threshold.
+The replacement is advice. xpd does not apply it automatically.
+
+Without a threshold, `fit` of the PCA and UMAP detectors raised ValueError "The `threshold` value
+cannot be `None`." The mixture detectors keep the share `threshold` of the training rows as
+inliers:
+
+| `threshold` | Training rows flagged, of 400 |
+| --- | --- |
+| 0.05 | 380 |
+| 0.4 | 240 |
+| 0.5 | 200 |
+| 0.95 | 20 |
+| 0.99, the default | 4 |
+| 2 | ValueError |
+
+`threshold=2` ran with `method="stddev"`, which counts standard deviations. A call whose `method`
+is anything but the text `"quantile"`, such as a variable, is left alone, because it may be
+`"stddev"`. A detector inside a search is left alone, because the search may set the threshold.
 
 #### grouped-shrinkage-arguments
 
 **Severity:** error. **Fix:** unsafe: `shrinkage_kwargs={"alpha": 0.1}` for `alpha=0.1`, and the same for `min_n_obs=`. The other forms have no fix.
 
-Reports three spellings of shrinkage that fail on the grouped and hierarchical meta estimators: any extra keyword on `GroupedClassifier`, which drops it, `shrinkage="constant"` or `"min_n_obs"` without `shrinkage_kwargs`, and a bare `alpha=` or `min_n_obs=` keyword.
+The rule reports spellings of shrinkage that fail on the grouped and hierarchical meta estimators:
+
+- any extra keyword on `GroupedClassifier`, which drops it
+- `shrinkage="constant"` or `"min_n_obs"` without `shrinkage_kwargs`
+- a bare `alpha=` or `min_n_obs=` keyword
 
 Example:
 
@@ -6085,23 +6582,29 @@ regressor = GroupedRegressor(LinearRegression(), groups=["region", "shop"], shri
 ```
 
 `GroupedClassifier` ends its signature with `**shrinkage_kwargs` and never reads it. With
-`shrinkage="relative"` its probabilities were bit equal to those without the keyword, and they
+`shrinkage="relative"` its probabilities were bit equal to the probabilities without the keyword. They
 differed by up to 0.17 from `HierarchicalClassifier(shrinkage="relative")`, which does shrink.
-`shrinkage="constant"` without a setting raised TypeError "constant_shrinkage() missing 1 required
-positional argument: 'alpha'" in `fit`. The bare keyword raised TypeError "got an unexpected
-keyword argument 'alpha'". `GroupedPredictor` took it until scikit-lego 0.9.2, so that document
-carries `since: "0.9.2"`.
+
+| Form | Error |
+| --- | --- |
+| `shrinkage="constant"` without a setting | TypeError "constant_shrinkage() missing 1 required positional argument: 'alpha'" in `fit` |
+| a bare `alpha=` keyword | TypeError "got an unexpected keyword argument 'alpha'" |
+
+`GroupedPredictor` took the bare keyword until scikit-lego 0.9.2, so that document carries
+`since: "0.9.2"`.
 
 ### Rows and fits
 
-Each old form below fits a step on rows it should not see in that order, or builds a meta
-estimator around a model it cannot fit.
+Each rule in the group reports a step fitted on rows it shouldn't see in that order, or a meta
+estimator built around a model it can't fit.
 
 #### add-lags-positive
 
 **Severity:** warning. **Fix:** none.
 
-Reports `add_lags` with a positive lag, as a number, in a list or from `range`. `add_lags` shifts by the negative of the lag, so lag 1 puts the value of the next row on each row. pandas `shift(1)` goes the other way.
+The rule reports `add_lags` with a positive lag, as a number, in a list or from `range`.
+`add_lags` shifts by the negative of the lag, so lag 1 puts the value of the next row on each row.
+pandas `shift(1)` goes the other way.
 
 Example:
 
@@ -6115,20 +6618,31 @@ Use instead:
 features = add_lags(frame, "sales", [-1, -2])
 ```
 
-The replacement is advice. xpd does not apply it automatically. On a frame with sales 10 to 50,
-`add_lags(frame, "sales", 1)` gave `sales1` = 20, 30, 40, 50, and lag -1 gave 10, 20, 30, 40 from
-the second row on. On a series of pure noise, a model given the column from lag 1 predicted the
-sign of the next row with accuracy 0.992, and a model given the column from lag -1 predicted the
-sign of its own row with accuracy 0.531. A positive lag is right when the new column is the
-target of a forecast, so the rule is a warning. A `range` is reported when its numbers are
-written out and it holds a positive lag: it starts at 1 or more, or it counts up to a stop of 2
-or more. `range(0, -3, -1)` holds 0, -1 and -2 and is left alone.
+The replacement is advice. xpd does not apply it automatically.
+
+On a frame with sales 10 to 50:
+
+| Call | Values of the new column |
+| --- | --- |
+| `add_lags(frame, "sales", 1)` | 20, 30, 40, 50 |
+| `add_lags(frame, "sales", -1)` | 10, 20, 30, 40, from the second row on |
+
+On a series of pure noise, a model given the column from lag 1 predicted the sign of the next row
+with accuracy 0.992. A model given the column from lag -1 predicted the sign of its own row with
+accuracy 0.531. A positive lag is right when the new column is the target of a forecast, so the
+rule is a warning.
+
+A `range` is reported when its numbers are written out and it holds a positive lag, which means it
+starts at 1 or more, or counts up to a stop of 2 or more. `range(0, -3, -1)` holds 0, -1 and -2
+and is left alone.
 
 #### decay-on-shuffled-rows
 
 **Severity:** warning. **Fix:** none.
 
-Reports `train_test_split` without `shuffle=False` in a file that builds a `DecayEstimator`. The estimator weights each row by its position, the last row most, and never reads a date, so it is right only on rows in time order.
+The rule reports `train_test_split` without `shuffle=False` in a file that builds a
+`DecayEstimator`. The estimator weights each row by its position, the last row most, and never
+reads a date. It is therefore right only on rows in time order.
 
 Example:
 
@@ -6144,17 +6658,25 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False)
 model = DecayEstimator(Ridge(), decay_kwargs={"decay_rate": 0.99}).fit(X_train, y_train)
 ```
 
-The replacement is advice. xpd does not apply it automatically. On 2,000 rows whose slope changed
-from 1 to 3 at row 1,000, the model fitted on the first 1,500 rows in order had the slope 2.989
-and a mean absolute error of 0.079 on the last 500 rows. Fitted on the same 1,500 rows in
-shuffled order it had the slope 1.648 and an error of 1.135, as the mean of 30 shuffles. A
-pattern cannot see which rows the estimator is fitted on, so the rule is a warning.
+The replacement is advice. xpd does not apply it automatically.
+
+On 2,000 rows whose slope changed from 1 to 3 at row 1,000, the model was fitted on the first
+1,500 rows and scored on the last 500:
+
+| Order of the 1,500 training rows | Slope | Mean absolute error |
+| --- | --- | --- |
+| in time order | 2.989 | 0.079 |
+| shuffled, as the mean of 30 shuffles | 1.648 | 1.135 |
+
+A pattern can't see which rows the estimator is fitted on, so the rule is a warning.
 
 #### outlier-remover-before-model
 
 **Severity:** error. **Fix:** none.
 
-Reports `OutlierRemover` in a pipeline that also holds a step named like a regressor or a classifier. The remover drops rows of X while the pipeline is fitted, and a scikit-learn pipeline cannot drop the same rows of y.
+The rule reports `OutlierRemover` in a pipeline that also holds a step named like a regressor or a
+classifier. The remover drops rows of X while the pipeline is fitted, and a scikit-learn pipeline
+can't drop the same rows of y.
 
 Example:
 
@@ -6170,15 +6692,20 @@ kept = IsolationForest().fit_predict(X) != -1
 model = LinearRegression().fit(X[kept], y[kept])
 ```
 
-The replacement is advice. xpd does not apply it automatically. `fit` raised ValueError "Found
-input variables with inconsistent numbers of samples: [356, 400]". A pipeline that ended in
-`KMeans`, which reads no y, fitted on the 356 kept rows, and the rule leaves it alone.
+The replacement is advice. xpd does not apply it automatically.
+
+`fit` raised ValueError "Found input variables with inconsistent numbers of samples: [356, 400]".
+A pipeline that ended in `KMeans`, which reads no y, fitted on the 356 kept rows, and the rule
+leaves it alone.
 
 #### decay-without-sample-weight
 
 **Severity:** error. **Fix:** none.
 
-Reports `DecayEstimator` around a `Pipeline`, and around a scikit-learn model whose `fit` takes no `sample_weight`, such as `KNeighborsRegressor`, `GaussianProcessRegressor` and `LinearDiscriminantAnalysis`. `DecayEstimator` passes its weights as `fit(X, y, sample_weight=...)`.
+The rule reports `DecayEstimator` around a `Pipeline`, and around a scikit-learn model whose `fit`
+takes no `sample_weight`, such as `KNeighborsRegressor`, `GaussianProcessRegressor` and
+`LinearDiscriminantAnalysis`. `DecayEstimator` passes its weights as
+`fit(X, y, sample_weight=...)`.
 
 Example:
 
@@ -6192,20 +6719,24 @@ Use instead:
 model = make_pipeline(StandardScaler(), DecayEstimator(Ridge()))
 ```
 
-The replacement is advice. xpd does not apply it automatically. The pipeline raised ValueError
-"Pipeline.fit does not accept the sample_weight parameter", and `KNeighborsRegressor` raised
-TypeError "Model KNeighborsRegressor.fit() does not have 'sample_weight'". The list of models is
-every classifier and regressor of `sklearn.utils.all_estimators()` on scikit-learn 1.9.1 that
-takes no argument to build and whose `fit` raised that TypeError inside a `DecayEstimator`. It
-has 22 names, among them `PassiveAggressiveClassifier`, `PassiveAggressiveRegressor`, `CCA` and
-`PLSCanonical`. With the `DecayEstimator` around the last step,
-the pipeline fitted.
+The replacement is advice. xpd does not apply it automatically.
+
+The pipeline raised ValueError "Pipeline.fit does not accept the sample_weight parameter", and
+`KNeighborsRegressor` raised TypeError "Model KNeighborsRegressor.fit() does not have
+'sample_weight'". With the `DecayEstimator` around the last step, the pipeline fitted.
+
+The list of models has 22 names, among them `PassiveAggressiveClassifier`,
+`PassiveAggressiveRegressor`, `CCA` and `PLSCanonical`. It holds every classifier and regressor of
+`sklearn.utils.all_estimators()` on scikit-learn 1.9.1 that takes no argument to build and whose
+`fit` raised that TypeError inside a `DecayEstimator`.
 
 #### zero-inflated-roles
 
 **Severity:** error. **Fix:** none.
 
-Reports `ZeroInflatedRegressor` with a class named like a regressor as the classifier, or a class named like a classifier as the regressor. The classifier comes first and decides zero or not, and the regressor comes second.
+The rule reports `ZeroInflatedRegressor` with a class named like a regressor as the classifier, or
+a class named like a classifier as the regressor. The classifier comes first and decides whether a
+value is zero, and the regressor comes second.
 
 Example:
 
@@ -6219,10 +6750,11 @@ Use instead:
 model = ZeroInflatedRegressor(classifier=LogisticRegression(), regressor=LinearRegression())
 ```
 
-The replacement is advice. xpd does not apply it automatically. `fit` raised ValueError
-"`classifier` has to be a classifier" and, with a classifier in second place, "`regressor` has to
-be a regressor". The rule reads the class names, and it knows that `LogisticRegression` is a
-classifier.
+The replacement is advice. xpd does not apply it automatically.
+
+`fit` raised ValueError "`classifier` has to be a classifier", and with a classifier in second
+place it raised "`regressor` has to be a regressor". The rule reads the class names, and it knows
+that `LogisticRegression` is a classifier.
 
 ### Scorers, datasets and helpers
 
@@ -6230,7 +6762,10 @@ classifier.
 
 **Severity:** error. **Fix:** unsafe: `p_percent_score("sex")` for `make_scorer(p_percent_score("sex"))`. The other forms have no fix.
 
-Reports `make_scorer` around `p_percent_score`, `equal_opportunity_score`, `correlation_score` or `subset_score`, and reports `p_percent_score(y_true, y_pred)` and `equal_opportunity_score(y_true, y_pred)`. Each function takes the column to look at and returns a scorer with the signature `(estimator, X, y)`.
+The rule reports `make_scorer` around `p_percent_score`, `equal_opportunity_score`,
+`correlation_score` or `subset_score`. It also reports `p_percent_score(y_true, y_pred)` and
+`equal_opportunity_score(y_true, y_pred)`. Each function takes the column to look at and returns a
+scorer with the signature `(estimator, X, y)`.
 
 Example:
 
@@ -6247,7 +6782,7 @@ fairness = p_percent_score("sex")(model, X_test, y_test)
 ```
 
 `make_scorer` calls the scorer with `(y_true, y_pred)`, which raised IndexError for three of the
-functions and TypeError for `equal_opportunity_score`. Inside `GridSearchCV` scikit-learn caught
+functions and TypeError for `equal_opportunity_score`. Inside `GridSearchCV`, scikit-learn caught
 the error and the best score was NaN. `p_percent_score(y, y_pred)` raised nothing and returned a
 function. The scorer itself, given to `scoring=`, gave a score.
 
@@ -6255,7 +6790,9 @@ function. The scorer itself, given to `scoring=`, gave a score.
 
 **Severity:** error. **Fix:** none.
 
-Reports `load_penguins`, `load_arrests`, `load_chicken`, `load_abalone`, `load_heroes` and `load_hearts` called with both `return_X_y=True` and `as_frame=True`. The loaders test `as_frame` first and return the whole frame, with the target in it.
+The rule reports `load_penguins`, `load_arrests`, `load_chicken`, `load_abalone`, `load_heroes` and
+`load_hearts` called with both `return_X_y=True` and `as_frame=True`. The loaders test `as_frame`
+first and return the whole frame, with the target in it.
 
 Example:
 
@@ -6270,16 +6807,19 @@ frame = load_penguins(as_frame=True)
 X, y = frame.drop(columns="species"), frame["species"]
 ```
 
-The replacement is advice. xpd does not apply it automatically. Unpacking raised ValueError "too
-many values to unpack (expected 2)" for all six loaders. scikit-learn's own loaders return a pair
-of frames for the same two keywords. `fetch_creditcard` passes both keywords to `fetch_openml`
-and is left alone.
+The replacement is advice. xpd does not apply it automatically.
+
+Unpacking raised ValueError "too many values to unpack (expected 2)" for all six loaders.
+scikit-learn's own loaders return a pair of frames for the same two keywords. `fetch_creditcard`
+passes both keywords to `fetch_openml` and is left alone.
 
 #### log-step-extra-bare
 
 **Severity:** error. **Fix:** none.
 
-Reports `@log_step_extra` without arguments, as a bare decorator or with empty parentheses. `log_step` works both ways. `log_step_extra` takes the log functions as its arguments, so as a bare decorator it takes the decorated function as a log function.
+The rule reports `@log_step_extra` without arguments, as a bare decorator or with empty
+parentheses. `log_step` works both ways, but `log_step_extra` takes the log functions as its
+arguments. As a bare decorator it takes the decorated function as a log function.
 
 Example:
 
@@ -6297,15 +6837,21 @@ def add_total(frame):
     return frame.assign(total=frame["price"] * frame["count"])
 ```
 
-The replacement is advice. xpd does not apply it automatically. Calling the function under the
-bare decorator returned another function, not a frame, and raised nothing. `@log_step_extra()`
-raised ValueError "Supply at least one log_function for log_step_extra".
+The replacement is advice. xpd does not apply it automatically.
+
+| Form | Result |
+| --- | --- |
+| `@log_step_extra` | Calling the function returned another function, not a frame, and raised nothing. |
+| `@log_step_extra()` | ValueError "Supply at least one log_function for log_step_extra" |
 
 #### selector-without-feature-names
 
 **Severity:** error. **Fix:** none.
 
-Reports `set_output(...)` and `get_feature_names_out()` on a pipeline that holds `ColumnSelector`, `ColumnDropper` or `TypeSelector`, called on the pipeline itself or on a name the file assigns it to. The three classes have `get_feature_names` and neither of the two scikit-learn methods.
+The rule reports `set_output(...)` and `get_feature_names_out()` on a pipeline that holds
+`ColumnSelector`, `ColumnDropper` or `TypeSelector`, called on the pipeline itself or on a name the
+file assigns it to. The three classes have `get_feature_names` and neither of the two scikit-learn
+methods.
 
 Example:
 
@@ -6321,17 +6867,20 @@ pipeline = make_pipeline(ColumnTransformer([("keep", "passthrough", ["age", "far
 pipeline.set_output(transform="pandas")
 ```
 
-The replacement is advice. xpd does not apply it automatically. `set_output` raised ValueError
-"Unable to configure output for ColumnSelector(...) because `set_output` is not available." and
-`get_feature_names_out` raised AttributeError "Estimator columnselector does not provide
-get_feature_names_out" for each of the three classes. The `ColumnTransformer` form did both, and
-names the columns `keep__age` and `keep__fare`.
+The replacement is advice. xpd does not apply it automatically.
+
+For each of the three classes, `set_output` raised ValueError "Unable to configure output for
+ColumnSelector(...) because `set_output` is not available.", and `get_feature_names_out` raised
+AttributeError "Estimator columnselector does not provide get_feature_names_out". The
+`ColumnTransformer` form did both, and it names the columns `keep__age` and `keep__fare`.
 
 #### debug-pipeline-default-log
 
 **Severity:** info. **Fix:** none.
 
-Reports `log_callback="default"` on `DebugPipeline` and `make_debug_pipeline` in a file that neither imports `logging` nor uses pytest's `caplog`. The default callback logs each step at level INFO, which Python hides until logging is set up.
+The rule reports `log_callback="default"` on `DebugPipeline` and `make_debug_pipeline` in a file
+that neither imports `logging` nor uses pytest's `caplog`. The default callback logs each step at
+level INFO, which Python hides until logging is set up.
 
 Example:
 
@@ -6348,24 +6897,36 @@ logging.basicConfig(level=logging.INFO)
 pipeline = DebugPipeline(steps, log_callback="default")
 ```
 
-The replacement is advice. xpd does not apply it automatically. Without the setup, fitting the
-pipeline printed 0 characters. After `logging.basicConfig(level=logging.INFO)` it logged one line
-for each step, such as `[StandardScaler()] shape=(400, 6) time=0s`. Logging may be set up in
-another module, so the rule is info.
+The replacement is advice. xpd does not apply it automatically.
+
+Without the setup, fitting the pipeline printed 0 characters. After
+`logging.basicConfig(level=logging.INFO)` it logged one line for each step, such as
+`[StandardScaler()] shape=(400, 6) time=0s`. Logging may be set up in another module, so the rule
+is info.
 
 ### Removed, deprecated and superseded forms
 
-Each form below raises or warns on scikit-lego 0.9.10. The removed forms were run and raised. The
-deprecated and superseded forms were run under `python -W error`, where the old form raised its
-warning and the new form ran clean. The messages take each replacement from the text of the
-warning or from the release that made the change. Every fix of a removed form turns code that
-raises into code that runs, so none of those fixes is safe.
+Each rule in the group reports a form that raises or warns on scikit-lego 0.9.10. The removed
+forms were run and raised. The deprecated and superseded forms were run under `python -W error`,
+where the old form raised its warning and the new form ran clean. The messages take each
+replacement from the text of the warning or from the release that made the change. A fix of a
+removed form turns code that raises into code that runs, so no such fix is safe.
 
 #### removed-in-sklego
 
 **Severity:** error. **Fix:** unsafe: `DemographicParityClassifier` for `FairClassifier`, `GroupedPredictor` for `GroupedEstimator`, `from sklego.preprocessing import OutlierRemover` for the import from `sklego.meta`, `as_frame=` for `give_pandas=`, and `decay_kwargs={"decay_rate": 0.99}` for `decay=0.99`. The other forms have no fix.
 
-Reports imports of `PatsyTransformer`, `FairClassifier`, `GroupedEstimator` and `sklego.meta.OutlierRemover` and of the modules that held them, which scikit-lego 0.8.0 removed, the `give_pandas=` keyword of the dataset loaders, which 0.6.6 removed, and the `decay=` keyword of `DecayEstimator`, which 0.7.0 removed. An import inside a `try` block that catches the error is left alone.
+The rule reports forms that scikit-lego removed. An import inside a `try` block that catches the
+error is left alone.
+
+| Old form | Removed in | Write instead |
+| --- | --- | --- |
+| an import of `PatsyTransformer` or its module | 0.8.0 | `FormulaicTransformer`, with no fix |
+| an import of `FairClassifier` or its module | 0.8.0 | `DemographicParityClassifier` |
+| an import of `GroupedEstimator` or its module | 0.8.0 | `GroupedPredictor` |
+| `from sklego.meta import OutlierRemover` | 0.8.0 | `from sklego.preprocessing import OutlierRemover` |
+| `give_pandas=` on the dataset loaders | 0.6.6 | `as_frame=` |
+| `decay=` on `DecayEstimator` | 0.7.0 | `decay_kwargs={"decay_rate": ...}` |
 
 Example:
 
@@ -6388,16 +6949,27 @@ model = DecayEstimator(Ridge(), decay_kwargs={"decay_rate": 0.99})
 ```
 
 The imports raised ImportError or ModuleNotFoundError, and the keywords raised TypeError.
-`PatsyTransformer` has no fix, because `FormulaicTransformer` reads the formula with formulaic
-and not with patsy. The weights that `decay=0.97` gave in scikit-lego 0.6 are equal to those of
-`decay_kwargs={"decay_rate": 0.97}` to rounding, and not bit for bit. Each document carries
-`since` with the release that removed its form.
+`PatsyTransformer` has no fix, because `FormulaicTransformer` reads the formula with formulaic and
+not with patsy. The weights that `decay=0.97` gave in scikit-lego 0.6 are equal to the weights of
+`decay_kwargs={"decay_rate": 0.97}` to rounding, and not bit for bit. Each document carries `since`
+with the release that removed its form.
 
 #### deprecated-in-sklego
 
 **Severity:** warning. **Fix:** safe: `ClusterFoldValidation` for `KlusterFoldValidation`, `TypeSelector` for `PandasTypeSelector`, `date_series=` for `date_serie=`, `n_features_in_` for `dim_`, `num_fit_cols_`, `n_columns_` and `num_cols_`, `n_fitted_levels_` for `n_levels_`, `coef_` for `coefs_`, and `penalty=None` for `penalty="none"`. `allowed_strategies`, `allowed_methods` and `allowed_effects` have no fix.
 
-Reports the names, keywords and fitted attributes that raise a DeprecationWarning: `KlusterFoldValidation`, `PandasTypeSelector`, `TimeGapSplit(date_serie=)`, the attributes `dim_`, `num_fit_cols_`, `n_columns_`, `num_cols_`, `n_levels_` and `coefs_`, the properties `allowed_strategies`, `allowed_methods` and `allowed_effects`, and `penalty="none"` on the fairness classifiers.
+The rule reports the names, keywords and fitted attributes that raise a DeprecationWarning:
+
+| Old form | Write instead |
+| --- | --- |
+| `KlusterFoldValidation` | `ClusterFoldValidation` |
+| `PandasTypeSelector` | `TypeSelector` |
+| `TimeGapSplit(date_serie=)` | `date_series=` |
+| the attributes `dim_`, `num_fit_cols_`, `n_columns_` and `num_cols_` | `n_features_in_` |
+| `n_levels_` | `n_fitted_levels_` |
+| `coefs_` | `coef_` |
+| `penalty="none"` on the fairness classifiers | `penalty=None` |
+| the properties `allowed_strategies`, `allowed_methods` and `allowed_effects` | no fix |
 
 Example:
 
@@ -6415,25 +6987,41 @@ splitter = TimeGapSplit(date_series=dates, train_duration=timedelta(days=10), va
 width = capper.n_features_in_
 ```
 
-Every fix was run before and after on the pack's sample file, and the folds, the selected
-columns, the attribute values, the coefficients and the predictions were equal. An old attribute
-name is reported only on an object that the file builds from a scikit-lego class with that
-property: a call chain that starts at the class, as in `ColumnCapper().fit(X).n_columns_`, or a
-name that the file assigns such a chain to. The classes are `RandomRegressor`, `RandomAdder`,
-`DictMapper` and `OutlierRemover` for `dim_`, the two mixture naive Bayes classifiers for
-`num_fit_cols_`, `ColumnCapper` for `n_columns_`, `IntervalEncoder` for `num_cols_`, and
-`HierarchicalRegressor` and `HierarchicalClassifier` for `n_levels_`. The same name on any other
-object, such as `cfg.dim_` on your own class, stays silent, because the rename would raise
-AttributeError there. An assignment to the name, and the definition of a function or class of
-the name, are the file's own and stay silent. `coefs_` is reported only in a file that names `ProbWeightRegression`
-or `DeadZoneRegressor` and no MLP, because scikit-learn's MLP models have a real `coefs_`. Each
-document carries `since` with the release that began to warn.
+Every fix was run before and after on the pack's sample file, and the folds, the selected columns,
+the attribute values, the coefficients and the predictions were equal.
+
+An old attribute name is reported only on an object that the file builds from a scikit-lego class
+with that property. The object is a call chain that starts at the class, as in
+`ColumnCapper().fit(X).n_columns_`, or a name that the file assigns such a chain to:
+
+| Attribute | Classes |
+| --- | --- |
+| `dim_` | `RandomRegressor`, `RandomAdder`, `DictMapper`, `OutlierRemover` |
+| `num_fit_cols_` | the two mixture naive Bayes classifiers |
+| `n_columns_` | `ColumnCapper` |
+| `num_cols_` | `IntervalEncoder` |
+| `n_levels_` | `HierarchicalRegressor`, `HierarchicalClassifier` |
+
+`coefs_` is reported only in a file that names `ProbWeightRegression` or `DeadZoneRegressor` and no
+MLP, because scikit-learn's MLP models have a real `coefs_`. The same name on any other object,
+such as `cfg.dim_` on your own class, stays silent, because the rename would raise AttributeError
+there. An assignment to the name, and the definition of a function or class of the name, are the
+file's own and stay silent. Each document carries `since` with the release that began to warn.
 
 #### superseded-estimator
 
 **Severity:** warning for the classes that warn, and info for `IdentityTransformer()`. **Fix:** none.
 
-Reports the classes that scikit-lego itself points away from since 0.9.8, where building one raises a UserWarning that names the replacement: `QuantileRegression` and `LADRegression`, `RepeatingBasisFunction`, and `DemographicParityClassifier` and `EqualOpportunityClassifier`. It also reports `IdentityTransformer()` without arguments.
+The rule reports the classes that scikit-lego itself points away from since 0.9.8, where building
+one raises a UserWarning that names the replacement. It also reports `IdentityTransformer()`
+without arguments.
+
+| Class | Replacement |
+| --- | --- |
+| `QuantileRegression`, `LADRegression` | scikit-learn's `QuantileRegressor` |
+| `RepeatingBasisFunction` | scikit-learn's `SplineTransformer(extrapolation="periodic")` |
+| `DemographicParityClassifier`, `EqualOpportunityClassifier` | fairlearn's `ThresholdOptimizer` around a `LogisticRegression` |
+| `IdentityTransformer()` | `FunctionTransformer()` |
 
 Example:
 
@@ -6452,12 +7040,10 @@ keep = FunctionTransformer()
 ```
 
 The replacement is advice. xpd does not apply it automatically, because each replacement is
-another model with other parameter names. The warnings ask for scikit-learn's `QuantileRegressor`
-and `SplineTransformer(extrapolation="periodic")`, and for fairlearn's `ThresholdOptimizer`
-around a `LogisticRegression`. On 500 rows `QuantileRegression(quantile=0.8)` and
-`QuantileRegressor(quantile=0.8, alpha=0)` gave the same coefficients to three decimals. The
-spline is another basis than the radial one, so its columns are other numbers.
-`IdentityTransformer()` and `FunctionTransformer()` returned the same array.
+another model with other parameter names. On 500 rows `QuantileRegression(quantile=0.8)` and
+`QuantileRegressor(quantile=0.8, alpha=0)` gave the same coefficients to three decimals. The spline
+is another basis than the radial one, so its columns are other numbers. `IdentityTransformer()` and
+`FunctionTransformer()` returned the same array.
 
 ### Speed and repeatable runs
 
@@ -6465,7 +7051,8 @@ spline is another basis than the radial one, so its columns are other numbers.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `GroupTimeSeriesSplit` with 6 or more splits. The class tries every combination of split points over the groups to find the most even folds, so each extra fold multiplies the time.
+The rule reports `GroupTimeSeriesSplit` with 6 or more splits. The class tries every combination of
+split points over the groups to find the most even folds, so each extra fold multiplies the time.
 
 Example:
 
@@ -6479,16 +7066,22 @@ Use instead:
 folds = GroupTimeSeriesSplit(n_splits=5)
 ```
 
-The replacement is advice. xpd does not apply it automatically. On 3,000 rows in 60 groups,
-`split` took 0.09 s at 4 splits, 1.08 s at 5 and 10.48 s at 6. With 40 groups it took 0.21 s at 5
-and 1.07 s at 6. The class warns itself above 5 splits from 30 groups on. With a few groups the
-search is short, so the rule is a warning.
+The replacement is advice. xpd does not apply it automatically.
+
+| Data | `split` at 4 splits | At 5 splits | At 6 splits |
+| --- | --- | --- | --- |
+| 3,000 rows in 60 groups | 0.09 s | 1.08 s | 10.48 s |
+| 40 groups | not given | 0.21 s | 1.07 s |
+
+The class warns itself above 5 splits from 30 groups on. With a few groups the search is short, so
+the rule is a warning.
 
 #### unseeded-random-estimator
 
 **Severity:** info. **Fix:** none.
 
-Reports `RandomRegressor` and `RandomAdder` built without `random_state`, outside test files. Each call then draws new numbers.
+The rule reports `RandomRegressor` and `RandomAdder` built without `random_state`, outside test
+files. Each call then draws new numbers.
 
 Example:
 
@@ -6502,63 +7095,71 @@ Use instead:
 baseline = RandomRegressor(strategy="normal", random_state=0)
 ```
 
-The replacement is advice. xpd does not apply it automatically. Two `predict` calls of one fitted
-`RandomRegressor()` differed, and so did two `transform` calls of one `RandomAdder()` on its
-training rows. Both pairs were equal with `random_state=0`.
+The replacement is advice. xpd does not apply it automatically.
+
+Two `predict` calls of one fitted `RandomRegressor()` differed, and so did two `transform` calls of
+one `RandomAdder()` on its training rows. Both pairs were equal with `random_state=0`.
 
 ### Habits the pack does not report
 
+The pack has no rule for the following habits:
+
 - `MaximumRelevanceMinimumRedundancy` with the default `kind="auto"` scores a whole-number
-  regression target as classes. On one such target it picked the features 1, 2 and 3, and 1, 2
-  and 5 with `kind="regression"`. A pattern cannot see the target, and a rule on every call
-  without `kind` would report the library's own tests.
-- `RegressionOutlierDetector` with a column position on a frame, and `TimeGapSplit`,
-  `RandomAdder` and `OutlierRemover` given an input type they do not take, depend on what `fit`
-  is given, which a pattern cannot see.
-- The extras cvxpy, umap-learn and formulaic have no rule, for the reason at the top of this
-  section.
+  regression target as classes. On one such target it picked the features 1, 2 and 3, against 1, 2
+  and 5 with `kind="regression"`. A pattern can't see the target, and a rule on every call without
+  `kind` would report the library's own tests.
+- `RegressionOutlierDetector` with a column position on a frame, and `TimeGapSplit`, `RandomAdder`
+  and `OutlierRemover` given an input type they don't take, depend on what `fit` is given, which a
+  pattern can't see.
+- The extras cvxpy, umap-learn and formulaic have no rule, because a package check can't see which
+  estimators a project uses.
+
 ## MAPIE
 
-These rules run on files that import `mapie`, the module of
-[MAPIE](https://mapie.readthedocs.io/), which builds prediction intervals and prediction sets
-around a scikit-learn model. They report the MAPIE 0.x API, which raises on MAPIE 1, code that
-breaks the coverage a conformal method promises, arguments that MAPIE refuses, and code that runs
-the model twice. Every number in this section was measured on MAPIE 1.6.0 with scikit-learn 1.9.1.
-Examples assume that the MAPIE and scikit-learn names they use are imported. Names such as
-`X_train`, `X_conf`, `y_test` and `model` represent values supplied by your program.
+The MAPIE rules report the MAPIE 0.x API, which raises on MAPIE 1, code that breaks the coverage
+that a conformal method promises, arguments that MAPIE refuses, and code that runs the model twice,
+in each file that imports `mapie`. [MAPIE](https://mapie.readthedocs.io/) builds prediction
+intervals and prediction sets around a scikit-learn model. Every number about the MAPIE rules was
+measured on MAPIE 1.6.0 with scikit-learn 1.9.1. The examples assume that the MAPIE and
+scikit-learn names they use are imported, and names such as `X_train`, `X_conf`, `y_test` and
+`model` stand for values from your program.
 
-MAPIE 1.0 replaced `MapieRegressor` and `MapieClassifier` with one class per method, moved `alpha`
-to the constructor as `confidence_level`, which is `1 - alpha`, and split `fit` into `fit` and
-`conformalize`. A rule document about that change carries `since`. xpd reads the installed
-version from the project's venv, as it does for pandas, and skips the document on an older
-release, so a project that still has MAPIE 0.9 gets no report about the 0.x API. When the venv
-has no MAPIE, or there is no venv, every document runs.
+MAPIE 1.0 changed the API:
 
-Two rules read the names of variables, such as `X_train`, because a pattern sees nothing else, so
-a name that misleads gives a wrong report. The other rules tie a call to an object by the
+| MAPIE 0.x | MAPIE 1 |
+| --- | --- |
+| `MapieRegressor`, `MapieClassifier` | one class per method |
+| `alpha` | `confidence_level` on the constructor, which is `1 - alpha` |
+| `fit` | `fit` and `conformalize` |
+
+A rule document about the change carries `since`. xpd reads the installed version from the
+project's venv and skips the document on an older release, so a project that still has MAPIE 0.9
+gets no report about the 0.x API. When the venv has no MAPIE, or there is no venv, every document
+runs.
+
+Some rules read the names of variables, such as `X_train`, because a pattern sees nothing else. A
+name that misleads therefore gives a wrong report. The other rules tie a call to an object by the
 variable the file assigns it to, and to rows by the variable given to an earlier call.
 
 ### How a rule earns its place
 
-Every rule document ships on something that was run, and it is one of four kinds:
+Each rule document ships only with a proof that was run. A proof is one of the following kinds:
 
-- A coverage proof runs the old and the new form over 30 seeds with `confidence_level=0.9` and
-  gives the mean share of test rows that the intervals or sets cover.
-- An interpreter proof runs the old form on MAPIE 1.6.0, under `python -W error` for a warning.
-  It passes when the old form raises and the new form runs clean.
-- A speed proof times both forms on one thread, as the median of 5 or 7 runs, at two data sizes,
-  and compares the arrays they return.
-- A rerun proof runs the old form twice in fresh objects. It passes when the two results differ
-  and the new form gives the same result twice.
+| Proof | What it does |
+| --- | --- |
+| coverage | Runs the old and the new form over 30 seeds with `confidence_level=0.9`, and gives the mean share of test rows that the intervals or sets cover. |
+| interpreter | Runs the old form on MAPIE 1.6.0, under `python -W error` for a warning. It passes when the old form raises and the new form runs clean. |
+| speed | Times both forms on one thread, as the median of 5 or 7 runs, at two data sizes, and compares the arrays they return. |
+| rerun | Runs the old form twice in fresh objects. It passes when the two results differ and the new form gives the same result twice. |
 
 A document is `error` only on a coverage proof or an interpreter proof, and its message quotes
-what was measured. A document that can also match code that is meant, such as a level below 0.5
-in a plot of coverage against the level, is `warning`.
+what was measured. A document that can also match code that is meant is `warning`, such as a level
+below 0.5 in a plot of coverage against the level.
 
-The rules were then run over MAPIE's own code at the 1.6.0 tag: its 162 Python files, which are
-the library, its tests and its examples, and the Python code of its 21 documentation pages and
-notebooks. Every report was read. A rule that reported correct code there was narrowed, and the
-table gives what is left.
+The rules were then run over MAPIE's own code at the 1.6.0 tag, and every report was read. The
+code was its 162 Python files, which hold the library, its tests and its examples, and the Python
+code of its 21 documentation pages and notebooks. A rule that reported correct code there was
+narrowed, and the table gives what is left.
 
 | Rule | Severity | Proof | Reports on MAPIE's own code | Wrong advice | Fix |
 | --- | --- | --- | --- | --- | --- |
@@ -6577,35 +7178,54 @@ table gives what is left.
 | [`unseeded-resampling`](#unseeded-resampling) | info | rerun: the result differs | 36 | 0 | none |
 
 A coverage proof gives the old form's mean against the new form's mean. A speed proof gives the
-lowest ratio over the forms the rule reports and both sizes. Wrong advice counts the reports
-where following the message would not fix a real problem in that code.
+lowest ratio over the forms the rule reports and both sizes. Wrong advice counts the reports where
+following the message would not fix a real problem in that code.
 
-All 5 reports with wrong advice are in MAPIE's tests. Three tests call `predict` beside
-`predict_interval` or `predict_set` to assert that the two agree, one test builds one object per
-level to compare it with the list form, and one test conformalizes on the rows of a
-`DummyRegressor` that predicts a constant, which learns nothing from them. Four more reports of
-`calibrate-on-training-rows` are tests that fit and conformalize on the same rows to check the
-mechanics, where coverage is not the point. The sixth is an example in MAPIE's gallery that
-conformalizes on its training rows. No rule reported the library's own source, and the examples,
-documentation pages and notebooks got 9 reports, none with wrong advice.
+All 5 reports with wrong advice are in MAPIE's tests:
+
+- Three tests call `predict` beside `predict_interval` or `predict_set` to assert that the two
+  agree.
+- One test builds one object per level to compare it with the list form.
+- One test conformalizes on the rows of a `DummyRegressor` that predicts a constant, which learns
+  nothing from them.
+
+Four more reports of `calibrate-on-training-rows` are tests that fit and conformalize on the same
+rows to check the mechanics, where coverage is not the point. The sixth is an example in MAPIE's
+gallery that conformalizes on its training rows. No rule reported the library's own source, and
+the examples, documentation pages and notebooks got 9 reports, none with wrong advice.
 
 Recall was not measured. No set of real MAPIE code was held back, so the table says how often a
 rule is wrong when it reports, and not how often it misses. The pack has no rule for
-`mapie.exchangeability_testing`, `mapie.experimental` and the FWER procedures: their misuse is in
-the data, such as rows shuffled before an exchangeability test, and a pattern cannot see it.
+`mapie.exchangeability_testing`, `mapie.experimental` and the FWER procedures. Their misuse is in
+the data, such as rows shuffled before an exchangeability test, and a pattern can't see it.
 
 ### The 0.x API
 
-Each form below raises or warns on MAPIE 1.6.0. Each was run there, and the messages take each
-replacement from the v1 release notes or from the error text. Every fix of a removed form turns
-code that raises into code that runs, so none of those fixes can be compared with the old form
-and none is safe.
+Each rule in the group reports a form that raises or warns on MAPIE 1.6.0. Each form was run
+there, and the messages take each replacement from the v1 release notes or from the error text. A
+fix of a removed form turns code that raises into code that runs, so it can't be compared with the
+old form, and no such fix is safe.
 
 #### removed-in-mapie
 
 **Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based` when the value is a number or a name, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. The other forms have no fix.
 
-Reports imports of `MapieRegressor`, `MapieClassifier`, `MapieQuantileRegressor`, `MapieTimeSeriesRegressor`, `MapieCalibrator`, `MapieMultiLabelClassifier`, `PrecisionRecallController`, `MondrianCP` and `ConformityScore`, imports of the modules that are gone, such as `mapie.quantile_regression`, `mapie.control_risk` and `mapie._typing`, and metric functions imported from `mapie.metrics` itself. It also reports `alpha=` on the MAPIE 1 constructors, on `predict_interval` and `predict_set`, on `predict` of an object that the file builds from a MAPIE 1 class and on the metrics, `fit` on a `CrossConformalRegressor`, a `CrossConformalClassifier` or a `JackknifeAfterBootstrapRegressor`, `cv=` on the split classes and `cv="prefit"` or `cv="split"` on the cross classes, `method=` on the classifiers and on `TopLabelCalibrator`, `method="naive"`, `sample_weight=` given to `fit` or `fit_conformalize`, `partial_fit` on a `TimeSeriesRegressor`, and the lower and upper bounds given to a metric as two arguments.
+The rule reports the MAPIE 0.x API that raises on MAPIE 1.6.0:
+
+| Old form | Where the rule reports it |
+| --- | --- |
+| `MapieRegressor`, `MapieClassifier`, `MapieQuantileRegressor`, `MapieTimeSeriesRegressor`, `MapieCalibrator`, `MapieMultiLabelClassifier`, `PrecisionRecallController`, `MondrianCP`, `ConformityScore` | an import |
+| modules that are gone, such as `mapie.quantile_regression`, `mapie.control_risk` and `mapie._typing` | an import |
+| metric functions from `mapie.metrics` itself | an import |
+| `alpha=` | the MAPIE 1 constructors, `predict_interval`, `predict_set`, `predict` of an object that the file builds from a MAPIE 1 class, and the metrics |
+| `fit` | a `CrossConformalRegressor`, `CrossConformalClassifier` or `JackknifeAfterBootstrapRegressor` |
+| `cv=` | the split classes |
+| `cv="prefit"` or `cv="split"` | the cross classes |
+| `method=` | the classifiers and `TopLabelCalibrator` |
+| `method="naive"` | any class |
+| `sample_weight=` | `fit` or `fit_conformalize` |
+| `partial_fit` | a `TimeSeriesRegressor` |
+| the lower and upper bounds as two arguments | a metric |
 
 Example:
 
@@ -6631,11 +7251,54 @@ y_pred, y_pis = mapie.predict_interval(X_test)
 coverage = regression_coverage_score(y_test, y_pis)[0]
 ```
 
+The rule leaves alone an import inside a `try` block that catches the error, code behind a version
+check, and code inside `pytest.raises`. Each of its documents carries the release that removed the
+form:
+
+| Form | Removed in |
+| --- | --- |
+| most forms | 1.0 |
+| `partial_fit` | 1.2 |
+| `PrecisionRecallController` | 1.3 |
+| `sample_weight=` on `TimeSeriesRegressor.fit` | 1.4.1 |
+
+`TimeSeriesRegressor` still had `partial_fit` in the 1.1.0 wheel and lost it in 1.2.0. Its `fit`
+took `sample_weight` and ran through 1.4.0, and it raises TypeError since 1.4.1.
+`fit_params={"sample_weight": w}` raised on 1.0.1 to 1.3.0 and ran from 1.4.0. The `fit` of the
+split classes raised on `sample_weight` on 1.0.1 already.
+
+The fix `confidence_level=1 - alpha` is written only for a number or a name. `alpha=[0.05, 0.2]`
+was common in 0.x code, and `1 - [0.05, 0.2]` raises TypeError. A list or another expression is
+therefore reported without a fix, and the message says to write 1 minus each value.
+`confidence_level=[0.95, 0.8]` gave intervals of shape (3, 2, 2) for 3 rows.
+
+`predict(X, alpha=0.1)` raised TypeError on each of the split, cross, jackknife and quantile
+classes. Their level is set in the constructor, so the `predict` document has no fix. `fit` raised
+AttributeError on `CrossConformalRegressor`, `CrossConformalClassifier` and
+`JackknifeAfterBootstrapRegressor`, on 1.0.1 and on 1.6.0. The rule reports it on a name that the
+file assigns from one of the three and from nothing else. `CrossConformalizedQuantileRegressor` has
+a `fit` on 1.6.0 and is left alone.
+
+The rule reports an import and doesn't rename the class, because the constructors differ.
+`MapieRegressor(model, cv="prefit")` becomes `SplitConformalRegressor(model, prefit=True)`, and
+`alpha` moves from `predict` to the constructor. Two fixes write `np.` and apply only in a file
+with `import numpy as np`. On the same bounds, the fixed calls of `regression_coverage_score`,
+`regression_mean_width_score` and `coverage_width_based` on MAPIE 1.6.0 returned the value that
+the old calls returned on MAPIE 0.9.2, bit for bit, and `regression_mwi_score` returned it to 15
+digits.
+
 #### deprecated-in-mapie
 
 **Severity:** warning. **Fix:** safe: `BinaryRisk` for `BinaryClassificationRisk`, and `aggregate_point_predictions=` for `aggregate_predictions=` and for `ensemble=` on a `JackknifeAfterBootstrapRegressor`. `update` has no fix.
 
-Reports `BinaryClassificationRisk`, which MAPIE 1.4 renamed, the `aggregate_predictions=` keyword of `CrossConformalRegressor.predict` and `predict_interval` and the `ensemble=` keyword of the same methods on `JackknifeAfterBootstrapRegressor`, which MAPIE 1.4.1 renamed, and `gamma=`, `confidence_level=` and `optimize_beta=` given to `TimeSeriesRegressor.update`, which has read none of them since MAPIE 1.3.
+The rule reports forms that MAPIE renamed or stopped reading:
+
+| Old form | Since | Write instead |
+| --- | --- | --- |
+| `BinaryClassificationRisk` | 1.4 | `BinaryRisk` |
+| `aggregate_predictions=` on `CrossConformalRegressor.predict` and `predict_interval` | 1.4.1 | `aggregate_point_predictions=` |
+| `ensemble=` on the same methods of `JackknifeAfterBootstrapRegressor` | 1.4.1 | `aggregate_point_predictions=` |
+| `gamma=`, `confidence_level=` and `optimize_beta=` on `TimeSeriesRegressor.update`, which reads none of them | 1.3 | `update` without them, and `adapt_conformal_inference` for `gamma` |
 
 Example:
 
@@ -6654,55 +7317,37 @@ series.update(X_new, y_new)
 series.adapt_conformal_inference(X_new, y_new, gamma=0.05)
 ```
 
+The fixes are safe. A controller built with `BinaryRisk` picked the same thresholds and gave the
+same predictions as one built with `BinaryClassificationRisk`, and the intervals with the new
+keywords were bit equal to the ones with the old keywords. A file that imports both risk classes
+ends with `BinaryRisk` twice in its import.
 
-`removed-in-mapie` leaves alone an import inside a `try` block that catches the error, code
-behind a version check, and code inside `pytest.raises`. Each of its documents carries the
-release that removed the form: 1.0 for most, 1.2 for `partial_fit`, 1.3 for
-`PrecisionRecallController` and 1.4.1 for `sample_weight=` on `TimeSeriesRegressor.fit`.
-`TimeSeriesRegressor` still had `partial_fit` in the 1.1.0 wheel and lost it in 1.2.0. Its `fit`
-took `sample_weight` and ran through 1.4.0, and raises TypeError since 1.4.1, and
-`fit_params={"sample_weight": w}` raised on 1.0.1 to 1.3.0 and ran from 1.4.0. The `fit` of the
-split classes raised on `sample_weight` on 1.0.1 already.
-
-The fix `confidence_level=1 - alpha` is written only for a number or a name. `alpha=[0.05, 0.2]`
-was common in 0.x code, and `1 - [0.05, 0.2]` raises TypeError, so a list or another expression
-is reported without a fix, and the message says to write 1 minus each value.
-`confidence_level=[0.95, 0.8]` gave intervals of shape (3, 2, 2) for 3 rows.
-
-`predict(X, alpha=0.1)` raised TypeError on each of the split, cross, jackknife and quantile
-classes. Their level is set in the constructor, so that document has no fix. `fit` raised
-AttributeError on `CrossConformalRegressor`, `CrossConformalClassifier` and
-`JackknifeAfterBootstrapRegressor`, on 1.0.1 and on 1.6.0. It is reported on a name that the file
-assigns from one of the three and from nothing else. `CrossConformalizedQuantileRegressor` has a
-`fit` on 1.6.0 and is left alone. The rule reports an import and does not rename the class, because
-the constructors differ: `MapieRegressor(model, cv="prefit")` becomes
-`SplitConformalRegressor(model, prefit=True)`, and `alpha` moves from `predict` to the
-constructor. Two fixes write `np.` and apply only in a file with `import numpy as np`. On the
-same bounds, the fixed calls of `regression_coverage_score`, `regression_mean_width_score` and
-`coverage_width_based` on MAPIE 1.6.0 returned the value that the old calls returned on MAPIE
-0.9.2, bit for bit, and `regression_mwi_score` returned it to 15 digits.
-
-The fixes of `deprecated-in-mapie` are safe: a controller built with `BinaryRisk` picked the same
-thresholds and gave the same predictions as one built with `BinaryClassificationRisk`, and the
-intervals with the new keywords were bit equal to the ones with the old keywords. A file that
-imports both risk classes ends with `BinaryRisk` twice in its import. `ensemble=` is reported only
-on an object that the file assigns from `JackknifeAfterBootstrapRegressor` and from no other
-class, because `TimeSeriesRegressor.predict` still takes it. With `method="aci"`, the intervals
-after `update(X, y, gamma=0.5)` were bit equal to the ones after `update(X, y)` on MAPIE 1.3.0,
-1.4.0 and 1.6.0, and they differed on MAPIE 1.2.0, so that document carries `since: "1.3"`.
+`ensemble=` is reported only on an object that the file assigns from
+`JackknifeAfterBootstrapRegressor` and from no other class, because `TimeSeriesRegressor.predict`
+still takes it. With `method="aci"`, the intervals after `update(X, y, gamma=0.5)` were bit equal to
+the ones after `update(X, y)` on MAPIE 1.3.0, 1.4.0 and 1.6.0, and they differed on MAPIE 1.2.0.
+The `update` document therefore carries `since: "1.3"`.
 
 ### Coverage that does not hold
 
-A conformal method promises that its intervals cover a share of new rows. The promise needs
-conformity scores from rows the model did not learn from, a level that is the share to cover, and
-test rows that the method has not seen. Each number below is the mean share of test rows covered
-over 30 seeds, with a `RandomForestRegressor` unless another model is named.
+Each rule in the group reports code that breaks the coverage a conformal method promises. The
+promise is that the intervals cover a share of new rows, and it needs the following conditions:
+
+- conformity scores from rows the model did not learn from
+- a level that is the share to cover
+- test rows that the method has not seen
+
+Each number below is the mean share of test rows covered over 30 seeds, with a
+`RandomForestRegressor` unless another model is named.
 
 #### alpha-as-confidence-level
 
 **Severity:** warning for a level below 0.5 and for a variable named `alpha` or `delta`, and error for a percent. **Fix:** none.
 
-Reports `confidence_level=0.1`, `confidence_level=[0.05, 0.1]` and `confidence_level=alpha`, where the value is the share to miss, the same values given to `regression_mwi_score` and `coverage_width_based` in the place of the level, and `confidence_level=90`.
+The rule reports a `confidence_level` that holds the share to miss, such as
+`confidence_level=0.1`, `confidence_level=[0.05, 0.1]` and `confidence_level=alpha`. It also
+reports the same values given to `regression_mwi_score` and `coverage_width_based` in the place of
+the level, and a percent such as `confidence_level=90`.
 
 Example:
 
@@ -6722,11 +7367,28 @@ score = regression_mwi_score(y_test, y_pis, 1 - alpha)
 
 The replacement is advice. xpd does not apply it automatically.
 
+| `confidence_level` | Share of test rows covered | Width of the intervals |
+| --- | --- | --- |
+| 0.1 | 0.101 | 0.289 |
+| 0.9 | 0.905 | 3.854 |
+
+MAPIE runs both without a warning. A literal below 0.5 is read on the constructors of the
+conformal classes and on `TimeSeriesRegressor.predict`. A risk controller is left alone, because
+its level is `1 - delta` and a low one is a choice. 0.5 itself, and a list with a level of 0.5 or
+more, are left alone.
+
+A percent raises "Invalid confidence_level or alpha. Allowed values are between 0 and 1", but only
+from `predict_interval` or `predict_set`, after the model is fitted. A risk controller raises
+"delta must be in (0, 1]".
+
 #### calibrate-on-training-rows
 
 **Severity:** error. **Fix:** none.
 
-Reports `conformalize` on the training rows, by the name of its first argument or because an earlier `fit` got the same variable, `calibrate` of a risk controller on the training rows, and `fit` of a `TopLabelCalibrator` or `VennAbersCalibrator` with `cv="prefit"` on the training rows.
+The rule reports `conformalize` on the training rows, known by the name of its first argument or
+because an earlier `fit` got the same variable. It also reports `calibrate` of a risk controller on
+the training rows, and `fit` of a `TopLabelCalibrator` or `VennAbersCalibrator` with
+`cv="prefit"` on the training rows.
 
 Example:
 
@@ -6749,11 +7411,34 @@ mapie.conformalize(X_conf, y_conf)
 
 The replacement is advice. xpd does not apply it automatically.
 
+| Form | Old form | Right form |
+| --- | --- | --- |
+| a regressor conformalized on its training rows | 0.483 coverage | 0.905 with held-out rows |
+| a `RandomForestClassifier` conformalized on its training rows | 0.248 coverage | 0.920 |
+| a model fitted on rows that include the conformalization rows | 0.478 coverage | not given |
+| a `GridSearchCV` fitted on the conformalization rows | 0.819 coverage | 0.902 |
+| a `BinaryClassificationController` with a target precision of 0.85, calibrated on the training rows | precision 0.666 on test rows, below the target in 30 of 30 runs | with held-out rows, a threshold in 10 of 30 runs and none below the target |
+| a `TopLabelCalibrator` with `cv="prefit"` fitted on the training rows | top-label calibration error 0.525 | 0.077 with held-out rows, and 0.119 without calibration |
+| a `VennAbersCalibrator` fitted on the training rows | top-label calibration error 0.272 | 0.051 |
+
+The rule reads the name for `train`, `trn`, `tr`, `fit` and `training`, and leaves alone a name
+with `conf`, `calib`, `cal`, `val`, `hold`, `test` or `res` in it. The form without a name needs an
+earlier `fit` with a target in the same block or the same chain. A scaler fitted on the
+conformalization rows is therefore left alone, and so is a class that calls `fit` and
+`conformalize` on itself. A `fit` is left out when a statement between it and the `conformalize`
+assigns to the variable, as in `X, y = load("conformalize")`, because the name then holds other
+rows.
+
+A model picked from six settings by its score on the conformalization rows covered 0.898 against
+0.899, so the rule doesn't report it.
+
 #### coverage-on-seen-rows
 
 **Severity:** error for rows given to `fit` or `fit_conformalize`, and warning for rows given to `conformalize`. **Fix:** none.
 
-Reports `predict_interval` and `predict_set` on the variable that an earlier statement gave to `fit`, `fit_conformalize` or `conformalize` of the same object, where the result goes into a MAPIE coverage metric.
+The rule reports `predict_interval` and `predict_set` on the variable that an earlier statement gave
+to `fit`, `fit_conformalize` or `conformalize` of the same object, where the result goes into a
+MAPIE coverage metric.
 
 Example:
 
@@ -6773,11 +7458,27 @@ coverage = regression_coverage_score(y_test, y_pis)[0]
 
 The replacement is advice. xpd does not apply it automatically.
 
+| Object | Rows given to | Coverage of the same rows | Coverage of the test rows |
+| --- | --- | --- | --- |
+| `CrossConformalRegressor` | `fit_conformalize` | 1.000 | 0.914 |
+| `SplitConformalRegressor` | `fit` | 1.000 | 0.905 |
+| any | `conformalize` | 0.903 in each of the 30 runs | not given |
+
+`conformalize` picks the quantile that covers its rows, so the 0.903, with a standard error of
+0.000, shows nothing, and the `conformalize` document is a warning.
+
+The rule reports only where the result reaches a coverage metric. The call is an argument of
+`regression_coverage_score`, `classification_coverage_score`, the SSC functions,
+`regression_mwi_score` or `hsic`, or the second name it is assigned to is. A prediction for seen
+rows that is only plotted is left alone, and so is one for a variable that a statement in between
+assigns other rows to.
+
 #### shuffled-time-series-split
 
 **Severity:** warning. **Fix:** none.
 
-Reports `train_test_split` and `train_conformalize_test_split` without `shuffle=False`, where the first result goes into `fit` of a `TimeSeriesRegressor`.
+The rule reports `train_test_split` and `train_conformalize_test_split` without `shuffle=False`,
+where the first result goes into `fit` of a `TimeSeriesRegressor`.
 
 Example:
 
@@ -6797,61 +7498,29 @@ series.fit(X_train, y_train)
 
 The replacement is advice. xpd does not apply it automatically.
 
+On a random walk of 900 rows:
 
-`alpha-as-confidence-level` rests on this measurement: with `confidence_level=0.1` the intervals
-covered 0.101 of the test rows and were 0.289 wide, against 0.905 and 3.854 with 0.9. MAPIE runs
-both without a warning. A literal below 0.5 is read on the constructors of the conformal classes
-and on `TimeSeriesRegressor.predict`. A risk controller is left alone, because its level is
-`1 - delta` and a low one is a choice. 0.5 itself and a list with a level of 0.5 or more are left
-alone. A percent raises "Invalid confidence_level or alpha. Allowed values are between 0 and 1",
-but only from `predict_interval` or `predict_set`, after the model is fitted, and a risk
-controller raises "delta must be in (0, 1]".
+| Model | Test rows | Coverage |
+| --- | --- | --- |
+| `TimeSeriesRegressor` | a shuffled test part | 0.923 |
+| `TimeSeriesRegressor` | a test part after the training rows | 0.153 |
+| `SplitConformalRegressor` on a shuffled split | its own test rows | 0.894 |
+| `SplitConformalRegressor` on a shuffled split | the 300 rows that came after them | 0.128 |
 
-`calibrate-on-training-rows` rests on four measurements. A regressor conformalized on its
-training rows covered 0.483 of the test rows against 0.905 with held-out rows, and a
-`RandomForestClassifier` covered 0.248 against 0.920. A model fitted on rows that include the
-conformalization rows covered 0.478, and a `GridSearchCV` fitted on the conformalization rows
-covered 0.819 against 0.902. A `BinaryClassificationController` with a target precision of 0.85
-that was calibrated on the training rows gave a precision of 0.666 on test rows and was below the
-target in 30 of 30 runs. With held-out rows it found a threshold in 10 of 30 runs, and none of
-those was below the target. On test rows a `TopLabelCalibrator` with `cv="prefit"` that was
-fitted on the training rows had a top-label calibration error of 0.525, against 0.077 with
-held-out rows and 0.119 without calibration, and a `VennAbersCalibrator` had 0.272 against 0.051.
-The rule reads the name for `train`, `trn`, `tr`, `fit` and `training`, and leaves alone a name
-with `conf`, `calib`, `cal`, `val`, `hold`, `test` or `res` in it. The form without a name needs
-an earlier `fit` with a target in the same block or the same chain, so a scaler fitted on the
-conformalization rows is left alone, and so is a class that calls `fit` and `conformalize` on
-itself. A `fit` is left out when a statement between it and the `conformalize` assigns to the
-variable, as in `X, y = load("conformalize")`, because the name then holds other rows. A model picked from six settings by its score on the conformalization rows covered 0.898
-against 0.899, so the rule does not report it.
-
-`coverage-on-seen-rows` rests on these: the intervals of a `CrossConformalRegressor` covered
-1.000 of the rows given to `fit_conformalize` and 0.914 of the test rows, and the ones of a
-`SplitConformalRegressor` covered 1.000 of the rows given to `fit` and 0.905 of the test rows.
-The rows given to `conformalize` were covered at 0.903 in each of the 30 runs, with a standard
-error of 0.000, because `conformalize` picks the quantile that covers them, so that number shows
-nothing and the document is a warning. The rule reports only where the result reaches a coverage
-metric: the call is an argument of `regression_coverage_score`, `classification_coverage_score`,
-the SSC functions, `regression_mwi_score` or `hsic`, or the second name it is assigned to is. A
-prediction for seen rows that is only plotted is left alone, and so is one for a variable that
-a statement in between assigns other rows to.
-
-`shuffled-time-series-split` rests on a random walk of 900 rows. A `TimeSeriesRegressor` covered
-0.923 of a shuffled test part and 0.153 of a test part that came after the training rows. A
-`SplitConformalRegressor` on a shuffled split covered 0.894 of its own test rows and 0.128 of the
-300 rows that came after them. The rule cannot see that the rows are in time order, so it is a
-warning.
+The rule can't see that the rows are in time order, so it is a warning.
 
 ### Arguments that raise
 
-Each form below raises when the object is used, on MAPIE 1.6.0. Code inside `pytest.raises` or
-`pytest.warns` is left alone.
+Each rule in the group reports a form that raises when the object is used on MAPIE 1.6.0. Code
+inside `pytest.raises` or `pytest.warns` is left alone.
 
 #### prefit-estimator-not-fitted
 
 **Severity:** error. **Fix:** none.
 
-Reports `SplitConformalRegressor` and `SplitConformalClassifier` with an estimator built in the argument list and no `prefit=False`, `fit` on such an object without `prefit=False`, and `ConformalizedQuantileRegressor(prefit=True)` with one estimator.
+The rule reports `SplitConformalRegressor` and `SplitConformalClassifier` with an estimator built
+in the argument list and no `prefit=False`, and `fit` on such an object without `prefit=False`. It
+also reports `ConformalizedQuantileRegressor(prefit=True)` with one estimator.
 
 Example:
 
@@ -6869,11 +7538,41 @@ mapie.fit(X_train, y_train)
 
 The replacement is advice. xpd does not apply it automatically.
 
+`prefit` is `True` by default on the split classes, which says the estimator is already fitted.
+With an estimator built in the argument list:
+
+| Call | Error |
+| --- | --- |
+| `conformalize`, with a regressor | NotFittedError |
+| `conformalize`, with a classifier | "Invalid classifier. Fitted classifier does not contain 'classes_' attribute" |
+| `fit` | "The fit method must be skipped when the prefit parameter is set to True" |
+
+The rule reads a class name or `make_pipeline` as a new estimator, so `LinearRegression().fit(X, y)`
+and a model loaded from a file are left alone. A wrapper around a fitted model is fitted too.
+`SplitConformalRegressor(FrozenEstimator(fitted))` ran, so `FrozenEstimator` is left alone, and so
+is a class that is given a `.fit(...)` chain. `fit` is reported on an object that the file assigns
+from a split class without `prefit=False` and from nothing else.
+
+`ConformalizedQuantileRegressor` has `prefit=False` as its default. With `prefit=True` it needs
+three fitted estimators, for the lower quantile, the upper quantile and the median, and one
+estimator raised "Estimator for prefit must be an iterable object". The rule reads only a class
+built in the argument list, with or without a `fit` chained to it, as one estimator. A call of a
+function may return the list of three, and
+`ConformalizedQuantileRegressor(fit_three(X, y), prefit=True)` ran.
+
+The conditional classes `ConditionalSplitConformalRegressor` and
+`ConditionalSplitConformalClassifier` raised the same errors, and the rule reads them by their
+`estimator` keyword.
+
 #### quantile-estimator-loss
 
 **Severity:** error. **Fix:** none.
 
-Reports `ConformalizedQuantileRegressor` and `CrossConformalizedQuantileRegressor` with an estimator built in the argument list that has no quantile loss: `GradientBoostingRegressor` or `HistGradientBoostingRegressor` without `loss="quantile"`, `LGBMRegressor` without `objective="quantile"`, or a scikit-learn regressor that has none, such as `RandomForestRegressor`.
+The rule reports `ConformalizedQuantileRegressor` and `CrossConformalizedQuantileRegressor` with an
+estimator built in the argument list that has no quantile loss. Such an estimator is
+`GradientBoostingRegressor` or `HistGradientBoostingRegressor` without `loss="quantile"`,
+`LGBMRegressor` without `objective="quantile"`, or a scikit-learn regressor that has none, such as
+`RandomForestRegressor`.
 
 Example:
 
@@ -6889,11 +7588,21 @@ mapie = ConformalizedQuantileRegressor(GradientBoostingRegressor(loss="quantile"
 
 The replacement is advice. xpd does not apply it automatically.
 
+| Estimator | Result |
+| --- | --- |
+| a boosting model without the quantile loss | "You need to set the loss/objective argument of your base model to `quantile`" |
+| a model of another class | "The base model is not supported" |
+| `GradientBoostingRegressor(loss="quantile")`, `HistGradientBoostingRegressor(loss="quantile")` | runs, because MAPIE sets the quantile itself |
+| `LGBMRegressor(objective="quantile")` | "The matching parameter `alpha_name` for estimator does not exist", until it also gets an `alpha` |
+
+The rule reads only an estimator built in the argument list. A `loss` or `objective` that isn't
+written as text, such as `loss=loss`, may hold `"quantile"` and is left alone.
+
 #### predict-function-returns-labels
 
 **Severity:** error. **Fix:** unsafe: `model.predict_proba`.
 
-Reports `BinaryClassificationController` with `model.predict` as its `predict_function`.
+The rule reports `BinaryClassificationController` with `model.predict` as its `predict_function`.
 
 Example:
 
@@ -6907,11 +7616,24 @@ Use instead:
 controller = BinaryClassificationController(model.predict_proba, "precision", target_level=0.8)
 ```
 
+With `model.predict`, `calibrate` raised IndexError, "Error when calling the predict_function",
+because the controller reads the probability of the positive class from the second column.
+`MultiLabelClassificationController` ran with `predict`, so the rule leaves it alone.
+
 #### risk-control-method
 
 **Severity:** error for a method the risk does not take and for a missing `confidence_level`, and warning for an argument that `"crc"` ignores. **Fix:** none.
 
-Reports `MultiLabelClassificationController` and `SemanticSegmentationController` with `risk="precision"` and `method="crc"` or `"rcps"`, with `method="ltt"` and recall, with `method="rcps"` or `risk="precision"` and no `confidence_level`, and with `method="crc"` beside a `confidence_level` or an `rcps_bound`.
+The rule reports `MultiLabelClassificationController` and `SemanticSegmentationController` with a
+method that the risk doesn't take, or without a `confidence_level` that the method needs, or with
+an argument that the method ignores. Each error comes from `calibrate`:
+
+| Arguments | Result | Severity |
+| --- | --- | --- |
+| `risk="precision"` with `method="crc"` or `"rcps"` | "Invalid method 'crc' for risk 'precision'. Valid methods are: ['ltt']" | error |
+| `method="ltt"` with recall | "Invalid method 'ltt' for risk 'recall'. Valid methods are: ['crc', 'rcps']" | error |
+| `method="rcps"` or `risk="precision"`, with no `confidence_level` | "Invalid confidence_level. confidence_level cannot be `None` when using method 'rcps'", and the same for `'ltt'` | error |
+| `method="crc"` beside a `confidence_level` or an `rcps_bound` | a UserWarning that the argument is ignored | warning |
 
 Example:
 
@@ -6927,52 +7649,14 @@ controller = MultiLabelClassificationController(model.predict_proba, risk="preci
 
 The replacement is advice. xpd does not apply it automatically.
 
-
-`prefit` is `True` by default on the split classes, which says the estimator is already fitted.
-With an estimator built in the argument list, `conformalize` raised NotFittedError for a regressor
-and "Invalid classifier. Fitted classifier does not contain 'classes_' attribute" for a
-classifier, and `fit` raised "The fit method must be skipped when the prefit parameter is set to
-True". `prefit-estimator-not-fitted` reads a class name or `make_pipeline` as a new estimator, so
-`LinearRegression().fit(X, y)` and a model loaded from a file are left alone. A wrapper around a
-fitted model is fitted too: `SplitConformalRegressor(FrozenEstimator(fitted))` ran, so
-`FrozenEstimator` is left alone, and so is a class that is given a `.fit(...)` chain. `fit` is reported on
-an object that the file assigns from a split class without `prefit=False` and from nothing else.
-`ConformalizedQuantileRegressor` has `prefit=False` as its default. With `prefit=True` it needs
-three fitted estimators, for the lower quantile, the upper quantile and the median, and one
-estimator raised "Estimator for prefit must be an iterable object". That document reads only a
-class built in the argument list, with or without a `fit` chained to it, as one estimator. A
-call of a function may return the list of three, and
-`ConformalizedQuantileRegressor(fit_three(X, y), prefit=True)` ran. The conditional classes
-`ConditionalSplitConformalRegressor` and `ConditionalSplitConformalClassifier` raised the same
-errors and are read by their `estimator` keyword.
-
-`quantile-estimator-loss` rests on two errors. A boosting model without the quantile loss raised
-"You need to set the loss/objective argument of your base model to `quantile`", and a model of
-another class raised "The base model is not supported". MAPIE sets the quantile itself, so
-`GradientBoostingRegressor(loss="quantile")` and `HistGradientBoostingRegressor(loss="quantile")`
-ran as they are. `LGBMRegressor(objective="quantile")` raised "The matching parameter
-`alpha_name` for estimator does not exist" until it also got an `alpha`. The rule reads only an
-estimator built in the argument list. A `loss` or `objective` that is not written as text, such
-as `loss=loss`, may hold `"quantile"` and is left alone.
-
-With `model.predict`, `calibrate` raised IndexError, "Error when calling the predict_function",
-because the controller reads the probability of the positive class from the second column.
-`MultiLabelClassificationController` ran with `predict`, so `predict-function-returns-labels`
-leaves it alone.
-
-`risk-control-method` rests on these errors from `calibrate`: "Invalid method 'crc' for risk
-'precision'. Valid methods are: ['ltt']", "Invalid method 'ltt' for risk 'recall'. Valid methods
-are: ['crc', 'rcps']", and "Invalid confidence_level. confidence_level cannot be `None` when
-using method 'rcps'", and the same for `'ltt'`. With `method="crc"`, a `confidence_level` or an
-`rcps_bound` raised a UserWarning that it is ignored.
-
 ### Work done twice
 
 #### predict-and-predict-interval
 
 **Severity:** warning. **Fix:** none.
 
-Reports `predict` on the same object and the same rows as a `predict_interval` or `predict_set` in the same block.
+The rule reports `predict` on the same object and the same rows as a `predict_interval` or
+`predict_set` in the same block.
 
 Example:
 
@@ -6989,11 +7673,23 @@ y_pred, y_pis = mapie.predict_interval(X_test)
 
 The replacement is advice. xpd does not apply it automatically.
 
+`predict_interval` and `predict_set` return the point predictions as their first value. With a
+forest of 50 trees on one thread, both forms returned the same arrays, bit for bit, and the pair
+of calls took longer than the single call:
+
+| Calls | At 2,000 rows | At 20,000 rows |
+| --- | --- | --- |
+| `predict` and `predict_interval`, against `predict_interval` alone | 1.99 times | 1.99 times |
+| `predict` and `predict_set`, against `predict_set` alone | 1.98 times | 1.97 times |
+
+The two calls must be statements of the same block and name the same object and the same rows.
+
 #### refit-per-confidence-level
 
 **Severity:** warning. **Fix:** none.
 
-Reports a conformal object built inside a loop or a comprehension with the loop variable as its `confidence_level`.
+The rule reports a conformal object built inside a loop or a comprehension with the loop variable
+as its `confidence_level`.
 
 Example:
 
@@ -7016,21 +7712,18 @@ intervals = {level: y_pis[:, :, i] for i, level in enumerate(levels)}
 
 The replacement is advice. xpd does not apply it automatically.
 
-
-`predict_interval` and `predict_set` return the point predictions as their first value. With a
-forest of 50 trees on one thread, `predict` and `predict_interval` together took 1.99 times as
-long as `predict_interval` alone on 2,000 and on 20,000 rows, and `predict` and `predict_set`
-took 1.98 and 1.97 times as long as `predict_set` alone. Both forms returned the same arrays, bit
-for bit. The two calls must be statements of the same block and name the same object and the
-same rows.
-
 `confidence_level` takes a list, and the intervals then have one column per level. With three
-levels, one seeded `CrossConformalRegressor` per level took 2.87 times as long as one for the
-list on 1,000 rows and 2.95 times on 5,000, and `SplitConformalRegressor` took 2.99 and 3.01
-times. The intervals were bit equal in both. Without `random_state` a cross class draws other
-folds for each object, so the per-level intervals then differ from the list form.
-`ConformalizedQuantileRegressor` takes one level only, and `refit-per-confidence-level` leaves it
-alone.
+levels, one seeded object per level took longer than one object for the list, and the intervals
+were bit equal:
+
+| Class | At 1,000 rows | At 5,000 rows |
+| --- | --- | --- |
+| `CrossConformalRegressor` | 2.87 times | 2.95 times |
+| `SplitConformalRegressor` | 2.99 times | 3.01 times |
+
+Without `random_state` a cross class draws other folds for each object, so the intervals per level
+then differ from the list form. `ConformalizedQuantileRegressor` takes one level only, and the rule
+leaves it alone.
 
 ### Reproducible results
 
@@ -7038,7 +7731,10 @@ alone.
 
 **Severity:** info. **Fix:** none.
 
-Reports `CrossConformalRegressor`, `CrossConformalClassifier` and `CrossConformalizedQuantileRegressor` with a number of folds, `JackknifeAfterBootstrapRegressor`, `Subsample`, `BlockBootstrap`, `train_conformalize_test_split`, and `SplitConformalClassifier` with the `"aps"` or `"raps"` score, each without `random_state`.
+The rule reports objects that draw random numbers and get no `random_state`. They are
+`CrossConformalRegressor`, `CrossConformalClassifier` and `CrossConformalizedQuantileRegressor` with
+a number of folds, `JackknifeAfterBootstrapRegressor`, `Subsample`, `BlockBootstrap`,
+`train_conformalize_test_split`, and `SplitConformalClassifier` with the `"aps"` or `"raps"` score.
 
 Example:
 
@@ -7062,89 +7758,93 @@ The value 0 is only the example. Any fixed number makes the run repeatable.
 
 The replacement is advice. xpd does not apply it automatically.
 
+The rule is info, because a seed doesn't move the expected coverage. Each form it names gave
+another result in two fresh runs and the same result with `random_state`.
 
-`unseeded-resampling` is info, because a seed does not move the expected coverage. Each form it
-names gave another result in two fresh runs and the same result with `random_state`. The cross
-classes shuffle their folds when `cv` is a number, which the default is, and gave the same
-intervals with `cv=KFold(5)` and with `cv=-1`, so a splitter and a negative number are left
-alone. `SplitConformalClassifier` gave the same sets twice with the `"lac"` and `"top_k"` scores
-and is reported only with `"aps"` and `"raps"`, which draw a random number for each row. The rule
-leaves alone a file that calls `np.random.seed`, after which the same objects gave the same
-result twice, a call with `shuffle=False` or `**`, a
-`JackknifeAfterBootstrapRegressor` whose `resampling` is a `Subsample`, which is reported itself,
-and a call whose result is thrown away. A splitter that shuffles draws its own seed, and
-`random_state` of the cross class does not reach it:
-`CrossConformalRegressor(model, cv=KFold(5, shuffle=True), random_state=0)` gave other intervals
-in two runs, and the same intervals with `KFold(5, shuffle=True, random_state=0)`. This rule does
-not report that splitter, because the scikit-learn rule
+The cross classes shuffle their folds when `cv` is a number, which is the default. They gave the
+same intervals with `cv=KFold(5)` and with `cv=-1`, so a splitter and a negative number are left
+alone. `SplitConformalClassifier` gave the same sets twice with the `"lac"` and `"top_k"` scores.
+It is reported only with `"aps"` and `"raps"`, which draw a random number for each row.
+
+The rule leaves alone:
+
+- a file that calls `np.random.seed`, after which the same objects gave the same result twice
+- a call with `shuffle=False` or `**`
+- a `JackknifeAfterBootstrapRegressor` whose `resampling` is a `Subsample`, which is reported
+  itself
+- a call whose result is thrown away
+
+A splitter that shuffles draws its own seed, and `random_state` of the cross class doesn't reach
+it. `CrossConformalRegressor(model, cv=KFold(5, shuffle=True), random_state=0)` gave other
+intervals in two runs, and the same intervals with `KFold(5, shuffle=True, random_state=0)`. The
+rule doesn't report such a splitter, because the scikit-learn rule
 [`missing-random-state`](#missing-random-state) reports the estimator and a `KFold` with
 `shuffle=True` in the same file.
+
 ## Category Encoders
 
-These rules run on files that import `category_encoders`. They report code that leaks the
-target into the test rows, arguments that give wrong codes without an error, code that raises
-on category_encoders 2.11.2, and forms that a release removed or deprecated. Every number in
-this section was measured on category_encoders 2.11.2 with scikit-learn 1.9.1, pandas 3.1.1 and
-NumPy 2.5.5 on Python 3.13. Examples assume `import category_encoders as ce` and that the
-scikit-learn names they use are imported. Names such as `X_train`, `y_test` and `encoder`
-represent values supplied by your program.
+The Category Encoders rules report code that leaks the target into the test rows, arguments that
+give wrong codes without an error, code that raises on category_encoders 2.11.2, and forms that a
+release removed or deprecated, in each file that imports `category_encoders`. Every number about the
+Category Encoders rules was measured on category_encoders 2.11.2 with scikit-learn 1.9.1, pandas 3.1.1 and NumPy
+2.5.5 on Python 3.13. The examples assume `import category_encoders as ce` and that the
+scikit-learn names they use are imported. Names such as `X_train`, `y_test` and `encoder` stand for
+values from your program.
 
-Three class names exist in scikit-learn as well: `OneHotEncoder`, `OrdinalEncoder` and
-`TargetEncoder`. A rule about one of them reports a call only with proof that the class comes
-from category_encoders. The proof is the module in front of the name, as in
-`ce.OneHotEncoder`, or an import of the name from `category_encoders` in the same file. A file
-that imports the same name from two libraries gives no proof, so those rules stay silent there.
-The other 20 encoder names belong to category_encoders alone and need no proof.
+`OneHotEncoder`, `OrdinalEncoder` and `TargetEncoder` exist in scikit-learn as well. A rule about
+one of the three reports a call only with proof that the class comes from category_encoders. The
+proof is the module in front of the name, as in `ce.OneHotEncoder`, or an import of the name from
+`category_encoders` in the same file. A file that imports the same name from both libraries gives
+no proof, so the rules about the three classes stay silent there. The other 20 encoder names
+belong to category_encoders alone and need no proof.
 
 A rule document whose advice needs a newer release carries `since`. xpd reads the installed
-version from the project's venv, as it does for pandas, and skips that document on an older
-release. When the venv has no category_encoders, or there is no venv, every document runs.
+version from the project's venv and skips that document on an older release. When the venv has no
+category_encoders, or there is no venv, every document runs.
 
 The scikit-learn pack already reports a target encoder that is fitted before the split, fitted
 before cross-validation, or refitted on the test rows, through
 [`fit-before-split`](#fit-before-split),
-[`cross-val-on-fitted-data`](#cross-val-on-fitted-data) and [`fit-on-test`](#fit-on-test). A
-file that uses category_encoders with a split nearly always imports scikit-learn, so this pack
-does not repeat those rules. It adds the one form they leave alone, in
+[`cross-val-on-fitted-data`](#cross-val-on-fitted-data) and [`fit-on-test`](#fit-on-test). A file
+that uses category_encoders with a split nearly always imports scikit-learn, so the Category
+Encoders pack doesn't repeat the three rules. It adds the one form they leave alone, in
 [`encode-before-split`](#encode-before-split).
 
 ### How a rule earns its place
 
-Every `error` and `warning` document ships on a proof that was run, and the message quotes what
-the proof measured. A proof is one of four kinds:
+Each `error` and `warning` document ships only with a proof that was run, and the message quotes
+what the proof measured. A proof is one of the following kinds:
 
-- A score proof runs the old and the new form over 30 seeds on data whose target is drawn apart
-  from every feature, where the honest AUC is 0.5. It passes when the old form's mean is more
-  than three standard errors above 0.5 and the new form's mean is within 0.02 of it.
-- A result proof runs the old form and prints the codes it gives, next to the codes of the new
-  form. It passes when the old form gives a code that is wrong for every input of that shape,
-  such as -1.0 for every row.
-- An interpreter proof runs the old form under `python -W error`. It passes when the old form
-  raises an exception or a warning and the new form runs clean. category_encoders 2.11.2 itself
-  sets a pandas option that pandas 3.1 deprecates, so that one warning was ignored.
-- A speed proof times both forms on one thread, as the median of 7 runs, at 10,000 and 100,000
-  rows. It passes when the new form is at least 1.5 times faster at both sizes.
+| Proof | What runs | When it passes |
+| --- | --- | --- |
+| score | The old and the new form, over 30 seeds on data whose target is drawn apart from every feature, where the honest AUC is 0.5. | The old form's mean is more than three standard errors above 0.5, and the new form's mean is within 0.02 of it. |
+| result | The old form, with the codes it gives printed next to the codes of the new form. | The old form gives a code that is wrong for every input of that shape, such as -1.0 for every row. |
+| interpreter | The old form under `python -W error`. | The old form raises an exception or a warning, and the new form runs clean. |
+| speed | Both forms on one thread, as the median of 7 runs, at 10,000 and 100,000 rows. | The new form is at least 1.5 times faster at both sizes. |
 
-A document is `info` when no proof passed for it, or when its advice depends on something the
-code does not show, such as the dtype of a column. `sklearn-ships-encoder` passed its speed
-proof and is still `info`, because the two libraries return different things and the swap is a
-choice.
+category_encoders 2.11.2 itself sets a pandas option that pandas 3.1 deprecates, so the
+interpreter proofs ignored the pandas warning about the option.
 
-The rules were run over two sets of code. The first is the library's own code at its latest
-release: the 86 Python files of the repository, and 35 more blocks taken from its docstrings,
-its `.rst` pages and its README. The second is 55 files from public repositories that import
-`category_encoders`. Four rules were narrowed after these runs, and the table gives the
-reports that are left:
+A document is `info` when no proof passed for it, or when its advice depends on something the code
+doesn't show, such as the dtype of a column. `sklearn-ships-encoder` passed its speed proof and is
+still `info`, because the two libraries return different things and the swap is a choice.
+
+The rules were run over two sets of code:
+
+- the library's own code at its latest release, which is the 86 Python files of the repository
+  and 35 more blocks taken from its docstrings, its `.rst` pages and its README
+- 55 files from public repositories that import `category_encoders`
+
+After the runs, the rules below were narrowed, and the table gives the reports that are left:
 
 - `invalid-handle-option` reported three scikit-learn `OneHotEncoder(handle_unknown="ignore")`
-  calls in files that import the name from both libraries, which is why a second import now
-  removes the proof.
+  calls in files that import the name from both libraries. A second import now removes the proof.
 - `hashing-default-components` reported `HashingEncoder().hashing_trick(df, N=3)`, which passes
   the number of columns itself.
-- `zero-regularization` reported `CountTargetEncoder(smoothing=0)` inside `assertRaises`. Code
-  that expects the error is now left alone by every rule about a form that raises.
-- `sklearn-ships-encoder` reported 6 encoders handed to `PolynomialWrapper` or
-  `NestedCVWrapper`, which take only the encoders of this library.
+- `zero-regularization` reported `CountTargetEncoder(smoothing=0)` inside `assertRaises`. Every
+  rule about a form that raises now leaves alone code that expects the error.
+- `sklearn-ships-encoder` reported 6 encoders handed to `PolynomialWrapper` or `NestedCVWrapper`,
+  which take only the encoders of category_encoders.
 
 | Rule | Severity | Proof | Reports on the library | Reports on 55 real files | Fix |
 | --- | --- | --- | --- | --- | --- |
@@ -7169,34 +7869,36 @@ A score proof gives the old form's mean against the new form's mean. The speed p
 lowest ratio over the three classes and both sizes.
 
 None of the 83 reports on the library names a line where the rule's claim is false. The advice
-still does not apply to most of them, because the library is using or testing its own classes:
+still doesn't apply to most of them, because the library uses or tests its own classes:
 
 - All 61 reports of `sklearn-ships-encoder` are the library's tests, examples and documentation
   building its own `OneHotEncoder`, `OrdinalEncoder` or `TargetEncoder`.
 - The 4 reports of `transform-with-test-target` are tests that pass a target to `transform` on
   purpose, to check what the encoder does with it.
-- The 10 reports of `hashing-default-components` are calls that do run with 8 columns: 4 in
-  tests, 4 in benchmark examples and 2 in the documentation.
+- The 10 reports of `hashing-default-components` are calls that do run with 8 columns, of which 4
+  are in tests, 4 in benchmark examples and 2 in the documentation.
 - The report of `cols-left-to-dtype` is an example that hands a `TargetEncoder()` two text
   columns, which it encodes.
 
-The 18 reports on the 55 real files all name a category_encoders class. Recall was not
-measured, and most rules have no report on the real files, so nothing here says how often the
-old forms occur.
+The 18 reports on the 55 real files all name a category_encoders class. Recall was not measured,
+and most rules have no report on the real files, so nothing here says how often the old forms
+occur.
 
 ### Leakage
 
-A target encoder codes a category by the labels of its rows. When it sees the labels of the
-test rows, the code of a test row holds part of its own label, and the score on the test rows is
-too high. The score proofs in this group use 600 rows with one text column of 100 levels and a
-target drawn apart from it, a random forest of 50 trees, and give the mean test AUC over 30
-seeds.
+Each rule in the group reports a target encoder that sees the labels of the test rows, so the
+score on the test rows is too high. A target encoder codes a category by the labels of its rows,
+so the code of a test row then holds part of its own label. The score proofs use 600 rows with one
+text column of 100 levels and a target drawn apart from it. They fit a random forest of 50 trees
+and give the mean test AUC over 30 seeds.
 
 #### transform-with-test-target
 
 **Severity:** error when the encoder is a `LeaveOneOutEncoder`, and info for the other supervised encoders. **Fix:** unsafe: `encoder.transform(X_test)`.
 
-Reports `encoder.transform(X_test, y_test)`. The supervised encoders of category_encoders take the target in `transform`, which no scikit-learn transformer does. It is meant for the training rows.
+The rule reports `encoder.transform(X_test, y_test)`. The supervised encoders of category_encoders
+take the target in `transform`, which no scikit-learn transformer does, and the target there is
+meant for the training rows.
 
 Example:
 
@@ -7214,28 +7916,32 @@ X_train = encoder.fit_transform(X_train, y_train)
 X_test = encoder.transform(X_test)
 ```
 
-With the target, `LeaveOneOutEncoder` takes each row's own label out of the mean of its
-category, so the code of a test row moves with its label. That scored 0.582 AUC on data with no
-signal, 7.3 standard errors above 0.5, against 0.498 for `transform(X_test)`.
+| Encoder | Test AUC with `transform(X_test, y_test)` | With `transform(X_test)` |
+| --- | --- | --- |
+| `LeaveOneOutEncoder` | 0.582, 7.3 standard errors above 0.5 | 0.498 |
+| `CatBoostEncoder` | 0.507, 0.8 standard errors from 0.5 | not given |
+| `TargetEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder`, `QuantileEncoder`, `CountTargetEncoder` | the same as without the test labels | the same |
 
-The other supervised encoders read the target in `transform` only to add the noise of `sigma`
-or `randomized=True`. `CatBoostEncoder` scored 0.507 with the test labels, 0.8 standard errors
-from 0.5. `TargetEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder`,
-`QuantileEncoder` and `CountTargetEncoder` scored the same with and without them. The form is
-still not meant for test rows, so it is info for them.
+With the target, `LeaveOneOutEncoder` takes each row's own label out of the mean of its category,
+so the code of a test row moves with its label. The other supervised encoders read the target in
+`transform` only to add the noise of `sigma` or `randomized=True`. The form is still not meant for
+test rows, so it is info for them.
 
 The rule reads the name of the first argument, which must hold `test` or `holdout`, or be a
-validation name such as `X_val`. It needs the encoder assigned from a supervised class in the
-same function, or in the module for code outside a function. The fix changes the codes of the
-test rows of a `LeaveOneOutEncoder` or a `CatBoostEncoder`, and it takes the noise off the test
-rows of an encoder with `randomized=True`, so it is unsafe. On a `TargetEncoder` and a
-`WOEEncoder` without noise, the fixed line gave an equal frame.
+validation name such as `X_val`. It needs the encoder assigned from a supervised class in the same
+function, or in the module for code outside a function.
+
+The fix is unsafe. It changes the codes of the test rows of a `LeaveOneOutEncoder` or a
+`CatBoostEncoder`, and it takes the noise off the test rows of an encoder with `randomized=True`.
+On a `TargetEncoder` and a `WOEEncoder` without noise, the fixed line gave an equal frame.
 
 #### encode-before-split
 
 **Severity:** error. **Fix:** none.
 
-Reports `TargetEncoder(...).fit_transform(X, y)` on every row, when the file imports `TargetEncoder` from `category_encoders` and the result is later split by `train_test_split` or passed to `cross_val_score` or another cross-validation function.
+The rule reports `TargetEncoder(...).fit_transform(X, y)` on every row, when the file imports
+`TargetEncoder` from `category_encoders` and the result is later split by `train_test_split` or
+passed to `cross_val_score` or another cross-validation function.
 
 Example:
 
@@ -7259,29 +7965,31 @@ X_test = encoder.transform(X_test)
 
 The replacement is advice. xpd does not apply it automatically.
 
-On data with no signal the old form scored 0.624 AUC, 13.4 standard errors above 0.5, against
-0.500 when the split came first. Before `cross_val_score` it scored 0.610 against 0.495 for a
-Pipeline that holds the encoder and the model. Fitted on every row before the split,
-`LeaveOneOutEncoder`, `CatBoostEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder`
-and `CountTargetEncoder` scored between 0.620 and 0.623.
+| Old form, on data with no signal | Test AUC | Right form |
+| --- | --- | --- |
+| `TargetEncoder` fitted on every row before the split | 0.624, 13.4 standard errors above 0.5 | 0.500 with the split first |
+| `TargetEncoder` fitted on every row before `cross_val_score` | 0.610 | 0.495 for a Pipeline that holds the encoder and the model |
+| `LeaveOneOutEncoder`, `CatBoostEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder` or `CountTargetEncoder` fitted on every row before the split | 0.620 to 0.623 | not given |
 
 [`fit-before-split`](#fit-before-split) and
-[`cross-val-on-fitted-data`](#cross-val-on-fitted-data) of the scikit-learn pack report this
-for every step but one: a bare `TargetEncoder(...)` built in the same expression, which they
-take for the scikit-learn class, because that class cross-fits in `fit_transform`. The
-category_encoders class does not, so this rule reports the same form when the import shows
-which class it is. Every other form, such as `ce.TargetEncoder(...)`, an encoder kept in a
-name, or another encoder class, is reported by the scikit-learn pack.
+[`cross-val-on-fitted-data`](#cross-val-on-fitted-data) of the scikit-learn pack report the form
+for every step but one, a bare `TargetEncoder(...)` built in the same expression. They take it for
+the scikit-learn class, because the scikit-learn class cross-fits in `fit_transform`. The
+category_encoders class doesn't, so `encode-before-split` reports the form when the import shows
+which class it is. The scikit-learn pack reports every other form, such as `ce.TargetEncoder(...)`,
+an encoder kept in a name, or another encoder class.
 
 ### Codes that are wrong without an error
 
-Each old form below runs and gives a number, and the number is not the one the code asks for.
+Each rule in the group reports a form that runs and gives another number than the code asks for.
 
 #### ordinal-mapping-pairs
 
 **Severity:** error. **Fix:** unsafe: the list of pairs written as a dict.
 
-Reports an `OrdinalEncoder` mapping whose `"mapping"` entry is a list of `(category, code)` pairs. That was the form before category_encoders 2.0, and old answers and notebooks still show it.
+The rule reports an `OrdinalEncoder` mapping whose `"mapping"` entry is a list of
+`(category, code)` pairs. The list of pairs was the form before category_encoders 2.0, and old
+answers and notebooks still show it.
 
 Example:
 
@@ -7297,16 +8005,17 @@ mapping = [{"col": "size", "mapping": {"small": 1, "medium": 2, "large": 3}}]
 encoder = ce.OrdinalEncoder(cols=["size"], mapping=mapping)
 ```
 
-2.11.2 takes the list of pairs without an error and finds no category in it. With
-`[("a", 1), ("b", 2), ("c", 3)]` every row of a column that holds a, b and c was coded -1.0. The
-fix changes every code of the column, from -1.0 to the code the pair names, so it is unsafe. The
-rule reports the `"mapping"` entry of a dict that also has a `"col"` entry.
+category_encoders 2.11.2 takes the list of pairs without an error and finds no category in it.
+With `[("a", 1), ("b", 2), ("c", 3)]` every row of a column that holds a, b and c was coded -1.0.
+The fix changes every code of the column, from -1.0 to the code the pair names, so it is unsafe.
+The rule reports the `"mapping"` entry of a dict that also has a `"col"` entry.
 
 #### ordinal-mapping-unknown
 
 **Severity:** info. **Fix:** none.
 
-Reports `OrdinalEncoder(mapping=...)` without `handle_unknown`. A category that the mapping does not name is then coded -1, with no error and no warning.
+The rule reports `OrdinalEncoder(mapping=...)` without `handle_unknown`. A category that the
+mapping doesn't name is then coded -1, with no error and no warning.
 
 Example:
 
@@ -7326,18 +8035,20 @@ encoder = ce.OrdinalEncoder(
 
 The replacement is advice. xpd does not apply it automatically.
 
-With the mapping `{"a": 1, "b": 2}`, the column a, b, c came out as 1.0, 2.0, -1.0. A key with
-a typing error, or a category that appears later, reaches the model as -1, which is below
-every real code. With `handle_unknown="error"` the same fit raised `ValueError: Unexpected
-categories found in column c`. Whether the mapping names every category cannot be read from
-the code, so the rule is info. A call that states `handle_unknown`, with any value, is left
-alone.
+| `{"a": 1, "b": 2}` on the column a, b, c | Result |
+| --- | --- |
+| without `handle_unknown` | 1.0, 2.0, -1.0 |
+| with `handle_unknown="error"` | `ValueError: Unexpected categories found in column c` at fit |
+
+A key with a typing error, or a category that appears later, reaches the model as -1, which is
+below every real code. Whether the mapping names every category can't be read from the code, so
+the rule is info. A call that states `handle_unknown`, with any value, is left alone.
 
 #### zero-regularization
 
 **Severity:** error. **Fix:** none.
 
-Reports `WOEEncoder(regularization=0)` and `CountTargetEncoder(smoothing=0)`.
+The rule reports `WOEEncoder(regularization=0)` and `CountTargetEncoder(smoothing=0)`.
 
 Example:
 
@@ -7353,21 +8064,25 @@ encoder = ce.WOEEncoder(cols=["city"], regularization=0.5)
 
 The replacement is advice. xpd does not apply it automatically.
 
-`WOEEncoder` adds `regularization`, 1.0 by default, to the counts of both classes before it
-takes the logarithm of their ratio. With 0, a category that holds one class alone divides by
-zero. A category of five rows of class 1 was coded `inf`, with no error and no warning, where
-the default gave 1.204. On a column where every category held both classes the codes were
-finite. `CountTargetEncoder(smoothing=0)` raised `ValueError: smoothing must be strictly bigger
-than 0.` at fit. That document carries `since: "2.11"`, the release that added the class.
+`WOEEncoder` adds `regularization`, 1.0 by default, to the counts of both classes before it takes
+the logarithm of their ratio. With 0, a category that holds one class alone divides by zero.
 
-`TargetEncoder(smoothing=0)` and `MEstimateEncoder(m=0)` gave the plain mean of each category
-and are left alone.
+| Form | Result |
+| --- | --- |
+| `WOEEncoder(regularization=0)` on a category of five rows of class 1 | `inf`, with no error and no warning |
+| `WOEEncoder()` on the same category | 1.204 |
+| `WOEEncoder(regularization=0)` on a column where every category holds both classes | finite codes |
+| `CountTargetEncoder(smoothing=0)` | `ValueError: smoothing must be strictly bigger than 0.` at fit |
+| `TargetEncoder(smoothing=0)` or `MEstimateEncoder(m=0)`, left alone | the plain mean of each category |
+
+The `CountTargetEncoder` document carries `since: "2.11"`, the release that added the class.
 
 #### hashing-default-components
 
 **Severity:** warning. **Fix:** none.
 
-Reports `HashingEncoder(...)` without `n_components`. The encoder hashes every value into `n_components` columns, 8 by default, and all encoded columns share them.
+The rule reports `HashingEncoder(...)` without `n_components`. The encoder hashes every value into
+`n_components` columns, 8 by default, and all encoded columns share them.
 
 Example:
 
@@ -7389,22 +8104,26 @@ The replacement is advice. xpd does not apply it automatically.
 | 64 | 48 |
 | 1024 | 95 |
 
-Two columns encoded by one `HashingEncoder()` gave 8 output columns in all, and the rows
-`(x, y)` and `(y, x)` got the same code, so the encoder also loses which column a value came
-from. The rule has no fix, because the right number depends on how many distinct values the
-columns hold. A call that passes the number by position, a call inside `isinstance`, and
+Two columns encoded by one `HashingEncoder()` gave 8 output columns in all, and the rows `(x, y)`
+and `(y, x)` got the same code. The encoder therefore also loses which column a value came from.
+The rule has no fix, because the right number depends on how many distinct values the columns
+hold. A call that passes the number by position, a call inside `isinstance`, and
 `HashingEncoder().hashing_trick(...)`, which takes the number as `N`, are left alone.
 
-Two ideas about this class were measured and dropped. `max_process=1` was 9.81 times faster
-than the default at 1,000 rows and 2.2 times slower at 100,000 rows, so no setting is right for
-both. `FeatureHasher` of scikit-learn was 5.4 times faster at 10,000 and 100,000 rows, but it
-returns a sparse matrix and takes no column names, so it is no drop-in.
+The pack measured and dropped other advice about the class:
+
+- `max_process=1` was 9.81 times faster than the default at 1,000 rows and 2.2 times slower at
+  100,000 rows, so no setting is right for both.
+- `FeatureHasher` of scikit-learn was 5.4 times faster at 10,000 and 100,000 rows, but it returns
+  a sparse matrix and takes no column names, so it can't take the place of the encoder.
 
 #### cols-left-to-dtype
 
 **Severity:** info. **Fix:** none.
 
-Reports an encoder built without `cols` inside a `ColumnTransformer` or `make_column_transformer`. Without `cols`, an encoder encodes the columns of the object, category and string dtypes and passes every other column through.
+The rule reports an encoder built without `cols` inside a `ColumnTransformer` or
+`make_column_transformer`. Without `cols`, an encoder encodes the columns of the object, category
+and string dtypes and passes every other column through.
 
 Example:
 
@@ -7420,14 +8139,17 @@ columns = make_column_transformer((ce.BinaryEncoder(cols="all"), ["zip_code"]), 
 
 The replacement is advice. xpd does not apply it automatically.
 
-Inside a `ColumnTransformer` the columns are already chosen, so a numeric column that was
-chosen on purpose comes back as it went in. `(ce.OneHotEncoder(), ["zip"])` on a whole-number
-column of 5 values gave 1 output column, equal to the input, and printed `Warning: No
-categorical columns found` with `print`, where a warning would be raised. With `cols="all"` it
-gave 5 columns. A `TargetEncoder()` gave the column back unchanged in the same way.
+Inside a `ColumnTransformer` the columns are already chosen, so a numeric column that was chosen
+on purpose comes back as it went in. On a whole-number column of 5 values:
+
+| Step | Output |
+| --- | --- |
+| `(ce.OneHotEncoder(), ["zip"])` | 1 column, equal to the input, and `Warning: No categorical columns found` printed with `print`, where a warning would be raised |
+| `(ce.OneHotEncoder(cols="all"), ["zip"])` | 5 columns |
+| `ce.TargetEncoder()` | the column unchanged |
 
 `cols="all"` was added in category_encoders 2.10, so the rule carries `since: "2.10"`. The rule
-cannot see the dtype of the chosen columns, and on text columns the old form is right, so it is
+can't see the dtype of the chosen columns, and on text columns the old form is right, so it is
 info. For `OneHotEncoder`, `OrdinalEncoder` and `TargetEncoder` the message also names the
 scikit-learn class, which encodes every column it is given.
 
@@ -7435,7 +8157,8 @@ scikit-learn class, which encodes every column it is given.
 
 **Severity:** info. **Fix:** none.
 
-Reports an encoder with `handle_unknown="return_nan"` or `handle_missing="return_nan"` inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.
+The rule reports an encoder with `handle_unknown="return_nan"` or `handle_missing="return_nan"`
+inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.
 
 Example:
 
@@ -7451,13 +8174,13 @@ model = make_pipeline(ce.OneHotEncoder(cols=["city"], handle_unknown="value"), L
 
 The replacement is advice. xpd does not apply it automatically.
 
-`return_nan` codes a category that fit did not see as NaN, in every output column of that row.
-In a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in
-front of a `LogisticRegression`, `predict` on a row with an unseen city raised `ValueError:
-Input X contains NaN`, and so did an `OrdinalEncoder` with `handle_missing="return_nan"` on a
-row with a missing city. The fit passed, because the training rows had no
-unseen category, so the error first shows on new data. With `"value"`, the default, the same
-`predict` ran.
+`return_nan` codes a category that fit did not see as NaN, in every output column of the row, and
+in a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in front
+of a `LogisticRegression`, `predict` on a row with an unseen city raised
+`ValueError: Input X contains NaN`. An `OrdinalEncoder` with `handle_missing="return_nan"` raised
+the same on a row with a missing city. The fit passed, because the training rows had no unseen
+category, so the error first shows on new data. With `"value"`, the default, the same `predict`
+ran.
 
 | Encoder | Code of an unseen category with `"value"` | With `"return_nan"` |
 | --- | --- | --- |
@@ -7473,14 +8196,15 @@ because the code may handle the NaN itself.
 
 ### Code that raises
 
-Each old form below raises on category_encoders 2.11.2. Code inside `assertRaises`,
-`pytest.raises` or a `try` block with an `except` clause expects the error and stays silent.
+Each rule in the group reports a form that raises on category_encoders 2.11.2. Code inside
+`assertRaises`, `pytest.raises` or a `try` block with an `except` clause expects the error and
+stays silent.
 
 #### supervised-encoder-without-target
 
 **Severity:** error. **Fix:** none.
 
-Reports `fit(X)` and `fit_transform(X)` without the target on a supervised encoder.
+The rule reports `fit(X)` and `fit_transform(X)` without the target on a supervised encoder.
 
 Example:
 
@@ -7496,23 +8220,27 @@ X_encoded = ce.TargetEncoder(cols=["city"]).fit_transform(X, y)
 
 The replacement is advice. xpd does not apply it automatically.
 
-Ten encoders learn from the target: `CatBoostEncoder`, `CountTargetEncoder`, `GLMMEncoder`,
+The supervised encoders are `CatBoostEncoder`, `CountTargetEncoder`, `GLMMEncoder`,
 `JamesSteinEncoder`, `LeaveOneOutEncoder`, `MEstimateEncoder`, `QuantileEncoder`,
-`SummaryEncoder`, `TargetEncoder` and `WOEEncoder`. On each of them `fit_transform(X)` raised
-`TypeError: fit_transform() missing argument: y`. `fit(X)` raised `ValueError: Supervised
-encoders need a target for the fitting. The target cannot be None` on nine of them, and
-`TypeError` on `SummaryEncoder`, whose `fit` has no default for `y`. A scikit-learn transformer
-takes `fit(X)`, so the form is easy to carry over from an `OrdinalEncoder` or a
-`OneHotEncoder`.
+`SummaryEncoder`, `TargetEncoder` and `WOEEncoder`.
 
-The rule reports the call on an encoder built in the same expression, and on a name that is
-assigned from a supervised class in the same function and from nothing else there.
+| Call | Error |
+| --- | --- |
+| `fit_transform(X)`, on each of the ten | `TypeError: fit_transform() missing argument: y` |
+| `fit(X)`, on nine of them | `ValueError: Supervised encoders need a target for the fitting. The target cannot be None` |
+| `fit(X)`, on `SummaryEncoder`, whose `fit` has no default for `y` | `TypeError` |
+
+A scikit-learn transformer takes `fit(X)`, so the form is easy to carry over from an
+`OrdinalEncoder` or a `OneHotEncoder`. The rule reports the call on an encoder built in the same
+expression, and on a name that is assigned from a supervised class in the same function and from
+nothing else there.
 
 #### invalid-handle-option
 
 **Severity:** error. **Fix:** none.
 
-Reports a `handle_unknown` or `handle_missing` string that the encoder does not take, such as `handle_unknown="ignore"`, which belongs to the scikit-learn `OneHotEncoder`.
+The rule reports a `handle_unknown` or `handle_missing` string that the encoder doesn't take, such
+as `handle_unknown="ignore"`, which belongs to the scikit-learn `OneHotEncoder`.
 
 Example:
 
@@ -7548,14 +8276,16 @@ every version.
 `"value"` on a category_encoders `OneHotEncoder` codes an unseen category as zeros, which is
 what `"ignore"` does in scikit-learn. `HashingEncoder` keeps no list of categories, so it has
 neither keyword and raised `TypeError: HashingEncoder.__init__() got an unexpected keyword
-argument 'handle_unknown'`. A value that is not a string, such as a number or a function, is
-allowed since 2.11 and is left alone, and so is `CountEncoder`, which checks nothing.
+argument 'handle_unknown'`. A value that is not a string, such as a number or a function, is allowed since 2.11 and is left alone.
+`CountEncoder` checks nothing and is left alone too.
 
 #### named-cols-after-array-step
 
 **Severity:** error. **Fix:** none.
 
-Reports an encoder with names in `cols` that comes after an imputer, a scaler or a `ColumnTransformer` in a pipeline. Those steps hand the next step a NumPy array, and the names are gone.
+The rule reports an encoder with names in `cols` that comes after an imputer, a scaler or a
+`ColumnTransformer` in a pipeline. Such steps hand the next step a NumPy array, and the names are
+gone.
 
 Example:
 
@@ -7572,12 +8302,12 @@ model = make_pipeline(imputer, ce.OneHotEncoder(cols=["city"]))
 
 The replacement is advice. xpd does not apply it automatically.
 
-The old form raised at fit: `ValueError: X does not contain the columns listed in cols:
-['city'] The encoder received a non-DataFrame input at fit, where named columns cannot be
-recovered positionally`. With `set_output(transform="pandas")` on the imputer the same
+The old form raised `ValueError: X does not contain the columns listed in cols: ['city'] The
+encoder received a non-DataFrame input at fit, where named columns cannot be recovered
+positionally` at fit. With `set_output(transform="pandas")` on the imputer the same
 pipeline ran, and so did the old form with the column given by position, as in `cols=[0]`.
 
-The rule knows these steps to give an array: `SimpleImputer`, `KNNImputer`, `IterativeImputer`,
+The rule knows that the following steps give an array: `SimpleImputer`, `KNNImputer`, `IterativeImputer`,
 `StandardScaler`, `MinMaxScaler`, `MaxAbsScaler`, `RobustScaler`, `Normalizer`,
 `PowerTransformer`, `QuantileTransformer`, `KBinsDiscretizer`, `PolynomialFeatures`,
 `ColumnTransformer` and `make_column_transformer`. It reads `make_pipeline(...)` and
@@ -7588,7 +8318,9 @@ calls `set_output` or sets `transform_output`, anywhere.
 
 **Severity:** error. **Fix:** none.
 
-Reports a method call on the result of `fit` of a `PolynomialWrapper` or a `NestedCVWrapper`, and a name assigned from that `fit`. Their `fit` has no return statement, so it returns `None` where every scikit-learn estimator returns itself.
+The rule reports a method call on the result of `fit` of a `PolynomialWrapper` or a
+`NestedCVWrapper`, and a name assigned from that `fit`. Their `fit` has no return statement, so it
+returns `None` where every scikit-learn estimator returns itself.
 
 Example:
 
@@ -7611,16 +8343,17 @@ wrappers. `fit_transform` returns the encoded frame on both and is left alone.
 
 ### Removed and deprecated forms
 
-The release of each removal was found by reading the constructor of every class in the wheels
-of 1.3.0, 2.2.2, 2.5.1, 2.6.4, 2.7.0, 2.8.0, 2.8.1, 2.9.0, 2.10.0 and 2.11.2, and each exception
-was raised on 2.11.2. Code inside `assertRaises`, `pytest.raises` or a `try` block with an `except`
+Each rule in the group reports a form that a release of category_encoders removed or deprecated.
+The release of each removal was found by reading the constructor of every class in the wheels of
+1.3.0, 2.2.2, 2.5.1, 2.6.4, 2.7.0, 2.8.0, 2.8.1, 2.9.0, 2.10.0 and 2.11.2, and each exception was
+raised on 2.11.2. Code inside `assertRaises`, `pytest.raises` or a `try` block with an `except`
 clause expects the error or handles both releases, and stays silent.
 
 #### removed-in-category-encoders
 
 **Severity:** error. **Fix:** unsafe for the two renamed names in `category_encoders.utils`. The other forms have no fix.
 
-Reports forms that a release of category_encoders removed and that raise on 2.11.2.
+The rule reports forms that a release of category_encoders removed and that raise on 2.11.2.
 
 Example:
 
@@ -7646,10 +8379,9 @@ encoder = ce.OneHotEncoder(handle_missing="value")
 
 Until 2.6 the four contrast encoders, `BackwardDifferenceEncoder`, `HelmertEncoder`,
 `PolynomialEncoder` and `SumEncoder`, added a column named `intercept` that holds 1 on every
-row. 2.7 stopped adding it, so a drop by that name raises `KeyError: "['intercept'] not found
+row. 2.7 stopped adding it, so a drop of the column raises `KeyError: "['intercept'] not found
 in axis"`. The rule reports the drop only in a file that names one of the four classes, and it
-leaves a drop with `errors="ignore"` alone. It also leaves alone a drop on a frame that the file
-gives a column of that name itself, with `frame["intercept"] = 1.0` or `frame.insert`, and every
+leaves a drop with `errors="ignore"` alone. It also leaves alone a drop on a frame that the file gives a column named `intercept` itself, with `frame["intercept"] = 1.0` or `frame.insert`, and every
 drop in a file that calls `assign(intercept=...)`, because such a drop takes out the file's own
 column.
 
@@ -7669,7 +8401,7 @@ defines its own `get_obj_cols` is left alone.
 
 **Severity:** warning for `get_feature_names`, and info for `max_sample`. **Fix:** safe.
 
-Reports `encoder.get_feature_names()` and `HashingEncoder(max_sample=...)`.
+The rule reports `encoder.get_feature_names()` and `HashingEncoder(max_sample=...)`.
 
 Example:
 
@@ -7692,7 +8424,7 @@ the fix is safe. The method `get_feature_names_out` was added in 2.6, so the doc
 
 scikit-learn removed its own `get_feature_names`, and
 [`removed-in-sklearn`](#removed-in-sklearn) reports every call in a file that imports sklearn.
-This rule therefore runs only in a file that does not import it. It needs the receiver built
+`deprecated-in-category-encoders` therefore runs only in a file that doesn't import sklearn. It needs the receiver built
 from a class whose name ends in `Encoder` or `Wrapper`, in the same expression or in an
 assignment of the same function.
 
@@ -7707,7 +8439,8 @@ keyword is safe.
 
 **Severity:** info. **Fix:** none.
 
-Reports a category_encoders `OneHotEncoder`, `OrdinalEncoder` or `TargetEncoder` that uses nothing the scikit-learn class of the same name lacks.
+The rule reports a category_encoders `OneHotEncoder`, `OrdinalEncoder` or `TargetEncoder` that
+uses nothing the scikit-learn class of the same name lacks.
 
 Example:
 
@@ -7754,11 +8487,11 @@ or not at all. An encoder handed to `PolynomialWrapper` or `NestedCVWrapper` is 
 an encoder without `cols` inside a `ColumnTransformer` is left to
 [`cols-left-to-dtype`](#cols-left-to-dtype).
 
-One idea was measured and dropped: that a Pipeline with the scikit-learn `TargetEncoder`
-scores better on the test rows than one with the category_encoders class. On 2,000 rows with a
-target that depends on a column of 300 levels, the category_encoders `TargetEncoder` scored
-0.599 AUC and the scikit-learn class 0.544, over 30 seeds with a random forest. The rule
-therefore claims the speed and nothing about the score.
+The pack also tested whether a Pipeline with the scikit-learn `TargetEncoder` scores better on the
+test rows than one with the category_encoders class, and it didn't. On 2,000 rows with a target
+that depends on a column of 300 levels, the category_encoders `TargetEncoder` scored 0.599 AUC and
+the scikit-learn class 0.544, over 30 seeds with a random forest. The rule therefore claims the
+speed and nothing about the score.
 
 ### Reproducible results
 
@@ -7766,7 +8499,8 @@ therefore claims the speed and nothing about the score.
 
 **Severity:** info. **Fix:** none.
 
-Reports an encoder that adds random noise without `random_state`, and a `NestedCVWrapper` that shuffles its folds without it.
+The rule reports an encoder that adds random noise without `random_state`, and a `NestedCVWrapper`
+that shuffles its folds without it.
 
 Example:
 
@@ -7797,21 +8531,20 @@ With `random_state=0` the two calls were equal in each row of the table, and a
 `NestedCVWrapper` with `shuffle=False` was equal too. A seed does not move the expected score,
 so the rule is info, as [`missing-random-state`](#missing-random-state) of the scikit-learn
 pack is. A `NestedCVWrapper` given a splitter as `cv` is left alone, because the splitter
-brings its own seed. A file that calls `np.random.seed` is left alone, because the encoders
-then draw from that seed.
+brings its own seed. A file that calls `np.random.seed` is left alone, because the encoders then draw from the global NumPy seed.
 
 ### What the pack leaves out
 
-These habits were looked at and have no rule.
+The pack has no rule for the following habits, which were looked at:
 
 - A target of more than two classes given to `TargetEncoder` as whole numbers is coded as the
   mean of the class numbers, which means nothing. `PolynomialWrapper` is the answer, but a
   pattern cannot see how many classes a target has. `WOEEncoder` raises `ValueError: The target
   column y must be binary` in the same case.
 - `encoder.fit(X_train, y_train)` followed by `encoder.transform(X_train)` gives the training
-  rows of a `LeaveOneOutEncoder` the plain mean of their category. With a random forest that
-  scored 0.599 AUC on the test rows against 0.541 with the target passed, so the form the
-  documentation asks for was the worse one here, and no rule reports the other.
+  rows of a `LeaveOneOutEncoder` the plain mean of their category. With a random forest, the form
+  scored 0.599 AUC on the test rows against 0.541 with the target passed. The form the
+  documentation asks for was the worse one here, so no rule reports the other.
 - `LeaveOneOutEncoder()` without `sigma` scored 0.541 against 0.551 with `sigma=0.05` in a
   forest, and the same in a logistic regression, which is no proof.
 - One encoder per column in a loop was 1.03 to 1.16 times slower than one encoder with `cols`.
@@ -7823,82 +8556,93 @@ These habits were looked at and have no rule.
 
 ## linearmodels
 
-These rules run on files that import `linearmodels`, the module of
-[linearmodels](https://bashtage.github.io/linearmodels/), which fits panel models, instrument
-models, systems of equations and factor models of asset prices. They report formulas and
-arguments that fit another model than the code reads as, covariance options that give other
-standard errors than the code asks for, code that raises on linearmodels 7.1, names of
-statsmodels results read on linearmodels results, and forms that a release removed or
-deprecated. Every number in this section was measured on linearmodels 7.1 with pandas 3.1.1,
-NumPy 2.5.5, SciPy 1.18.1, statsmodels 0.15.0 and formulaic 1.2.2 on Python 3.13, and a number
-for another release names it. The data sets `wage_panel`, `mroz` and `french` are the ones in
-`linearmodels.datasets`. Examples assume that the linearmodels names they use are imported and
-that `sm` is `statsmodels.api`. Names such as `data`, `y`, `X` and `instruments` represent
-values supplied by your program.
+The linearmodels rules report formulas and arguments that fit another model than the code reads
+as, covariance options that give other standard errors than the code asks for, code that raises on
+linearmodels 7.1, statsmodels names read on linearmodels results, and forms that a release removed
+or deprecated. They run in each file that imports `linearmodels`.
+[linearmodels](https://bashtage.github.io/linearmodels/) fits panel models, instrument models,
+systems of equations and factor models of asset prices.
 
-Most of the pack is about one fact: linearmodels looks like statsmodels and differs from it in
-small ways. It adds no intercept to a formula, it names its covariances and its results in
-another way, its `IV2SLS` takes other arguments in another order, and `summary` is a property.
-Code written from the memory of statsmodels runs into each of these.
+Every number about the linearmodels rules was measured on linearmodels 7.1 with pandas 3.1.1, NumPy 2.5.5,
+SciPy 1.18.1, statsmodels 0.15.0 and formulaic 1.2.2 on Python 3.13, and a number for another
+release names it. The data sets `wage_panel`, `mroz` and `french` are the ones in
+`linearmodels.datasets`. The examples assume that the linearmodels names they use are imported and
+that `sm` is `statsmodels.api`. Names such as `data`, `y`, `X` and `instruments` stand for values
+from your program.
 
-Four class names exist in statsmodels as well: `OLS`, `IV2SLS`, `IVGMM` and `SUR`. A rule about
-one of them reports a call only with proof that the class comes from linearmodels. The proof is
-the module in front of the name, as in `linearmodels.IV2SLS` or `lm.IV2SLS` after
-`import linearmodels as lm`, or an import of the name from `linearmodels` in the same file. A
-file that imports the same name from two libraries gives no proof, so those rules stay silent
-there. The other 15 model classes of `linearmodels.__all__` have names of their own and need no
-proof.
+Most of the pack is about one fact. linearmodels looks like statsmodels and differs from it in
+small ways, and code written from the memory of statsmodels runs into each of them:
 
-A rule about `fit` or about a result reads only an object it can follow to a linearmodels
-class: a call on the class itself, such as `PanelOLS(y, X).fit(...)`, or a name that its
-function, or the module outside any function, assigns from such calls and from nothing else. A
-name that is also assigned from anything else, that a loop, a `with` statement or a lambda
-parameter binds, or that comes in as an argument is left alone. A statsmodels model in the same
-file is therefore not reported: the 950 real files hold 583 `cov_type=` strings with a
+| What | statsmodels | linearmodels |
+| --- | --- | --- |
+| intercept in a formula | added | not added |
+| covariance names | `"nonrobust"`, `"HC1"`, `"cluster"` | `"unadjusted"`, `"robust"`, `"clustered"` |
+| result names | `bse`, `tvalues`, `resid` | `std_errors`, `tstats`, `resids` |
+| `IV2SLS` arguments | `(endog, exog, instrument=None)`, in `statsmodels.sandbox.regression.gmm` | `(dependent, exog, endog, instruments)` |
+| `summary` | a method | a property |
+
+`OLS`, `IV2SLS`, `IVGMM` and `SUR` exist in statsmodels as well. A rule about one of the four
+reports a call only with proof that the class comes from linearmodels. The proof is the module in
+front of the name, as in `linearmodels.IV2SLS` or `lm.IV2SLS` after `import linearmodels as lm`, or
+an import of the name from `linearmodels` in the same file. A file that imports the same name from
+both libraries gives no proof, so the rules about the four classes stay silent there. The other 15
+model classes of `linearmodels.__all__` have names of their own and need no proof.
+
+A rule about `fit` or about a result reads only an object it can follow to a linearmodels class.
+Such an object is a call on the class itself, such as `PanelOLS(y, X).fit(...)`, or a name that
+its function, or the module outside any function, assigns from such calls and from nothing else.
+The rule leaves alone a name that is also assigned from anything else, that a loop, a `with`
+statement or a lambda parameter binds, or that comes in as an argument. A statsmodels model in the
+same file is therefore not reported. The 950 real files hold 583 `cov_type=` strings with a
 statsmodels name, such as `"HC3"` and `"cluster"`, and no rule reports one of them.
 
-A rule reads an argument only when it is written out. A `cov_type`, a formula or a flag that is
-a name, an f-string or a value unpacked from a dictionary is left alone.
+A rule reads an argument only when it is written out. A `cov_type`, a formula or a flag that is a
+name, an f-string or a value unpacked from a dictionary is left alone.
 
-A rule document whose advice needs a newer release carries `since`. xpd reads the installed
-version from the project's venv, as it does for pandas, and skips that document on an older
-release. When the venv has no linearmodels, or there is no venv, every document runs. Each
-`since` was checked by installing the release before it and the release at it from PyPI and
-running the form on both: 4.14 and 4.15, 4.17 and 4.18, 4.31 and 5.0, and 7.0 and 7.1.
+A rule document whose advice needs a newer release carries `since`. xpd reads the installed version
+from the project's venv and skips that document on an older release. When the venv has no
+linearmodels, or there is no venv, every document runs. Each `since` was checked by installing
+from PyPI the release before it and the release at it, and running the form on both:
+
+| `since` | Releases run |
+| --- | --- |
+| 4.15 | 4.14 and 4.15 |
+| 4.18 | 4.17 and 4.18 |
+| 5.0 | 4.31 and 5.0 |
+| 7.1 | 7.0 and 7.1 |
 
 ### How a rule earns its place
 
-Every `error` and `warning` document ships on a proof that was run, and the message quotes what
-the proof measured. A proof is one of four kinds:
+Each `error` and `warning` document ships only with a proof that was run, and the message quotes
+what the proof measured. A proof is one of the following kinds:
 
-- A result proof runs the old and the new form on the same data and prints what each returns.
-  It passes when the old form gives another number than the code reads as, with no error and
-  no warning, such as a coefficient of 0.2184 where 0.0338 is the one with an intercept.
-- An interpreter proof runs the old form under `python -W error`. It passes when the old form
-  raises an exception or a warning and the new form runs clean. Old releases warn about their
-  own dependencies, so on those only a warning from linearmodels counted.
-- A simulation proof draws data whose true coefficient is known, at least 1,000 times, and
-  counts how often the 95% interval covers it or how often a true null is rejected at 5%.
-- A speed proof times both forms on one thread, as the median of 5 fits, at two sizes. It
-  passes when the new form is at least 1.5 times faster at both.
+| Proof | What runs | When it passes |
+| --- | --- | --- |
+| result | The old and the new form on the same data, with what each returns printed. | The old form gives another number than the code reads as, with no error and no warning, such as a coefficient of 0.2184 where 0.0338 is the one with an intercept. |
+| interpreter | The old form under `python -W error`. | The old form raises an exception or a warning, and the new form runs clean. Old releases warn about their own dependencies, so on the old releases only a warning from linearmodels counted. |
+| simulation | At least 1,000 draws of data whose true coefficient is known. | It counts how often the 95% interval covers the coefficient, or how often a true null is rejected at 5%. |
+| speed | Both forms on one thread, as the median of 5 fits, at two sizes. | The new form is at least 1.5 times faster at both. |
 
-A document is `info` when its advice depends on something the code does not show, such as the
-dtype of a column or how the errors are related. A form that was run on 7.1 and on 7.0 gave the
-same result on both unless the text says otherwise.
+A document is `info` when its advice depends on something the code doesn't show, such as the dtype
+of a column or how the errors are related. A form that was run on 7.1 and on 7.0 gave the same
+result on both unless the text says otherwise.
 
-The rules were run over two sets of code. The first is the library's own code at 7.1, 258
-files: the 229 Python files of the repository, of which 165 are tests, the code cells of its 12
-notebooks, the code blocks of 9 `.rst` and `.md` pages, and the doctest lines of 8 modules. The
-second is 950 files from 623 public repositories that mention `linearmodels`, found through the
-GitHub code search, at most 4 from one repository, with notebooks turned into their code cells.
-Four rules were narrowed after these runs, and the table gives the reports that are left:
+The rules were run over two sets of code:
 
-- `time-before-entity-index` reported 2 frames that no panel model reads, and one frame indexed
-  by date and hour on purpose. The frame must now reach a panel model, and `hour` is a time.
-- `statsmodels-result-name` reported `res.tvalues` behind `hasattr(res, "tstats")`. Code under a
-  `hasattr` check is now left alone by every rule about a form that raises.
+- the library's own code at 7.1, 258 files, which are the 229 Python files of the repository, of
+  which 165 are tests, the code cells of its 12 notebooks, the code blocks of 9 `.rst` and `.md`
+  pages, and the doctest lines of 8 modules
+- 950 files from 623 public repositories that mention `linearmodels`, found through the GitHub
+  code search, at most 4 from one repository, with notebooks turned into their code cells
+
+After the runs, the rules below were narrowed, and the table gives the reports that are left:
+
+- `time-before-entity-index` reported 2 frames that no panel model reads, and one frame indexed by
+  date and hour on purpose. The frame must now reach a panel model, and `hour` is a time.
+- `statsmodels-result-name` reported `res.tvalues` behind `hasattr(res, "tstats")`. Every rule
+  about a form that raises now leaves code under a `hasattr` check alone.
 - `hand-written-hausman` reported a test of OLS against instruments, which the method of 7.1
-  does not do. Its message now names `wu_hausman()` as well.
+  doesn't do. Its message now names `wu_hausman()` as well.
 - `absorb-not-categorical` matched its own name in a comment. It now looks for `category`.
 
 | Rule | Severity | Proof | Reports on the library | Reports on 950 real files | Fix |
@@ -7931,35 +8675,41 @@ Four rules were narrowed after these runs, and the table gives the reports that 
 
 A result proof gives the old form's number against the new form's number.
 
-Of the 424 reports on the library, 401 are in its tests, which call the forms on purpose: 308
-fits with the default covariance, 42 `PanelOLS` models without effects that are compared with
-`PooledOLS`, 22 kernel estimators with the default bandwidth, and 11 uses of the deprecated
-names inside the tests of the deprecations. One report names a line where the advice is wrong: a
-documentation page shows `set_index(['year','firm'])` for the `PanelOLS` that pandas had in
-2017, which took the time first. One report is a defect of the library's own README, whose
-first example writes `exper + exper ** 2` and fits a model without the squared term.
+Of the 424 reports on the library, 401 are in its tests, which call the forms on purpose. They are
+308 fits with the default covariance, 42 `PanelOLS` models without effects that are compared with
+`PooledOLS`, 22 kernel estimators with the default bandwidth, and 11 uses of the deprecated names
+inside the tests of the deprecations. One report names a line where the advice is wrong, which is a
+documentation page that shows `set_index(['year','firm'])` for the `PanelOLS` that pandas had in
+2017, which took the time first. One report is a defect of the library's own README, whose first
+example writes `exper + exper ** 2` and fits a model without the squared term.
 
-Of the 516 reports on the 950 real files, 112 are errors or warnings, and each was read. None
-names a line where the rule's claim is false. The 404 others are `info`: 20 of the 372
+Of the 516 reports on the 950 real files, 112 are errors or warnings, and each was read. None names
+a line where the rule's claim is false. The other 404 are `info`. Of them, 20 of the 372
 `panel-default-covariance` reports, 14 of the 27 `hand-written-hausman` reports and all 5
-`absorb-not-categorical` reports were read,
-and each is a fit or a model of the kind the rule describes. The files hold 583 `cov_type=`
-strings with a statsmodels name, such as `"HC3"` and `"cluster"`, and `unknown-cov-type` reports
-none of them. The 20 that were read are calls on statsmodels models. Recall was not measured, so
-nothing here says how often a rule misses the form it describes. With the pack, xpd took 7%
-more processor time on the 950 files than without it, 744 s against 696 s.
+`absorb-not-categorical` reports were read, and each is a fit or a model of the kind the rule
+describes. `unknown-cov-type` reports none of the 583 `cov_type=` strings with a statsmodels name,
+and the 20 of them that were read are calls on statsmodels models.
+
+Recall was not measured, so nothing here says how often a rule misses the form it describes. With
+the pack, xpd took 7% more processor time on the 950 files than without it, 744 s against 696 s.
 
 ### Formulas
 
-linearmodels parses formulas with formulaic, and every model has a `from_formula`. The rules in
-this group read a formula only when it is a string in the `from_formula` call: the first
-argument, the `formula` keyword, or a value of the dictionary that a system model takes.
+Each rule in the group reports a formula that fits another model than it reads as. linearmodels
+parses formulas with formulaic, and every model has a `from_formula`. The rules read a formula only
+when it is a string in the `from_formula` call, as the first argument, the `formula` keyword, or a
+value of the dictionary that a system model takes.
 
 #### formula-without-constant
 
 **Severity:** warning. **Fix:** none.
 
-Reports a formula with no `1` term in `from_formula` of `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FamaMacBeth`, `PanelOLS` and the system models, and in `from_formula` of `IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE`, `IVJIVE` and `OLS` when the formula has an instrument block in brackets. linearmodels adds no intercept to these formulas. statsmodels and R add one, so `"y ~ x"` is a regression through the origin here and a regression with an intercept there.
+The rule reports a formula with no `1` term in `from_formula` of `PooledOLS`, `RandomEffects`,
+`BetweenOLS`, `FamaMacBeth`, `PanelOLS` and the system models. It also reports such a formula in
+`from_formula` of `IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE`, `IVJIVE` and `OLS` when the formula has
+an instrument block in brackets. linearmodels adds no intercept to such formulas, where statsmodels
+and R add one, so `"y ~ x"` is a regression through the origin here and a regression with an
+intercept there.
 
 Example:
 
@@ -7975,13 +8725,36 @@ model = PooledOLS.from_formula("lwage ~ 1 + exper", data)
 iv = IV2SLS.from_formula("lwage ~ 1 + exper + [educ ~ fatheduc + motheduc]", data)
 ```
 
-On the wage panel, on 7.1 and on 7.0, `PooledOLS` gave `exper` a coefficient of 0.2184 for `"lwage ~ exper"` and 0.0338, with an intercept of 1.4289, for `"lwage ~ 1 + exper"`. `RandomEffects` gave 0.1119 against 0.0589, `BetweenOLS` 0.2364 against -0.0229, and `IV2SLS` on the mroz data gave `educ` 0.0769 against 0.0664. The instrument models for one equation add the intercept themselves when the formula has no block in brackets: on 7.1, 7.0 and 5.0, `IV2SLS`, `IVLIML`, `IVGMM` and `IVGMMCUE` returned `Intercept` and `exper` for `"lwage ~ exper"`, so the rule leaves that form alone on those classes. The rule stays silent when the formula says `- 1` or `0 +`, which states that no intercept is meant, when it names a column that looks like a constant, such as `const`, when it has a `C()` term, whose dummies span the intercept, and when a `PanelOLS` formula has effects or the call has `other_effects`, which absorb it. A no-intercept model can be meant, so this is a warning.
+On 7.1 and on 7.0, the coefficient of `exper` on the wage panel, and of `educ` for `IV2SLS` on the
+mroz data:
+
+| Model | Without `1` | With `1` |
+| --- | --- | --- |
+| `PooledOLS` | 0.2184 | 0.0338, with an intercept of 1.4289 |
+| `RandomEffects` | 0.1119 | 0.0589 |
+| `BetweenOLS` | 0.2364 | -0.0229 |
+| `IV2SLS` with an instrument block | 0.0769 | 0.0664 |
+
+The instrument models for one equation add the intercept themselves when the formula has no block
+in brackets. On 7.1, 7.0 and 5.0, `IV2SLS`, `IVLIML`, `IVGMM` and `IVGMMCUE` returned `Intercept`
+and `exper` for `"lwage ~ exper"`, so the rule leaves the form alone on the four classes.
+
+The rule stays silent when:
+
+- the formula says `- 1` or `0 +`, which states that no intercept is meant
+- the formula names a column that looks like a constant, such as `const`
+- the formula has a `C()` term, whose dummies span the intercept
+- a `PanelOLS` formula has effects, or the call has `other_effects`, which absorb the intercept
+
+A model without an intercept can be meant, so the rule is a warning.
 
 #### effects-outside-panel-ols
 
 **Severity:** error. **Fix:** none.
 
-Reports `EntityEffects`, `FixedEffects` or `TimeEffects` in a formula given to `PooledOLS`, `RandomEffects`, `BetweenOLS`, `FirstDifferenceOLS` or `FamaMacBeth`. Every panel model takes the three terms out of the formula, and only `PanelOLS` then uses them.
+The rule reports `EntityEffects`, `FixedEffects` or `TimeEffects` in a formula given to
+`PooledOLS`, `RandomEffects`, `BetweenOLS`, `FirstDifferenceOLS` or `FamaMacBeth`. Every panel
+model takes the three terms out of the formula, and only `PanelOLS` then uses them.
 
 Example:
 
@@ -8001,7 +8774,8 @@ On 7.1 and 7.0, each of the five classes returned the same coefficients for `"lw
 
 **Severity:** error. **Fix:** none.
 
-Reports `entity_effects=` or `time_effects=` given to `PanelOLS.from_formula`. The constructor takes the two keywords, and `from_formula` reads the effects from the formula.
+The rule reports `entity_effects=` or `time_effects=` given to `PanelOLS.from_formula`. The
+constructor takes the two keywords, but `from_formula` reads the effects from the formula.
 
 Example:
 
@@ -8021,7 +8795,9 @@ model = PanelOLS.from_formula("lwage ~ 1 + exper + EntityEffects", data)
 
 **Severity:** error. **Fix:** none.
 
-Reports a term that is a name, `**` and a number, such as `exper**2`, in a formula of any model. A formula reads `**` as a power of interactions, so `exper**2` is `exper`. The squared values need `I(exper**2)`.
+The rule reports a term that is a name, `**` and a number, such as `exper**2`, in a formula of any
+model. A formula reads `**` as a power of interactions, so `exper**2` is `exper`. The squared values
+need `I(exper**2)`.
 
 Example:
 
@@ -8041,7 +8817,9 @@ On 7.1 and 7.0 the first formula gave a model with the columns `Intercept` and `
 
 **Severity:** error. **Fix:** none.
 
-Reports a `1` term in a formula of `FirstDifferenceOLS`, and `add_constant(...)` as its `exog`. A first difference removes everything that is constant over time, so the model refuses a constant.
+The rule reports a `1` term in a formula of `FirstDifferenceOLS`, and `add_constant(...)` as its
+`exog`. A first difference removes everything that is constant over time, so the model refuses a
+constant.
 
 Example:
 
@@ -8063,7 +8841,8 @@ Both forms raised `ValueError: Constants are not allowed in first difference reg
 
 **Severity:** error. **Fix:** none.
 
-Reports `weights="name"` on a model or on its `from_formula`. statsmodels and R take the weights of a formula model as the name of a column. linearmodels takes the values.
+The rule reports `weights="name"` on a model or on its `from_formula`. statsmodels and R take the
+weights of a formula model as the name of a column, but linearmodels takes the values.
 
 Example:
 
@@ -8081,14 +8860,17 @@ model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights=data["hours"])
 
 ### Panel models
 
-A panel model takes a frame whose index has two levels, the entity first and the time second.
-`PanelOLS` is the only class with effects, and it has none until it is told to.
+Each rule in the group reports a panel model that reads its index or its effects in another way
+than the code means. A panel model takes a frame whose index has two levels, the entity first and
+the time second. `PanelOLS` is the only class with effects, and it has none until it is told to.
 
 #### panel-ols-without-effects
 
 **Severity:** warning. **Fix:** none.
 
-Reports `PanelOLS(...)` with none of `entity_effects`, `time_effects` and `other_effects`, and `PanelOLS.from_formula` with a formula that has no effects term. The name of the class reads like a fixed effects estimator, and without one of the three it fits pooled OLS.
+The rule reports `PanelOLS(...)` with none of `entity_effects`, `time_effects` and
+`other_effects`, and `PanelOLS.from_formula` with a formula that has no effects term. The name of
+the class reads like a fixed effects estimator, but without one of the three it fits pooled OLS.
 
 Example:
 
@@ -8103,13 +8885,27 @@ fixed = PanelOLS(y, X, entity_effects=True).fit()
 pooled = PooledOLS(y, X).fit()
 ```
 
-On the wage panel, on 7.1 and 7.0, `PanelOLS(y, X)` and `PooledOLS(y, X)` returned the same coefficients, with `exper` at 0.0349, and `PanelOLS(y, X, entity_effects=True)` returned 0.0698. The rule reports 37 calls in 25 of the 950 real files. Among them are results named `fe_model` and `mod_fe`, and a function whose docstring starts "One- and two-way fixed effects estimator for panel data" and whose body is `PanelOLS(y, exogenous).fit()`. A call that passes any of the three keywords is left alone, also with the value `False`, and so is a call that unpacks its keywords. A formula with a `C()` term may hold the effects as dummies and is left alone too.
+On the wage panel, on 7.1 and 7.0:
+
+| Model | Coefficient of `exper` |
+| --- | --- |
+| `PanelOLS(y, X)` | 0.0349 |
+| `PooledOLS(y, X)` | 0.0349 |
+| `PanelOLS(y, X, entity_effects=True)` | 0.0698 |
+
+The rule reports 37 calls in 25 of the 950 real files. Among them are results named `fe_model` and
+`mod_fe`, and a function whose docstring starts "One- and two-way fixed effects estimator for panel
+data" and whose body is `PanelOLS(y, exogenous).fit()`. A call that passes any of the three
+keywords is left alone, also with the value `False`, and so is a call that unpacks its keywords. A
+formula with a `C()` term may hold the effects as dummies and is left alone too.
 
 #### too-many-effects
 
 **Severity:** error. **Fix:** none.
 
-Reports `PanelOLS` with `entity_effects=True`, `time_effects=True` and an `other_effects` that is written as data, and a formula with both effect terms next to such an `other_effects`. The model takes two effects at most.
+The rule reports `PanelOLS` with `entity_effects=True`, `time_effects=True` and an
+`other_effects` that is written as data. It also reports a formula with both effect terms next to
+such an `other_effects`. The model takes two effects at most.
 
 Example:
 
@@ -8124,13 +8920,21 @@ effects = data.reset_index()[["nr", "year", "occupation"]].astype("category")
 model = AbsorbingLS(y.reset_index(drop=True), X.reset_index(drop=True), absorb=effects)
 ```
 
-7.1 and 7.0 raised `ValueError: At most two effects supported.` for both forms. `AbsorbingLS` with the three columns as categories ran on 7.1. With `other_effects=None` the call runs, so the rule counts `other_effects` only when its value is a subscript, an attribute or a call, such as `data[["occupation"]]`, or a name that its function assigns from such a value and from nothing else. A parameter, a name that holds `None`, a value read from `self` or from a settings object, and a `get` call are left alone.
+7.1 and 7.0 raised `ValueError: At most two effects supported.` for both forms. `AbsorbingLS` with
+the three columns as categories ran on 7.1.
+
+With `other_effects=None` the call runs, so the rule counts `other_effects` only when its value is
+a subscript, an attribute or a call, such as `data[["occupation"]]`. A name that its function
+assigns from such a value and from nothing else counts too. A parameter, a name that holds `None`,
+a value read from `self` or from a settings object, and a `get` call are left alone.
 
 #### time-before-entity-index
 
 **Severity:** warning. **Fix:** unsafe: the two names in the other order.
 
-Reports `set_index([time, entity])` where the first name is a usual name for a time, such as `"year"` or `"date"`, the second is not, and the frame reaches a panel model. Nothing checks which level is which.
+The rule reports `set_index([time, entity])` when the frame reaches a panel model. The first name
+must be a usual name for a time, such as `"year"` or `"date"`, and the second must not be. Nothing
+checks which level is which.
 
 Example:
 
@@ -8146,13 +8950,37 @@ data = wage.set_index(["nr", "year"])
 model = PanelOLS(data.lwage, data[["hours", "married"]], entity_effects=True)
 ```
 
-With the year first, `PanelOLS` read the wage panel as 8 entities over 545 periods, and `entity_effects=True` gave `married` 0.1622, which is what `time_effects=True` gives on the right index, where the entity effects estimate is 0.2483. No error and no warning was raised. The rule knows the order only by the names. A two level index is also made for other uses, so the frame must reach a panel model: the `set_index` call is an argument of the model, or its result is assigned to a name that a panel model in the same function reads. The first form of the rule read every `set_index` in a file that imports linearmodels, and 2 of its 4 reports on the real files were a table of portfolios by month that no panel model reads. The rule also stays silent when another statement in the function can change the index of the same name, such as `swaplevel`, a second `set_index`, a merge or an assignment to `.index`, when the same chain goes on with such a call, as in `set_index(["year", "nr"]).swaplevel()`, and when a later statement assigns the name again. A list with a comment inside is reported without the fix, which would delete the comment.
+With the year first, `PanelOLS` read the wage panel as 8 entities over 545 periods, with no error
+and no warning:
+
+| Index | Option | Coefficient of `married` |
+| --- | --- | --- |
+| `["year", "nr"]` | `entity_effects=True` | 0.1622 |
+| `["nr", "year"]` | `time_effects=True` | 0.1622 |
+| `["nr", "year"]` | `entity_effects=True` | 0.2483 |
+
+The rule knows the order only by the names. A two level index is also made for other uses, so the
+frame must reach a panel model. The `set_index` call is an argument of the model, or its result is
+assigned to a name that a panel model in the same function reads. The first form of the rule read
+every `set_index` in a file that imports linearmodels, and 2 of its 4 reports on the real files were
+a table of portfolios by month that no panel model reads.
+
+The rule also stays silent when:
+
+- another statement in the function can change the index of the same name, such as `swaplevel`, a
+  second `set_index`, a merge or an assignment to `.index`
+- the same chain goes on with such a call, as in `set_index(["year", "nr"]).swaplevel()`
+- a later statement assigns the name again
+
+A list with a comment inside is reported without the fix, which would delete the comment.
 
 #### use-lsdv
 
 **Severity:** warning. **Fix:** none.
 
-Reports `use_lsdv=True` in `fit` of a `PanelOLS`. It estimates each effect as a dummy column, where the default removes the effects by subtracting group means and gives the same estimates.
+The rule reports `use_lsdv=True` in `fit` of a `PanelOLS`. The option estimates each effect as a
+dummy column, where the default removes the effects by subtracting group means and gives the same
+estimates.
 
 Example:
 
@@ -8166,18 +8994,31 @@ Use instead:
 result = PanelOLS(y, X, entity_effects=True).fit()
 ```
 
-On one thread, as the median of 5 fits with entity effects, 3 regressors and 10 periods, LSDV took 0.298 s against 0.017 s for 500 entities, which is 17 times, and 77.1 s against 0.051 s for 3,000 entities, which is 1,508 times. 7.0 gave 18 times and 1,382 times. The coefficients differed by at most 2.2e-16 and the standard errors by at most 1.7e-18, so the estimates are equal and not bit equal, and the rule has no fix. `use_lsmr=True` and `low_memory=True` ran within 10% of the default and are not reported.
+On one thread, as the median of 5 fits with entity effects, 3 regressors and 10 periods:
+
+| Entities | LSDV | Default | LSDV was slower on 7.1 by | On 7.0 by |
+| --- | --- | --- | --- | --- |
+| 500 | 0.298 s | 0.017 s | 17 times | 18 times |
+| 3,000 | 77.1 s | 0.051 s | 1,508 times | 1,382 times |
+
+The coefficients differed by at most 2.2e-16 and the standard errors by at most 1.7e-18, so the
+estimates are equal but not bit equal, and the rule has no fix. `use_lsmr=True` and
+`low_memory=True` ran within 10% of the default and are not reported.
 
 ### Covariance
 
-`fit` takes `cov_type` and, next to it as keywords, the options of that covariance. Each model
-has its own short list of names, and none of them is a statsmodels name.
+Each rule in the group reports a covariance choice that gives other standard errors than the code
+asks for, or that raises. `fit` takes `cov_type` and, next to it as keywords, the options of the
+chosen covariance. Each model has its own short list of names, and none of them is a statsmodels
+name.
 
 #### clustered-without-clusters
 
 **Severity:** error. **Fix:** none.
 
-Reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and `clusters`. Without them every observation is a cluster of its own, which is the heteroskedasticity robust covariance under another name.
+The rule reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and
+`clusters`. Without them every observation is a cluster of its own, which is the
+heteroskedasticity robust covariance under another name.
 
 Example:
 
@@ -8191,13 +9032,30 @@ Use instead:
 result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
 ```
 
-On 7.1 and 7.0, `PanelOLS` with entity effects on the wage panel gave the first standard error 0.041301 for `cov_type="clustered"`, 0.041301 for `cov_type="robust"` and 0.049385 with `cluster_entity=True`. `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS` gave equal pairs in the same way, and so did `OLS`, `IV2SLS`, `IVLIML`, `AbsorbingLS`, `SUR` and `IV3SLS`, which take the groups as `clusters=`: 0.427716 both ways on `IV2SLS`. `IVGMM`, `IVGMMCUE` and `IVJIVE` raise `TypeError` instead, and the rule reports them with that message. The rule reports 31 calls in 9 of the 950 real files, each a regression table whose standard errors are said to be clustered and are not. `BetweenOLS` is left out, because it refuses `cluster_entity` and its rows are the entities already.
+On 7.1 and 7.0, `PanelOLS` with entity effects on the wage panel gave the following first standard errors:
+
+| `fit` | First standard error |
+| --- | --- |
+| `cov_type="clustered"` | 0.041301 |
+| `cov_type="robust"` | 0.041301 |
+| `cov_type="clustered", cluster_entity=True` | 0.049385 |
+
+`PooledOLS`, `RandomEffects` and `FirstDifferenceOLS` gave equal pairs in the same way. So did
+`OLS`, `IV2SLS`, `IVLIML`, `AbsorbingLS`, `SUR` and `IV3SLS`, which take the groups as `clusters=`,
+such as 0.427716 both ways on `IV2SLS`. `IVGMM`, `IVGMMCUE` and `IVJIVE` raise `TypeError` instead,
+and the rule's message for them says so.
+
+The rule reports 31 calls in 9 of the 950 real files, each a regression table whose standard errors
+are said to be clustered and are not. `BetweenOLS` is left out, because it refuses `cluster_entity`
+and its rows are the entities already.
 
 #### cov-option-without-cov-type
 
 **Severity:** error. **Fix:** none.
 
-Reports `cluster_entity`, `cluster_time` or `clusters` in a `fit` call whose `cov_type` is absent or is another name than `"clustered"`, and `bandwidth` or `kernel` in a call whose `cov_type` is absent or is not a kernel covariance.
+The rule reports `cluster_entity`, `cluster_time` or `clusters` in a `fit` call whose `cov_type` is
+absent or is a name other than `"clustered"`. It also reports `bandwidth` or `kernel` in a call
+whose `cov_type` is absent or is not a kernel covariance.
 
 Example:
 
@@ -8213,13 +9071,36 @@ result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_e
 fama = FamaMacBeth(y, X).fit(cov_type="kernel", bandwidth=3)
 ```
 
-7.1 raised `ValueError: The keyword argument 'cluster_entity' is not accepted with cov_type='unadjusted'` on `PanelOLS`. Each of the 15 classes other than `FamaMacBeth` and the factor models was run with each of the five keywords against no `cov_type` and against each name the rule reads, which is 930 calls on 7.1 and 868 on 7.0, and every one raised: `ValueError` or `UnknownOptionError` on 7.1, and `ValueError`, `TypeError` or `KeyError` on 7.0. `FamaMacBeth.fit` names `bandwidth` and `kernel` in its signature and reads them only with `cov_type="kernel"`: on 7.1 and 7.0 the first standard error on the wage panel was 0.203664 with no option, with `bandwidth=3` and with `kernel="parzen"`, and 0.300158 with `cov_type="kernel"` and `bandwidth=3`. The factor models ignored the two keywords on 7.0, where `TradedFactorModel.fit(bandwidth=3)` returned the standard error of the default, and raise `ValueError` on 7.1.
+7.1 raised `ValueError: The keyword argument 'cluster_entity' is not accepted with
+cov_type='unadjusted'` on `PanelOLS`. Each of the 15 classes other than `FamaMacBeth` and the
+factor models was run with each of the five keywords, against no `cov_type` and against each name
+the rule reads, and every call raised:
+
+| Release | Calls | Errors |
+| --- | --- | --- |
+| 7.1 | 930 | `ValueError` or `UnknownOptionError` |
+| 7.0 | 868 | `ValueError`, `TypeError` or `KeyError` |
+
+`FamaMacBeth.fit` names `bandwidth` and `kernel` in its signature and reads them only with
+`cov_type="kernel"`. On 7.1 and 7.0 the first standard error on the wage panel was:
+
+| `FamaMacBeth(y, X).fit(...)` | First standard error |
+| --- | --- |
+| no option | 0.203664 |
+| `bandwidth=3` | 0.203664 |
+| `kernel="parzen"` | 0.203664 |
+| `cov_type="kernel", bandwidth=3` | 0.300158 |
+
+The factor models ignored the two keywords on 7.0, where `TradedFactorModel.fit(bandwidth=3)`
+returned the standard error of the default, and they raise `ValueError` on 7.1.
 
 #### unknown-cov-type
 
 **Severity:** error. **Fix:** none.
 
-Reports a `cov_type` string that the model does not take, such as `"HC1"`, `"HAC"`, `"cluster"` or `"nonrobust"` of statsmodels, `"clustered"` on `FamaMacBeth` or `IVSystemGMM`, `"kernel"` on `BetweenOLS`, and `"unadjusted"` on a factor model.
+The rule reports a `cov_type` string that the model doesn't take, such as `"HC1"`, `"HAC"`,
+`"cluster"` or `"nonrobust"` of statsmodels, `"clustered"` on `FamaMacBeth` or `IVSystemGMM`,
+`"kernel"` on `BetweenOLS`, and `"unadjusted"` on a factor model.
 
 Example:
 
@@ -8235,7 +9116,9 @@ result = PanelOLS(y, X, entity_effects=True).fit(cov_type="robust")
 iv = IV2SLS(y, exog, endog, instruments).fit(cov_type="unadjusted", debiased=True)
 ```
 
-7.1 raises `UnknownOptionError`, which is both a `ValueError` and a `KeyError`, with the list of names the model takes, and 7.0 raised `ValueError` or `KeyError`. The lists were read from that error for each of the 19 model classes, and each name on a list was then run on its class:
+7.1 raises `UnknownOptionError`, which is both a `ValueError` and a `KeyError`, with the list of
+names the model takes, and 7.0 raised `ValueError` or `KeyError`. The lists were read from the
+error for each of the 19 model classes, and each name on a list was then run on its class:
 
 | Models | Names |
 | --- | --- |
@@ -8248,13 +9131,29 @@ iv = IV2SLS(y, exog, endog, instruments).fit(cov_type="unadjusted", debiased=Tru
 | `IVSystemGMM` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `hac` |
 | `TradedFactorModel`, `LinearFactorModel`, `LinearFactorModelGMM` | `robust`, `heteroskedastic`, `kernel` |
 
-Since 7.1 the names are not case sensitive, so the rule takes a known name in any case. On `OLS` with the mroz data, the standard errors of linearmodels were equal to those of statsmodels to 1e-13 for `"robust"` and `"HC0"`, for `"robust"` with `debiased=True` and `"HC1"`, for `"unadjusted"` with `debiased=True` and `"nonrobust"`, and for `"clustered"` with `clusters=` and `debiased=True` and `"cluster"` with the same groups. The message for the instrument models gives that table. The panel models default to `debiased=True`, and their default standard errors were equal to those of statsmodels.
+Since 7.1 the names are not case sensitive, so the rule takes a known name in any case.
+
+On `OLS` with the mroz data, the standard errors of linearmodels were equal to the ones of statsmodels
+to 1e-13 for each pair below, and the message for the instrument models gives the same pairs:
+
+| linearmodels | statsmodels |
+| --- | --- |
+| `"robust"` | `"HC0"` |
+| `"robust"` with `debiased=True` | `"HC1"` |
+| `"unadjusted"` with `debiased=True` | `"nonrobust"` |
+| `"clustered"` with `clusters=` and `debiased=True` | `"cluster"` with the same groups |
+
+The panel models default to `debiased=True`, and their default standard errors were equal to the ones
+of statsmodels.
 
 #### kernel-default-bandwidth
 
 **Severity:** warning. **Fix:** none.
 
-Reports `weight_type="kernel"` on `IVGMM`, `IVGMMCUE` and `IVSystemGMM`, and `cov_type="kernel"` in `fit` of `IVGMM` and `IVGMMCUE`, with neither `bandwidth` nor `optimal_bw`. 7.1 changed the default bandwidth from `nobs - 2` to one selected from the data, so the same code gives other numbers on 7.0 and on 7.1.
+The rule reports `weight_type="kernel"` on `IVGMM`, `IVGMMCUE` and `IVSystemGMM`, and
+`cov_type="kernel"` in `fit` of `IVGMM` and `IVGMMCUE`, with neither `bandwidth` nor `optimal_bw`.
+7.1 changed the default bandwidth from `nobs - 2` to one selected from the data, so the same code
+gives other numbers on 7.0 and on 7.1.
 
 Example:
 
@@ -8268,13 +9167,26 @@ Use instead:
 result = IVGMM(y, exog, endog, instruments, weight_type="kernel", optimal_bw=True).fit()
 ```
 
-On the mroz data, `IVGMM(..., weight_type="kernel")` had a J statistic of 0.8022 and a first standard error of 0.43964 on 7.0, and 0.3794 and 0.43137 on 7.1, where it also gave `DefaultBandwidthWarning`. With `optimal_bw=True` both releases gave 0.3794 and 0.43137, and with `bandwidth=4` both gave 0.43117. `IVGMM(...).fit(cov_type="kernel")` gave 0.35929 on 7.0 and 0.4658 on 7.1, and 0.46795 on both with `bandwidth=4`. `IVSystemGMM.fit(cov_type="kernel")` and `IV2SLS.fit(cov_type="kernel")` gave the same numbers on both releases with no warning and are not reported.
+On the mroz data:
+
+| Form | On 7.0 | On 7.1 |
+| --- | --- | --- |
+| `IVGMM(..., weight_type="kernel")`, J statistic and first standard error | 0.8022 and 0.43964 | 0.3794 and 0.43137, with `DefaultBandwidthWarning` |
+| the same with `optimal_bw=True` | 0.3794 and 0.43137 | 0.3794 and 0.43137 |
+| the same with `bandwidth=4` | 0.43117 | 0.43117 |
+| `IVGMM(...).fit(cov_type="kernel")`, first standard error | 0.35929 | 0.4658 |
+| the same with `bandwidth=4` | 0.46795 | 0.46795 |
+
+`IVSystemGMM.fit(cov_type="kernel")` and `IV2SLS.fit(cov_type="kernel")` gave the same numbers on
+both releases with no warning and are not reported.
 
 #### panel-default-covariance
 
 **Severity:** info. **Fix:** none.
 
-Reports `fit` with no `cov_type` on `PanelOLS`, `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS`. The default is `"unadjusted"`, the covariance for errors that are homoskedastic and unrelated over time, and the errors of one entity usually are related.
+The rule reports `fit` with no `cov_type` on `PanelOLS`, `PooledOLS`, `RandomEffects` and
+`FirstDifferenceOLS`. The default is `"unadjusted"`, the covariance for errors that are
+homoskedastic and unrelated over time, but the errors of one entity are usually related.
 
 Example:
 
@@ -8288,19 +9200,33 @@ Use instead:
 result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
 ```
 
-Over 1,000 draws of 200 entities and 8 periods, with an AR(1) regressor and an AR(1) error within each entity, both with coefficient 0.8, and a true slope of 0, `PanelOLS` with entity effects gave p below 0.05 in 17.3% of the draws with the default, 16.4% with `cov_type="robust"` and 5.7% with `cov_type="clustered"` and `cluster_entity=True`. In a second simulation with 300 entities, 3 periods and errors that are heteroskedastic and unrelated over time, the shares were 22.4%, 7.1% and 5.0%. Those are two simulations, and how far the default is off depends on the data, so the rule is info. It is the rule with the most reports: 372 in 142 of the 950 real files. `BetweenOLS` has one row for each entity and `FamaMacBeth` has its own covariance, so both are left alone, and a call that states `cov_type`, also as `"unadjusted"`, has made its choice.
+In two simulations with a true slope of 0, `PanelOLS` with entity effects gave p below 0.05 in
+the following shares of the draws:
+
+| Simulation | Default | `cov_type="robust"` | `cov_type="clustered"`, `cluster_entity=True` |
+| --- | --- | --- | --- |
+| 1,000 draws of 200 entities and 8 periods, with an AR(1) regressor and an AR(1) error within each entity, both with coefficient 0.8 | 17.3% | 16.4% | 5.7% |
+| 300 entities and 3 periods, with errors that are heteroskedastic and unrelated over time | 22.4% | 7.1% | 5.0% |
+
+How far the default is off depends on the data, so the rule is info. It is the rule with the most
+reports, 372 in 142 of the 950 real files. `BetweenOLS` has one row for each entity and
+`FamaMacBeth` has its own covariance, so both are left alone. A call that states `cov_type`, also
+as `"unadjusted"`, has made its choice.
 
 ### Instruments and absorbed effects
 
-`IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE` and `IVJIVE` take four arrays in the order dependent,
-exog, endog, instruments. None of the four has a default, and none of the models adds a
-constant.
+Each rule in the group reports an instrument model or an absorbed effect that is set up in another
+way than the code means. `IV2SLS`, `IVLIML`, `IVGMM`, `IVGMMCUE` and `IVJIVE` take four arrays in
+the order dependent, exog, endog, instruments. None of the four has a default, and none of the
+models adds a constant.
 
 #### iv-missing-arguments
 
 **Severity:** error. **Fix:** none.
 
-Reports an instrument model called with two or three arguments, and the keyword `instrument=`. statsmodels has an `IV2SLS` of its own, in `statsmodels.sandbox.regression.gmm`, with the signature `(endog, exog, instrument=None)`, where `endog` is the dependent variable.
+The rule reports an instrument model called with two or three arguments, and the keyword
+`instrument=`. statsmodels has an `IV2SLS` of its own, in `statsmodels.sandbox.regression.gmm`,
+with the signature `(endog, exog, instrument=None)`, where `endog` is the dependent variable.
 
 Example:
 
@@ -8320,7 +9246,8 @@ model = IV2SLS(y, exog, endog, instruments)
 
 **Severity:** warning. **Fix:** none.
 
-Reports an instrument model whose second argument has `endog` in its name and whose third has `exog`. The order of linearmodels is exog and then endog, and nothing checks the roles.
+The rule reports an instrument model whose second argument has `endog` in its name and whose third
+has `exog`. linearmodels takes exog and then endog, and nothing checks the roles.
 
 Example:
 
@@ -8340,7 +9267,8 @@ On the mroz data, `IV2SLS(lwage, educ, [const, exper], [fatheduc, motheduc])` ra
 
 **Severity:** warning. **Fix:** none.
 
-Reports `None` written as the `exog` of an instrument model that has an endogenous regressor. The model then has no intercept.
+The rule reports `None` written as the `exog` of an instrument model that has an endogenous
+regressor. The model then has no intercept.
 
 Example:
 
@@ -8354,13 +9282,24 @@ Use instead:
 model = IV2SLS(y, sm.add_constant(controls), x, z)
 ```
 
-Over 2,000 draws of 500 rows from `y = 2 + x + error` with one instrument, the mean estimate of the coefficient on `x` was 2.002 without `exog` and 0.990 with a constant column as `exog`. On the mroz data the coefficient on `educ` was 0.0928 without `exog` and 0.0664 with a constant and `exper`. Data with mean zero needs no intercept, so this is a warning.
+Over 2,000 draws of 500 rows from `y = 2 + x + error` with one instrument:
+
+| `exog` | Mean estimate of the coefficient on `x`, which is 1 |
+| --- | --- |
+| `None` | 2.002 |
+| a constant column | 0.990 |
+
+On the mroz data the coefficient on `educ` was 0.0928 without `exog` and 0.0664 with a constant and
+`exper`. Data with mean zero needs no intercept, so the rule is a warning.
 
 #### manual-two-stage
 
 **Severity:** warning. **Fix:** none.
 
-Reports a model whose `exog` holds `.fitted_values` of another fit: `OLS` or a panel class, or `IV2SLS`, `IVLIML` or `IVGMM` with `None` for `endog` and for `instruments`, which is least squares. That is two stage least squares by hand: the coefficient is right, and the standard errors come from residuals that use the fitted values in place of the regressor.
+The rule reports a model whose `exog` holds `.fitted_values` of another fit. The model is `OLS` or
+a panel class, or `IV2SLS`, `IVLIML` or `IVGMM` with `None` for `endog` and for `instruments`,
+which is least squares. Such a model is two stage least squares by hand. The coefficient is right,
+but the standard errors come from residuals that use the fitted values in place of the regressor.
 
 Example:
 
@@ -8375,13 +9314,24 @@ Use instead:
 result = IV2SLS(data.lwage, data[["const", "exper"]], data.educ, data[["fatheduc", "motheduc"]]).fit()
 ```
 
-On the mroz data both ways gave `educ` 0.0664, with an unadjusted standard error of 0.0327 by hand and 0.0311 from `IV2SLS`. Over 2,000 draws of 500 rows with one instrument, the 95% interval of the hand-made second stage covered the true coefficient in 99.6% of the draws and the interval of `IV2SLS` in 95.7%, and the hand-made standard error was 1.37 times the other on average. Which way the error goes depends on the data. The rule sees only the form where the fitted values are written in the call. A second stage that reads them from a column it stored earlier is not seen, and neither corpus has the form the rule reads.
+| Measurement | By hand | `IV2SLS` |
+| --- | --- | --- |
+| coefficient of `educ` on the mroz data | 0.0664 | 0.0664 |
+| unadjusted standard error on the mroz data | 0.0327 | 0.0311 |
+| coverage of the 95% interval, over 2,000 draws of 500 rows with one instrument | 99.6% | 95.7% |
+
+In the draws, the standard error by hand was 1.37 times the other on average. Which way the error
+goes depends on the data. The rule sees only the form where the fitted values are written in the
+call. A second stage that reads them from a column it stored earlier is not seen, and neither
+corpus has the form the rule reads.
 
 #### absorb-not-categorical
 
 **Severity:** info. **Fix:** none.
 
-Reports `AbsorbingLS(..., absorb=...)` in a file that never says `category`, `Categorical` or `cut(`. `absorb` reads the dtype of each column: a categorical column is absorbed as one effect for each category, and any other column as one continuous regressor.
+The rule reports `AbsorbingLS(..., absorb=...)` in a file that never says `category`,
+`Categorical` or `cut(`. `absorb` reads the dtype of each column. A categorical column is absorbed
+as one effect for each category, and any other column as one continuous regressor.
 
 Example:
 
@@ -8395,7 +9345,19 @@ Use instead:
 model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]].astype("category"))
 ```
 
-With 200 firms, a firm effect in the regressor and a true coefficient of 1.0, `absorb` with the integer firm id gave 3.397, where no `absorb` at all gave 3.398, and the same column as a category gave 1.022. No error and no warning was raised. A text column raises `TypeError` on 7.1, and 7.0 took it like the integers. One of the 4 real files that the rule reports turns its columns into text with `astype(str)` right before the call. The code does not show a dtype, so the rule is info, and data that is categorical when it is loaded is reported without need.
+With 200 firms, a firm effect in the regressor and a true coefficient of 1.0, no form raised an
+error or a warning:
+
+| `absorb` | Coefficient |
+| --- | --- |
+| the integer firm id | 3.397 |
+| none | 3.398 |
+| the firm id as a category | 1.022 |
+
+A text column raises `TypeError` on 7.1, and 7.0 took it like the integers. One of the 4 real files
+that the rule reports turns its columns into text with `astype(str)` right before the call. The
+code doesn't show a dtype, so the rule is info, and data that is categorical when it is loaded is
+reported without need.
 
 ### Results
 
@@ -8403,7 +9365,10 @@ With 200 firms, a firm effect in the regressor and a true coefficient of 1.0, `a
 
 **Severity:** error. **Fix:** unsafe: `summary` for `summary()`, `std_errors` for `bse`, `tstats` for `tvalues`, `resids` for `resid` and `fitted_values` for `fittedvalues`. The other names have no fix.
 
-Reports a name of a statsmodels result read on a linearmodels result: `summary()` called, and `bse`, `tvalues`, `resid`, `fittedvalues`, `aic`, `bic`, `llf`, `fvalue`, `f_pvalue`, `ssr`, `mse_resid`, `cov_params`, `t_test`, `f_test`, `get_robustcov_results`, `summary2`, `save` and 36 more.
+The rule reports a statsmodels result name read on a linearmodels result, such as `summary()`
+called, `bse`, `tvalues`, `resid`, `fittedvalues`, `aic`, `bic`, `llf`, `fvalue`, `f_pvalue`,
+`ssr`, `mse_resid`, `cov_params`, `t_test`, `f_test`, `get_robustcov_results`, `summary2`, `save`
+and 36 more.
 
 Example:
 
@@ -8421,7 +9386,7 @@ print(result.summary)
 errors = result.std_errors
 ```
 
-`summary` is a property, and on 7.1 and 7.0 `summary()` raised `TypeError: 'Summary' object is not callable` on the result of each of the 19 model classes. The other names are the 53 public names of a statsmodels 0.15.0 OLS result that none of those 19 results has, found with `dir()` and `hasattr`, and each raises `AttributeError`. The results of the factor models have no residuals under either name, so `resid` and `fittedvalues` are not reported on them.
+`summary` is a property, and on 7.1 and 7.0 `summary()` raised `TypeError: 'Summary' object is not callable` on the result of each of the 19 model classes. The other names are the 53 public names of a statsmodels 0.15.0 OLS result that none of the 19 results has, found with `dir()` and `hasattr`, and each raises `AttributeError`. The results of the factor models have no residuals under either name, so `resid` and `fittedvalues` are not reported on them.
 
 | statsmodels | linearmodels |
 | --- | --- |
@@ -8438,13 +9403,14 @@ errors = result.std_errors
 | `t_test`, `f_test` | `wald_test`, on the panel and instrument results |
 | `get_robustcov_results` | a new `fit(cov_type=...)` |
 
-On `OLS` with the mroz data, each pair of the table from `bse` to `mse_resid` was equal to 1e-11 for an unadjusted fit with `debiased=True`, and `loglik` of `PooledOLS` was equal to `llf`. The rule reports 15 reads in 6 of the 950 real files. `.summary()` is called in 171 of those files, and the rule reports it in the 3 where the result can be followed to a linearmodels model. Code under a `hasattr` check is a compatibility path and stays silent.
+On `OLS` with the mroz data, each pair of the table from `bse` to `mse_resid` was equal to 1e-11 for an unadjusted fit with `debiased=True`, and `loglik` of `PooledOLS` was equal to `llf`. The rule reports 15 reads in 6 of the 950 real files. `.summary()` is called in 171 of the 950 files, and the rule reports it in the 3 where the result can be followed to a linearmodels model. Code under a `hasattr` check is a compatibility path and stays silent.
 
 #### invalid-compare-precision
 
 **Severity:** error. **Fix:** none.
 
-Reports `compare(..., precision=...)` of `linearmodels.panel` or `linearmodels.iv` with a string other than `"tstats"`, `"std_errors"`, `"std-errors"` and `"pvalues"`.
+The rule reports `compare(..., precision=...)` of `linearmodels.panel` or `linearmodels.iv` with a
+string other than `"tstats"`, `"std_errors"`, `"std-errors"` and `"pvalues"`.
 
 Example:
 
@@ -8464,7 +9430,11 @@ On 7.1 and 7.0 both functions took the four strings in any case, and raised `Val
 
 **Severity:** info. **Fix:** none. Needs linearmodels 7.1.
 
-Reports a function whose name starts with `hausman`, apart from `hausman_taylor`, which is the Hausman and Taylor estimator, and names such as `hausman_table` or `hausman_data`, which show results or prepare data. 7.1 added the Hausman test of random effects against fixed effects as a method of the random effects result, and the instrument results have had `wu_hausman()` for longer.
+The rule reports a function whose name starts with `hausman`. It leaves alone `hausman_taylor`,
+which is the Hausman and Taylor estimator, and names such as `hausman_table` or `hausman_data`,
+which show results or prepare data. 7.1 added the Hausman test of random effects against fixed
+effects as a method of the random effects result, and the instrument results have had
+`wu_hausman()` for longer.
 
 Example:
 
@@ -8485,14 +9455,16 @@ On 7.1 the method returned a `HausmanTestResults` with the fields `statistic` an
 
 ### Removed and deprecated forms
 
-Each form below was run on the release before and the release at the version the rule names,
-both installed from PyPI.
+Each rule in the group reports a form that a release removed or deprecated. Each form was run on
+the release before and the release at the version the rule names, both installed from PyPI.
 
 #### removed-in-linearmodels
 
 **Severity:** error. **Fix:** unsafe: `wald_test` for `test_linear_constraint`. The import has no fix.
 
-Reports an import of `linearmodels.utility`, which 4.18 split into the modules of `linearmodels.shared`, and `test_linear_constraint` on a result of `OLS`, `IV2SLS`, `IVLIML` or `IVGMM`, which 4.15 removed after 4.12 renamed it `wald_test`.
+The rule reports an import of `linearmodels.utility`, which 4.18 split into the modules of
+`linearmodels.shared`. It also reports `test_linear_constraint` on a result of `OLS`, `IV2SLS`,
+`IVLIML` or `IVGMM`, which 4.12 renamed `wald_test` and 4.15 removed.
 
 Example:
 
@@ -8511,7 +9483,13 @@ from linearmodels.shared.hypotheses import WaldTestStatistic
 test = result.wald_test(restriction, value)
 ```
 
-The import ran on 4.17 and raised `ModuleNotFoundError: No module named 'linearmodels.utility'` on 4.18 and on 7.1. `test_linear_constraint` returned a `WaldTestStatistic` on 4.14 and raised `AttributeError` on 4.15, and `wald_test` ran on both. The 22 public names of the old module were looked up in the 7.1 source:
+| Form | Ran on | Raised on |
+| --- | --- | --- |
+| `from linearmodels.utility import ...` | 4.17 | 4.18 and 7.1, with `ModuleNotFoundError: No module named 'linearmodels.utility'` |
+| `test_linear_constraint` | 4.14, where it returned a `WaldTestStatistic` | 4.15, with `AttributeError` |
+
+`wald_test` ran on 4.14 and on 4.15. The 22 public names of the old module were looked up in the
+7.1 source:
 
 | Names of `linearmodels.utility` | Module on 7.1 |
 | --- | --- |
@@ -8528,7 +9506,9 @@ Code inside a try block with an except clause is a compatibility path and stays 
 
 **Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module. The other forms have no fix.
 
-Reports `from linearmodels.__future__ import ordering`, the `lsmr_options` keyword of `AbsorbingLS.fit`, and `linearmodels.DROP_MISSING`. 7.1 gives `FutureWarning` for each, and 8.0 removes them.
+The rule reports `from linearmodels.__future__ import ordering`, the `lsmr_options` keyword of
+`AbsorbingLS.fit`, and `linearmodels.DROP_MISSING`. 7.1 gives `FutureWarning` for each, and 8.0
+removes them.
 
 Example:
 
@@ -8544,26 +9524,48 @@ Use instead:
 result = model.fit(method="lsmr", absorb_options={"atol": 1e-10})
 ```
 
-The import turned off the sorting of formula variables in 4.31, and 5.0 made that the default. With `"y ~ 1 + z + x + w"`, 4.31 gave the order `Intercept, w, x, z` without the import and `Intercept, z, x, w` with it, and 5.0, 7.0 and 7.1 gave `Intercept, z, x, w` both ways. The fix deletes a line that does nothing from 5.0 on, the cases of `samples/linearmodels/migration.py` returned equal values before and after it, and `since` keeps the document away from a project on 4.31. Inside a function or a block the import has no fix, because it may be the only statement there. `absorb_options` ran on 4.18 and raised `TypeError` on 4.17, and `lsmr_options` gave `FutureWarning` on 4.31, 5.0, 7.0 and 7.1. The new form needs `method="lsmr"` next to the options, since the default method may pick an algorithm that does not take them, so it has no fix. Reading `DROP_MISSING` ran clean on 7.0 and gave `FutureWarning: linearmodels.DROP_MISSING has no effect` on 7.1.
+The import turned off the sorting of formula variables in 4.31, and 5.0 made the unsorted order the
+default. With `"y ~ 1 + z + x + w"`:
+
+| Release | Order without the import | With the import |
+| --- | --- | --- |
+| 4.31 | `Intercept, w, x, z` | `Intercept, z, x, w` |
+| 5.0, 7.0 and 7.1 | `Intercept, z, x, w` | `Intercept, z, x, w` |
+
+The fix deletes a line that does nothing from 5.0 on, and the cases of
+`samples/linearmodels/migration.py` returned equal values before and after it. `since` keeps the
+document away from a project on 4.31. Inside a function or a block the import has no fix, because
+it may be the only statement there.
+
+| Form | Result |
+| --- | --- |
+| `absorb_options` | ran on 4.18, and raised `TypeError` on 4.17 |
+| `lsmr_options` | gave `FutureWarning` on 4.31, 5.0, 7.0 and 7.1 |
+| reading `DROP_MISSING` | ran clean on 7.0, and gave `FutureWarning: linearmodels.DROP_MISSING has no effect` on 7.1 |
+
+The new form needs `method="lsmr"` next to the options, because the default method may pick an
+algorithm that doesn't take them, so `lsmr_options` has no fix.
 
 ### What the pack leaves out
 
-- `check_rank=False`. On columns that are exactly collinear, 7.1 raised `LinAlgError: Singular
-  matrix`, so the flag did not give wrong numbers in silence where it was tried.
-- Inputs whose labels do not match. 7.1 raises `ValueError` where 7.0 paired them by position,
-  and a pattern cannot see an index.
-- A frame without a two level index, a time level of text, and regressors that the effects
-  absorb. Each raises with a clear message, and none shows in the code.
+The pack has no rule for the following forms:
+
+- `check_rank=False`, because on columns that are exactly collinear 7.1 raised
+  `LinAlgError: Singular matrix`. Where it was tried, the flag didn't give wrong numbers in silence.
+- Inputs whose labels don't match, which raise `ValueError` on 7.1 where 7.0 paired them by
+  position. A pattern can't see an index.
+- A frame without a two level index, a time level of text, and regressors that the effects absorb.
+  Each raises with a clear message, and none shows in the code.
 - The changes of 7.1 to weighted models, to `FamaMacBeth` p-values and to the Hausman and
   specification tests. The code is the same on both releases, so a rule would report every use.
-- Patsy functions that formulaic lacks. `te()` raised, and `cr()` and `cc()` raised a rank
-  error next to an intercept. `Q()`, `center()`, `standardize()`, `bs()` and
+- Patsy functions that formulaic lacks. `te()` raised, and `cr()` and `cc()` raised a rank error
+  next to an intercept. `Q()`, `center()`, `standardize()`, `bs()` and
   `C(x, Treatment(reference=...))` all ran. No use of the three was found in the real files.
-- `SUR`, `IV3SLS`, `IVSystemGMM` and the factor models have no rule of their own. The formula,
-  covariance and result rules read them.
-- xxhash, which `AbsorbingLS` uses for its cache when it is installed. A fit with two absorbed
-  columns took 0.345 s with it and 0.361 s without on 100,000 rows, and 1.418 s against 1.289 s
-  on 1,000,000, so the pack has no package check.
+- `SUR`, `IV3SLS`, `IVSystemGMM` and the factor models, which have no rule of their own. The
+  formula, covariance and result rules read them.
+- xxhash, which `AbsorbingLS` uses for its cache when it is installed, as a package check. A fit
+  with two absorbed columns took 0.345 s with it and 0.361 s without on 100,000 rows, and 1.418 s
+  against 1.289 s on 1,000,000.
 
 ## arch
 
