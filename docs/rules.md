@@ -7579,6 +7579,128 @@ result = PanelOLS(y, X, entity_effects=True).fit()
 
 On one thread, as the median of 5 fits with entity effects, 3 regressors and 10 periods, LSDV took 0.298 s against 0.017 s for 500 entities, which is 17 times, and 77.1 s against 0.051 s for 3,000 entities, which is 1,508 times. 7.0 gave 18 times and 1,382 times. The coefficients differed by at most 2.2e-16 and the standard errors by at most 1.7e-18, so the estimates are equal and not bit equal, and the rule has no fix. `use_lsmr=True` and `low_memory=True` ran within 10% of the default and are not reported.
 
+### Covariance
+
+`fit` takes `cov_type` and, next to it as keywords, the options of that covariance. Each model
+has its own short list of names, and none of them is a statsmodels name.
+
+#### clustered-without-clusters
+
+**Severity:** error. **Fix:** none.
+
+Reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and `clusters`. Without them every observation is a cluster of its own, which is the heteroskedasticity robust covariance under another name.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered")
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
+```
+
+On 7.1 and 7.0, `PanelOLS` with entity effects on the wage panel gave the first standard error 0.041301 for `cov_type="clustered"`, 0.041301 for `cov_type="robust"` and 0.049385 with `cluster_entity=True`. `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS` gave equal pairs in the same way, and so did `OLS`, `IV2SLS`, `IVLIML`, `AbsorbingLS`, `SUR` and `IV3SLS`, which take the groups as `clusters=`: 0.427716 both ways on `IV2SLS`. `IVGMM`, `IVGMMCUE` and `IVJIVE` raise `TypeError` instead, and the rule reports them with that message. The rule reports 31 calls in 9 of the 950 real files, each a regression table whose standard errors are said to be clustered and are not. `BetweenOLS` is left out, because it refuses `cluster_entity` and its rows are the entities already.
+
+#### cov-option-without-cov-type
+
+**Severity:** error. **Fix:** none.
+
+Reports `cluster_entity`, `cluster_time` or `clusters` in a `fit` call whose `cov_type` is absent or is another name than `"clustered"`, and `bandwidth` or `kernel` in a call whose `cov_type` is absent or is not a kernel covariance.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cluster_entity=True)
+fama = FamaMacBeth(y, X).fit(bandwidth=3)
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
+fama = FamaMacBeth(y, X).fit(cov_type="kernel", bandwidth=3)
+```
+
+7.1 raised `ValueError: The keyword argument 'cluster_entity' is not accepted with cov_type='unadjusted'` on `PanelOLS`. Each of the 15 classes other than `FamaMacBeth` and the factor models was run with each of the five keywords against no `cov_type` and against each name the rule reads, which is 930 calls on 7.1 and 868 on 7.0, and every one raised: `ValueError` or `UnknownOptionError` on 7.1, and `ValueError`, `TypeError` or `KeyError` on 7.0. `FamaMacBeth.fit` names `bandwidth` and `kernel` in its signature and reads them only with `cov_type="kernel"`: on 7.1 and 7.0 the first standard error on the wage panel was 0.203664 with no option, with `bandwidth=3` and with `kernel="parzen"`, and 0.300158 with `cov_type="kernel"` and `bandwidth=3`. The factor models ignored the two keywords on 7.0, where `TradedFactorModel.fit(bandwidth=3)` returned the standard error of the default, and raise `ValueError` on 7.1.
+
+#### unknown-cov-type
+
+**Severity:** error. **Fix:** none.
+
+Reports a `cov_type` string that the model does not take, such as `"HC1"`, `"HAC"`, `"cluster"` or `"nonrobust"` of statsmodels, `"clustered"` on `FamaMacBeth` or `IVSystemGMM`, `"kernel"` on `BetweenOLS`, and `"unadjusted"` on a factor model.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="HC1")
+iv = IV2SLS(y, exog, endog, instruments).fit(cov_type="nonrobust")
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="robust")
+iv = IV2SLS(y, exog, endog, instruments).fit(cov_type="unadjusted", debiased=True)
+```
+
+7.1 raises `UnknownOptionError`, which is both a `ValueError` and a `KeyError`, with the list of names the model takes, and 7.0 raised `ValueError` or `KeyError`. The lists were read from that error for each of the 19 model classes, and each name on a list was then run on its class:
+
+| Models | Names |
+| --- | --- |
+| `PanelOLS`, `PooledOLS`, `RandomEffects`, `FirstDifferenceOLS` | `unadjusted`, `homoskedastic`, `conventional`, `robust`, `heteroskedastic`, `clustered`, `kernel`, `dk`, `driscoll-kraay`, `ac`, `autocorrelated` |
+| `BetweenOLS` | `unadjusted`, `homoskedastic`, `conventional`, `robust`, `heteroskedastic`, `clustered` |
+| `FamaMacBeth` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel` |
+| `OLS`, `IV2SLS`, `IVLIML`, `AbsorbingLS` | `unadjusted`, `homoskedastic`, `homo`, `robust`, `heteroskedastic`, `hccm`, `kernel`, `clustered`, `one-way`, and the four class names such as `KernelCovariance` |
+| `IVGMM`, `IVGMMCUE`, `IVJIVE` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `clustered` |
+| `SUR`, `IV3SLS` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `hac`, `clustered` |
+| `IVSystemGMM` | `unadjusted`, `homoskedastic`, `robust`, `heteroskedastic`, `kernel`, `hac` |
+| `TradedFactorModel`, `LinearFactorModel`, `LinearFactorModelGMM` | `robust`, `heteroskedastic`, `kernel` |
+
+Since 7.1 the names are not case sensitive, so the rule takes a known name in any case. On `OLS` with the mroz data, the standard errors of linearmodels were equal to those of statsmodels to 1e-13 for `"robust"` and `"HC0"`, for `"robust"` with `debiased=True` and `"HC1"`, for `"unadjusted"` with `debiased=True` and `"nonrobust"`, and for `"clustered"` with `clusters=` and `debiased=True` and `"cluster"` with the same groups. The message for the instrument models gives that table. The panel models default to `debiased=True`, and their default standard errors were equal to those of statsmodels.
+
+#### kernel-default-bandwidth
+
+**Severity:** warning. **Fix:** none.
+
+Reports `weight_type="kernel"` on `IVGMM`, `IVGMMCUE` and `IVSystemGMM`, and `cov_type="kernel"` in `fit` of `IVGMM` and `IVGMMCUE`, with neither `bandwidth` nor `optimal_bw`. 7.1 changed the default bandwidth from `nobs - 2` to one selected from the data, so the same code gives other numbers on 7.0 and on 7.1.
+
+Example:
+
+```python
+result = IVGMM(y, exog, endog, instruments, weight_type="kernel").fit()
+```
+
+Use instead:
+
+```python
+result = IVGMM(y, exog, endog, instruments, weight_type="kernel", optimal_bw=True).fit()
+```
+
+On the mroz data, `IVGMM(..., weight_type="kernel")` had a J statistic of 0.8022 and a first standard error of 0.43964 on 7.0, and 0.3794 and 0.43137 on 7.1, where it also gave `DefaultBandwidthWarning`. With `optimal_bw=True` both releases gave 0.3794 and 0.43137, and with `bandwidth=4` both gave 0.43117. `IVGMM(...).fit(cov_type="kernel")` gave 0.35929 on 7.0 and 0.4658 on 7.1, and 0.46795 on both with `bandwidth=4`. `IVSystemGMM.fit(cov_type="kernel")` and `IV2SLS.fit(cov_type="kernel")` gave the same numbers on both releases with no warning and are not reported.
+
+#### panel-default-covariance
+
+**Severity:** info. **Fix:** none.
+
+Reports `fit` with no `cov_type` on `PanelOLS`, `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS`. The default is `"unadjusted"`, the covariance for errors that are homoskedastic and unrelated over time, and the errors of one entity usually are related.
+
+Example:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit()
+```
+
+Use instead:
+
+```python
+result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered", cluster_entity=True)
+```
+
+Over 1,000 draws of 200 entities and 8 periods, with an AR(1) regressor and an AR(1) error within each entity, both with coefficient 0.8, and a true slope of 0, `PanelOLS` with entity effects gave p below 0.05 in 17.3% of the draws with the default, 16.4% with `cov_type="robust"` and 5.7% with `cov_type="clustered"` and `cluster_entity=True`. In a second simulation with 300 entities, 3 periods and errors that are heteroskedastic and unrelated over time, the shares were 22.4%, 7.1% and 5.0%. Those are two simulations, and how far the default is off depends on the data, so the rule is info. It is the rule with the most reports: 372 in 142 of the 950 real files. `BetweenOLS` has one row for each entity and `FamaMacBeth` has its own covariance, so both are left alone, and a call that states `cov_type`, also as `"unadjusted"`, has made its choice.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of
