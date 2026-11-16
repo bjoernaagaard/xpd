@@ -8515,8 +8515,9 @@ cp samples/bad.py /tmp/bad.py && target/release/xpd check /tmp/bad.py --fix --un
 ```
 
 The files in `samples/pandas/`, `samples/numpy/`, `samples/scipy/`, `samples/sklearn/`,
-`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/hamilton/` and
-`samples/python/` mark each line a rule reports with a comment that names the rules.
+`samples/sklego/`, `samples/mapie/`, `samples/category_encoders/`, `samples/linearmodels/`,
+`samples/hamilton/` and `samples/python/` mark each line a rule reports with a comment that names
+the rules.
 
 `pack.yml` may list package checks under `packages`. Each entry has an `id`, the `package` to
 look for, a `message`, and optionally `onlyWith`, a list of tools. xpd warns when the venv has the
