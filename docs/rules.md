@@ -9535,12 +9535,20 @@ It does not import or run the collected code. The table gives current corpus rep
 source, total reports and distinct files with a report. Figure behavior measurements are
 separate from corpus counts.
 
-Recall follows the planting method used for scikit-learn above. The frozen manifest has
-1,164 known bad forms in copies of 47 real corpus files. Each rule has 48 plants across six
-form groups and three import spellings. `free-facet-scales` has 12 extra subplot plants.
+Recall measures 1,212 conditional configuration candidates in copies of 47 real corpus files.
+All 25 rules have 48 plants across six form groups, except `free-facet-scales`, which has
+60 across eight groups. The original 1,164 identities remain. Review corrected 128 missing
+figure or data premises, retained the other 1,036 plants and added 48 `box-plot-ink` candidates.
 The groups include literal settings, updates, dictionaries, objects and values held in names
-where the shape permits. Each plant counts once, only when its rule reports its target lines.
+where the shape permits. Each plant counts once when its rule reports its target lines.
 Pre-existing reports do not count. Every complete copy passed `ast.parse`; none was run.
+
+Candidates qualify only under the stated data assumptions. External dataframe columns must
+have the intended numeric values and groups. An informational advisory is a design choice,
+not proof that the figure is wrong. The box candidates contain actual numeric lists and ask
+whether a five-number summary suffices; default outliers and hover information may matter.
+Independent equivalents of repaired forms and box forms were rendered with Plotly 7.1.0.
+Their resolved settings and SVG outputs are saved separately from the source copies.
 
 The source files were available during development and some reports were already reviewed.
 They are held aside for this measurement, not an unseen evaluation set. Selection requires
@@ -9548,9 +9556,11 @@ AST-readable files with express and graph_objects or graph_objs imports. The for
 actual px and go spellings, including `from plotly import graph_objects as go`. The main set
 uses six form groups with six value or data variations, rather than 36 independent shapes.
 Existing file-wide exclusions still apply. Recall measures these plants, not every program.
-The manifest, copies, per-target outcomes, spelling distribution and two rerun commands are
-saved under `research/plotly-rules/runs/recall/`. `measure.py --rules` accepts any five rule
-names and `--binary` accepts a review binary. The manifest remains fixed after rule changes.
+Unsupported forms remain in the denominator, including box dictionary splats, explicit bad
+axis titles and flat Surface. Recognition cannot establish universal design quality.
+The manifest, identity mapping, per-target truth decisions, outcomes and two rerun commands
+are saved under `research/plotly-rules/runs/recall/`. `measure.py --rules` accepts rule names
+and `--binary` accepts a review binary. Rule changes reuse the final manifest.
 
 | Rule | Severity | Page | Measurement | Reports: docs, Dash, public | Total reports | Files with report | Recall | Fix |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -9559,28 +9569,28 @@ names and `--binary` accepts a review binary. The manifest remains fixed after r
 | [`area-axis-without-zero`](#area-axis-without-zero) | warning | 57 | drawn: fills of 95 and 100 at 163.6 and 327.3 pixels | 0, 0, 0 | 0 | 0 | 37 of 48 | none |
 | [`polar-bar-area`](#polar-bar-area) | warning | 57 | drawn: radii 1, 2, 3, 4 for values 1, 2, 3, 4 | 10, 4, 1 | 15 | 8 | 48 of 48 | none |
 | [`three-d-for-two-d`](#three-d-for-two-d) | error, warning | 71 | resolved: `visible=False`. Resolved: z axis from -1 to 1 | 0, 0, 0 | 0 | 0 | 32 of 48 | none |
-| [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 42 | 62 | 37 | 32 of 48 | none |
-| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel. Drawn: bars of 5 and 10 equally tall | 2, 0, 2 | 4 | 3 | 40 of 60 | none |
+| [`dual-y-axis`](#dual-y-axis) | info | 61 | resolved: lines cross at 1.67 or at 1.81 | 15, 5, 41 | 61 | 36 | 32 of 48 | none |
+| [`free-facet-scales`](#free-facet-scales) | info | 170 | resolved: one value at 0.70 and at 0.45 of the panel. Drawn: bars of 5 and 10 equally tall | 2, 0, 1 | 3 | 2 | 40 of 60 | none |
 | [`default-template`](#default-template) | info | 96 | resolved: `#E5ECF6`. Drawn: 10 grid lines | 102, 18, 231 | 351 | 351 | 32 of 48 | unsafe |
 | [`explicit-grid`](#explicit-grid) | info | 112 | drawn: 0 grid lines became 10 | 9, 4, 28 | 41 | 19 | 40 of 48 | unsafe |
 | [`boxed-axis-frame`](#boxed-axis-frame) | info | 103 | drawn: 1 axis line segment became 2 | 7, 1, 18 | 26 | 7 | 40 of 48 | none |
-| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels. Drawn: 3 shades for 3 bar lengths | 16, 0, 87 | 103 | 59 | 40 of 48 | none |
+| [`box-plot-ink`](#box-plot-ink) | info | 124 | drawn: 36 box segments and 16 offset quartile segments for four groups | 5, 0, 14 | 19 | 9 | 40 of 48 | none |
+| [`redundant-color`](#redundant-color) | info | 100 | drawn: 4 legend entries equal to the 4 tick labels. Drawn: 3 shades for 3 bar lengths | 16, 0, 70 | 86 | 55 | 40 of 48 | none |
 | [`pattern-fill`](#pattern-fill) | warning | 108 | drawn: 2 pattern images where there were 0 | 19, 0, 1 | 20 | 11 | 40 of 48 | none |
 | [`gauge-indicator`](#gauge-indicator) | info | 168 | drawn: 8 shapes and 7 labels for one number | 4, 2, 30 | 36 | 25 | 40 of 48 | none |
 | [`rainbow-colorscale`](#rainbow-colorscale) | warning | 154 | resolved: Jet lightness 13.5, 97.1, 25.5 along the scale | 1, 0, 7 | 8 | 6 | 40 of 48 | none |
-| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet or in 2 cells | 28, 7, 128 | 163 | 88 | 48 of 48 | none |
+| [`pie-chart`](#pie-chart) | warning | 178 | resolved: trace type `pie`, 2 traces with a facet or in 2 cells | 28, 7, 120 | 155 | 84 | 48 of 48 | none |
 | [`sunburst-as-pie`](#sunburst-as-pie) | warning | 178 | drawn: a wedge of 45 with 2.25 times the area of one of 60 | 14, 2, 11 | 27 | 15 | 48 of 48 | none |
 | [`spline-line`](#spline-line) | info | 92 | drawn: 10.55 where the data ends at 10 | 4, 0, 7 | 11 | 8 | 40 of 48 | unsafe |
-| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once. Drawn: 1 of 3 frames | 11, 1, 29 | 41 | 22 | 40 of 48 | none |
-| [`heatmap-smoothing`](#heatmap-smoothing) | info | 92 | drawn: 252 colors for a grid of two values | 2, 0, 0 | 2 | 1 | 40 of 48 | unsafe |
-| [`table-for-small-data`](#table-for-small-data) | info | 56 | drawn: 0 of 4 values written, 4 of 4 in `go.Table` | 31, 0, 1 | 32 | 12 | 17 of 48 | none |
+| [`animation-frame`](#animation-frame) | info | 170 | resolved: 142 of 1,704 rows at once. Drawn: 1 of 3 frames | 11, 1, 27 | 39 | 22 | 40 of 48 | none |
+| [`heatmap-smoothing`](#heatmap-smoothing) | info | 92 | drawn: 252 colors for a grid of two values | 0, 0, 0 | 0 | 0 | 40 of 48 | unsafe |
+| [`table-for-small-data`](#table-for-small-data) | info | 56 | drawn: 0 of 4 values written, 4 of 4 in `go.Table` | 31, 0, 1 | 32 | 12 | 29 of 48 | none |
 | [`legend-instead-of-labels`](#legend-instead-of-labels) | info | 180 | drawn: 2 legend entries became 0 with labels | 7, 3, 71 | 81 | 59 | 21 of 48 | none |
-| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 5, 4, 90 | 99 | 57 | 40 of 48 | none |
+| [`rotated-tick-labels`](#rotated-tick-labels) | info | 183 | drawn: 2 of 2 category labels rotated | 4, 4, 71 | 79 | 51 | 40 of 48 | none |
 | [`all-caps-title`](#all-caps-title) | info | 183 | drawn: a title 1.31 times as wide in capitals | 3, 0, 1 | 4 | 2 | 40 of 48 | none |
-| [`axis-title-column-name`](#axis-title-column-name) | info | 183 | resolved: axis title `gdpPercap` | 68, 1, 107 | 176 | 72 | 15 of 48 | none |
+| [`axis-title-column-name`](#axis-title-column-name) | info | 183 | resolved: axis title `gdpPercap` | 68, 1, 104 | 173 | 71 | 15 of 48 | none |
 
-`bar-axis-without-zero`, `area-axis-without-zero` and `three-d-for-two-d` each have
-0 corpus reports in 0 files. The sample figures show the forms they catch.
+`area-axis-without-zero`, `bar-axis-without-zero`, `heatmap-smoothing`, `three-d-for-two-d` each have 0 corpus reports in 0 files.
 The corpus counts describe frequency, not recall or whether advice suits a particular chart.
 
 No fix of the pack is safe, because every fix changes what the reader sees. `--fix` alone
@@ -10068,6 +10078,9 @@ without `showline` drew no line, so the rule reads the two together.
 
 Severity: info. Fix: none.
 
+Recall was 40 of 48. The rule found 8 of 16 forms using names. Other measured misses were
+`dictionary splat and trace name` (8).
+
 Reports `px.box` and `go.Box` constructors with exactly one of `x` or `y`,
 without written point settings, notches, means, quartile methods, precomputed
 statistics, box styling, orientation or unknown argument splats. Express color,
@@ -10481,9 +10494,9 @@ different.
 
 **Severity:** info. **Fix:** none.
 
-Recall was 17 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
-bar literal values` (2), `px pie literal values` (3), `bare Bar y` (8), `bare horizontal Bar x` (8),
-`Figure Pie list` (2).
+Recall was 29 of 48. The rule found none of 8 values held in a name. Other measured misses were `px
+bar literal values` (2), `px pie literal values` (3), `bare Bar y` (3), `Figure Pie list` (2), `bare
+horizontal Bar x` (1).
 
 Reports `px.bar` and `go.Bar` whose values, `y`, or `x` with `orientation="h"`, are a written list or tuple of 1 to 20 numbers, and `px.pie` and `go.Pie` whose `values` is one, when the call is a px call or the only trace of a `go.Figure`.
 
