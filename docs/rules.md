@@ -7638,6 +7638,133 @@ the square of `scale` belongs. Three had wrong advice: two fitted data that was 
 first, and one only divided the residuals by the volatility. The 4 reports on arch's own code
 are tests of `rescale` itself.
 
+### Forecasts and fits
+
+`forecast` has `method="analytic"`, `horizon=1` and `reindex=False` as its defaults, and it
+forecasts from the last row unless `start` names an earlier one. `fit` prints the steps of the
+optimizer unless `disp="off"`.
+
+#### analytic-forecast-horizon
+
+**Severity:** error. **Fix:** none.
+
+Reports `forecast` with a `horizon` above 1 and the analytic method on a result of `arch_model` with `vol` `"egarch"`, `"aparch"` or `"fiaparch"`, or with a `power` that is not 2 and `vol` `"garch"`, `"figarch"` or no `vol`.
+
+Example:
+
+```python
+res = arch_model(returns, vol="EGARCH", p=1, o=1, q=1).fit(disp="off")
+forecasts = res.forecast(horizon=5)
+```
+
+Use instead:
+
+```python
+res = arch_model(returns, vol="EGARCH", p=1, o=1, q=1).fit(disp="off")
+forecasts = res.forecast(horizon=5, method="simulation")
+```
+
+A volatility model that does not evolve in squares has no closed form beyond one step.
+`forecast(horizon=5)` was run for each `vol` on arch 9.0.0.
+
+| Model | `forecast(horizon=5)` | `forecast(horizon=1)` |
+| --- | --- | --- |
+| `vol="egarch"`, `"aparch"`, `"fiaparch"` | ValueError: Analytic forecasts not available for horizon > 1 | runs |
+| `vol="garch"` or `"figarch"` with `power=1.0` | ValueError: Analytic forecasts not available for horizon > 1 when power != 2 | runs |
+| `vol="garch"`, also with `o=1`, `"arch"`, `"figarch"`, `"harch"`, `"ngarch"` | runs | runs |
+
+The rule follows the model through the file: the call is `forecast` on a variable that the file
+assigns from `fit` or `fix` of a variable that it assigns from such an `arch_model` call, and
+each of the two names is assigned from nothing else. A `horizon` or a `method` that is a
+variable is not read, and `power` is read only where `arch_model` reads it. A model that is
+built from the classes, such as `ConstantMean(y, volatility=EGARCH())`, is not seen. The corpus
+had no report.
+
+#### forecast-per-origin
+
+**Severity:** warning. **Fix:** none.
+
+Reports `forecast` with `start` set to the variable of a `for` loop or a comprehension over `range(...)`, when the loop calls neither `fit` nor `fix`.
+
+Example:
+
+```python
+rows = []
+for origin in range(first, len(returns)):
+    rows.append(res.forecast(horizon=10, start=origin).variance.iloc[0])
+```
+
+Use instead:
+
+```python
+variance = res.forecast(horizon=10, start=first).variance
+```
+
+`forecast(start=i)` returns one row for every origin from `i` to the end of the data, so the
+loop computes the same rows many times over and keeps one. On the 5,030 S&P 500 returns with
+`horizon=10`, a loop over the last 200 origins took 0.106 seconds and one call took 0.0005
+seconds, with equal values. On arch 8.0.0 it was 0.329 against 0.0056 seconds.
+
+A loop that fits inside is a rolling estimate, where each origin has its own parameters, and is
+left alone. So is a loop over a few chosen origins, such as a tuple. The one report in the
+corpus is a test in arch that steps through the origins of a hedgehog plot.
+
+#### reindex-is-default
+
+**Severity:** info. **Fix:** safe: the argument is taken out when it is not the first one of the call.
+
+Reports `reindex=False` given to `forecast` of an arch model or result.
+
+Example:
+
+```python
+forecasts = res.forecast(horizon=5, reindex=False)
+```
+
+Use instead:
+
+```python
+forecasts = res.forecast(horizon=5)
+```
+
+Until arch 6.2 `forecast` returned a frame as long as the data and warned that the default would
+change, and code from that time passes `reindex=False` to get the short frame without the
+warning. On 6.1.0, `forecast()` on 1,500 rows returned 1,500 rows with a FutureWarning, and on
+6.2.0 it returned 1 row with no warning, so the document carries `since: "6.2"`. On 6.2.0, 8.0.0
+and 9.0.0 the frames of `forecast(reindex=False)` and `forecast()` were equal, for the last row
+and with `start`, which is why the fix is safe. `reindex=True` still returns the long frame and
+is left alone.
+
+The import `from arch.__future__ import reindexing` belongs to the same habit and is reported by
+[`removed-in-arch`](#removed-in-arch). The public code had 64 reports of this rule, and arch's own
+tests, notebooks and documentation had 25.
+
+#### fit-output-in-loop
+
+**Severity:** info. **Fix:** none.
+
+Reports `fit` without `disp` on an arch model inside a loop or a comprehension.
+
+Example:
+
+```python
+for end in range(1000, len(returns)):
+    res = arch_model(returns.iloc[:end]).fit()
+```
+
+Use instead:
+
+```python
+for end in range(1000, len(returns)):
+    res = arch_model(returns.iloc[:end]).fit(disp="off")
+```
+
+`fit` has `disp="final"` and `update_freq=1`, so it prints a line for every iteration and a
+summary at the end. Twenty fits of a GARCH(1,1) in a loop printed 240 lines, and none with
+`disp="off"`. The time was the same, 0.102 and 0.101 seconds, so the rule is info.
+`update_freq=0` alone still prints the summary. All 15 reports on the public code were fits in a
+loop over windows, assets or model orders.
+
 ## Hamilton
 
 These rules run on files that import `hamilton`, the module of

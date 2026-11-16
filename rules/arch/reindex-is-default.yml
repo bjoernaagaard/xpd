@@ -1,0 +1,86 @@
+# forecast took reindex=None until arch 6.2, returned a frame as long as the data and warned
+# that the default would change. Code written then passes reindex=False to get the short frame
+# and to silence the warning. arch 6.2 made False the default: on 6.1.0, installed from PyPI,
+# forecast() on 1,500 rows returned 1,500 rows with a FutureWarning, and on 6.2.0 it returned 1
+# row with no warning. The document carries since, so a project with an older arch is left
+# alone.
+#
+# Safe: on 6.2.0, 8.0.0 and 9.0.0 the frames of forecast(reindex=False) and forecast() were
+# equal, for the last row and with start. The rule reads forecast only on a model that the file
+# builds from arch_model or a mean class, or on a result that it gets from fit or fix of such a
+# model, and the names must be assigned from nothing else. The fix takes the argument out with
+# the comma before it, so it applies when the argument is not the first one.
+id: reindex-is-default
+language: python
+severity: info
+message: reindex=False is the default of forecast since arch 6.2, so this argument does nothing. Drop it.
+rule:
+  kind: keyword_argument
+  regex: '^reindex\s*=\s*False$'
+  all:
+    - not: { nthChild: 1 }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
+utils:
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: safe, since: "6.2" }
+---
+# The same argument as the first one of the call. Taking it out would leave the comma after
+# it, so this form has no fix.
+id: reindex-is-default
+language: python
+severity: info
+message: reindex=False is the default of forecast since arch 6.2, so this argument does nothing. Drop it.
+rule:
+  kind: keyword_argument
+  regex: '^reindex\s*=\s*False$'
+  all:
+    - nthChild: 1
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
+utils:
+  model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
+  model:
+    any:
+      - matches: model-call
+      - kind: identifier
+        pattern: $M
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
+  fit-call: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(fit|fix)$' } }, { has: { field: object, matches: model } }] } }
+  result:
+    any:
+      - matches: fit-call
+      - kind: identifier
+        pattern: $R
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
+metadata: { since: "6.2" }
