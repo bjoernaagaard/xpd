@@ -240,10 +240,52 @@ class LoopsOverSolutions(Problem):
         out["F"] = np.array([row[0] ** 2 + row[1] ** 2 for row in x])
 
 
+class FlagFromTheCaller(Problem):
+    def __init__(self, elementwise=True, **kwargs):
+        super().__init__(n_var=2, n_obj=2, xl=0.0, xu=1.0, elementwise=elementwise, **kwargs)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        # The caller turns elementwise on, so x is one solution and a list of numbers is right.
+        out["F"] = np.array([x[0], 10 + x[1]])
+
+
 @case
 def indexing_that_fits_the_class():
     X = np.array([[0.1, 0.2], [0.3, 0.4]])
-    return RightIndexing().evaluate(X), RightElementwise().evaluate(X), LoopsOverSolutions().evaluate(X)
+    return RightIndexing().evaluate(X), RightElementwise().evaluate(X), LoopsOverSolutions().evaluate(X), FlagFromTheCaller().evaluate(X)
+
+
+class BoundsByPosition(Problem):
+    def __init__(self):
+        super().__init__(2, 1, 0, np.zeros(2), np.ones(2))  # xpd: positional-problem-bounds
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+
+
+class BoundsByKeyword(Problem):
+    def __init__(self):
+        super().__init__(2, 1, 0, xl=np.zeros(2), xu=np.ones(2))
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+
+
+class CountsByPosition(Problem):
+    def __init__(self, xl, xu):
+        # The fourth argument is a whole number, so it is the count of equality constraints.
+        super().__init__(2, 1, 0, 0, xl, xu)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+
+
+@case
+def bounds_by_position_and_by_keyword():
+    shifted = BoundsByPosition()
+    counted = CountsByPosition(np.zeros(2), np.ones(2))
+    best = minimize(BoundsByKeyword(), GA(pop_size=10), ("n_gen", 3), seed=1).F
+    return shifted.n_eq_constr, shifted.xl, shifted.xu, counted.xl, counted.xu, best
 
 
 class Vectorized(Problem):

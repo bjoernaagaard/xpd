@@ -4,8 +4,10 @@
 # more generations after has_terminated = False, and 15 more after it got
 # MaximumGenerationTermination(20) as its termination.
 #
-# The file must load an object with np.load, pickle or dill, as the recipe does. An attribute of
-# self is the class's own and is left alone.
+# The object must be a name that the file assigns from np.load, pickle.load or dill.load, as the
+# recipe does, also as one name of a tuple, as in checkpoint, = np.load(...).flatten(). Another
+# object with an attribute of this name, such as a game, is left alone, and so is an attribute
+# of self, which is the class's own.
 id: has-terminated-assignment
 language: python
 severity: error
@@ -18,5 +20,12 @@ rule:
     - inside:
         kind: module
         stopBy: end
-        has: { stopBy: end, kind: call, has: { field: function, regex: '^((np|numpy|pickle|dill)\.load|load)$' } }
+        has:
+          stopBy: end
+          kind: assignment
+          all:
+            - has: { field: left, any: [{ pattern: $A }, { any: [{ kind: pattern_list }, { kind: tuple_pattern }, { kind: list_pattern }], has: { stopBy: end, kind: identifier, pattern: $A } }] }
+            - has: { field: right, any: [{ matches: load-call }, { has: { stopBy: end, matches: load-call } }] }
+utils:
+  load-call: { kind: call, has: { field: function, regex: '^((np|numpy|pickle|dill)\.load|load)$' } }
 metadata: { since: "0.6" }

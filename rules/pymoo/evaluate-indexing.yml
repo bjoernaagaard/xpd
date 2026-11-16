@@ -7,7 +7,8 @@
 # on the second parameter of _evaluate.
 
 # x[:, 0] in an ElementwiseProblem raised IndexError, "too many indices for array: array is
-# 1-dimensional, but 2 were indexed". A class that passes elementwise=False is left alone.
+# 1-dimensional, but 2 were indexed". A class that passes elementwise with any value but True is
+# left alone.
 id: evaluate-indexing
 language: python
 severity: error
@@ -28,7 +29,7 @@ rule:
               kind: class_definition
               all:
                 - has: { field: superclasses, has: { kind: identifier, regex: '^ElementwiseProblem$' } }
-                - not: { has: { stopBy: end, kind: keyword_argument, regex: '^elementwise\s*=\s*False$' } }
+                - not: { has: { stopBy: end, kind: keyword_argument, regex: '^elementwise\s*=', not: { regex: '=\s*True$' } } }
                 - inside:
                     kind: module
                     stopBy: end
@@ -37,8 +38,10 @@ rule:
 # x[0] ** 2 + x[1] ** 2 in a Problem takes the first two solutions, not the first two variables,
 # and raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided
 # (2,)". The method must use the parameter only with whole numbers as subscripts and never loop,
-# so a method that takes x[:, 0], x.T or x[i] is left alone, and so is a class that passes
-# elementwise=True.
+# so a method that takes x[:, 0], x.T or x[i] is left alone. So is a class that passes
+# elementwise with any value but False, such as elementwise=elementwise, and a class that passes
+# **kwargs on to __init__, because the caller can then build it with elementwise=True, and
+# _evaluate gets one solution.
 id: evaluate-indexing
 language: python
 severity: error
@@ -69,7 +72,7 @@ rule:
               kind: class_definition
               all:
                 - has: { field: superclasses, has: { kind: identifier, regex: '^Problem$' } }
-                - not: { has: { stopBy: end, kind: keyword_argument, regex: '^elementwise(_evaluation)?\s*=\s*True$' } }
+                - not: { has: { stopBy: end, any: [{ kind: keyword_argument, regex: '^elementwise(_evaluation)?\s*=', not: { regex: '=\s*False$' } }, { kind: dictionary_splat, inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.__init__$' } } } }] } }
                 - inside:
                     kind: module
                     stopBy: end

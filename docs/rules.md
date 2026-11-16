@@ -8813,7 +8813,12 @@ pymoo renamed its modules in 0.5.0, removed `pymoo.factory` and most keywords of
 document about such a change carries `since`. xpd reads the installed version from the project's
 venv, as it does for pandas, and skips the document on an older release, so a project that still
 has pymoo 0.5.0 gets no report about 0.6. When the venv has no pymoo, or there is no venv, every
-document runs.
+document runs but those with `until`. A document carries `until` when its advice differs by
+release: `StarmapParallelization` and `DaskParallelization` are in `pymoo.core.problem` on 0.6.0
+to 0.6.1.5 and in `pymoo.parallelization` from 0.6.1.6 on, where the other import raised
+ModuleNotFoundError, and the Nelder and Mead and pattern search modules are
+`pymoo.algorithms.soo.nonconvex.nelder_mead` and `pattern_search` on 0.5.0 and `nelder` and
+`pattern` from 0.6.0 on. A project gets the module of the release in its venv.
 
 A pattern sees no types, so every rule ties what it reports to pymoo by a name. A class or a
 function must be one the file imports from pymoo, such as `Problem` from `pymoo.core.problem` or
@@ -8857,6 +8862,7 @@ narrowed, and the table gives what is left.
 | [`removed-in-pymoo`](#removed-in-pymoo) | error | interpreter: ModuleNotFoundError, ImportError, Exception, AttributeError | 0 | 1,694 | 0 of 40 read | unsafe |
 | [`deprecated-in-pymoo`](#deprecated-in-pymoo) | warning | interpreter: DeprecationWarning, and the same class or array | 2 | 97 | 0 of 36 read | safe |
 | [`n-constr-keyword`](#n-constr-keyword) | info | value: the same X, F and G | 2 | 232 | 0 of 28 read | safe |
+| [`positional-problem-bounds`](#positional-problem-bounds) | error | value: `xl` [1, 1] and `xu` None, and interpreter: TypeError | 0 | 0 | no reports | none |
 | [`ignored-problem-keyword`](#ignored-problem-keyword) | error, warning | value: [0.66, 0.93, 1.26] against [0.14, 0.77, 1.94], and 0 calls of the starmap | 1 | 67 | 0 of 9 read | none |
 | [`setup-positional-termination`](#setup-positional-termination) | error | value: past 30 generations where 7 were asked | 0 | 1 | 0 | unsafe |
 | [`has-terminated-assignment`](#has-terminated-assignment) | error | value: 0 more generations against 15 | 0 | 4 | 0 | none |
@@ -8894,6 +8900,14 @@ callbacks and comprehensions that have a variable named like the algorithm, and 
 read in the scope of the run. `evaluate-returns-value` reported one base class that returns
 `NotImplemented`. `unread-history` reported runs inside functions, whose caller may read the
 history.
+
+A review then found reports on code that runs. `evaluate-indexing` and
+`objectives-stacked-by-row` now leave a class alone that can be built with `elementwise=True`,
+`reused-algorithm-without-copy` leaves a loop over the algorithms alone,
+`algorithm-read-after-minimize` reads a walrus as a new binding, and `has-terminated-assignment`
+and the `calc` document of `removed-in-pymoo` need a name that the file ties to pymoo. The
+reports on pymoo's own code and on the public files were the same before and after, line for
+line, and `positional-problem-bounds`, which the review added, made no report on either.
 
 Recall was not measured. No set of real pymoo code was held back, so the table says how often a
 rule is wrong when it reports, and not how often it misses.
@@ -9004,6 +9018,30 @@ class Welded(Problem):
         super().__init__(n_var=4, n_obj=2, n_ieq_constr=4, xl=xl, xu=xu)
 ```
 
+#### positional-problem-bounds
+
+**Severity:** error. **Fix:** none.
+
+Reports `xl` and `xu` given by position to `super().__init__` in a problem class, or to `Problem` and `ElementwiseProblem` called by name. pymoo 0.5 had `Problem(n_var, n_obj, n_constr, xl, xu)`. Since pymoo 0.6.0 the signature is `(n_var, n_obj, n_ieq_constr, n_eq_constr, xl, xu)`, so the fourth argument is read as the number of equality constraints and the fifth as `xl`.
+
+Example:
+
+```python
+class Sphere(Problem):
+    def __init__(self):
+        super().__init__(2, 1, 0, np.zeros(2), np.ones(2))
+```
+
+Use instead:
+
+```python
+class Sphere(Problem):
+    def __init__(self):
+        super().__init__(2, 1, 0, xl=np.zeros(2), xu=np.ones(2))
+```
+
+On pymoo 0.6.2 and on 0.6.0 the first class was built with no error and had `n_eq_constr` [0, 0], `xl` [1, 1] and `xu` None, and `minimize` with `GA` then raised TypeError, "only integer scalar arrays can be converted to a scalar index". With `xu=` as a keyword after the four positions it had `xl` None. On 0.5.0 both ran with `xl` [0, 0] and `xu` [1, 1], and the second class ran on all three. The rule reads a call with exactly five positional arguments and no `xl` or `xu` keyword, and a call with exactly four and `xu` as a keyword. A whole number written as the fourth argument is a count, as in `Problem(2, 1, 0, 0, xl)`, and is left alone.
+
 #### ignored-problem-keyword
 
 **Severity:** error for `elementwise_evaluation` and `parallelization`, warning for `type_var`. **Fix:** none.
@@ -9056,7 +9094,7 @@ algorithm.setup(problem, termination=("n_gen", 200), seed=1)
 
 **Severity:** error. **Fix:** none.
 
-Reports `has_terminated = False` on an object, in a file that loads something with `np.load`, pickle or dill. The checkpoint recipe of pymoo 0.4 and 0.5 used that line to let a loaded algorithm run on. Since 0.6.0 nothing reads the attribute. An `NSGA2` that had finished its 5 generations ran 0 more generations after the line, and 15 more after it got a new termination.
+Reports `has_terminated = False` on a name that the file assigns from `np.load`, `pickle.load` or `dill.load`, also as one name of a tuple. Another object with an attribute of that name is left alone. The checkpoint recipe of pymoo 0.4 and 0.5 used that line to let a loaded algorithm run on. Since 0.6.0 nothing reads the attribute. An `NSGA2` that had finished its 5 generations ran 0 more generations after the line, and 15 more after it got a new termination.
 
 Example:
 
@@ -9120,7 +9158,7 @@ Both write their results to the dictionary `out`.
 
 **Severity:** error. **Fix:** unsafe: `np.column_stack` on the same list.
 
-Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. That array has one row per objective, and pymoo reshapes it to one row per solution without transposing. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10. An `ElementwiseProblem`, where a list of numbers is right, and a stack followed by `.T` are left alone.
+Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. That array has one row per objective, and pymoo reshapes it to one row per solution without transposing. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10. An `ElementwiseProblem`, where a list of numbers is right, and a stack followed by `.T` are left alone. So is a class that passes `elementwise=` with any value but `False`, such as `elementwise=elementwise`, or passes `**kwargs` on to `__init__`, because the caller can then build it with `elementwise=True`.
 
 Example:
 
@@ -9198,7 +9236,7 @@ class Bounded(Problem):
 
 **Severity:** error. **Fix:** none.
 
-Reports `x[:, 0]` on the parameter of `_evaluate` in an `ElementwiseProblem`, which raised IndexError, "too many indices for array". It also reports `x[0]` in a `Problem` whose `_evaluate` uses the parameter only with whole numbers as subscripts and has no loop. That takes the first solution and not the first variable, and with 100 solutions of 2 variables it raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided (2,)".
+Reports `x[:, 0]` on the parameter of `_evaluate` in an `ElementwiseProblem`, which raised IndexError, "too many indices for array". It also reports `x[0]` in a `Problem` whose `_evaluate` uses the parameter only with whole numbers as subscripts and has no loop. That takes the first solution and not the first variable, and with 100 solutions of 2 variables it raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided (2,)". A `Problem` class that passes `elementwise=` with any value but `False`, or passes `**kwargs` on to `__init__`, can be built with `elementwise=True` and then gets one solution, so it is left alone.
 
 Example:
 
@@ -9220,7 +9258,7 @@ class Sphere(ElementwiseProblem):
 
 **Severity:** error. **Fix:** none.
 
-Reports `elementwise_runner=pool.starmap`, which raised TypeError, "ElementwiseEvaluationFunction.__call__() takes 2 positional arguments but 3 were given", because a runner is called as `runner(f, X)`. It also reports `elementwise_runner=` given to a class that the file defines with `Problem` as its base. A `Problem` evaluates the population in one call and never calls the runner: in 3 generations it was called 0 times, where an `ElementwiseProblem` called it 3 times.
+Reports `elementwise_runner=pool.starmap`, which raised TypeError, "ElementwiseEvaluationFunction.__call__() takes 2 positional arguments but 3 were given", because a runner is called as `runner(f, X)`. It also reports `elementwise_runner=` given to a class that the file defines with `Problem` as its base. A `Problem` evaluates the population in one call and never calls the runner: in 3 generations it was called 0 times, where an `ElementwiseProblem` called it 3 times. A call that also passes `elementwise=` or `**kwargs` is left alone. `StarmapParallelization` is in `pymoo.core.problem` on 0.6.0 to 0.6.1.5 and in `pymoo.parallelization` from 0.6.1.6 on, and the message names the module of the release in the venv.
 
 Example:
 
@@ -9258,7 +9296,7 @@ res = minimize(problem, NSGA2(pop_size=100), termination=("n_gen", 200), seed=1)
 
 **Severity:** error. **Fix:** none.
 
-Reports `pop`, `opt`, `off`, `n_gen`, `n_iter`, `history`, `callback` and `result` read from an algorithm after it was given to `minimize`. `minimize` runs a deep copy and returns it as `res.algorithm`. After a run of 10 generations, `algorithm.pop`, `algorithm.opt` and `algorithm.n_gen` were None, `algorithm.result()` raised TypeError, and a callback given to the constructor had 0 records, where the one in `res.algorithm` had 10. A call with `copy_algorithm`, a name that is assigned again after the run, and a file that also drives the same name with `setup` or `next` are left alone.
+Reports `pop`, `opt`, `off`, `n_gen`, `n_iter`, `history`, `callback` and `result` read from an algorithm after it was given to `minimize`. `minimize` runs a deep copy and returns it as `res.algorithm`. After a run of 10 generations, `algorithm.pop`, `algorithm.opt` and `algorithm.n_gen` were None, `algorithm.result()` raised TypeError, and a callback given to the constructor had 0 records, where the one in `res.algorithm` had 10. A call with `copy_algorithm`, a name that is assigned again after the run or bound by a walrus, as in `(algorithm := res.algorithm)`, and a file that also drives the same name with `setup` or `next` are left alone.
 
 Example:
 
@@ -9280,7 +9318,7 @@ best = res.algorithm.callback.data["best"]
 
 **Severity:** error. **Fix:** none.
 
-Reports a second `minimize` on the same algorithm when both calls pass `copy_algorithm=False`, in one block or in a loop that never assigns the name. `minimize` then sets the algorithm up only when it has no problem yet. A second call with another problem, `("n_gen", 30)` and another seed returned the `F` of the first call, still at generation 11 and still on the first problem.
+Reports a second `minimize` on the same algorithm when both calls pass `copy_algorithm=False`, in one block or in a loop that never binds the name. A loop over the algorithms, as in `for algorithm in [NSGA2(), SMSEMOA()]`, gives each pass another object and is left alone. `minimize` then sets the algorithm up only when it has no problem yet. A second call with another problem, `("n_gen", 30)` and another seed returned the `F` of the first call, still at generation 11 and still on the first problem.
 
 Example:
 
@@ -10566,7 +10604,11 @@ with `metadata: { fix: safe }` or `metadata: { fix: unsafe }`. A fix may write a
 the module under that alias.
 
 A rule that needs a newer library version says so with `metadata: { since: "3.1" }`. xpd skips it
-when the project's venv holds an older version of the pack's library. It finds the version for any
+when the project's venv holds an older version of the pack's library. A rule whose advice holds
+only up to a release says so with `until`, as in `metadata: { since: "0.6", until: "0.6.1.6" }`.
+xpd runs it when the venv holds a version from `since` up to, and not including, `until`, and
+skips it when the version is not known, so that a second document with `since: "0.6.1.6"` gives
+the newest advice there. It finds the version for any
 pack the same way: from the dist-info folder whose name is the module, or whose `top_level.txt`
 lists the module.
 

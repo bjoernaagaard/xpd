@@ -6,8 +6,8 @@
 #
 # The name must be the second argument of a minimize, imported from pymoo.optimize, that does
 # not pass copy_algorithm, and the read must come in a later statement of the same block or
-# inside one. The rule is silent when the name is assigned again after the run, and in a file
-# that also drives the same name with setup or next.
+# inside one. The rule is silent when the name is assigned again after the run, in a file that
+# binds the name with a walrus, and in a file that also drives the same name with setup or next.
 id: algorithm-read-after-minimize
 language: python
 severity: error
@@ -55,6 +55,8 @@ rule:
           kind: module
           stopBy: end
           has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(setup|next|infill|advance|ask|tell)$' } }, { has: { field: object, pattern: $ALG } }] } }
+    # A walrus binds the name again, as in (algorithm := res.algorithm).
+    - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: named_expression, has: { field: name, pattern: $ALG } } } }
 utils:
   pymoo-minimize:
     kind: call

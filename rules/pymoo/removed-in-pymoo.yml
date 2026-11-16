@@ -457,6 +457,25 @@ utils:
 fix: pymoo.algorithms.base.local
 metadata: { fix: unsafe, since: "0.5" }
 ---
+# pymoo 0.5.0 has this module as soo.nonconvex.nelder_mead, and 0.6.0 renamed it to nelder, so the
+# advice and the fix differ by release. This document is for 0.5, and the next one is from 0.6 on.
+id: removed-in-pymoo
+language: python
+severity: error
+message: pymoo.algorithms.so_nelder_mead was removed in pymoo 0.5.0, and the import raises ModuleNotFoundError. Import from pymoo.algorithms.soo.nonconvex.nelder_mead, which pymoo 0.6.0 renamed to nelder.
+rule:
+  kind: dotted_name
+  regex: '^pymoo\.algorithms\.so_nelder_mead$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+pymoo\.algorithms\.so_nelder_mead\s+import\s+\(?[\s,]*((NelderAndMeadTermination|NelderMead|adaptive_params|default_params)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: pymoo.algorithms.soo.nonconvex.nelder_mead
+metadata: { fix: unsafe, since: "0.5", until: "0.6" }
+---
 id: removed-in-pymoo
 language: python
 severity: error
@@ -472,7 +491,26 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.nelder
-metadata: { fix: unsafe, since: "0.5" }
+metadata: { fix: unsafe, since: "0.6" }
+---
+# pymoo 0.5.0 has this module as soo.nonconvex.pattern_search, and 0.6.0 renamed it to pattern, so the
+# advice and the fix differ by release. This document is for 0.5, and the next one is from 0.6 on.
+id: removed-in-pymoo
+language: python
+severity: error
+message: pymoo.algorithms.so_pattern_search was removed in pymoo 0.5.0, and the import raises ModuleNotFoundError. Import from pymoo.algorithms.soo.nonconvex.pattern_search, which pymoo 0.6.0 renamed to pattern.
+rule:
+  kind: dotted_name
+  regex: '^pymoo\.algorithms\.so_pattern_search$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+pymoo\.algorithms\.so_pattern_search\s+import\s+\(?[\s,]*((PatternSearch)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+fix: pymoo.algorithms.soo.nonconvex.pattern_search
+metadata: { fix: unsafe, since: "0.5", until: "0.6" }
 ---
 id: removed-in-pymoo
 language: python
@@ -489,7 +527,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.pattern
-metadata: { fix: unsafe, since: "0.5" }
+metadata: { fix: unsafe, since: "0.6" }
 ---
 id: removed-in-pymoo
 language: python
@@ -2119,6 +2157,28 @@ metadata: { since: "0.6" }
 id: removed-in-pymoo
 language: python
 severity: error
+message: $N is not in pymoo.core.problem since pymoo 0.6.0, and the import raises ImportError. Give the problem elementwise_runner=DaskParallelization(client), with DaskParallelization from pymoo.core.problem.
+rule:
+  kind: dotted_name
+  pattern: $N
+  regex: '^(dask_parallelized_eval)$'
+  inside:
+    stopBy: end
+    kind: import_from_statement
+    has: { field: module_name, regex: '^pymoo\.core\.problem$' }
+  not:
+    any:
+      - inside: { kind: import_from_statement, field: module_name }
+      - inside: { kind: aliased_import, field: alias }
+      - matches: compat-code
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "0.6", until: "0.6.1.6" }
+---
+# The same form from pymoo 0.6.1.6 on, which moved DaskParallelization to pymoo.parallelization.
+id: removed-in-pymoo
+language: python
+severity: error
 message: $N is not in pymoo.core.problem since pymoo 0.6.0, and the import raises ImportError. Give the problem elementwise_runner=DaskParallelization(client), with DaskParallelization from pymoo.parallelization.
 rule:
   kind: dotted_name
@@ -2135,8 +2195,30 @@ rule:
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
-metadata: { since: "0.6" }
+metadata: { since: "0.6.1.6" }
 ---
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.core.problem since pymoo 0.6.0, and the import raises ImportError. Give the problem elementwise_runner=StarmapParallelization(pool.starmap), with StarmapParallelization from pymoo.core.problem.
+rule:
+  kind: dotted_name
+  pattern: $N
+  regex: '^(starmap_parallelized_eval)$'
+  inside:
+    stopBy: end
+    kind: import_from_statement
+    has: { field: module_name, regex: '^pymoo\.core\.problem$' }
+  not:
+    any:
+      - inside: { kind: import_from_statement, field: module_name }
+      - inside: { kind: aliased_import, field: alias }
+      - matches: compat-code
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "0.6", until: "0.6.1.6" }
+---
+# The same form from pymoo 0.6.1.6 on, which moved StarmapParallelization to pymoo.parallelization.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2156,7 +2238,7 @@ rule:
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
-metadata: { since: "0.6" }
+metadata: { since: "0.6.1.6" }
 ---
 id: removed-in-pymoo
 language: python
@@ -2634,38 +2716,44 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
-# An indicator is called, or run with do, since 0.5.0. calc raises AttributeError on 0.5.0 and
-# on 0.6.2. The object must be built in the same expression, or be a name that the file binds
-# to an indicator class and to no other class.
+# An indicator is run with do since 0.5.0, and can be called since 0.6.0. calc raises
+# AttributeError on 0.5.0 and on 0.6.2, and calling the object raised TypeError on 0.5.0. The
+# object must be built in the same expression, or be a name that the file binds to an indicator
+# class and to no other class. The file must import the class from pymoo.indicators,
+# pymoo.performance_indicator or pymoo.factory and must not define a class of that name, because
+# a project's own IGD may well have a calc method.
 id: removed-in-pymoo
 language: python
 severity: error
-message: An indicator has no calc since pymoo 0.5.0, and the call raises AttributeError. Call the object, as in $I($$$A), or write $I.do($$$A).
+message: An indicator has no calc since pymoo 0.5.0, and the call raises AttributeError. Write $I.do($$$A). From pymoo 0.6.0 on the object can also be called, as in $I($$$A).
 rule:
   pattern: $I.calc($$$A)
-  any:
-    - has: { field: function, has: { field: object, kind: call, has: { field: function, regex: '(^|\.)(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)$' } } }
-    - all:
-        - has: { field: function, has: { field: object, kind: identifier, pattern: $I } }
-        - inside:
-            kind: module
-            stopBy: end
-            has:
-              stopBy: end
-              kind: assignment
-              all:
-                - has: { field: left, pattern: $I }
-                - has: { field: right, regex: '^(\w+\.)*(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)\(' }
-        - not:
-            inside:
-              kind: module
-              stopBy: end
-              has:
+  all:
+    - any:
+        - has: { field: function, has: { field: object, kind: call, has: { field: function, pattern: $CLS, regex: '(^|\.)(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)$' } } }
+        - all:
+            - has: { field: function, has: { field: object, kind: identifier, pattern: $I } }
+            - inside:
+                kind: module
                 stopBy: end
-                kind: assignment
-                all:
-                  - has: { field: left, pattern: $I }
-                  - not: { has: { field: right, regex: '^(\w+\.)*(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)\(' } }
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $I }
+                    - has: { field: right, kind: call, has: { field: function, pattern: $CLS, regex: '(^|\.)(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)$' } }
+            - not:
+                inside:
+                  kind: module
+                  stopBy: end
+                  has:
+                    stopBy: end
+                    kind: assignment
+                    all:
+                      - has: { field: left, pattern: $I }
+                      - not: { has: { field: right, regex: '^(\w+\.)*(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)\(' } }
+    - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.(indicators|performance_indicator|factory)\b[^#]*\bimport\b[^#]*\b(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)\b' } }
+    - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: class_definition, has: { field: name, pattern: $CLS } } } }
   not: { matches: compat-code }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }

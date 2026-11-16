@@ -6,8 +6,9 @@
 #
 # Both calls must be the minimize the file imports from pymoo.optimize, name the same algorithm
 # and pass copy_algorithm=False. The first document needs the two calls in one block with no
-# assignment to the name after the first. The second needs the call in a loop that never assigns
-# the name.
+# assignment to the name after the first. The second needs the call in a loop that never binds
+# the name: not by an assignment, not as the loop variable, as in for algorithm in [NSGA2(),
+# SMSEMOA()], where each pass runs another object, and not by a walrus.
 id: reused-algorithm-without-copy
 language: python
 severity: error
@@ -58,7 +59,13 @@ rule:
     - inside:
         stopBy: end
         any: [{ kind: for_statement }, { kind: while_statement }]
-        not: { has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } } }
+        not:
+          any:
+            - has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+            # A loop over the algorithms gives each pass another object, and so does a walrus.
+            - { kind: for_statement, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+            - has: { stopBy: end, any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+            - has: { stopBy: end, kind: named_expression, has: { field: name, pattern: $ALG } }
 utils:
   pymoo-minimize:
     kind: call

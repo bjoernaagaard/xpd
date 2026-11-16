@@ -36,6 +36,7 @@ impl Applicability {
 struct Metadata {
     fix: Option<Applicability>,
     since: Option<Version>,
+    until: Option<Version>,
 }
 
 /// One rule document of a pack.
@@ -45,6 +46,9 @@ pub(crate) struct Rule {
     pub(crate) fix: Option<Applicability>,
     /// The first library version the rule applies to.
     pub(crate) since: Option<Version>,
+    /// The first library version the rule no longer applies to. A rule with `until` gives the
+    /// advice for the older releases, and another document gives the advice from `until` on.
+    pub(crate) until: Option<Version>,
     /// The rule's `files:` globs. When set, the rule runs only on a path that matches one.
     files: Option<GlobSet>,
     /// The rule's `ignores:` globs. The rule skips a path that matches one.
@@ -92,7 +96,9 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
         let metadata = match &config.metadata {
             Some(metadata) => serde_json::to_value(metadata)
                 .and_then(serde_json::from_value)
-                .context("metadata may hold fix: safe or unsafe, and since: \"<version>\"")?,
+                .context(
+                    "metadata may hold fix: safe or unsafe, since: \"<version>\" and until: \"<version>\"",
+                )?,
             None => Metadata::default(),
         };
         let fix = match (config.fixer.len(), metadata.fix) {
@@ -108,6 +114,7 @@ impl TryFrom<RuleConfig<SupportLang>> for Rule {
             config,
             fix,
             since: metadata.since,
+            until: metadata.until,
             files,
             ignores,
         })
@@ -118,6 +125,12 @@ impl Rule {
     /// Whether the rule's advice works on the `installed` version of its library.
     pub(crate) fn applies_to(&self, installed: &Version) -> bool {
         self.since.as_ref().is_none_or(|since| since <= installed)
+            && self.until.as_ref().is_none_or(|until| installed < until)
+    }
+
+    /// Whether the rule's advice works on the newest version of its library.
+    pub(crate) fn applies_to_newest(&self) -> bool {
+        self.until.is_none()
     }
 }
 
@@ -136,6 +149,7 @@ impl fmt::Debug for Rule {
             .field("id", &self.config.id)
             .field("fix", &self.fix)
             .field("since", &self.since)
+            .field("until", &self.until)
             .finish_non_exhaustive()
     }
 }

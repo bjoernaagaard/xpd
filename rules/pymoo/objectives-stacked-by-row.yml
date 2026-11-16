@@ -12,7 +12,8 @@
 #
 # The class must inherit from the Problem that the file imports from pymoo. An ElementwiseProblem
 # gets one solution, where a list of numbers is right, and is left alone. So is a class that
-# passes elementwise=True, and a stack with axis.
+# passes elementwise with any value but False or passes **kwargs on to __init__, because the
+# caller can then build it with elementwise=True, and a stack with axis.
 id: objectives-stacked-by-row
 language: python
 severity: error
@@ -31,7 +32,7 @@ rule:
         kind: class_definition
         all:
           - has: { field: superclasses, has: { kind: identifier, regex: '^Problem$' } }
-          - not: { has: { stopBy: end, kind: keyword_argument, regex: '^elementwise(_evaluation)?\s*=\s*True$' } }
+          - not: { has: { stopBy: end, any: [{ kind: keyword_argument, regex: '^elementwise(_evaluation)?\s*=', not: { regex: '=\s*False$' } }, { kind: dictionary_splat, inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.__init__$' } } } }] } }
           - inside:
               kind: module
               stopBy: end

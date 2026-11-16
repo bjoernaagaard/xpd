@@ -105,7 +105,8 @@ metadata: { fix: safe, since: "0.6.1.2" }
 ---
 # The same key on a population that the file does not tie to a result. ast-grep sees no types,
 # so this document reads the name of the object: a variable or an attribute named pop, opt, off
-# or population. A dictionary of that name gets a wrong report, so the document has no fix.
+# or population. A name that the file assigns a dictionary is left alone. A dictionary that comes
+# from somewhere else still gets a wrong report, so the document has no fix.
 id: deprecated-in-pymoo
 language: python
 severity: warning
@@ -128,6 +129,23 @@ rule:
                       - has: { field: attribute, regex: '^get$' }
                       - has: { field: object, regex: '(^|\.)(pop|opt|off|population)$' }
                 - not: { matches: get-on-a-result }
+                # A name that the file assigns a dictionary is not a population.
+                - not:
+                    has:
+                      field: function
+                      has:
+                        field: object
+                        kind: identifier
+                        pattern: $POP
+                        inside:
+                          kind: module
+                          stopBy: end
+                          has:
+                            stopBy: end
+                            kind: assignment
+                            all:
+                              - has: { field: left, pattern: $POP }
+                              - has: { field: right, any: [{ kind: dictionary }, { kind: dictionary_comprehension }, { kind: call, has: { field: function, regex: '^(dict|defaultdict|OrderedDict|collections\.\w+|json\.loads?)$' } }] }
     - not: { matches: expected-to-warn }
 utils:
   pymoo-minimize:

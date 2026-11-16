@@ -148,9 +148,14 @@ impl Pack {
             .map(|doc| doc.text)
     }
 
-    /// Drops the rules that need a newer version of the library than `installed`.
+    /// Drops the rules that need a newer or an older version of the library than `installed`.
     fn keep_rules_for(&mut self, installed: &Version) {
         self.rules.retain(|rule| rule.applies_to(installed));
+    }
+
+    /// Drops the rules whose advice is only for older versions of the library.
+    fn keep_newest_rules(&mut self) {
+        self.rules.retain(Rule::applies_to_newest);
     }
 }
 
@@ -166,16 +171,17 @@ impl fmt::Debug for Pack {
 }
 
 /// Every pack, each with the rules for the `installed` version of its library. A pack whose
-/// library is not installed, or a run without a venv, keeps every rule, so the project gets the
-/// newest advice.
+/// library is not installed, or a run without a venv, keeps every rule but those with `until`,
+/// so the project gets the newest advice.
 pub(crate) fn load(installed: Option<&Distributions>) -> Result<Vec<Pack>> {
     SOURCES
         .iter()
         .map(|source| {
             let mut pack =
                 Pack::try_from(source).with_context(|| format!("rules/{}", source.module))?;
-            if let Some(version) = installed.and_then(|found| found.version(pack.module)) {
-                pack.keep_rules_for(version);
+            match installed.and_then(|found| found.version(pack.module)) {
+                Some(version) => pack.keep_rules_for(version),
+                None => pack.keep_newest_rules(),
             }
             Ok(pack)
         })

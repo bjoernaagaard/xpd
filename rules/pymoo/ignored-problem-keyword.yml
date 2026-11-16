@@ -43,6 +43,33 @@ metadata: { since: "0.6" }
 id: ignored-problem-keyword
 language: python
 severity: error
+message: parallelization is not read since pymoo 0.5.0, so the solutions are evaluated one after the other. A starmap given this way was called 0 times in 3 generations. Pass elementwise_runner=StarmapParallelization(pool.starmap), with StarmapParallelization from pymoo.core.problem.
+rule:
+  kind: keyword_argument
+  regex: '^parallelization\s*='
+  inside: { kind: argument_list, inside: { matches: problem-init } }
+utils:
+  problem-init:
+    kind: call
+    all:
+      - any:
+          - all:
+              - has: { field: function, regex: '^(super\(\)|Problem|ElementwiseProblem)\.__init__$' }
+              - inside:
+                  stopBy: end
+                  kind: class_definition
+                  has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+          - has: { field: function, regex: '^(Problem|ElementwiseProblem)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+metadata: { since: "0.6", until: "0.6.1.6" }
+---
+# The same form from pymoo 0.6.1.6 on, which moved StarmapParallelization to pymoo.parallelization.
+id: ignored-problem-keyword
+language: python
+severity: error
 message: parallelization is not read since pymoo 0.5.0, so the solutions are evaluated one after the other. A starmap given this way was called 0 times in 3 generations. Pass elementwise_runner=StarmapParallelization(pool.starmap), with StarmapParallelization from pymoo.parallelization.
 rule:
   kind: keyword_argument
@@ -64,7 +91,7 @@ utils:
           kind: module
           stopBy: end
           has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
-metadata: { since: "0.6" }
+metadata: { since: "0.6.1.6" }
 ---
 # pymoo 0.4 kept type_var as an attribute of the problem. Since 0.5.0 Problem has no such
 # parameter and only stores the keyword in problem.data, and 0.6.0 added vtype. A problem built

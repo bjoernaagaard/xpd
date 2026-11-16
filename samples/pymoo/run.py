@@ -85,6 +85,15 @@ def algorithm_run_in_place_or_built_again():
     return len(in_place.pop), kept.algorithm is in_place, first.F, again.pop, stepped.pop, done.F
 
 
+@case
+def algorithm_bound_again_by_a_walrus():
+    walrus = NSGA2(pop_size=20)
+    res = minimize(get_problem("zdt1"), walrus, ("n_gen", 5), seed=1)
+    # The walrus gives the name the algorithm that ran.
+    generations = (walrus := res.algorithm).n_gen
+    return generations, walrus.n_gen
+
+
 def notify(algorithm):
     return algorithm.pop
 
@@ -114,6 +123,9 @@ def runs_with_a_new_algorithm():
     for name in ("zdt1", "zdt2"):
         fresh = NSGA2(pop_size=20)
         fronts.append(minimize(get_problem(name), fresh, ("n_gen", 5), seed=1, copy_algorithm=False).F)
+    # A loop over the algorithms runs another object in each pass.
+    for each in [NSGA2(pop_size=20), NSGA2(pop_size=30)]:
+        fronts.append(minimize(get_problem("zdt1"), each, ("n_gen", 5), seed=1, copy_algorithm=False).F)
     return first.F, second.F, third.F, fourth.F, fronts
 
 
@@ -151,6 +163,14 @@ def continue_a_finished_run():
 class Job:
     def __init__(self):
         self.has_terminated = False
+
+
+@case
+def another_object_with_the_attribute():
+    # A job is not an algorithm that the file loads, so its attribute is its own.
+    job = Job()
+    job.has_terminated = False
+    return job.has_terminated
 
 
 @case

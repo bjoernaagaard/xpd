@@ -4,7 +4,21 @@
 
 # A runner is called as runner(f, X). pool.starmap given as it is passes each solution as a
 # second argument and raised TypeError, "ElementwiseEvaluationFunction.__call__() takes 2
-# positional arguments but 3 were given". StarmapParallelization wraps it.
+# positional arguments but 3 were given". StarmapParallelization wraps it. The class is in
+# pymoo.core.problem on 0.6.0 to 0.6.1.5, where pymoo.parallelization does not exist and its
+# import raised ModuleNotFoundError, and in pymoo.parallelization from 0.6.1.6 on. This document
+# carries until and names the first module, and the next one names the second.
+id: elementwise-runner
+language: python
+severity: error
+message: elementwise_runner is called as runner(f, X), and a bare starmap raises TypeError, "ElementwiseEvaluationFunction.__call__() takes 2 positional arguments but 3 were given". Wrap it, as in elementwise_runner=StarmapParallelization($R), with StarmapParallelization from pymoo.core.problem.
+rule:
+  kind: keyword_argument
+  regex: '^elementwise_runner\s*='
+  has: { field: value, kind: attribute, pattern: $R, has: { field: attribute, regex: '^starmap$' } }
+metadata: { since: "0.6", until: "0.6.1.6" }
+---
+# The same form from pymoo 0.6.1.6 on, which moved StarmapParallelization to pymoo.parallelization.
 id: elementwise-runner
 language: python
 severity: error
@@ -13,12 +27,12 @@ rule:
   kind: keyword_argument
   regex: '^elementwise_runner\s*='
   has: { field: value, kind: attribute, pattern: $R, has: { field: attribute, regex: '^starmap$' } }
-metadata: { since: "0.6" }
+metadata: { since: "0.6.1.6" }
 ---
 # A Problem evaluates the whole population in one call of _evaluate and never calls the runner.
 # In 3 generations a Problem given a runner called it 0 times, where an ElementwiseProblem called
 # it 3 times. The class must be one the file defines with the Problem it imports from pymoo as
-# its base, and without an elementwise keyword.
+# its base, and without an elementwise keyword in the class or in the call.
 id: elementwise-runner
 language: python
 severity: error
@@ -32,6 +46,8 @@ rule:
       kind: call
       all:
         - has: { field: function, kind: identifier, pattern: $C }
+        # The call can turn the flag on itself when the class passes its keywords on.
+        - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, regex: '^elementwise\s*=' }, { kind: dictionary_splat }] } } }
         - inside:
             kind: module
             stopBy: end

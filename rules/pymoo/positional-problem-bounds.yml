@@ -1,0 +1,89 @@
+# pymoo 0.5 had Problem(n_var, n_obj, n_constr, xl, xu). pymoo 0.6.0 split the constraint count,
+# so the signature is now (n_var, n_obj, n_ieq_constr, n_eq_constr, xl, xu), and a call written
+# for 0.5 with the bounds by position puts xl where n_eq_constr is read and xu where xl is read.
+# Nothing checks it. On pymoo 0.6.2 and 0.6.0, Problem(2, 1, 0, np.zeros(2), np.ones(2)) built a
+# problem with n_eq_constr [0, 0], xl [1, 1] and xu None, and with xu= as a keyword it had xl
+# None. minimize with GA then raised TypeError, "only integer scalar arrays can be converted to a
+# scalar index". On 0.5.0 the same class ran with xl [0, 0] and xu [1, 1].
+#
+# The rule reads a call with exactly five positional arguments and no xl or xu keyword, and a
+# call with exactly four and xu as a keyword. A whole number written as the fourth argument is a
+# count, as in Problem(2, 1, 0, 0, xl), and is left alone. The call must be super().__init__
+# inside a class that inherits from the Problem or ElementwiseProblem the file imports from
+# pymoo, or one of those two classes called by name.
+id: positional-problem-bounds
+language: python
+severity: error
+message: The fourth positional argument of Problem is n_eq_constr since pymoo 0.6.0, where 0.5 had xl there, so $A is read as the number of equality constraints and not as the lower bounds. On pymoo 0.6.2, Problem(2, 1, 0, np.zeros(2), np.ones(2)) built a problem with xl [1, 1] and xu None with no error, and minimize then raised TypeError, "only integer scalar arrays can be converted to a scalar index". Pass xl= and xu= by keyword.
+rule:
+  kind: argument_list
+  all:
+    - has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, pattern: $A, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: integer }, { regex: '^[(),]$' }] } }
+    - inside: { matches: problem-init }
+    - not: { has: { kind: list_splat } }
+    - not: { has: { kind: keyword_argument, has: { field: name, regex: '^xl$' } } }
+    - any:
+        # n_var, n_obj, n_constr, xl, xu.
+        - all:
+            - has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { regex: '^[(),]$' }] } }
+            - not: { has: { nthChild: { position: 6, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { regex: '^[(),]$' }] } } }
+            - not: { has: { kind: keyword_argument, has: { field: name, regex: '^xu$' } } }
+        # n_var, n_obj, n_constr, xl and xu=.
+        - all:
+            - not: { has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { regex: '^[(),]$' }] } } }
+            - has: { kind: keyword_argument, has: { field: name, regex: '^xu$' } }
+utils:
+  problem-init:
+    kind: call
+    all:
+      - any:
+          - all:
+              - has: { field: function, regex: '^super\(\)\.__init__$' }
+              - inside:
+                  stopBy: end
+                  kind: class_definition
+                  has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+          - has: { field: function, regex: '^(Problem|ElementwiseProblem)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+metadata: { since: "0.6" }
+---
+# The same call written as Problem.__init__(self, ...), where self comes first.
+id: positional-problem-bounds
+language: python
+severity: error
+message: The fourth positional argument of Problem is n_eq_constr since pymoo 0.6.0, where 0.5 had xl there, so $A is read as the number of equality constraints and not as the lower bounds. On pymoo 0.6.2, Problem(2, 1, 0, np.zeros(2), np.ones(2)) built a problem with xl [1, 1] and xu None with no error, and minimize then raised TypeError, "only integer scalar arrays can be converted to a scalar index". Pass xl= and xu= by keyword.
+rule:
+  kind: argument_list
+  all:
+    - has: { nthChild: { position: 5, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, pattern: $A, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: integer }, { regex: '^[(),]$' }] } }
+    - inside: { matches: problem-init }
+    - not: { has: { kind: list_splat } }
+    - not: { has: { kind: keyword_argument, has: { field: name, regex: '^xl$' } } }
+    - any:
+        # n_var, n_obj, n_constr, xl, xu.
+        - all:
+            - has: { nthChild: { position: 6, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { regex: '^[(),]$' }] } }
+            - not: { has: { nthChild: { position: 7, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { regex: '^[(),]$' }] } } }
+            - not: { has: { kind: keyword_argument, has: { field: name, regex: '^xu$' } } }
+        # n_var, n_obj, n_constr, xl and xu=.
+        - all:
+            - not: { has: { nthChild: { position: 6, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { regex: '^[(),]$' }] } } }
+            - has: { kind: keyword_argument, has: { field: name, regex: '^xu$' } }
+utils:
+  problem-init:
+    kind: call
+    all:
+      - all:
+          - has: { field: function, regex: '^(Problem|ElementwiseProblem)\.__init__$' }
+          - inside:
+                  stopBy: end
+                  kind: class_definition
+                  has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+metadata: { since: "0.6" }
