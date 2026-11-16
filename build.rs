@@ -70,6 +70,17 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed={PLUGIN}");
     println!("cargo:rerun-if-changed={PLUGIN_MCP}");
     plugin_version()?;
+    println!("cargo:rerun-if-changed=indexes");
+    let indexes = sorted_entries(Path::new("indexes"))?
+        .iter()
+        .filter(|p| {
+            p.extension().is_some_and(|e| e == "json")
+                && p.file_name().is_some_and(|n| n != "questions.json")
+        })
+        .map(|p| include(&format!("/{}", p.display())))
+        .collect::<Vec<_>>()
+        .join(",\n");
+    write(&out.join("indexes.rs"), &format!("&[{indexes}]"))?;
     let page =
         fs::read_to_string(RULES_PAGE).with_context(|| format!("cannot read {RULES_PAGE}"))?;
     let mut docs = rule_docs(&page)?;

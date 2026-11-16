@@ -11,6 +11,7 @@ use serde_json::Value;
 
 use crate::catalog;
 use crate::graph::Graph;
+use crate::index::{self, Kind};
 use crate::lsp;
 use crate::mcp;
 use crate::pack;
@@ -53,6 +54,43 @@ enum Format {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
+    /// Find libraries and rules for a task, without importing Python.
+    Find {
+        query: Option<String>,
+        #[arg(long)]
+        package: Option<String>,
+        #[arg(long, value_enum)]
+        kind: Option<Kind>,
+        #[arg(long, value_enum, default_value = "text")]
+        format: Format,
+        /// Additional index generated from local source.
+        #[arg(long)]
+        index: Option<PathBuf>,
+        /// Run real discovery questions and fail if an expected entry misses the top five.
+        #[arg(long, conflicts_with = "query")]
+        check: Option<PathBuf>,
+        /// Allowed ranking misses for an explicit regression baseline. Every miss is printed.
+        #[arg(long, default_value_t = 0, requires = "check")]
+        max_misses: usize,
+    },
+    /// Show a public symbol's parameters, summary, own members and guarding rules.
+    Api {
+        name: String,
+        #[arg(long, value_enum, default_value = "text")]
+        format: Format,
+        #[arg(long)]
+        index: Option<PathBuf>,
+    },
+    /// Parse library source into a versioned index. Never imports or runs library code.
+    Index {
+        source: PathBuf,
+        #[arg(long)]
+        package: String,
+        #[arg(long)]
+        version: Option<String>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Lint Python files. Exit 0 when clean, 1 on any error-severity issue, 2 if xpd can't run.
     ///
     /// A library's rules run only on files that import it, and the Python rules run on every file.
@@ -168,6 +206,59 @@ pub(crate) fn run() -> ExitCode {
             };
             check(&paths, format, fix.then_some(allowed), allowed)
         }
+        Cmd::Find {
+            query,
+            package,
+            kind,
+            format,
+            index,
+            check,
+            max_misses,
+        } => discovery((|| {
+            let entries = index::load(index.as_deref())?;
+            if let Some(path) = check {
+                check_ranking(&entries, &path, max_misses)?;
+            } else {
+                let query = query.context("provide a task query or --check")?;
+                let found = index::find(&entries, &query, package.as_deref(), kind);
+                print_entries(&found, format, Detail::Summary)?;
+            }
+            Ok(())
+        })()),
+        Cmd::Api {
+            name,
+            format,
+            index,
+        } => discovery((|| {
+            let entries = index::load(index.as_deref())?;
+            let entry = entries
+                .iter()
+                .find(|e| e.name == name)
+                .with_context(|| format!("no entry named {name}"))?;
+            print_entries(&[entry], format, Detail::Full)
+        })()),
+        Cmd::Index {
+            source,
+            package,
+            version,
+            output,
+        } => discovery((|| {
+            let version = match version {
+                Some(v) => v,
+                None => index::source_version(&source, &package)?,
+            };
+            let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
+            let index = index::generate(&source, &package, &version)?;
+            std::fs::write(&output, serde_json::to_vec(&index)?)?;
+            println!(
+                "{} {}: {} symbols written to {}",
+                package,
+                version,
+                index.entries.len(),
+                output.display()
+            );
+            Ok(())
+        })()),
         Cmd::Hook => hook(),
         Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
@@ -441,4 +532,108 @@ fn run_py(script: &str, args: &[PathBuf]) -> ExitCode {
             ExitCode::from(PYTHON_NOT_STARTED)
         }
     }
+}
+
+fn discovery(result: Result<()>) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("xpd: {error:#}");
+            ExitCode::from(CHECK_FAILED)
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Detail {
+    Summary,
+    Full,
+}
+
+fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> Result<()> {
+    let entries: Vec<_> = entries
+        .iter()
+        .map(|entry| {
+            let mut entry = (*entry).clone();
+            entry.keywords.clear();
+            if matches!(detail, Detail::Summary) {
+                entry.members.clear();
+                entry.summary = entry
+                    .summary
+                    .split("\n\n")
+                    .next()
+                    .unwrap_or_default()
+                    .to_owned();
+            }
+            entry
+        })
+        .collect();
+    match format {
+        Format::Json => println!("{}", serde_json::to_string(&entries)?),
+        Format::Text => {
+            for entry in entries {
+                println!(
+                    "{}({}) [{}]\n{}",
+                    entry.name,
+                    entry.parameters.join(", "),
+                    entry.callable.as_deref().unwrap_or("rule"),
+                    entry.summary
+                );
+                for member in &entry.members {
+                    println!(
+                        "  {}({}) {}",
+                        member.name,
+                        member.parameters.join(", "),
+                        member.summary
+                    );
+                }
+                if !entry.rules.is_empty() {
+                    println!("Rules: {}", entry.rules.join(", "));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_ranking(
+    entries: &[index::Entry],
+    path: &std::path::Path,
+    max_misses: usize,
+) -> Result<()> {
+    let questions: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+    let mut failed = 0;
+    for question in &questions {
+        let query = question["query"].as_str().context("question needs query")?;
+        let expected = question["expected"]
+            .as_str()
+            .context("question needs expected")?;
+        anyhow::ensure!(
+            entries.iter().any(|e| e.name == expected),
+            "expected entry {expected} is absent from the index"
+        );
+        let found = index::find(entries, query, None, None);
+        if !found.iter().any(|e| e.name == expected) {
+            failed += 1;
+            println!(
+                "FAIL {query} expected {expected}; found {}",
+                found
+                    .iter()
+                    .map(|e| e.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+    }
+    println!(
+        "{} of {} questions passed",
+        questions.len() - failed,
+        questions.len()
+    );
+    anyhow::ensure!(
+        failed <= max_misses,
+        "{failed} discovery questions failed; allowed {max_misses}"
+    );
+
+    Ok(())
 }

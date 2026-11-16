@@ -4,6 +4,7 @@
 mod catalog;
 mod cli;
 mod graph;
+mod index;
 mod lsp;
 mod mcp;
 mod nodes;

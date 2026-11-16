@@ -222,3 +222,57 @@ rule:
 "
     )
 }
+
+pub(crate) fn symbol_rules(module: &str) -> Result<BTreeMap<String, Vec<String>>> {
+    let mut links = BTreeMap::<String, Vec<String>>::new();
+    if let Some(source) = SOURCES.iter().find(|s| s.module == module) {
+        for rule in source.rules {
+            for document in rule.yaml.split("\n---") {
+                let value: serde_json::Value = ast_grep_config::from_str(document)?;
+                let mut tokens = std::collections::BTreeSet::new();
+                pattern_names(
+                    value.get("rule").unwrap_or(&serde_json::Value::Null),
+                    &mut tokens,
+                );
+                pattern_names(
+                    value.get("utils").unwrap_or(&serde_json::Value::Null),
+                    &mut tokens,
+                );
+                for token in tokens {
+                    let rules = links.entry(token).or_default();
+                    let id = format!("{}/{}", module, rule.id);
+                    if !rules.contains(&id) {
+                        rules.push(id);
+                    }
+                }
+            }
+        }
+    }
+    Ok(links)
+}
+
+fn pattern_names(value: &serde_json::Value, names: &mut std::collections::BTreeSet<String>) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, value) in fields {
+                if matches!(key.as_str(), "pattern" | "regex") {
+                    if let Some(text) = value.as_str() {
+                        names.extend(
+                            text.split(|c: char| !c.is_alphanumeric() && c != '_')
+                                .filter(|s| !s.is_empty())
+                                .map(str::to_owned),
+                        );
+                    }
+                } else if key != "not" {
+                    pattern_names(value, names);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                pattern_names(value, names);
+            }
+        }
+        _ => {}
+    }
+}

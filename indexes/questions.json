@@ -1,0 +1,210 @@
+[
+  {
+    "query": "grouped regression, going from one model on all data to 24 individual models",
+    "expected": "sklego.meta.GroupedPredictor"
+  },
+  {
+    "query": "time series bootstrap for cross validation",
+    "expected": "mapie.subsample.BlockBootstrap"
+  },
+  {
+    "query": "small multiples",
+    "expected": "plotly/free-facet-scales"
+  },
+  {
+    "query": "read a CSV file into a dataframe",
+    "expected": "pandas.read_csv"
+  },
+  {
+    "query": "combine data frames by database style join",
+    "expected": "pandas.merge"
+  },
+  {
+    "query": "concatenate pandas objects along an axis",
+    "expected": "pandas.concat"
+  },
+  {
+    "query": "reshape a dataframe from wide to long format",
+    "expected": "pandas.melt"
+  },
+  {
+    "query": "create an array of evenly spaced numbers over an interval",
+    "expected": "numpy.linspace"
+  },
+  {
+    "query": "compute the average of an array along an axis",
+    "expected": "numpy.mean"
+  },
+  {
+    "query": "compute the median along an axis",
+    "expected": "numpy.median"
+  },
+  {
+    "query": "load data from a text file",
+    "expected": "numpy.loadtxt"
+  },
+  {
+    "query": "find peaks in a signal",
+    "expected": "scipy.signal.find_peaks"
+  },
+  {
+    "query": "minimize a scalar function of several variables",
+    "expected": "scipy.optimize.minimize"
+  },
+  {
+    "query": "one way analysis of variance",
+    "expected": "scipy.stats.f_oneway"
+  },
+  {
+    "query": "calculate pairwise distances between observations",
+    "expected": "scipy.spatial.distance.pdist"
+  },
+  {
+    "query": "split time ordered data into train and test folds",
+    "expected": "sklearn.model_selection.TimeSeriesSplit"
+  },
+  {
+    "query": "standardize features by removing the mean and scaling to unit variance",
+    "expected": "sklearn.preprocessing.StandardScaler"
+  },
+  {
+    "query": "chain preprocessing transformers and a final estimator",
+    "expected": "sklearn.pipeline.Pipeline"
+  },
+  {
+    "query": "random forest regression",
+    "expected": "sklearn.ensemble.RandomForestRegressor"
+  },
+  {
+    "query": "apply different transformers to columns",
+    "expected": "sklearn.compose.ColumnTransformer"
+  },
+  {
+    "query": "transform features separately for each group",
+    "expected": "sklego.meta.GroupedTransformer"
+  },
+  {
+    "query": "remove linear correlation between sensitive features and other features",
+    "expected": "sklego.preprocessing.InformationFilter"
+  },
+  {
+    "query": "regression that is robust to outliers using a dead zone",
+    "expected": "sklego.linear_model.DeadZoneRegressor"
+  },
+  {
+    "query": "change the threshold of a binary classifier",
+    "expected": "sklego.meta.Thresholder"
+  },
+  {
+    "query": "split conformal prediction intervals for regression",
+    "expected": "mapie.regression.SplitConformalRegressor"
+  },
+  {
+    "query": "cross conformal prediction intervals for regression",
+    "expected": "mapie.regression.CrossConformalRegressor"
+  },
+  {
+    "query": "conformal prediction sets for classification",
+    "expected": "mapie.classification.SplitConformalClassifier"
+  },
+  {
+    "query": "encode categories as binary features",
+    "expected": "category_encoders.BinaryEncoder"
+  },
+  {
+    "query": "encode categories using target statistics",
+    "expected": "category_encoders.TargetEncoder"
+  },
+  {
+    "query": "encode categorical features with hashing",
+    "expected": "category_encoders.HashingEncoder"
+  },
+  {
+    "query": "encode categories using the weight of evidence",
+    "expected": "category_encoders.WOEEncoder"
+  },
+  {
+    "query": "panel data fixed effects regression",
+    "expected": "linearmodels.PanelOLS"
+  },
+  {
+    "query": "instrumental variable two stage least squares",
+    "expected": "linearmodels.IV2SLS"
+  },
+  {
+    "query": "estimate a seemingly unrelated regression",
+    "expected": "linearmodels.SUR"
+  },
+  {
+    "query": "Fama MacBeth regression for panel data",
+    "expected": "linearmodels.FamaMacBeth"
+  },
+  {
+    "query": "stationary bootstrap for dependent time series",
+    "expected": "arch.bootstrap.StationaryBootstrap"
+  },
+  {
+    "query": "circular block bootstrap for time series",
+    "expected": "arch.bootstrap.CircularBlockBootstrap"
+  },
+  {
+    "query": "moving block bootstrap for time series",
+    "expected": "arch.bootstrap.MovingBlockBootstrap"
+  },
+  {
+    "query": "specify a univariate ARCH volatility model",
+    "expected": "arch.arch_model"
+  },
+  {
+    "query": "multi objective optimization with NSGA2",
+    "expected": "pymoo.algorithms.moo.kgb.NSGA2"
+  },
+  {
+    "query": "multi objective optimization using MOEAD",
+    "expected": "pymoo.algorithms.moo.moead.MOEAD"
+  },
+  {
+    "query": "particle swarm optimization",
+    "expected": "pymoo.algorithms.soo.nonconvex.pso.PSO"
+  },
+  {
+    "query": "define an elementwise optimization problem",
+    "expected": "pymoo.core.problem.ElementwiseProblem"
+  },
+  {
+    "query": "draw a bar chart",
+    "expected": "plotly.express.bar"
+  },
+  {
+    "query": "draw a scatter plot",
+    "expected": "plotly.express.scatter"
+  },
+  {
+    "query": "draw a histogram",
+    "expected": "plotly.express.histogram"
+  },
+  {
+    "query": "draw a box plot",
+    "expected": "plotly.express.box"
+  },
+  {
+    "query": "build a Hamilton driver",
+    "expected": "hamilton.driver.Builder"
+  },
+  {
+    "query": "extract columns from the output dataframe of a node",
+    "expected": "hamilton.function_modifiers.extract_columns"
+  },
+  {
+    "query": "parameterize a Hamilton function with literal values",
+    "expected": "hamilton.function_modifiers.parameterize_values"
+  },
+  {
+    "query": "select Hamilton functions based on configuration",
+    "expected": "hamilton.function_modifiers.config"
+  },
+  {
+    "query": "avoid using dict str Any for typed function signatures",
+    "expected": "python/dict-str-any"
+  }
+]
