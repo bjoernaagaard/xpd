@@ -42,8 +42,20 @@ Use `xpd` whenever you write or change Python code.
     `frame["x"] = ...` on the frame a step was given.
   - Apache Hamilton modules: a `warning` names an input one edit from a node
     name, so check it for a typing error. `inputs` are what the caller passes.
+- `xpd outline <paths…> --format json`: the imports, definitions and members of
+  each file, with line numbers. Run it to map a project before you read whole
+  files.
+- `xpd run --pattern '<code>' <paths…> --json`: find code by its syntax, such as
+  `'$X.iterrows()'`. Add `--rewrite '<code>'` to preview a replacement, and
+  `--update-all` to write every match.
+- `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on its raw
+  training rows and compare outputs and scores with the contract. Needs pandas
+  and scikit-learn.
 
-When the xpd MCP server is connected, call its tools (`check`, `fix`, `graph`,
-`profile`, `equiv`, `rules`, `rule`, `find`, `api`) instead of the shell commands. They take
-the same paths and return the same JSON, except that `rules` lists the rules
-without their documentation and `rule` returns one rule with it.
+When the xpd MCP server is connected, call its tools instead of the shell commands.
+`check`, `fix`, `graph`, `profile`, `equiv`, `refit`, `find`, `api`, `outline`, `new` and
+`test` match the commands of the same names, and `fix` is `check --fix`. `query` and
+`rewrite` are `xpd run` without and with a replacement. They take the same paths and
+return the same JSON. `rules` lists the rules without their documentation, and `rule`
+returns one rule with it. `discovery_gate`, `contract` and `gates` judge a run from a
+data file to a saved model.
