@@ -1,9 +1,10 @@
 # Rules
 
-xpd has nine rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
+xpd has ten rule packs: [pandas](#pandas), [NumPy](#numpy), [SciPy](#scipy),
 [scikit-learn](#scikit-learn), [scikit-lego](#scikit-lego), [MAPIE](#mapie),
-[Category Encoders](#category-encoders), [Hamilton](#hamilton) and [Python](#python). A library's
-rules run only on files that import it. The Python rules run on every file.
+[Category Encoders](#category-encoders), [linearmodels](#linearmodels), [Hamilton](#hamilton) and
+[Python](#python). A library's rules run only on files that import it. The Python rules run on
+every file.
 
 ## pandas
 
