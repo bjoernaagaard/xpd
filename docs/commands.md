@@ -270,10 +270,11 @@ network or Python execution is needed. `--package` takes the Python import name,
 takes `symbol`, `rule` or `recipe`. Empty matches return an empty list and exit 0. Unfiltered results include at most three
 recipes, leaving room for API entries or rules. `--kind recipe` returns up to five recipes.
 
+Discovery ranks the words in names, signatures, docstring summaries, rule texts and recipe titles. It answers "what is the thing called that does X" but does not yet answer questions about a method's properties, such as which linear models need no scaling.
+
 Names are split at underscores and camel case. Name tokens get weight three in BM25, with
-light stemming and common word forms shared by queries and entries. Parameter names and
-source documentation and class member summaries get lower weights. Adjacent words help distinguish
-tasks that share individual words. Exact acronym names and phrases get
+uniform suffix stemming shared by queries and entries. Parameter names and
+source documentation and class member summaries get lower weights. Exact acronym names and phrases get
 bonuses, and shorter public paths rank higher. The build prepares the search table, and queries decode only the returned entries. Long signatures
 are shortened in text search results; JSON and `api` retain every parameter. Results are keyword matches, not a judgment
 that a library suits every requirement. Read the chosen API and its rules before using it.
@@ -294,7 +295,7 @@ Rule links are inferred from symbol name tokens in the pack's rule patterns, inc
 patterns. They are possible guards, rather than proof that every use of the symbol matches.
 The rule entries include the full documentation, so terms such as "small multiples" are searchable.
 A rule prints as `plotly/bar-axis-without-zero [rule]`, without a call signature or raw matcher
-metavariables. A recipe prints its title, used symbols, pinned source, license, attribution and
+metavariables. A recipe name combines the pack and the first eight words of its title. Recipes with the same name are deduplicated within a pack. The name stays the same when source paths or line numbers change. A recipe prints its title, used symbols, pinned source, license, attribution and
 complete Python snippet. `recipe.modified` records whether xpd applied fixes; `recipe.code` is
 null for a source whose license is not recognized as permitting redistribution.
 

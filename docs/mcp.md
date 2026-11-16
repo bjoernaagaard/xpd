@@ -215,7 +215,7 @@ fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas
 Call `find(task, package=None, kind=None)` before selecting a library, even if the project has
 not installed it. The result holds up to five entries ranked by keywords. `package`
 is a Python import name. Read each entry's `kind`, which can include `symbol`, `rule` and
-`recipe`. The server preserves other kinds and fields added by the binary. Call `api(name)` with a returned dotted
+`recipe`. The server preserves other kinds and fields added by the binary. Call `api(name)` with a returned
 name to read its parameter names, docstring summary, own class members and possible guarding
 rules. Both tools call the installed binary. The server holds no symbol index. In code mode, `find` returns its list under `result`.
 `api` returns an object directly. Both include `signature`, a display of indexed parameter
@@ -254,3 +254,18 @@ agent to get permission before adding a missing library through the project's de
 manager. The default sandbox only calls tools. The agent writes files before the single
 `execute` call, which repeats discovery and checks the written choice. See the runnable
 [discovery examples](code-mode.md#discovery-before-execution).
+
+The sdist wheel was run through a real FastMCP 4.2.0 code mode client. The unchanged
+scripts in [code mode](code-mode.md#run-the-scripts-through-the-server) returned these results.
+
+| Call | Real result |
+| --- | --- |
+| `find(task="rounded bars", kind="recipe")`, then `api` | `plotly/recipe/rounded-bars`, MIT, 498 bytes of code, source ending `bar-charts.md#L746` |
+| Grouped model `execute` | `passed: true`, one API call checked, no lint issues, `equivalent: true` |
+| Bootstrap `execute` | `passed: true`, five API calls checked, no lint issues, `equivalent: true` |
+| Plotly `execute` | `passed: false`, `ran: false`, `plotly.express.scatter is not among the recorded candidates.` |
+| Invented API `execute` | `passed: false`, `ran: false`, unknown `group_by` and `ImaginaryPredictor` |
+
+The Plotly discovery question remains unanswered. The gate stops execution instead of
+accepting a choice absent from the recorded candidates. Recipe API output retains `recipe`
+with its title, symbols, source path and line, code, license, attribution and modification flag.

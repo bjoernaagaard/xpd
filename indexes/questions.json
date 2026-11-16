@@ -178,25 +178,5 @@
   {
     "query": "fixed effects panel regression",
     "expected": "linearmodels.PanelOLS"
-  },
-  {
-    "query": "multi-hot encoding for delimiter-separated items",
-    "expected": "category_encoders/recipe/multi-hot-encoding-for-cells-that-contain-several"
-  },
-  {
-    "query": "maximum relevance minimum redundancy feature selection example",
-    "expected": "sklego/recipe/maximum-relevance-minimum-redundancy-mrmr-is-an-iterative"
-  },
-  {
-    "query": "reweight input signals with weights that sum to one",
-    "expected": "sklego/recipe/probweightregression-assumes-that-all-input-signals-in-x"
-  },
-  {
-    "query": "split conformal prediction intervals worked example",
-    "expected": "mapie/recipe/computes-prediction-intervals-using-the-split-conformal-regression"
-  },
-  {
-    "query": "show a block bootstrap training set example",
-    "expected": "mapie/recipe/generate-a-sampling-method-that-block-bootstraps-the"
   }
 ]

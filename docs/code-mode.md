@@ -400,6 +400,8 @@ version as this draft.
 
 ## What is open
 
+Discovery ranks the words in names, signatures, docstring summaries, rule texts and recipe titles. It answers "what is the thing called that does X" but does not yet answer questions about a method's properties, such as which linear models need no scaling.
+
 | Open item | What the draft does now |
 | --- | --- |
 | `gates` cannot tell which files a result is about | It trusts the script. A script that lints another file, or hands in an old result, passes. The tools would have to return the paths they ran on, or `gates` would have to run the stages itself |
@@ -468,15 +470,18 @@ commands were run from this worktree, without changing the project's dependencie
 PyArrow and bottleneck satisfy the optional pandas package checks in this environment.
 
 ```sh
-cargo build --release
-uv venv /var/tmp/xpd-discovery-venv
-uv pip install --python /var/tmp/xpd-discovery-venv/bin/python maturin
-/var/tmp/xpd-discovery-venv/bin/maturin build --release --out /var/tmp/xpd-discovery-wheels
-uv pip install --python /var/tmp/xpd-discovery-venv/bin/python /var/tmp/xpd-discovery-wheels/*.whl pandas scikit-learn scikit-lego arch mapie plotly pyarrow bottleneck
+cargo package --list
+uv venv /var/tmp/xpd-library-verification/venv
+uv pip install --python /var/tmp/xpd-library-verification/venv/bin/python maturin
+/var/tmp/xpd-library-verification/venv/bin/maturin sdist --out /var/tmp/xpd-library-verification/final-sdist
+mkdir -p /var/tmp/xpd-library-verification/final-clean
+tar -xzf /var/tmp/xpd-library-verification/final-sdist/xpd-0.16.0.tar.gz -C /var/tmp/xpd-library-verification/final-clean
+/var/tmp/xpd-library-verification/venv/bin/maturin build --release --manifest-path /var/tmp/xpd-library-verification/final-clean/xpd-0.16.0/Cargo.toml --out /var/tmp/xpd-library-verification/final-wheels
+uv pip install --python /var/tmp/xpd-library-verification/venv/bin/python /var/tmp/xpd-library-verification/final-wheels/*.whl pandas scikit-learn scikit-lego arch mapie plotly pyarrow bottleneck
 ```
 
 Paste one complete script below into `CODE` in this client and run it from the repository
-with `/var/tmp/xpd-discovery-venv/bin/python`. `find` returns its list under `result`, as
+with `/var/tmp/xpd-library-verification/venv/bin/python`. `find` returns its list under `result`, as
 FastMCP's output schema specifies. `api` returns an object directly.
 
 ```python
@@ -489,9 +494,9 @@ CODE = """paste one script below here"""
 
 async def main():
     transport = StdioTransport(
-        "/var/tmp/xpd-discovery-venv/bin/xpd",
+        "/var/tmp/xpd-library-verification/venv/bin/xpd",
         ["mcp", "--code-mode", "--root", "samples/pipeline"],
-        env={"VIRTUAL_ENV": "/var/tmp/xpd-discovery-venv"},
+        env={"VIRTUAL_ENV": "/var/tmp/xpd-library-verification/venv"},
     )
     async with Client(transport) as client:
         result = await client.call_tool("execute", {"code": CODE})
@@ -502,7 +507,7 @@ asyncio.run(main())
 
 The following outputs were returned by the installed wheel's server through a real
 FastMCP 4.2.0 client. `check` selects the Plotly pack because `figure.py` imports Plotly.
-These standalone examples require the API gate, no lint errors, and equal `result` values
+The grouped and bootstrap examples pass the API gate, have no lint errors, and have equal `result` values
 from two processes. They do not claim the saved model gates of the penguin workflow.
 
 ### One model per group
@@ -554,7 +559,7 @@ return {
     },
     {
       "kind": "symbol",
-      "name": "sklego.meta.HierarchicalPredictor"
+      "name": "linearmodels.PanelOLS"
     },
     {
       "kind": "symbol",
@@ -562,7 +567,7 @@ return {
     },
     {
       "kind": "symbol",
-      "name": "category_encoders.OneHotEncoder"
+      "name": "pandas.DatetimeIndex"
     }
   ],
   "choice": {
@@ -639,19 +644,19 @@ return {
     },
     {
       "kind": "symbol",
-      "name": "mapie.regression.TimeSeriesRegressor"
-    },
-    {
-      "kind": "symbol",
-      "name": "sklearn.model_selection.cross_validate"
-    },
-    {
-      "kind": "symbol",
       "name": "mapie.subsample.BlockBootstrap"
     },
     {
       "kind": "symbol",
-      "name": "sklego.model_selection.TimeGapSplit"
+      "name": "mapie.regression.TimeSeriesRegressor"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.IndependentSamplesBootstrap"
+    },
+    {
+      "kind": "symbol",
+      "name": "arch.bootstrap.optimal_block_length"
     },
     {
       "kind": "symbol",
@@ -667,11 +672,11 @@ return {
     },
     {
       "kind": "symbol",
-      "name": "arch.bootstrap.StationaryBootstrap"
+      "name": "arch.bootstrap.optimal_block_length"
     },
     {
       "kind": "symbol",
-      "name": "arch.bootstrap.optimal_block_length"
+      "name": "arch.bootstrap.StationaryBootstrap"
     }
   ],
   "choice": {
@@ -744,55 +749,18 @@ return {
 
 ```json
 {
-  "passed": true,
-  "candidates": [
-    {
-      "kind": "symbol",
-      "name": "plotly.express.scatter"
-    },
-    {
-      "kind": "symbol",
-      "name": "plotly.express.scatter_map"
-    },
-    {
-      "kind": "symbol",
-      "name": "plotly.express.scatter_geo"
-    },
-    {
-      "kind": "symbol",
-      "name": "plotly.express.scatter_3d"
-    },
-    {
-      "kind": "symbol",
-      "name": "plotly.express.scatter_polar"
-    }
-  ],
-  "choice": {
-    "name": "plotly.express.scatter",
-    "reason": "Build a new scatter figure from rows and check the Plotly pack before execution.",
-    "symbols": [
-      "plotly.express.scatter"
-    ]
-  },
-  "api_gate": {
+  "passed": false,
+  "gate": {
     "name": "indexed-api-calls",
     "stage": "discovery",
     "evidence": [
       "api",
       "source"
     ],
-    "passed": true,
-    "detail": "Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run."
+    "passed": false,
+    "detail": "plotly.express.scatter is not among the recorded candidates."
   },
-  "lint": {
-    "fixed": 0,
-    "fixable": 0,
-    "issues": []
-  },
-  "repeat": {
-    "equivalent": true,
-    "detail": null
-  }
+  "ran": false
 }
 ```
 
@@ -866,6 +834,24 @@ dependencies. `importlib.util.find_spec("sklego")` was `None`. Its real server s
 `sklego.meta.GroupedPredictor` with `estimator`, `groups`, `shrinkage`, `use_global_model`,
 `check_X` and `shrinkage_kwargs` from one code mode `api` call.
 
-The binary used for this draft predates the recipe index additions. Its runs prove symbols
-and rules through code mode. Recipe records are accepted by the server's open `kind` field,
-but a real indexed recipe run remains unverified until that binary is available.
+The wheel rebuilt from the sdist returns recipe code and attribution through a real
+FastMCP 4.2.0 client. The grouped and bootstrap scripts pass. The Plotly script stops
+before execution because `plotly.express.scatter` is absent from the candidates returned
+for its unchanged question. The API gate correctly refuses that choice. The discovery
+failure remains for investigation. Running `figure.py` directly still prints the figure
+output above.
+
+A recipe lookup through the same code mode server returned the following inspected fields.
+
+```python
+found = await call_tool("find", {"task": "rounded bars", "kind": "recipe"})
+entry = await call_tool("api", {"name": found["result"][0]["name"]})
+return {"name": entry["name"], "kind": entry["kind"],
+        "license": entry["recipe"]["license"],
+        "source": entry["recipe"]["source"],
+        "code_bytes": len(entry["recipe"]["code"])}
+```
+
+```json
+{"name":"plotly/recipe/rounded-bars","kind":"recipe","license":"MIT","source":"https://github.com/plotly/plotly.py/blob/v7.1.0/doc/python/bar-charts.md#L746","code_bytes":498}
+```
