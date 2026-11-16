@@ -245,6 +245,9 @@ This gate checks source spellings. It cannot resolve shadowed imports, instance 
 runtime aliases, required arguments, positional binding, argument values or types. An
 indexed name may be absent from the installed library. A valid inherited or variadic
 parameter may be absent from the index. Calls in other modules are outside its scope.
+The index gives each name one public path, so `numpy.zeros` passes and a longer path to the
+same function fails. A compiled function without a stub file is absent, and so is a NumPy
+universal function such as `numpy.add`. [`index`](commands.md#index) lists the rules.
 A recipe's association with its chosen symbols is the agent's account.
 
 Pass `DiscoveryProof` as `Proof.discovery` to `gates`. When either the proof or the contract

@@ -314,8 +314,12 @@ xpd api plotly.express.bar --format json
 
 Prints the entry's parameter names, first docstring paragraph, public methods and rule
 links. JSON is a list containing one entry, with the same entry fields as `find`. Missing names exit
-2. Parameter names come from source and do not include defaults or type annotations. Griffe supplies constructor parameters and inherited public
-members from parsed library source and available stubs. Compiled functions without stubs and dynamically constructed exports may be absent.
+2. Parameter names come from source and stub files and do not include defaults or type
+annotations. A class lists the parameters of its nearest `__init__`, or of its nearest `__new__`
+when it has no `__init__`. A function that exists only as overloads in a stub file lists the
+parameters of all its overloads. A class lists its public methods and properties, with the
+inherited ones. A compiled function without a stub is absent. NumPy universal functions such as
+`numpy.add` are absent, because their stubs declare them as attributes.
 
 Rule links are inferred from symbol name tokens in the pack's rule patterns, including regex
 patterns. They are possible guards, rather than proof that every use of the symbol matches.
@@ -334,11 +338,14 @@ xpd find "grouped regression" --index local.json
 xpd api sklego.meta.GroupedPredictor --index local.json
 ```
 
-Parses Python source and stubs with Griffe 2.4.1 and never imports or executes library code.
-Griffe is needed only when building an index. It is not an xpd runtime dependency.
-The Python selected by the active environment must have the pinned Griffe version. The first
-command reads the version from wheel metadata and writes `indexes/sklego.json`. For a source
-checkout, pass `--version`. `--output` selects another file. The output directory must exist.
+Griffe 2.4.1 parses the library's Python source and stub files. Indexing never imports or
+runs library code. Griffe is a build tool. Only `xpd index` needs it, and no other command
+does. `xpd index` runs the Python of the active environment, so start it with
+`uv run --with griffe==2.4.1`. Without that Griffe version, the command stops and prints the
+command to run. The first command reads the version from wheel metadata and writes
+`indexes/sklego.json`. For a source checkout, pass `--version`. `--output` selects another
+file. The output directory must exist. Without `--examples`, the command keeps the recipes that
+the output file already holds for the same package and version.
 An explicit local index replaces the embedded index for its package and also supports libraries
 without an xpd rule pack. Both read commands accept `--index`.
 
@@ -348,16 +355,33 @@ source-derived `keywords`. A recipe adds `recipe`, with `title`, `symbols`, `sou
 `license`, `attribution` and `modified`. An index with harvested examples also records candidate,
 clean, fixed, dropped, capped and retained counts under `recipes`.
 
-Griffe resolves import aliases and inherited members with inspection disabled. Public paths
-retain source exports and public names, including imports within the same library when a
-module has no `__all__`. Paths with private names, test modules and vendored modules are
-excluded. A module whose opening documentation marks it for internal use is also excluded.
-A Griffe extension keeps functions declared only through overloads in stub files.
+A name is public when Griffe says it is. A module is public when its name has no leading
+underscore. Another name is public when its module lists it in `__all__`. In a module without
+`__all__`, a name is public when it has no leading underscore and the module defines it.
+The index adds three rules, and each one comes from a named symbol.
 
-The `inputs` field records the Python and Griffe versions. `--archive` records the pinned
-wheel URL used for symbols. `--examples-archive` and `--examples-root` record the pinned
-source archive and the relative paths needed to repeat the recipe harvest. Neither option
-downloads or runs the source. CI rebuilds the index from the recorded inputs.
+| Rule | Symbol that needs it |
+| --- | --- |
+| A folder named `tests` is skipped. | `pandas.tests.frame.test_api.TestDataFrameMisc` is in the wheel and is not library API. |
+| A name from `from module import *` is public, even when `__all__` leaves it out. | `pandas.api.types.is_numeric_dtype` |
+| An import into a module without a readable `__all__` is public, when the name is defined in that module's package or below it. | `numpy.lib.stride_tricks.as_strided` is public. `pymoo.vendor.vendor_scipy.LocalSearch` is imported from another package and stays private. |
+
+Each definition gets one entry for each public name it has. When several public paths reach
+the same name, the entry uses the path with the fewest parts, then the shortest text, then
+lexical order. `numpy.concat` and `numpy.concatenate` are two names for one function, and both
+have an entry.
+
+Griffe drops some callables that the library has. The index keeps them through a Griffe
+extension and a Griffe loader subclass in `py/index.py`. Each case names its symbol.
+
+| Case | Symbol |
+| --- | --- |
+| A function that exists only as overloads in a stub file | `numpy.zeros` |
+| A plain assignment to another callable | `numpy.concat`, `pandas.io.pytables.Term` |
+| A function that its stub declares as an attribute | `numpy.polynomial.hermite.hermadd` |
+| A class or function with the same name as the submodule that defines it | `numpy.memmap`, `scipy.optimize.least_squares` |
+| An `__all__` that is computed and cannot be read | `scipy.signal.butter` |
+| An import beside a stand-in definition that takes `*args, **kwargs` | `plotly.figure_factory.create_hexbin_map` |
 
 To refresh recipes with symbols, use a pinned library checkout under a new empty `/var/tmp`
 directory. For example, after downloading and unpacking the library source there, run one command.
