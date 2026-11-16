@@ -1,5 +1,6 @@
 //! The findings of one lint run, and how `check` and `hook` print them.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use ast_grep_config::Severity;
@@ -83,6 +84,87 @@ pub(crate) struct Report {
 }
 
 impl Report {
+    pub(crate) fn sarif(&self) -> Value {
+        let ids: BTreeMap<_, _> = self
+            .issues
+            .iter()
+            .map(|issue| (format!("{}/{}", issue.package, issue.rule), issue))
+            .collect();
+        let rules: Vec<_> = ids
+            .iter()
+            .map(|(id, issue)| {
+                json!({
+                    "id": id,
+                    "shortDescription": {"text": issue.message},
+                    "helpUri": crate::catalog::url(&issue.rule),
+                })
+            })
+            .collect();
+        let indexes: BTreeMap<_, _> = ids.keys().enumerate().map(|(n, id)| (id, n)).collect();
+        let results: Vec<_> = self
+            .issues
+            .iter()
+            .map(|issue| {
+                let id = format!("{}/{}", issue.package, issue.rule);
+                let level = match issue.severity {
+                    Severity::Error => "error",
+                    Severity::Warning => "warning",
+                    _ => "note",
+                };
+                let mut location = json!({
+                    "artifactLocation": {"uri": artifact_uri(&issue.file)},
+                });
+                if let Some(position) = issue.position {
+                    location["region"] = json!({
+                        "startLine": position.line,
+                        "startColumn": position.column,
+                    });
+                }
+                json!({
+                    "ruleId": id,
+                    "ruleIndex": indexes[&id],
+                    "level": level,
+                    "message": {"text": issue.message},
+                    "locations": [{"physicalLocation": location}],
+                })
+            })
+            .collect();
+        json!({
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {"driver": {
+                    "name": "xpd",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "informationUri": env!("CARGO_PKG_HOMEPAGE"),
+                    "rules": rules,
+                }},
+                "columnKind": "unicodeCodePoints",
+                "results": results,
+            }],
+        })
+    }
+
+    pub(crate) fn github(&self) -> Vec<String> {
+        self.issues
+            .iter()
+            .map(|issue| {
+                let level = match issue.severity {
+                    Severity::Error => "error",
+                    Severity::Warning => "warning",
+                    _ => "notice",
+                };
+                let file = annotation_property(&issue.file.to_string_lossy());
+                let title = annotation_property(&format!("{}/{}", issue.package, issue.rule));
+                let position = issue.position.map_or_else(String::new, |position| {
+                    format!(",line={},col={}", position.line, position.column)
+                });
+                let message = annotation_text(&issue.message);
+                format!("::{level} file={file}{position},title={title}::{message}")
+            })
+            .collect()
+    }
+
     /// Whether any issue has error severity, which makes `check` exit 1.
     pub(crate) fn has_errors(&self) -> bool {
         self.issues.iter().any(|i| i.severity == Severity::Error)
@@ -119,4 +201,32 @@ impl Report {
         }
         parts.join(", ")
     }
+}
+
+fn annotation_text(value: &str) -> String {
+    value
+        .replace('%', "%25")
+        .replace('\r', "%0D")
+        .replace('\n', "%0A")
+}
+
+fn annotation_property(value: &str) -> String {
+    annotation_text(value)
+        .replace(':', "%3A")
+        .replace(',', "%2C")
+}
+
+fn artifact_uri(path: &std::path::Path) -> String {
+    use std::fmt::Write as _;
+
+    let path = path.to_string_lossy().replace('\\', "/");
+    let mut uri = String::new();
+    for byte in path.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~/:".contains(&byte) {
+            uri.push(char::from(byte));
+        } else {
+            write!(uri, "%{byte:02X}").expect("writing into a String cannot fail");
+        }
+    }
+    uri
 }

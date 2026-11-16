@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
 use crate::catalog;
@@ -51,6 +51,14 @@ struct Cli {
 enum Format {
     Text,
     Json,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CheckFormat {
+    Text,
+    Json,
+    Sarif,
+    Github,
 }
 
 #[derive(Debug, clap::Args)]
@@ -119,16 +127,20 @@ enum Cmd {
   xpd check analysis.py --format json
   xpd check . --fix
   xpd check . --fix --unsafe-fixes")]
+    #[command(visible_alias = "scan")]
     Check {
         /// Files or directories (directories respect .gitignore).
         #[arg(default_value = ".")]
         paths: Vec<PathBuf>,
         /// Output format. Default: text on a terminal, json otherwise.
         #[arg(long, value_enum)]
-        format: Option<Format>,
+        format: Option<CheckFormat>,
         /// Apply safe fixes, and report what is left.
         #[arg(long)]
         fix: bool,
+        /// Review each proposed fix before writing it.
+        #[arg(long, short = 'i', requires = "fix")]
+        review: bool,
         /// Also count unsafe fixes, which may change behavior: apply them with --fix, or mark
         /// them as fixable without it.
         #[arg(long)]
@@ -201,6 +213,11 @@ enum Cmd {
     /// holds, saved or not. Exit 0 after `shutdown` and `exit`, 1 when the client goes away
     /// without them.
     Lsp,
+    /// Generate completion for the installed xpd command tree.
+    Completions {
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 /// Runs the command the arguments name.
@@ -217,15 +234,24 @@ pub(crate) fn run() -> ExitCode {
             paths,
             format,
             fix,
+            review,
             unsafe_fixes,
         } => {
-            let format = format.unwrap_or(default_format);
+            let format = format.unwrap_or(match default_format {
+                Format::Text => CheckFormat::Text,
+                Format::Json => CheckFormat::Json,
+            });
             let allowed = if unsafe_fixes {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             };
-            check(&paths, format, fix.then_some(allowed), allowed)
+            let fixes = if review {
+                FixMode::Review(allowed)
+            } else {
+                FixMode::Apply(fix.then_some(allowed))
+            };
+            check(&paths, format, fixes, allowed)
         }
         Cmd::Find {
             query,
@@ -275,6 +301,10 @@ pub(crate) fn run() -> ExitCode {
         }
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
+        Cmd::Completions { shell } => {
+            clap_complete::generate(shell, &mut Cli::command(), "xpd", &mut io::stdout());
+            ExitCode::SUCCESS
+        }
     }
 }
 
@@ -389,14 +419,21 @@ fn rules(format: Format) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Lints `paths` with the rules for the library versions in the project's venv, after writing
-/// fixes up to `fix` when it is set.
-fn lint(paths: &[PathBuf], fix: Option<Applicability>, scope: Scope) -> Result<Report> {
+#[derive(Debug, Clone, Copy)]
+enum FixMode {
+    Apply(Option<Applicability>),
+    Review(Applicability),
+}
+
+fn lint(paths: &[PathBuf], mode: FixMode, scope: Scope) -> Result<Report> {
     let venv = Venv::find();
     let installed = venv.as_ref().map(Venv::distributions);
     let packs = pack::load(installed.as_ref()).context("invalid embedded rules")?;
     let files = scan::collect_files(paths)?;
-    let scanned = scan::scan(&files, &packs, fix)?;
+    let scanned = match mode {
+        FixMode::Apply(fix) => scan::scan(&files, &packs, fix)?,
+        FixMode::Review(allowed) => crate::review::scan(&files, &packs, allowed)?,
+    };
     let mut issues = scanned.issues;
     if let (Scope::Project, Some(venv), Some(installed)) = (scope, &venv, &installed) {
         // Without a working directory there is no project folder to look in.
@@ -421,11 +458,11 @@ enum Scope {
 /// `allowed` is the fix level that `[*]` and the summary count as fixable.
 fn check(
     paths: &[PathBuf],
-    format: Format,
-    fix: Option<Applicability>,
+    format: CheckFormat,
+    fixes: FixMode,
     allowed: Applicability,
 ) -> ExitCode {
-    let report = match lint(paths, fix, Scope::Project) {
+    let report = match lint(paths, fixes, Scope::Project) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("xpd: {e:#}");
@@ -433,8 +470,14 @@ fn check(
         }
     };
     match format {
-        Format::Json => println!("{}", report.to_json(allowed)),
-        Format::Text => {
+        CheckFormat::Json => println!("{}", report.to_json(allowed)),
+        CheckFormat::Sarif => println!("{}", report.sarif()),
+        CheckFormat::Github => {
+            for line in report.github() {
+                println!("{line}");
+            }
+        }
+        CheckFormat::Text => {
             for i in &report.issues {
                 println!("{}", i.line(allowed));
             }
@@ -590,7 +633,7 @@ fn hook_lines(files: &[&PathBuf]) -> Result<Vec<String>> {
     if files.is_empty() {
         return Ok(Vec::new());
     }
-    let report = lint(&files, None, Scope::Files)?;
+    let report = lint(&files, FixMode::Apply(None), Scope::Files)?;
     let issues = report
         .issues
         .iter()

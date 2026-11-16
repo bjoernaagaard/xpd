@@ -2637,8 +2637,11 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "rayon",
+ "regex",
  "serde",
+ "serde-saphyr",
  "serde_json",
+ "similar",
 ]
 
 [[package]]

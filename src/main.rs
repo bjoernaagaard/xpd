@@ -15,6 +15,7 @@ mod pack;
 mod package_check;
 mod recipe;
 mod report;
+mod review;
 mod rule;
 mod scan;
 mod search;
