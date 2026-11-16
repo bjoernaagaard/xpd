@@ -312,7 +312,7 @@ def reduction_by_level(df):
 
 @case
 def stack_dropna(df):
-    wide = df.pivot_table(index="k", columns="a", values="b")
+    wide = df.pivot_table(index="k", columns="a", values="b")  # xpd: pivot-table-default-mean
     return (
         wide.stack(dropna=False),  # xpd: stack-dropna
         wide.stack(dropna=True),  # xpd: stack-dropna
@@ -322,7 +322,7 @@ def stack_dropna(df):
 
 @case
 def stack_that_stays(df):
-    wide = df.pivot_table(index="k", columns="a", values="b")
+    wide = df.pivot_table(index="k", columns="a", values="b")  # xpd: pivot-table-default-mean
     return wide.stack(), wide.stack().dropna(), np.stack([df["a"].to_numpy(), df["a"].to_numpy()])
 
 

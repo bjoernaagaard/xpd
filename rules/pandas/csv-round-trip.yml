@@ -9,7 +9,8 @@
 # written the same way in both calls. A path written as a string is the same file anywhere in the
 # module. Any other path, such as a name, must be read in the function that writes it, or at
 # module level for a write at module level, because two functions can each have their own `path`.
-# A file that only writes a CSV is left alone, because another program may read it. The rule has no fix, because it changes two
+# A file that only writes a CSV is left alone, because another program may read it. So is to_csv
+# with mode=, because it appends to a file, which to_parquet does not do. The rule has no fix, because it changes two
 # calls and the file on disk.
 id: csv-round-trip
 language: python
@@ -20,6 +21,7 @@ rule:
     - any:
         - pattern: $X.to_csv($P)
         - pattern: $X.to_csv($P, $$$A)
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^mode$ } } } }
     - any:
         - inside: { stopBy: end, kind: module, has: { stopBy: end, matches: reads-it-back, has: { field: arguments, has: { kind: string, pattern: $P } } } }
         - inside: { stopBy: { kind: function_definition }, kind: function_definition, has: { stopBy: end, matches: reads-it-back } }

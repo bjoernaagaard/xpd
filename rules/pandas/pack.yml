@@ -21,7 +21,7 @@ packages:
   - id: missing-plotly
     package: plotly
     onlyWith: [matplotlib, seaborn]
-    message: The project draws with matplotlib and has no plotly, so df.plot returns a static matplotlib Axes. With plotly installed and pd.options.plotting.backend = "plotly", df.plot.bar(x="team", y="score") returned the same figure as px.bar(df, x="team", y="score"), which xpd checks with its plotly rules. Add plotly to the project.
+    message: The project has matplotlib and no plotly, so df.plot returns a static matplotlib Axes. With plotly installed and pd.options.plotting.backend = "plotly", df.plot.bar(x="team", y="score") returned the same figure as px.bar(df, x="team", y="score"), which xpd checks with its plotly rules. Add plotly to the project.
   - id: missing-pandas-stubs
     package: pandas-stubs
     onlyWith: [mypy, pyright, basedpyright, ty, pyrefly]

@@ -2636,7 +2636,7 @@ file 49.0 MB.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.to_csv(path)` in a file that also calls `pd.read_csv(path)` on the same path, written the same way in both calls. `read_csv` guesses every dtype again: the datetime column and the ordered category came back as `str`, and the `Int64` column as `float64`. `to_csv` took 0.93 seconds and `to_parquet` 0.09. A file that only writes a CSV is left alone, because another program may read it.
+Reports `df.to_csv(path)` in a file that also calls `pd.read_csv(path)` on the same path, written the same way in both calls. `read_csv` guesses every dtype again: the datetime column and the ordered category came back as `str`, and the `Int64` column as `float64`. `to_csv` took 0.93 seconds and `to_parquet` 0.09. A file that only writes a CSV is left alone, because another program may read it. So is `to_csv` with `mode=`, which appends to a file.
 
 Example:
 
