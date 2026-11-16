@@ -124,18 +124,26 @@ last column names the tools whose results decide the gate.
 | --- | --- | --- | --- |
 | `data-is-profiled` | Raw data | The contract names the profiled file with its row count, and the target has no nulls | `profile`, `contract` |
 | `split-covers-every-row` | Split | The training rows and the held out rows add up to the rows of the file | `profile`, `contract` |
-| `split-is-seeded` | Split | `check` reports no `missing-random-state` and no `random-state-without-shuffle` | `check`, `contract` |
+| `split-is-seeded` | Split | `check` reports no draw without a seed, by the rules in the table below | `check`, `contract` |
 | `inputs-are-raw-columns` | Preprocessing | Each input of the model is a column of the file with the same dtype, and none is the target. A column made outside the Pipeline fails here | `profile`, `contract` |
 | `dataflow-connects` | Preprocessing | `graph` reports no error or warning, and each feature step reads only input columns and columns of earlier steps | `graph`, `contract` |
 | `one-pipeline` | Model | The saved object is a `sklearn.pipeline.Pipeline` with its steps listed | `contract` |
-| `no-leakage` | Validation | `check` reports no error, such as `fit-before-split`, `fit-on-test` or `tune-on-test` | `check` |
+| `no-leakage` | Validation | `check` reports no error of any pack. The table below names the errors that are leaks | `check` |
 | `cross-validated` | Validation | The contract has one score for each of two or more folds | `contract` |
 | `reproducible` | Proof | `equiv` of the training script with itself is equivalent, so two runs predict the same | `equiv` |
 | `saved-model-predicts` | Persisted model | `equiv` of the training script with the prediction script is equivalent, so the model loaded from disk predicts what the fitted one did | `equiv` |
 | `versions-recorded` | Persisted model | The contract records Python, scikit-learn and pandas, and its pandas is the one `profile` ran with | `profile`, `contract` |
 
-`no-leakage` counts every error of every pack, and not a list of rules. `split-is-seeded` names
-two rules, and the server refuses to start when the binary no longer has them.
+`no-leakage` counts every error of every pack, and not a list of rules. `split-is-seeded` reads a
+list of rules, and the server refuses to start when the binary no longer has one of them. Both
+gates read the four packs about models.
+
+| Pack | Rules that fail `split-is-seeded` | Errors about a leak that fail `no-leakage` |
+| --- | --- | --- |
+| sklearn | `missing-random-state`, `random-state-without-shuffle` | `fit-before-split`, `fit-on-test`, `tune-on-test` |
+| sklego | `unseeded-random-estimator` | None. Its errors are wrong numbers and code that raises |
+| mapie | `unseeded-resampling` | `calibrate-on-training-rows`, `coverage-on-seen-rows` |
+| category_encoders | `encoder-noise-without-seed` | `encode-before-split`, `transform-with-test-target` |
 
 ## A run from raw rows to a saved model
 
@@ -367,12 +375,12 @@ another strength.
 
 ## Where the other parts plug in
 
-Three rule packs and a language server are written at the same time as this draft. The draft
-does not depend on any of them.
+The scikit-lego, MAPIE and Category Encoders packs and the language server are in the same
+version as this draft.
 
 | Part | Where it meets a run |
 | --- | --- |
-| A new rule pack, such as sklego, mapie or category_encoders | `no-leakage` counts every error that `check` reports, so the errors of a new pack fail the gate with no change to the server |
+| The sklego, mapie and category_encoders packs | `no-leakage` counts every error that `check` reports, so their errors fail the gate, and `split-is-seeded` reads their rule about a draw without a seed. A pack that is added later fails `no-leakage` with no change to the server |
 | mapie | A model with prediction intervals needs rows for calibration that no step was fitted on. `Split` would get a third row count, and the contract a section for the coverage. A contract may already hold sections that xpd does not know |
 | category_encoders | An encoder that reads the target must be a step of the Pipeline. `inputs-are-raw-columns` already fails when a column is encoded outside it |
 | The language server | It shows the issues of `check` while the scripts are written, before any gate runs. A failed `no-leakage` or `dataflow-connects` gate names a file and a line in its `detail`, which the language server could show in the editor |

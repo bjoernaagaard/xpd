@@ -27,9 +27,14 @@ from xpd.mcp.models import (
 from xpd.mcp.root import Project
 from xpd.mcp.tools import READS
 
-SKLEARN = "sklearn"
-# The scikit-learn rules that report a split or an estimator that draws without a seed.
-SEED_RULES = ("missing-random-state", "random-state-without-shuffle")
+# The rules of each pack that report a split, an estimator or an encoder that draws without a
+# seed. A pack without such a rule is not listed.
+SEED_RULES = {
+    "sklearn": ("missing-random-state", "random-state-without-shuffle"),
+    "sklego": ("unseeded-random-estimator",),
+    "mapie": ("unseeded-resampling",),
+    "category_encoders": ("encoder-noise-without-seed",),
+}
 PIPELINE = "sklearn.pipeline.Pipeline"
 # What a later run needs to rebuild the environment that wrote the model.
 VERSIONS = ("python", "scikit-learn", "pandas")
@@ -80,16 +85,20 @@ def split_covers_every_row(profile: Profile, contract: Contract) -> Gate:
 
 def split_is_seeded(lint: CheckReport, contract: Contract) -> Gate:
     failures = [
-        f"{issue.file}:{issue.line} {issue.rule}."
+        f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
         for issue in lint.issues
-        if issue.package == SKLEARN and issue.rule in SEED_RULES
+        if issue.rule in SEED_RULES.get(issue.package, ())
     ]
     found = f"The split has the seed {contract.split.seed}, and check reports no unseeded draw."
     return gate("split-is-seeded", "split", ["check", "contract"], failures, found)
 
 
 def no_leakage(lint: CheckReport) -> Gate:
-    """Every error counts, so the errors of a pack that is added later count too."""
+    """Every error of every pack counts, and not a list of rules. The leaks among them are
+    `fit-before-split`, `fit-on-test` and `tune-on-test` of sklearn, `calibrate-on-training-rows`
+    and `coverage-on-seen-rows` of mapie, and `encode-before-split` and
+    `transform-with-test-target` of category_encoders. sklego has no rule about a leak, and its
+    errors fail the gate as wrong results."""
     failures = [
         f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
         for issue in lint.issues
@@ -221,8 +230,9 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
 
 def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
     # A rule that the binary renamed would never match, and its gate would pass every run.
-    for rule in SEED_RULES:
-        rules.find(SKLEARN, rule)
+    for package, names in SEED_RULES.items():
+        for rule in names:
+            rules.find(package, rule)
 
     @mcp.tool(tags={"pipeline"}, annotations=READS)
     async def contract(ctx: Context, file: str) -> Contract | InputRequiredResult:
@@ -276,7 +286,9 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         seeded and covers every row, the model takes raw columns, one Pipeline holds every
         step, the feature steps connect, `check` reports no error such as leakage, the scores
         come from folds of the training rows, two training runs agree, the saved model predicts
-        what the fitted one did, and the versions are recorded.
+        what the fitted one did, and the versions are recorded. The seed and the errors are read
+        from every pack, so the scikit-lego, MAPIE and Category Encoders rules count as the
+        scikit-learn rules do.
 
         Args:
             profile: The result of `profile` on the data file.
