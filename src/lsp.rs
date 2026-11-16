@@ -3,9 +3,10 @@
 
 mod project;
 mod text;
+mod transport;
 mod uri;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -16,17 +17,17 @@ use anyhow::{Context, Result};
 use ast_grep_config::Severity;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::{
-    DidChangeConfiguration, DidChangeTextDocument, DidChangeWorkspaceFolders, DidCloseTextDocument,
-    DidOpenTextDocument, DidSaveTextDocument, Exit, Notification as NotificationType,
-    PublishDiagnostics, ShowMessage,
+    Cancel, DidChangeConfiguration, DidChangeTextDocument, DidChangeWorkspaceFolders,
+    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit,
+    Notification as NotificationType, PublishDiagnostics, ShowMessage,
 };
 use lsp_types::request::{
     CodeActionRequest, DocumentDiagnosticRequest, HoverRequest, Request as RequestType, Shutdown,
     WorkspaceDiagnosticRefresh,
 };
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
-    CodeActionProviderCapability, CodeDescription, Diagnostic, DiagnosticOptions,
+    CancelParams, CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand,
+    CodeActionParams, CodeActionProviderCapability, CodeDescription, Diagnostic, DiagnosticOptions,
     DiagnosticServerCapabilities, DiagnosticSeverity, DidChangeConfigurationParams,
     DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentChanges,
@@ -60,7 +61,13 @@ const FIX_ALL: CodeActionKind = CodeActionKind::new("source.fixAll.xpd");
 /// Serves one client until it sends `exit`. The exit code is 0 when the client asked for
 /// `shutdown` first and 1 otherwise, as the protocol says.
 pub(crate) fn run() -> ExitCode {
-    let (connection, io_threads) = Connection::stdio();
+    let (connection, io_threads) = match transport::connect() {
+        Ok(connected) => connected,
+        Err(e) => {
+            eprintln!("xpd lsp: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     let code = match serve(&connection) {
         Ok(code) => code,
         Err(e) => {
@@ -108,11 +115,30 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
     if let Some(e) = invalid_options {
         server.show(MessageType::WARNING, format!("xpd: {e:#}"));
     }
-    for message in &connection.receiver {
+    // A lint of a long file takes seconds, and the client sends more in that time. The server
+    // takes every message that waits before it handles the next one, so it sees a request
+    // that was cancelled, and it lints a document only when nothing waits or a request needs
+    // the issues. Ten changes that wait cost one lint.
+    let mut waiting = VecDeque::new();
+    loop {
+        for message in connection.receiver.try_iter() {
+            server.queue(&mut waiting, message);
+        }
+        let Some(message) = waiting.pop_front() else {
+            if server.publish_next() {
+                continue;
+            }
+            match connection.receiver.recv() {
+                Ok(message) => server.queue(&mut waiting, message),
+                // The client closed the stream without `shutdown` and `exit`.
+                Err(_) => return Ok(ExitCode::FAILURE),
+            }
+            continue;
+        };
         match message {
             Message::Request(request) if request.method == Shutdown::METHOD => {
                 server.send(Response::new_ok(request.id, ()).into());
-                return Ok(wait_for_exit(connection));
+                return Ok(wait_for_exit(connection, waiting));
             }
             Message::Request(request) => server.request(request),
             Message::Notification(notification) if notification.method == Exit::METHOD => {
@@ -124,13 +150,11 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
             Message::Response(_) => {}
         }
     }
-    // The client closed the stream without `shutdown` and `exit`.
-    Ok(ExitCode::FAILURE)
 }
 
 /// After `shutdown`, the server only waits for `exit` and refuses every request.
-fn wait_for_exit(connection: &Connection) -> ExitCode {
-    for message in &connection.receiver {
+fn wait_for_exit(connection: &Connection, waiting: VecDeque<Message>) -> ExitCode {
+    for message in waiting.into_iter().chain(&connection.receiver) {
         match message {
             Message::Notification(notification) if notification.method == Exit::METHOD => {
                 return ExitCode::SUCCESS;
@@ -292,18 +316,35 @@ struct Document {
     version: Option<i32>,
     text: String,
     place: Place,
+    /// The issues of `text` at `place`, once something asked for them. `None` after the text,
+    /// the place or the project's rules changed.
+    linted: Option<Linted>,
 }
 
 /// A document's issues, with the rules that found them.
+#[derive(Debug)]
 struct Linted {
     packs: Rc<[Pack]>,
     found: Vec<Found>,
 }
 
-fn lint(workspace: &mut Workspace, document: &Document) -> Result<Linted> {
-    let packs = Rc::clone(&workspace.project(&document.place.root)?.packs);
-    let found = scan::lint_source(&document.place.path, &document.text, &packs);
-    Ok(Linted { packs, found })
+/// The issues of `document`, linted now unless the document still holds them. Diagnostics, a
+/// hover and a code action for one version of a document share one lint this way.
+fn lint<'d>(
+    workspace: &mut Workspace,
+    document: &'d mut Document,
+) -> Result<(&'d Document, &'d Linted)> {
+    if document.linted.is_none() {
+        let packs = Rc::clone(&workspace.project(&document.place.root)?.packs);
+        let found = scan::lint_source(&document.place.path, &document.text, &packs);
+        document.linted = Some(Linted { packs, found });
+    }
+    let document: &'d Document = document;
+    let linted = document
+        .linted
+        .as_ref()
+        .context("the document was not linted")?;
+    Ok((document, linted))
 }
 
 /// The part of a match that the editor marks: from where the match starts, which is the
@@ -398,6 +439,9 @@ struct Server<'c> {
     documents: HashMap<String, Document>,
     /// The file that holds each project's package warnings, by the project's folder.
     package_files: HashMap<PathBuf, Uri>,
+    /// The open documents whose issues the client does not have yet, when the server pushes
+    /// them.
+    unpublished: BTreeSet<String>,
     /// The number of requests the server has sent, which makes the next request's id.
     sent_requests: i32,
 }
@@ -423,6 +467,7 @@ impl<'c> Server<'c> {
             workspace,
             documents: HashMap::new(),
             package_files: HashMap::new(),
+            unpublished: BTreeSet::new(),
             sent_requests: 0,
         }
     }
@@ -479,6 +524,52 @@ impl<'c> Server<'c> {
 
     fn show(&self, typ: MessageType, message: String) {
         self.notify::<ShowMessage>(ShowMessageParams { typ, message });
+    }
+
+    /// Puts a message of the client behind the ones that wait in `waiting`. A
+    /// `$/cancelRequest` takes the request it names out of them and answers it as cancelled.
+    /// It does nothing for a request the server has answered, as the protocol allows.
+    fn queue(&self, waiting: &mut VecDeque<Message>, message: Message) {
+        let cancelled = match &message {
+            Message::Notification(notification) if notification.method == Cancel::METHOD => {
+                serde_json::from_value::<CancelParams>(notification.params.clone()).ok()
+            }
+            _ => {
+                waiting.push_back(message);
+                return;
+            }
+        };
+        let Some(cancelled) = cancelled else {
+            return;
+        };
+        let id = match cancelled.id {
+            NumberOrString::Number(id) => RequestId::from(id),
+            NumberOrString::String(id) => RequestId::from(id),
+        };
+        let named = waiting.iter().position(
+            |waits| matches!(waits, Message::Request(request) if request.id == id && request.method != Shutdown::METHOD),
+        );
+        if let Some(Message::Request(request)) = named.and_then(|at| waiting.remove(at)) {
+            let response = Response {
+                id: request.id,
+                response_result: Err(failure(
+                    ErrorCode::RequestCanceled,
+                    format!("the client cancelled {}", request.method),
+                )),
+            };
+            self.send(response.into());
+        }
+    }
+
+    /// Sends the issues of one document that waits for them, and returns whether one did.
+    fn publish_next(&mut self) -> bool {
+        let Some(key) = self.unpublished.pop_first() else {
+            return false;
+        };
+        if let Err(e) = self.publish(&key) {
+            self.show(MessageType::ERROR, format!("xpd: {e:#}"));
+        }
+        true
     }
 
     fn request(&mut self, request: Request) {
@@ -547,9 +638,13 @@ impl<'c> Server<'c> {
             version: Some(opened.version),
             text: opened.text,
             place,
+            linted: None,
         };
-        self.documents
-            .insert(document.uri.as_str().to_owned(), document);
+        let key = document.uri.as_str().to_owned();
+        self.documents.insert(key.clone(), document);
+        if self.client.delivery == Delivery::Push {
+            self.unpublished.insert(key);
+        }
         self.refresh_project(&root)
     }
 
@@ -563,8 +658,10 @@ impl<'c> Server<'c> {
             text::apply(&mut document.text, change, self.client.encoding);
         }
         document.version = Some(params.text_document.version);
+        document.linted = None;
+        // The issues go out when no message waits, so one lint serves every change that does.
         if self.client.delivery == Delivery::Push {
-            self.publish(key)?;
+            self.unpublished.insert(key.to_owned());
         }
         Ok(())
     }
@@ -589,6 +686,7 @@ impl<'c> Server<'c> {
         let Some(closed) = self.documents.remove(uri.as_str()) else {
             return Ok(());
         };
+        self.unpublished.remove(uri.as_str());
         // The issues are about the editor's text, so they go when the editor lets go of it.
         if self.client.delivery == Delivery::Push {
             self.notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(uri, Vec::new(), None));
@@ -619,8 +717,12 @@ impl<'c> Server<'c> {
             self.workspace.add_folder(&folder.uri);
         }
         let before = self.roots();
-        for document in self.documents.values_mut() {
+        for (key, document) in &mut self.documents {
             document.place = self.workspace.place(&document.uri);
+            document.linted = None;
+            if self.client.delivery == Delivery::Push {
+                self.unpublished.insert(key.clone());
+            }
         }
         let now = self.roots();
         for root in before.difference(&now) {
@@ -648,18 +750,18 @@ impl<'c> Server<'c> {
     fn refresh_project(&mut self, root: &Path) -> Result<()> {
         let rules_changed = self.workspace.refresh(root)?;
         self.publish_package_issues(root)?;
-        match self.client.delivery {
-            Delivery::Push => {
-                let keys: Vec<String> = self
-                    .documents
-                    .iter()
-                    .filter(|(_, document)| document.place.root == root)
-                    .map(|(key, _)| key.clone())
-                    .collect();
-                keys.iter().try_for_each(|key| self.publish(key))?;
+        if !rules_changed {
+            return Ok(());
+        }
+        let documents = self.documents.iter_mut();
+        for (key, document) in documents.filter(|(_, document)| document.place.root == root) {
+            document.linted = None;
+            if self.client.delivery == Delivery::Push {
+                self.unpublished.insert(key.clone());
             }
-            Delivery::Pull(Refresh::Supported) if rules_changed => self.ask_to_pull_again(),
-            Delivery::Pull(_) => {}
+        }
+        if self.client.delivery == Delivery::Pull(Refresh::Supported) {
+            self.ask_to_pull_again();
         }
         Ok(())
     }
@@ -688,9 +790,9 @@ impl<'c> Server<'c> {
     fn publish(&mut self, key: &str) -> Result<()> {
         let document = self
             .documents
-            .get(key)
+            .get_mut(key)
             .context("the document is not open")?;
-        let linted = lint(&mut self.workspace, document)?;
+        let (document, linted) = lint(&mut self.workspace, document)?;
         let params = PublishDiagnosticsParams::new(
             document.uri.clone(),
             diagnostics(document, &linted.found, self.client.encoding),
@@ -745,8 +847,8 @@ impl<'c> Server<'c> {
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReport> {
         let uri = params.text_document.uri;
-        let on_disk;
-        let document = if let Some(document) = self.documents.get(uri.as_str()) {
+        let mut on_disk;
+        let document = if let Some(document) = self.documents.get_mut(uri.as_str()) {
             Some(document)
         } else {
             on_disk = uri::to_path(&uri)
@@ -756,12 +858,13 @@ impl<'c> Server<'c> {
                     uri,
                     version: None,
                     text,
+                    linted: None,
                 });
-            on_disk.as_ref()
+            on_disk.as_mut()
         };
         let items = match document {
             Some(document) => {
-                let linted = lint(&mut self.workspace, document)?;
+                let (document, linted) = lint(&mut self.workspace, document)?;
                 diagnostics(document, &linted.found, self.client.encoding)
             }
             None => Vec::new(),
@@ -780,10 +883,10 @@ impl<'c> Server<'c> {
     /// The documentation of the rules that report the place under the cursor.
     fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>> {
         let at = params.text_document_position_params;
-        let Some(document) = self.documents.get(at.text_document.uri.as_str()) else {
+        let Some(document) = self.documents.get_mut(at.text_document.uri.as_str()) else {
             return Ok(None);
         };
-        let linted = lint(&mut self.workspace, document)?;
+        let (document, linted) = lint(&mut self.workspace, document)?;
         let lines = Lines::new(&document.text, self.client.encoding);
         let offset = lines.offset(at.position);
         let mut sections: Vec<String> = Vec::new();
@@ -840,11 +943,12 @@ impl<'c> Server<'c> {
             context,
             ..
         } = params;
-        let Some(document) = self.documents.get(text_document.uri.as_str()) else {
+        let Some(document) = self.documents.get_mut(text_document.uri.as_str()) else {
             return Ok(Vec::new());
         };
         let only = context.only.as_deref();
-        let linted = lint(&mut self.workspace, document)?;
+        let form = self.client.edit_form;
+        let (document, linted) = lint(&mut self.workspace, document)?;
         let lines = Lines::new(&document.text, self.client.encoding);
         let asked = lines.offset(range.start)..lines.offset(range.end);
         let mut actions = Vec::new();
@@ -869,7 +973,7 @@ impl<'c> Server<'c> {
                     },
                     kind: Some(CodeActionKind::QUICKFIX),
                     diagnostics: Some(vec![diagnostic(issue, lsp_range(&lines, &marked))]),
-                    edit: Some(self.edit(document, &lines, fix)),
+                    edit: Some(edit(form, document, &lines, fix)),
                     // The editor applies a preferred fix on its "auto fix" key, so only a fix
                     // that keeps what the code does is preferred.
                     is_preferred: Some(level == Applicability::Safe),
@@ -877,8 +981,10 @@ impl<'c> Server<'c> {
                 });
             }
         }
-        if wants(only, &FIX_ALL) {
-            let allowed = self.settings.allowed();
+        let allowed = self.settings.allowed();
+        // Without an issue that has a fix of the allowed level, the pass below changes nothing.
+        let fixable = |found: &Found| found.issue.fix.is_some_and(|level| level <= allowed);
+        if wants(only, &FIX_ALL) && linted.found.iter().any(fixable) {
             let (fixed, count) = scan::fix_source(
                 &document.place.path,
                 document.text.clone(),
@@ -896,36 +1002,41 @@ impl<'c> Server<'c> {
                         }
                     },
                     kind: Some(FIX_ALL),
-                    edit: Some(self.edit(document, &lines, &change)),
+                    edit: Some(edit(form, document, &lines, &change)),
                     ..CodeAction::default()
                 });
             }
         }
         Ok(actions.into_iter().map(CodeActionOrCommand::from).collect())
     }
+}
 
-    /// An edit that writes `change` to `document`.
-    fn edit(&self, document: &Document, lines: &Lines<'_>, change: &Replacement) -> WorkspaceEdit {
-        let edit = TextEdit {
-            range: lsp_range(lines, &change.range),
-            new_text: change.text.clone(),
-        };
-        let uri = document.uri.clone();
-        match self.client.edit_form {
-            EditForm::Versioned => WorkspaceEdit {
-                document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
-                    text_document: OptionalVersionedTextDocumentIdentifier {
-                        uri,
-                        version: document.version,
-                    },
-                    edits: vec![OneOf::Left(edit)],
-                }])),
-                ..WorkspaceEdit::default()
-            },
-            EditForm::Plain => WorkspaceEdit {
-                changes: Some(HashMap::from([(uri, vec![edit])])),
-                ..WorkspaceEdit::default()
-            },
-        }
+/// An edit that writes `change` to `document`.
+fn edit(
+    form: EditForm,
+    document: &Document,
+    lines: &Lines<'_>,
+    change: &Replacement,
+) -> WorkspaceEdit {
+    let edit = TextEdit {
+        range: lsp_range(lines, &change.range),
+        new_text: change.text.clone(),
+    };
+    let uri = document.uri.clone();
+    match form {
+        EditForm::Versioned => WorkspaceEdit {
+            document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
+                text_document: OptionalVersionedTextDocumentIdentifier {
+                    uri,
+                    version: document.version,
+                },
+                edits: vec![OneOf::Left(edit)],
+            }])),
+            ..WorkspaceEdit::default()
+        },
+        EditForm::Plain => WorkspaceEdit {
+            changes: Some(HashMap::from([(uri, vec![edit])])),
+            ..WorkspaceEdit::default()
+        },
     }
 }
