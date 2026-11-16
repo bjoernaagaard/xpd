@@ -8,14 +8,14 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail, ensure};
-use ast_grep_config::{GlobalRules, Severity};
+use ast_grep_config::Severity;
 use serde_json::{Value, json};
 
 pub(crate) use self::local::LocalProject;
 use crate::pack::{self, Pack};
 use crate::package_check;
 use crate::report::severity_name;
-use crate::rule::{Applicability, Origin, Rule};
+use crate::rule::{Applicability, Rule};
 use crate::venv::Distributions;
 use crate::version::Version;
 
@@ -153,9 +153,7 @@ impl Catalog {
         let rules = if let Some(project) = &self.project {
             project.check_document(path, text)?
         } else {
-            let globals = GlobalRules::default();
-            pack::compile_rules(path, text, &globals, Origin::Structural, None)
-                .with_context(|| path.display().to_string())?
+            return Ok(());
         };
         let known = || self.packs.iter().flat_map(|pack| &pack.rules);
         for rule in &rules {

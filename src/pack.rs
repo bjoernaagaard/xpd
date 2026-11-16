@@ -156,6 +156,8 @@ pub(crate) struct Pack {
     pub(crate) module: String,
     gate: Gate,
     pub(crate) rules: Vec<Rule>,
+    /// Versioned-out rules still consume suppression comments, but never report or fix.
+    pub(crate) inactive_rules: Vec<Rule>,
     /// Short names a fix may write, each with the module it must be imported as, such as `pd`
     /// for `pandas`.
     pub(crate) aliases: BTreeMap<String, String>,
@@ -290,6 +292,7 @@ impl Pack {
             module: module.to_owned(),
             gate,
             rules,
+            inactive_rules: Vec::new(),
             aliases: manifest.aliases,
             package_checks: manifest.packages,
             docs: &[],
@@ -304,6 +307,7 @@ impl Pack {
             module: package,
             gate: Gate::EveryFile,
             rules,
+            inactive_rules: Vec::new(),
             aliases: BTreeMap::new(),
             package_checks: Vec::new(),
             docs: &[],
@@ -326,6 +330,7 @@ impl Pack {
             module: OWN_PACKAGE.to_owned(),
             gate: Gate::Suppressions,
             rules: vec![rule],
+            inactive_rules: Vec::new(),
             aliases: BTreeMap::new(),
             package_checks: Vec::new(),
             docs: &[],
@@ -343,7 +348,10 @@ impl Pack {
 
     /// Whether the pack has a rule for files of `language`.
     fn has_rules_for(&self, language: SupportLang) -> bool {
-        (self.rules.iter()).any(|rule| rule.config.language == language)
+        self.rules
+            .iter()
+            .chain(&self.inactive_rules)
+            .any(|rule| rule.config.language == language)
     }
 
     /// Whether the pack's rules can run on `src`, a file of `language`, from its text alone. A
@@ -422,10 +430,16 @@ impl Pack {
     /// is not installed, or a run without a venv, keeps every rule but those with `until`, so
     /// the project gets the newest advice.
     pub(crate) fn keep_rules_for(&mut self, installed: Option<&Distributions>) {
-        match installed.and_then(|found| found.version(&self.module)) {
-            Some(version) => self.rules.retain(|rule| rule.applies_to(version)),
-            None => self.rules.retain(Rule::applies_to_newest),
-        }
+        let version = installed.and_then(|found| found.version(&self.module));
+        (self.rules, self.inactive_rules) = std::mem::take(&mut self.rules)
+            .into_iter()
+            .chain(std::mem::take(&mut self.inactive_rules))
+            .partition(|rule| {
+                version.map_or_else(
+                    || rule.applies_to_newest(),
+                    |version| rule.applies_to(version),
+                )
+            });
     }
 }
 
@@ -534,12 +548,15 @@ fn utility_names(value: &serde_json::Value, names: &mut BTreeSet<String>) {
     match value {
         serde_json::Value::Object(fields) => {
             for (key, value) in fields {
-                match value.as_str() {
-                    Some(name) if key == "matches" => {
+                if key == "matches" {
+                    if let Some(name) = value.as_str() {
                         names.insert(name.to_owned());
                     }
-                    _ => utility_names(value, names),
+                    if let Some(calls) = value.as_object() {
+                        names.extend(calls.keys().cloned());
+                    }
                 }
+                utility_names(value, names);
             }
         }
         serde_json::Value::Array(values) => {

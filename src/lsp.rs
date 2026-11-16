@@ -387,6 +387,7 @@ fn lint<'d>(
                         severity: Severity::Error,
                         message,
                         fix: None,
+                        help: None,
                     },
                     range: 0..document.text.lines().next().map_or(0, str::len),
                     fix: None,
@@ -453,7 +454,7 @@ fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<
         .map(|found| {
             let mut diagnostic =
                 diagnostic(&found.issue, lsp_range(&lines, &marked(found, &lines)));
-            diagnostic.code_description = rule_help(&linted.catalog, &found.issue)
+            diagnostic.code_description = rule_help(&linted.catalog, found)
                 .and_then(|(_, url)| url)
                 .and_then(|href| href.parse().ok())
                 .map(|href| CodeDescription { href });
@@ -462,12 +463,20 @@ fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<
         .collect()
 }
 
-fn rule_help<'a>(catalog: &'a Catalog, issue: &Issue) -> Option<(&'a str, Option<String>)> {
-    let pack = catalog
-        .packs
-        .iter()
-        .find(|pack| pack.module == issue.package)?;
-    let rule = pack.rules.iter().find(|rule| rule.id == issue.rule);
+fn rule_help<'a>(catalog: &'a Catalog, found: &Found) -> Option<(&'a str, Option<String>)> {
+    let issue = &found.issue;
+    let matches = |rule: &&crate::rule::Rule| {
+        found
+            .variant
+            .as_ref()
+            .map_or_else(|| rule.id == issue.rule, |variant| rule.variant == *variant)
+    };
+    let pack = catalog.packs.iter().find(|pack| {
+        pack.module == issue.package
+            && (pack.rules.iter().any(|rule| matches(&rule))
+                || (found.variant.is_none() && pack.doc(&issue.rule).is_some()))
+    })?;
+    let rule = pack.rules.iter().find(matches);
     let doc = pack
         .doc(&issue.rule)
         .or_else(|| rule.map(|rule| rule.config.note.as_deref().unwrap_or(&rule.config.message)))?;
@@ -1012,7 +1021,7 @@ impl<'c> Server<'c> {
                 continue;
             }
             let issue = &found.issue;
-            let Some((doc, url)) = rule_help(&linted.catalog, issue) else {
+            let Some((doc, url)) = rule_help(&linted.catalog, found) else {
                 continue;
             };
             let name = format!("{}/{}", issue.package, issue.rule);

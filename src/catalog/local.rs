@@ -16,7 +16,7 @@
 //!     packages: [{ id: missing-extra, package: team-extra, message: Add team-extra. }]
 //! ```
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -51,6 +51,26 @@ struct SgConfig {
 }
 
 impl SgConfig {
+    fn tests(&self, root: &Path) -> Result<Vec<TestConfig>> {
+        (self.test_configs.iter().flatten())
+            .map(|test| {
+                let test_dir = absolute(&root.join(&test.test_dir));
+                ensure!(
+                    test_dir.starts_with(root)
+                        && !test
+                            .test_dir
+                            .components()
+                            .any(|part| matches!(part, std::path::Component::ParentDir)),
+                    "testDir must stay inside the project root"
+                );
+                Ok(TestConfig {
+                    test_dir,
+                    snapshot_dir: test.snapshot_dir.clone(),
+                })
+            })
+            .collect()
+    }
+
     /// The keys that are set and that change which files ast-grep reads as which language,
     /// which xpd does not follow.
     fn unsupported(&self) -> Vec<&'static str> {
@@ -132,6 +152,7 @@ pub(crate) struct LocalProject {
     pub(crate) inputs: Vec<PathBuf>,
     /// The keys of `sgconfig.yml` that are set and that xpd does not follow.
     unsupported: Vec<&'static str>,
+    custom_languages: BTreeSet<String>,
     packs: Vec<LocalPack>,
     /// The project's utility rules, which each of its rules can name with `matches`.
     globals: GlobalRules,
@@ -267,6 +288,18 @@ impl LocalProject {
         let text = fs::read_to_string(&config).with_context(|| cannot_read(&config))?;
         let sg: SgConfig =
             ast_grep_config::from_str(&text).with_context(|| config.display().to_string())?;
+        let custom_languages = sg
+            .custom_languages
+            .as_ref()
+            .and_then(serde_json::Value::as_object)
+            .map(|languages| {
+                languages
+                    .keys()
+                    .filter(|name| name.parse::<ast_grep_language::SupportLang>().is_err())
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
         let manifest = Some(root.join(MANIFEST_NAME)).filter(|path| path.is_file());
         let entries = match &manifest {
             Some(path) => {
@@ -283,16 +316,7 @@ impl LocalProject {
             "utilDirs",
             &config,
         )?;
-        let test_configs = (sg.test_configs.iter().flatten())
-            .map(|test| {
-                let test_dir = absolute(&root.join(&test.test_dir));
-                let snapshot_dir = test.snapshot_dir.as_ref().map(|dir| test_dir.join(dir));
-                TestConfig {
-                    test_dir,
-                    snapshot_dir,
-                }
-            })
-            .collect();
+        let test_configs = sg.tests(&root)?;
         let mut packs: Vec<LocalPack> = Vec::new();
         let mut manifests = Vec::new();
         for entry in entries {
@@ -325,11 +349,18 @@ impl LocalProject {
         let util_files = yaml_files(&util_dirs)?;
         let util_texts = util_files
             .iter()
-            .map(|path| fs::read_to_string(path).with_context(|| cannot_read(path)))
+            .map(|path| {
+                let text = fs::read_to_string(path).with_context(|| cannot_read(path))?;
+                supported_yaml(&text, &custom_languages)
+            })
             .collect::<Result<Vec<String>>>()?;
         let utils = util_files.iter().map(PathBuf::as_path);
-        let globals = pack::global_utils(utils.zip(util_texts.iter().map(String::as_str)))
-            .with_context(|| format!("the utility rules of {}", config.display()))?;
+        let globals = pack::global_utils(
+            utils
+                .zip(util_texts.iter().map(String::as_str))
+                .filter(|(_, text)| !text.is_empty()),
+        )
+        .with_context(|| format!("the utility rules of {}", config.display()))?;
 
         let inputs = [config.clone()]
             .into_iter()
@@ -339,6 +370,7 @@ impl LocalProject {
         let project = Self {
             root,
             unsupported: sg.unsupported(),
+            custom_languages,
             manifest,
             rule_dirs,
             util_dirs,
@@ -420,6 +452,7 @@ impl LocalProject {
     /// The rules of the rule file at `path` with the text `yaml`, compiled as the project
     /// loads them.
     fn compile(&self, path: &Path, yaml: &str) -> Result<Vec<Rule>> {
+        let yaml = supported_yaml(yaml, &self.custom_languages)?;
         let pack = self
             .owner(path)
             .map(|index| self.packs[index].module.as_str());
@@ -427,7 +460,7 @@ impl LocalProject {
             Some(_) => Origin::LocalPack,
             None => Origin::Structural,
         };
-        pack::compile_rules(path, yaml, &self.globals, origin, pack)
+        pack::compile_rules(path, &yaml, &self.globals, origin, pack)
             .with_context(|| path.display().to_string())
     }
 
@@ -442,16 +475,17 @@ impl LocalProject {
         } else if Some(&path) == self.manifest.as_ref() {
             XpdConfig::parse(&path, text)?;
         } else if self.util_dirs.iter().any(|dir| path.starts_with(dir)) {
-            let mut sources = vec![(path.clone(), text.to_owned())];
+            let mut sources = vec![(path.clone(), supported_yaml(text, &self.custom_languages)?)];
             for saved in yaml_files(&self.util_dirs)? {
                 if saved != path {
                     let text = fs::read_to_string(&saved).with_context(|| cannot_read(&saved))?;
-                    sources.push((saved, text));
+                    sources.push((saved, supported_yaml(&text, &self.custom_languages)?));
                 }
             }
             pack::global_utils(
                 sources
                     .iter()
+                    .filter(|(_, text)| !text.is_empty())
                     .map(|(path, text)| (path.as_path(), text.as_str())),
             )
             .with_context(|| path.display().to_string())?;
@@ -466,6 +500,9 @@ impl LocalProject {
         self.unsupported
             .iter()
             .map(|key| {
+                if *key == "customLanguages" {
+                    return format!("{}: xpd skips rules and utilities for custom languages", self.config.display());
+                }
                 format!(
                     "{}: xpd does not read {key}, so it finds each file's language by the file's name alone",
                     self.config.display()
@@ -473,4 +510,24 @@ impl LocalProject {
             })
             .collect()
     }
+}
+
+fn supported_yaml(text: &str, custom: &BTreeSet<String>) -> Result<String> {
+    if custom.is_empty() {
+        return Ok(text.to_owned());
+    }
+    let documents: Vec<serde_json::Value> = ast_grep_config::from_multiple(text)?;
+    let mut supported = String::new();
+    for document in documents {
+        if document
+            .get("language")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|language| custom.contains(language))
+        {
+            continue;
+        }
+        supported.push_str("---\n");
+        supported.push_str(&serde_saphyr::to_string(&document)?);
+    }
+    Ok(supported)
 }

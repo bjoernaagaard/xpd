@@ -202,7 +202,23 @@ fn matched_rules<'p, 'r>(
                 .map(move |rule| (pack, rule))
         })
         .collect();
-    let mut combined = CombinedScan::new(selected.iter().map(|(_, rule)| &rule.config).collect());
+    let inactive = packs
+        .iter()
+        .filter(|pack| src.contains("ast-grep-ignore") && pack.applies(root, src, language))
+        .flat_map(|pack| {
+            let path = pack.glob_path(file);
+            pack.inactive_rules
+                .iter()
+                .filter(move |rule| rule.config.language == language && rule.runs_on(&path))
+                .map(|rule| &rule.config)
+        });
+    let mut combined = CombinedScan::new(
+        selected
+            .iter()
+            .map(|(_, rule)| &rule.config)
+            .chain(inactive)
+            .collect(),
+    );
     let unused = packs
         .iter()
         .find_map(|pack| pack.unused_suppression().map(|rule| (pack, rule)));
@@ -310,6 +326,11 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
                 severity: rule.config.severity.clone(),
                 message: rule.config.get_message(&m),
                 fix: rule.fix.filter(|_| edit.is_some()),
+                help: if pack.is_embedded() {
+                    Some(crate::catalog::url(&rule.id))
+                } else {
+                    rule.config.url.clone()
+                },
             };
             found.push(Found {
                 variant: Some(rule.variant.clone()),

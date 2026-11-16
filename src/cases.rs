@@ -143,7 +143,7 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
                 options,
                 packs,
                 &case,
-                &path,
+                &directory,
                 &snapshot_dir,
                 source_root,
             )?);
@@ -205,6 +205,9 @@ fn run_case(
             ..Snapshots::default()
         }
     };
+    for snapshot in snapshots.snapshots.values_mut() {
+        order_labels(snapshot);
+    }
     ensure!(
         snapshots.id == case.id,
         "snapshot id differs from case id {}",
@@ -233,20 +236,7 @@ fn run_case(
                 .as_ref()
                 .is_some_and(|variant| selected.iter().any(|rule| rule.variant == *variant))
         });
-        let actual = found.map(|found| {
-            let labels: Vec<_> = found.labels.iter().map(|label| {
-                let mut value = json!({ "source": &source[label.range.clone()], "style": label.style, "start": label.range.start, "end": label.range.end });
-                if let Some(message) = &label.message { value["message"] = json!(message); }
-                value
-            }).collect();
-            let mut result = json!({"labels": labels});
-            if let Some(edit) = found.fix {
-                let mut fixed = source.clone();
-                fixed.replace_range(edit.range, &edit.text);
-                result["fixed"] = Value::String(fixed);
-            }
-            result
-        });
+        let actual = found.map(|found| snapshot(found, source));
         let status = if !invalid && actual.is_some() {
             "unexpected finding"
         } else if invalid && actual.is_none() {
@@ -281,6 +271,22 @@ fn run_case(
     Ok(outcomes)
 }
 
+fn snapshot(found: scan::Found, source: &str) -> Value {
+    let labels: Vec<_> = found.labels.iter().map(|label| {
+                let mut value = json!({ "source": &source[label.range.clone()], "style": label.style, "start": label.range.start, "end": label.range.end });
+                if let Some(message) = &label.message { value["message"] = json!(message); }
+                value
+            }).collect();
+    let mut result = json!({"labels": labels});
+    if let Some(edit) = found.fix {
+        let mut fixed = source.to_owned();
+        fixed.replace_range(edit.range, &edit.text);
+        result["fixed"] = Value::String(fixed);
+    }
+    order_labels(&mut result);
+    result
+}
+
 fn source_path(rule: &crate::rule::Rule, case: &Case) -> Result<PathBuf> {
     let file_types = rule.config.language.file_types();
     let extension = file_types
@@ -295,19 +301,12 @@ fn source_path(rule: &crate::rule::Rule, case: &Case) -> Result<PathBuf> {
         .unwrap_or_else(|| PathBuf::from(format!("case.{extension}"))))
 }
 
-fn snapshot_file(path: &Path, snapshot_dir: &Path, id: &str) -> Result<PathBuf> {
-    let snapshot_path = path
-        .parent()
-        .context("case has no parent")?
-        .join(snapshot_dir)
-        .join(format!(
-            "{}-snapshot.yml",
-            id.replace(['/', '\\', ':'], "-")
-        ));
-    let case_root = path
-        .parent()
-        .context("case has no parent")?
-        .canonicalize()?;
+fn snapshot_file(directory: &Path, snapshot_dir: &Path, id: &str) -> Result<PathBuf> {
+    let snapshot_path = directory.join(snapshot_dir).join(format!(
+        "{}-snapshot.yml",
+        id.replace(['/', '\\', ':'], "-")
+    ));
+    let case_root = directory.canonicalize()?;
     let existing = snapshot_path
         .ancestors()
         .find(|path| fs::symlink_metadata(path).is_ok())
@@ -317,6 +316,22 @@ fn snapshot_file(path: &Path, snapshot_dir: &Path, id: &str) -> Result<PathBuf> 
         "snapshot path leaves the case directory"
     );
     Ok(snapshot_path)
+}
+
+fn order_labels(snapshot: &mut Value) {
+    if let Some(labels) = snapshot.get_mut("labels").and_then(Value::as_array_mut) {
+        labels.sort_by(|left, right| {
+            let key = |value: &Value| {
+                (
+                    value["start"].as_u64(),
+                    value["end"].as_u64(),
+                    value["style"].as_str().unwrap_or_default().to_owned(),
+                    value["message"].as_str().unwrap_or_default().to_owned(),
+                )
+            };
+            key(left).cmp(&key(right))
+        });
+    }
 }
 
 fn directories(options: &Options, catalog: &Catalog) -> Result<Vec<(PathBuf, PathBuf)>> {

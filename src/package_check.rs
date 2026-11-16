@@ -66,6 +66,7 @@ pub(crate) fn missing(
             severity: SEVERITY,
             message: check.message.clone(),
             fix: None,
+            help: pack.is_embedded().then(|| crate::catalog::url(&check.id)),
         })
         .collect()
 }

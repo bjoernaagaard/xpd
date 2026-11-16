@@ -28,6 +28,7 @@ pub(crate) struct Issue {
     pub(crate) message: String,
     /// `None` when the rule has no fix.
     pub(crate) fix: Option<Applicability>,
+    pub(crate) help: Option<String>,
 }
 
 pub(crate) fn severity_name(severity: &Severity) -> &'static str {
@@ -106,11 +107,14 @@ impl Report {
         let rules: Vec<_> = ids
             .iter()
             .map(|(id, issue)| {
-                json!({
+                let mut rule = json!({
                     "id": id,
                     "shortDescription": {"text": issue.message},
-                    "helpUri": crate::catalog::url(&issue.rule),
-                })
+                });
+                if let Some(url) = &issue.help {
+                    rule["helpUri"] = json!(url);
+                }
+                rule
             })
             .collect();
         let indexes: BTreeMap<_, _> = ids.keys().enumerate().map(|(n, id)| (id, n)).collect();
