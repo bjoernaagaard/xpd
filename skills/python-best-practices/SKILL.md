@@ -113,6 +113,9 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 - A generator expression goes straight into the call that consumes it, such as `sum`,
   `any` or `"".join`. When the caller may stop early or the data is large, write a
   generator function.
+- **One call per statement when the call needs several lines.** Don't nest a call that
+  runs over several lines inside the arguments of another, as in
+  `frames.append(pd.DataFrame({...}))`. Name the inner result on the line above.
 - No `lambda` bound to a name. Write `def`.
 - **No function that only passes its parameters to one call,** such as
   `def reference(curve, at_price): return float(curve(at_price))`. Call the other
@@ -250,7 +253,8 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | Calls and environment reads at import | `xpd check`: `python/import-side-effect` |
 | `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
 | A comprehension over several lines, or among other arguments | `xpd check`: `python/comprehension-multi-line`, `python/comprehension-among-arguments` |
-| A function that only passes its parameters on | `xpd check`: `python/pass-through-function` |
+| A function that only passes its parameters on, a call over several lines inside another call | `xpd check`: `python/pass-through-function`, `python/multi-line-call-argument` |
+| A frame rebuilt from the columns of another frame | `xpd check`: `pandas/frame-rebuilt-from-columns` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
 | A dataclass, `NamedTuple`, `TypedDict` or attrs class, `json.loads` | `xpd check`: `python/record-without-msgspec`, `python/json-without-type` |
 | `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |

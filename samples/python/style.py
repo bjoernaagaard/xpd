@@ -181,3 +181,19 @@ def joined(items: list[dict], sep: str) -> str:
 def first(values: list[_T]) -> _T:
     with patch("os.getcwd"):
         return values[0]
+
+
+def nested(items: list[dict]) -> list[str]:
+    found = []
+    found.append(
+        "{name}:{price}".format(  # xpd: multi-line-call-argument
+            name=items[0]["name"],
+            price=items[0]["price"],
+        )
+    )
+    return found
+
+
+def flat_calls(items: list[dict]) -> list[str]:
+    label = "{name}:{price}".format(name=items[0]["name"], price=items[0]["price"])
+    return [label]

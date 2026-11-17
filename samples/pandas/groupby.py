@@ -198,3 +198,16 @@ def total_or_nan(df: pd.DataFrame) -> float:
 
 def loads(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return df["load"].astype(float).to_numpy(), df["load"].to_numpy(dtype=float)  # xpd: astype-then-to-numpy
+
+
+def renamed_by_hand(df: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame({"area": df["region"], "mw": df["load"], "h": df["hour"]})  # xpd: frame-rebuilt-from-columns
+
+
+def renamed(df: pd.DataFrame) -> pd.DataFrame:
+    names = {"region": "area", "load": "mw", "hour": "h"}
+    return df.rename(columns=names)[list(names.values())]
+
+
+def two_columns(df: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame({"area": df["region"], "mw": df["load"], "day": 1})

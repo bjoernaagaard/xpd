@@ -2384,6 +2384,42 @@ xpd gives the replacement as advice and doesn't apply it. A time window starts w
 Each rule in this group asks for an argument that states what the code expects, so that pandas
 raises when the data doesn't match instead of giving a wrong result.
 
+#### frame-rebuilt-from-columns
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `pd.DataFrame({...})` with a dict in which three or more values are taken from
+columns of the same frame.
+
+Example:
+
+```python
+lots = pd.DataFrame(
+    {
+        "lot": raw["Auction Lot ID"],
+        "side": raw["Buy Sell"].str.lower(),
+        "cleared_mw": raw["Cleared Volume"],
+    }
+)
+```
+
+Use instead:
+
+```python
+NAMES = {"Auction Lot ID": "lot", "Buy Sell": "side", "Cleared Volume": "cleared_mw"}
+
+lots = raw.rename(columns=NAMES)[list(NAMES.values())]
+lots = lots.assign(side=lots["side"].str.lower())
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The dict copies the frame one column at a time, and the old name, the new name and the
+conversion of each column are mixed in one long literal. The mapping states the names once and
+also selects the columns, and `assign` shows the few columns that change. On pandas 3.1.1 the
+two forms gave equal frames. When the frame comes from `read_csv`, give the conversions to that
+call with `usecols=`, `dtype=` and `parse_dates=`.
+
 #### empty-guard
 
 **Severity:** warning. **Fix:** unsafe: the reduction without the test, because the frame in the test and the frame in the reduction can differ.
@@ -13073,7 +13109,7 @@ and the `python-review` skill reviews code against it.
 | Names | `module-private-name`, `vague-module-name` |
 | Modules | `import-side-effect` |
 | Types | `typing-cast`, `dict-str-any`, `record-without-msgspec`, `json-without-type`, `same-type-conversion`, `float-around-number` |
-| Functions | `pass-through-function` |
+| Functions | `pass-through-function`, `multi-line-call-argument` |
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
 
@@ -13524,6 +13560,40 @@ xpd gives the replacement as advice and doesn't apply it.
 
 The function gives the call a second name, and a reader has to open it to learn that it does
 nothing else. When the function is passed as a value, pass the function it calls.
+
+#### multi-line-call-argument
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a call that runs over several lines and is an argument of another call.
+
+Example:
+
+```python
+frames.append(
+    pd.DataFrame(
+        {
+            "side": side,
+            "cost": cost,
+            "value": implied(kind, spread - d, markup),
+        }
+    )
+)
+```
+
+Use instead:
+
+```python
+value = implied(kind, spread - d, markup)
+frame = pd.DataFrame({"side": side, "cost": cost, "value": value})
+frames.append(frame)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+Two argument lists are nested, so a reader has to match the brackets to see which argument
+belongs to which call, and every line sits two or three levels deep. A name on the line above
+says what the inner call builds, and the outer call then fits on one line.
 
 ### Tests
 

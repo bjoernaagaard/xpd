@@ -110,6 +110,10 @@ The first two groups are where real bugs live.
   a call (`python/comprehension-among-arguments`). Show the loop or the named value.
 - A function that only passes its parameters to one call
   (`python/pass-through-function`), or that is one line and called from one place.
+- A call that runs over several lines inside the arguments of another call
+  (`python/multi-line-call-argument`), or a frame rebuilt from the columns of another
+  frame in a dict (`pandas/frame-rebuilt-from-columns`). Show the named value or the
+  `rename`.
 - A loop over `groupby` that appends a summary per group
   (`pandas/groupby-loop-collects`). Show the `agg` call.
 - A function that works at several levels at once, or needs comments to separate its

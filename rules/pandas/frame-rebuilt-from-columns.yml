@@ -1,0 +1,33 @@
+# A frame built from a dict whose values are columns of one other frame copies that frame one
+# column at a time, and the old and the new name of each column stand in a long literal with the
+# conversions mixed in. rename with a mapping states the names, the mapping also selects the
+# columns, and assign converts the few columns that change. On pandas 3.1.1 the two forms gave
+# equal frames for three renamed columns. The rule reports a dict with three or more values
+# taken from the same frame. It has no fix, because the conversions move to assign or to the
+# read_csv call, which the rule cannot write.
+id: frame-rebuilt-from-columns
+language: python
+severity: warning
+message: This builds a frame from the columns of $RAW one at a time. Use $RAW.rename(columns=names)[list(names.values())], and convert the columns that change with assign or in the call that reads the file.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: ^(pd|pandas)\.DataFrame$ }
+    - has:
+        field: arguments
+        has:
+          kind: dictionary
+          has:
+            matches: column-pair
+            follows:
+              stopBy: end
+              matches: column-pair
+              follows: { stopBy: end, matches: column-pair }
+utils:
+  column-pair:
+    kind: pair
+    has:
+      field: value
+      any:
+        - pattern: $RAW[$_KEY]
+        - has: { stopBy: end, pattern: '$RAW[$_KEY]' }

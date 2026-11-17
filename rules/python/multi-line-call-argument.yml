@@ -1,0 +1,15 @@
+# A call that runs over several lines as an argument of another call nests two argument lists,
+# so a reader has to match the brackets to see which argument belongs to which call, and every
+# line sits two or three levels deep. A name on the line above says what the inner call builds,
+# and the outer call then fits on one line. The rule has no fix, because the name for the value
+# is not in the file.
+id: multi-line-call-argument
+language: python
+severity: warning
+message: This call runs over several lines inside the arguments of another call. Give its result a name on the line above, and pass the name.
+rule:
+  kind: call
+  regex: "\n"
+  inside:
+    kind: argument_list
+    inside: { kind: call }
