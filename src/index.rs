@@ -53,7 +53,7 @@ pub(crate) struct Entry {
     pub(crate) parameters: Vec<String>,
     /// The parameter list as the source writes it: each parameter with its type annotation and
     /// its default, and a `*` or `/` that stands alone between parameters. Empty for a function
-    /// that only overloads declare, and in an index from an xpd that kept the names only.
+    /// that only overloads declare.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) parameters_written: Vec<String>,
     pub(crate) summary: String,
@@ -65,6 +65,10 @@ pub(crate) struct Entry {
     pub(crate) recipe: Option<crate::recipe::Recipe>,
 }
 
+/// The version of an index file. Version 2 records which members of a class are properties, so
+/// a member without `property` is a method. Version 1 left that out for every member.
+const INDEX_SCHEMA: u32 = 2;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Index {
     pub(crate) schema_version: u32,
@@ -75,7 +79,8 @@ pub(crate) struct Index {
     pub(crate) recipes: Option<crate::recipe::Stats>,
 }
 
-/// A function or method whose parameters an entry takes.
+/// A function or method whose parameters an entry takes. `receiver` says that Python binds its
+/// first parameter to the object or the class, so a call does not pass it.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum Definition {
@@ -84,10 +89,14 @@ enum Definition {
         name: String,
         file: PathBuf,
         line: usize,
+        receiver: bool,
     },
     /// A function that Griffe builds, such as the `__init__` of a dataclass, which has no
     /// definition to read. Griffe writes its parameters from the fields of the class.
-    Built { parameters: Vec<ParameterText> },
+    Built {
+        parameters: Vec<ParameterText>,
+        receiver: bool,
+    },
 }
 
 /// A member as py/index.py writes it, with the definitions whose parameters it takes.
@@ -116,7 +125,6 @@ struct Resolved {
 
 #[derive(Debug, Deserialize)]
 struct ResolvedIndex {
-    schema_version: u32,
     package: String,
     version: String,
     entries: Vec<Resolved>,
@@ -134,17 +142,18 @@ struct Parameters {
 }
 
 impl Sources {
-    /// The parameters of `name`: those of each of its definitions, each name once, without
-    /// `self` and `cls`. Only one definition gives a written list, because several overloads
-    /// write a parameter in several ways.
+    /// The parameters of `name`: those of each of its definitions, each name once, without the
+    /// receiver of a method. Only one definition gives a written list, because several
+    /// overloads write a parameter in several ways.
     fn parameters(&mut self, name: &str, definitions: &[Definition]) -> Result<Parameters> {
         let mut parameters: Vec<ParameterText> = Vec::new();
         for definition in definitions {
-            let read = match definition {
+            let (mut read, receiver) = match definition {
                 Definition::Source {
                     name: function,
                     file,
                     line,
+                    receiver,
                 } => {
                     if !self.0.contains_key(file) {
                         let src = std::fs::read_to_string(file)
@@ -156,10 +165,28 @@ impl Sources {
                         .with_context(|| {
                             format!("{name}: no {function} at {}:{line}", file.display())
                         })?;
-                    &callable.parameters
+                    (callable.parameters.as_slice(), *receiver)
                 }
-                Definition::Built { parameters } => parameters,
+                Definition::Built {
+                    parameters,
+                    receiver,
+                } => (parameters.as_slice(), *receiver),
             };
+            // The receiver is the first parameter whatever its name is, and `*args` takes it
+            // together with the arguments of the call.
+            if receiver
+                && let [first, rest @ ..] = read
+                && first.name.is_some()
+                && !first.written.starts_with('*')
+            {
+                read = rest;
+                // `def method(self, /, value)` leaves a `/` with no parameter before it.
+                if let [slash, rest @ ..] = read
+                    && slash.written == "/"
+                {
+                    read = rest;
+                }
+            }
             for parameter in read {
                 // A `*` or `/` that stands alone has no name, and a definition writes it once.
                 let known = (parameter.name.as_ref())
@@ -168,11 +195,6 @@ impl Sources {
                     parameters.push(parameter.clone());
                 }
             }
-        }
-        parameters.retain(|p| !matches!(p.name.as_deref(), Some("self" | "cls")));
-        // `def method(self, /, value)` leaves a `/` with no parameter before it.
-        if parameters.first().is_some_and(|p| p.written == "/") {
-            parameters.remove(0);
         }
         let names = parameters.iter().filter_map(|p| p.name.clone()).collect();
         let written = match definitions {
@@ -233,7 +255,7 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         });
     }
     let mut index = Index {
-        schema_version: resolved.schema_version,
+        schema_version: INDEX_SCHEMA,
         package: resolved.package,
         version: resolved.version,
         entries,
@@ -276,7 +298,12 @@ impl Library {
 pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
     let local = if let Some(path) = extra {
         let index: Index = serde_json::from_str(&std::fs::read_to_string(path)?)?;
-        ensure!(index.schema_version == 1, "unsupported index schema");
+        ensure!(
+            index.schema_version == INDEX_SCHEMA,
+            "{} has index schema {}, and this xpd reads schema {INDEX_SCHEMA}. Build the index again with xpd index.",
+            path.display(),
+            index.schema_version
+        );
         let mut entries = RECORDS
             .iter()
             .filter(|e| e.package != index.package || e.kind == Kind::Rule)

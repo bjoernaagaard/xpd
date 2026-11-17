@@ -698,7 +698,8 @@ Round to nearest integer towards zero.
 `xpd api` prints one symbol, method, rule or recipe in full, with each parameter as the source
 writes it, the first paragraph of the docstring, the public methods and the rules that may guard
 it. A parameter keeps its type annotation and its default, so you can write the call without
-importing the library.
+importing the library. A stub file writes `...` in place of a default, so such a parameter is
+optional and the text does not give its value.
 
 ```console
 $ xpd api sklego.meta.GroupedPredictor
@@ -711,8 +712,9 @@ sklego.meta.GroupedPredictor(estimator, groups, shrinkage=None, use_global_model
 Rules: sklego/grouped-shrinkage-arguments
 ```
 
-The member lines of a class show the parameter names only. To read one method or property on its
-own, add its name to the name of its class. An inherited member works the same way.
+The member lines of a class show the parameter names only, and a property has no parentheses. To
+read one method or property on its own, add its name to the name of its class. An inherited member
+works the same way.
 
 ```console
 $ xpd api mapie.regression.TimeSeriesRegressor.update
@@ -736,19 +738,23 @@ $ xpd api sklearn.model_selection.TimeSeriesSplit.split --format json
 [{"kind":"symbol","package":"sklearn","name":"sklearn.model_selection.TimeSeriesSplit.split","callable":"method","parameters":["X","y","groups"],"parameters_written":["X","y=None","groups=None"],"summary":"Generate indices to split data into training and test set.","members":[],"rules":[]}]
 ```
 
-`--index FILE` adds a local index. A name that is not in the index exits 2.
+`--index FILE` adds a local index, which must have the [index schema](#index-file) of this xpd. A
+name that is not in the index exits 2.
 
 | Entry | What `api` shows |
 | --- | --- |
 | A class | The parameters of its nearest `__init__`, or of its nearest `__new__` when it has no `__init__`, and its public methods and properties, with the inherited ones |
-| A method or property of a class, as `Class.member` | The parameters of the method without `self` or `cls`, and the first paragraph of its docstring. A property has no parameter list. The entry has no rule links |
-| Any parameter | The text of the source or stub file, with its type annotation and its default. A parameter that the source writes over several lines is joined into one line, without its comments |
+| A method or property of a class, as `Class.member` | The parameters of the method and the first paragraph of its docstring. A property has no parameter list. The entry has no rule links |
+| The first parameter of a method or of a constructor, such as `self` or `cls` | Nothing, because Python binds it to the object or the class and a call does not pass it. A static method keeps its first parameter. A function of a module keeps a parameter named `self` or `cls`, such as the `cls` of `pandas.compat.set_function_name` |
+| Any parameter | The text of the source or stub file, with its type annotation and its default |
+| A parameter that the source writes over several lines | One line, without its comments and without a comma before a closing bracket. A line break inside a string is printed as `\n` |
+| A default that the source writes as `...`, such as those of `pandas.Timestamp.replace` | `= ...`. A stub file writes it in place of the real default, so the parameter is optional and the library's documentation has the value. Many numpy, pandas and scipy stubs do so |
 | A `*` or `/` that stands alone in the parameter list | The same character, so the parameters after `*` are keyword-only and those before `/` are positional-only. `parameters_written` holds it as an item of its own |
 | A function that exists only as overloads in a stub file, such as `numpy.zeros` | The parameter names of all its overloads, without type annotations and defaults, because each overload writes them in its own way |
 | The `__init__` that Python builds for a dataclass | Each field as Griffe reads it, with its annotation and default, because the source has no parameter list |
 | A compiled function without a stub | No entry, because the index leaves it out |
 | A NumPy universal function, such as `numpy.add` | No entry, because its stub declares it as an attribute |
-| A local index that an earlier xpd built | The parameter names only, until you build the index again |
+| A local index with index schema 1, which an earlier xpd built | No entry, because xpd refuses the file until you build the index again |
 
 The printed text says how to call the symbol. It does not say what a parameter means, so read the
 library's documentation for that.
@@ -824,7 +830,14 @@ works for a library without an xpd rule pack.
 
 ### Index file
 
-Each index file has `schema_version`, `package`, `version` and `entries`.
+Each index file has `schema_version`, `package`, `version` and `entries`. `schema_version` is 2.
+Schema 1 did not record which members of a class are properties, so `find` and `api` refuse a
+local index that has it.
+
+```console
+$ xpd api arch.unitroot.ADF.pvalue --index old.json
+xpd: old.json has index schema 1, and this xpd reads schema 2. Build the index again with xpd index.
+```
 
 | Key | What it holds |
 | --- | --- |

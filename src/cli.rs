@@ -129,8 +129,9 @@ enum Cmd {
     /// Show a public symbol's parameters as the source writes them, with its summary, members
     /// and guarding rules.
     ///
-    /// A parameter keeps its type annotation and its default. The name is a class or a function
-    /// that `find` returns, a method or property of a class, a rule or a recipe.
+    /// A parameter keeps its type annotation and its default. A stub file writes `...` for a
+    /// default, which says only that the parameter is optional. The name is a class or a
+    /// function that `find` returns, a method or property of a class, a rule or a recipe.
     #[command(after_long_help = "Examples:
   xpd api sklego.model_selection.TimeGapSplit
   xpd api mapie.regression.TimeSeriesRegressor.update
@@ -875,12 +876,17 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
                     }
                 }
                 for member in &entry.members {
-                    println!(
-                        "  {}({}) {}",
-                        member.name,
-                        member.parameters.join(", "),
-                        member.summary
-                    );
+                    // A property is read and not called, so it has no parameter list.
+                    if member.property {
+                        println!("  {} {}", member.name, member.summary);
+                    } else {
+                        println!(
+                            "  {}({}) {}",
+                            member.name,
+                            member.parameters.join(", "),
+                            member.summary
+                        );
+                    }
                 }
                 if !entry.rules.is_empty() {
                     println!("Rules: {}", entry.rules.join(", "));

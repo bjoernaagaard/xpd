@@ -278,8 +278,10 @@ The first `find` downloads the 333 MB embedding model that ranks by meaning, as 
 [commands page](commands.md#find) explains, so the first call can take a few minutes.
 `parameters_written` holds the parameter list as the source writes it, so each parameter has its
 type annotation and its default, and a `*` or `/` that stands alone is an item of its own. Read
-it before you write a call. It is empty in the results of `find`, and for a function that
-exists only as overloads in a stub file, as the [commands page](commands.md#api) explains.
+it before you write a call. A stub file writes `...` for a default, which says only that the
+parameter is optional. `parameters_written` is empty in the results of `find`, and for a
+function that exists only as overloads in a stub file, as the
+[commands page](commands.md#api) explains.
 `api` adds `signature`, which shows the indexed parameter names only. `signature` is `null`
 for an entry that is not a callable symbol. The server keeps any field that the binary adds to
 an entry.

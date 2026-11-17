@@ -18,7 +18,8 @@ Use `xpd` whenever you write or change Python code.
   In code mode, read these lists directly. Record inspected candidates in the same grouped
   shape. A symbol read directly through `api` counts as a candidate when recorded there.
   `xpd api <dotted.name>` reads a result with its guarding rules and with each parameter as
-  the source writes it, so it shows the type annotation and the default. Read a method with
+  the source writes it, so it shows the type annotation and the default. A stub file writes
+  `...` for a default, which says only that the parameter is optional. Read a method with
   `xpd api <Class>.<method>` before you call it, instead of importing the library to inspect it.
 - `xpd rules --format json`: every rule with its documentation. Read a rule's
   `doc` before you change code it reports.

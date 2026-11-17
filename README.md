@@ -125,7 +125,8 @@ environment. Every other command reads files.
 `xpd find "<task>"` names the classes, the rules and the worked examples for a task in your own
 words, also for a library you haven't installed. `xpd api <name>` then prints one of them in
 full, with each parameter as the source writes it, so you see the type annotation and the
-default. The name can also be a method of a class, such as `Class.method`.
+default. A stub file writes `...` for a default. The name can also be a method of a class, such
+as `Class.method`.
 
 ```console
 $ xpd find "time series bootstrap for cross validation" --limit 1

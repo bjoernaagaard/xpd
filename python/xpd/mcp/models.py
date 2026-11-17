@@ -285,16 +285,17 @@ class Written(BaseModel):
     model_config = ConfigDict(extra="allow", frozen=True)
 
 
+PARAMETERS_WRITTEN = (
+    "The parameter list as the source writes it: each parameter with its type annotation and "
+    "default, and a * or / that stands alone between parameters. A stub file writes ... for a "
+    "default, which says only that the parameter is optional."
+)
+
+
 class ApiMember(Output):
     name: str
     parameters: list[str]
-    parameters_written: list[str] = Field(
-        default_factory=list,
-        description=(
-            "The parameter list as the source writes it: each parameter with its type "
-            "annotation and default, and a * or / that stands alone between parameters."
-        ),
-    )
+    parameters_written: list[str] = Field(default_factory=list, description=PARAMETERS_WRITTEN)
     summary: str
     property: bool = Field(default=False, description="The member is read and not called.")
 
@@ -305,13 +306,7 @@ class DiscoveryEntry(Output):
     name: str
     callable: Literal["class", "function", "method", "property"] | None
     parameters: list[str]
-    parameters_written: list[str] = Field(
-        default_factory=list,
-        description=(
-            "The parameter list as the source writes it: each parameter with its type "
-            "annotation and default, and a * or / that stands alone between parameters."
-        ),
-    )
+    parameters_written: list[str] = Field(default_factory=list, description=PARAMETERS_WRITTEN)
     summary: str
     members: list[ApiMember]
     rules: list[str]

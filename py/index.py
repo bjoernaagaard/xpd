@@ -39,11 +39,16 @@ Unresolved = (griffe.AliasResolutionError, griffe.CyclicAliasError)
 
 
 class Source(TypedDict):
-    """A function that the source defines, where its definition starts."""
+    """A function that the source defines, where its definition starts.
+
+    `receiver` says that Python binds the first parameter to the object or the class, so a
+    call does not pass it.
+    """
 
     name: str
     file: str
     line: int
+    receiver: bool
 
 
 class Parameter(TypedDict):
@@ -58,6 +63,7 @@ class Built(TypedDict):
 
     name: str
     parameters: list[Parameter]
+    receiver: bool
 
 
 Definition = Source | Built
@@ -304,10 +310,17 @@ def definitions(obj: griffe.Object | griffe.Alias) -> list[Definition]:
 
 
 def definition(function: griffe.Function) -> Definition:
+    """Where xpd reads the parameters of `function`.
+
+    A function of a class takes its object or its class first, unless it is a static method.
+    `pandas.compat.set_function_name` is a function of a module with a parameter named `cls`,
+    which a call passes.
+    """
+    receiver = function.parent.is_class and "staticmethod" not in function.labels
     file = function.extra["xpd"].get("file")
     if file is None:
-        return Built(name=function.name, parameters=built_parameters(function))
-    return Source(name=function.name, file=file, line=function.lineno)
+        return Built(name=function.name, parameters=built_parameters(function), receiver=receiver)
+    return Source(name=function.name, file=file, line=function.lineno, receiver=receiver)
 
 
 def built_parameters(function: griffe.Function) -> list[Parameter]:
@@ -525,7 +538,6 @@ def main() -> None:
     loader.resolve_aliases(external=False)
     json.dump(
         {
-            "schema_version": 1,
             "package": package,
             "version": version,
             "entries": entries(module, callables.imports),

@@ -284,7 +284,8 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
 
         The name is a class or function that find returns, or a method or property of a class,
         such as pandas.DataFrame.merge. parameters_written holds each parameter as the source
-        writes it, with its type annotation and default.
+        writes it, with its type annotation and default. A stub file writes ... for a default,
+        which says only that the parameter is optional.
         """
         entries = await xpd.run(API, Path.cwd(), [name])
         return entries[0]

@@ -293,7 +293,8 @@ pub(crate) fn python_callables(src: &str) -> Vec<Callable> {
 }
 
 /// The source of `node` on one line, without comments. A line break becomes a space, or nothing
-/// when it follows an opening bracket or comes before a closing one.
+/// when it follows an opening bracket or comes before a closing one. The comma before a closing
+/// bracket on the next line goes too, unless it is what makes a tuple of one item.
 fn one_line(src: &str, node: &Node<'_>) -> String {
     let mut tokens = Vec::new();
     collect_tokens(node, &mut tokens);
@@ -304,23 +305,52 @@ fn one_line(src: &str, node: &Node<'_>) -> String {
             let between = &src[previous.range().end..token.range().start];
             if !between.contains('\n') {
                 text.push_str(between);
-            } else if !matches!(previous.kind().as_ref(), "(" | "[" | "{")
-                && !matches!(token.kind().as_ref(), ")" | "]" | "}")
-            {
+            } else if matches!(token.kind().as_ref(), ")" | "]" | "}") {
+                if previous.kind() == "," && !makes_tuple(previous) {
+                    text.pop();
+                }
+            } else if !matches!(previous.kind().as_ref(), "(" | "[" | "{") {
                 text.push(' ');
             }
         }
-        text.push_str(&src[token.range()]);
+        if token.kind() == "string" {
+            push_string(src, token, &mut text);
+        } else {
+            text.push_str(&src[token.range()]);
+        }
         previous = Some(token);
     }
     text
 }
 
-/// The tokens below `node`, in the order of the source. A string is one token, so a line break
-/// inside it stays, and a comment is none.
+/// Whether `comma` is the only comma of a tuple or of a subscript, as in `(1,)` and `a[1,]`,
+/// which mean something else without it.
+fn makes_tuple(comma: &Node<'_>) -> bool {
+    comma.parent().is_some_and(|parent| {
+        matches!(parent.kind().as_ref(), "tuple" | "subscript")
+            && parent.children().filter(|c| c.kind() == ",").count() == 1
+    })
+}
+
+/// Adds the string `node` on one line. A line break in the string becomes `\n`, and a
+/// backslash that continues the string on the next line goes with its line break.
+fn push_string(src: &str, node: &Node<'_>, text: &mut String) {
+    let mut push = |part: &str| text.push_str(&part.replace("\r\n", "\\n").replace('\n', "\\n"));
+    let mut start = node.range().start;
+    for escape in node.dfs().filter(|n| n.kind() == "escape_sequence") {
+        if src[escape.range()].ends_with('\n') {
+            push(&src[start..escape.range().start]);
+            start = escape.range().end;
+        }
+    }
+    push(&src[start..node.range().end]);
+}
+
+/// The tokens below `node`, in the order of the source. A string is one token, and a comment
+/// and a backslash that continues a line are none.
 fn collect_tokens<'r>(node: &Node<'r>, tokens: &mut Vec<Node<'r>>) {
     match node.kind().as_ref() {
-        "comment" => {}
+        "comment" | "line_continuation" => {}
         kind if kind != "string" && node.children().len() > 0 => {
             for child in node.children() {
                 collect_tokens(&child, tokens);
