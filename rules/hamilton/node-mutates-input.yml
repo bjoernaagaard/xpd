@@ -10,6 +10,8 @@
 # @hamilton_exclude functions. `inplace=True` is reported by pandas/no-inplace.
 #
 # In each document the write is the matched node, so its pattern binds $P before `inside` reads it.
+# No document has a fix, because the copy goes into another statement, at the start of the node or
+# where the second name is bound, which the match on the write does not reach.
 
 # raw["c"] = ..., raw.loc[mask, "c"] = ..., raw.columns = ..., raw["c"] += ..., del raw["c"]
 id: node-mutates-input

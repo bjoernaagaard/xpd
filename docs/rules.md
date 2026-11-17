@@ -12934,7 +12934,7 @@ Copy an input before a node changes it, because Hamilton hands the same object t
 
 #### node-mutates-input
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** none. The copy goes into another statement, at the start of the node or where the second name is bound.
 
 The rule reports a node that writes to one of its parameters, such as `raw["uk"] = ...`, `raw.loc[mask, "uk"] = 0`, `raw.columns = ...`, `del raw["dk"]`, `raw.pop("uk")` and `rows.append(...)`.
 
