@@ -2488,12 +2488,14 @@ The fix is unsafe, because the chain raises AttributeError when the first or the
 Example:
 
 ```python
+df = pd.read_csv("sales.csv")
 result = add_shares(add_totals(clean(df)))
 ```
 
 Use instead:
 
 ```python
+df = pd.read_csv("sales.csv")
 result = df.pipe(clean).pipe(add_totals).pipe(add_shares)
 ```
 
@@ -4866,15 +4868,17 @@ times faster.
 Example:
 
 ```python
-tree = KDTree(points)
-nearest = [tree.query(q)[1] for q in queries]
+def nearest_points(points, queries):
+    tree = KDTree(points)
+    return [tree.query(q)[1] for q in queries]
 ```
 
 Use instead:
 
 ```python
-tree = KDTree(points)
-nearest = tree.query(queries)[1]
+def nearest_points(points, queries):
+    tree = KDTree(points)
+    return tree.query(queries)[1]
 ```
 
 #### solve-in-loop
