@@ -327,13 +327,13 @@ The rule reports `df.groupby("k").apply(lambda g: g["k"])`, which raises KeyErro
 Example:
 
 ```python
-keys = df.groupby("region").apply(lambda group: group["region"].iloc[0])
+labels = df.groupby("region").apply(lambda group: group["region"].iloc[0] + ": " + ", ".join(group["site"]))
 ```
 
 Use instead:
 
 ```python
-keys = df.groupby("region").apply(lambda group: group.name)
+labels = df.groupby("region").apply(lambda group: group.name + ": " + ", ".join(group["site"]))
 ```
 
 `group.name` exists only inside the function passed to `apply`, and with more than one group key it holds a tuple.
@@ -717,7 +717,7 @@ Use instead:
 unmatched = left.merge(right, on="key", how="left_anti")
 ```
 
-The anti join returns only the columns of the left frame, without the indicator and without the columns of the right frame. Use it when you need the unmatched rows of the left frame and not every merged column.
+The anti join returns the rows, columns and row labels of the filtered merge without the `_merge` column, so the columns of the right frame hold missing values.
 
 xpd gives the replacement as advice and doesn't apply it.
 
@@ -1103,13 +1103,13 @@ The rule reports `df["a"].apply(lambda v: 1 if v > 50 else 0)` and `lambda v: mi
 Example:
 
 ```python
-flag = df["load"].apply(lambda value: 1 if value > 50 else 0)
+level = df["load"].apply(lambda value: "high" if value > 50 else "low")
 ```
 
 Use instead:
 
 ```python
-flag = pd.Series(np.where(df["load"] > 50, 1, 0), index=df.index)
+level = pd.Series(np.where(df["load"] > 50, "high", "low"), index=df.index)
 ```
 
 `pd.Series(..., index=df.index)` keeps the row labels. Check the name, the dtype and the missing values of the result.
@@ -2354,7 +2354,7 @@ raises when the data doesn't match instead of giving a wrong result.
 
 **Severity:** warning. **Fix:** none.
 
-The rule reports `merge` without `validate=`, which duplicates rows without a warning when a key repeats. The rule leaves a merge with `how="cross"` alone, because it pairs every row on purpose.
+The rule reports `merge` without `validate=`, which duplicates rows without a warning when a key repeats. The rule leaves a merge with `how="cross"` alone, because it pairs every row on purpose, and a merge with `how="left_anti"` or `how="right_anti"`, because an anti join keeps each row of one frame at most once.
 
 Example:
 
@@ -3201,9 +3201,9 @@ The rule leaves alone a lookup such as `labels[(score > t).astype(int)]`, where 
 
 #### iterator-to-array
 
-**Severity:** error. **Fix:** unsafe: `np.array([v * 2 for v in y])`, and `np.array(sorted({1, 2, 3}))` for a set, where sorted raises on values that do not compare.
+**Severity:** error. **Fix:** unsafe: `np.array([len(w) for w in y])`, and `np.array(sorted({1, 2, 3}))` for a set, where sorted raises on values that do not compare.
 
-The rule reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy doesn't read the values out of an iterator. The table shows what each call returned on NumPy 2.5.5.
+The rule reports `np.array(len(w) for w in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy doesn't read the values out of an iterator. The table shows what each call returned on NumPy 2.5.5.
 
 | Call on a generator | Result |
 | --- | --- |
@@ -3215,16 +3215,19 @@ The rule reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.ar
 Example:
 
 ```python
-doubled = np.array(v * 2 for v in values)
+lengths = np.array(len(word) for word in words)
 ```
 
 Use instead:
 
 ```python
-doubled = np.array([v * 2 for v in values])
+lengths = np.array([len(word) for word in words])
 ```
 
-The rule leaves `np.fromiter` alone, because it reads the values out of an iterator.
+The rule leaves `np.fromiter` alone, because it reads the values out of an iterator. When the
+comprehension is arithmetic on each value, as in `[v * 2 for v in values]`,
+[`per-value-comprehension`](#per-value-comprehension) then reports the list, because the same
+arithmetic on the whole array runs faster.
 
 #### nan-to-int
 
@@ -3320,14 +3323,16 @@ The rule reports `a.all() == b.all()` and `np.any(a) == np.any(b)`, which compar
 Example:
 
 ```python
-assert a.all() == b.all()
+same = a.all() == b.all()
 ```
 
 Use instead:
 
 ```python
-assert np.array_equal(a, b)
+same = np.array_equal(a, b)
 ```
+
+In an `assert`, [`assert-on-arrays`](#assert-on-arrays) then advises `np.testing.assert_array_equal(a, b)`, which shows the elements that differ.
 
 #### where-tuple-length
 
@@ -4449,15 +4454,17 @@ Example:
 
 ```python
 engine = qmc.Sobol(d=2, seed=0)
-X = sparse.random(1000, 100, density=0.01, random_state=0)
+U, s, Vt = svds(A, k=3, random_state=0)
 ```
 
 Use instead:
 
 ```python
 engine = qmc.Sobol(d=2, rng=0)
-X = sparse.random(1000, 100, density=0.01, rng=0)
+U, s, Vt = svds(A, k=3, rng=0)
 ```
+
+On `sparse.random`, [`sparse-matrix-api`](#sparse-matrix-api) then advises `sparse.random_array`, which returns a sparse array.
 
 #### legacy-optimize
 

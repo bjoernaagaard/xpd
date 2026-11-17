@@ -153,6 +153,12 @@ def merge_indicator_anti_join(df):
 
 
 @case
+def anti_join(df):
+    other = df[df["a"] > 50][["k"]].drop_duplicates()
+    return df.merge(other, on="k", how="left_anti")
+
+
+@case
 def merge_indicator_kept(df):
     other = df[df["a"] > 50][["k"]].drop_duplicates()
     m = df.merge(other, on="k", how="left", indicator=True, validate="many_to_one")

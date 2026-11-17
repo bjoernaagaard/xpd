@@ -1,5 +1,7 @@
 # A cross merge pairs every row with every row on purpose, and validate= checks nothing there,
-# so how="cross" is left alone.
+# so how="cross" is left alone. An anti join keeps each row of one frame at most once, so it
+# cannot duplicate rows, and how="left_anti" and how="right_anti" are left alone too. On pandas
+# 3.1.1 a left_anti merge on a right frame with a key three times returned one row.
 # No fix, because the relation of the keys, such as one_to_one or many_to_one, is not in the file.
 id: merge-without-validate
 language: python
@@ -19,4 +21,4 @@ rule:
           - has: { field: name, regex: ^validate$ }
           - all:
               - has: { field: name, regex: ^how$ }
-              - has: { field: value, regex: '^["'']cross["'']$' }
+              - has: { field: value, regex: '^["''](cross|left_anti|right_anti)["'']$' }
