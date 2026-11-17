@@ -1,7 +1,8 @@
 # A comprehension whose value merges dicts with ** does a row's worth of work in one
 # expression, and every part of the row needs a helper that returns a dict. A loop that fills
 # the row with update() reads top to bottom. A ** that belongs to a comprehension nested
-# inside is reported by unpacked-comprehension.
+# inside is reported by unpacked-comprehension. The rule has no fix, because the loop that replaces
+# the comprehension needs names for its variables.
 id: comprehension-merges-dicts
 language: python
 severity: warning

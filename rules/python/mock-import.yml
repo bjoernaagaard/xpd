@@ -1,5 +1,6 @@
 # A test that replaces a function with a mock passes when the mock is called as the test
-# expects, whatever the real function does. Run the real code on real input.
+# expects, whatever the real function does. Run the real code on real input. The rule has no fix,
+# because a test without the mock is another design.
 id: mock-import
 language: python
 severity: warning

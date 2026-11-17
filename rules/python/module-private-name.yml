@@ -8,7 +8,8 @@
 # write one. On Python 3.12 `def first[T](xs: list[T])` needs no module level name at all.
 #
 # A file that imports hamilton is left alone, because Hamilton turns every module level function
-# into a node unless its name starts with an underscore.
+# into a node unless its name starts with an underscore. The rule has no fix, because every use of
+# the name, in this file and in others, would change with it.
 id: module-private-name
 language: python
 severity: warning

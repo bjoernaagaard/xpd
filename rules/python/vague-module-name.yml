@@ -1,5 +1,7 @@
 # A module named utils, helpers, common or misc says nothing about what it holds, so unrelated
-# code collects in it and every other module imports it. Name the module after what it holds.
+# code collects in it and every other module imports it. Name the module after what it holds. The
+# rule has no fix, because the new name is not in the file, and every import of the module would
+# change with it.
 id: vague-module-name
 language: python
 severity: warning

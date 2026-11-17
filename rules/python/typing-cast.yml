@@ -1,6 +1,8 @@
 # cast() tells the type checker to believe a type that nothing checks, so the error it hides
 # comes back at run time, far from the cast. Fix the type where the value is made, or narrow it
-# with isinstance, match or a TypeIs function, which the checker and the program both follow.
+# with isinstance, match or a TypeIs function, which the checker and the program both follow. The
+# rule has no fix, because the message names three rewrites, and the code does not show which one
+# is meant.
 id: typing-cast
 language: python
 severity: warning

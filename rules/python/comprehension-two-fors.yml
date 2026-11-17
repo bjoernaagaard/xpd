@@ -1,6 +1,7 @@
 # A comprehension with two `for` clauses reads in the order of a nested loop, while its result
 # stands first, so a reader has to reorder it. A nested loop says the same thing in the order
-# it runs. Python 3.15 flattens with `[*xs for xs in lists]`.
+# it runs. Python 3.15 flattens with `[*xs for xs in lists]`. The rule has no fix, because the
+# message names two rewrites, and the file does not show whether it runs on Python 3.15.
 id: comprehension-two-fors
 language: python
 severity: warning

@@ -1,6 +1,7 @@
 # A dict[str, Any] in a signature tells the caller and the type checker nothing about the keys
 # or the values, so every function that takes it has to know the shape by heart. Decode the
-# data once, where it enters the program, into a dataclass or a TypedDict.
+# data once, where it enters the program, into a dataclass or a TypedDict. The rule has no fix,
+# because the dataclass or the TypedDict and its fields are not in the file.
 id: dict-str-any
 language: python
 severity: warning
