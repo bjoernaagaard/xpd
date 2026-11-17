@@ -1125,7 +1125,7 @@ scaled = df["load"] * 2 + 1
 
 **Severity:** warning. **Fix:** unsafe: `df["a"].sum()`, `df["k"].nunique()`, `df["k"].nunique(dropna=False)` for `len(df["k"].unique())`, `(df["a"] > 50).sum()`, `set(df["k"].unique())`, `df["a"].tolist()`, `df["a"].to_numpy()`. `Counter` has no fix.
 
-Reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])`, `np.array(df["a"].tolist())`, `len(df["k"].unique())` and `set(df["k"].values)`, which were 2.6 to 483 times slower than the column method. For `set` and `list` the value before `[` must be named like a frame, because both are also how code copies a value of a dict. Even so, the rule can report a dict of lists, such as `list(config["names"])`. The rule doesn't run on test files.
+Reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])`, `np.array(df["a"].tolist())`, `len(df["k"].unique())` and `set(df["k"].values)`. All but `len(df["k"].unique())` were 2.6 to 483 times slower than the column method, and `len(df["k"].unique())` took as long as `nunique(dropna=False)`. For `set` and `list` the value before `[` must be named like a frame, because both are also how code copies a value of a dict. Even so, the rule can report a dict of lists, such as `list(config["names"])`. The rule doesn't run on test files.
 
 Example:
 
@@ -2285,7 +2285,7 @@ The fix is unsafe, because `(s - s.shift(n)) / s.shift(n)` rounds differently, s
 
 **Severity:** warning. **Fix:** none.
 
-Reports `df.groupby([df["d"].dt.year, df["d"].dt.month])`, and the same with `index.year` and `index.month`. On 2,000,000 rows the two keys took 25 ms and one monthly key took 6 ms.
+Reports `df.groupby([df["d"].dt.year, df["d"].dt.month])`, and the same with `index.year` and `index.month`. On 2,000,000 quarter-hourly rows in `Europe/Copenhagen` the two keys took 89 ms and one monthly key took 14 ms.
 
 Example:
 
@@ -2584,7 +2584,7 @@ or that writes a CSV file that reads back wrong.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `read_csv(..., engine="python")`, `sep=None` and `low_memory=False`, which turn off the fast C reader. On 1,000,000 rows `sep=None` was 54 times slower than a named separator. The rule leaves `engine="python"` alone when the call needs it, which is for `skipfooter` or for a separator of several characters other than `\s+`.
+Reports `read_csv(..., engine="python")`, `sep=None` and `low_memory=False`, which turn off the fast C reader. On 1,000,000 rows `sep=None` was 68 times slower than a named separator, measured with the reader's default threads on a 32-core machine. The rule leaves `engine="python"` alone when the call needs it, which is for `skipfooter` or for a separator of several characters other than `\s+`.
 
 Example:
 
@@ -2608,7 +2608,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `nrows=1000`.
 
-Reports `pd.read_csv(path).head(1000)` and `.iloc[:1000]`, which parse the whole file to keep the first rows. `nrows` was 58 times faster than `head`.
+Reports `pd.read_csv(path).head(1000)` and `.iloc[:1000]`, which parse the whole file to keep the first rows. `nrows` was 45 times faster than `head`, measured with the reader's default threads on a 32-core machine.
 
 Example:
 
@@ -2628,7 +2628,7 @@ The fix is unsafe, because pandas guesses the dtypes from the rows it reads, so 
 
 **Severity:** warning. **Fix:** none.
 
-Reports `read_csv(..., converters=...)`, which calls a Python function once per value and was 3.9 to 7.8 times slower than `dtype` or a column method after the read.
+Reports `read_csv(..., converters=...)`, which calls a Python function once per value and was 3.6 to 5.1 times slower than `dtype` or a column method after the read, measured with the reader's default threads on a 32-core machine.
 
 Example:
 
@@ -2649,7 +2649,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** unsafe: `engine="pyarrow"`. The `json.loads` loop has no fix.
 
-Reports `pd.read_json(path, lines=True)` without an engine, and `pd.DataFrame([json.loads(line) for line in f])`. `read_json` with the pyarrow engine was 18 times faster than without an engine, and 27 times faster than the `json.loads` loop. The rule leaves a call alone that reads from a `StringIO`, because the pyarrow engine raises on a text buffer.
+Reports `pd.read_json(path, lines=True)` without an engine, and `pd.DataFrame([json.loads(line) for line in f])`. `read_json` with the pyarrow engine was 25 times faster than without an engine, and 48 times faster than the `json.loads` loop, measured with the reader's default threads on a 32-core machine. The rule leaves a call alone that reads from a `StringIO`, because the pyarrow engine raises on a text buffer.
 
 Example:
 
@@ -2763,7 +2763,7 @@ Reports `pd.read_parquet(path)[["id", "price"]]` and `pd.read_parquet(path)["pri
 
 | Columns read with `columns=` | Faster by |
 | --- | --- |
-| 2 of 50 | 8.4 and 12.7 times in two runs |
+| 2 of 50 | 9.6 and 9.2 times in two runs, measured with the reader's default threads on a 32-core machine |
 | 2 of 6 | 1.7 times |
 
 Example:
@@ -2786,7 +2786,7 @@ Reports `df = pd.read_parquet(path)` followed directly by `df = df[df["id"] >= v
 
 | File, filtered to the last tenth of a sorted column | Faster by |
 | --- | --- |
-| 10 row groups | 4.4 times |
+| 10 row groups | 5.3 and 4.6 times in two runs, measured with the reader's default threads on a 32-core machine |
 | 1 row group | 1.3 to 1.5 times |
 
 Example:
@@ -2808,7 +2808,7 @@ The replacement is advice. xpd does not apply it automatically.
 
 **Severity:** warning. **Fix:** none.
 
-Reports `pd.concat(pd.read_csv(path, chunksize=n))`, also with `list(...)` or a comprehension around the reader. The code joins every chunk again, so the whole file is in memory anyway. It took 3.0 and 3.1 times as long in two runs as one `read_csv` without `chunksize`, and the two frames were equal. The rule leaves a loop alone that reduces each chunk before the concat.
+Reports `pd.concat(pd.read_csv(path, chunksize=n))`, also with `list(...)` or a comprehension around the reader. The code joins every chunk again, so the whole file is in memory anyway. It took 3.1 and 2.9 times as long in two runs as one `read_csv` without `chunksize`, measured with the reader's default threads on a 32-core machine, and on one thread it took 1.1 and 1.0 times as long. The two frames were equal. The rule leaves a loop alone that reduces each chunk before the concat.
 
 Example:
 

@@ -1,13 +1,13 @@
-# A Parquet file stores each column on its own, so read_parquet can read the named columns and
-# skip the rest. On pandas 3.1.1 with pyarrow 26.0.1, reading 2 of 50 float columns of 200,000
-# rows with columns= was 8.4 and 12.7 times faster in two runs than reading every column and
-# selecting the two, and 2 of 6 columns of 1,000,000 rows was 1.7 times faster. The two frames
-# were equal, with the columns in the order of the list, and a file with a named index gave the
-# same index both ways (research/modern-pandas/probes/storage.txt).
+# A Parquet file stores each column on its own, so read_parquet can read the named columns and skip
+# the rest. On pandas 3.1.1 with pyarrow 26.0.1, reading 2 of 50 float columns of 200,000 rows with
+# columns= was 9.6 and 9.2 times faster in two runs than reading every column and selecting the two,
+# with the reader's default threads on a 32-core machine, and 2 of 6 columns of 1,000,000 rows was
+# 1.7 times faster. The two frames were equal, with the columns in the order of the list, and a file
+# with a named index gave the same index both ways (research/modern-pandas/probes/storage.txt).
 id: read-parquet-all-columns
 language: python
 severity: warning
-message: This reads every column of the file and keeps $L. Pass columns=$L to read_parquet, which read 2 of 50 columns 8 times faster and returned an equal frame.
+message: This reads every column of the file and keeps $L. Pass columns=$L to read_parquet, which read 2 of 50 columns 9 times faster with the reader's default threads on a 32-core machine and returned an equal frame.
 rule:
   pattern: $PD.read_parquet($$$A)[$L]
   not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^columns$ } } }
@@ -25,7 +25,7 @@ metadata: { fix: safe }
 id: read-parquet-all-columns
 language: python
 severity: warning
-message: This reads every column of the file and keeps $C. Pass columns=[$C] to read_parquet, which read 2 of 50 columns 8 times faster and returned an equal column.
+message: This reads every column of the file and keeps $C. Pass columns=[$C] to read_parquet, which read 2 of 50 columns 9 times faster with the reader's default threads on a 32-core machine and returned an equal column.
 rule:
   pattern: $PD.read_parquet($$$A)[$C]
   not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^columns$ } } }
