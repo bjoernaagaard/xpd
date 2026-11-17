@@ -2,6 +2,7 @@
 # step name with __ in it raises ValueError at fit. Other libraries have a Pipeline too, so the
 # first three documents report a call only when its name comes from scikit-learn. That test reads
 # the whole file, so it comes after the test of the name.
+# No fix, because a grid or a named_steps lookup elsewhere names the step too.
 id: pipeline-step-form
 language: python
 severity: error
@@ -34,6 +35,7 @@ utils:
           - has: { field: function, kind: identifier }
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
 ---
+# Unsafe: the old form raises at fit.
 id: pipeline-step-form
 language: python
 severity: error
@@ -55,7 +57,13 @@ utils:
       - all:
           - has: { field: function, kind: identifier }
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^sklearn\.(pipeline|compose)$' } }, { has: { kind: dotted_name, pattern: $F } }] } }
+transform:
+  STEPS:
+    substring: { source: $L, startChar: 1, endChar: -1 }
+fix: $F($STEPS)
+metadata: { fix: unsafe }
 ---
+# No fix, because the message names two rewrites, and a name for each step is not in the file.
 id: pipeline-step-form
 language: python
 severity: error
@@ -82,7 +90,7 @@ utils:
 # alone. The Pipeline of imbalanced-learn takes samplers, so files that import from
 # imblearn.pipeline are left alone, because the name may be that one. The import tests read the
 # whole file, so the sampler name is tested first in all, which keeps its order. ast-grep checks
-# constraints only after the whole rule.
+# constraints only after the whole rule. No fix, because the import of Pipeline is another statement.
 id: pipeline-step-form
 language: python
 severity: error

@@ -196,6 +196,7 @@ def target_function_pairs():
     X, y, w = frame()
     target = np.exp(X["a"].to_numpy())
     TransformedTargetRegressor(regressor=Ridge(), func=np.log).fit(X[["b"]], target)  # xpd: transformed-target-pair
+    TransformedTargetRegressor(regressor=Ridge(), func=np.log1p).fit(X[["b"]], target)  # xpd: transformed-target-pair
     TransformedTargetRegressor(regressor=Ridge(), inverse_func=np.exp).fit(X[["b"]], target)  # xpd: transformed-target-pair
     TransformedTargetRegressor(Ridge(), transformer=StandardScaler(), func=np.log, inverse_func=np.exp)  # xpd: transformed-target-pair
 

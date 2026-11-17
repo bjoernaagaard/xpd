@@ -1,0 +1,18 @@
+# The scikit-learn pack. Every other .yml file in this folder is a rule.
+
+# A fix that writes `np.` applies only in a file with `import numpy as np`.
+aliases:
+  np: numpy
+
+# Names a fix may write bare, each with the module it must be imported from. A fix that writes
+# `CalibratedClassifierCV(` applies only in a file with
+# `from sklearn.calibration import CalibratedClassifierCV`. Elsewhere the issue has no fix.
+members:
+  CalibratedClassifierCV: sklearn.calibration
+  SGDClassifier: sklearn.linear_model
+  SGDRegressor: sklearn.linear_model
+  OneVsRestClassifier: sklearn.multiclass
+  FrozenEstimator: sklearn.frozen
+  GroupKFold: sklearn.model_selection
+  accuracy_score: sklearn.metrics
+  r2_score: sklearn.metrics

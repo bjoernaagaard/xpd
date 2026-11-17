@@ -58,6 +58,7 @@ metadata: { fix: unsafe }
 ---
 # Scores or probabilities first make the true values continuous, and these metrics raise on a
 # continuous target.
+# Unsafe: the old form raises, and a name can mislead.
 id: metric-arguments-swapped
 language: python
 severity: error
@@ -66,6 +67,7 @@ rule:
   kind: call
   all:
     - has: { field: function, regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve|log_loss|brier_score_loss)$' }
+    - any: [{ pattern: '$F($S, $T)' }, { pattern: '$F($S, $T, $$$REST)' }]
     - has:
         field: arguments
         has:
@@ -78,3 +80,5 @@ rule:
     - has:
         field: arguments
         has: { nthChild: 2, kind: identifier, regex: '(?i)(true|test|val|actual|target|label|^y$)', not: { regex: '(?i)pred|hat|prob|score' } }
+fix: $F($T, $S, $$$REST)
+metadata: { fix: unsafe }

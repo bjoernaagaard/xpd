@@ -1,11 +1,28 @@
 # The default Barnes-Hut method approximates the forces between distant points, so its embedding
 # is another one, no speed proof applies, and the rule is info.
+# Unsafe: the default method gives another embedding.
 id: tsne-exact
 language: python
 severity: info
-message: method="exact" computes the force between every pair of rows. The default Barnes-Hut method gave the same trustworthiness over 20 seeds and fitted a median 4.5 times faster on 300 rows and 16 times faster on 1,000 rows, with the default number of threads. Leave method at its default.
+message: method="exact" computes the force between every pair of rows. The default Barnes-Hut method gave the same trustworthiness over 20 seeds and fitted a median 4.5 times faster on 300 rows and 16 times faster on 1,000 rows, with the default number of threads. Drop method="exact" to use the default.
 rule:
   pattern: $C($$$A)
   has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*.exact.$' } }
 constraints:
   C: { regex: '(^|\.)TSNE$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^method$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^method$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$A, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }

@@ -27,7 +27,8 @@ fix: sklearn.model_selection
 metadata: { fix: unsafe }
 ---
 # The same modules, where a name has no twin in sklearn.model_selection, such as LabelKFold, or
-# where the module itself is imported.
+# where the module itself is imported. No fix, because the code that reads those names is
+# elsewhere.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -76,6 +77,8 @@ utils:
 fix: joblib
 metadata: { fix: unsafe }
 ---
+# No fix, because the import binds another name too, or the code reads the module by its full name
+# elsewhere.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -91,6 +94,8 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# No fix, because each name of six has its own Python 3 name, and the code that uses it is
+# elsewhere.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -107,6 +112,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# No fix, because the advice is another dataset.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -121,6 +127,8 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# No fix, because SimpleImputer is in another module, the code that uses the name is elsewhere,
+# and axis has no counterpart.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -162,6 +170,8 @@ utils:
 fix: $P
 metadata: { fix: unsafe }
 ---
+# No fix, because the names come from more than one public module, or the module itself is
+# imported.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -185,7 +195,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
-# Private names, such as BaseForest or _tree, have no public home to point to.
+# No fix, because private names, such as BaseForest or _tree, have no public home to point to.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -714,6 +724,44 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
+# multi_class="ovr" fitted one binary model per class, which OneVsRestClassifier does. The fix
+# rewrites the whole call, so it holds only when multi_class is on the first line of the call,
+# where the report is.
+# Unsafe: the old form raises on 1.9.1. The fixed model is a OneVsRestClassifier, so code that
+# reads coef_ or a grid that names a parameter such as logisticregression__C must read the
+# estimators_ or put estimator__ in front.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes multi_class=. Write OneVsRestClassifier($C()) to fit one model per class, as multi_class="ovr" did.
+rule:
+  pattern: $C($$$ARGS)
+  regex: '^[^\n]*\bmulti_class\s*=\s*["'']ovr["'']'
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^multi_class\s*=\s*["'']ovr["'']$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)LogisticRegression(CV)?$' }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: OneVsRestClassifier($C($REST))
+metadata: { fix: unsafe }
+---
+# No fix, because the value of multi_class is not in the file, or it is on a later line than the
+# call, and the fix rewrites the whole call.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -725,12 +773,16 @@ rule:
     any:
       - regex: '^multi_class\s*=\s*["''](multinomial|auto)["'']$'
       - matches: compat-code
+      - all:
+          - regex: '^multi_class\s*=\s*["'']ovr["'']$'
+          - inside: { kind: argument_list, inside: { kind: call, regex: '^[^\n]*\bmulti_class\s*=\s*["'']ovr["'']' } }
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression(CV)?$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# No fix, because min_impurity_decrease measures another quantity, so its value is not in the file.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -748,6 +800,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# No fix, because the message gives the scaler only as an example.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -765,6 +818,26 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# Unsafe: the old form raises on 1.9.1. The fix holds only when max_iter and tol are not passed,
+# because the fixed form would then repeat them.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes n_iter=. Write max_iter= for the number of passes over the data, with tol=None to run all of them.
+rule:
+  kind: keyword_argument
+  all: [{ has: { field: name, regex: ^n_iter$ } }, { has: { field: value, pattern: $V } }]
+  not: { matches: compat-code }
+  inside:
+    kind: argument_list
+    not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^(max_iter|tol)$ } }] } }
+    inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(SGDClassifier|SGDRegressor|Perceptron|PassiveAggressiveClassifier|PassiveAggressiveRegressor)$' } }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: max_iter=$V, tol=None
+metadata: { fix: unsafe }
+---
+# No fix, because max_iter or tol is already passed, or ** can hold them.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -772,13 +845,60 @@ message: $C no longer takes n_iter=. Pass max_iter for the number of passes over
 rule:
   kind: keyword_argument
   has: { field: name, regex: ^n_iter$ }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - inside: { kind: argument_list, not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^(max_iter|tol)$ } }] } } }
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, pattern: $C, regex: '(^|\.)(SGDClassifier|SGDRegressor|Perceptron|PassiveAggressiveClassifier|PassiveAggressiveRegressor)$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# With alphas=None the number of alphas came from n_alphas, and alphas takes that number since
+# 1.7. The fix rewrites the whole call, so it holds only when n_alphas is on the first line of the
+# call, where the report is.
+# Unsafe: the old form raises on 1.9.1.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes n_alphas= next to alphas=. Drop alphas=None and write the number of alphas as alphas=.
+rule:
+  pattern: $C($$$ARGS)
+  regex: '^[^\n]*\bn_alphas\s*='
+  has:
+    field: arguments
+    all:
+      - has: { kind: keyword_argument, has: { field: name, regex: ^n_alphas$ } }
+      - has: { kind: keyword_argument, regex: '^alphas\s*=\s*None$' }
+      - not: { has: { kind: dictionary_splat } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(LassoCV|ElasticNetCV|MultiTaskLassoCV|MultiTaskElasticNetCV)$' }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^alphas$ } }
+    fix: ""
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^n_alphas$ } }, { has: { field: value, pattern: $V } }] }
+    fix: "alphas=$V, "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(n_)?alphas$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
+---
+# No fix, because alphas may hold a list, or n_alphas is on a later line than the call, and the
+# fix rewrites the whole call.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -786,7 +906,14 @@ message: $C no longer takes n_alphas= next to alphas=. Drop alphas=None and pass
 rule:
   kind: keyword_argument
   has: { field: name, regex: ^n_alphas$ }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - inside:
+          kind: argument_list
+          has: { kind: keyword_argument, regex: '^alphas\s*=\s*None$' }
+          not: { has: { kind: dictionary_splat } }
+          inside: { kind: call, regex: '^[^\n]*\bn_alphas\s*=' }
   inside:
     kind: argument_list
     has: { kind: keyword_argument, has: { field: name, regex: ^alphas$ } }
@@ -828,6 +955,7 @@ utils:
 fix: max_features=1.0
 metadata: { fix: unsafe, since: "1.1" }
 ---
+# No fix, because the message names several values, and the code does not show which one is meant.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -843,7 +971,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
 # A search grid whose max_features list holds "auto". Every tree and forest in 1.9.1 refuses the
-# value, so each candidate with it fails to fit and scores nan.
+# value, so each candidate with it fails to fit and scores nan. No fix, because the grid does not
+# show whether the model is a classifier or a regressor.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -938,6 +1067,60 @@ utils:
 fix: loss="log_loss"
 metadata: { fix: unsafe }
 ---
+# A frozen estimator is not fitted again, which is what cv="prefit" did. The fix rewrites the whole
+# call, so it holds only when cv is on the first line of the call, where the report is, and the
+# model is the first argument or estimator=.
+# Unsafe: the old form raises on 1.9.1.
+id: removed-in-sklearn
+language: python
+severity: error
+message: CalibratedClassifierCV(cv="prefit") is refused by scikit-learn 1.9.1. Write CalibratedClassifierCV(FrozenEstimator(model)), with FrozenEstimator from sklearn.frozen.
+rule:
+  pattern: $C($$$ARGS)
+  regex: '^[^\n]*\bcv\s*=\s*["'']prefit["'']'
+  has:
+    field: arguments
+    all:
+      - has: { kind: keyword_argument, regex: '^cv\s*=\s*["'']prefit["'']$' }
+      - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+      - any:
+          - has: { kind: keyword_argument, has: { field: name, regex: ^estimator$ } }
+          - has:
+              nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+              not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)CalibratedClassifierCV$' }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^cv$ } }
+    fix: ""
+  - id: freeze-keyword
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^estimator$ } }, { has: { field: value, pattern: $M } }] }
+    fix: "estimator=FrozenEstimator($M), "
+  - id: freeze-first
+    rule:
+      pattern: $M
+      nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+      not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] }
+    fix: "FrozenEstimator($M), "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, freeze-keyword, freeze-first, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe, since: "1.6" }
+---
+# No fix, because the model is not passed in the call, or cv is on a later line than the call, and
+# the fix rewrites the whole call.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -945,7 +1128,18 @@ message: CalibratedClassifierCV(cv="prefit") is refused by scikit-learn 1.9.1. W
 rule:
   kind: keyword_argument
   regex: '^cv\s*=\s*["'']prefit["'']$'
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - inside:
+          kind: argument_list
+          not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+          any:
+            - has: { kind: keyword_argument, has: { field: name, regex: ^estimator$ } }
+            - has:
+                nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+                not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] }
+          inside: { kind: call, regex: '^[^\n]*\bcv\s*=\s*["'']prefit["'']' }
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)CalibratedClassifierCV$' } }
@@ -953,6 +1147,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 metadata: { since: "1.6" }
 ---
+# Unsafe: the old form raises on 1.9.1. The fix holds only when C and l1_ratio are not passed,
+# because the fixed form would then repeat C or let l1_ratio pick a penalty.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -963,11 +1159,33 @@ rule:
   not: { matches: compat-code }
   inside:
     kind: argument_list
+    not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^(C|l1_ratio)$ } }] } }
+    inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: C=np.inf
+metadata: { fix: unsafe, since: "1.8" }
+---
+# No fix, because C or l1_ratio is already passed, or ** can hold them.
+id: removed-in-sklearn
+language: python
+severity: error
+message: penalty="none" is refused by scikit-learn 1.9.1. Write C=np.inf for a model with no penalty.
+rule:
+  kind: keyword_argument
+  regex: '^penalty\s*=\s*["'']none["'']$'
+  not:
+    any:
+      - matches: compat-code
+      - inside: { kind: argument_list, not: { has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^(C|l1_ratio)$ } }] } } }
+  inside:
+    kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)LogisticRegression$' } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 metadata: { since: "1.8" }
 ---
+# Unsafe: the old form raises on 1.9.1.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -979,11 +1197,14 @@ rule:
   inside:
     kind: argument_list
     inside: { kind: call, field: arguments, has: { field: function, regex: '(^|\.)(DecisionTreeClassifier|DecisionTreeRegressor|ExtraTreeClassifier|ExtraTreeRegressor|RandomForestClassifier|RandomForestRegressor|ExtraTreesClassifier|ExtraTreesRegressor|GradientBoostingClassifier|GradientBoostingRegressor)$' } }
+fix: min_samples_split=2
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+metadata: { fix: unsafe }
 ---
 # A splitter called the way the removed sklearn.cross_validation module took it, with the data or
-# its length first. model_selection splitters take n_splits first and get the data in split.
+# its length first. model_selection splitters take n_splits first and get the data in split. No fix,
+# because the data moves to a split call that the code does not have.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1004,7 +1225,8 @@ constraints:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
-# The test for an import from sklearn reads the whole file, so the four documents below test the
+# None of the four documents below has a fix, because the names of the parameters are not in the
+# file. The test for an import from sklearn reads the whole file, so the four documents test the
 # name of the call first in all, which keeps its order. ast-grep checks constraints only after the
 # whole rule has matched.
 id: removed-in-sklearn

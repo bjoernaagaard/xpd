@@ -1,6 +1,7 @@
 # force_int_remainder_cols is gone from ColumnTransformer and make_column_transformer on
 # scikit-learn 1.9.1, which raise TypeError on it. The remainder columns now come back in the
 # form the other columns were given in.
+# Unsafe: the old form raises on 1.9.1.
 id: column-transformer-removed
 language: python
 severity: error
@@ -10,3 +11,19 @@ rule:
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^force_int_remainder_cols$ } } }
 constraints:
   C: { regex: '(^|\.)(ColumnTransformer|make_column_transformer)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^force_int_remainder_cols$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^force_int_remainder_cols$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$A, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }

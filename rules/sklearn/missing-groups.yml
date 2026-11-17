@@ -1,7 +1,8 @@
 # The group splitters need the group of each row. Without groups= they raise "The 'groups'
 # parameter should not be None", and StratifiedGroupKFold raises that it found 1 group. A call with
 # params= or ** can carry the groups, so it is left alone. A search such as SequentialFeatureSelector
-# or LogisticRegressionCV takes groups only through metadata routing, so it is not listed.
+# or LogisticRegressionCV takes groups only through metadata routing, so it is not listed. No
+# document in this file has a fix, because the group of each row is not in the file.
 id: missing-groups
 language: python
 severity: error

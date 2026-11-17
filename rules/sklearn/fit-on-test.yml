@@ -5,6 +5,7 @@
 # one alone when it is built in the same expression or assigned in the same block. A LabelEncoder
 # refitted on test columns gives codes that differ from training, so it is left alone only when
 # its result goes straight into another call, such as a plot, and never into a stored column.
+# No fix, because the name of the training rows is not in the file.
 id: fit-on-test
 language: python
 severity: error
@@ -19,6 +20,7 @@ constraints:
   Y: { not: { kind: keyword_argument } }
   S: { not: { regex: '(?i)permutation' } }
 ---
+# No fix, because the name of the training rows is not in the file.
 id: fit-on-test
 language: python
 severity: error
@@ -50,7 +52,8 @@ fix: $S.transform($X)
 metadata: { fix: unsafe }
 ---
 # A step built in the same expression, as in StandardScaler().fit_transform(X_test), was never
-# fitted on the training data, so there is nothing to call transform on.
+# fitted on the training data, so there is nothing to call transform on. No fix, because the
+# fitted step needs a name that the file does not have.
 id: fit-on-test
 language: python
 severity: info
@@ -76,6 +79,23 @@ utils:
 # With the target, the step learns from the test labels. A category_encoders TargetEncoder
 # refitted this way scored 0.992 AUC on noise, but SelectKBest scored 0.438 and the
 # scikit-learn TargetEncoder, which cross-fits, 0.507, so the form as a whole has no proof.
+# Unsafe: fit_transform on a name with test in it can be meant, transform raises when the step was
+# never fitted, and transform takes no target.
+id: fit-on-test
+language: python
+severity: info
+message: fit_transform on test data learns from the test rows and their labels. Call $S.transform($X) on the object that was fitted on the training data.
+rule:
+  pattern: $S.fit_transform($X, $$$REST)
+constraints:
+  X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
+  # Only encoders and selectors. A ranking step on test predictions is post-processing.
+  S: { not: { kind: call }, regex: '(?i)encod|^(enc|te)$|select|kbest|rfe' }
+fix: $S.transform($X)
+metadata: { fix: unsafe }
+---
+# No fix, because a step built in the same expression was never fitted on the training data, and
+# the fitted step needs a name that the file does not have.
 id: fit-on-test
 language: python
 severity: info
@@ -85,10 +105,11 @@ rule:
 constraints:
   X: { regex: '(?i)(^|[^a-z])(test|holdout)([^a-z]|$)|(^|(^|[^a-z])(x|y|df|data)_)(val|valid|validation)([^a-z]|$)', not: { any: [{ regex: '(?i)train|concat|append|stack|r_\[' }, { has: { stopBy: end, kind: string, regex: '(?i)test' } }] } }
   # Only encoders and selectors. A ranking step on test predictions is post-processing.
-  S: { regex: '(?i)encod|^(enc|te)$|select|kbest|rfe' }
+  S: { kind: call, regex: '(?i)encod|^(enc|te)$|select|kbest|rfe' }
 ---
 # fit with the rows alone is how a scaler or an encoder is fitted. On noise it moved nothing, and
-# on data with signal it cost up to 0.058 AUC in the shapes above, so this is info.
+# on data with signal it cost up to 0.058 AUC in the shapes above, so this is info. No fix,
+# because the name of the training rows is not in the file.
 id: fit-on-test
 language: python
 severity: info

@@ -3,7 +3,8 @@
 # probabilities both give 0.5, so no proof can show the loss, and these two documents are info.
 # Files that import keras, tensorflow or torch are left
 # alone, and so is a Booster that xgboost or lightgbm trained, because predict returns
-# probabilities there.
+# probabilities there. Neither document has a fix, because the first names two rewrites and the
+# second reports an assignment whose name the metric reads elsewhere.
 id: auc-from-labels
 language: python
 severity: info
@@ -87,15 +88,33 @@ utils:
 fix: $M.predict_proba($$$X)
 metadata: { fix: unsafe }
 ---
+# Unsafe: the loss changes on purpose, and on more than two classes column 1 is one class only.
 id: auc-from-labels
 language: python
 severity: error
-message: brier_score_loss scores probabilities, and predict returns the class labels, so it counts the wrong labels. It scored 0.50 on data with no signal, where the honest loss is 0.25. Pass predict_proba(X)[:, 1].
+message: brier_score_loss scores probabilities, and predict returns the class labels, so it counts the wrong labels. It scored 0.50 on data with no signal, where the honest loss is 0.25. Write $M.predict_proba($$$X)[:, 1].
 rule:
   pattern: $F($$$ARGS)
   has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict($$$X)', not: { any: [{ matches: predict-of-predictions }, { matches: predict-returns-scores }] } } }
 constraints:
   F: { regex: '(^|\.)brier_score_loss$' }
+rewriters:
+  - id: score
+    rule:
+      nthChild: 2
+      pattern: '$M.predict($$$X)'
+    fix: "$M.predict_proba($$$X)[:, 1], "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [score, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
 utils:
   predict-returns-scores:
     inside:
@@ -106,7 +125,9 @@ utils:
         - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
   predict-of-predictions:
     has: { field: arguments, has: { nthChild: 1, regex: '(?i)pred|prob|score' } }
+metadata: { fix: unsafe }
 ---
+# No fix, because the metric reads the name in another statement.
 id: auc-from-labels
 language: python
 severity: error
@@ -146,10 +167,12 @@ utils:
 ---
 # multi_class says the target has more than two classes, and there roc_auc_score raises on one
 # label per row.
+# Unsafe: the score changes on purpose, and on a target with two classes the fixed form raises,
+# because roc_auc_score then takes one score per row.
 id: auc-from-labels
 language: python
 severity: error
-message: roc_auc_score with multi_class needs one probability per class, and predict returns one label per row, which raises on more than two classes. Pass predict_proba(X).
+message: roc_auc_score with multi_class needs one probability per class, and predict returns one label per row, which raises on more than two classes. Write $M.predict_proba($$$X).
 rule:
   pattern: $F($$$ARGS)
   all:
@@ -157,6 +180,23 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } } }
 constraints:
   F: { regex: '(^|\.)roc_auc_score$' }
+rewriters:
+  - id: score
+    rule:
+      nthChild: 2
+      pattern: '$M.predict($$$X)'
+    fix: "$M.predict_proba($$$X), "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [score, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
 utils:
   predict-returns-scores:
     inside:
@@ -165,9 +205,42 @@ utils:
       any:
         - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'keras|tensorflow|torch' }
         - has: { stopBy: end, pattern: '$M = $BOOSTER($$$TRAIN)', has: { field: right, has: { field: function, regex: '^(xgb|xgboost|lgb|lightgbm)\.(train|Booster)$' } } }
+metadata: { fix: unsafe }
 ---
 # predict_proba returns one column per class. These functions take one score per row, and
-# roc_auc_score takes the whole matrix only with multi_class.
+# roc_auc_score takes the whole matrix only with multi_class. The curves take two classes only, so
+# column 1 is the score of the positive class.
+# Unsafe: the old form raises.
+id: auc-from-labels
+language: python
+severity: error
+message: $F takes one score per row, and predict_proba returns one column per class, so this raises. Write $M.predict_proba($$$X)[:, 1].
+rule:
+  pattern: $F($$$ARGS)
+  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)' } }
+  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } } } }
+constraints:
+  F: { regex: '(^|\.)(roc_curve|precision_recall_curve|det_curve)$' }
+rewriters:
+  - id: score
+    rule:
+      nthChild: 2
+      pattern: '$M.predict_proba($$$X)'
+    fix: "$M.predict_proba($$$X)[:, 1], "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [score, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe }
+---
+# No fix, because the message names two rewrites, and the number of classes decides.
 id: auc-from-labels
 language: python
 severity: error
@@ -177,32 +250,86 @@ rule:
   has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)' } }
   not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } } } }
 constraints:
-  F: { regex: '(^|\.)(roc_auc_score|roc_curve|precision_recall_curve|det_curve)$' }
+  F: { regex: '(^|\.)roc_auc_score$' }
 ---
+# Unsafe: the old form raises.
 id: auc-from-labels
 language: python
 severity: error
-message: $F takes probabilities, and decision_function returns scores outside 0 to 1, so this raises. Pass predict_proba(X).
+message: $F takes probabilities, and decision_function returns scores outside 0 to 1, so this raises. Write $M.predict_proba($$$X).
 rule:
   pattern: $F($$$ARGS)
   has: { field: arguments, has: { nthChild: 2, pattern: '$M.decision_function($$$X)' } }
 constraints:
   F: { regex: '(^|\.)(log_loss|brier_score_loss)$' }
+rewriters:
+  - id: score
+    rule:
+      nthChild: 2
+      pattern: '$M.decision_function($$$X)'
+    fix: "$M.predict_proba($$$X), "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [score, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe }
 ---
 # Column 0 of predict_proba is the probability of the first class. On data with no signal both
-# columns give 0.5, so no proof can show the loss, and the document is info.
+# columns give 0.5, so no proof can show the loss, and the documents are info.
+# Unsafe: the score changes on purpose. A call with pos_label can mean the first class, so it has
+# no fix.
+id: auc-from-labels
+language: python
+severity: info
+message: Column 0 of predict_proba is the probability of the first class, so this scores the model upside down. Write $M.predict_proba($$$X)[:, 1].
+rule:
+  pattern: $F($$$ARGS)
+  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)[:, 0]' } }
+  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^pos_label$ } } } }
+constraints:
+  F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve)$' }
+rewriters:
+  - id: score
+    rule:
+      nthChild: 2
+      pattern: '$M.predict_proba($$$X)[:, 0]'
+    fix: "$M.predict_proba($$$X)[:, 1], "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [score, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe }
+---
+# No fix, because pos_label may name the first class, and then column 0 is right.
 id: auc-from-labels
 language: python
 severity: info
 message: Column 0 of predict_proba is the probability of the first class, so this scores the model upside down. Take column 1.
 rule:
   pattern: $F($$$ARGS)
-  has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)[:, 0]' } }
+  all:
+    - has: { field: arguments, has: { nthChild: 2, pattern: '$M.predict_proba($$$X)[:, 0]' } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^pos_label$ } } }
 constraints:
   F: { regex: '(^|\.)(roc_auc_score|average_precision_score|roc_curve|precision_recall_curve|det_curve)$' }
 ---
 # make_scorer calls predict unless response_method says otherwise, so the scorer ranks labels.
-# On data with no signal both forms give 0.5, so the document is info.
+# On data with no signal both forms give 0.5, so the document is info. No fix, because the message
+# names two rewrites.
 id: auc-from-labels
 language: python
 severity: info

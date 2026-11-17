@@ -4,7 +4,8 @@
 # there, so warm_start cannot help it, and that loop is left alone. So is a loop over n_estimators
 # with another loop inside it, where another setting changes between fits, and a loop that reads
 # a clock, because it times each fit and warm_start would change what it measures. AdaBoost has
-# no warm_start.
+# no warm_start. Neither document has a fix, because the model moves out of the loop, which changes
+# other statements.
 id: refit-per-n-estimators
 language: python
 severity: warning

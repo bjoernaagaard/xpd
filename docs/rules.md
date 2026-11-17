@@ -5095,7 +5095,7 @@ aside before any rule was written. The judging had the following parts:
 | [`cross-val-on-fitted-data`](#cross-val-on-fitted-data) | error | score: 0.764 against 0.518 AUC | 10 | 0 and 0 of 10 | 72 of 78 | none |
 | [`tune-on-test`](#tune-on-test) | error | score: 0.597 against 0.507 accuracy | 1 | 0 and 0 of 1 | 15 of 50 | none |
 | [`stateful-function-transformer`](#stateful-function-transformer) | info | none of the three | 0 | no reports | 24 of 30 | none |
-| [`groups-ignored`](#groups-ignored) | error | score: 0.849 against 0.480 accuracy | 0 | no reports | 56 of 57 | none |
+| [`groups-ignored`](#groups-ignored) | error | score: 0.849 against 0.480 accuracy | 0 | no reports | 56 of 57 | unsafe |
 | [`missing-groups`](#missing-groups) | error | interpreter: ValueError | 0 | no reports | 48 of 50 | none |
 | [`leave-one-out-score`](#leave-one-out-score) | error | interpreter: UndefinedMetricWarning | 0 | no reports | 14 of 33 | none |
 | [`auc-from-labels`](#auc-from-labels) | error, info | score: log loss 18.00 against 0.70 | 20 | 2 and 2 of 20 | 55 of 72 | unsafe |
@@ -5104,22 +5104,22 @@ aside before any rule was written. The judging had the following parts:
 | [`unknown-scoring-name`](#unknown-scoring-name) | error | interpreter: InvalidParameterError, ValueError | 4 | 0 and 0 of 4 | 16 of 32 | none |
 | [`removed-in-sklearn`](#removed-in-sklearn) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, InvalidParameterError | 321 | 1 and 0 of 58 | 517 of 600 | unsafe |
 | [`deprecated-in-sklearn`](#deprecated-in-sklearn) | warning | interpreter: FutureWarning | 101 | 3 and 0 of 57 | 274 of 308 | safe, unsafe |
-| [`removed-metric-api`](#removed-metric-api) | error | interpreter: ImportError, TypeError | 13 | 0 and 0 of 13 | 74 of 74 | none |
+| [`removed-metric-api`](#removed-metric-api) | error | interpreter: ImportError, TypeError | 13 | 0 and 0 of 13 | 74 of 74 | unsafe |
 | [`deprecated-metric-api`](#deprecated-metric-api) | warning | interpreter: FutureWarning | 0 | no reports | 48 of 48 | safe |
-| [`fit-params-keyword`](#fit-params-keyword) | error | interpreter: TypeError | 4 | 0 and 0 of 4 | 32 of 32 | none |
-| [`column-transformer-removed`](#column-transformer-removed) | error | interpreter: TypeError | 3 | 0 and 0 of 3 | 30 of 30 | none |
-| [`metadata-routing`](#metadata-routing) | error | interpreter: RuntimeError, ValueError, TypeError, UnsetMetadataPassedError | 0 | no reports | 34 of 34 | none |
+| [`fit-params-keyword`](#fit-params-keyword) | error | interpreter: TypeError | 4 | 0 and 0 of 4 | 32 of 32 | unsafe |
+| [`column-transformer-removed`](#column-transformer-removed) | error | interpreter: TypeError | 3 | 0 and 0 of 3 | 30 of 30 | unsafe |
+| [`metadata-routing`](#metadata-routing) | error | interpreter: RuntimeError, ValueError, TypeError, UnsetMetadataPassedError | 0 | no reports | 34 of 34 | unsafe |
 | [`pipeline-fit-params`](#pipeline-fit-params) | error | interpreter: ValueError | 0 | no reports | 23 of 30 | none |
-| [`pipeline-step-form`](#pipeline-step-form) | error | interpreter: ValueError, TypeError | 0 | no reports | 29 of 35 | none |
-| [`transformed-target-pair`](#transformed-target-pair) | error | interpreter: ValueError | 0 | no reports | 31 of 36 | none |
-| [`pandas-output-sparse`](#pandas-output-sparse) | error | interpreter: ValueError | 0 | no reports | 29 of 31 | none |
+| [`pipeline-step-form`](#pipeline-step-form) | error | interpreter: ValueError, TypeError | 0 | no reports | 29 of 35 | unsafe |
+| [`transformed-target-pair`](#transformed-target-pair) | error | interpreter: ValueError | 0 | no reports | 31 of 36 | unsafe |
+| [`pandas-output-sparse`](#pandas-output-sparse) | error | interpreter: ValueError | 0 | no reports | 29 of 31 | unsafe |
 | [`predict-per-row`](#predict-per-row) | warning | speed: 2.77 times | 2 | 0 and 2 of 2 | 28 of 32 | none |
 | [`score-after-predict`](#score-after-predict) | warning | speed: 1.62 times | 17 | 0 and 0 of 17 | 31 of 32 | unsafe |
 | [`predict-and-predict-proba`](#predict-and-predict-proba) | warning | speed: 1.83 times | 22 | 0 and 0 of 22 | 30 of 30 | none |
 | [`cross-val-score-per-metric`](#cross-val-score-per-metric) | warning | speed: 1.60 times | 14 | 0 and 0 of 14 | 30 of 30 | none |
 | [`vectorizer-fit-then-transform`](#vectorizer-fit-then-transform) | warning | speed: 1.63 times | 12 | 0 and 4 of 12 | 19 of 25 | unsafe |
 | [`refit-per-n-estimators`](#refit-per-n-estimators) | warning | speed: 1.64 times | 0 | no reports | 30 of 30 | none |
-| [`tsne-exact`](#tsne-exact) | info | none of the three | 0 | no reports | 21 of 30 | none |
+| [`tsne-exact`](#tsne-exact) | info | none of the three | 0 | no reports | 21 of 30 | unsafe |
 | [`random-state-without-shuffle`](#random-state-without-shuffle) | error | interpreter: ValueError | 9 | 0 and 0 of 9 | 54 of 54 | none |
 | [`missing-random-state`](#missing-random-state) | info | none of the three | 527 | 1 and 1 of 52 | 79 of 80 | none |
 
@@ -5150,7 +5150,7 @@ one-hot encoder and a text vectorizer.
 
 #### fit-on-test
 
-**Severity:** error for `fit` with a target and for `partial_fit`, and info for `fit_transform` and for `fit` without a target. **Fix:** unsafe: `scaler.transform(X_test)`. The other forms have no fix.
+**Severity:** error for `fit` with a target and for `partial_fit`, and info for `fit_transform` and for `fit` without a target. **Fix:** unsafe: `scaler.transform(X_test)` for `scaler.fit_transform(X_test)`, and `selector.transform(X_test)` for `selector.fit_transform(X_test, y_test)` on a named encoder or selector. A fit on test rows can be meant, and transform raises on a step that was never fitted. The other forms have no fix.
 
 The rule reports `model.fit(X_test, y_test)` and `model.partial_fit(X_test, y_test)`, which train
 on the test rows. It also reports `scaler.fit_transform(X_test)` and `scaler.fit(X_test)`, which
@@ -5394,7 +5394,7 @@ Each rule in the group reports a split of the rows that leaks or gives no score.
 
 #### groups-ignored
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `cv=GroupKFold(5)` for `cv=KFold(5)`, `cv=GroupKFold()` when cv is missing, `cv=GroupKFold(5)` for `cv=5`, and `cv=GroupKFold(n_splits=5)` in a search built inside the fit call. The folds change on purpose. Other splitters, a splitter or a search held in a name, and a call to split have no fix.
 
 The rule reports `groups=` given to a cross-validation function or a search whose `cv` ignores
 it. It also reports the groups given to `split` on a splitter that ignores them, such as
@@ -5412,7 +5412,7 @@ Use instead:
 scores = cross_val_score(model, X, y, groups=patient_id, cv=GroupKFold(n_splits=5))
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 scikit-learn warns "The groups parameter is ignored by KFold" and splits the rows as if no groups
 were given. How much the score leaks depends on the row order:
@@ -5523,7 +5523,7 @@ scorer name that doesn't exist.
 
 #### auc-from-labels
 
-**Severity:** error for `log_loss` and `brier_score_loss` given labels, for the whole `predict_proba` matrix where one score per row is needed, for `decision_function` given to a loss, and for `roc_auc_score` with `multi_class` given labels, and info for ranking metrics given labels, column 0 of `predict_proba`, and `make_scorer(roc_auc_score)` without `response_method`. **Fix:** unsafe: `log_loss(y_test, model.predict_proba(X_test))`. The other forms have no fix.
+**Severity:** error for `log_loss` and `brier_score_loss` given labels, for the whole `predict_proba` matrix where one score per row is needed, for `decision_function` given to a loss, and for `roc_auc_score` with `multi_class` given labels, and info for ranking metrics given labels, column 0 of `predict_proba`, and `make_scorer(roc_auc_score)` without `response_method`. **Fix:** unsafe: `log_loss(y_test, model.predict_proba(X_test))` for labels or `decision_function` given to a loss, `model.predict_proba(X_test)[:, 1]` for labels given to `brier_score_loss` and for the whole matrix given to `roc_curve`, `precision_recall_curve` or `det_curve`, `model.predict_proba(X_test)` for labels given to `roc_auc_score` with `multi_class`, and column 1 for column 0 when no `pos_label` is passed. Each fix changes the score on purpose, and the `multi_class` fix raises on a target with two classes. The other forms have no fix.
 
 The rule reports a metric that needs one probability or score per row and gets class labels or a
 whole matrix, such as `log_loss(y_test, model.predict(X_test))`,
@@ -5581,7 +5581,7 @@ before the metric. It also misses a `predict` variable whose argument is wrapped
 
 #### metric-arguments-swapped
 
-**Severity:** error for `precision_score`, `classification_report` and `precision_recall_fscore_support`, and for scores passed first to a ranking metric or a loss, and info for the other metrics that change with the order. **Fix:** unsafe: `precision_score(y_test, y_pred)`. The scores-first form has no fix.
+**Severity:** error for `precision_score`, `classification_report` and `precision_recall_fscore_support`, and for scores passed first to a ranking metric or a loss, and info for the other metrics that change with the order. **Fix:** unsafe: `precision_score(y_test, y_pred)`, and the labels first for scores passed first, as in `roc_auc_score(y_test, scores)`. A name can mislead.
 
 The rule reports a metric whose predictions come first, such as `precision_score(y_pred, y_test)`
 and `roc_auc_score(y_score, y_test)`.
@@ -5706,7 +5706,7 @@ list, and it joins a call written over several lines onto one line.
 
 #### removed-in-sklearn
 
-**Severity:** error. **Fix:** unsafe: `sklearn.model_selection` for `sklearn.cross_validation`, `sklearn.grid_search` and `sklearn.learning_curve`, `import joblib`, the public module for a private module path such as `sklearn.linear_model.logistic`, `get_feature_names_out()`, renamed keywords such as `sparse_output=`, `estimator=`, `max_iter=`, `store_cv_results=`, `ensure_all_finite=`, `metric=`, `alphas=` and `n_splits=`, dropped keywords such as `n_jobs`, `behaviour`, `algorithm`, `iid`, `multi_class`, `min_impurity_split=None` and `normalize=False`, and new values for refused ones, such as `max_features="sqrt"` or `1.0` for `"auto"`, `loss="log_loss"`, `criterion="squared_error"` and `"absolute_error"`, and `loss="squared_error"`. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: `sklearn.model_selection` for `sklearn.cross_validation`, `sklearn.grid_search` and `sklearn.learning_curve`, `import joblib`, the public module for a private module path such as `sklearn.linear_model.logistic`, `get_feature_names_out()`, renamed keywords such as `sparse_output=`, `estimator=`, `max_iter=`, `store_cv_results=`, `ensure_all_finite=`, `metric=`, `alphas=` and `n_splits=`, dropped keywords such as `n_jobs`, `behaviour`, `algorithm`, `iid`, `multi_class`, `min_impurity_split=None` and `normalize=False`, new values for refused ones, such as `max_features="sqrt"` or `1.0` for `"auto"`, `loss="log_loss"`, `criterion="squared_error"` and `"absolute_error"`, `loss="squared_error"`, `C=np.inf` for `penalty="none"` and `min_samples_split=2` for `1`, `OneVsRestClassifier(LogisticRegression())` for `multi_class="ovr"`, `max_iter=` with `tol=None` for `n_iter=` on the SGD models, `alphas=` for `n_alphas=` beside `alphas=None`, and `CalibratedClassifierCV(FrozenEstimator(model))` for `cv="prefit"`. A fix that rewrites the whole call applies only when the keyword is on the first line of the call. The other forms have no fix.
 
 The rule reports imports of removed modules and names, such as `sklearn.cross_validation`,
 `sklearn.externals.joblib` and `six`, `load_boston`, `preprocessing.Imputer`, private module paths
@@ -5756,6 +5756,7 @@ means:
 | --- | --- |
 | `get_feature_names_out()` | It returns an array where `get_feature_names()` returned a list, so `print` shows `array([...])`. At 1 held-back site the fix broke a project class that defined its own `get_feature_names`. |
 | dropping `multi_class` | Every multiclass fit uses the multinomial loss. With liblinear on three or more classes the fixed call raises ValueError. |
+| `OneVsRestClassifier(...)` for `multi_class="ovr"` | The model is a `OneVsRestClassifier`, so `coef_` moves to its `estimators_`, and a grid key such as `logisticregression__C` needs `estimator__` in front. |
 | dropping `algorithm="SAMME.R"` | A SAMME.R model becomes a SAMME model. |
 | `OneHotEncoder(sparse_output=False, dtype=np.int)` | At 2 held-back sites the call also held `np.int`, which is gone from NumPy. The same run with `--fix --unsafe-fixes` rewrote it to `int`, and the fixed call ran. |
 
@@ -5767,7 +5768,7 @@ misses `sklearn.feature_extraction.stop_words` imported as a module.
 
 #### deprecated-in-sklearn
 
-**Severity:** warning. **Fix:** safe: drop `probability=False` from `SVC` and `NuSVC`, drop `penalty="elasticnet"` beside an `l1_ratio`, drop `n_jobs=` from `LogisticRegression`, `criterion="squared_error"` for `"friedman_mse"` on regression trees and forests, drop `criterion=` from GradientBoosting, `metric=` for MDS `dissimilarity=`, `metric_mds=` for MDS `metric=True` or `False`, `alphas=` for `n_alphas=`, and `alphas=100` for `alphas=None`. Unsafe: drop `penalty="l2"`, `l1_ratio=1` for `penalty="l1"`, and `l1_ratio=0` for `l1_ratio=None` on `LogisticRegression`. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: drop `probability=False` from `SVC` and `NuSVC`, drop `penalty="elasticnet"` beside an `l1_ratio`, drop `n_jobs=` from `LogisticRegression`, `criterion="squared_error"` for `"friedman_mse"` on regression trees and forests, drop `criterion=` from GradientBoosting, `metric=` for MDS `dissimilarity=`, `metric_mds=` for MDS `metric=True` or `False`, `alphas=` for `n_alphas=`, `alphas=` for `n_alphas=` beside `alphas=None`, `alphas=100` for `alphas=None`, `C=np.inf` for `penalty=None` on `LogisticRegression`, and `init="random"` for MDS without `init`. Unsafe: drop `penalty="l2"`, `l1_ratio=1` for `penalty="l1"`, and `l1_ratio=0` for `l1_ratio=None` on `LogisticRegression`. Also unsafe: `CalibratedClassifierCV(SVC(), ensemble=False)` for `probability=True`, whose probabilities and predictions differ, `l1_ratios=(0,)` or `(1,)` for `penalty="l2"` or `"l1"` on `LogisticRegressionCV`, and `l1_ratios=(0,), scoring="accuracy", use_legacy_attributes=True` on a `LogisticRegressionCV` that sets none of the three. There `l1_ratio_`, `scores_`, `coefs_paths_` and `n_iter_` change form. A passive aggressive model without `C` or `loss` becomes `SGDClassifier` or `SGDRegressor` with `penalty=None`, `learning_rate="pa1"` and `eta0=1.0`, which fits the same model as another class. The other forms have no fix.
 
 The rule reports forms that warn FutureWarning on scikit-learn 1.9.1. Its message gives the
 release that removes each form or changes its default:
@@ -5847,7 +5848,7 @@ deprecated value in a parameter grid or a variable.
 
 #### removed-metric-api
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe, because every old form raises: `metrics.RocCurveDisplay.from_estimator` and the matching Display class for `metrics.plot_*`, `root_mean_squared_error(...)` for `squared=False`, dropping `squared=True` and `eps=`, `response_method=` for `needs_proba=True` or `needs_threshold=True`, `name=` for `estimator_name=`, `y_score=` for `y_pred=`, and `curve_kwargs={...}` for matplotlib keywords on `RocCurveDisplay`. `SCORERS`, the imports of the `plot_*` functions, `jaccard_similarity_score`, `make_scorer` with `squared=` and `label=` have no fix.
 
 The rule reports metric APIs that scikit-learn removed:
 
@@ -5871,7 +5872,7 @@ rmse = root_mean_squared_error(y_test, y_pred)
 scorer = make_scorer(roc_auc_score, response_method="predict_proba")
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 Every form raises on scikit-learn 1.9.1. `SCORERS`, the `plot_*` functions and
 `jaccard_similarity_score` raise ImportError, and the keywords raise TypeError. `make_scorer`
@@ -5885,12 +5886,12 @@ with `squared=`. Old module paths such as `sklearn.metrics.ranking` are left to
 
 The four `RocCurveDisplay` forms raised TypeError in the first run, with matplotlib 3.11.2 added
 to scikit-learn 1.9.1. The saved rerun had no matplotlib, so the saved results hold no passing
-proof for them. The forms have no fix, because a form that raises leaves nothing to compare bit for bit.
+proof for them. Their fixes are unsafe, because a form that raises leaves nothing to compare bit for bit.
 Neither reader called one of the 13 held-back reports wrong. Recall was 74 of 74.
 
 #### deprecated-metric-api
 
-**Severity:** warning. **Fix:** safe: `log_loss(y_test, y_proba=proba)` and `PrecisionRecallDisplay(precision=precision, recall=recall, name="model")`. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: `log_loss(y_test, y_proba=proba)`, `PrecisionRecallDisplay(precision=precision, recall=recall, name="model")`, `y_score=` for `y_pred=` on `PrecisionRecallDisplay.from_predictions` and `DetCurveDisplay.from_predictions`, and `curve_kwargs={"color": "red"}` for `color="red"` on `PrecisionRecallDisplay`, which already used those keywords as `curve_kwargs`. The other forms have no fix.
 
 The rule reports metric APIs that warn on scikit-learn 1.9.1. Its message gives the release that
 removes each form, from the warning text:
@@ -5923,7 +5924,7 @@ has no fix. Recall was 48 of 48.
 
 #### fit-params-keyword
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `params=` for `fit_params=` on the cross-validation functions, because the old form raises. The search form has no fix.
 
 The rule reports `fit_params=` on `cross_val_score`, `cross_validate`, `cross_val_predict`,
 `learning_curve`, `validation_curve`, `permutation_test_score` and the four search classes.
@@ -5940,19 +5941,19 @@ Use instead:
 scores = cross_val_score(model, X, y, params={"sample_weight": w})
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 The keyword raises TypeError on scikit-learn 1.9.1. The documents for `cross_val_score`,
 `cross_validate` and `cross_val_predict` carry `since: "1.4"`, the release that added `params`,
 and the documents for the other three functions carry `since: "1.6"`. On `GridSearchCV`,
 `RandomizedSearchCV`, `HalvingGridSearchCV` and `HalvingRandomSearchCV` the message says to drop
-the keyword and pass the values to `fit`. A rename has no fix, because the old form raises and
-leaves nothing to compare. Neither reader called one of the 4 held-back reports wrong. Recall was
+the keyword and pass the values to `fit`. The rename is an unsafe fix, because the old form raises
+and leaves nothing to compare. Neither reader called one of the 4 held-back reports wrong. Recall was
 32 of 32.
 
 #### column-transformer-removed
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: drop `force_int_remainder_cols`, because the old form raises.
 
 The rule reports `force_int_remainder_cols=` on `ColumnTransformer` and `make_column_transformer`.
 
@@ -5968,7 +5969,7 @@ Use instead:
 ColumnTransformer(transformers, remainder="passthrough")
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 The keyword raises TypeError on scikit-learn 1.9.1, with either value. The remainder columns now
 come back in the form the other columns were given in. Neither reader called one of the 3
@@ -5983,7 +5984,7 @@ there and have no number for wrong advice.
 
 #### metadata-routing
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `params={"groups": groups}` for `groups=` when routing is on, because the old form raises. The other forms have no fix.
 
 The rule reports forms that raise because metadata routing is off, such as `set_fit_request` and
 `Pipeline(transform_input=...)`. It also reports forms that raise because routing is on, such as
@@ -6004,7 +6005,7 @@ model = LogisticRegression().set_fit_request(sample_weight=True).set_score_reque
 cross_validate(model, X, y, params={"sample_weight": w})
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 The rule counts a file as routed when any call in it passes `enable_metadata_routing` with a value
 other than `False`. A function or a script that never calls a `set_*_request` method has asked
@@ -6055,7 +6056,7 @@ a loop and fitted inside it.
 
 #### pipeline-step-form
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `make_pipeline(a, b)` for `make_pipeline([a, b])`, because the old form raises at fit. The other forms have no fix.
 
 The rule reports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare
 estimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.
@@ -6076,7 +6077,7 @@ from imblearn.pipeline import Pipeline
 pipe = Pipeline([("smote", SMOTE()), ("model", LogisticRegression())])
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 | Form | Error |
 | --- | --- |
@@ -6097,7 +6098,7 @@ by names that hold the estimators, or as a single step.
 
 #### transformed-target-pair
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `inverse_func=np.expm1` beside `func=np.log1p`, because the old form raises at fit. The other forms have no fix.
 
 The rule reports `TransformedTargetRegressor` with `func` and no `inverse_func`, with
 `inverse_func` and no `func`, or with both a `transformer` and functions.
@@ -6114,14 +6115,14 @@ Use instead:
 model = TransformedTargetRegressor(regressor=Ridge(), func=np.log1p, inverse_func=np.expm1)
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 Each of the three mixes raises ValueError at fit. Recall was 31 of 36, and the rule found none of 5
 plants that import the class under another name, as in `TransformedTargetRegressor as TTR`.
 
 #### pandas-output-sparse
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `OneHotEncoder(sparse_output=False)` in a file that sets pandas output for every transformer, because the old form raises. The `set_output` form has no fix.
 
 The rule reports pandas output on a OneHotEncoder that keeps its default `sparse_output=True`,
 set with `set_output` or with `set_config(transform_output="pandas")`.
@@ -6140,7 +6141,7 @@ encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
 encoder.set_output(transform="pandas")
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 Each form raises "ValueError: Pandas output does not support sparse data" on scikit-learn 1.9.1.
 The rule reports `set_output(transform="pandas")` on a OneHotEncoder, or on a Pipeline,
@@ -6197,7 +6198,7 @@ Reader B called both held-back reports wrong advice, and reader A called neither
 
 #### score-after-predict
 
-**Severity:** warning. **Fix:** unsafe: `f1_score(y_test, y_pred)`. `model.score(X_test, y_test)` has no fix.
+**Severity:** warning. **Fix:** unsafe: `f1_score(y_test, y_pred)`, and `accuracy_score(y_test, y_pred)` or `r2_score(y_test, y_pred)` for `model.score(X_test, y_test)` when the file binds the name to a classifier or to a regressor. Code between the two lines can change the predictions. A name bound to both has no fix.
 
 The rule reports `model.score(X_test, y_test)` and `f1_score(y_test, model.predict(X_test))` after
 `y_pred = model.predict(X_test)`. It reports them only when the file builds `model` as a forest, a
@@ -6384,7 +6385,7 @@ fit, and both readers called it wrong. Recall was 30 of 30.
 
 #### tsne-exact
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe: drop `method="exact"`, which gives another embedding.
 
 The rule reports `TSNE(method="exact")`.
 
@@ -6400,7 +6401,7 @@ Use instead:
 embedding = TSNE(random_state=0).fit_transform(X)
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd applies the replacement with `--fix --unsafe-fixes`.
 
 The rule is info, because the default Barnes-Hut method approximates the forces between distant
 points. Its embedding therefore differs from the exact one, so no speed proof applies. Over 20 seeds on

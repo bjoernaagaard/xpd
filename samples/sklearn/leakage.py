@@ -52,7 +52,9 @@ def fit_transform_on_test():
     codes = OrdinalEncoder().fit_transform(test[["city"]])  # xpd: fit-on-test
     city_codes = LabelEncoder().fit_transform(test["city"])  # xpd: fit-on-test
     picked = SelectKBest(f_classif, k=1).fit_transform(X_test, y_test)  # xpd: fit-on-test
-    return X_train_scaled, X_test_scaled, X_val_scaled, codes, city_codes, picked
+    selector = SelectKBest(f_classif, k=1).fit(X_train, y_train)
+    refitted = selector.fit_transform(X_test, y_test)  # xpd: fit-on-test
+    return X_train_scaled, X_test_scaled, X_val_scaled, codes, city_codes, picked, refitted
 
 
 @case

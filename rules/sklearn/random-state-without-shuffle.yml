@@ -3,7 +3,7 @@
 # The classes of the removed sklearn.cross_validation took other arguments, and removed-in-sklearn
 # reports that import, so a file that imports it is left alone unless the call passes n_splits,
 # which only the classes of sklearn.model_selection take. The import test reads the whole file, so
-# it comes last.
+# it comes last. Neither document has a fix, because each message names two rewrites.
 id: random-state-without-shuffle
 language: python
 severity: error

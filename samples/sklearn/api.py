@@ -9,12 +9,15 @@ form raises, so its case builds it through `attempt`, which returns None when it
 import warnings
 
 import numpy as np
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.cluster import HDBSCAN
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV, PassiveAggressiveClassifier, SGDClassifier, SGDRegressor, lasso_path
+from sklearn.frozen import FrozenEstimator
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV, PassiveAggressiveClassifier, PassiveAggressiveRegressor, SGDClassifier, SGDRegressor, lasso_path
 from sklearn.manifold import MDS
 from sklearn.model_selection import KFold
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.preprocessing import TargetEncoder
 from sklearn.svm import SVC, NuSVC
 from sklearn.tree import DecisionTreeRegressor
@@ -44,11 +47,17 @@ def fitted(model):
 @case
 def svc_probability():
     X, y = data()
-    model = SVC(probability=True, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
-    nu = NuSVC(probability=True, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
     plain = SVC(probability=False).fit(X, y)  # xpd: deprecated-in-sklearn
     silent = SVC(C=2.0).fit(X, y)
-    return fitted(plain), plain.predict(X), model.predict(X), nu.predict(X), silent.predict(X)
+    return fitted(plain), plain.predict(X), silent.predict(X)
+
+
+@case
+def svc_platt_probability():
+    X, y = data()
+    model = SVC(probability=True, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
+    nu = NuSVC(probability=True, random_state=0).fit(X, y)  # xpd: deprecated-in-sklearn
+    return model.predict(X), nu.predict(X)
 
 
 def svc_platt(model):
@@ -74,8 +83,14 @@ def logistic_penalty():
             fitted(wrapped), wrapped.predict_proba(X))
 
 
+@case
+def logistic_no_penalty():
+    X, y = data()
+    model = LogisticRegression(penalty=None, max_iter=1000).fit(X, y)  # xpd: deprecated-in-sklearn
+    return fitted(model), model.predict_proba(X)
+
+
 def logistic_penalty_other(X, y, kind):
-    LogisticRegression(penalty=None).fit(X, y)  # xpd: deprecated-in-sklearn
     LogisticRegression(penalty=kind, l1_ratio=0.3).fit(X, y)  # xpd: deprecated-in-sklearn
     LogisticRegression(C=np.inf).fit(X, y)
 
@@ -85,8 +100,9 @@ def logistic_cv():
     X, y = data()
     old = LogisticRegressionCV(cv=3)  # xpd: deprecated-in-sklearn
     penalty = LogisticRegressionCV(penalty="l1", solver="liblinear", l1_ratios=(1,), scoring="accuracy", use_legacy_attributes=False)  # xpd: deprecated-in-sklearn
+    l2 = LogisticRegressionCV(penalty="l2", cv=3, scoring="accuracy", use_legacy_attributes=False)  # xpd: deprecated-in-sklearn, deprecated-in-sklearn
     model = LogisticRegressionCV(cv=3, l1_ratios=(0,), scoring="accuracy", use_legacy_attributes=False).fit(X, y)
-    return model.predict(X), old.cv, penalty.solver
+    return model.predict(X), old.cv, penalty.solver, l2.cv
 
 
 @case
@@ -112,8 +128,9 @@ def boosting_criterion():
 def passive_aggressive():
     X, y = data()
     old = PassiveAggressiveClassifier(random_state=0)  # xpd: deprecated-in-sklearn
+    old_regressor = PassiveAggressiveRegressor(random_state=0)  # xpd: deprecated-in-sklearn
     new = SGDClassifier(loss="hinge", penalty=None, learning_rate="pa1", eta0=1.0, random_state=0).fit(X, y)
-    return new.predict(X), old.random_state
+    return new.predict(X), old.random_state, old_regressor.random_state
 
 
 @case
@@ -150,8 +167,9 @@ def path_alphas():
     old = lasso_path(X, y, n_alphas=20)  # xpd: deprecated-in-sklearn
     none = lasso_path(X, y, alphas=None)  # xpd: deprecated-in-sklearn
     both = lasso_path(X, y, n_alphas=20, alphas=[0.1, 1.0])  # xpd: deprecated-in-sklearn
+    paired = lasso_path(X, y, n_alphas=20, alphas=None)  # xpd: deprecated-in-sklearn
     new = lasso_path(X, y, alphas=20)
-    return old, none, both, new
+    return old, none, both, paired, new
 
 
 @case
@@ -167,6 +185,13 @@ def removed_helpers():
     from sklearn.metrics.cluster import entropy  # xpd: deprecated-metric-api
     from sklearn.metrics.cluster import mutual_info_score
     return stable_cumsum, entropy, mutual_info_score
+
+
+def pandas_output_for_every_transformer(cats):
+    from sklearn import config_context
+    from sklearn.preprocessing import OneHotEncoder
+    with config_context(transform_output="pandas"):
+        return OneHotEncoder(handle_unknown="ignore").fit_transform(cats)  # xpd: pandas-output-sparse
 
 
 def attempt(build):

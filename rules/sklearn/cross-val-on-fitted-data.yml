@@ -1,7 +1,8 @@
 # A step that learns from the target, fitted on every row before cross-validation or a search,
 # has seen the labels of every fold. A Pipeline fits the step again inside each fold. A step
 # fitted on the rows alone, such as a scaler, is left alone, because it moved the mean fold AUC
-# by less than 0.001.
+# by less than 0.001. No document in this file has a fix, because the advice is another design, a
+# Pipeline that holds the step and the model.
 id: cross-val-on-fitted-data
 language: python
 severity: error

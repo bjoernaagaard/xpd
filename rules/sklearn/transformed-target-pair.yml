@@ -1,5 +1,29 @@
 # TransformedTargetRegressor takes either a transformer or both functions, and fit raises
 # ValueError on any other mix.
+# Unsafe: the old form raises at fit.
+id: transformed-target-pair
+language: python
+severity: error
+message: TransformedTargetRegressor raises ValueError at fit when it gets func without inverse_func. Write inverse_func=np.expm1, the inverse of np.log1p.
+rule:
+  pattern: $C($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^func\s*=\s*np\.log1p$' } }
+  not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^inverse_func$ } }] } } }
+constraints:
+  C: { regex: '(^|\.)TransformedTargetRegressor$' }
+rewriters:
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$A, rewriters: [keep], joinBy: "" }
+fix: $C($KEPTinverse_func=np.expm1)
+metadata: { fix: unsafe }
+---
+# No fix, because the inverse of this function is not in the file.
 id: transformed-target-pair
 language: python
 severity: error
@@ -7,10 +31,14 @@ message: TransformedTargetRegressor raises ValueError at fit when it gets func w
 rule:
   pattern: $C($$$A)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^func$ }, not: { has: { field: value, regex: ^None$ } } } }
-  not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^inverse_func$ } }] } } }
+  not:
+    any:
+      - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^inverse_func$ } }] } }
+      - has: { field: arguments, has: { kind: keyword_argument, regex: '^func\s*=\s*np\.log1p$' } }
 constraints:
   C: { regex: '(^|\.)TransformedTargetRegressor$' }
 ---
+# No fix, because func is not in the file.
 id: transformed-target-pair
 language: python
 severity: error
@@ -22,6 +50,7 @@ rule:
 constraints:
   C: { regex: '(^|\.)TransformedTargetRegressor$' }
 ---
+# No fix, because the message names two rewrites.
 id: transformed-target-pair
 language: python
 severity: error

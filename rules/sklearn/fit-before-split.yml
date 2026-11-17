@@ -1,7 +1,8 @@
 # A step that learns from the target, fitted on every row and split afterwards, has seen the
 # labels of the test rows. The rule reports the fit when a later statement of the same block
 # passes its result to train_test_split. A step fitted on the rows alone, such as a scaler, is
-# left alone, because it moved the test AUC by less than 0.001.
+# left alone, because it moved the test AUC by less than 0.001. No document in this file has a fix,
+# because the split moves before the fit, which changes other statements.
 id: fit-before-split
 language: python
 severity: error

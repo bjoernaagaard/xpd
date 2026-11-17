@@ -9,7 +9,7 @@
 # PyTorch and the random module have helpers with such names that leave NumPy unseeded, so a
 # helper imported from them does not count. A train_test_split statement whose
 # result is thrown away, and a constructor that only an isinstance call reads, change no result and
-# are left alone.
+# are left alone. No document in this file has a fix, because the seed is not in the file.
 #
 # The seed test reads the whole file, so a rule that starts from every call tests the class name
 # first in all, which keeps its order. ast-grep checks constraints only after the whole rule has

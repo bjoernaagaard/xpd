@@ -1,7 +1,8 @@
 # RandomForestClassifier, ExtraTreesClassifier and BaggingClassifier compute predict as the class
 # with the largest predict_proba, so predict and predict_proba on the same rows run every tree
 # twice. A name the file also binds to another class is left alone, because the rule cannot tell
-# which binding the call sees.
+# which binding the call sees. No fix, because the rewrite needs a new name for the probabilities
+# and changes two statements.
 id: predict-and-predict-proba
 language: python
 severity: warning

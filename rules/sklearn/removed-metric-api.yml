@@ -1,5 +1,6 @@
-# Each document finds one metric API that scikit-learn removed. Every form raises on 1.9.1. The
-# forms have no fix, because a fix needs a case that runs before and after it.
+# Each document finds one metric API that scikit-learn removed. Every form raises on 1.9.1, so no
+# fix is bit equal to the old form and every fix is unsafe.
+# No fix, because the message names two calls, one for the names and one for a scorer.
 id: removed-metric-api
 language: python
 severity: error
@@ -12,22 +13,43 @@ rule:
         - has: { stopBy: end, kind: identifier, regex: ^SCORERS$ }
     - { kind: attribute, regex: '^(sklearn\.)?metrics\.SCORERS$' }
 ---
-# The Display classes took over in scikit-learn 1.0.
+# The Display classes took over in scikit-learn 1.0. Each removed function took the arguments of
+# from_estimator on its class, in the same order.
+# Unsafe: the old form raises on 1.9.1.
+id: removed-metric-api
+language: python
+severity: error
+message: $NAME was removed from sklearn.metrics, so this raises. Write $NEW, which takes the same arguments.
+rule:
+  kind: attribute
+  pattern: $A
+  regex: '^(sklearn\.)?metrics\.plot_'
+  has: { field: attribute, regex: '^plot_(confusion_matrix|roc_curve|precision_recall_curve|det_curve)$', pattern: $NAME }
+transform:
+  CM:
+    replace: { source: $A, replace: 'plot_confusion_matrix$', by: 'ConfusionMatrixDisplay.from_estimator' }
+  ROC:
+    replace: { source: $CM, replace: 'plot_roc_curve$', by: 'RocCurveDisplay.from_estimator' }
+  PR:
+    replace: { source: $ROC, replace: 'plot_precision_recall_curve$', by: 'PrecisionRecallDisplay.from_estimator' }
+  NEW:
+    replace: { source: $PR, replace: 'plot_det_curve$', by: 'DetCurveDisplay.from_estimator' }
+fix: $NEW
+metadata: { fix: unsafe, since: "1.0" }
+---
+# No fix, because the code that calls the imported name is elsewhere.
 id: removed-metric-api
 language: python
 severity: error
 message: $NAME was removed from sklearn.metrics, so this raises. Call from_estimator on the matching Display class, such as ConfusionMatrixDisplay.from_estimator(model, X, y).
 rule:
-  any:
-    - kind: import_from_statement
-      all:
-        - has: { field: module_name, regex: '^sklearn\.metrics$' }
-        - has: { stopBy: end, kind: identifier, regex: '^plot_(confusion_matrix|roc_curve|precision_recall_curve|det_curve)$', pattern: $NAME, not: { inside: { kind: aliased_import, field: alias } } }
-    - kind: attribute
-      regex: '^(sklearn\.)?metrics\.plot_'
-      has: { field: attribute, regex: '^plot_(confusion_matrix|roc_curve|precision_recall_curve|det_curve)$', pattern: $NAME }
+  kind: import_from_statement
+  all:
+    - has: { field: module_name, regex: '^sklearn\.metrics$' }
+    - has: { stopBy: end, kind: identifier, regex: '^plot_(confusion_matrix|roc_curve|precision_recall_curve|det_curve)$', pattern: $NAME, not: { inside: { kind: aliased_import, field: alias } } }
 metadata: { since: "1.0" }
 ---
+# No fix, because average= depends on the number of classes, which the file does not show.
 id: removed-metric-api
 language: python
 severity: error
@@ -46,11 +68,110 @@ rule:
 id: removed-metric-api
 language: python
 severity: error
+message: $F no longer takes squared=, so this raises. Write root_$F without squared=False, which returns the root.
+rule:
+  kind: call
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^squared\s*=\s*False$' } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+    - pattern: $FN($$$ARGS)
+constraints:
+  F: { regex: '^(mean_squared_error|mean_squared_log_error)$' }
+utils:
+  from-sklearn-metrics:
+    any:
+      - kind: attribute
+        has: { field: object, regex: '^(sklearn\.)?metrics$' }
+      - kind: identifier
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            has: { field: module_name, regex: '^sklearn\.metrics$' }
+            any:
+              - has: { stopBy: end, kind: identifier, pattern: $F }
+              - has: { kind: wildcard_import }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(squared)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(squared)$ } }] }
+    fix: "$ARG, "
+transform:
+  ROOT:
+    replace: { source: $FN, replace: '(mean_squared(_log)?_error)$', by: 'root_$1' }
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $ROOT($REST)
+metadata: { fix: unsafe, since: "1.4" }
+---
+id: removed-metric-api
+language: python
+severity: error
+message: $F no longer takes squared=, so this raises. Drop squared=True, which was the default.
+rule:
+  kind: call
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^squared\s*=\s*True$' } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+    - pattern: $FN($$$ARGS)
+constraints:
+  F: { regex: '^(mean_squared_error|mean_squared_log_error)$' }
+utils:
+  from-sklearn-metrics:
+    any:
+      - kind: attribute
+        has: { field: object, regex: '^(sklearn\.)?metrics$' }
+      - kind: identifier
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            has: { field: module_name, regex: '^sklearn\.metrics$' }
+            any:
+              - has: { stopBy: end, kind: identifier, pattern: $F }
+              - has: { kind: wildcard_import }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(squared)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(squared)$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe, since: "1.4" }
+---
+# No fix, because the value of squared is not in the file.
+id: removed-metric-api
+language: python
+severity: error
 message: $F no longer takes squared=, so this raises. Call root_$F for the root, or drop squared=True.
 rule:
   kind: call
   all:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^squared$ } } }
+    - not:
+        all:
+          - has: { field: arguments, has: { kind: keyword_argument, regex: '^squared\s*=\s*(True|False)$' } }
+          - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
 constraints:
   F: { regex: '^(mean_squared_error|mean_squared_log_error)$' }
@@ -72,7 +193,8 @@ utils:
               - has: { kind: wildcard_import }
 metadata: { since: "1.4" }
 ---
-# make_scorer passes every keyword it does not know to the metric when the scorer runs.
+# make_scorer passes every keyword it does not know to the metric when the scorer runs. No fix,
+# because the message names two rewrites.
 id: removed-metric-api
 language: python
 severity: error
@@ -112,6 +234,7 @@ rule:
   all:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^eps$ } } }
     - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+    - pattern: $FN($$$ARGS)
 constraints:
   F: { regex: '^log_loss$' }
 utils:
@@ -130,6 +253,22 @@ utils:
             any:
               - has: { stopBy: end, kind: identifier, pattern: $F }
               - has: { kind: wildcard_import }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(eps)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(eps)$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe }
 ---
 id: removed-metric-api
 language: python
@@ -138,7 +277,61 @@ message: make_scorer passes needs_proba= on to the metric, which raises when the
 rule:
   kind: call
   all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^needs_proba\s*=\s*(True|False)$' } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^response_method$ } }] } } }
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+    - pattern: $FN($$$ARGS)
+constraints:
+  F: { regex: ^make_scorer$ }
+utils:
+  from-sklearn-metrics:
+    any:
+      - kind: attribute
+        has: { field: object, regex: '^(sklearn\.)?metrics$' }
+      - kind: identifier
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            has: { field: module_name, regex: '^sklearn\.metrics$' }
+            any:
+              - has: { stopBy: end, kind: identifier, pattern: $F }
+              - has: { kind: wildcard_import }
+rewriters:
+  - id: response-method
+    rule: { kind: keyword_argument, regex: '^needs_proba\s*=\s*True$' }
+    fix: 'response_method="predict_proba", '
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(needs_proba)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(needs_proba)$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [response-method, drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe, since: "1.4" }
+---
+# No fix, because the value of needs_proba is not in the file, or response_method is already passed.
+id: removed-metric-api
+language: python
+severity: error
+message: make_scorer passes needs_proba= on to the metric, which raises when the scorer runs, so a search scores every fold as nan. Drop it, and pass response_method="predict_proba" where it was True.
+rule:
+  kind: call
+  all:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^needs_proba$ } } }
+    - not:
+        all:
+          - has: { field: arguments, has: { kind: keyword_argument, regex: '^needs_proba\s*=\s*(True|False)$' } }
+          - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^response_method$ } }] } } }
     - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
 constraints:
   F: { regex: ^make_scorer$ }
@@ -167,7 +360,61 @@ message: make_scorer passes needs_threshold= on to the metric, which raises when
 rule:
   kind: call
   all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^needs_threshold\s*=\s*(True|False)$' } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^response_method$ } }] } } }
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+    - pattern: $FN($$$ARGS)
+constraints:
+  F: { regex: ^make_scorer$ }
+utils:
+  from-sklearn-metrics:
+    any:
+      - kind: attribute
+        has: { field: object, regex: '^(sklearn\.)?metrics$' }
+      - kind: identifier
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            has: { field: module_name, regex: '^sklearn\.metrics$' }
+            any:
+              - has: { stopBy: end, kind: identifier, pattern: $F }
+              - has: { kind: wildcard_import }
+rewriters:
+  - id: response-method
+    rule: { kind: keyword_argument, regex: '^needs_threshold\s*=\s*True$' }
+    fix: 'response_method=("decision_function", "predict_proba"), '
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(needs_threshold)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(needs_threshold)$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [response-method, drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe, since: "1.4" }
+---
+# No fix, because the value of needs_threshold is not in the file, or response_method is already passed.
+id: removed-metric-api
+language: python
+severity: error
+message: make_scorer passes needs_threshold= on to the metric, which raises when the scorer runs, so a search scores every fold as nan. Drop it, and pass response_method=("decision_function", "predict_proba") where it was True.
+rule:
+  kind: call
+  all:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^needs_threshold$ } } }
+    - not:
+        all:
+          - has: { field: arguments, has: { kind: keyword_argument, regex: '^needs_threshold\s*=\s*(True|False)$' } }
+          - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^response_method$ } }] } } }
     - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
 constraints:
   F: { regex: ^make_scorer$ }
@@ -198,6 +445,36 @@ rule:
   all:
     - has: { field: function, regex: '(^|\.)RocCurveDisplay$' }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^estimator_name$ } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^name$ } }] } } }
+    - pattern: $FN($$$ARGS)
+rewriters:
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^estimator_name$ } }, { has: { field: value, pattern: $V } }] }
+    fix: "name=$V, "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe, since: "1.7" }
+---
+# No fix, because name= is already passed, or ** can hold it.
+id: removed-metric-api
+language: python
+severity: error
+message: RocCurveDisplay no longer takes estimator_name=, so this raises. Pass name= instead.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '(^|\.)RocCurveDisplay$' }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^estimator_name$ } } }
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^name$ } }] } }
 metadata: { since: "1.7" }
 ---
 id: removed-metric-api
@@ -209,10 +486,90 @@ rule:
   all:
     - has: { field: function, regex: '(^|\.)RocCurveDisplay\.from_predictions$' }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^y_pred$ } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^y_score$ } }] } } }
+    - pattern: $FN($$$ARGS)
+rewriters:
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^y_pred$ } }, { has: { field: value, pattern: $V } }] }
+    fix: "y_score=$V, "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe, since: "1.7" }
+---
+# No fix, because y_score= is already passed, or ** can hold it.
+id: removed-metric-api
+language: python
+severity: error
+message: RocCurveDisplay.from_predictions no longer takes y_pred=, so this raises. Pass the scores as y_score=.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '(^|\.)RocCurveDisplay\.from_predictions$' }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^y_pred$ } } }
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^y_score$ } }] } }
 metadata: { since: "1.7" }
 ---
 # The keywords below are the ones the three methods take on 1.9.1. Any other keyword was a
-# matplotlib argument, which these methods no longer pass on.
+# matplotlib argument, which these methods no longer pass on. The fix holds only without label=,
+# which the message moves to name= instead.
+id: removed-metric-api
+language: python
+severity: error
+message: $F no longer passes $KW= on to matplotlib, so this raises. Write the matplotlib arguments as curve_kwargs={...}.
+rule:
+  kind: call
+  pattern: $FN($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)RocCurveDisplay\.(from_estimator|from_predictions|from_cv_results)$|^RocCurveDisplay\(.*\)\.plot$', pattern: $F }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          has:
+            field: name
+            pattern: $KW
+            not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|chance_level_kwargs|despine|cv_results)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^curve_kwargs$ } }, { kind: keyword_argument, has: { field: name, regex: ^label$ } }] } } }
+rewriters:
+  - id: move
+    rule:
+      kind: keyword_argument
+      all:
+        - has: { field: name, pattern: $K, not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|chance_level_kwargs|despine|cv_results)$' } }
+        - has: { field: value, pattern: $V }
+    fix: '"$K": $V, '
+  - id: skip-moved
+    rule: { kind: keyword_argument, has: { field: name, not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|chance_level_kwargs|despine|cv_results)$' } } }
+    fix: ""
+  - id: skip-kept
+    rule: { pattern: $ARG }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [skip-moved, keep], joinBy: "" }
+  MOVED:
+    rewrite: { source: $$$ARGS, rewriters: [move, skip-kept], joinBy: "" }
+  DICT:
+    replace: { source: $MOVED, replace: ", $", by: "" }
+fix: $FN($KEPTcurve_kwargs={$DICT})
+metadata: { fix: unsafe, since: "1.7" }
+---
+# No fix, because label= goes to name= and the rest to curve_kwargs, or curve_kwargs is already
+# passed, or ** can hold it.
 id: removed-metric-api
 language: python
 severity: error
@@ -220,6 +577,7 @@ message: $F no longer passes $KW= on to matplotlib, so this raises. Pass name= f
 rule:
   kind: call
   all:
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^curve_kwargs$ } }, { kind: keyword_argument, has: { field: name, regex: ^label$ } }] } }
     - has: { field: function, regex: '(^|\.)RocCurveDisplay\.(from_estimator|from_predictions|from_cv_results)$|^RocCurveDisplay\(.*\)\.plot$', pattern: $F }
   has:
     field: arguments

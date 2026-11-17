@@ -1,7 +1,8 @@
 # A loop that builds one model per setting, scores each on the test rows and keeps the scores
 # picks the setting by the test score. The best of 30 such scores was 0.597 accuracy on noise.
 # The rule needs a score, predict or predict_proba on a name with test in it, and the loop
-# variable as a keyword of the call that built that model.
+# variable as a keyword of the call that built that model. No fix, because the advice is another
+# design, a search on the training rows.
 id: tune-on-test
 language: python
 severity: error

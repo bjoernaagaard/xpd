@@ -1,7 +1,8 @@
 # A scikit-learn predict call validates its input and sets up the computation each time, so one
 # call per row repeats that work for every row. The rule reports a call whose rows come from the
 # loop variable: the row itself, or the data indexed by it. any stops at the first form that
-# matches, so a longer form comes before a shorter form it contains.
+# matches, so a longer form comes before a shorter form it contains. Neither document has a fix,
+# because the rewrite replaces the loop around the call.
 id: predict-per-row
 language: python
 severity: warning

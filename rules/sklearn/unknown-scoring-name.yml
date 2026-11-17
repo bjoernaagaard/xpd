@@ -1,6 +1,7 @@
 # get_scorer raises on any name outside sklearn.metrics.get_scorer_names(). The list below is
 # that function's output on scikit-learn 1.9.1. A string with { or % in it is left alone,
-# because it is a template that code fills in later.
+# because it is a template that code fills in later. No fix, because the intended name is not in the
+# file.
 id: unknown-scoring-name
 language: python
 severity: error

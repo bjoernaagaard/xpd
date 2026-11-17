@@ -1,7 +1,8 @@
 # Two cross_val_score calls on the same model, data and folds that differ only in scoring fit the
 # model on every fold twice. cross_validate fits once and scores each fit with every scorer, with
 # the same splits, so the scores are bit equal for a model that fits the same way twice. The checks
-# sit under all, because all binds $S and $K before the search for the later call reads them.
+# sit under all, because all binds $S and $K before the search for the later call reads them. No
+# document in this file has a fix, because the rewrite joins two statements into one.
 id: cross-val-score-per-metric
 language: python
 severity: warning

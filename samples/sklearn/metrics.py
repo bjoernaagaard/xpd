@@ -185,6 +185,7 @@ def removed_metric_api():
     print(sorted(metrics.SCORERS))  # xpd: removed-metric-api
     metrics.plot_roc_curve(model, X_test, y_test)  # xpd: removed-metric-api
     mean_squared_error(y_test, y_score, squared=False)  # xpd: removed-metric-api
+    mean_squared_error(y_test, y_score, squared=True)  # xpd: removed-metric-api
     metrics.mean_squared_log_error(y_test, y_score, squared=False)  # xpd: removed-metric-api
     make_scorer(mean_squared_error, squared=False, greater_is_better=False)  # xpd: removed-metric-api
     log_loss(y_test, y_score, eps=1e-15)  # xpd: removed-metric-api
@@ -240,15 +241,21 @@ def deprecated_metric_api():
     )
 
 
+@case
 def deprecated_display_keywords():
+    import matplotlib
+
+    matplotlib.use("Agg")
     from sklearn.metrics import DetCurveDisplay, PrecisionRecallDisplay
 
     model, X_test, y_test = fitted()
     y_score = model.predict_proba(X_test)[:, 1]
-    PrecisionRecallDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: deprecated-metric-api
-    DetCurveDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: deprecated-metric-api
-    PrecisionRecallDisplay.from_estimator(model, X_test, y_test, color="red")  # xpd: deprecated-metric-api
-    PrecisionRecallDisplay.from_predictions(y_test, y_score=y_score, curve_kwargs={"color": "red"})
+    pr = PrecisionRecallDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: deprecated-metric-api
+    det = DetCurveDisplay.from_predictions(y_test, y_pred=y_score)  # xpd: deprecated-metric-api
+    red = PrecisionRecallDisplay.from_estimator(model, X_test, y_test, color="red")  # xpd: deprecated-metric-api
+    new = PrecisionRecallDisplay.from_predictions(y_test, y_score=y_score, curve_kwargs={"color": "red"})
+    return (pr.precision, pr.recall, pr.average_precision, det.fpr, det.fnr, red.line_.get_color(),
+            red.line_.get_drawstyle(), red.line_.get_xydata(), new.line_.get_color())
 
 
 def unknown_scoring_names():

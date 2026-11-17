@@ -53,7 +53,37 @@ rule:
 fix: name=$V
 metadata: { fix: safe, since: "1.8" }
 ---
-# from_predictions needs matplotlib to run, so the form has no fix: a fix needs a case that runs.
+# from_predictions takes the value of y_pred as y_score, so the fixed call draws the same curve.
+# The fix holds only when y_score is not passed, by name or as the second argument.
+id: deprecated-metric-api
+language: python
+severity: warning
+message: $F renamed y_pred= to y_score= in scikit-learn 1.8, and y_pred= goes away in 1.10. Write y_score= instead.
+rule:
+  kind: call
+  pattern: $FN($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(PrecisionRecallDisplay|DetCurveDisplay)\.from_predictions$', pattern: $F }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^y_pred$ } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: keyword_argument, has: { field: name, regex: ^y_score$ } }, { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] } }] } } }
+rewriters:
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^y_pred$ } }, { has: { field: value, pattern: $V } }] }
+    fix: "y_score=$V, "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: safe, since: "1.8" }
+---
+# No fix, because y_score is passed too, which raises, or ** can hold it.
 id: deprecated-metric-api
 language: python
 severity: warning
@@ -63,10 +93,60 @@ rule:
   all:
     - has: { field: function, regex: '(^|\.)(PrecisionRecallDisplay|DetCurveDisplay)\.from_predictions$', pattern: $F }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^y_pred$ } } }
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: keyword_argument, has: { field: name, regex: ^y_score$ } }, { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] } }] } }
 metadata: { since: "1.8" }
 ---
 # The keywords below are the ones these methods take on 1.9.1. Any other keyword is a
-# matplotlib argument, which they pass on with a FutureWarning.
+# matplotlib argument, which they pass on with a FutureWarning. The methods use those keywords as
+# curve_kwargs, so the fixed call draws the same curve.
+id: deprecated-metric-api
+language: python
+severity: warning
+message: $F passes $KW= on to matplotlib with a FutureWarning, and scikit-learn 1.11 stops taking it. Write the matplotlib arguments as curve_kwargs={...}.
+rule:
+  kind: call
+  pattern: $FN($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)PrecisionRecallDisplay\.(from_estimator|from_predictions)$|^PrecisionRecallDisplay\(.*\)\.plot$', pattern: $F }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          has:
+            field: name
+            pattern: $KW
+            not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|despine)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^curve_kwargs$ } }] } } }
+rewriters:
+  - id: move
+    rule:
+      kind: keyword_argument
+      all:
+        - has: { field: name, pattern: $K, not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|despine)$' } }
+        - has: { field: value, pattern: $V }
+    fix: '"$K": $V, '
+  - id: skip-moved
+    rule: { kind: keyword_argument, has: { field: name, not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|despine)$' } } }
+    fix: ""
+  - id: skip-kept
+    rule: { pattern: $ARG }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [skip-moved, keep], joinBy: "" }
+  MOVED:
+    rewrite: { source: $$$ARGS, rewriters: [move, skip-kept], joinBy: "" }
+  DICT:
+    replace: { source: $MOVED, replace: ", $", by: "" }
+fix: $FN($KEPTcurve_kwargs={$DICT})
+metadata: { fix: safe, since: "1.9" }
+---
+# No fix, because curve_kwargs is already passed, or ** can hold it.
 id: deprecated-metric-api
 language: python
 severity: warning
@@ -74,6 +154,7 @@ message: $F passes $KW= on to matplotlib with a FutureWarning, and scikit-learn 
 rule:
   kind: call
   all:
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^curve_kwargs$ } }] } }
     - has: { field: function, regex: '(^|\.)PrecisionRecallDisplay\.(from_estimator|from_predictions)$|^PrecisionRecallDisplay\(.*\)\.plot$', pattern: $F }
   has:
     field: arguments
@@ -85,6 +166,7 @@ rule:
         not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|despine)$' }
 metadata: { since: "1.9" }
 ---
+# No fix, because the counts to pass are computed in another call that the code does not have.
 id: deprecated-metric-api
 language: python
 severity: warning

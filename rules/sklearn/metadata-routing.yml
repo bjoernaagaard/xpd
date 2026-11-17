@@ -5,6 +5,7 @@
 # The routed-file test reads the whole file, so each rule tests the name of the call first in all,
 # which keeps its order. A test in constraints would come too late, because ast-grep checks
 # constraints only after the whole rule has matched.
+# No fix, because the set_config call belongs in another statement, before the estimator is built.
 id: metadata-routing
 language: python
 severity: error
@@ -21,6 +22,7 @@ utils:
       stopBy: end
       has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
 ---
+# No fix, because the message names two rewrites.
 id: metadata-routing
 language: python
 severity: error
@@ -38,6 +40,43 @@ utils:
       stopBy: end
       has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
 ---
+# Unsafe: the old form raises. The fix holds only when params is not passed, because the fixed
+# call would repeat it.
+id: metadata-routing
+language: python
+severity: error
+message: 'With metadata routing on, $F raises ValueError when it gets groups=. Write params={"groups": $G} instead.'
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^groups$ } }, { has: { field: value, pattern: $G } }], not: { has: { field: value, regex: ^None$ } } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^params$ } }] } } }
+    - matches: routed-file
+utils:
+  routed-file:
+    inside:
+      kind: module
+      stopBy: end
+      has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
+rewriters:
+  - id: route
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^groups$ } }, { has: { field: value, pattern: $V } }] }
+    fix: 'params={"groups": $V}, '
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$A, rewriters: [route, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe }
+---
+# No fix, because params is passed too, or ** can hold it, and the groups must join it.
 id: metadata-routing
 language: python
 severity: error
@@ -47,6 +86,7 @@ rule:
   all:
     - has: { field: function, regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict|learning_curve|validation_curve|permutation_test_score)$' }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^groups$ }, not: { has: { field: value, regex: ^None$ } } } }
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^params$ } }] } }
     - matches: routed-file
 utils:
   routed-file:
@@ -56,7 +96,8 @@ utils:
       has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^enable_metadata_routing$ }, not: { has: { field: value, regex: ^False$ } } }
 ---
 # The step__param form belongs to routing being off. With routing on, Pipeline.fit routes a
-# plain name to every step that requested it.
+# plain name to every step that requested it. No fix, because the set_fit_request call belongs in
+# another statement.
 id: metadata-routing
 language: python
 severity: error
@@ -77,7 +118,7 @@ utils:
 ---
 # With routing on, metadata reaches an estimator only after it asks for it. A function or a
 # script that never calls a set_*_request method has asked for nothing, so params raises
-# UnsetMetadataPassedError.
+# UnsetMetadataPassedError. No fix, because the request calls belong in other statements.
 id: metadata-routing
 language: python
 severity: error

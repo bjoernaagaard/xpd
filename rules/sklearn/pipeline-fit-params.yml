@@ -1,6 +1,7 @@
 # With metadata routing off, Pipeline.fit takes only <step>__<name> keywords and raises
 # ValueError on a plain name. The pipeline is the one built in an earlier statement of the same
-# block, or the call itself. X and y passed by name are the data, not step parameters.
+# block, or the call itself. X and y passed by name are the data, not step parameters. No fix,
+# because the name of the step is not in the call.
 id: pipeline-fit-params
 language: python
 severity: error

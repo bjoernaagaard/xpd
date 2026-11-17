@@ -2,7 +2,7 @@
 # reports such a score only when no held-out rows are scored in the function around it, in the
 # functions next to that one, or in the file when the score sits outside a function. Held-out
 # rows are a predict or score on a name with test, val or holdout in it, or a cross-validation
-# or search. The rule reads variable names.
+# or search. The rule reads variable names. No fix, because the held-out rows are not in the file.
 id: score-on-training-rows
 language: python
 severity: error

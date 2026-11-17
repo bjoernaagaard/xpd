@@ -2,7 +2,8 @@
 # the range of the rows it gets uses the test rows at predict time, so a prediction depends on
 # the other rows in the batch. LogisticRegression scored 0.773 with batches of 5 test rows and
 # 0.847 with StandardScaler, over 30 seeds of data with signal. On data with no signal both
-# stay near 0.5, so this is info. A reduction along axis 1 works per row and is left alone.
+# stay near 0.5, so this is info. A reduction along axis 1 works per row and is left alone. No fix,
+# because the advice is another design, a scaler in place of the function.
 id: stateful-function-transformer
 language: python
 severity: info

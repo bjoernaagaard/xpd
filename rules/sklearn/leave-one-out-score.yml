@@ -2,7 +2,8 @@
 # fold, so every fold scores nan with an UndefinedMetricWarning, and a search over nan scores picks
 # its first candidate. A regressor scores R2 when no scoring is given. The rule knows a regressor
 # only by its class name in the same call, or by an explicit scoring. explained_variance and
-# average_precision score 1 or 0 on a fold of one row and no nan, so they are left alone.
+# average_precision score 1 or 0 on a fold of one row and no nan, so they are left alone. Neither
+# document has a fix, because each message names two rewrites.
 id: leave-one-out-score
 language: python
 severity: error

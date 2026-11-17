@@ -1,28 +1,90 @@
 # These functions take params= since scikit-learn 1.4, and fit_params= raises TypeError on
-# 1.9.1. A rename has no fix here, because the old form raises and leaves nothing to compare.
+# 1.9.1. The fixes hold only when params is not passed, because the fixed call would repeat it.
+# Unsafe: the old form raises on 1.9.1.
+id: fit-params-keyword
+language: python
+severity: error
+message: $F no longer takes fit_params and raises TypeError on scikit-learn 1.9. Write params= in place of fit_params=.
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+  not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^params$ } }] } } }
+constraints:
+  F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict)$' }
+rewriters:
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^fit_params$ } }, { has: { field: value, pattern: $V } }] }
+    fix: "params=$V, "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$A, rewriters: [rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe, since: "1.4" }
+---
+# No fix, because params is passed too, which raises, or ** can hold it.
 id: fit-params-keyword
 language: python
 severity: error
 message: $F no longer takes fit_params and raises TypeError on scikit-learn 1.9. Rename the keyword to params.
 rule:
   pattern: $F($$$A)
-  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^params$ } }] } }
 constraints:
   F: { regex: '(^|\.)(cross_val_score|cross_validate|cross_val_predict)$' }
 metadata: { since: "1.4" }
 ---
-# These three took params= in scikit-learn 1.6.
+# These three took params= in scikit-learn 1.6. Unsafe: the old form raises on 1.9.1.
+id: fit-params-keyword
+language: python
+severity: error
+message: $F no longer takes fit_params and raises TypeError on scikit-learn 1.9. Write params= in place of fit_params=.
+rule:
+  pattern: $F($$$A)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+  not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^params$ } }] } } }
+constraints:
+  F: { regex: '(^|\.)(learning_curve|validation_curve|permutation_test_score)$' }
+rewriters:
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^fit_params$ } }, { has: { field: value, pattern: $V } }] }
+    fix: "params=$V, "
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$A, rewriters: [rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $F($REST)
+metadata: { fix: unsafe, since: "1.6" }
+---
+# No fix, because params is passed too, which raises, or ** can hold it.
 id: fit-params-keyword
 language: python
 severity: error
 message: $F no longer takes fit_params and raises TypeError on scikit-learn 1.9. Rename the keyword to params.
 rule:
   pattern: $F($$$A)
-  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^fit_params$ } } }
+    - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^params$ } }] } }
 constraints:
   F: { regex: '(^|\.)(learning_curve|validation_curve|permutation_test_score)$' }
 metadata: { since: "1.6" }
 ---
+# No fix, because the values move to the call of fit, which is another statement.
 id: fit-params-keyword
 language: python
 severity: error
