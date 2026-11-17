@@ -1,9 +1,9 @@
 # xpd
 
 Run `uvx xpd check .` in your project to find the lines of Python that are slow or give a wrong
-result. xpd checks code that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE,
-Category Encoders, linearmodels, arch, pymoo, plotly or Apache Hamilton, and it can rewrite
-many of the lines it reports.
+result, and add `--fix` to rewrite each line whose fix keeps what the code does. xpd checks code
+that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders,
+linearmodels, arch, pymoo, plotly or Apache Hamilton.
 
 ```console
 $ uvx xpd check samples/bad.py
@@ -17,7 +17,7 @@ xpd: 5 issues, 2 more with --fix --unsafe-fixes
 
 ## Install
 
-`uv tool install xpd` installs the `xpd` command. `uvx xpd check .` runs it once without an
+`uv tool install xpd` installs the `xpd` command, and `uvx xpd check .` runs it once without an
 install.
 
 ```sh
@@ -47,7 +47,8 @@ samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes 
 ## Let xpd fix the lines
 
 `xpd check . --fix` writes each fix that keeps what the code does. Add `--unsafe-fixes` to also
-write each fix that may change what the code does, and read the diff afterwards.
+write each fix that may change what the code does, and read the diff afterwards. On
+`samples/bad.py` the two flags rewrite two of the five lines and report the other three again.
 
 ```diff
  for i, row in df.iterrows():
