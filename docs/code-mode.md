@@ -246,7 +246,7 @@ The report lists the gates in the order of the table below, and each gate has `p
 | `saved-model-predicts` | Persisted model | The prediction script, in a new Python process that loads the model from disk, leaves the `result` of the training script | `equiv` |
 | `versions-recorded` | Persisted model | The contract records Python, scikit-learn and pandas, and its pandas is the one `profile` ran with | `profile`, `contract` |
 | `indexed-api-calls` | Discovery | `discovery_gate` passed, as [discovery before execution](#discovery-before-execution) describes | `api`, `source` |
-| `discovery-is-recorded` | Discovery | The contract and `proof.discovery` hold the same discovery record | `contract` |
+| `discovery-is-recorded` | Discovery | The contract and `proof.discovery` hold the same question, the same candidates by kind and name in the same order, and the same choice. The text of a candidate may differ, because it changes between xpd releases | `contract` |
 
 `split-is-seeded` reads the rules in the second column below. The server refuses to start when
 the binary no longer has one of them, because a renamed rule would let the gate pass every run.

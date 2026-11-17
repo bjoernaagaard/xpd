@@ -398,7 +398,8 @@ gates(profile, contract, proof)
   judge 13 gates
   if contract.discovery or proof.discovery is set
     judge indexed-api-calls, the gate in proof.discovery
-    judge discovery-is-recorded, which passes when the contract and the proof hold the same record
+    judge discovery-is-recorded, which passes when the contract and the proof hold the same
+    question, candidate names and choice
 ```
 
 `gates` judges the results you pass, so it does not prove that the files are unchanged or that a

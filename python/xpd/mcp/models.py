@@ -349,6 +349,16 @@ class Discovery(Written):
     candidates: DiscoveryMatches
     choice: DiscoveryChoice
 
+    def decision(self) -> tuple[DiscoveryQuestion, list[tuple[str, str]], DiscoveryChoice]:
+        """The question, the kind and name of each candidate in order, and the choice. The text
+        of a candidate is left out, because xpd rewrites a rule's text and an index entry between
+        releases, and the decision is the same."""
+        return (
+            self.question,
+            [(entry.kind, entry.name) for entry in self.candidates.entries()],
+            self.choice,
+        )
+
 
 class RawData(Written):
     file: str = Field(description="The data file, relative to the project root.")

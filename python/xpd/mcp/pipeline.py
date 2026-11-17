@@ -314,7 +314,8 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
             failures.append("No discovery_gate result was supplied.")
         else:
             gates.append(proof.discovery.gate)
-            if contract.discovery != proof.discovery.discovery:
+            recorded = contract.discovery.decision() if contract.discovery else None
+            if recorded != proof.discovery.discovery.decision():
                 failures.append("The contract and proof record different discovery choices.")
         gates.append(
             gate(
