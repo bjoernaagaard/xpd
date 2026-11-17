@@ -1,5 +1,7 @@
 # Each document finds one API that pandas 3 removed. The forms raise on pandas 3.0 and 3.1.
 
+# Safe: on pandas 2.3.3 df.applymap(f) and df.map(f) give results with equal pickles, and so do
+# the two Styler methods.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -132,6 +134,8 @@ utils:
 # alias means the same for periods. Inside resample, asfreq and shift, "M", "Q" and "Y" remain
 # valid for periods, and "A" becomes "Y" for periods but "YE" for datetimes, so the documents
 # below handle them.
+# Safe: on pandas 2.3.3 each old alias and its new one give results with equal pickles in 2,320
+# calls of date_range, resample, Grouper and to_offset. bdate_range refuses CBM and CBH there.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -259,6 +263,8 @@ rule:
 ---
 # A frequency alias where the call takes periods: to_period, period_range, Period and
 # PeriodIndex. "M", "Q" and "Y" remain valid there, and "A" becomes "Y".
+# Safe: on pandas 2.3.3 each old alias and its new one give results with equal pickles in 96
+# calls of the period functions.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -325,6 +331,8 @@ fix: $NEW
 metadata: { fix: unsafe }
 ---
 # delim_whitespace=True, when the call does not also set sep or delimiter.
+# Safe: on pandas 2.3.3 read_csv(delim_whitespace=True) and read_csv(sep=r"\s+") give frames with
+# equal pickles in 12 calls.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -516,6 +524,7 @@ rule:
           - regex: '^squeeze\s*=\s*False$'
           - follows: { regex: '^,$' }
 ---
+# Safe: on pandas 1.5.3 to_csv(line_terminator=v) and to_csv(lineterminator=v) write the same text.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -557,6 +566,8 @@ rule:
   not: { follows: { regex: '^,$' } }
   inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.to_excel$' } } }
 ---
+# Safe: on pandas 1.5.3 read_csv(p, sep) and read_csv(p, sep=sep) give frames with equal pickles,
+# and so do the two read_table calls.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -570,6 +581,7 @@ constraints:
 fix: $PD.$R($P, sep=$SEP)
 metadata: { fix: safe }
 ---
+# Safe: on pandas 2.3.3 x.to_csv(p, sep) and x.to_csv(p, sep=sep) write the same text in 12 calls.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -603,6 +615,7 @@ constraints:
 fix: $PD.Series($X).value_counts()
 metadata: { fix: unsafe }
 ---
+# Safe: on pandas 1.5.3 x.is_monotonic and x.is_monotonic_increasing give equal results.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -651,6 +664,7 @@ rule:
 fix: $X.loc[$$$A]
 metadata: { fix: unsafe }
 ---
+# Safe: on pandas 1.5.3 pd.np is numpy.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -709,6 +723,8 @@ rule:
 constraints:
   PD: { regex: '^(pd|pandas)$' }
 ---
+# Safe: on pandas 1.5.3 pd.io.json.json_normalize and pd.json_normalize give frames with equal
+# pickles.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -914,6 +930,8 @@ utils:
 # Timedelta text with a removed unit, in Timedelta, to_timedelta and offset= of resample and
 # Grouper. "T", "L", "U" and "N" raise ValueError on pandas 3.1. "H" and "S" still run and warn,
 # so deprecated-in-pandas-3 reports them.
+# Safe: on pandas 2.3.3 Timedelta text with T, L, U and N gives the same value as with min, ms, us
+# and ns in 24 calls.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -942,6 +960,8 @@ fix: $NEW
 metadata: { fix: safe }
 ---
 # The unit of Timedelta and to_timedelta, by keyword or as the second argument.
+# Safe: on pandas 2.3.3 the units T, L, U and N give the same Timedelta as min, ms, us and ns in
+# 16 calls.
 id: removed-in-pandas-3
 language: python
 severity: error

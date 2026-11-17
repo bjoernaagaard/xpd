@@ -5,6 +5,8 @@
 # alone.
 
 # These were the Python builtins under another name, so the builtin is the same object.
+# Safe: on NumPy 1.23.5 np.int, np.float, np.complex, np.object, np.str and np.unicode are the
+# builtins themselves.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -29,6 +31,7 @@ fix: $NEW
 metadata: { fix: safe }
 ---
 # Each old name was the same type object as the new one.
+# Safe: on NumPy 1.26.4 each old name is the new type itself, such as np.float_ is np.float64.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -66,6 +69,7 @@ fix: $NP.$NEW
 metadata: { fix: safe }
 ---
 # The old constants held the same Python floats as np.nan, np.inf, 0.0, -np.inf and -0.0.
+# Safe: on NumPy 1.26.4 each old name is the same object as the new one, such as np.NaN is np.nan.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -90,6 +94,7 @@ transform:
 fix: $NP.$NEW
 metadata: { fix: safe }
 ---
+# Safe: on NumPy 1.26.4 np.PZERO and 0.0 have equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -113,6 +118,7 @@ metadata: { fix: safe }
 ---
 # A leading minus binds less tightly than an attribute, a call, a subscript or a power, so the
 # fix applies only where the name is not the left side of one of those.
+# Safe: on NumPy 1.26.4 np.NINF and -np.inf have equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -141,6 +147,7 @@ constraints:
 fix: -$NP.inf
 metadata: { fix: safe }
 ---
+# Safe: on NumPy 1.26.4 np.NZERO and -0.0 have equal pickles, with the same sign.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -226,6 +233,8 @@ fix: (-0.0)
 metadata: { fix: unsafe }
 ---
 # Each old function called the new one with the same arguments, or was the same object.
+# Safe: on NumPy 1.26.4 each old name is the same function as the new one, such as np.row_stack is
+# np.vstack.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -261,6 +270,7 @@ fix: $NP.$NEW
 metadata: { fix: safe }
 ---
 # np.exceptions arrived in NumPy 1.25 and holds the same classes.
+# Safe: on NumPy 1.26.4 each of the five classes is the same object under np.exceptions.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -279,12 +289,38 @@ utils:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N:
-    regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$'
+    regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning)$'
 fix: $NP.exceptions.$N
 metadata: { fix: safe, since: "1.25" }
 ---
+# Unsafe: no NumPy release has both np.DTypePromotionError and np.exceptions.DTypePromotionError,
+# so the two cannot be compared.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: $NP.$N was removed in NumPy 2. Write $NP.exceptions.$N, which is the same class.
+rule:
+  all:
+    - { matches: numpy-name }
+    - not: { matches: compat-code }
+utils:
+  numpy-name:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP }
+      - has: { field: attribute, pattern: $N }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N:
+    regex: '^(DTypePromotionError)$'
+fix: $NP.exceptions.$N
+metadata: { fix: unsafe, since: "1.25" }
+---
 # RankWarning joined np.exceptions in NumPy 2.0. It used to live at np.RankWarning and in
 # np.lib.polynomial, which np.lib re-exported.
+# Unsafe: no NumPy release has both the old place and np.exceptions.RankWarning, so the two
+# cannot be compared.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -300,10 +336,12 @@ rule:
 constraints:
   NP: { regex: '^(np|numpy)$' }
 fix: $NP.exceptions.RankWarning
-metadata: { fix: safe, since: "2.0" }
+metadata: { fix: unsafe, since: "2.0" }
 ---
 # trapezoid and np.lib.array_utils arrived in NumPy 2.0. trapz called trapezoid with the same
 # arguments.
+# Safe: on NumPy 1.26.4 np.product, np.cumproduct, np.sometrue, np.alltrue and np.round_ give
+# results with equal pickles to np.prod, np.cumprod, np.any, np.all and np.round.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -329,6 +367,7 @@ fix: $NP.$NEW
 metadata: { fix: safe, since: "2.0" }
 ---
 # msort(a) was np.sort(a, axis=0).
+# Safe: on NumPy 1.26.4 np.msort(a) and np.sort(a, axis=0) give results with equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -344,6 +383,7 @@ metadata: { fix: safe }
 ---
 # asscalar(a) was a.item(). The fix applies when a is a name, an attribute, a call or a
 # subscript, so the method call binds to all of it.
+# Safe: on NumPy 1.22.4 np.asscalar(a) and a.item() give results with equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -358,6 +398,7 @@ constraints:
 fix: $A.item()
 metadata: { fix: safe }
 ---
+# Safe: on NumPy 1.22.4 np.asscalar(a) and a.item() give results with equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -630,6 +671,7 @@ metadata: { since: "2.0" }
 ---
 # np.lib re-exported these functions before NumPy 2. np.lib.<name> was the same object as
 # np.<name>. np.lib.polynomial was a module, not np.polynomial, so it is not in the list.
+# Safe: on NumPy 1.26.4 np.lib.<name> is np.<name> for each of the 147 names.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -647,6 +689,7 @@ fix: $NP.$N
 metadata: { fix: safe }
 ---
 # The same names imported from numpy.lib. The fix applies when every imported name moved.
+# Safe: on NumPy 1.26.4 np.lib.<name> is np.<name> for each of the 147 names.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -981,6 +1024,7 @@ rule:
 ---
 # reshape lost newshape= in NumPy 2.4. The shape by position works on every version, and shape=
 # only from 2.1.
+# Safe: on NumPy 1.26.4 reshape(a, newshape=s) and reshape(a, s) give results with equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -995,6 +1039,8 @@ constraints:
 fix: $NP.reshape($A, $S)
 metadata: { fix: safe }
 ---
+# Safe: on NumPy 1.26.4 reshape(a, newshape=s, order=o) and reshape(a, s, order=o) give results
+# with equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1076,6 +1122,8 @@ utils:
 ---
 # method= replaced interpolation= in NumPy 1.22 and takes the same values. NumPy 2.4 removed
 # interpolation=. pandas keeps interpolation= on its own quantile, which is not matched.
+# Safe: on NumPy 1.26.4 interpolation=v and method=v give results with equal pickles in 80 calls
+# of the quantile functions.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -1185,6 +1233,8 @@ rule:
 fix: density=$V
 metadata: { fix: unsafe }
 ---
+# Safe: on NumPy 2.2.6 bincount(x, minlength=None) and bincount(x, minlength=0) give results
+# with equal pickles.
 id: removed-in-numpy-2
 language: python
 severity: error
