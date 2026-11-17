@@ -152,15 +152,6 @@ message: This pie is one of several in the figure, and Tufte calls several pies 
 rule:
   matches: several-pies
 utils:
-  # A call that makes a plotly figure.
-  new-figure:
-    kind: call
-    any:
-      - has: { field: function, kind: attribute, has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }
-      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-      - all:
-          - has: { field: function, regex: '(^|\.)make_subplots$' }
-          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
   # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
   figure-type:
     kind: type
@@ -168,11 +159,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: { new-figure: { PX: { matches: { px: { ALIAS: { pattern: $PX } } } }, GO: { matches: { go: { ALIAS: { pattern: $GO } } } } } }
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: { new-figure: { PX: { matches: { px: { ALIAS: { pattern: $PX } } } }, GO: { matches: { go: { ALIAS: { pattern: $GO } } } } } } }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
@@ -286,15 +277,6 @@ message: A pie chart puts no numbers along a common scale, so the reader compare
 rule:
   matches: several-pies
 utils:
-  # A call that makes a plotly figure.
-  new-figure:
-    kind: call
-    any:
-      - has: { field: function, kind: attribute, has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }
-      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-      - all:
-          - has: { field: function, regex: '(^|\.)make_subplots$' }
-          - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
   # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
   figure-type:
     kind: type
@@ -302,11 +284,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: { new-figure: { PX: { matches: { px: { ALIAS: { pattern: $PX } } } }, GO: { matches: { go: { ALIAS: { pattern: $GO } } } } } }
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: { new-figure: { PX: { matches: { px: { ALIAS: { pattern: $PX } } } }, GO: { matches: { go: { ALIAS: { pattern: $GO } } } } } } }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is

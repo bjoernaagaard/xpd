@@ -73,7 +73,7 @@ rule:
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
 utils:
   # An empty go.Figure, so every trace it draws is added later.
-  new-figure:
+  new-empty-figure:
     kind: call
     all:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
@@ -95,11 +95,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: new-empty-figure
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-empty-figure }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is

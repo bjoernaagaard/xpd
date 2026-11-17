@@ -83,7 +83,7 @@ rule:
 utils:
   # A figure of upright bars: px.bar or px.histogram without orientation, log_y and base, or a
   # go.Figure whose own arguments hold a go.Bar without orientation and base.
-  new-figure:
+  new-bar-figure:
     kind: call
     any:
       - all:
@@ -111,11 +111,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: new-bar-figure
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-bar-figure }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
@@ -168,7 +168,7 @@ rule:
     - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
 utils:
   # A go.Figure that holds no go.Bar of its own, so its bars come from add_trace or add_bar.
-  new-figure:
+  new-figure-without-bars:
     kind: call
     all:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
@@ -218,11 +218,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: new-figure-without-bars
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure-without-bars }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
@@ -281,7 +281,7 @@ rule:
 utils:
   # A figure of upright bars: px.bar or px.histogram without orientation, log_y and base, or a
   # go.Figure whose own arguments hold a go.Bar without orientation and base.
-  new-figure:
+  new-bar-figure:
     kind: call
     any:
       - all:
@@ -309,11 +309,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: new-bar-figure
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-bar-figure }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is

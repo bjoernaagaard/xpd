@@ -22,7 +22,7 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^matches$' } }, { has: { field: value, kind: none } }] } }
 utils:
   # A px figure with facets.
-  new-figure:
+  new-faceted-figure:
     kind: call
     all:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|choropleth|density_contour|density_heatmap|ecdf|funnel|histogram|imshow|line|line_geo|pie|scatter|scatter_geo|strip|timeline|violin)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
@@ -30,11 +30,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: new-faceted-figure
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-faceted-figure }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
@@ -103,7 +103,7 @@ rule:
     - not: { inside: { stopBy: end, kind: module, regex: 'matches|shared_yaxes|yaxis[0-9]*_range|update_yaxes\([^)]*range' } }
 utils:
   # A call that makes a figure with subplots.
-  new-figure:
+  new-subplots-without-shared-y:
     kind: call
     all:
       - has: { field: function, regex: '(^|\.)make_subplots$' }
@@ -112,11 +112,11 @@ utils:
   # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
-      - matches: new-figure
+      - matches: new-subplots-without-shared-y
       - kind: call
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
-          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-figure }
+          - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: new-subplots-without-shared-y }
   # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
   # variable only when `holds` in the metadata of this document proves what it holds: the
   # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
