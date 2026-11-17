@@ -11,7 +11,8 @@
 # shift, followed by nothing but dropna, fillna, copy, squeeze, to_numpy, iloc, loc or values.
 # Returns times 100, returns divided by their standard deviation, and returns passed through a
 # helper may be on another scale, so each is left alone. A name that is also assigned something else, such as the
-# same returns times 100, is left alone, and so is a call that says rescale, in either way.
+# same returns times 100, is left alone, and so is a call that says rescale, in either way. No
+# fix, because the message names two rewrites and the call does not show which one is meant.
 id: unscaled-returns
 language: python
 severity: warning

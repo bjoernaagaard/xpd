@@ -10,7 +10,8 @@
 # in between must be assigned from nothing else. A model whose volatility the file assigns, as
 # in am.volatility = GARCH(1, 0, 1), is left alone. power is read only where arch_model reads it,
 # which is with vol "garch" or "figarch", or with no vol. A horizon or a method that is a
-# variable is not read.
+# variable is not read. No fix, because the message names two methods and the call does not show
+# which one is meant.
 id: analytic-forecast-horizon
 language: python
 severity: error
@@ -69,7 +70,8 @@ utils:
 # hedgehog_plot calls forecast for each origin, with method="analytic" and horizon=10 unless the
 # call says otherwise. On arch 9.0.0 and 8.0.0 it raised the same ValueError for vol="egarch",
 # and on 9.0.0 for vol="garch" with power=1.0. It ran with horizon=1 and with
-# method="simulation". The call is read only when every argument is a keyword.
+# method="simulation". The call is read only when every argument is a keyword. No fix, because
+# the message names two methods and the call does not show which one is meant.
 id: analytic-forecast-horizon
 language: python
 severity: error

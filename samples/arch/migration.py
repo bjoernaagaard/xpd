@@ -76,8 +76,9 @@ def removed_seed_methods():
 def removed_cov_nw_export():
     from arch.utility import cov_nw as newey_west  # xpd: removed-in-arch
     from arch.utility import cov_nw  # xpd: removed-in-arch
+    from arch.utility import test, cov_nw as long_run  # xpd: removed-in-arch
 
-    return cov_nw, newey_west
+    return cov_nw, newey_west, test, long_run
 
 
 def read_only_attributes():

@@ -8,7 +8,8 @@
 #
 # The rule reports rescale=True in a file that reads conditional_volatility or calls forecast,
 # which are in the rescaled units, and that never reads an attribute named scale. A file that
-# only reads the standardized residuals or the fit statistics is left alone.
+# only reads the standardized residuals or the fit statistics is left alone. No fix, because the
+# division goes where the code reads each result, which the match does not reach.
 id: rescaled-units
 language: python
 severity: warning

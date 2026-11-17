@@ -50,8 +50,9 @@ fix:
   expandStart: { regex: ',' }
 metadata: { fix: safe, since: "6.2" }
 ---
-# The same argument as the first one of the call, or after a comment. Taking it out would
-# leave a comma with nothing before it, so this form has no fix.
+# The same argument as the first one of the call, or after a comment. Taking it out alone would
+# leave a comma with nothing before it, so the fix writes the arguments again without it and
+# without the comments between them. It is safe for the reason the first document gives.
 id: reindex-is-default
 language: python
 severity: info
@@ -65,6 +66,7 @@ rule:
         kind: argument_list
         inside:
           kind: call
+          pattern: $F($$$ARGS)
           has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^forecast$' } }, { has: { field: object, any: [{ matches: result }, { matches: model }] } }] }
 utils:
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
@@ -87,4 +89,27 @@ utils:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { has: { field: right, matches: fit-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $R } }, { not: { has: { field: right, matches: fit-call } } }] } } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $R } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $R } }, { kind: named_expression, has: { field: name, pattern: $R } }] } } }
-metadata: { since: "6.2" }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, regex: '^reindex\s*=\s*False$' }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            regex: '^reindex\s*=\s*False$'
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix:
+  template: $REST
+  expandStart: { nthChild: 1, stopBy: end }
+  expandEnd: { nthChild: { position: 1, reverse: true }, stopBy: end }
+metadata: { fix: safe, since: "6.2" }

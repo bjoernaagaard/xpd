@@ -10,7 +10,9 @@
 # form and every fix is unsafe.
 
 # arch.__future__.reindexing made reindex=False the default of forecast before arch 6.2 did.
-# The import did nothing from 6.2 on, and arch 9.0 removed the module.
+# The import did nothing from 6.2 on, and arch 9.0 removed the module. The fix deletes the
+# statement, and a name that it bound, such as arch in import arch.__future__.reindexing, is then
+# not bound by that line.
 id: removed-in-arch
 language: python
 severity: error
@@ -24,7 +26,8 @@ rule:
   not: { matches: compat-code }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
-metadata: { since: "9.0" }
+fix: ""
+metadata: { fix: unsafe, since: "9.0" }
 ---
 # hedgehog_plot took type until arch 9.0, with a FutureWarning on 8.0.0, and takes plot_type
 # with the same values. The fix renames the keyword only on a result that the file gets from
@@ -190,6 +193,41 @@ metadata: { fix: unsafe, since: "8.0" }
 ---
 # A distribution took the RandomState as its one positional argument until arch 8.0. seed is
 # keyword only, so a positional argument raises TypeError on 8.0.0 and 9.0.0.
+# The fix names the one argument seed, and drops the comments in the call.
+id: removed-in-arch
+language: python
+severity: error
+message: $C takes no positional argument since arch 8.0, and this call raises TypeError. Write $C(seed=$A), which takes the same RandomState, a Generator or an integer.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $C, matches: distribution-class }
+    - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] }, pattern: $A } }
+    - not: { has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+  distribution-class:
+    any:
+      - kind: attribute
+        regex: '^arch\.univariate(\.distribution)?\.(Normal|StudentsT|SkewStudent|GeneralizedError)$'
+      - kind: identifier
+        regex: '^(Normal|StudentsT|SkewStudent|GeneralizedError)$'
+        pattern: $N
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            kind: import_from_statement
+            stopBy: end
+            all:
+              - has: { field: module_name, regex: '^arch\.univariate(\.distribution)?$' }
+              - has: { stopBy: end, kind: identifier, pattern: $N }
+fix: $C(seed=$A)
+metadata: { fix: unsafe, since: "8.0" }
+---
+# The same call with more than one argument has no fix, because the call does not show which
+# argument is the seed.
 id: removed-in-arch
 language: python
 severity: error
@@ -199,6 +237,7 @@ rule:
   all:
     - has: { field: function, pattern: $C, matches: distribution-class }
     - has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: list_splat }] } } }
+    - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
   not: { matches: compat-code }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
@@ -223,6 +262,60 @@ metadata: { since: "8.0" }
 # seed, get_state and set_state were methods of the bootstraps until arch 8.0, and seed was one
 # of SPA, StepM, MCS and RealityCheck. Each raises AttributeError on 8.0.0 and 9.0.0. The object
 # is one that the file builds from an arch class and assigns to this name and to nothing else.
+# get_state() of a bootstrap becomes the state property, which arch has had since 5.0.
+id: removed-in-arch
+language: python
+severity: error
+message: arch 8.0 removed get_state from the bootstraps, and this call raises AttributeError. Write $O.state, which holds the state of the bootstrap's generator.
+rule:
+  kind: call
+  pattern: $O.get_state()
+  has: { field: function, kind: attribute, has: { field: object, matches: resampler } }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+  resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
+  resampler:
+    kind: identifier
+    pattern: $B
+    all:
+      - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: resampler-call } }] } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: resampler-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
+fix: $O.state
+metadata: { fix: unsafe, since: "8.0" }
+---
+# set_state(value) of a bootstrap, as a statement of its own, becomes an assignment to state.
+id: removed-in-arch
+language: python
+severity: error
+message: arch 8.0 removed set_state from the bootstraps, and this call raises AttributeError. Write $O.state = $S.
+rule:
+  kind: call
+  pattern: $O.set_state($S)
+  all:
+    - has: { field: function, kind: attribute, has: { field: object, matches: resampler } }
+    - inside: { kind: expression_statement }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+  resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
+  resampler:
+    kind: identifier
+    pattern: $B
+    all:
+      - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: resampler-call } }] } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: resampler-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
+fix: $O.state = $S
+metadata: { fix: unsafe, since: "8.0" }
+---
+# seed, get_state and set_state were methods of the bootstraps until arch 8.0, and seed was one
+# of SPA, StepM, MCS and RealityCheck. Each raises AttributeError on 8.0.0 and 9.0.0. The object
+# is one that the file builds from an arch class and assigns to this name and to nothing else.
+# The forms that the two documents above do not fix have no fix, because seed moves to the call
+# that creates the object, which the match does not reach.
 id: removed-in-arch
 language: python
 severity: error
@@ -235,10 +328,28 @@ rule:
     all:
       - has: { field: attribute, pattern: $A, regex: '^(seed|get_state|set_state)$' }
       - has: { field: object, matches: resampler }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - all:
+          - has: { field: function, kind: attribute, has: { field: object, matches: bootstrap } }
+          - any:
+              - pattern: $O.get_state()
+              - all:
+                  - pattern: $O.set_state($S)
+                  - inside: { kind: expression_statement }
+                  - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap|SPA|StepM|MCS|RealityCheck)$' } }
+  bootstrap-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
+  bootstrap:
+    kind: identifier
+    pattern: $B
+    all:
+      - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: bootstrap-call } }] } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: bootstrap-call } } }] } } }
+      - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
   resampler:
     kind: identifier
     pattern: $B
@@ -249,15 +360,16 @@ utils:
 metadata: { since: "8.0" }
 ---
 # The random_state property of a bootstrap gave its RandomState until arch 8.0. generator gives
-# the Generator or RandomState the bootstrap draws from, and exists since arch 5.0.
+# the Generator or RandomState the bootstrap draws from, and exists since arch 5.0. The fix
+# writes generator in place of random_state, also where the code assigns the property.
 id: removed-in-arch
 language: python
 severity: error
-message: arch 8.0 removed the random_state property of the bootstraps, and reading it raises AttributeError. Read generator.
+message: arch 8.0 removed the random_state property of the bootstraps, and using it raises AttributeError. Write $O.generator, the RandomState or Generator that the bootstrap draws from.
 rule:
   kind: attribute
+  pattern: $O.random_state
   all:
-    - has: { field: attribute, regex: '^random_state$' }
     - has: { field: object, matches: resampler }
     - not: { inside: { kind: call, field: function } }
   not: { matches: compat-code }
@@ -271,25 +383,67 @@ utils:
       - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { has: { field: right, matches: resampler-call } }] } }
       - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $B } }, { not: { has: { field: right, matches: resampler-call } } }] } } }
       - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $B } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $B } }, { kind: named_expression, has: { field: name, pattern: $B } }] } } }
-metadata: { since: "8.0" }
+fix: $O.generator
+metadata: { fix: unsafe, since: "8.0" }
 ---
 # arch.utility exported cov_nw until arch 8.0. The function is still in arch.utility.cov, which
 # every release from 4.19 to 9.0.0 has. The fix rewrites the import when cov_nw is the only name
-# it brings in.
+# it brings in, under its own name or another.
 id: removed-in-arch
 language: python
 severity: error
 message: arch.utility has not exported cov_nw since arch 8.0, and this import raises ImportError. Import it from arch.utility.cov.
 rule:
   kind: import_from_statement
-  regex: '^from\s+arch\.utility\s+import\s+cov_nw$'
+  all:
+    - has: { field: module_name, regex: '^arch\.utility$' }
+    - has: { matches: cov-name, pattern: $COV }
+    - not: { has: { matches: other-name } }
   not: { matches: compat-code }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
-fix: from arch.utility.cov import cov_nw
+  cov-name: { any: [{ kind: dotted_name, regex: '^cov_nw$' }, { kind: aliased_import, has: { field: name, regex: '^cov_nw$' } }] }
+  other-name: { any: [{ kind: dotted_name, not: { regex: '^(cov_nw|arch\.utility)$' } }, { kind: aliased_import, not: { has: { field: name, regex: '^cov_nw$' } } }] }
+fix: from arch.utility.cov import $COV
 metadata: { fix: unsafe, since: "8.0" }
 ---
-# The same import with other names beside cov_nw, or under another name, has no fix.
+# The same import with other names beside cov_nw. The fix keeps the other names in the import,
+# drops the comments in it, and imports cov_nw from arch.utility.cov on a line of its own.
+id: removed-in-arch
+language: python
+severity: error
+message: arch.utility has not exported cov_nw since arch 8.0, and this import raises ImportError. Import it from arch.utility.cov.
+rule:
+  kind: import_from_statement
+  pattern: from arch.utility import $$$NAMES
+  all:
+    - has: { field: module_name, regex: '^arch\.utility$' }
+    - has: { matches: cov-name, pattern: $COV }
+    - has: { matches: other-name }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+  cov-name: { any: [{ kind: dotted_name, regex: '^cov_nw$' }, { kind: aliased_import, has: { field: name, regex: '^cov_nw$' } }] }
+  other-name: { any: [{ kind: dotted_name, not: { regex: '^(cov_nw|arch\.utility)$' } }, { kind: aliased_import, not: { has: { field: name, regex: '^cov_nw$' } } }] }
+rewriters:
+  - id: drop
+    rule: { matches: cov-name }
+    fix: ""
+  - id: keep
+    rule: { pattern: $N, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$N, "
+transform:
+  KEPT:
+    rewrite: { source: $$$NAMES, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: |-
+  from arch.utility import $REST
+  from arch.utility.cov import $COV
+metadata: { fix: unsafe, since: "8.0" }
+---
+# Any other import from arch.utility with cov_nw in its text, such as another name imported as
+# cov_nw, has no fix, because it does not import cov_nw.
 id: removed-in-arch
 language: python
 severity: error
@@ -299,14 +453,17 @@ rule:
   all:
     - has: { field: module_name, regex: '^arch\.utility$' }
     - regex: '\bcov_nw\b'
-    - not: { regex: '^from\s+arch\.utility\s+import\s+cov_nw$' }
+    - not: { has: { matches: cov-name } }
   not: { matches: compat-code }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+  cov-name: { any: [{ kind: dotted_name, regex: '^cov_nw$' }, { kind: aliased_import, has: { field: name, regex: '^cov_nw$' } }] }
+  other-name: { any: [{ kind: dotted_name, not: { regex: '^(cov_nw|arch\.utility)$' } }, { kind: aliased_import, not: { has: { field: name, regex: '^cov_nw$' } } }] }
 metadata: { since: "8.0" }
 ---
 # block_size of a block bootstrap and bootstrap of a multiple comparison test are read only
-# since arch 9.0, and assigning either raises AttributeError. Both assignments ran on 8.0.0.
+# since arch 9.0, and assigning either raises AttributeError. Both assignments ran on 8.0.0. No
+# fix, because the new object needs the arguments of the call that made the old one.
 id: removed-in-arch
 language: python
 severity: error
@@ -347,7 +504,8 @@ metadata: { since: "9.0" }
 # SPA, StepM and RealityCheck took nested=True with studentize=False until arch 9.0, where the
 # pair raises ValueError, "nested can only be True when studentize is True". On 8.0.0 it ran and
 # gave the p-values of studentize=False. Both values must be written in the call. The names are
-# short, so the file must import them from arch.bootstrap.
+# short, so the file must import them from arch.bootstrap. No fix, because the message names two
+# rewrites and the call does not show which one is meant.
 id: removed-in-arch
 language: python
 severity: error

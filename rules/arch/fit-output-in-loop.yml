@@ -6,12 +6,17 @@
 #
 # The rule reads fit only on a model that the file builds from arch_model or a mean class, and
 # the name must be assigned from nothing else. update_freq=0 alone still prints the summary.
+#
+# Unsafe: the fixed fit prints nothing, and a script or a log that reads the printed lines gets
+# none. The fit returns the same result. The fix writes the arguments again with disp="off" at
+# the end, and drops the comments between them.
 id: fit-output-in-loop
 language: python
 severity: info
 message: fit prints every iteration and a summary on each call, and this one runs in a loop. On arch 9.0.0, 20 fits printed 240 lines. Pass disp="off".
 rule:
   kind: call
+  pattern: $F($$$ARGS)
   all:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] }
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^disp$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
@@ -30,3 +35,14 @@ utils:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { has: { field: right, matches: model-call } }] } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $M } }, { not: { has: { field: right, matches: model-call } } }] } } }
           - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, any: [{ any: [{ kind: parameters }, { kind: lambda_parameters }, { kind: as_pattern_target }, { kind: pattern_list }, { kind: tuple_pattern }], has: { stopBy: end, kind: identifier, pattern: $M } }, { any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, pattern: $M } }, { kind: named_expression, has: { field: name, pattern: $M } }] } } }
+rewriters:
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [keep], joinBy: "" }
+  ARGUMENTS:
+    replace: { source: $KEPT, replace: "$", by: 'disp="off"' }
+fix: $F($ARGUMENTS)
+metadata: { fix: unsafe }

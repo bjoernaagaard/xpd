@@ -9959,18 +9959,18 @@ table gives the reports that were left after the rules were narrowed.
 | Rule | Severity | Proof | Reports on arch's own code | Reports on public code | Wrong advice | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
 | [`removed-in-arch`](#removed-in-arch) | error | interpreter: ModuleNotFoundError, ImportError, TypeError, AttributeError, ValueError | 1 | 34 | 0 | unsafe |
-| [`arch-unknown-option`](#arch-unknown-option) | error | interpreter: ValueError | 0 | 13 | 0 | none |
+| [`arch-unknown-option`](#arch-unknown-option) | error | interpreter: ValueError | 0 | 13 | 0 | unsafe |
 | [`arch-ignored-argument`](#arch-ignored-argument) | warning | same result, and rerun for the two seeds | 10 | 21 | 1 | none |
-| [`arch-rejected-number`](#arch-rejected-number) | error | interpreter: TypeError, ValueError | 1, over 189 files | not run | 1 | none |
+| [`arch-rejected-number`](#arch-rejected-number) | error | interpreter: TypeError, ValueError | 1, over 189 files | not run | 1 | unsafe |
 | [`unscaled-returns`](#unscaled-returns) | warning | numbers: mu 4.02 against 0.056, with optimizer code 4 | 0 | 21 | 0 | none |
 | [`rescaled-units`](#rescaled-units) | warning | numbers: a variance forecast 10,000 times the data's | 4 | 14 | 7 | none |
 | [`analytic-forecast-horizon`](#analytic-forecast-horizon) | error | interpreter: ValueError | 0 | 0 | no reports | none |
 | [`forecast-per-origin`](#forecast-per-origin) | warning | speed: 0.106 seconds against 0.0005 | 1 | 0 | 0 | none |
 | [`reindex-is-default`](#reindex-is-default) | info | same result: equal frames with and without the argument | 20 | 61 | 0 | safe |
-| [`fit-output-in-loop`](#fit-output-in-loop) | info | numbers: 240 lines for 20 fits against 0 | 0 | 15 | 0 | none |
+| [`fit-output-in-loop`](#fit-output-in-loop) | info | numbers: 240 lines for 20 fits against 0 | 0 | 15 | 0 | unsafe |
 | [`arch-unseeded-draws`](#arch-unseeded-draws) | info | rerun: the result differs | 109 | 182 | 1 | none |
 | [`results-before-compute`](#results-before-compute) | error | interpreter: RuntimeError | 2 | 0 | 2 | none |
-| [`opt-bandwidth-as-bandwidth`](#opt-bandwidth-as-bandwidth) | warning | numbers: 0.5245 against 0.5158 | 0 | 0 | no reports | none |
+| [`opt-bandwidth-as-bandwidth`](#opt-bandwidth-as-bandwidth) | warning | numbers: 0.5245 against 0.5158 | 0 | 0 | no reports | unsafe |
 
 Wrong advice counts the reports where following the message would not fix a real problem in that
 code, and each rule's section says which reports they are. Before the rules were narrowed, the
@@ -10013,7 +10013,7 @@ the old form raises and its result cannot be compared with the result of the new
 
 #### removed-in-arch
 
-**Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` on a bootstrap or a distribution, `plot_type=` for `type=` on `hedgehog_plot` of a result that the file gets from an arch model, and `from arch.utility.cov import cov_nw` for the import from `arch.utility` when `cov_nw` is the only name. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe, because the old form raises: the `arch.__future__` import is deleted, `seed=` replaces `random_state=` on a bootstrap or a distribution and names the one positional argument of a distribution, `plot_type=` replaces `type=` on `hedgehog_plot` of a result that the file gets from an arch model, `bs.state` replaces `bs.get_state()`, `bs.state = s` replaces the statement `bs.set_state(s)`, and `bs.generator` replaces `bs.random_state`. The import of `cov_nw` from `arch.utility` moves to `arch.utility.cov`, and the other names of the same import stay in a line of their own. Deleting `import arch.__future__.reindexing` also stops that line from binding `arch`. `seed()` on an object, a distribution with more than one argument, `hedgehog_plot` of an object the file does not tie to arch, the read only attributes and the `nested` and `studentize` pair have no fix.
 
 The rule reports a form that arch 8.0 or 9.0 removed. The table after the example lists every form, with
 what it did on the release before the removal and what it does now.
@@ -10080,7 +10080,7 @@ to the model that was asked for.
 
 #### arch-unknown-option
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe, because the old call raises: `trend="n"` for `trend="nc"` in the classes that take `"n"`. Every other option has no fix, because the call does not show which accepted option was meant.
 
 The rule reports a string that is not one of the option's values, for each option in the table after the
 example. arch raises ValueError on such a string.
@@ -10160,7 +10160,7 @@ The public code had 13 reports, and each was a value that arch refuses:
 
 #### arch-ignored-argument
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** none. Each message names two rewrites, and the call does not show which one is meant, and the `rng` form needs a seed that the file does not hold.
 
 The rule reports an argument that arch accepts and never reads for the model or the test that the call
 asks for.
@@ -10252,7 +10252,7 @@ documentation page on volatility forecasts.
 
 #### arch-rejected-number
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe, because the old call raises: a float with nothing but zeros after the point loses the point, as in `p=1` for `p=1.0`, `size=` of two digits becomes the fraction, as in `size=0.95` for `size=95`, and `o=1` is added after `vol="ngarch"` when the call has no `o`. A float such as `2.5`, any other `size`, and an `o=0` that is written have no fix.
 
 The rule reports a number written in the call that arch refuses: a float where arch counts something, a `size` of `conf_int` of 1 or more, and `vol="ngarch"` with `o` left at 0.
 
@@ -10315,7 +10315,7 @@ its message asks for a value between 1 and 1000. Daily returns as decimals have 
 
 #### unscaled-returns
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** none. The message names two rewrites, and the call does not show which one is meant.
 
 The rule reports a series from `pct_change`, or from `log` with `diff` or `shift`, that is given to `arch_model`, `ConstantMean`, `ZeroMean`, `ARX`, `HARX`, `LS`, `MAMean` or `ARCHInMean` with nothing that multiplies it and no `rescale`.
 
@@ -10369,7 +10369,7 @@ or a log difference with no factor.
 
 #### rescaled-units
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** none. The division goes where the code reads each result, which the match does not reach.
 
 The rule reports `rescale=True` on `arch_model` or a mean class in a file that reads `conditional_volatility` or calls `forecast` and never reads `scale`.
 
@@ -10418,7 +10418,7 @@ table gives the defaults of the two calls.
 
 #### analytic-forecast-horizon
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** none. The message names two methods, and the call does not show which one is meant.
 
 The rule reports `forecast` with a `horizon` above 1 and the analytic method on a result of `arch_model` with `vol` `"egarch"`, `"aparch"` or `"fiaparch"`, or with a `power` that is not 2 and `vol` `"garch"`, `"figarch"` or no `vol`. Reports `hedgehog_plot` on such a result as well, unless the call says `horizon=1` or another method.
 
@@ -10466,7 +10466,7 @@ neither set of code had a report.
 
 #### forecast-per-origin
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** none. The rewrite replaces the loop around the call.
 
 The rule reports `forecast` with `start` set to the variable of a `for` loop or a comprehension over `range(...)`, when the loop calls neither `fit` nor `fix`.
 
@@ -10501,7 +10501,7 @@ a test in arch's own code that steps through the origins of a hedgehog plot.
 
 #### reindex-is-default
 
-**Severity:** info. **Fix:** safe: the argument is taken out when a comma comes right before it, so not when it is the first argument or follows a comment.
+**Severity:** info. **Fix:** safe: the argument is taken out. When it is the first argument or follows a comment, the fix writes the arguments again without it and drops the comments between them.
 
 The rule reports `reindex=False` given to `forecast` of an arch model or result.
 
@@ -10537,7 +10537,7 @@ arch's own tests, notebooks and documentation.
 
 #### fit-output-in-loop
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe: `disp="off"` is added at the end of the arguments, and comments between them are dropped. The fit returns the same result and prints nothing, so a script or a log that reads the printed lines gets none.
 
 The rule reports `fit` without `disp` on an arch model inside a loop or a comprehension.
 
@@ -10573,7 +10573,7 @@ The rules in the group report random draws without a seed, test results read bef
 
 #### arch-unseeded-draws
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** none. The seed is not in the file.
 
 The rule reports a call that draws random numbers without a seed.
 
@@ -10634,7 +10634,7 @@ and `RealityCheck` are read only when the file imports them from `arch.bootstrap
 
 #### results-before-compute
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** none. `compute` must run once before the first read, in a statement that the match does not reach.
 
 The rule reports `pvalues`, `critical_values`, `better_models`, `superior_models`, `included` and `excluded` read from an `SPA`, `StepM`, `MCS` or `RealityCheck` in a file that never calls `compute` on that object.
 
@@ -10675,7 +10675,7 @@ tests that pass a bad `pvalue` to `critical_values` to check the ValueError that
 
 #### opt-bandwidth-as-bandwidth
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `bandwidth=est.bandwidth` for `bandwidth=est.opt_bandwidth`. The fixed call repeats the first estimate, so the number changes, 0.5158 to 0.5245 in the Bartlett example.
 
 The rule reports `bandwidth=` set to the `opt_bandwidth` of an estimator, on `Bartlett`, `Gallant`, `NeweyWest`, `Parzen`, `ParzenCauchy`, `ParzenGeometric`, `ParzenRiesz`, `TukeyHamming`, `TukeyHanning` and `TukeyParzen`.
 

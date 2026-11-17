@@ -10,18 +10,22 @@
 # two estimates were equal. The classes are the ten of arch.covariance.kernel whose bandwidth
 # was not their opt_bandwidth on 9.0.0, found by a script. Andrews, QuadraticSpectral and
 # ZeroLag had the two equal and are left alone.
+#
+# Unsafe: the fixed call passes the bandwidth that the first estimate used, so it gives the first
+# estimate again and not the one that opt_bandwidth gave.
 id: opt-bandwidth-as-bandwidth
 language: python
 severity: warning
-message: Since arch 9.0 $K uses opt_bandwidth minus 1 as its bandwidth, so passing opt_bandwidth back gives another estimate. Bartlett gave a long run variance of 0.5245 on its own and 0.5158 with bandwidth=opt_bandwidth. Pass the bandwidth attribute to repeat the estimate.
+message: Since arch 9.0 $K uses opt_bandwidth minus 1 as its bandwidth, so passing opt_bandwidth back gives another estimate. Bartlett gave a long run variance of 0.5245 on its own and 0.5158 with bandwidth=opt_bandwidth. Write bandwidth=$E.bandwidth to repeat the estimate.
 rule:
   kind: keyword_argument
   all:
     - has: { field: name, regex: '^bandwidth$' }
-    - has: { field: value, kind: attribute, has: { field: attribute, regex: '^opt_bandwidth$' } }
+    - has: { field: value, kind: attribute, pattern: $E.opt_bandwidth }
     - inside:
         kind: argument_list
         inside:
           kind: call
           has: { field: function, pattern: $K, regex: '(^|\.)(Bartlett|Gallant|NeweyWest|Parzen|ParzenCauchy|ParzenGeometric|ParzenRiesz|TukeyHamming|TukeyHanning|TukeyParzen)$' }
-metadata: { since: "9.0" }
+fix: bandwidth=$E.bandwidth
+metadata: { fix: unsafe, since: "9.0" }

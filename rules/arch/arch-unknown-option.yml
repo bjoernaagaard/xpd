@@ -10,6 +10,9 @@
 #
 # Releases before 9.0 took some of these options in one case only, so a value that 9.0.0 accepts
 # in another case is not reported, and neither is a value that only 9.0 has, such as "maic".
+#
+# Only trend="nc" has a fix. Every other document has no fix, because the call does not show
+# which of the accepted options the author meant.
 
 # arch_model builds one of seven mean models. A moving average mean is the class MAMean and has
 # no name here.
@@ -92,6 +95,7 @@ rule:
   all:
     - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
     - not: { regex: '(?i)^[rbu]{0,2}(''|")(n|c|ct|ctt)(''|")$' }
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")nc(''|")$' }
     - not: { has: { kind: interpolation } }
     - inside:
         kind: keyword_argument
@@ -136,6 +140,7 @@ rule:
   all:
     - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
     - not: { regex: '(?i)^[rbu]{0,2}(''|")(n|c|ct)(''|")$' }
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")nc(''|")$' }
     - not: { has: { kind: interpolation } }
     - inside:
         kind: keyword_argument
@@ -158,6 +163,7 @@ rule:
   all:
     - regex: '^[rbuRBU]{0,2}(''|")[^''"\\]*(''|")$'
     - not: { regex: '(?i)^[rbu]{0,2}(''|")(n|c)(''|")$' }
+    - not: { regex: '(?i)^[rbu]{0,2}(''|")nc(''|")$' }
     - not: { has: { kind: interpolation } }
     - inside:
         kind: keyword_argument
@@ -169,6 +175,32 @@ rule:
             kind: call
             has: { field: function, pattern: $C, regex: '(^|\.)(VarianceRatio)$' }
   not: { matches: expected-to-raise }
+---
+# "nc" is the statsmodels name of no deterministic term, and arch calls it "n". The fix writes
+# "n" in the same quotes. Unsafe: the old call raises, so there is nothing to compare.
+id: arch-unknown-option
+language: python
+severity: error
+message: '$C takes trend "n" for no deterministic term, and "nc" is the name statsmodels uses. arch 9.0.0 raises ValueError for $V. Write "n".'
+rule:
+  kind: string
+  pattern: $V
+  all:
+    - regex: '(?i)^[rbu]{0,2}(''|")nc(''|")$'
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^trend$' }
+        inside:
+          kind: argument_list
+          inside:
+            kind: call
+            has: { field: function, pattern: $C, regex: '(^|\.)(ADF|engle_granger|phillips_ouliaris|DynamicOLS|FullyModifiedOLS|CanonicalCointegratingReg|PhillipsPerron|VarianceRatio)$' }
+  not: { matches: expected-to-raise }
+transform:
+  N: { replace: { source: $V, replace: '(?i)nc', by: 'n' } }
+fix: $N
+metadata: { fix: unsafe }
 ---
 id: arch-unknown-option
 language: python

@@ -8,7 +8,8 @@
 # name that the file assigns such an object to, and nothing else, when the file never calls
 # compute on that name and reads the name only before a dot. A loop over the tests and a helper
 # that takes the test both call compute through another name, and the results then read fine.
-# The class names are short, so the file must import them from arch.bootstrap.
+# The class names are short, so the file must import them from arch.bootstrap. No fix, because
+# compute must run once before the first read, in a statement that the match does not reach.
 id: results-before-compute
 language: python
 severity: error

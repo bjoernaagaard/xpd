@@ -9,7 +9,8 @@
 # A loop that also calls fit or fix is a rolling estimate, where each origin has its own
 # parameters, and is left alone too. So is a call whose object or whose other arguments hold the
 # loop variable, as in fits[i].forecast(start=i), where each origin has its own result. No forecast of another library that was looked at takes
-# start, so the call is read on any object.
+# start, so the call is read on any object. No fix, because the rewrite replaces the loop around
+# the call, which the match does not reach.
 id: forecast-per-origin
 language: python
 severity: warning

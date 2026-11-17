@@ -3,6 +3,9 @@
 # gave the same parameters or the same statistic. The release notes of 9.0 say that arguments of
 # arch_model that do not apply to the selected model are still ignored. A value or an option
 # that is a variable is not read, so the rule is silent on it.
+#
+# No document has a fix. The last one needs a seed that the file does not hold, and each other
+# message names two rewrites, and the call does not show which one is meant.
 
 # arch_model has lags for the "ar", "arx", "har" and "harx" means only. With mean="constant",
 # which is the default, "zero" or "ls", a fit of 1,500 daily S&P 500 returns with lags=2 had the
