@@ -43,20 +43,36 @@ def shown(view: PrefabApp, data: Output) -> ToolResult:
     return ToolResult(content=data.model_dump_json(), structured_content=view)
 
 
+def label(text: str) -> str:
+    """`text` as a quoted Mermaid label. Mermaid reads `#quot;` as a double quote."""
+    return '"' + text.replace('"', "#quot;") + '"'
+
+
 def dataflow_chart(report: GraphReport) -> str:
-    """A Mermaid flowchart with one box per step or node and one arrow per read. Each box id gets
-    a prefix, so a name such as `end` is never read as a Mermaid keyword."""
+    """A Mermaid flowchart with one box per step or node and one arrow per read. A box's id is
+    its place in the chart, such as s0 or n3, since a step of a chain is named like
+    `.assign(gross)` and a name such as `end` is a Mermaid keyword. Steps are named within
+    their pipeline, and Apache Hamilton nodes and inputs within the whole report."""
+    boxes: dict[tuple[int, str], str] = {}
+
+    def box(pipeline: int, name: str) -> str:
+        prefix = "n" if pipeline < 0 else "s"
+        return boxes.setdefault((pipeline, name), f"{prefix}{len(boxes)}")
+
     lines = ["flowchart LR"]
-    for pipeline in report.pipelines:
-        lines.extend(f'  s_{step.name}["{step.name}()"]' for step in pipeline.steps)
+    for index, pipeline in enumerate(report.pipelines):
+        for step in pipeline.steps:
+            shown = f"{step.name}()" if step.kind == "function" else step.name
+            lines.append(f"  {box(index, step.name)}[{label(shown)}]")
         lines.extend(
-            f"  s_{link.source} -->|{', '.join(link.columns)}| s_{link.to}"
+            f"  {box(index, link.source)} -->|{label(', '.join(link.columns))}| "
+            f"{box(index, link.to)}"
             for link in pipeline.links
         )
-    lines.extend(f'  n_{name.name}(["{name.name}"])' for name in report.inputs)
+    lines.extend(f"  {box(-1, name.name)}([{label(name.name)}])" for name in report.inputs)
     for node in report.nodes:
-        lines.append(f'  n_{node.name}["{node.name}"]')
-        lines.extend(f"  n_{source.name} --> n_{node.name}" for source in node.inputs)
+        lines.append(f"  {box(-1, node.name)}[{label(node.name)}]")
+        lines.extend(f"  {box(-1, source.name)} --> {box(-1, node.name)}" for source in node.inputs)
     return "\n".join(lines)
 
 
