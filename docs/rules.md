@@ -13497,7 +13497,7 @@ on(a rule document)
 
 | Case | What the document gets |
 | --- | --- |
-| The old form raises on the library version that the pack is written for | An unsafe fix, because a form that raises leaves no value to compare. The renames in `removed-in-numpy-2` are marked safe from before this policy, because the old name gave the same value on NumPy 1 |
+| The old form raises on the library version that the pack is written for | A safe fix when the rewrite is exact: on an older version of the library where both forms run, the new form is the same object as the old one, or gives a value of the same type that is equal bit for bit. Otherwise an unsafe fix. The comment above the document names the version that the proof ran on |
 | The rewrite returns another type, such as an array where the old form returned a list | An unsafe fix |
 | The rewrite changes what the code does on purpose, because the old form gave a wrong result | An unsafe fix |
 | The rewrite drops, adds or renames one argument of a call | A fix that builds the argument list again with `rewriters`, as `deprecated-in-sklearn` does |
