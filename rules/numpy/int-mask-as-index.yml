@@ -33,6 +33,7 @@ utils:
 fix: $X[$M]
 metadata: { fix: unsafe }
 ---
+# No fix, because the code does not show whether the opposite mask or numbers were meant.
 id: int-mask-as-index
 language: python
 severity: error

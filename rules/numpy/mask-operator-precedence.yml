@@ -2,6 +2,48 @@
 # raises ValueError on an array and compares the wrong values on a number. Only a & or | in the
 # middle of a chained comparison counts, because x == A | B with one comparison is ordinary flag
 # arithmetic. A file that imports pandas is left to the pandas rule mask-precedence.
+
+# Two comparisons of names, numbers or attributes joined by one & or |. Unsafe on purpose, because
+# the fix gives the mask the code meant where the old form raised or compared the wrong values.
+id: mask-operator-precedence
+language: python
+severity: error
+message: The & and | operators bind tighter than comparisons, so this compares against a combined value. Write $FIXED.
+rule:
+  kind: comparison_operator
+  pattern: $ALL
+  # all checks in order, so the costly search for a pandas import runs only on a match.
+  all:
+    - has: { nthChild: 1, matches: simple }
+    - has:
+        nthChild: 2
+        kind: binary_operator
+        all:
+          - has: { field: left, matches: simple }
+          - has: { field: right, matches: simple }
+          - has: { field: operator, regex: '^[&|]$' }
+    - has: { nthChild: 3, matches: simple }
+    - not: { has: { nthChild: 4 } }
+    - not: { has: { field: operators, regex: ^(in|not in|is|is not)$ } }
+    - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+utils:
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }
+transform:
+  FIXED:
+    replace:
+      source: $ALL
+      replace: '^([\w.]+)\s*(<=|>=|==|!=|<|>)\s*([\w.]+)\s*([&|])\s*([\w.]+)\s*(<=|>=|==|!=|<|>)\s*([\w.]+)$'
+      by: '($1 $2 $3) $4 ($5 $6 $7)'
+fix: $FIXED
+metadata: { fix: unsafe }
+---
+# No fix for other operands, such as calls, subscripts or a third comparison, which a fix
+# cannot split apart.
 id: mask-operator-precedence
 language: python
 severity: error
@@ -15,4 +57,23 @@ rule:
         has: { field: operator, regex: '^[&|]$' }
         not: { any: [{ nthChild: 1 }, { nthChild: { position: 1, reverse: true } }] }
     - not: { has: { field: operators, regex: ^(in|not in|is|is not)$ } }
+    - not:
+        all:
+          - has: { nthChild: 1, matches: simple }
+          - has:
+              nthChild: 2
+              kind: binary_operator
+              all:
+                - has: { field: left, matches: simple }
+                - has: { field: right, matches: simple }
+                - has: { field: operator, regex: '^[&|]$' }
+          - has: { nthChild: 3, matches: simple }
+          - not: { has: { nthChild: 4 } }
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
+utils:
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }

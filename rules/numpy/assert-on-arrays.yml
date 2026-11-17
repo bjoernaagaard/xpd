@@ -20,6 +20,190 @@ constraints:
 fix: $NP.testing.assert_allclose($A, $B, rtol=1e-05, atol=1e-08, equal_nan=False)
 metadata: { fix: unsafe }
 ---
+# Unsafe for the same reasons. The fix writes the default of a tolerance that the call leaves out,
+# and equal_nan=False.
+id: assert-on-arrays
+language: python
+severity: info
+message: A failed assert on $NP.allclose reports only False. Write $NP.testing.assert_allclose($A, $B, rtol=$R, atol=1e-08, equal_nan=False), which keeps the tolerances and shows the differing elements.
+rule:
+  any:
+    - pattern: "assert $NP.allclose($A, $B, rtol=$R)"
+    - pattern: "assert $NP.allclose($A, $B, $R)"
+  matches: rtol-only
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  no-message: { not: { has: { nthChild: 2 } } }
+  first-two-plain:
+    has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+  rtol-only:
+    all:
+      - any: [{ pattern: "assert $NP.allclose($A, $B, rtol=$R)" }, { pattern: "assert $NP.allclose($A, $B, $R)" }]
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, has: { nthChild: 3, any: [{ matches: plain }, { regex: '^rtol\s*=' }] } } }
+  atol-only:
+    all:
+      - pattern: "assert $NP.allclose($A, $B, atol=$T)"
+      - matches: no-message
+      - matches: first-two-plain
+  both-tolerances:
+    all:
+      - any:
+          - pattern: "assert $NP.allclose($A, $B, rtol=$R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, atol=$T, rtol=$R)"
+          - pattern: "assert $NP.allclose($A, $B, $R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, $R, $T)"
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 3, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }, { has: { nthChild: 4, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }] } }
+  string-message:
+    all:
+      - pattern: "assert $NP.allclose($A, $B), $M"
+      - has: { nthChild: 2, any: [{ kind: string }, { kind: concatenated_string }] }
+      - matches: first-two-plain
+fix: $NP.testing.assert_allclose($A, $B, rtol=$R, atol=1e-08, equal_nan=False)
+metadata: { fix: unsafe }
+---
+id: assert-on-arrays
+language: python
+severity: info
+message: A failed assert on $NP.allclose reports only False. Write $NP.testing.assert_allclose($A, $B, rtol=1e-05, atol=$T, equal_nan=False), which keeps the tolerances and shows the differing elements.
+rule:
+  pattern: "assert $NP.allclose($A, $B, atol=$T)"
+  matches: atol-only
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  no-message: { not: { has: { nthChild: 2 } } }
+  first-two-plain:
+    has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+  rtol-only:
+    all:
+      - any: [{ pattern: "assert $NP.allclose($A, $B, rtol=$R)" }, { pattern: "assert $NP.allclose($A, $B, $R)" }]
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, has: { nthChild: 3, any: [{ matches: plain }, { regex: '^rtol\s*=' }] } } }
+  atol-only:
+    all:
+      - pattern: "assert $NP.allclose($A, $B, atol=$T)"
+      - matches: no-message
+      - matches: first-two-plain
+  both-tolerances:
+    all:
+      - any:
+          - pattern: "assert $NP.allclose($A, $B, rtol=$R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, atol=$T, rtol=$R)"
+          - pattern: "assert $NP.allclose($A, $B, $R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, $R, $T)"
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 3, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }, { has: { nthChild: 4, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }] } }
+  string-message:
+    all:
+      - pattern: "assert $NP.allclose($A, $B), $M"
+      - has: { nthChild: 2, any: [{ kind: string }, { kind: concatenated_string }] }
+      - matches: first-two-plain
+fix: $NP.testing.assert_allclose($A, $B, rtol=1e-05, atol=$T, equal_nan=False)
+metadata: { fix: unsafe }
+---
+id: assert-on-arrays
+language: python
+severity: info
+message: A failed assert on $NP.allclose reports only False. Write $NP.testing.assert_allclose($A, $B, rtol=$R, atol=$T, equal_nan=False), which keeps the tolerances and shows the differing elements.
+rule:
+  any:
+    - pattern: "assert $NP.allclose($A, $B, rtol=$R, atol=$T)"
+    - pattern: "assert $NP.allclose($A, $B, atol=$T, rtol=$R)"
+    - pattern: "assert $NP.allclose($A, $B, $R, atol=$T)"
+    - pattern: "assert $NP.allclose($A, $B, $R, $T)"
+  matches: both-tolerances
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  no-message: { not: { has: { nthChild: 2 } } }
+  first-two-plain:
+    has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+  rtol-only:
+    all:
+      - any: [{ pattern: "assert $NP.allclose($A, $B, rtol=$R)" }, { pattern: "assert $NP.allclose($A, $B, $R)" }]
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, has: { nthChild: 3, any: [{ matches: plain }, { regex: '^rtol\s*=' }] } } }
+  atol-only:
+    all:
+      - pattern: "assert $NP.allclose($A, $B, atol=$T)"
+      - matches: no-message
+      - matches: first-two-plain
+  both-tolerances:
+    all:
+      - any:
+          - pattern: "assert $NP.allclose($A, $B, rtol=$R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, atol=$T, rtol=$R)"
+          - pattern: "assert $NP.allclose($A, $B, $R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, $R, $T)"
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 3, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }, { has: { nthChild: 4, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }] } }
+  string-message:
+    all:
+      - pattern: "assert $NP.allclose($A, $B), $M"
+      - has: { nthChild: 2, any: [{ kind: string }, { kind: concatenated_string }] }
+      - matches: first-two-plain
+fix: $NP.testing.assert_allclose($A, $B, rtol=$R, atol=$T, equal_nan=False)
+metadata: { fix: unsafe }
+---
+# Unsafe for the same reasons, and the message is built on every call where the assert built it
+# only on failure. err_msg must be a string, so the message must be written as one.
+id: assert-on-arrays
+language: python
+severity: info
+message: A failed assert on $NP.allclose reports only False. Write $NP.testing.assert_allclose($A, $B, rtol=1e-05, atol=1e-08, equal_nan=False, err_msg=$M), which keeps the tolerances and shows the differing elements.
+rule:
+  pattern: "assert $NP.allclose($A, $B), $M"
+  matches: string-message
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  no-message: { not: { has: { nthChild: 2 } } }
+  first-two-plain:
+    has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+  rtol-only:
+    all:
+      - any: [{ pattern: "assert $NP.allclose($A, $B, rtol=$R)" }, { pattern: "assert $NP.allclose($A, $B, $R)" }]
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, has: { nthChild: 3, any: [{ matches: plain }, { regex: '^rtol\s*=' }] } } }
+  atol-only:
+    all:
+      - pattern: "assert $NP.allclose($A, $B, atol=$T)"
+      - matches: no-message
+      - matches: first-two-plain
+  both-tolerances:
+    all:
+      - any:
+          - pattern: "assert $NP.allclose($A, $B, rtol=$R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, atol=$T, rtol=$R)"
+          - pattern: "assert $NP.allclose($A, $B, $R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, $R, $T)"
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 3, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }, { has: { nthChild: 4, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }] } }
+  string-message:
+    all:
+      - pattern: "assert $NP.allclose($A, $B), $M"
+      - has: { nthChild: 2, any: [{ kind: string }, { kind: concatenated_string }] }
+      - matches: first-two-plain
+fix: $NP.testing.assert_allclose($A, $B, rtol=1e-05, atol=1e-08, equal_nan=False, err_msg=$M)
+metadata: { fix: unsafe }
+---
+# No fix for the other forms, such as equal_nan, a splat or a message that is not written as a
+# string, because err_msg must be a string and the documents above rebuild only rtol and atol.
 id: assert-on-arrays
 language: python
 severity: info
@@ -28,11 +212,45 @@ rule:
   kind: assert_statement
   has: { nthChild: 1, pattern: $NP.allclose($$$ARGS) }
   not:
-    all:
-      - pattern: "assert $NP.allclose($A, $B)"
-      - not: { has: { nthChild: 2 } }
+    any:
+      - all: [{ pattern: "assert $NP.allclose($A, $B)" }, { matches: no-message }]
+      - matches: rtol-only
+      - matches: atol-only
+      - matches: both-tolerances
+      - matches: string-message
 constraints:
   NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  no-message: { not: { has: { nthChild: 2 } } }
+  first-two-plain:
+    has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+  rtol-only:
+    all:
+      - any: [{ pattern: "assert $NP.allclose($A, $B, rtol=$R)" }, { pattern: "assert $NP.allclose($A, $B, $R)" }]
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, has: { nthChild: 3, any: [{ matches: plain }, { regex: '^rtol\s*=' }] } } }
+  atol-only:
+    all:
+      - pattern: "assert $NP.allclose($A, $B, atol=$T)"
+      - matches: no-message
+      - matches: first-two-plain
+  both-tolerances:
+    all:
+      - any:
+          - pattern: "assert $NP.allclose($A, $B, rtol=$R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, atol=$T, rtol=$R)"
+          - pattern: "assert $NP.allclose($A, $B, $R, atol=$T)"
+          - pattern: "assert $NP.allclose($A, $B, $R, $T)"
+      - matches: no-message
+      - matches: first-two-plain
+      - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 3, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }, { has: { nthChild: 4, any: [{ matches: plain }, { regex: '^(rtol|atol)\s*=' }] } }] } }
+  string-message:
+    all:
+      - pattern: "assert $NP.allclose($A, $B), $M"
+      - has: { nthChild: 2, any: [{ kind: string }, { kind: concatenated_string }] }
+      - matches: first-two-plain
 ---
 # Unsafe: assert_array_equal treats NaN in the same place as equal, compares an array with a
 # scalar where np.array_equal returns False, and fails on shapes that == broadcasts.
@@ -62,7 +280,64 @@ rule:
 fix: np.testing.assert_array_equal($A, $B)
 metadata: { fix: unsafe }
 ---
-# The same comparisons with a message, or with more arguments, have no fix.
+# Unsafe for the same reasons, and the message is built on every call where the assert built it
+# only on failure. err_msg must be a string, so the message must be written as one.
+id: assert-on-arrays
+language: python
+severity: info
+message: A failed assert on an array comparison reports only False. Write $NP.testing.assert_array_equal($A, $B, err_msg=$M), which shows the differing elements.
+rule:
+  any:
+    - pattern: "assert $NP.array_equal($A, $B), $M"
+    - pattern: "assert $NP.all($A == $B), $M"
+  matches: string-message
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  string: { any: [{ kind: string }, { kind: concatenated_string }] }
+  string-message:
+    all:
+      - any:
+          - all:
+              - pattern: "assert $NP.array_equal($A, $B), $M"
+              - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+          - pattern: "assert $NP.all($A == $B), $M"
+      - has: { nthChild: 2, matches: string }
+  string-message-method:
+    all:
+      - pattern: "assert ($A == $B).all(), $M"
+      - has: { nthChild: 2, matches: string }
+fix: $NP.testing.assert_array_equal($A, $B, err_msg=$M)
+metadata: { fix: unsafe }
+---
+id: assert-on-arrays
+language: python
+severity: info
+message: A failed assert on (a == b).all() reports only False. Write np.testing.assert_array_equal($A, $B, err_msg=$M), which shows the differing elements.
+rule:
+  pattern: "assert ($A == $B).all(), $M"
+  matches: string-message-method
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  string: { any: [{ kind: string }, { kind: concatenated_string }] }
+  string-message:
+    all:
+      - any:
+          - all:
+              - pattern: "assert $NP.array_equal($A, $B), $M"
+              - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+          - pattern: "assert $NP.all($A == $B), $M"
+      - has: { nthChild: 2, matches: string }
+  string-message-method:
+    all:
+      - pattern: "assert ($A == $B).all(), $M"
+      - has: { nthChild: 2, matches: string }
+fix: np.testing.assert_array_equal($A, $B, err_msg=$M)
+metadata: { fix: unsafe }
+---
+# No fix for a message that is not written as a string, which err_msg needs, or for more
+# arguments, such as equal_nan.
 id: assert-on-arrays
 language: python
 severity: info
@@ -76,11 +351,29 @@ rule:
       - pattern: $NP.all($A == $B)
       - pattern: ($A == $B).all()
   not:
-    all:
-      - any:
-          - pattern: "assert $NP.array_equal($A, $B)"
-          - pattern: assert $NP.all($A == $B)
-          - pattern: assert ($A == $B).all()
-      - not: { has: { nthChild: 2 } }
+    any:
+      - all:
+          - any:
+              - pattern: "assert $NP.array_equal($A, $B)"
+              - pattern: assert $NP.all($A == $B)
+              - pattern: assert ($A == $B).all()
+          - not: { has: { nthChild: 2 } }
+      - matches: string-message
+      - matches: string-message-method
 constraints:
   NP: { regex: '^(np|numpy)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  string: { any: [{ kind: string }, { kind: concatenated_string }] }
+  string-message:
+    all:
+      - any:
+          - all:
+              - pattern: "assert $NP.array_equal($A, $B), $M"
+              - has: { nthChild: 1, has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }
+          - pattern: "assert $NP.all($A == $B), $M"
+      - has: { nthChild: 2, matches: string }
+  string-message-method:
+    all:
+      - pattern: "assert ($A == $B).all(), $M"
+      - has: { nthChild: 2, matches: string }

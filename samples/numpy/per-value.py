@@ -123,8 +123,10 @@ def comprehensions():
     squares = np.array([x * x + 1 for x in a])  # xpd: per-value-comprehension
     roots = np.array([math.sqrt(x) for x in a])  # xpd: per-value-comprehension
     steps = np.array([i * 0.5 for i in range(6)])  # xpd: per-value-comprehension
+    total = np.array([x + 1 for x in a]).sum()  # xpd: per-value-comprehension
+    doubled = 2 * np.array([i + 1 for i in range(6)])  # xpd: per-value-comprehension
     mapped = list(map(np.sqrt, a))  # xpd: per-value-comprehension
-    return squares, roots, steps, mapped
+    return squares, roots, steps, mapped, total, doubled
 
 
 def scale(x):

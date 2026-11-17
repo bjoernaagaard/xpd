@@ -1,64 +1,145 @@
 # np.poly1d and the poly* functions are NumPy's old polynomial API. The docs say they should
 # not be used in new code and that numpy.polynomial is preferred:
-# https://numpy.org/doc/stable/reference/routines.polynomials.html. No fix, because
-# numpy.polynomial stores coefficients from degree zero up, the reverse of the old order, and
-# the old functions also take poly1d objects.
+# https://numpy.org/doc/stable/reference/routines.polynomials.html. numpy.polynomial stores
+# coefficients from degree zero up, the reverse of the old order, so each fix reverses them
+# with [::-1] on the way in and, where coefficients come out, on the way out. Unsafe: the old
+# functions also take poly1d objects, which [::-1] does not reverse, and numpy.polynomial turns
+# whole number coefficients into floats and computes in another order, so the last bits can
+# change.
+
+# Unsafe also because Polynomial.fit maps x onto [-1, 1] before it fits, a fit whose highest
+# coefficients are zero comes back shorter, and a 2-D y raises where polyfit fitted each column.
 id: legacy-polynomial
 language: python
 severity: info
-message: $NP.polyfit is part of NumPy's legacy polynomial API, and its docs recommend Polynomial.fit as more stable numerically. Write $NP.polynomial.Polynomial.fit(x, y, deg), and call .convert().coef for the coefficients from degree zero up.
-rule: { pattern: $NP.polyfit($$$ARGS) }
+message: $NP.polyfit is part of NumPy's legacy polynomial API, and its docs recommend Polynomial.fit as more stable numerically. Write $NP.polynomial.Polynomial.fit($X, $Y, $DEG).convert().coef[::-1], which keeps the coefficients from the highest degree down.
+rule: { pattern: "$NP.polyfit($X, $Y, $DEG)" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  Y: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  DEG: { any: [{ not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }, { regex: '^deg\s*=' }] }
+fix: $NP.polynomial.Polynomial.fit($X, $Y, $DEG).convert().coef[::-1]
+metadata: { fix: unsafe }
+---
+# Unsafe also because a Polynomial has other methods than a poly1d, such as roots() for r and
+# coef for coeffs, from degree zero up.
+id: legacy-polynomial
+language: python
+severity: info
+message: $NP.poly1d is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial($PC[::-1]), because the new class takes coefficients from degree zero up.
+rule: { pattern: "$NP.poly1d($C)" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: tight
+    rule: { pattern: $K, any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }, { kind: list }, { kind: tuple }] }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PC: { rewrite: { source: $C, rewriters: [tight, wrap] } }
+fix: $NP.polynomial.Polynomial($PC[::-1])
+metadata: { fix: unsafe }
 ---
 id: legacy-polynomial
 language: python
 severity: info
-message: $NP.poly1d is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]), because the new class takes coefficients from degree zero up.
-rule: { pattern: $NP.poly1d($$$ARGS) }
+message: $NP.polyval is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyval($X, $PC[::-1]), which takes x first and coefficients from degree zero up.
+rule: { pattern: "$NP.polyval($C, $X)" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  C: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: tight
+    rule: { pattern: $K, any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }, { kind: list }, { kind: tuple }] }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PC: { rewrite: { source: $C, rewriters: [tight, wrap] } }
+fix: $NP.polynomial.polynomial.polyval($X, $PC[::-1])
+metadata: { fix: unsafe }
+---
+# Unsafe also because polyroots sorts the roots.
+id: legacy-polynomial
+language: python
+severity: info
+message: $NP.roots is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyroots($PC[::-1]), because the new functions take coefficients from degree zero up.
+rule: { pattern: "$NP.roots($C)" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  C: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: tight
+    rule: { pattern: $K, any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }, { kind: list }, { kind: tuple }] }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PC: { rewrite: { source: $C, rewriters: [tight, wrap] } }
+fix: $NP.polynomial.polynomial.polyroots($PC[::-1])
+metadata: { fix: unsafe }
+---
+# Unsafe also because np.poly of a square matrix gave its characteristic polynomial, where
+# polyfromroots takes the values of the matrix as roots.
+id: legacy-polynomial
+language: python
+severity: info
+message: $NP.poly is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyfromroots($R)[::-1], which gives the same coefficients from the highest degree down.
+rule: { pattern: "$NP.poly($R)" }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  R: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: $NP.polynomial.polynomial.polyfromroots($R)[::-1]
+metadata: { fix: unsafe }
 ---
 id: legacy-polynomial
 language: python
 severity: info
-message: $NP.polyval is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyval(x, coef[::-1]), which takes x first and coefficients from degree zero up.
-rule: { pattern: $NP.polyval($$$ARGS) }
+message: $NP.polyder is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyder($PC[::-1])[::-1], because the new functions take coefficients from degree zero up.
+rule: { pattern: "$NP.polyder($C)" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  C: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: tight
+    rule: { pattern: $K, any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }, { kind: list }, { kind: tuple }] }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PC: { rewrite: { source: $C, rewriters: [tight, wrap] } }
+fix: $NP.polynomial.polynomial.polyder($PC[::-1])[::-1]
+metadata: { fix: unsafe }
 ---
 id: legacy-polynomial
 language: python
 severity: info
-message: $NP.roots is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).roots(), because the new class takes coefficients from degree zero up.
-rule: { pattern: $NP.roots($$$ARGS) }
+message: $NP.polyint is part of NumPy's legacy polynomial API. Write $NP.polynomial.polynomial.polyint($PC[::-1])[::-1], because the new functions take coefficients from degree zero up.
+rule: { pattern: "$NP.polyint($C)" }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+  C: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: tight
+    rule: { pattern: $K, any: [{ kind: identifier }, { kind: attribute }, { kind: subscript }, { kind: call }, { kind: parenthesized_expression }, { kind: list }, { kind: tuple }] }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PC: { rewrite: { source: $C, rewriters: [tight, wrap] } }
+fix: $NP.polynomial.polynomial.polyint($PC[::-1])[::-1]
+metadata: { fix: unsafe }
 ---
-id: legacy-polynomial
-language: python
-severity: info
-message: $NP.poly is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial.fromroots(roots), which gives coefficients from degree zero up.
-rule: { pattern: $NP.poly($$$ARGS) }
-constraints:
-  NP: { regex: '^(np|numpy)$' }
----
-id: legacy-polynomial
-language: python
-severity: info
-message: $NP.polyder is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).deriv(), because the new class takes coefficients from degree zero up.
-rule: { pattern: $NP.polyder($$$ARGS) }
-constraints:
-  NP: { regex: '^(np|numpy)$' }
----
-id: legacy-polynomial
-language: python
-severity: info
-message: $NP.polyint is part of NumPy's legacy polynomial API. Write $NP.polynomial.Polynomial(coef[::-1]).integ(), because the new class takes coefficients from degree zero up.
-rule: { pattern: $NP.polyint($$$ARGS) }
-constraints:
-  NP: { regex: '^(np|numpy)$' }
----
+# No fix, because the advice is to keep Polynomial objects and use their operators.
 id: legacy-polynomial
 language: python
 severity: info
@@ -67,3 +148,29 @@ rule: { pattern: $NP.$F($$$ARGS) }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   F: { regex: '^(polyadd|polysub|polymul|polydiv)$' }
+---
+# No fix for the other arguments, such as full=True, w, r=True or m, because the documents
+# above rebuild only the usual call.
+id: legacy-polynomial
+language: python
+severity: info
+message: $NP.$F is part of NumPy's legacy polynomial API. $HINT
+rule:
+  pattern: $NP.$F($$$ARGS)
+  not:
+    any:
+      - all: [{ pattern: "$NP.polyfit($X, $Y, $DEG)" }, { has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }, { has: { nthChild: 3, any: [{ matches: plain }, { regex: '^deg\s*=' }] } }] } }]
+      - all: [{ pattern: "$NP.polyval($C, $X)" }, { has: { field: arguments, all: [{ has: { nthChild: 1, matches: plain } }, { has: { nthChild: 2, matches: plain } }] } }]
+      - all: [{ pattern: "$NP.$G($C)" }, { has: { field: function, regex: '\.(poly1d|roots|poly|polyder|polyint)$' } }, { has: { field: arguments, has: { nthChild: 1, matches: plain } } }]
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(polyfit|poly1d|polyval|roots|poly|polyder|polyint)$' }
+utils:
+  plain: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+transform:
+  H1: { replace: { source: $F, replace: '^polyfit$', by: 'Its docs recommend Polynomial.fit as more stable numerically. Write numpy.polynomial.Polynomial.fit(x, y, deg), and call .convert().coef for the coefficients from degree zero up.' } }
+  H2: { replace: { source: $H1, replace: '^poly1d$', by: 'Write numpy.polynomial.Polynomial(coef[::-1]), because the new class takes coefficients from degree zero up.' } }
+  H3: { replace: { source: $H2, replace: '^polyval$', by: 'Write numpy.polynomial.polynomial.polyval(x, coef[::-1]), which takes x first and coefficients from degree zero up.' } }
+  H4: { replace: { source: $H3, replace: '^roots$', by: 'Write numpy.polynomial.polynomial.polyroots(coef[::-1]), because the new functions take coefficients from degree zero up.' } }
+  H5: { replace: { source: $H4, replace: '^poly$', by: 'Write numpy.polynomial.polynomial.polyfromroots(roots), which gives coefficients from degree zero up.' } }
+  HINT: { replace: { source: $H5, replace: '^(polyder|polyint)$', by: 'Write numpy.polynomial.polynomial.$1(coef[::-1]), because the new functions take coefficients from degree zero up.' } }

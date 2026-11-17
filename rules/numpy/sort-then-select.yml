@@ -106,6 +106,7 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
   K: { kind: integer, regex: '^[1-9][0-9]?$' }
 ---
+# The fix needs a second statement, so there is none.
 id: sort-then-select
 language: python
 severity: warning

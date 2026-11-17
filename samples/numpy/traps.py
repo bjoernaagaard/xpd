@@ -32,6 +32,7 @@ def nan_comparisons():
         float("nan") != x,  # xpd: compare-to-nan
         x != math.nan,  # xpd: compare-to-nan
         np.nan in np.unique(x),  # xpd: compare-to-nan
+        np.nan not in np.unique(x),  # xpd: compare-to-nan
         np.isnan(x),
         ~np.isnan(x),
         x == np.inf,
@@ -110,6 +111,7 @@ def tolerance_in_the_third_slot():
     return [
         np.isclose(0.0, 1e-4, 1e-3),  # xpd: positional-tolerance
         np.allclose(np.zeros(2), np.full(2, 1e-4), 1e-3),  # xpd: positional-tolerance
+        np.isclose(0.0, 1e-4, 1e-3, equal_nan=True),  # xpd: positional-tolerance
         np.isclose(0.0, 1e-4, atol=1e-3),
         np.isclose(0.0, 1e-4, rtol=1e-3),
         np.allclose(np.zeros(2), np.full(2, 1e-4)),
@@ -336,6 +338,7 @@ def iterators_that_raise(y):
     np.sum(v for v in y)  # xpd: iterator-to-array
     np.mean(map(float, y))  # xpd: iterator-to-array
     np.concatenate(np.ones(2) for _ in y)  # xpd: iterator-to-array
+    np.array({1, 2, 3}, dtype=float)  # xpd: iterator-to-array
 
 
 @case

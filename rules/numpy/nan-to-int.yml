@@ -1,6 +1,7 @@
 # Casting NaN to a whole number has no right answer. NumPy 2.5 gives the smallest int64 with a
 # RuntimeWarning, and the value differs between platforms. A cast whose input the code fills
 # with np.nan, as in np.where(m, x, np.nan).astype(int), meets NaN whenever that branch is taken.
+# No fix, because the whole number that should stand for NaN is not in the file.
 id: nan-to-int
 language: python
 severity: warning

@@ -90,7 +90,8 @@ utils:
 fix: ($E).$B(axis=0)
 metadata: { fix: unsafe }
 ---
-# sorted gives a list of NumPy scalars and np.sort gives an array, so there is no fix.
+# Unsafe: np.sort gives an array where sorted gave a list, puts NaN last where sorted left it in
+# place, and sorts each row of a 2-D array where sorted raised.
 id: builtin-on-array
 language: python
 severity: warning
@@ -108,9 +109,11 @@ utils:
     kind: comparison_operator
     not: { regex: '\b(in|is)\b' }
     has: { matches: numpy-call }
+fix: np.sort($E)
+metadata: { fix: unsafe }
 ---
-# list gives NumPy scalars, or arrays for a 2-D array, and tolist gives Python values, so there is
-# no fix.
+# Unsafe: tolist gives Python numbers where list gave NumPy scalars, and lists of rows where list
+# gave the rows of a 2-D array as arrays.
 id: builtin-on-array
 language: python
 severity: warning
@@ -128,3 +131,5 @@ utils:
     kind: comparison_operator
     not: { regex: '\b(in|is)\b' }
     has: { matches: numpy-call }
+fix: $E.tolist()
+metadata: { fix: unsafe }

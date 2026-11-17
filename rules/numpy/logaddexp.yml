@@ -30,7 +30,22 @@ fix: $NP.logaddexp(0, $X)
 metadata: { fix: unsafe }
 ---
 # np.logaddexp.reduce is exact but ran 8 times slower, so the message names the shift by the
-# maximum, which ran 1.7 times slower than the old form, and SciPy.
+# maximum, which ran 1.7 times slower than the old form. The fix writes $X three times, so it
+# applies only when $X calls nothing. Unsafe: the last bits change, inf becomes a number, an
+# array of only -inf gives NaN where the old form gave -inf, and an empty array raises.
+id: logaddexp
+language: python
+severity: warning
+message: exp($X) overflows to inf above 709, so this log of a sum gives inf where the answer is finite. Write $NP.max($X) + $NP.log($NP.sum($NP.exp($X - $NP.max($X)))), which subtracts the maximum before exp.
+rule: { pattern: $NP.log($NP.sum($NP.exp($X))) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  X: { not: { any: [{ regex: '\bmax\b' }, { kind: call }, { has: { stopBy: end, kind: call } }] } }
+fix: $NP.max($X) + $NP.log($NP.sum($NP.exp($X - $NP.max($X))))
+metadata: { fix: unsafe }
+---
+# No fix, because $X calls a function that the rewrite would call three times, and a name for
+# its value is not in the file.
 id: logaddexp
 language: python
 severity: warning
@@ -38,9 +53,25 @@ message: exp($X) overflows to inf above 709, so this log of a sum gives inf wher
 rule: { pattern: $NP.log($NP.sum($NP.exp($X))) }
 constraints:
   NP: { regex: '^(np|numpy)$' }
-  X: { not: { regex: '\bmax\b' } }
+  X: { not: { regex: '\bmax\b' }, any: [{ kind: call }, { has: { stopBy: end, kind: call } }] }
 ---
-# The softmax. At [1000, 1000, 999] the old form gave nan for every value.
+# The softmax. At [1000, 1000, 999] the old form gave nan for every value. The fix writes $X
+# four times, so it applies only when $X calls nothing. Unsafe: the last bits change, and an
+# array of only -inf gives NaN as before but an empty array raises.
+id: logaddexp
+language: python
+severity: warning
+message: exp($X) overflows to inf above 709, and inf divided by inf is nan, so this softmax gives nan. Write $NP.exp($X - $NP.max($X)) / $NP.sum($NP.exp($X - $NP.max($X))), which subtracts the maximum first.
+rule: { pattern: $NP.exp($X) / $NP.sum($NP.exp($X)) }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  X: { not: { any: [{ regex: '\bmax\b' }, { kind: call }, { has: { stopBy: end, kind: call } }] } }
+fix: $NP.exp($X - $NP.max($X)) / $NP.sum($NP.exp($X - $NP.max($X)))
+metadata: { fix: unsafe }
+---
+# No fix when the sum runs along an axis, where the maximum must run along the same axis with
+# keepdims, which the code does not show, or when $X calls a function that the rewrite would
+# call four times.
 id: logaddexp
 language: python
 severity: warning
@@ -50,6 +81,10 @@ rule:
     - pattern: $NP.exp($X) / $NP.sum($NP.exp($X))
     - pattern: $NP.exp($X) / $NP.sum($NP.exp($X), $$$REST)
     - pattern: $NP.exp($X) / $NP.exp($X).sum($$$REST)
+  not:
+    all:
+      - pattern: $NP.exp($X) / $NP.sum($NP.exp($X))
+      - not: { has: { stopBy: end, kind: call, not: { regex: '^(np|numpy)\.(exp|sum)\(' } } }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   X: { not: { regex: '\bmax\b' } }

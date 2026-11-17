@@ -1,10 +1,12 @@
 # np.empty and np.empty_like leave the memory as they found it, so an expression that reads the
 # new array at once computes with leftover bytes. np.empty(n) * np.nan is left alone, because
-# every value becomes NaN whatever the bytes held.
+# every value becomes NaN whatever the bytes held. The fix writes $Z with the same arguments.
+# Unsafe on purpose, because the result becomes a computation on zeros where it was on leftover
+# bytes.
 id: read-uninitialized
 language: python
 severity: error
-message: $F leaves the values unset, so this computes with whatever bytes were in memory. Write $Z, or fill the array before reading it.
+message: $F leaves the values unset, so this computes with whatever bytes were in memory. Write $Z($$$ARGS), which starts from zeros.
 rule:
   pattern: $F($$$ARGS)
   any:
@@ -24,3 +26,5 @@ constraints:
   F: { regex: '^(np|numpy)\.(empty|empty_like)$' }
 transform:
   Z: { replace: { source: $F, replace: empty, by: zeros } }
+fix: $Z($$$ARGS)
+metadata: { fix: unsafe }

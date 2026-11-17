@@ -1,7 +1,8 @@
 # The slow form is an array that grows inside a loop, as in `out = np.append(out, x)`, which
 # copies every earlier value on each pass. A call that builds the array from other arrays, such
 # as `rows = np.vstack(parts_of_this_row)`, copies each value once and is left alone, and so is
-# an array that the same pass set before it grows, because it starts again on every pass.
+# an array that the same pass set before it grows, because it starts again on every pass. No fix,
+# because the list and the call after the loop are in other statements than the match.
 id: growth-in-loop
 language: python
 severity: warning

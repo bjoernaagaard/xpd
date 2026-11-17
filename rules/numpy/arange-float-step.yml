@@ -2,7 +2,8 @@
 # such as 0.1 the stop value can appear in the result or the length can be one off. The NumPy
 # docs for arange say "When using a non-integer step, such as 0.1, it is often better to use
 # numpy.linspace" (https://numpy.org/doc/stable/reference/generated/numpy.arange.html). A step
-# that is a multiple of 1/64, such as 0.5, 0.25 or 0.03125, is exact and left alone.
+# that is a multiple of 1/64, such as 0.5, 0.25 or 0.03125, is exact and left alone. No fix,
+# because the number of values is not in the file.
 id: arange-float-step
 language: python
 severity: warning

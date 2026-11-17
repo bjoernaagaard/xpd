@@ -1,25 +1,36 @@
 # The high end of np.random.randint and Generator.integers is exclusive, so randint(0, 1) and
-# randint(1) can only return 0.
+# randint(1) can only return 0. The fixes write a high end of 2 and keep the other arguments.
+# They are unsafe on purpose, because the result becomes a 0 or a 1 where it was always 0.
 id: randint-single-value
 language: python
 severity: error
-message: The high end of randint is exclusive, so this always returns 0. Write $NP.random.randint(0, 2) for a 0 or a 1.
+message: The high end of randint is exclusive, so this always returns 0. Write $NP.random.randint($NEW) for a 0 or a 1.
 rule:
+  pattern: $NP.random.randint($$$ARGS)
   any:
     - pattern: $NP.random.randint(0, 1, $$$REST)
     - pattern: $NP.random.randint(1)
     - pattern: $NP.random.randint(1, size=$S)
 constraints:
   NP: { regex: '^(np|numpy)$' }
+transform:
+  NEW: { replace: { source: $$$ARGS, replace: '^(0\s*,\s*)?1\b', by: '0, 2' } }
+fix: $NP.random.randint($NEW)
+metadata: { fix: unsafe }
 ---
 # Generator.integers, unless endpoint=True makes the high end inclusive.
 id: randint-single-value
 language: python
 severity: error
-message: The high end of $R.integers is exclusive, so this always returns 0. Write $R.integers(0, 2) for a 0 or a 1.
+message: The high end of $R.integers is exclusive, so this always returns 0. Write $R.integers($NEW) for a 0 or a 1.
 rule:
+  pattern: $R.integers($$$ARGS)
   any:
     - pattern: $R.integers(0, 1, $$$REST)
     - pattern: $R.integers(1)
     - pattern: $R.integers(1, size=$S)
   not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^endpoint$ } } } }
+transform:
+  NEW: { replace: { source: $$$ARGS, replace: '^(0\s*,\s*)?1\b', by: '0, 2' } }
+fix: $R.integers($NEW)
+metadata: { fix: unsafe }

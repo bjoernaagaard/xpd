@@ -34,7 +34,8 @@ constraints:
 fix: $NP.count_nonzero($C)
 metadata: { fix: unsafe }
 ---
-# Unsafe: len returns a Python int and count_nonzero a NumPy integer.
+# Unsafe: len returns a Python int and count_nonzero a NumPy integer, and when $X is a dict,
+# len counted the value that the comparison looked up.
 id: count-nonzero
 language: python
 severity: warning
@@ -42,6 +43,8 @@ message: This copies the selected values to count them, which ran 14 times slowe
 rule: { pattern: "len($X[$C])" }
 constraints:
   C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
+fix: np.count_nonzero($C)
+metadata: { fix: unsafe }
 ---
 # np.sum returns a NumPy integer, so the comparison gives a NumPy bool, as np.any does. Masked
 # arrays and pandas columns with missing values gave the same result in runs/safety-pandas.txt.

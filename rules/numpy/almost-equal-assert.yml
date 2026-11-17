@@ -109,7 +109,9 @@ fix: assert_allclose($A, $B, rtol=0, atol=1.5e-$D)
 metadata: { fix: unsafe }
 ---
 # Every other call, such as a bare name that the file does not import from numpy.testing, an
-# err_msg argument or a computed decimal.
+# err_msg argument or a computed decimal. No fix, because a bare name that the file does not
+# import may name another function, and the documents above rebuild only the two values and a
+# literal decimal.
 id: almost-equal-assert
 language: python
 severity: info
@@ -137,12 +139,56 @@ utils:
             - has: { nthChild: 3, kind: integer }
             - has: { nthChild: 3, kind: keyword_argument, regex: '^decimal\s*=\s*\d+$' }
 ---
-# assert_approx_equal compares significant digits, which no assert_allclose call reproduces
-# exactly, so it has no fix.
+# assert_approx_equal compares 7 significant digits by default, which the fix writes as
+# rtol=1e-6. Unsafe: the old test scaled the tolerance to the power of ten below the
+# mean of the two values, so a difference up to ten times rtol passed before and fails after,
+# and a desired value of 0 now fails on any other actual value.
+id: almost-equal-assert
+language: python
+severity: info
+message: assert_approx_equal is on NumPy's not recommended list, and its default compares 7 significant digits. Write $M.assert_allclose($A, $B, rtol=1e-6).
+rule: { pattern: "$M.assert_approx_equal($A, $B)" }
+constraints:
+  M: { regex: '^(np\.testing|numpy\.testing|npt|nt|testing)$' }
+  A: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  B: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: $M.assert_allclose($A, $B, rtol=1e-6)
+metadata: { fix: unsafe }
+---
+id: almost-equal-assert
+language: python
+severity: info
+message: assert_approx_equal is on NumPy's not recommended list, and its default compares 7 significant digits. Write assert_allclose($A, $B, rtol=1e-6).
+rule:
+  pattern: "$F($A, $B)"
+  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+constraints:
+  F: { regex: '^assert_approx_equal$' }
+  A: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  B: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: assert_allclose($A, $B, rtol=1e-6)
+metadata: { fix: unsafe }
+---
+# No fix for significant=, err_msg or a bare name that the file does not import from
+# numpy.testing, because the documents above write only the default of 7 digits.
 id: almost-equal-assert
 language: python
 severity: info
 message: assert_approx_equal is on NumPy's not recommended list. Write assert_allclose with rtol set to the relative tolerance the test needs, such as rtol=1e-6 for 7 significant digits.
-rule: { pattern: $F($$$ARGS) }
+rule:
+  pattern: $F($$$ARGS)
+  not:
+    all:
+      - any:
+          - has: { field: function, regex: '^(np\.testing|numpy\.testing|npt|nt|testing)\.' }
+          - all:
+              - has: { field: function, kind: identifier }
+              - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, regex: '^assert_approx_equal$' } }] } }
+      - has:
+          field: arguments
+          all:
+            - has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+            - has: { nthChild: 2, not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+            - not: { has: { nthChild: 3 } }
 constraints:
   F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_approx_equal$' }

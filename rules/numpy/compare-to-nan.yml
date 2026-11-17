@@ -76,15 +76,26 @@ metadata: { fix: unsafe }
 ---
 # An array holds new float objects, so `in` compares with ==, and NaN never matches. On a list
 # that holds the np.nan object itself, `in` matches by identity, so only an array made by a
-# NumPy call on the right counts.
+# NumPy call on the right counts. Unsafe on purpose, and isnan raises on an array of text or
+# objects, where `in` returned False.
 id: compare-to-nan
 language: python
 severity: error
 message: The in operator compares with ==, and NaN equals nothing, so it never finds NaN in an array. Write $NP.isnan($A).any().
-rule:
-  any:
-    - pattern: $NP.nan in $A
-    - pattern: $NP.nan not in $A
+rule: { pattern: $NP.nan in $A }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   A: { kind: call, has: { field: function, regex: '^(np|numpy)\.' } }
+fix: $NP.isnan($A).any()
+metadata: { fix: unsafe }
+---
+id: compare-to-nan
+language: python
+severity: error
+message: The in operator compares with ==, and NaN equals nothing, so `not in` always finds NaN missing from an array. Write not $NP.isnan($A).any().
+rule: { pattern: $NP.nan not in $A }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { kind: call, has: { field: function, regex: '^(np|numpy)\.' } }
+fix: not $NP.isnan($A).any()
+metadata: { fix: unsafe }

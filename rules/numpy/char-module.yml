@@ -39,6 +39,7 @@ constraints:
 fix: $NP.strings.multiply
 metadata: { fix: unsafe, since: "2.0" }
 ---
+# Unsafe: np.strings.$F returns a tuple of three arrays where np.char returned one array.
 id: char-module
 language: python
 severity: info
@@ -47,4 +48,5 @@ rule: { pattern: $NP.char.$F }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   F: { regex: '^(partition|rpartition)$' }
-metadata: { since: "2.0" }
+fix: $NP.strings.$F
+metadata: { fix: unsafe, since: "2.0" }

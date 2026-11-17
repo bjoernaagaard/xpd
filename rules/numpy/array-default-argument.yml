@@ -1,6 +1,7 @@
 # A default value is built once, when def runs, and every call shares it. A function that writes
 # into an array default changes the default for every later call. Only a default that the body
-# writes to is reported, through +=, an index assignment, or an in place method.
+# writes to is reported, through +=, an index assignment, or an in place method. No fix, because
+# the array has to be built in the body of the function.
 id: array-default-argument
 language: python
 severity: warning

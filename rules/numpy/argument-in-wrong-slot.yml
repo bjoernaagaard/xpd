@@ -56,10 +56,12 @@ constraints:
 fix: $NP.$F(($A, $B))
 metadata: { fix: unsafe }
 ---
+# The fix puts the positional arguments in one tuple and keeps the keywords after it. It drops
+# comments between the arguments.
 id: argument-in-wrong-slot
 language: python
 severity: error
-message: $NP.$F takes one sequence of arrays, so more than one positional argument raises TypeError. Put the arrays in one tuple.
+message: $NP.$F takes one sequence of arrays, so more than one positional argument raises TypeError. Write $NP.$F(($ARRAYS)$KEYWORDS).
 rule:
   pattern: $NP.$F($$$ARGS)
   has:
@@ -70,6 +72,25 @@ rule:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   F: { regex: '^(vstack|hstack|dstack|column_stack)$' }
+rewriters:
+  - id: drop-other
+    rule: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }, { kind: line_continuation }] }
+    fix: ""
+  - id: keep-array
+    rule: { pattern: $X }
+    fix: "$X, "
+  - id: keep-keyword
+    rule: { pattern: $X, any: [{ kind: keyword_argument }, { kind: dictionary_splat }] }
+    fix: ", $X"
+  - id: drop-array
+    rule: { pattern: $X }
+    fix: ""
+transform:
+  LISTED: { rewrite: { source: $$$ARGS, rewriters: [drop-other, keep-array], joinBy: "" } }
+  ARRAYS: { replace: { source: $LISTED, replace: ", $", by: "" } }
+  KEYWORDS: { rewrite: { source: $$$ARGS, rewriters: [keep-keyword, drop-array], joinBy: "" } }
+fix: $NP.$F(($ARRAYS)$KEYWORDS)
+metadata: { fix: unsafe }
 ---
 # The second argument of np.concatenate and np.stack is the axis, so a list, a tuple or an array
 # there is an array that was meant to join the first.
@@ -123,7 +144,8 @@ fix: $NP.random.$F(($A, $B))
 metadata: { fix: unsafe }
 ---
 # The third argument of np.linspace is the number of values. A float there raises, and a true
-# division always gives a float.
+# division always gives a float. No fix, because the code does not show whether a count or a step
+# was meant.
 id: argument-in-wrong-slot
 language: python
 severity: error
@@ -183,6 +205,7 @@ language: python
 severity: error
 message: $NP.$F takes fractions from 0 to 1, so a percent raises ValueError. For percents call $NP.$P with the same arguments.
 rule:
+  pattern: $NP.$F($$$ARGS)
   any:
     - pattern: $NP.$F($A, $Q, $$$REST)
     - pattern: $NP.$F($A, $Q)
@@ -210,3 +233,5 @@ utils:
       - { kind: float, regex: '^1\.\d*[1-9]\d*$' }
 transform:
   P: { replace: { source: $F, replace: quantile, by: percentile } }
+fix: $NP.$P($$$ARGS)
+metadata: { fix: unsafe }

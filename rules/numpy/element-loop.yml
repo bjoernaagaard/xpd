@@ -2,7 +2,8 @@
 # position. A body that calls a function of its own, reads the array it writes, writes a slice,
 # reads through a lookup table, or does more than one thing is left alone, because such a loop
 # is often meant. The array must come from a NumPy call before the loop, or the body must call
-# NumPy, so that a loop over a Python list is not reported.
+# NumPy, so that a loop over a Python list is not reported. No document has a fix, because the
+# expression on whole arrays depends on what the body computes.
 id: element-loop
 language: python
 severity: warning

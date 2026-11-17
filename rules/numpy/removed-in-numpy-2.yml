@@ -169,6 +169,7 @@ constraints:
 fix: "-0.0"
 metadata: { fix: safe }
 ---
+# Unsafe, because the old form raises on NumPy 2.5. The parentheses keep the minus with inf.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -193,7 +194,10 @@ utils:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^(NINF)$' }
+fix: (-$NP.inf)
+metadata: { fix: unsafe }
 ---
+# Unsafe, because the old form raises on NumPy 2.5.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -218,6 +222,8 @@ utils:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { regex: '^(NZERO)$' }
+fix: (-0.0)
+metadata: { fix: unsafe }
 ---
 # Each old function called the new one with the same arguments, or was the same object.
 id: removed-in-numpy-2
@@ -366,6 +372,7 @@ constraints:
 fix: $A.item()
 metadata: { fix: safe }
 ---
+# Unsafe, because the old form raises on NumPy 2.5.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -377,6 +384,8 @@ rule:
 constraints:
   NP: { regex: '^(np|numpy)$' }
   A: { not: { any: [{ kind: identifier }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
+fix: ($A).item()
+metadata: { fix: unsafe }
 ---
 # in1d flattened its result, and isin keeps the shape of its first argument, so the fix is
 # unsafe on an input with more than one dimension. isin(...).ravel() is what in1d gave.
@@ -498,7 +507,33 @@ transform:
   H74: { replace: { source: $H73, replace: '^Datetime64$', by: Use np.datetime64. } }
   HINT: { replace: { source: $H74, replace: '^[A-Z_]+$', by: It was an internal constant with no replacement. } }
 ---
-# np.exceptions arrived in NumPy 1.25.
+# np.exceptions arrived in NumPy 1.25. Unsafe, because the old import raises on NumPy 2.5.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 no longer has these names in numpy. Write $NEW.
+rule:
+  all:
+    - matches: moved-import
+      pattern: $S
+    - not: { matches: compat-code }
+utils:
+  # A statement on one line that imports only these names from numpy.
+  moved-import:
+    kind: import_from_statement
+    not: { regex: '\n' }
+    all:
+      - has: { field: module_name, regex: '^numpy$' }
+      - not: { has: { kind: wildcard_import } }
+      - not: { has: { kind: dotted_name, not: { regex: '^(numpy|AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$' } } }
+      - not: { has: { kind: aliased_import, not: { has: { field: name, regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$' } } } }
+transform:
+  NEW: { replace: { source: $S, replace: '^from\s+numpy\s+import', by: 'from numpy.exceptions import' } }
+fix: $NEW
+metadata: { fix: unsafe, since: "1.25" }
+---
+# No fix when the statement spans lines or imports other names too, because the import has to
+# become two statements.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -514,10 +549,52 @@ rule:
             kind: aliased_import
             field: name
             inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+    - not: { inside: { stopBy: end, kind: import_from_statement, matches: moved-import } }
     - not: { matches: compat-code }
+utils:
+  # A statement on one line that imports only these names from numpy.
+  moved-import:
+    kind: import_from_statement
+    not: { regex: '\n' }
+    all:
+      - has: { field: module_name, regex: '^numpy$' }
+      - not: { has: { kind: wildcard_import } }
+      - not: { has: { kind: dotted_name, not: { regex: '^(numpy|AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$' } } }
+      - not: { has: { kind: aliased_import, not: { has: { field: name, regex: '^(AxisError|ComplexWarning|VisibleDeprecationWarning|TooHardError|ModuleDeprecationWarning|DTypePromotionError)$' } } } }
 metadata: { since: "1.25" }
 ---
 # trapezoid, np.lib.array_utils and np.exceptions.RankWarning arrived in NumPy 2.0.
+# Unsafe, because the old import raises on NumPy 2.5.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 no longer has numpy.$N. Write $NEW.
+rule:
+  all:
+    - matches: moved-import
+      pattern: $S
+      has: { field: name, any: [{ kind: dotted_name, pattern: $N }, { kind: aliased_import, has: { field: name, pattern: $N } }] }
+      # The two names go to different modules, so the statement must import one name.
+      not: { has: { nthChild: 3 } }
+    - not: { matches: compat-code }
+utils:
+  # A statement on one line that imports only these names from numpy.
+  moved-import:
+    kind: import_from_statement
+    not: { regex: '\n' }
+    all:
+      - has: { field: module_name, regex: '^numpy$' }
+      - not: { has: { kind: wildcard_import } }
+      - not: { has: { kind: dotted_name, not: { regex: '^(numpy|RankWarning|byte_bounds)$' } } }
+      - not: { has: { kind: aliased_import, not: { has: { field: name, regex: '^(RankWarning|byte_bounds)$' } } } }
+transform:
+  T1: { replace: { source: $S, replace: '^from\s+numpy\s+import(\s+RankWarning\b)', by: 'from numpy.exceptions import$1' } }
+  NEW: { replace: { source: $T1, replace: '^from\s+numpy\s+import(\s+byte_bounds\b)', by: 'from numpy.lib.array_utils import$1' } }
+fix: $NEW
+metadata: { fix: unsafe, since: "2.0" }
+---
+# No fix for trapz, whose new name trapezoid the code would have to use too, or when the
+# statement spans lines or imports other names, because the import has to become two statements.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -533,7 +610,18 @@ rule:
             kind: aliased_import
             field: name
             inside: { kind: import_from_statement, has: { field: module_name, regex: '^numpy$' } }
+    - not: { inside: { stopBy: end, kind: import_from_statement, all: [{ matches: moved-import }, { not: { has: { nthChild: 3 } } }] } }
     - not: { matches: compat-code }
+utils:
+  # A statement on one line that imports only these names from numpy.
+  moved-import:
+    kind: import_from_statement
+    not: { regex: '\n' }
+    all:
+      - has: { field: module_name, regex: '^numpy$' }
+      - not: { has: { kind: wildcard_import } }
+      - not: { has: { kind: dotted_name, not: { regex: '^(numpy|RankWarning|byte_bounds)$' } } }
+      - not: { has: { kind: aliased_import, not: { has: { field: name, regex: '^(RankWarning|byte_bounds)$' } } } }
 transform:
   H1: { replace: { source: $N, replace: '^RankWarning$', by: Import it from numpy.exceptions. } }
   H2: { replace: { source: $H1, replace: '^trapz$', by: Import trapezoid instead. } }
@@ -583,7 +671,8 @@ utils:
 fix: from numpy import $$$NAMES
 metadata: { fix: safe }
 ---
-# A moved name imported together with a name that numpy.lib keeps, such as NumpyVersion.
+# A moved name imported together with a name that numpy.lib keeps, such as NumpyVersion. No fix,
+# because the import has to become two statements.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -613,7 +702,9 @@ utils:
         - { kind: aliased_import, not: { has: { field: name, matches: moved-name } } }
         - kind: wildcard_import
 ---
-# Modules that NumPy removed or made private. HINT names where their public names live now.
+# Modules that NumPy removed or made private. HINT names where their public names live now. No
+# fix, because these modules have no one to one replacement, or the code that reads the module
+# has to change with the import.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -668,7 +759,27 @@ transform:
 fix: $NEW
 metadata: { fix: unsafe }
 ---
-# The same modules reached by attribute, and the nose helpers of numpy.testing.
+# The modules whose public names live on in one module. Unsafe, because the old module also held
+# private names that the new one does not export.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: NumPy 2 has no $M. Write $NEW.
+rule:
+  all:
+    - kind: attribute
+      pattern: $M
+      regex: '^(np|numpy)\.(linalg\.linalg|fft\.helper|testing\.utils|lib\.(function_base|type_check|shape_base|index_tricks|arraysetops|nanfunctions|twodim_base|ufunclike|histograms|arraypad))$'
+      not: { inside: { kind: assignment, field: left } }
+    - not: { matches: compat-code }
+transform:
+  T1: { replace: { source: $M, replace: '^(np|numpy)\.(linalg|fft|testing)\.\w+$', by: '$1.$2' } }
+  NEW: { replace: { source: $T1, replace: '^(np|numpy)\.lib\.\w+$', by: '$1' } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+# The other modules reached by attribute, and the nose helpers of numpy.testing. No fix for the
+# modules with no one to one replacement.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -678,7 +789,7 @@ rule:
     - kind: attribute
       pattern: $M
       regex: '^(np|numpy)\.(linalg\.linalg|fft\.helper|lib\.(math|financial|function_base|type_check|shape_base|index_tricks|arraysetops|utils|nanfunctions|twodim_base|ufunclike|histograms|arraypad|arrayterator)|core\.umath_tests|testing\.(dec|decorators|nosetester|utils|Tester|raises|run_module_suite)|distutils|dual|oldnumeric|numarray)$'
-      not: { inside: { kind: assignment, field: left } }
+      not: { any: [{ inside: { kind: assignment, field: left } }, { regex: '^(np|numpy)\.(linalg\.linalg|fft\.helper|testing\.utils|lib\.(function_base|type_check|shape_base|index_tricks|arraysetops|nanfunctions|twodim_base|ufunclike|histograms|arraypad))$' }] }
     - not: { matches: compat-code }
 transform:
   H1: { replace: { source: $M, replace: '^(np|numpy)\.(linalg|fft)\.\w+$', by: 'Use $1.$2.' } }
@@ -694,7 +805,8 @@ transform:
   H11: { replace: { source: $H10, replace: '^(np|numpy)\.dual$', by: Use the functions of numpy or scipy. } }
   HINT: { replace: { source: $H11, replace: '^(np|numpy)\.(oldnumeric|numarray)$', by: Port the code to numpy. } }
 ---
-# The nose helpers imported from numpy.testing.
+# The nose helpers imported from numpy.testing. No fix, because pytest has no function of the
+# same shape.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -823,7 +935,26 @@ fix: $X[$I, $J, $K] = $V
 metadata: { fix: unsafe }
 ---
 # A single integer index set the element at that flat position, so a.itemset(4, v) is
-# a.flat[4] = v, which differs from a[4] = v on more than one dimension.
+# a.flat[4] = v, which differs from a[4] = v on more than one dimension. The fix applies to a
+# statement whose index is a number or arithmetic, because a name can hold a tuple. Unsafe: the
+# pattern cannot tell an array from another object with a method of this name.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: ndarray.itemset was removed in NumPy 2. Write $X.flat[$I] = $V, which sets the element at that flat position.
+rule:
+  all:
+    - pattern: $X.itemset($I, $V)
+      inside: { kind: expression_statement }
+    - not: { matches: compat-code }
+constraints:
+  I: { any: [{ kind: integer }, { kind: binary_operator }, { kind: unary_operator }] }
+  V: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: $X.flat[$I] = $V
+metadata: { fix: unsafe }
+---
+# No fix for an index held in a name, which can be a tuple or a flat position, or for a call
+# whose value is used.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -838,6 +969,9 @@ rule:
               - all:
                   - pattern: $X.itemset($T, $V)
                   - has: { field: arguments, has: { nthChild: 1, kind: tuple } }
+              - all:
+                  - pattern: $X.itemset($I, $V)
+                  - has: { field: arguments, all: [{ has: { nthChild: 1, any: [{ kind: integer }, { kind: binary_operator }, { kind: unary_operator }] } }, { has: { nthChild: 2, not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }] }
               - all:
                   - any:
                       - pattern: $X.itemset($I, $J, $V)
@@ -875,6 +1009,46 @@ constraints:
 fix: $NP.reshape($A, $S, order=$O)
 metadata: { fix: safe }
 ---
+# The fix passes the shape by position and keeps the other keywords. Unsafe, because the old form
+# raises on NumPy 2.4 and later.
+id: removed-in-numpy-2
+language: python
+severity: error
+message: reshape(newshape=) was removed in NumPy 2.4. Write $NP.reshape($A, $S, $KEPT).
+rule:
+  all:
+    - pattern: $NP.reshape($A, $$$REST)
+      has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^newshape$ } }, { has: { field: value, pattern: $S } }] } }
+      not:
+        any:
+          - pattern: $NP.reshape($A, newshape=$S)
+          - pattern: $NP.reshape($A, newshape=$S, order=$O)
+    - matches: rebuildable
+    - not: { matches: compat-code }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+utils:
+  # The array by position and every other argument a keyword.
+  rebuildable:
+    has:
+      field: arguments
+      all:
+        - has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+        - not: { has: { all: [{ pattern: $POS }, { not: { nthChild: 1 } }, { not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }] } }] } }
+rewriters:
+  - id: drop
+    rule: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^newshape$ } }] }
+    fix: ""
+  - id: keep
+    rule: { pattern: $K }
+    fix: "$K, "
+transform:
+  LISTED: { rewrite: { source: $$$REST, rewriters: [drop, keep], joinBy: "" } }
+  KEPT: { replace: { source: $LISTED, replace: ", $", by: "" } }
+fix: $NP.reshape($A, $S, $KEPT)
+metadata: { fix: unsafe }
+---
+# No fix for an array passed by keyword or a splat, which the fix cannot place.
 id: removed-in-numpy-2
 language: python
 severity: error
@@ -887,9 +1061,18 @@ rule:
         any:
           - pattern: $NP.reshape($A, newshape=$S)
           - pattern: $NP.reshape($A, newshape=$S, order=$O)
+    - not: { matches: rebuildable }
     - not: { matches: compat-code }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+utils:
+  # The array by position and every other argument a keyword.
+  rebuildable:
+    has:
+      field: arguments
+      all:
+        - has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+        - not: { has: { all: [{ pattern: $POS }, { not: { nthChild: 1 } }, { not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }, { kind: comment }] } }] } }
 ---
 # method= replaced interpolation= in NumPy 1.22 and takes the same values. NumPy 2.4 removed
 # interpolation=. pandas keeps interpolation= on its own quantile, which is not matched.
@@ -1084,10 +1267,12 @@ constraints:
 fix: $NP.asarray($X, dtype=$D)
 metadata: { fix: unsafe }
 ---
+# The fix writes copy=None and keeps the other arguments. Unsafe, because the old form raised where
+# a copy was needed.
 id: removed-in-numpy-2
 language: python
 severity: error
-message: np.array(copy=False) raises on NumPy 2 when it must copy, for example from a list. Write np.asarray, which copies only when needed, or copy=None.
+message: np.array(copy=False) raises on NumPy 2 when it must copy, for example from a list. Write copy=None, which copies only when needed, as np.asarray does.
 rule:
   all:
     - pattern: $NP.array($$$ARGS)
@@ -1122,6 +1307,21 @@ utils:
               - has: { field: value, regex: ^True$ }
 constraints:
   NP: { regex: '^(np|numpy)$' }
+rewriters:
+  - id: drop
+    rule: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: ""
+  - id: to-none
+    rule: { kind: keyword_argument, regex: '^copy\s*=\s*False$' }
+    fix: "copy=None, "
+  - id: keep
+    rule: { pattern: $K }
+    fix: "$K, "
+transform:
+  LISTED: { rewrite: { source: $$$ARGS, rewriters: [drop, to-none, keep], joinBy: "" } }
+  NEW: { replace: { source: $LISTED, replace: ", $", by: "" } }
+fix: $NP.array($NEW)
+metadata: { fix: unsafe }
 ---
 # NumPy 2.5 removed the dtype code "a", which was another name for "S".
 # Unsafe: a dtype= keyword of a function that is not NumPy's can give the text another meaning.

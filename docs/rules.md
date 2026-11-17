@@ -2983,11 +2983,11 @@ project's virtual environment (venv). When the venv has no NumPy, or there is no
 
 Fix every report in the group, because the reported code gives a wrong value without an error,
 or raises on every input. Every fix in the group is unsafe, because it changes the result to the
-one the code meant.
+one the code meant, except the fix of `positional-tolerance`, which only names the argument.
 
 #### compare-to-nan
 
-**Severity:** error. **Fix:** unsafe: `np.isnan(x)`. `np.nan in np.unique(x)` has no fix.
+**Severity:** error. **Fix:** unsafe: `np.isnan(x)`, `np.isnan(np.unique(x)).any()` for `np.nan in np.unique(x)`, and `not np.isnan(np.unique(x)).any()` for `not in`. `isnan` raises on an array of text or objects, where `in` returned False.
 
 The rule reports `x == np.nan`, `x != np.nan`, `x == float("nan")`, `x == math.nan` and `np.nan in np.unique(x)`. None of them finds NaN, because NaN equals nothing.
 
@@ -3007,7 +3007,7 @@ In a file that imports pandas, the pandas rule [`compare-to-missing`](#compare-t
 
 #### argument-in-wrong-slot
 
-**Severity:** error. **Fix:** unsafe: `np.zeros((3, 4))`. The linspace form and a quantile call with more arguments have no fix.
+**Severity:** error. **Fix:** unsafe: `np.zeros((3, 4))`, `np.hstack((a, b, a))` with any keywords after the tuple, and `np.percentile` with the same arguments for a quantile call with more arguments. The linspace form has no fix, because the code does not show whether a count or a step was meant.
 
 The rule reports `np.zeros(3, 4)`, `np.full(3, 4, 0)`, `np.reshape(a, 2, 3)`, `np.vstack(a, b)`, `np.concatenate(a, [4, 5])`, `np.random.rand((3, 4))`, `np.random.random(3, 4)`, `np.linspace(0, 1, 0.1)` and `np.quantile(x, 95)`. Each call puts an argument in the place of another parameter, so it raises.
 
@@ -3045,7 +3045,7 @@ The rule leaves a list such as `[0.5, 99.5]` alone, where one number is a percen
 
 #### positional-tolerance
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** safe: `np.isclose(a, b, rtol=1e-3)`, which names the parameter that the third argument already fills. Where an absolute tolerance was meant, change it to `atol=`. A call with a splat before the third argument has no fix.
 
 The rule reports `np.isclose(a, b, 1e-3)` and `np.allclose(a, b, 1e-3)`. The third argument sets `rtol`, and `atol` stays 1e-8.
 
@@ -3061,7 +3061,7 @@ Use instead:
 same = np.isclose(a, b, atol=1e-3)
 ```
 
-The rule leaves a call alone that also passes `atol`, or that passes a value named like `rtol`. xpd gives the replacement as advice and doesn't apply it.
+The rule leaves a call alone that also passes `atol`, or that passes a value named like `rtol`.
 
 #### arange-float-step
 
@@ -3085,7 +3085,7 @@ The rule leaves a step alone that is a multiple of 1/64, such as 0.5 or 0.25, be
 
 #### randint-single-value
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `np.random.randint(0, 2)` and `rng.integers(0, 2)`, with the other arguments kept, so the result is a 0 or a 1 where it was always 0.
 
 The rule reports `np.random.randint(0, 1, n)`, `np.random.randint(1)` and `rng.integers(0, 1)`. Each call always returns 0, because the upper bound is excluded.
 
@@ -3100,8 +3100,6 @@ Use instead:
 ```python
 coin = rng.integers(0, 2, size=10)
 ```
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### result-is-none
 
@@ -3145,7 +3143,7 @@ The rule leaves alone a call with `out=`, a call in a `try` block or in a `with 
 
 #### write-to-copy
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `x[0] = 9` for `x.astype(int)[0] = 9` and `x.copy()[0] = 9`, so the write reaches `x`, cast to the dtype of `x`. A mask or a list of positions, and `flatten`, have no fix.
 
 The rule reports `x[x > 2][0] = v`, `x[[0, 1]][0] = v`, `m.flatten()[0] = v` and `x.astype(int)[0] = v`. Each one writes to a copy, so the array keeps its old values.
 
@@ -3161,11 +3159,11 @@ Use instead:
 x[np.flatnonzero(x > 2)[0]] = -1
 ```
 
-The rule leaves `x[1:4][0] = v` and `m[0][mask] = v` alone, because indexing with a slice or a whole number returns a view. xpd gives the replacement as advice and doesn't apply it.
+The rule leaves `x[1:4][0] = v` and `m[0][mask] = v` alone, because indexing with a slice or a whole number returns a view.
 
 #### array-truth-value
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `x[(x > 2) & (x < 8)]` for `and`, `|` for `or`, `~` for `not`, and `(2 < x) & (x < 8)` for a chained comparison of names and numbers. On an array of one value the old form indexed with one bool. Other operands, such as a mask held in a name, have no fix.
 
 The rule reports `x[(x > 2) and (x < 8)]`, `x[not (x > 2)]` and `x[2 < x < 8]`. Each one raises ValueError, because `and`, `or`, `not` and a chained comparison ask for the truth value of a whole array.
 
@@ -3181,11 +3179,9 @@ Use instead:
 inside = x[(x > 2) & (x < 8)]
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
-
 #### mask-operator-precedence
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `(x > 2) & (x < 8)` when the four operands are names, numbers or attributes. Other operands have no fix.
 
 The rule reports `x > 2 & x < 8`. Python applies `&` before the comparisons, so the code compares `x` with `2 & x`.
 
@@ -3201,7 +3197,7 @@ Use instead:
 inside = x[(x > 2) & (x < 8)]
 ```
 
-In a file that imports pandas, the pandas rule [`mask-precedence`](#mask-precedence) reports the code instead. xpd gives the replacement as advice and doesn't apply it.
+In a file that imports pandas, the pandas rule [`mask-precedence`](#mask-precedence) reports the code instead.
 
 #### int-mask-as-index
 
@@ -3225,7 +3221,7 @@ The rule leaves alone a lookup such as `labels[(score > t).astype(int)]`, where 
 
 #### iterator-to-array
 
-**Severity:** error. **Fix:** unsafe: `np.array([v * 2 for v in y])`. A set has no fix.
+**Severity:** error. **Fix:** unsafe: `np.array([v * 2 for v in y])`, and `np.array(sorted({1, 2, 3}))` for a set, where sorted raises on values that do not compare.
 
 The rule reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy doesn't read the values out of an iterator. The table shows what each call returned on NumPy 2.5.5.
 
@@ -3272,7 +3268,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### read-uninitialized
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `np.zeros(n)` and `np.zeros_like(a)` with the same arguments, so the code computes on zeros.
 
 The rule reports `np.empty(n).sum()` and `np.empty_like(x) + 1`, which compute with whatever bytes were in memory.
 
@@ -3288,7 +3284,7 @@ Use instead:
 total = np.zeros(n) + offset
 ```
 
-The rule leaves `np.empty(n) * np.nan` alone, because it gives NaN everywhere. xpd gives the replacement as advice and doesn't apply it.
+The rule leaves `np.empty(n) * np.nan` alone, because it gives NaN everywhere.
 
 #### array-default-argument
 
@@ -3378,7 +3374,7 @@ the rule's message names, because the old form raises or warns on NumPy 2.5.
 
 #### removed-in-numpy-2
 
-**Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, a shape by position for `newshape=`, `method=` for `interpolation=` and `minlength=0`. unsafe: `"S"` for the dtype code `"a"`, because a `dtype=` keyword of another library can give the text another meaning, deleting `fix_imports=`, `bias=` and `ddof=`, because a call in the deleted value no longer runs, `np.ptp(a)`, `a.tobytes()` and `a[i, j] = v` for `a.itemset`, because the pattern cannot tell an array from another object with a method of that name, `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`. The other forms have no fix.
+**Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, a shape by position for `newshape=`, `method=` for `interpolation=` and `minlength=0`. unsafe: `"S"` for the dtype code `"a"`, because a `dtype=` keyword of another library can give the text another meaning, deleting `fix_imports=`, `bias=` and `ddof=`, because a call in the deleted value no longer runs, `np.ptp(a)`, `a.tobytes()` and `a[i, j] = v` for `a.itemset`, because the pattern cannot tell an array from another object with a method of that name, `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`, imported or read by attribute. Also unsafe, because the old form raises on NumPy 2.5: `(-np.inf)` and `(-0.0)` where `np.NINF` and `np.NZERO` are part of a larger operand, `(x + 1).item()` for `np.asscalar(x + 1)`, `from numpy.exceptions import` for an import of the moved errors and warnings, `from numpy.lib.array_utils import byte_bounds`, `a.flat[4] = v` for `a.itemset(4, v)`, `newshape=` moved by position before the other keywords, and `copy=None` for the other `np.array(copy=False)` calls. The other forms have no fix.
 
 The rule reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, and its message says what to write instead. The rule leaves alone code under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches ImportError or AttributeError. Such code exists to support old NumPy.
 
@@ -3402,7 +3398,7 @@ warning = np.exceptions.ComplexWarning
 
 #### deprecated-in-numpy-2
 
-**Severity:** warning. **Fix:** safe: `np.trunc` for `np.fix`, `np.ma.round` for `np.ma.round_`, `out=` for an output passed by position to `np.maximum` and `np.minimum`, and a datetime64 string without its `Z`. unsafe: `np.rec` and `np.char` for `np.core.records` and `np.core.defchararray`, which export fewer names, `np.<name>` for `np.core.<name>`, `randint(low, high + 1)` for `random_integers(low, high)`, with or without a size, `x = x.reshape(shape)` for `x.shape = shape`, and `x = x.view(dtype)` for `x.dtype = dtype`. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: `np.trunc` for `np.fix`, `np.ma.round` for `np.ma.round_`, `out=` for an output passed by position to `np.maximum` and `np.minimum`, and a datetime64 string without its `Z`. unsafe: `np.rec` and `np.char` for `np.core.records` and `np.core.defchararray`, which export fewer names, `np.<name>` for `np.core.<name>` and for `np.core.numeric.<name>` and the other public submodules, `from numpy import` for a `from numpy.core` import of public names, `randint(low, high + 1)` for `random_integers(low, high)`, with or without a size and with brackets around a `high` such as `n * 2`, `randint(1, high + 1)` for `random_integers(high)`, `axes=range(-len(s), 0)` added where `s=` has no `axes=`, which reads `s` twice, `x = x.reshape(shape)` for `x.shape = shape`, and `x = x.view(dtype)` for `x.dtype = dtype`. The other forms have no fix, and `x.strides = v` has none because `as_strided` does not check the bounds that the assignment checked.
 
 The rule reports the forms in the table, and each of them warns on NumPy 2.5.
 
@@ -3490,7 +3486,7 @@ out = np.concatenate(parts)
 
 #### per-value-comprehension
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: the element with the loop variable replaced by `np.asarray(a)`, as in `np.asarray(a) * 2 + 1`, or by `np.arange(n)` for a range, and `np.sqrt(np.asarray(a))` for `map`. Python ints do not wrap where int64 does, a division by zero gives inf where Python raised, and `map` returned an iterator. An element with `if`, `and`, `or`, `not`, `min`, `max` or a math function, and a loop over a call, have no fix.
 
 The rule reports `np.array([x * 2 + 1 for x in a])`, `np.array([math.sqrt(x) for x in a])`, `np.array([i * 0.5 for i in range(n)])` and `map(np.sqrt, a)`, where the element is arithmetic or a NumPy or math function on the loop variable.
 
@@ -3508,7 +3504,7 @@ roots = np.sqrt(np.asarray(values))
 
 #### builtin-on-array
 
-**Severity:** warning. **Fix:** unsafe: `np.abs(a).sum(axis=0)`, `np.abs(a).max(axis=0)`. `sorted` and `list` have no fix.
+**Severity:** warning. **Fix:** unsafe: `np.abs(a).sum(axis=0)`, `np.abs(a).max(axis=0)`, `np.sort(np.abs(a))` for `sorted`, which gives an array, and `np.abs(a).tolist()` for `list`, which gives Python numbers.
 
 The rule reports `sum`, `min`, `max`, `sorted` and `list` around a NumPy call, as in `sum(np.abs(a))`, or around a comparison with a NumPy call, as in `sum(np.abs(a) > 1)`.
 
@@ -3656,7 +3652,7 @@ top = np.sort(np.partition(scores, -5)[-5:])
 
 #### count-nonzero
 
-**Severity:** warning. **Fix:** safe: `np.any(x > 2)`. unsafe: `np.count_nonzero(x > 0)`. `len(x[x > 0])` has no fix.
+**Severity:** warning. **Fix:** safe: `np.any(x > 2)`. unsafe: `np.count_nonzero(x > 0)`, also for `len(x[x > 0])`, which gave a Python int.
 
 The rule reports `np.sum(x > 0)`, `len(np.where(c)[0])`, `len(np.nonzero(c)[0])`, `len(np.flatnonzero(c))`, `len(x[x > 0])` and `np.sum(x > 2) > 0`.
 
@@ -3710,7 +3706,7 @@ log_survival = np.log1p(-p)
 
 #### logaddexp
 
-**Severity:** warning. **Fix:** unsafe: `np.logaddexp(a, b)`, `np.logaddexp(0, x)`. The log of a sum of exponentials and the softmax have no fix.
+**Severity:** warning. **Fix:** unsafe: `np.logaddexp(a, b)`, `np.logaddexp(0, x)`, `np.max(x) + np.log(np.sum(np.exp(x - np.max(x))))` and `np.exp(x - np.max(x)) / np.sum(np.exp(x - np.max(x)))`. The last bits change, an array of only -inf gives NaN, and an empty array raises. A softmax summed along an axis, and an operand that calls a function, have no fix.
 
 The rule reports `np.log(np.exp(a) + np.exp(b))`, `np.log(1 + np.exp(x))`, `np.log1p(np.exp(x))`, `np.log(np.sum(np.exp(x)))` and `np.exp(x) / np.sum(np.exp(x))`.
 
@@ -4005,7 +4001,7 @@ print(rng.bit_generator.seed_seq.entropy)
 
 #### legacy-polynomial
 
-**Severity:** info. **Fix:** none, because `numpy.polynomial` takes coefficients from degree zero up, the reverse of the old order.
+**Severity:** info. **Fix:** unsafe: `np.polynomial.Polynomial.fit(x, y, deg).convert().coef[::-1]` for `polyfit`, and the `numpy.polynomial` function on `coef[::-1]` for `poly1d`, `polyval`, `roots`, `poly`, `polyder` and `polyint`, reversed again where coefficients come out. A poly1d argument raises, whole number coefficients become floats, roots come out sorted, and `poly1d` becomes a `Polynomial` with other methods. `polyadd`, `polysub`, `polymul`, `polydiv` and calls with other arguments have no fix.
 
 The rule reports `np.polyfit`, `np.poly1d`, `np.polyval`, `np.roots`, `np.poly`, `np.polyder`, `np.polyint`, `np.polyadd`, `np.polysub`, `np.polymul` and `np.polydiv`.
 
@@ -4023,7 +4019,7 @@ intercept, slope = np.polynomial.Polynomial.fit(x, y, 1).convert().coef
 
 #### almost-equal-assert
 
-**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)`, with `1.5e-6` for `assert_array_almost_equal` and `1.5e-<decimal>` for a literal decimal. A difference of exactly `atol` failed before and passes after, dicts and ragged lists are no longer compared item by item, and complex values are compared by magnitude. A bare name that the file imports from `numpy.testing` gets `assert_allclose(a, b, rtol=0, atol=1.5e-7)` in a file that also imports `assert_allclose` from `numpy.testing`. Any other bare name, an `err_msg` argument, a computed decimal and `assert_approx_equal` have no fix.
+**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)`, with `1.5e-6` for `assert_array_almost_equal` and `1.5e-<decimal>` for a literal decimal. A difference of exactly `atol` failed before and passes after, dicts and ragged lists are no longer compared item by item, and complex values are compared by magnitude. A bare name that the file imports from `numpy.testing` gets `assert_allclose(a, b, rtol=0, atol=1.5e-7)` in a file that also imports `assert_allclose` from `numpy.testing`. `assert_approx_equal(a, b)` gets `assert_allclose(a, b, rtol=1e-6)`, which can fail where a difference up to ten times `rtol` passed. Any other bare name, an `err_msg` argument, a computed decimal and `significant=` have no fix.
 
 The rule reports `assert_almost_equal`, `assert_array_almost_equal` and `assert_approx_equal`, which NumPy lists under "Asserts (not recommended)".
 
@@ -4041,7 +4037,7 @@ np.testing.assert_allclose(result, expected, rtol=0, atol=1.5e-4)
 
 #### assert-on-arrays
 
-**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)` and `np.testing.assert_array_equal(a, b)`. assert_allclose fails on shapes that `np.allclose` broadcasts, assert_array_equal treats NaN in the same place as equal, and both still run under `python -O`. An assert with a message, or `np.allclose` with more arguments, has no fix.
+**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)`, with the `rtol` and `atol` that the call passes, and `np.testing.assert_array_equal(a, b)`, each with `err_msg=` for a message written as a string. assert_allclose fails on shapes that `np.allclose` broadcasts, assert_array_equal treats NaN in the same place as equal, and both still run under `python -O`. A message that is not a string, `equal_nan` and a splat have no fix.
 
 The rule reports `assert np.allclose(a, b)`, `assert np.array_equal(a, b)`, `assert np.all(a == b)` and `assert (a == b).all()`. A failed assert shows only False, where the testing functions show the elements that differ.
 
@@ -4077,7 +4073,7 @@ assert res.success, res.message
 
 #### char-module
 
-**Severity:** info. **Fix:** safe: `np.strings.upper` and every other name that is the same function in both modules. Unsafe: the comparisons, such as `np.strings.equal`, which do not strip trailing whitespace, and `np.strings.multiply`, which raises a different error on bad input. `partition` and `rpartition` have no fix, because `np.strings` returns a tuple of three arrays.
+**Severity:** info. **Fix:** safe: `np.strings.upper` and every other name that is the same function in both modules. Unsafe: the comparisons, such as `np.strings.equal`, which do not strip trailing whitespace, and `np.strings.multiply`, which raises a different error on bad input. Unsafe also: `partition` and `rpartition`, because `np.strings` returns a tuple of three arrays.
 
 The rule reports a function of `np.char` when `np.strings`, added in NumPy 2.0, has a function of the same name. NumPy's docs call `np.char` legacy.
 
@@ -4095,7 +4091,7 @@ names = np.strings.upper(names)
 
 #### dot-on-matrices
 
-**Severity:** info. **Fix:** unsafe: `a @ b` when both operands are names, attributes, subscripts, calls or parenthesized. `@` raises on a scalar and on two Python lists, and on arrays of more than two dimensions it works on stacks of matrices, where `np.dot` does not.
+**Severity:** info. **Fix:** unsafe: `a @ b`, with parentheses around an operand such as `a + 1`, and around the product where it is part of a larger operand, as in `(a @ b).T`. `@` raises on a scalar and on two Python lists, and on arrays of more than two dimensions it works on stacks of matrices, where `np.dot` does not.
 
 The rule reports `np.dot(a, b)`, because the docs of `np.dot` prefer `matmul` or `a @ b` for two 2-D arrays.
 

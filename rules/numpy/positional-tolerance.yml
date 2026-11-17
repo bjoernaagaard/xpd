@@ -2,6 +2,64 @@
 # the second argument, and atol keeps its default of 1e-8. A number written there is often meant
 # as an absolute tolerance, and then values near zero never count as close. A call that also
 # passes atol, by position or by name, or a value named like rtol, sets both on purpose.
+# The fix names the third argument rtol, which is the parameter it already fills, so the call
+# does the same.
+id: positional-tolerance
+language: python
+severity: warning
+message: The third argument of $NP.$F is rtol, a relative tolerance, and atol stays 1e-8. Write rtol=$T, which keeps what the call does, and change it to atol=$T where an absolute tolerance was meant.
+rule:
+  pattern: $NP.$F($A, $B, $T)
+  not:
+    has:
+      field: arguments
+      any:
+        - has: { nthChild: 4, not: { kind: keyword_argument } }
+        - has: { kind: keyword_argument, has: { field: name, regex: ^atol$ } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(isclose|allclose)$' }
+  A: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  B: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  T:
+    not:
+      any:
+        - kind: keyword_argument
+        - kind: list_splat
+        - kind: dictionary_splat
+        - regex: '(?i)rtol'
+fix: $NP.$F($A, $B, rtol=$T)
+metadata: { fix: safe }
+---
+id: positional-tolerance
+language: python
+severity: warning
+message: The third argument of $NP.$F is rtol, a relative tolerance, and atol stays 1e-8. Write rtol=$T, which keeps what the call does, and change it to atol=$T where an absolute tolerance was meant.
+rule:
+  pattern: "$NP.$F($A, $B, $T, $$$REST)"
+  not:
+    has:
+      field: arguments
+      any:
+        - has: { nthChild: 4, not: { kind: keyword_argument } }
+        - has: { kind: keyword_argument, has: { field: name, regex: ^atol$ } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  F: { regex: '^(isclose|allclose)$' }
+  A: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  B: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  T:
+    not:
+      any:
+        - kind: keyword_argument
+        - kind: list_splat
+        - kind: dictionary_splat
+        - regex: '(?i)rtol'
+fix: $NP.$F($A, $B, rtol=$T, $$$REST)
+metadata: { fix: safe }
+---
+# No fix when a splat comes before the third argument, because then the code does not show which
+# parameter the argument fills.
 id: positional-tolerance
 language: python
 severity: warning
@@ -9,7 +67,8 @@ message: The third argument of $NP.$F is rtol, a relative tolerance, and atol st
 rule:
   any:
     - pattern: $NP.$F($A, $B, $T)
-    - pattern: $NP.$F($A, $B, $T, $$$REST)
+    - pattern: "$NP.$F($A, $B, $T, $$$REST)"
+  has: { field: arguments, any: [{ has: { nthChild: 1, any: [{ kind: list_splat }, { kind: dictionary_splat }] } }, { has: { nthChild: 2, any: [{ kind: list_splat }, { kind: dictionary_splat }] } }] }
   not:
     has:
       field: arguments

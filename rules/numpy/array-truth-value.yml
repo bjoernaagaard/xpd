@@ -2,6 +2,254 @@
 # ValueError for an array of more than one value. Inside an index on the same array, as in
 # x[(x > 2) and (x < 8)], the operands are masks of that array, so the mistake is certain. A
 # chained comparison with & or | in the middle is left to mask-operator-precedence.
+# Two comparisons joined by and or or, the negation of one, and a chained comparison of names
+# and numbers. Unsafe on purpose, because the fix gives the mask where the old form raised, and on
+# an array of one value the old form indexed with one bool.
+id: array-truth-value
+language: python
+severity: error
+message: and, or, not and a chained comparison ask for the truth of a whole array, which raises ValueError. Write $X[$PL & $PR].
+rule:
+  kind: subscript
+  all:
+    - has: { field: value, pattern: $X }
+    - has: { field: subscript, matches: masks-and, has: { field: left, pattern: $L }, all: [{ has: { field: right, pattern: $R } }] }
+    - has: { field: subscript, matches: compares-x }
+constraints:
+  X: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # A comparison of two values, bare or in parentheses.
+  mask:
+    any:
+      - { kind: comparison_operator, matches: two-operands }
+      - { kind: parenthesized_expression, has: { kind: comparison_operator, matches: two-operands } }
+  two-operands:
+    all:
+      - not: { has: { nthChild: 3 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }
+  masks-and:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^and$' } }]
+  masks-or:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^or$' } }]
+  not-mask:
+    kind: not_operator
+    has: { field: argument, matches: mask }
+  simple-chain:
+    kind: comparison_operator
+    all:
+      - has: { nthChild: 1, matches: simple }
+      - has: { nthChild: 2, matches: simple }
+      - has: { nthChild: 3, matches: simple }
+      - not: { has: { nthChild: 4 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  compares-x:
+    any:
+      - { kind: comparison_operator, has: { pattern: $X } }
+      - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }
+rewriters:
+  - id: keep
+    rule: { kind: parenthesized_expression, pattern: $K }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PL: { rewrite: { source: $L, rewriters: [keep, wrap] } }
+  PR: { rewrite: { source: $R, rewriters: [keep, wrap] } }
+fix: $X[$PL & $PR]
+metadata: { fix: unsafe }
+---
+id: array-truth-value
+language: python
+severity: error
+message: and, or, not and a chained comparison ask for the truth of a whole array, which raises ValueError. Write $X[$PL | $PR].
+rule:
+  kind: subscript
+  all:
+    - has: { field: value, pattern: $X }
+    - has: { field: subscript, matches: masks-or, has: { field: left, pattern: $L }, all: [{ has: { field: right, pattern: $R } }] }
+    - has: { field: subscript, matches: compares-x }
+constraints:
+  X: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # A comparison of two values, bare or in parentheses.
+  mask:
+    any:
+      - { kind: comparison_operator, matches: two-operands }
+      - { kind: parenthesized_expression, has: { kind: comparison_operator, matches: two-operands } }
+  two-operands:
+    all:
+      - not: { has: { nthChild: 3 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }
+  masks-and:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^and$' } }]
+  masks-or:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^or$' } }]
+  not-mask:
+    kind: not_operator
+    has: { field: argument, matches: mask }
+  simple-chain:
+    kind: comparison_operator
+    all:
+      - has: { nthChild: 1, matches: simple }
+      - has: { nthChild: 2, matches: simple }
+      - has: { nthChild: 3, matches: simple }
+      - not: { has: { nthChild: 4 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  compares-x:
+    any:
+      - { kind: comparison_operator, has: { pattern: $X } }
+      - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }
+rewriters:
+  - id: keep
+    rule: { kind: parenthesized_expression, pattern: $K }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PL: { rewrite: { source: $L, rewriters: [keep, wrap] } }
+  PR: { rewrite: { source: $R, rewriters: [keep, wrap] } }
+fix: $X[$PL | $PR]
+metadata: { fix: unsafe }
+---
+id: array-truth-value
+language: python
+severity: error
+message: and, or, not and a chained comparison ask for the truth of a whole array, which raises ValueError. Write $X[~$PE].
+rule:
+  kind: subscript
+  all:
+    - has: { field: value, pattern: $X }
+    - has: { field: subscript, matches: not-mask, has: { field: argument, pattern: $E } }
+    - has: { field: subscript, matches: compares-x }
+constraints:
+  X: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # A comparison of two values, bare or in parentheses.
+  mask:
+    any:
+      - { kind: comparison_operator, matches: two-operands }
+      - { kind: parenthesized_expression, has: { kind: comparison_operator, matches: two-operands } }
+  two-operands:
+    all:
+      - not: { has: { nthChild: 3 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }
+  masks-and:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^and$' } }]
+  masks-or:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^or$' } }]
+  not-mask:
+    kind: not_operator
+    has: { field: argument, matches: mask }
+  simple-chain:
+    kind: comparison_operator
+    all:
+      - has: { nthChild: 1, matches: simple }
+      - has: { nthChild: 2, matches: simple }
+      - has: { nthChild: 3, matches: simple }
+      - not: { has: { nthChild: 4 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  compares-x:
+    any:
+      - { kind: comparison_operator, has: { pattern: $X } }
+      - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }
+rewriters:
+  - id: keep
+    rule: { kind: parenthesized_expression, pattern: $K }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PE: { rewrite: { source: $E, rewriters: [keep, wrap] } }
+fix: $X[~$PE]
+metadata: { fix: unsafe }
+---
+id: array-truth-value
+language: python
+severity: error
+message: and, or, not and a chained comparison ask for the truth of a whole array, which raises ValueError. Write $X[$SPLIT].
+rule:
+  kind: subscript
+  all:
+    - has: { field: value, pattern: $X }
+    - has: { field: subscript, matches: simple-chain, pattern: $C }
+    - has: { field: subscript, matches: compares-x }
+constraints:
+  X: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # A comparison of two values, bare or in parentheses.
+  mask:
+    any:
+      - { kind: comparison_operator, matches: two-operands }
+      - { kind: parenthesized_expression, has: { kind: comparison_operator, matches: two-operands } }
+  two-operands:
+    all:
+      - not: { has: { nthChild: 3 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }
+  masks-and:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^and$' } }]
+  masks-or:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^or$' } }]
+  not-mask:
+    kind: not_operator
+    has: { field: argument, matches: mask }
+  simple-chain:
+    kind: comparison_operator
+    all:
+      - has: { nthChild: 1, matches: simple }
+      - has: { nthChild: 2, matches: simple }
+      - has: { nthChild: 3, matches: simple }
+      - not: { has: { nthChild: 4 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  compares-x:
+    any:
+      - { kind: comparison_operator, has: { pattern: $X } }
+      - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }
+transform:
+  SPLIT:
+    replace:
+      source: $C
+      replace: '^([\w.]+)\s*(<=|>=|==|!=|<|>)\s*([\w.]+)\s*(<=|>=|==|!=|<|>)\s*([\w.]+)$'
+      by: '($1 $2 $3) & ($3 $4 $5)'
+fix: $X[$SPLIT]
+metadata: { fix: unsafe }
+---
+# No fix for other operands, such as a mask held in a name, three comparisons or a chain with a
+# call in it, which the fixes above do not rebuild.
 id: array-truth-value
 language: python
 severity: error
@@ -18,6 +266,7 @@ rule:
           - kind: comparison_operator
             has: { nthChild: 3 }
             not: { has: { kind: binary_operator, has: { field: operator, regex: '^[&|]$' } } }
+    - not: { has: { field: subscript, any: [{ matches: masks-and }, { matches: masks-or }, { matches: not-mask }, { matches: simple-chain }] } }
     - has:
         field: subscript
         any:
@@ -25,3 +274,40 @@ rule:
           - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }
 constraints:
   X: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  # A comparison of two values, bare or in parentheses.
+  mask:
+    any:
+      - { kind: comparison_operator, matches: two-operands }
+      - { kind: parenthesized_expression, has: { kind: comparison_operator, matches: two-operands } }
+  two-operands:
+    all:
+      - not: { has: { nthChild: 3 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  simple:
+    any:
+      - kind: identifier
+      - kind: integer
+      - { kind: float, regex: '^[\d.]+([eE]\d+)?$' }
+      - { kind: attribute, not: { has: { stopBy: end, any: [{ kind: call }, { kind: subscript }] } } }
+  masks-and:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^and$' } }]
+  masks-or:
+    kind: boolean_operator
+    all: [{ has: { field: left, matches: mask } }, { has: { field: right, matches: mask } }, { has: { field: operator, regex: '^or$' } }]
+  not-mask:
+    kind: not_operator
+    has: { field: argument, matches: mask }
+  simple-chain:
+    kind: comparison_operator
+    all:
+      - has: { nthChild: 1, matches: simple }
+      - has: { nthChild: 2, matches: simple }
+      - has: { nthChild: 3, matches: simple }
+      - not: { has: { nthChild: 4 } }
+      - not: { has: { field: operators, regex: '^(in|not in|is|is not)$' } }
+  compares-x:
+    any:
+      - { kind: comparison_operator, has: { pattern: $X } }
+      - has: { stopBy: end, kind: comparison_operator, has: { pattern: $X } }

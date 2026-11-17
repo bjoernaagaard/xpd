@@ -5,6 +5,33 @@
 # DeprecationWarning on the first use. On NumPy 1, numpy.core is where these names live, so the
 # documents apply from 2.0. _multiarray_umath and multiarray._reconstruct stay silent
 # because pickles from NumPy 1 name them, so they are left alone.
+# The import of public names from numpy.core gets numpy as its module. Unsafe, because numpy.core
+# also held names that the main namespace does not export, such as the private submodules.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Import the same names from numpy.
+rule:
+  all:
+    - kind: dotted_name
+      inside: { kind: import_from_statement, field: module_name, matches: public-import }
+    - not: { matches: compat-code }
+utils:
+  # from numpy.core, or one of its public submodules, import of public names only.
+  public-import:
+    kind: import_from_statement
+    has: { field: module_name, regex: '^numpy\.core(\.(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits))?$' }
+    not:
+      any:
+        - has: { kind: wildcard_import }
+        - has: { field: name, kind: dotted_name, regex: '^(_|normalize_axis_)' }
+        - has: { field: name, kind: aliased_import, has: { field: name, regex: '^(_|normalize_axis_)' } }
+fix: numpy
+metadata: { fix: unsafe, since: "2.0" }
+---
+# No fix for an import statement, a private name, normalize_axis_index and normalize_axis_tuple,
+# which live in numpy.lib.array_utils, or another submodule, whose names the code reads through
+# the module.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -18,9 +45,21 @@ rule:
         - inside: { kind: import_from_statement, field: module_name, not: { has: { field: name, regex: '^_reconstruct$' } } }
         - inside: { kind: import_statement }
         - inside: { kind: aliased_import, inside: { kind: import_statement } }
+    - not: { inside: { kind: import_from_statement, field: module_name, matches: public-import } }
     - not: { matches: compat-code }
+utils:
+  # from numpy.core, or one of its public submodules, import of public names only.
+  public-import:
+    kind: import_from_statement
+    has: { field: module_name, regex: '^numpy\.core(\.(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits))?$' }
+    not:
+      any:
+        - has: { kind: wildcard_import }
+        - has: { field: name, kind: dotted_name, regex: '^(_|normalize_axis_)' }
+        - has: { field: name, kind: aliased_import, has: { field: name, regex: '^(_|normalize_axis_)' } }
 metadata: { since: "2.0" }
 ---
+# No fix, because the code that reads core.<name> has to change too.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -76,6 +115,32 @@ transform:
 fix: $NP.$NEW
 metadata: { fix: unsafe, since: "2.0" }
 ---
+# A name read through a public submodule of numpy.core, as in np.core.numeric.isclose, is the same
+# object as np.isclose. Unsafe for the same reason as np.core.<name>.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: numpy.core is private since NumPy 2.0 and warns on use. Write $NP.$M.
+rule:
+  all:
+    - matches: public-member
+    - not: { matches: compat-code }
+utils:
+  public-member:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $NP.core.$N }
+      - has: { field: attribute, pattern: $M }
+    not: { inside: { kind: assignment, field: left } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { regex: '^(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits)$' }
+  M: { regex: '^[a-zA-Z]\w*$', not: { regex: '^normalize_axis_' } }
+fix: $NP.$M
+metadata: { fix: unsafe, since: "2.0" }
+---
+# No fix for the module itself, a private name, or normalize_axis_index and normalize_axis_tuple,
+# which live in numpy.lib.array_utils.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -83,7 +148,15 @@ message: numpy.core is private since NumPy 2.0 and warns on use. Write the name 
 rule:
   all:
     - pattern: $NP.core.$N
-      not: { inside: { kind: assignment, field: left } }
+      not:
+        any:
+          - inside: { kind: assignment, field: left }
+          - inside:
+              kind: attribute
+              field: object
+              has: { field: object, regex: '\.core\.(multiarray|numeric|umath|fromnumeric|numerictypes|shape_base|function_base|einsumfunc|arrayprint|getlimits)$' }
+              all: [{ has: { field: attribute, regex: '^[a-zA-Z]\w*$', not: { regex: '^normalize_axis_' } } }]
+              not: { inside: { kind: assignment, field: left } }
     - not: { matches: compat-code }
 constraints:
   NP: { regex: '^(np|numpy)$' }
@@ -137,7 +210,9 @@ constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
 # NumPy 2.5 deprecated the chararray class and the char functions that build one. An array with
-# a str or bytes dtype and the functions of np.strings replace it.
+# a str or bytes dtype and the functions of np.strings replace it. No fix, because chararray
+# takes a shape where np.array takes the values, and the chararray methods that the code calls
+# have to become np.strings functions.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -153,6 +228,7 @@ transform:
   NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
 metadata: { since: "2.0" }
 ---
+# No fix, for the same reasons as the attribute form.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -173,7 +249,8 @@ transform:
   NEW: { replace: { source: $N, replace: '^chararray$', by: array } }
 metadata: { since: "2.0" }
 ---
-# NumPy 2.4 deprecated the warning helpers of numpy.testing.
+# NumPy 2.4 deprecated the warning helpers of numpy.testing. No fix, because the message names two
+# replacements, and both are used as a with block where the old helpers could also be called.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -251,6 +328,60 @@ constraints:
 fix: $R.randint($LO, $HI + 1)
 metadata: { fix: unsafe }
 ---
+# Unsafe for the same reasons, when high is an expression that needs brackets before 1 is added.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: random_integers is deprecated. Write $R.randint($LO, ($HI) + 1), which draws the same numbers.
+rule:
+  all:
+    - pattern: '$R.random_integers($LO, $HI)'
+    - not: { matches: compat-code }
+constraints:
+  LO: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  HI: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
+fix: $R.randint($LO, ($HI) + 1)
+metadata: { fix: unsafe }
+---
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: random_integers is deprecated. Write $R.randint($LO, ($HI) + 1, $SIZE), which draws the same numbers.
+rule:
+  all:
+    - pattern: '$R.random_integers($LO, $HI, $SIZE)'
+    - not: { matches: compat-code }
+constraints:
+  LO: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  HI: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
+  SIZE: { not: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+fix: $R.randint($LO, ($HI) + 1, $SIZE)
+metadata: { fix: unsafe }
+---
+# With one argument, random_integers(high) draws from 1 to high.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: random_integers is deprecated. Write $R.randint(1, $PHI + 1), which draws the same numbers.
+rule:
+  all:
+    - pattern: '$R.random_integers($HI)'
+    - not: { matches: compat-code }
+constraints:
+  HI: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: tight
+    rule: { pattern: $K, any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] }
+    fix: $K
+  - id: wrap
+    rule: { pattern: $K }
+    fix: ($K)
+transform:
+  PHI: { rewrite: { source: $HI, rewriters: [tight, wrap] } }
+fix: $R.randint(1, $PHI + 1)
+metadata: { fix: unsafe }
+---
+# No fix for keywords for low or high, or a splat, which the documents above do not rebuild.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -266,11 +397,19 @@ rule:
               - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } } }
           - all:
               - pattern: '$R.random_integers($LO, $HI)'
-              - has: { field: arguments, has: { nthChild: 2, any: [{ kind: identifier }, { kind: integer }, { kind: attribute }, { kind: call }, { kind: subscript }] } }
-              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }] } } }
+              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }, { kind: dictionary_splat }] } } }
+          - all:
+              - pattern: '$R.random_integers($LO, $HI, $SIZE)'
+              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } } }
+              - not: { has: { field: arguments, has: { nthChild: 2, kind: keyword_argument } } }
+              - not: { has: { field: arguments, has: { nthChild: 1, kind: keyword_argument } } }
+          - all:
+              - pattern: '$R.random_integers($HI)'
+              - not: { has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: keyword_argument }, { kind: dictionary_splat }] } } }
     - not: { matches: compat-code }
 ---
-# NumPy 2.5 deprecated the generic timedelta64 unit, which a bare number or "NaT" gets.
+# NumPy 2.5 deprecated the generic timedelta64 unit, which a bare number or "NaT" gets. No fix,
+# because the unit is not in the file.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -286,6 +425,7 @@ rule:
 constraints:
   NP: { regex: '^(np|numpy)$' }
 ---
+# No fix, because the unit is not in the file.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -322,6 +462,7 @@ transform:
 fix: $NEW
 metadata: { fix: safe }
 ---
+# No fix, because the time in UTC is not in the file, and a fix cannot add the offset to it.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
@@ -335,17 +476,19 @@ rule:
     - not: { matches: compat-code }
 ---
 # NumPy 2.0 deprecated s= without axes= on the n-dimensional transforms. Today s applies to the
-# last len(s) axes, and a later release will apply it to the axes given.
+# last len(s) axes, and a later release will apply it to the axes given. The fix passes
+# axes=range(-len(s), 0), the axes that s applies to today, when s calls nothing. Unsafe, because
+# the fix reads s twice, so an iterator in a name runs out before the transform reads it.
 id: deprecated-in-numpy-2
 language: python
 severity: warning
-message: $F with s= and no axes= is deprecated since NumPy 2.0. Pass axes= too, such as axes=range(-len(s), 0) for the last axes.
+message: $F with s= and no axes= is deprecated since NumPy 2.0. Write $F($$$ARGS, axes=range(-len($S), 0)), which names the last axes that s applies to today.
 rule:
   all:
     - pattern: $F($$$ARGS)
       any:
-        - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^s$ } } }
-        - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } }
+        - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^s$ } }, { has: { field: value, pattern: $S } }] } }
+        - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument }, pattern: $S } }
       not:
         any:
           - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^axes$ } } }
@@ -354,6 +497,31 @@ rule:
     - not: { matches: compat-code }
 constraints:
   F: { regex: '^(np|numpy)\.fft\.(fftn|ifftn|rfftn|irfftn)$' }
+  S: { not: { any: [{ kind: call }, { has: { stopBy: end, kind: call } }] } }
+fix: $F($$$ARGS, axes=range(-len($S), 0))
+metadata: { fix: unsafe }
+---
+# No fix when s calls a function, because the fix would call it twice.
+id: deprecated-in-numpy-2
+language: python
+severity: warning
+message: $F with s= and no axes= is deprecated since NumPy 2.0. Pass axes= too, such as axes=range(-len(s), 0) for the last axes.
+rule:
+  all:
+    - pattern: $F($$$ARGS)
+      any:
+        - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^s$ } }, { has: { field: value, matches: calls } }] } }
+        - has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument }, matches: calls } }
+      not:
+        any:
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^axes$ } } }
+          - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
+          - has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+    - not: { matches: compat-code }
+constraints:
+  F: { regex: '^(np|numpy)\.fft\.(fftn|ifftn|rfftn|irfftn)$' }
+utils:
+  calls: { any: [{ kind: call }, { has: { stopBy: end, kind: call } }] }
 ---
 # Setting shape, dtype or strides on an array warns since NumPy 2.4 and 2.5, because another
 # thread or view can share the array. The rule needs the name to be bound from an np call in the
@@ -409,6 +577,8 @@ constraints:
 fix: $X = $X.view($V)
 metadata: { fix: unsafe }
 ---
+# No fix, because np.lib.stride_tricks.as_strided does not check the bounds that the assignment
+# checked, so a wrong stride would read memory outside the array.
 id: deprecated-in-numpy-2
 language: python
 severity: warning

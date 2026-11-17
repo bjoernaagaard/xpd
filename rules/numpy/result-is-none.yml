@@ -20,6 +20,8 @@ utils:
 fix: $X.sort($$$ARGS)
 metadata: { fix: unsafe }
 ---
+# No fix, because the message names np.sort for an array and sorted for a list, and the code
+# does not show which one it holds.
 id: result-is-none
 language: python
 severity: error
@@ -54,6 +56,7 @@ constraints:
 fix: $F($$$ARGS)
 metadata: { fix: unsafe }
 ---
+# No fix, because the call has to move to a statement of its own.
 id: result-is-none
 language: python
 severity: error

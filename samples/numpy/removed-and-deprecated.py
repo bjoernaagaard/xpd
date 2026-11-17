@@ -26,6 +26,7 @@ def imports():
     from numpy import float_, isin  # xpd: removed-in-numpy-2
     from numpy import isin, float_  # xpd: removed-in-numpy-2
     from numpy import AxisError as AxisProblem  # xpd: removed-in-numpy-2
+    from numpy import RankWarning  # xpd: removed-in-numpy-2
     from numpy import trapz  # xpd: removed-in-numpy-2
     from numpy.lib import pad, median  # xpd: removed-in-numpy-2
     from numpy.lib import pad, NumpyVersion  # xpd: removed-in-numpy-2
@@ -69,6 +70,7 @@ def constants(values):
     low = values.clip(np.NINF, np.PINF)  # xpd: removed-in-numpy-2, removed-in-numpy-2
     flipped = np.NINF ** 2  # xpd: removed-in-numpy-2
     zero = np.NZERO  # xpd: removed-in-numpy-2
+    bits = np.NZERO.hex()  # xpd: removed-in-numpy-2
     kept = (np.nan, np.inf, -np.inf)
     return missing, top, low, flipped, zero, kept
 
@@ -84,6 +86,7 @@ def renamed(values, mask):
     ordered = np.msort(values)  # xpd: removed-in-numpy-2
     first = np.asscalar(values[:1])  # xpd: removed-in-numpy-2
     summed = np.asscalar(values.sum())  # xpd: removed-in-numpy-2
+    shifted = np.asscalar(values[:1] + 1)  # xpd: removed-in-numpy-2
     found = np.in1d(values, [1.0, 2.0])  # xpd: removed-in-numpy-2
     kept = (np.prod(values), np.cumprod(values), np.any(mask), np.all(mask), np.round(values, 2))
     kept_too = (np.vstack([values, values]), np.trapezoid(values), np.sort(values, axis=0), isin(values, [1.0]))
@@ -139,6 +142,7 @@ def methods(values, grid, root):
 def keywords(values, grid):
     flat = np.reshape(grid, newshape=-1)  # xpd: removed-in-numpy-2
     flat_f = np.reshape(grid, newshape=(-1,), order="F")  # xpd: removed-in-numpy-2
+    flat_c = np.reshape(grid, order="C", newshape=(-1,))  # xpd: removed-in-numpy-2
     shaped = np.reshape(newshape=(2, 3), a=values)  # xpd: removed-in-numpy-2
     kept_shape = (np.reshape(grid, -1), grid.reshape(-1))
     near = np.quantile(values, 0.3, interpolation="nearest")  # xpd: removed-in-numpy-2
@@ -168,6 +172,7 @@ def keywords(values, grid):
 def deprecated_imports():
     from numpy.core.numeric import normalize_axis_tuple  # xpd: deprecated-in-numpy-2
     from numpy.core import records  # xpd: deprecated-in-numpy-2
+    from numpy.core import zeros  # xpd: deprecated-in-numpy-2
     import numpy.core.multiarray as multiarray  # xpd: deprecated-in-numpy-2
     from numpy import core  # xpd: deprecated-in-numpy-2
     from numpy import isin, core  # xpd: deprecated-in-numpy-2
@@ -228,6 +233,7 @@ def random_integers_with_size():
 
 def random_integers_without_size(state, low, high):
     one = state.random_integers(1, 6)  # xpd: deprecated-in-numpy-2
+    doubled = state.random_integers(1, high * 2)  # xpd: deprecated-in-numpy-2
     upto = np.random.random_integers(6)  # xpd: deprecated-in-numpy-2
     spread = state.random_integers(low, high - 1, 3)  # xpd: deprecated-in-numpy-2
     return one, upto, spread

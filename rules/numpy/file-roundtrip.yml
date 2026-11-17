@@ -29,6 +29,7 @@ constraints:
 # https://numpy.org/doc/stable/reference/generated/numpy.fromfile.html
 # A raw file that another tool writes is read with fromfile alone, and is left alone. So is a
 # file object held on self, as in scipy.io.FortranFile, which writes a format other programs read.
+# No fix, because the tofile call that writes the file has to change too.
 id: file-roundtrip
 language: python
 severity: warning

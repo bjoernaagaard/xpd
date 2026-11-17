@@ -15,6 +15,7 @@ from numpy.testing import (
     assert_,
     assert_allclose,
     assert_almost_equal,
+    assert_approx_equal,
     assert_array_almost_equal,
     assert_raises,
 )
@@ -96,6 +97,7 @@ def legacy_polynomial():
     p = np.poly1d(coef)  # xpd: legacy-polynomial
     from_roots = np.poly([1.0, 2.0])  # xpd: legacy-polynomial
     slope = np.polyder(coef)  # xpd: legacy-polynomial
+    area = np.polyint(coef)  # xpd: legacy-polynomial
     product = np.polymul(coef, coef)  # xpd: legacy-polynomial
     return fit, value, zeros, p(2.0), from_roots, slope, product
 
@@ -118,6 +120,7 @@ def almost_equal_asserts():
     npt.assert_array_almost_equal(a, b, decimal=5)  # xpd: almost-equal-assert
     npt.assert_array_almost_equal(a, b, err_msg="drift")  # xpd: almost-equal-assert
     npt.assert_approx_equal(1.0, 1.0 + 1e-9)  # xpd: almost-equal-assert
+    assert_approx_equal(1.0, 1.0 + 1e-9)  # xpd: almost-equal-assert
     assert_almost_equal(a, b)  # xpd: almost-equal-assert
     assert_array_almost_equal(a, b)  # xpd: almost-equal-assert
     assert_array_almost_equal(a, b, decimal=5)  # xpd: almost-equal-assert
@@ -131,6 +134,10 @@ def asserts_on_arrays():
     b = a.copy()
     assert np.allclose(a, b)  # xpd: assert-on-arrays
     assert np.allclose(a, b, atol=1e-3)  # xpd: assert-on-arrays
+    assert np.allclose(a, b, rtol=1e-3)  # xpd: assert-on-arrays
+    assert np.allclose(a, b, 1e-3, 1e-6)  # xpd: assert-on-arrays
+    assert np.allclose(a, b), "a and b differ"  # xpd: assert-on-arrays
+    assert np.array_equal(a, b), "a and b differ"  # xpd: assert-on-arrays
     assert np.array_equal(a, b)  # xpd: assert-on-arrays
     assert np.all(a == b)  # xpd: assert-on-arrays
     assert (a == b).all()  # xpd: assert-on-arrays
@@ -161,6 +168,7 @@ def dot_on_matrices():
     m = np.dot(a, b)  # xpd: dot-on-matrices
     mv = np.dot(a, v)  # xpd: dot-on-matrices
     shifted = np.dot(a + 1, b)  # xpd: dot-on-matrices
+    turned = np.dot(a, b).T  # xpd: dot-on-matrices
     return m, mv, shifted, a @ b, np.vdot(v, v), np.inner(v, v)
 
 

@@ -1,5 +1,6 @@
 # Without axis, np.append, np.insert and np.delete flatten the array first. A list of lists
-# appended or inserted is a row or a column, so the flat result is never what was meant.
+# appended or inserted is a row or a column, so the flat result is never what was meant. No fix,
+# because the code does not show whether axis=0 or axis=1 was meant.
 id: append-flattens
 language: python
 severity: error

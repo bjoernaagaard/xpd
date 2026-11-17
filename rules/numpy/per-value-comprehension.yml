@@ -3,6 +3,207 @@
 # expression on the whole array. An element that calls any other function, a filter with `if`,
 # a second `for`, and a loop over zip are left alone, and so is a power with the loop variable
 # in the exponent.
+# The fix writes the expression with $X replaced by np.asarray($IT). It applies when $IT is a name
+# or an attribute, so reading it again gives the same values. Unsafe: Python ints do not wrap
+# where int64 does, a list of lists is a list of rows where the comprehension saw each row as a
+# list, and a division by zero gives inf where Python raised.
+id: per-value-comprehension
+language: python
+severity: warning
+message: This runs Python once per value of $IT. Apply the expression to the whole array instead, with $X replaced by np.asarray($IT), which ran 60 to 470 times faster on 1,000,000 values of an array and 2 to 24 times faster on a list.
+rule:
+  pattern: $NP.$MAKE($LIST)
+  has:
+    field: arguments
+    has:
+      kind: list_comprehension
+      matches: per-value
+      all:
+        - has: { field: body, pattern: $BODY }
+  all:
+    - matches: whole-array-body
+    - matches: loose-context
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  MAKE: { regex: '^(array|asarray)$' }
+  IT: { any: [{ kind: identifier }, { kind: attribute }], not: { regex: '\.(shape|strides)$' } }
+utils:
+  per-value:
+    all:
+      - has:
+          kind: for_in_clause
+          all:
+            - has: { field: left, kind: identifier, pattern: $X }
+            - has: { field: right, pattern: $IT }
+      - has: { field: body, matches: arithmetic, has: { stopBy: end, pattern: $X } }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  arithmetic:
+    all:
+      - not: { any: [{ matches: not-arithmetic }, { has: { stopBy: end, matches: not-arithmetic } }] }
+      - not: { any: [{ matches: power-of-x }, { has: { stopBy: end, matches: power-of-x } }] }
+  # x**i builds a row per pass when x is an array, and 2**i overflows int64 where Python ints
+  # do not.
+  power-of-x:
+    kind: binary_operator
+    all:
+      - has: { field: operator, regex: '^\*\*$' }
+      - has: { field: right, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] }
+  not-arithmetic:
+    any:
+      - kind: lambda
+      - kind: list_comprehension
+      - kind: generator_expression
+      - kind: string
+      - kind: slice
+      - kind: tuple
+      - kind: list
+      - kind: dictionary
+      - kind: subscript
+      - { kind: comparison_operator, regex: '\bin\b' }
+      - { kind: binary_operator, has: { field: operator, regex: '^@$' } }
+      - kind: attribute
+        not: { inside: { kind: call, field: function } }
+      - kind: call
+        not: { has: { field: function, matches: elementwise-function } }
+  elementwise-function:
+    any:
+      - regex: '^(np|numpy)\.(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|arcsinh|arccosh|arctanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|fmax|fmin|clip|isnan|isfinite|isinf|degrees|radians|deg2rad|rad2deg|logaddexp|mod|fmod|remainder)$'
+      - regex: '^math\.(sqrt|cbrt|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|asin|acos|atan|atan2|hypot|sinh|cosh|tanh|asinh|acosh|atanh|floor|ceil|trunc|fabs|pow|degrees|radians|fmod|copysign)$'
+      - regex: '^(abs|min|max)$'
+  # Forms that work on one value and raise or differ on a whole array.
+  whole-array-breaker:
+    any:
+      - kind: conditional_expression
+      - kind: boolean_operator
+      - kind: not_operator
+      - { kind: comparison_operator, has: { nthChild: 3 } }
+      - { kind: call, has: { field: function, regex: '^(math\.\w+|min|max)$' } }
+  whole-array-body:
+    has:
+      field: arguments
+      has:
+        kind: list_comprehension
+        has: { field: body, not: { any: [{ matches: whole-array-breaker }, { has: { stopBy: end, matches: whole-array-breaker } }] } }
+  # A place where the expression can stand without parentheses of its own.
+  loose-context:
+    any:
+      - inside: { kind: assignment, field: right }
+      - inside: { kind: augmented_assignment, field: right }
+      - inside: { kind: argument_list }
+      - inside: { kind: keyword_argument, field: value }
+      - inside: { kind: return_statement }
+      - inside: { kind: expression_list }
+rewriters:
+  - id: whole-array
+    rule: { kind: identifier, pattern: $X }
+    fix: np.asarray($IT)
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [whole-array] } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+# Unsafe for the same reasons, with parentheses around the expression where it is part of a
+# larger one.
+id: per-value-comprehension
+language: python
+severity: warning
+message: This runs Python once per value of $IT. Apply the expression to the whole array instead, with $X replaced by np.asarray($IT), which ran 60 to 470 times faster on 1,000,000 values of an array and 2 to 24 times faster on a list.
+rule:
+  pattern: $NP.$MAKE($LIST)
+  has:
+    field: arguments
+    has:
+      kind: list_comprehension
+      matches: per-value
+      all:
+        - has: { field: body, pattern: $BODY }
+  all:
+    - matches: whole-array-body
+    - not: { matches: loose-context }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  MAKE: { regex: '^(array|asarray)$' }
+  IT: { any: [{ kind: identifier }, { kind: attribute }], not: { regex: '\.(shape|strides)$' } }
+utils:
+  per-value:
+    all:
+      - has:
+          kind: for_in_clause
+          all:
+            - has: { field: left, kind: identifier, pattern: $X }
+            - has: { field: right, pattern: $IT }
+      - has: { field: body, matches: arithmetic, has: { stopBy: end, pattern: $X } }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  arithmetic:
+    all:
+      - not: { any: [{ matches: not-arithmetic }, { has: { stopBy: end, matches: not-arithmetic } }] }
+      - not: { any: [{ matches: power-of-x }, { has: { stopBy: end, matches: power-of-x } }] }
+  # x**i builds a row per pass when x is an array, and 2**i overflows int64 where Python ints
+  # do not.
+  power-of-x:
+    kind: binary_operator
+    all:
+      - has: { field: operator, regex: '^\*\*$' }
+      - has: { field: right, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] }
+  not-arithmetic:
+    any:
+      - kind: lambda
+      - kind: list_comprehension
+      - kind: generator_expression
+      - kind: string
+      - kind: slice
+      - kind: tuple
+      - kind: list
+      - kind: dictionary
+      - kind: subscript
+      - { kind: comparison_operator, regex: '\bin\b' }
+      - { kind: binary_operator, has: { field: operator, regex: '^@$' } }
+      - kind: attribute
+        not: { inside: { kind: call, field: function } }
+      - kind: call
+        not: { has: { field: function, matches: elementwise-function } }
+  elementwise-function:
+    any:
+      - regex: '^(np|numpy)\.(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|arcsinh|arccosh|arctanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|fmax|fmin|clip|isnan|isfinite|isinf|degrees|radians|deg2rad|rad2deg|logaddexp|mod|fmod|remainder)$'
+      - regex: '^math\.(sqrt|cbrt|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|asin|acos|atan|atan2|hypot|sinh|cosh|tanh|asinh|acosh|atanh|floor|ceil|trunc|fabs|pow|degrees|radians|fmod|copysign)$'
+      - regex: '^(abs|min|max)$'
+  # Forms that work on one value and raise or differ on a whole array.
+  whole-array-breaker:
+    any:
+      - kind: conditional_expression
+      - kind: boolean_operator
+      - kind: not_operator
+      - { kind: comparison_operator, has: { nthChild: 3 } }
+      - { kind: call, has: { field: function, regex: '^(math\.\w+|min|max)$' } }
+  whole-array-body:
+    has:
+      field: arguments
+      has:
+        kind: list_comprehension
+        has: { field: body, not: { any: [{ matches: whole-array-breaker }, { has: { stopBy: end, matches: whole-array-breaker } }] } }
+  # A place where the expression can stand without parentheses of its own.
+  loose-context:
+    any:
+      - inside: { kind: assignment, field: right }
+      - inside: { kind: augmented_assignment, field: right }
+      - inside: { kind: argument_list }
+      - inside: { kind: keyword_argument, field: value }
+      - inside: { kind: return_statement }
+      - inside: { kind: expression_list }
+rewriters:
+  - id: whole-array
+    rule: { kind: identifier, pattern: $X }
+    fix: np.asarray($IT)
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [whole-array] } }
+fix: ($NEW)
+metadata: { fix: unsafe }
+---
+# No fix when the element uses if, and, or, not, a chained comparison, min, max or a math
+# function, which do not work on a whole array, or when $IT is a call or another expression
+# that the fix would compute more than once.
 id: per-value-comprehension
 language: python
 severity: warning
@@ -12,6 +213,7 @@ rule:
   has:
     field: arguments
     has: { kind: list_comprehension, matches: per-value }
+  not: { matches: fixable }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   MAKE: { regex: '^(array|asarray)$' }
@@ -60,8 +262,236 @@ utils:
       - regex: '^(np|numpy)\.(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|arcsinh|arccosh|arctanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|fmax|fmin|clip|isnan|isfinite|isinf|degrees|radians|deg2rad|rad2deg|logaddexp|mod|fmod|remainder)$'
       - regex: '^math\.(sqrt|cbrt|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|asin|acos|atan|atan2|hypot|sinh|cosh|tanh|asinh|acosh|atanh|floor|ceil|trunc|fabs|pow|degrees|radians|fmod|copysign)$'
       - regex: '^(abs|min|max)$'
+  # Forms that work on one value and raise or differ on a whole array.
+  whole-array-breaker:
+    any:
+      - kind: conditional_expression
+      - kind: boolean_operator
+      - kind: not_operator
+      - { kind: comparison_operator, has: { nthChild: 3 } }
+      - { kind: call, has: { field: function, regex: '^(math\.\w+|min|max)$' } }
+  whole-array-body:
+    has:
+      field: arguments
+      has:
+        kind: list_comprehension
+        has: { field: body, not: { any: [{ matches: whole-array-breaker }, { has: { stopBy: end, matches: whole-array-breaker } }] } }
+  # A place where the expression can stand without parentheses of its own.
+  loose-context:
+    any:
+      - inside: { kind: assignment, field: right }
+      - inside: { kind: augmented_assignment, field: right }
+      - inside: { kind: argument_list }
+      - inside: { kind: keyword_argument, field: value }
+      - inside: { kind: return_statement }
+      - inside: { kind: expression_list }
+  fixable:
+    all:
+      - has: { field: arguments, has: { kind: list_comprehension, all: [{ has: { kind: for_in_clause, has: { field: right, any: [{ kind: identifier }, { kind: attribute }], not: { regex: '\.(shape|strides)$' } } } }] } }
+      - matches: whole-array-body
 ---
 # The same comprehension over range, which np.arange replaces.
+# The fix writes the expression with $X replaced by np.arange($$$R). It applies when the range
+# calls nothing but len. Unsafe: Python ints do not wrap where int64 does, an empty range gave
+# a float64 array where the fix keeps the dtype of the expression, and a division by zero gives
+# inf where Python raised.
+id: per-value-comprehension
+language: python
+severity: warning
+message: This runs Python once per value of range. Apply the expression to the whole array instead, with $X replaced by np.arange($$$R), which ran 49 to 51 times faster on 1,000,000 values.
+rule:
+  pattern: $NP.$MAKE($LIST)
+  has:
+    field: arguments
+    has:
+      kind: list_comprehension
+      matches: per-value
+      all:
+        - has: { field: body, pattern: $BODY }
+  all:
+    - matches: whole-array-body
+    - matches: loose-context
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  MAKE: { regex: '^(array|asarray)$' }
+  IT: { pattern: range($$$R), not: { has: { stopBy: end, kind: call, not: { regex: '^len\(' } } } }
+utils:
+  per-value:
+    all:
+      - has:
+          kind: for_in_clause
+          all:
+            - has: { field: left, kind: identifier, pattern: $X }
+            - has: { field: right, pattern: $IT }
+      - has: { field: body, matches: arithmetic, has: { stopBy: end, pattern: $X } }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  arithmetic:
+    all:
+      - not: { any: [{ matches: not-arithmetic }, { has: { stopBy: end, matches: not-arithmetic } }] }
+      - not: { any: [{ matches: power-of-x }, { has: { stopBy: end, matches: power-of-x } }] }
+  # x**i builds a row per pass when x is an array, and 2**i overflows int64 where Python ints
+  # do not.
+  power-of-x:
+    kind: binary_operator
+    all:
+      - has: { field: operator, regex: '^\*\*$' }
+      - has: { field: right, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] }
+  not-arithmetic:
+    any:
+      - kind: lambda
+      - kind: list_comprehension
+      - kind: generator_expression
+      - kind: string
+      - kind: slice
+      - kind: tuple
+      - kind: list
+      - kind: dictionary
+      - kind: subscript
+      - { kind: comparison_operator, regex: '\bin\b' }
+      - { kind: binary_operator, has: { field: operator, regex: '^@$' } }
+      - kind: attribute
+        not: { inside: { kind: call, field: function } }
+      - kind: call
+        not: { has: { field: function, matches: elementwise-function } }
+  elementwise-function:
+    any:
+      - regex: '^(np|numpy)\.(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|arcsinh|arccosh|arctanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|fmax|fmin|clip|isnan|isfinite|isinf|degrees|radians|deg2rad|rad2deg|logaddexp|mod|fmod|remainder)$'
+      - regex: '^math\.(sqrt|cbrt|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|asin|acos|atan|atan2|hypot|sinh|cosh|tanh|asinh|acosh|atanh|floor|ceil|trunc|fabs|pow|degrees|radians|fmod|copysign)$'
+      - regex: '^(abs|min|max)$'
+  # Forms that work on one value and raise or differ on a whole array.
+  whole-array-breaker:
+    any:
+      - kind: conditional_expression
+      - kind: boolean_operator
+      - kind: not_operator
+      - { kind: comparison_operator, has: { nthChild: 3 } }
+      - { kind: call, has: { field: function, regex: '^(math\.\w+|min|max)$' } }
+  whole-array-body:
+    has:
+      field: arguments
+      has:
+        kind: list_comprehension
+        has: { field: body, not: { any: [{ matches: whole-array-breaker }, { has: { stopBy: end, matches: whole-array-breaker } }] } }
+  # A place where the expression can stand without parentheses of its own.
+  loose-context:
+    any:
+      - inside: { kind: assignment, field: right }
+      - inside: { kind: augmented_assignment, field: right }
+      - inside: { kind: argument_list }
+      - inside: { kind: keyword_argument, field: value }
+      - inside: { kind: return_statement }
+      - inside: { kind: expression_list }
+rewriters:
+  - id: whole-array
+    rule: { kind: identifier, pattern: $X }
+    fix: np.arange($$$R)
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [whole-array] } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+# Unsafe for the same reasons, with parentheses around the expression where it is part of a
+# larger one.
+id: per-value-comprehension
+language: python
+severity: warning
+message: This runs Python once per value of range. Apply the expression to the whole array instead, with $X replaced by np.arange($$$R), which ran 49 to 51 times faster on 1,000,000 values.
+rule:
+  pattern: $NP.$MAKE($LIST)
+  has:
+    field: arguments
+    has:
+      kind: list_comprehension
+      matches: per-value
+      all:
+        - has: { field: body, pattern: $BODY }
+  all:
+    - matches: whole-array-body
+    - not: { matches: loose-context }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  MAKE: { regex: '^(array|asarray)$' }
+  IT: { pattern: range($$$R), not: { has: { stopBy: end, kind: call, not: { regex: '^len\(' } } } }
+utils:
+  per-value:
+    all:
+      - has:
+          kind: for_in_clause
+          all:
+            - has: { field: left, kind: identifier, pattern: $X }
+            - has: { field: right, pattern: $IT }
+      - has: { field: body, matches: arithmetic, has: { stopBy: end, pattern: $X } }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
+  arithmetic:
+    all:
+      - not: { any: [{ matches: not-arithmetic }, { has: { stopBy: end, matches: not-arithmetic } }] }
+      - not: { any: [{ matches: power-of-x }, { has: { stopBy: end, matches: power-of-x } }] }
+  # x**i builds a row per pass when x is an array, and 2**i overflows int64 where Python ints
+  # do not.
+  power-of-x:
+    kind: binary_operator
+    all:
+      - has: { field: operator, regex: '^\*\*$' }
+      - has: { field: right, any: [{ pattern: $X }, { has: { stopBy: end, pattern: $X } }] }
+  not-arithmetic:
+    any:
+      - kind: lambda
+      - kind: list_comprehension
+      - kind: generator_expression
+      - kind: string
+      - kind: slice
+      - kind: tuple
+      - kind: list
+      - kind: dictionary
+      - kind: subscript
+      - { kind: comparison_operator, regex: '\bin\b' }
+      - { kind: binary_operator, has: { field: operator, regex: '^@$' } }
+      - kind: attribute
+        not: { inside: { kind: call, field: function } }
+      - kind: call
+        not: { has: { field: function, matches: elementwise-function } }
+  elementwise-function:
+    any:
+      - regex: '^(np|numpy)\.(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|arcsinh|arccosh|arctanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|fmax|fmin|clip|isnan|isfinite|isinf|degrees|radians|deg2rad|rad2deg|logaddexp|mod|fmod|remainder)$'
+      - regex: '^math\.(sqrt|cbrt|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|asin|acos|atan|atan2|hypot|sinh|cosh|tanh|asinh|acosh|atanh|floor|ceil|trunc|fabs|pow|degrees|radians|fmod|copysign)$'
+      - regex: '^(abs|min|max)$'
+  # Forms that work on one value and raise or differ on a whole array.
+  whole-array-breaker:
+    any:
+      - kind: conditional_expression
+      - kind: boolean_operator
+      - kind: not_operator
+      - { kind: comparison_operator, has: { nthChild: 3 } }
+      - { kind: call, has: { field: function, regex: '^(math\.\w+|min|max)$' } }
+  whole-array-body:
+    has:
+      field: arguments
+      has:
+        kind: list_comprehension
+        has: { field: body, not: { any: [{ matches: whole-array-breaker }, { has: { stopBy: end, matches: whole-array-breaker } }] } }
+  # A place where the expression can stand without parentheses of its own.
+  loose-context:
+    any:
+      - inside: { kind: assignment, field: right }
+      - inside: { kind: augmented_assignment, field: right }
+      - inside: { kind: argument_list }
+      - inside: { kind: keyword_argument, field: value }
+      - inside: { kind: return_statement }
+      - inside: { kind: expression_list }
+rewriters:
+  - id: whole-array
+    rule: { kind: identifier, pattern: $X }
+    fix: np.arange($$$R)
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [whole-array] } }
+fix: ($NEW)
+metadata: { fix: unsafe }
+---
+# No fix when the element uses if, and, or, not, a chained comparison, min, max or a math
+# function, which do not work on a whole array, or when the range calls a function other than
+# len, which the fix would call more than once.
 id: per-value-comprehension
 language: python
 severity: warning
@@ -71,6 +501,7 @@ rule:
   has:
     field: arguments
     has: { kind: list_comprehension, matches: per-value }
+  not: { matches: fixable }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   MAKE: { regex: '^(array|asarray)$' }
@@ -119,8 +550,38 @@ utils:
       - regex: '^(np|numpy)\.(sqrt|cbrt|square|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|arcsin|arccos|arctan|arctan2|hypot|sinh|cosh|tanh|arcsinh|arccosh|arctanh|floor|ceil|trunc|rint|round|sign|abs|absolute|fabs|power|maximum|minimum|fmax|fmin|clip|isnan|isfinite|isinf|degrees|radians|deg2rad|rad2deg|logaddexp|mod|fmod|remainder)$'
       - regex: '^math\.(sqrt|cbrt|exp|exp2|expm1|log|log2|log10|log1p|sin|cos|tan|asin|acos|atan|atan2|hypot|sinh|cosh|tanh|asinh|acosh|atanh|floor|ceil|trunc|fabs|pow|degrees|radians|fmod|copysign)$'
       - regex: '^(abs|min|max)$'
+  # Forms that work on one value and raise or differ on a whole array.
+  whole-array-breaker:
+    any:
+      - kind: conditional_expression
+      - kind: boolean_operator
+      - kind: not_operator
+      - { kind: comparison_operator, has: { nthChild: 3 } }
+      - { kind: call, has: { field: function, regex: '^(math\.\w+|min|max)$' } }
+  whole-array-body:
+    has:
+      field: arguments
+      has:
+        kind: list_comprehension
+        has: { field: body, not: { any: [{ matches: whole-array-breaker }, { has: { stopBy: end, matches: whole-array-breaker } }] } }
+  # A place where the expression can stand without parentheses of its own.
+  loose-context:
+    any:
+      - inside: { kind: assignment, field: right }
+      - inside: { kind: augmented_assignment, field: right }
+      - inside: { kind: argument_list }
+      - inside: { kind: keyword_argument, field: value }
+      - inside: { kind: return_statement }
+      - inside: { kind: expression_list }
+  fixable:
+    all:
+      - has: { field: arguments, has: { kind: list_comprehension, has: { kind: for_in_clause, has: { field: right, pattern: range($$$R), not: { has: { stopBy: end, kind: call, not: { regex: '^len\(' } } } } } } }
+      - matches: whole-array-body
 ---
 # map with a NumPy or math function that works on each element calls it once per value.
+# Unsafe: the fix returns an array where map returned an iterator, which next() reads and a
+# second loop finds empty, and a math function returns a Python number or raises where NumPy
+# returns a float or NaN.
 id: per-value-comprehension
 language: python
 severity: warning
@@ -137,3 +598,5 @@ transform:
       source: $F
       replace: '^(np|numpy|math)\.(asin|acos|atan|asinh|acosh|atanh|.*)$'
       by: '$2'
+fix: np.$N(np.asarray($IT))
+metadata: { fix: unsafe }

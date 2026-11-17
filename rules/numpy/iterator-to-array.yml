@@ -69,15 +69,13 @@ utils:
 fix: $F(list($I), $$$REST)
 metadata: { fix: unsafe }
 ---
-# A set has no order, so there is no fix.
+# A set has no order, so the fix sorts it. Unsafe on purpose, and sorted raises on values that
+# do not compare, such as a mix of numbers and text.
 id: iterator-to-array
 language: python
 severity: error
-message: $F does not unpack a set. It wraps the set in a zero dimensional object array. Write $F(sorted($I)), or $F(list($I)) when the order does not matter.
-rule:
-  any:
-    - pattern: $F($I)
-    - pattern: $F($I, $$$REST)
+message: $F does not unpack a set. It wraps the set in a zero dimensional object array. Write $F(sorted($I)).
+rule: { pattern: $F($I) }
 constraints:
   F: { regex: '^(np|numpy)\.(array|asarray|asanyarray)$' }
   I:
@@ -85,3 +83,20 @@ constraints:
       - kind: set
       - kind: set_comprehension
       - { kind: call, has: { field: function, regex: '^(set|frozenset)$' } }
+fix: $F(sorted($I))
+metadata: { fix: unsafe }
+---
+id: iterator-to-array
+language: python
+severity: error
+message: $F does not unpack a set. It wraps the set in a zero dimensional object array. Write $F(sorted($I), ...).
+rule: { pattern: "$F($I, $$$REST)" }
+constraints:
+  F: { regex: '^(np|numpy)\.(array|asarray|asanyarray)$' }
+  I:
+    any:
+      - kind: set
+      - kind: set_comprehension
+      - { kind: call, has: { field: function, regex: '^(set|frozenset)$' } }
+fix: $F(sorted($I), $$$REST)
+metadata: { fix: unsafe }
