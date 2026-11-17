@@ -20,6 +20,8 @@ dynamic = ["version", "description", "readme", "keywords"]
 dependencies = [
   "fastmcp[anthropic,apps,azure,code-mode,gemini,jev,openai,tasks]~=4.2.0",
   "prefab-ui==0.21.1",
+  # The server reads sgconfig.yml and xpd.yml to learn which rule files a project has.
+  "pyyaml>=6",
 ]
 
 [project.urls]
