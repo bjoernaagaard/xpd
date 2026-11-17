@@ -50,7 +50,12 @@ return {
 }"""
 
 
-def stages_script(data: str, task: str = "") -> str:
+def discovery_task(target: str, task: str = "") -> str:
+    """The task that `find` gets, and that the script records as the discovery question."""
+    return task or f"predict {target}"
+
+
+def stages_script(data: str, target: str, task: str = "") -> str:
     """The script for one project: the paths as constants, then the stages."""
     paths = {
         "DATA": data,
@@ -58,7 +63,7 @@ def stages_script(data: str, task: str = "") -> str:
         "TRAIN": "train.py",
         "PREDICT": "predict.py",
         "CONTRACT": "model/contract.json",
-        "TASK": task or "classify penguin species with a logistic regression pipeline",
+        "TASK": discovery_task(target, task),
         "CHOICE": "sklearn.linear_model.LogisticRegression",
         "REASON": "Class probabilities for the species target.",
     }
@@ -169,11 +174,11 @@ def register(mcp: FastMCP) -> None:
             target: The column the model predicts.
             task: The task in plain words, before choosing a library.
         """
-        script = stages_script(data, task)
+        script = stages_script(data, target, task)
         return f"""Build a model that predicts {target} from {data}. Write three scripts in the \
 project root, which is where each of them runs, and save the model in the folder model.
 
-First call `find` with the task {task or "predict " + target}, then `api` on the candidates.
+First call `find` with the task {discovery_task(target, task)}, then `api` on the candidates.
 Keep each candidate's kind, name, signature, summary and guarding rules. Kinds may include
 recipes as well as symbols and rules. Choose a candidate and state why. For a recipe, name
 its indexed callable symbols too. Set TASK, CHOICE, REASON and SYMBOLS in the script to those

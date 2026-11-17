@@ -291,8 +291,9 @@ samples/pipeline/
 ```
 
 The client below starts the server with code mode on and sends the script that
-`build_pipeline` returns for `data` set to `penguins.csv` and `target` set to `species`. Run it
-from the repository root in an environment that has xpd, pandas and scikit-learn. `equiv` and
+`build_pipeline` returns for `data` set to `penguins.csv`, `target` set to `species` and `task`
+set to `classify penguin species with a logistic regression pipeline`. Run it from the
+repository root in an environment that has xpd, pandas and scikit-learn. `equiv` and
 `refit` run the scripts with the Python of `VIRTUAL_ENV`, or else with the Python of the nearest
 `.venv`. FastMCP's stdio client passes on only a few environment variables, so the client passes
 `VIRTUAL_ENV` to the server itself.
