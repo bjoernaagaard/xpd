@@ -1,7 +1,7 @@
 # GroupTimeSeriesSplit tries every combination of n_splits split points over the groups to find
 # the most even folds, so the work grows with the number of groups to the power n_splits. On
 # 3,000 rows in 60 groups, split took 0.09 s at n_splits=4, 1.08 s at 5 and 10.48 s at 6, and
-# with 40 groups 0.21 s at 5 and 1.07 s at 6. The class warns itself from 30 groups on at
+# with 40 groups 0.10 s at 5 and 1.07 s at 6. The class warns itself above 30 groups at
 # n_splits above 5. With a few groups the search is short, so the rule is a warning.
 
 id: group-time-series-split-folds

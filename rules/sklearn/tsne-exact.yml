@@ -3,7 +3,7 @@
 id: tsne-exact
 language: python
 severity: info
-message: method="exact" computes the force between every pair of rows. The default Barnes-Hut method gave the same trustworthiness over 20 seeds and fitted a median 2.2 times faster on 300 rows and 4.0 times faster on 1,000 rows. Leave method at its default.
+message: method="exact" computes the force between every pair of rows. The default Barnes-Hut method gave the same trustworthiness over 20 seeds and fitted a median 4.5 times faster on 300 rows and 16 times faster on 1,000 rows, with the default number of threads. Leave method at its default.
 rule:
   pattern: $C($$$A)
   has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*.exact.$' } }
