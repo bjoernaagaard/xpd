@@ -26,7 +26,7 @@ confidence-threshold = 0.8
 exceptions = [
     { crate = "libcst@1.9.0", allow = ["PSF-2.0"] },
     { crate = "option-ext@0.2.0", allow = ["MPL-2.0"] },
-    { crate = "xpd", allow = ["MPL-2.0"] },
+    { crate = "xpd", allow = ["MPL-2.0", "PSF-2.0"] },
 ]
 
 [bans]
