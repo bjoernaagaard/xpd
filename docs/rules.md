@@ -9310,7 +9310,7 @@ name.
 
 #### clustered-without-clusters
 
-**Severity:** error. **Fix:** unsafe: `cluster_entity=True` is added to `fit` of `PanelOLS`, `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS`. It changes the standard errors on purpose, and it clusters by entity where the code may have meant time. The models that take `clusters=` have no fix, because the groups are not in the file.
+**Severity:** error. **Fix:** none, because the code does not show whether to cluster by entity or by time, and the groups for `clusters=` are not in the file.
 
 The rule reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and
 `clusters`. Without them every observation is a cluster of its own, which is the
@@ -13518,7 +13518,7 @@ on(a rule document)
 
 | Case | What the document gets |
 | --- | --- |
-| The old form raises on the library version that the pack is written for | An unsafe fix. A form that raises leaves no value to compare, so its fix is never safe |
+| The old form raises on the library version that the pack is written for | An unsafe fix, because a form that raises leaves no value to compare. The renames in `removed-in-numpy-2` are marked safe from before this policy, because the old name gave the same value on NumPy 1 |
 | The rewrite returns another type, such as an array where the old form returned a list | An unsafe fix |
 | The rewrite changes what the code does on purpose, because the old form gave a wrong result | An unsafe fix |
 | The rewrite drops, adds or renames one argument of a call | A fix that builds the argument list again with `rewriters`, as `deprecated-in-sklearn` does |

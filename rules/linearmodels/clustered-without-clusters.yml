@@ -9,8 +9,7 @@
 # unpacks keywords from a dictionary. BetweenOLS is left out: it refuses cluster_entity, and its
 # rows are the entities already.
 #
-# Unsafe: the fix clusters by entity, which changes the standard errors on purpose, and the code
-# may have meant to cluster by time.
+# No fix, because the code does not show whether to cluster by entity or by time.
 id: clustered-without-clusters
 language: python
 severity: error
@@ -18,20 +17,10 @@ message: cov_type="clustered" with no cluster_entity, cluster_time or clusters p
 rule:
   kind: call
   all:
-    - pattern: $C($$$ARGS)
     - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:clustered|one-way)["'']+$' } }] } } }
     - matches: lm-fit
     - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cluster_entity|cluster_time|clusters)$' } }] } } }
     - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
-rewriters:
-  - id: keep
-    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
-    fix: "$ARG, "
-transform:
-  KEPT:
-    rewrite: { source: $$$ARGS, rewriters: [keep], joinBy: "" }
-fix: $C($KEPTcluster_entity=True)
-metadata: { fix: unsafe }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|FirstDifferenceOLS)$' }] }
