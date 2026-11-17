@@ -3,8 +3,11 @@
 # or a positional argument that the signature takes only by keyword. Code inside a try block that
 # catches the error, or behind a version check, is a compatibility path and stays silent.
 #
-# A fix here turns code that raises into code that runs, so no fix is bit equal to the old form
-# and every fix is unsafe. Where the source documents a keyword as renamed, the message says so.
+# A fix here turns code that raises into code that runs. A fix is safe when an older release ran
+# both forms and the new form gave the same object, or a fit and an output with equal pickles, on
+# real data. The comment above a safe fix names that release. The fitted model keeps the value it
+# was given, so a renamed keyword or value still reads differently as a parameter. Where the
+# source documents a keyword as renamed, the message says so.
 # The long name lists come from scikit-learn 1.9.1 itself: its public modules, the names each
 # subpackage exports, and the signatures that take arguments only by keyword.
 
@@ -61,6 +64,27 @@ utils:
 fix: import joblib
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 0.22.2 with joblib 0.14.1 each of these names in sklearn.externals.joblib
+# was the same object as in joblib.
+id: removed-in-sklearn
+language: python
+severity: error
+message: sklearn.externals.joblib was removed. Import joblib itself, which scikit-learn depends on.
+rule:
+  kind: dotted_name
+  regex: '^sklearn\.externals\.joblib$'
+  inside:
+    kind: import_from_statement
+    field: module_name
+    regex: '^from\s+sklearn\.externals\.joblib\s+import\s+\(?[\s,]*((Logger|MemorizedResult|Memory|Parallel|PrintTime|cpu_count|delayed|dump|effective_n_jobs|hash|load|parallel_backend|register_compressor|register_parallel_backend|register_store_backend|wrap_non_picklable_objects)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: joblib
+metadata: { fix: safe }
+---
+# Unsafe: on scikit-learn 0.22.2 the module sklearn.externals.joblib was not the module joblib,
+# and it also held sys, warnings and msg.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -71,7 +95,10 @@ rule:
   any:
     - inside: { kind: import_from_statement, field: module_name }
     - inside: { kind: aliased_import, field: name, inside: { kind: import_statement } }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - inside: { kind: import_from_statement, field: module_name, regex: '^from\s+sklearn\.externals\.joblib\s+import\s+\(?[\s,]*((Logger|MemorizedResult|Memory|Parallel|PrintTime|cpu_count|delayed|dump|effective_n_jobs|hash|load|parallel_backend|register_compressor|register_parallel_backend|register_store_backend|wrap_non_picklable_objects)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: joblib
@@ -146,6 +173,35 @@ utils:
 # A dotted path to a submodule that 1.9.1 does not have, such as sklearn.linear_model.logistic,
 # which older releases had before the module was made private. The fix applies when every name
 # the statement imports is exported by the subpackage.
+# Safe: on scikit-learn 0.19.2, 0.20.4, 0.21.3, 0.22.2 and 0.23.2 each listed name was the same
+# object in each listed module as in its subpackage.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $M is not a module in scikit-learn 1.9.1, so the import raises. Import from $P, which exports these names.
+rule:
+  kind: dotted_name
+  pattern: $M
+  regex: '^(sklearn\.cluster\.affinity_propagation_|sklearn\.cluster\.bicluster|sklearn\.cluster\.birch|sklearn\.cluster\.dbscan_|sklearn\.cluster\.hierarchical|sklearn\.cluster\.k_means_|sklearn\.cluster\.mean_shift_|sklearn\.cluster\.optics_|sklearn\.cluster\.spectral|sklearn\.covariance\.elliptic_envelope|sklearn\.covariance\.empirical_covariance_|sklearn\.covariance\.graph_lasso_|sklearn\.covariance\.outlier_detection|sklearn\.covariance\.robust_covariance|sklearn\.covariance\.shrunk_covariance_|sklearn\.cross_decomposition\.cca_|sklearn\.cross_decomposition\.pls_|sklearn\.datasets\.base|sklearn\.datasets\.california_housing|sklearn\.datasets\.covtype|sklearn\.datasets\.kddcup99|sklearn\.datasets\.lfw|sklearn\.datasets\.mlcomp|sklearn\.datasets\.mldata|sklearn\.datasets\.olivetti_faces|sklearn\.datasets\.openml|sklearn\.datasets\.rcv1|sklearn\.datasets\.samples_generator|sklearn\.datasets\.species_distributions|sklearn\.datasets\.svmlight_format|sklearn\.datasets\.twenty_newsgroups|sklearn\.decomposition\.dict_learning|sklearn\.decomposition\.factor_analysis|sklearn\.decomposition\.fastica_|sklearn\.decomposition\.incremental_pca|sklearn\.decomposition\.kernel_pca|sklearn\.decomposition\.nmf|sklearn\.decomposition\.online_lda|sklearn\.decomposition\.pca|sklearn\.decomposition\.sparse_pca|sklearn\.decomposition\.truncated_svd|sklearn\.ensemble\.bagging|sklearn\.ensemble\.base|sklearn\.ensemble\.forest|sklearn\.ensemble\.gradient_boosting|sklearn\.ensemble\.iforest|sklearn\.ensemble\.voting|sklearn\.ensemble\.voting_classifier|sklearn\.ensemble\.weight_boosting|sklearn\.feature_extraction\.dict_vectorizer|sklearn\.feature_extraction\.hashing|sklearn\.feature_selection\.base|sklearn\.feature_selection\.from_model|sklearn\.feature_selection\.mutual_info|sklearn\.feature_selection\.mutual_info_|sklearn\.feature_selection\.rfe|sklearn\.feature_selection\.univariate_selection|sklearn\.feature_selection\.variance_threshold|sklearn\.gaussian_process\.gpc|sklearn\.gaussian_process\.gpr|sklearn\.inspection\.partial_dependence|sklearn\.linear_model\.base|sklearn\.linear_model\.bayes|sklearn\.linear_model\.coordinate_descent|sklearn\.linear_model\.huber|sklearn\.linear_model\.least_angle|sklearn\.linear_model\.logistic|sklearn\.linear_model\.omp|sklearn\.linear_model\.passive_aggressive|sklearn\.linear_model\.perceptron|sklearn\.linear_model\.randomized_l1|sklearn\.linear_model\.ransac|sklearn\.linear_model\.ridge|sklearn\.linear_model\.stochastic_gradient|sklearn\.linear_model\.theil_sen|sklearn\.manifold\.isomap|sklearn\.manifold\.locally_linear|sklearn\.manifold\.mds|sklearn\.manifold\.spectral_embedding_|sklearn\.manifold\.t_sne|sklearn\.metrics\.classification|sklearn\.metrics\.ranking|sklearn\.metrics\.regression|sklearn\.metrics\.scorer|sklearn\.mixture\.bayesian_mixture|sklearn\.mixture\.gaussian_mixture|sklearn\.neighbors\.ball_tree|sklearn\.neighbors\.base|sklearn\.neighbors\.classification|sklearn\.neighbors\.graph|sklearn\.neighbors\.kd_tree|sklearn\.neighbors\.kde|sklearn\.neighbors\.lof|sklearn\.neighbors\.nca|sklearn\.neighbors\.nearest_centroid|sklearn\.neighbors\.regression|sklearn\.neighbors\.unsupervised|sklearn\.neural_network\.multilayer_perceptron|sklearn\.neural_network\.rbm|sklearn\.preprocessing\.data|sklearn\.preprocessing\.label|sklearn\.semi_supervised\.label_propagation|sklearn\.svm\.bounds|sklearn\.svm\.classes|sklearn\.tree\.export|sklearn\.tree\.tree|sklearn\.utils\.arpack|sklearn\.utils\.mocking|sklearn\.utils\.sparsetools|sklearn\.utils\.testing)$'
+  not:
+    any:
+      - regex: '^(sklearn\.base|sklearn\.calibration|sklearn\.callback|sklearn\.cluster|sklearn\.compose|sklearn\.covariance|sklearn\.cross_decomposition|sklearn\.datasets|sklearn\.datasets\.data|sklearn\.datasets\.descr|sklearn\.datasets\.images|sklearn\.decomposition|sklearn\.discriminant_analysis|sklearn\.dummy|sklearn\.ensemble|sklearn\.exceptions|sklearn\.experimental|sklearn\.experimental\.enable_halving_search_cv|sklearn\.experimental\.enable_hist_gradient_boosting|sklearn\.experimental\.enable_iterative_imputer|sklearn\.externals|sklearn\.externals\.array_api_compat|sklearn\.externals\.array_api_extra|sklearn\.externals\.conftest|sklearn\.feature_extraction|sklearn\.feature_extraction\.image|sklearn\.feature_extraction\.text|sklearn\.feature_selection|sklearn\.frozen|sklearn\.gaussian_process|sklearn\.gaussian_process\.kernels|sklearn\.impute|sklearn\.inspection|sklearn\.isotonic|sklearn\.kernel_approximation|sklearn\.kernel_ridge|sklearn\.linear_model|sklearn\.manifold|sklearn\.metrics|sklearn\.metrics\.cluster|sklearn\.metrics\.pairwise|sklearn\.mixture|sklearn\.model_selection|sklearn\.multiclass|sklearn\.multioutput|sklearn\.naive_bayes|sklearn\.neighbors|sklearn\.neural_network|sklearn\.pipeline|sklearn\.preprocessing|sklearn\.random_projection|sklearn\.semi_supervised|sklearn\.svm|sklearn\.tests|sklearn\.tests\.metadata_routing_common|sklearn\.tests\.test_base|sklearn\.tests\.test_build|sklearn\.tests\.test_calibration|sklearn\.tests\.test_check_build|sklearn\.tests\.test_common|sklearn\.tests\.test_config|sklearn\.tests\.test_discriminant_analysis|sklearn\.tests\.test_docstring_parameters|sklearn\.tests\.test_docstring_parameters_consistency|sklearn\.tests\.test_docstrings|sklearn\.tests\.test_dummy|sklearn\.tests\.test_init|sklearn\.tests\.test_isotonic|sklearn\.tests\.test_kernel_approximation|sklearn\.tests\.test_kernel_ridge|sklearn\.tests\.test_metadata_routing|sklearn\.tests\.test_metaestimators|sklearn\.tests\.test_metaestimators_metadata_routing|sklearn\.tests\.test_min_dependencies_consistency|sklearn\.tests\.test_multiclass|sklearn\.tests\.test_multioutput|sklearn\.tests\.test_naive_bayes|sklearn\.tests\.test_pipeline|sklearn\.tests\.test_public_functions|sklearn\.tests\.test_random_projection|sklearn\.tree|sklearn\.utils|sklearn\.utils\.arrayfuncs|sklearn\.utils\.class_weight|sklearn\.utils\.deprecation|sklearn\.utils\.discovery|sklearn\.utils\.estimator_checks|sklearn\.utils\.extmath|sklearn\.utils\.fixes|sklearn\.utils\.graph|sklearn\.utils\.metadata_routing|sklearn\.utils\.metaestimators|sklearn\.utils\.multiclass|sklearn\.utils\.murmurhash|sklearn\.utils\.optimize|sklearn\.utils\.parallel|sklearn\.utils\.random|sklearn\.utils\.sparsefuncs|sklearn\.utils\.sparsefuncs_fast|sklearn\.utils\.stats|sklearn\.utils\.validation)$'
+      - regex: '^sklearn\.externals\.'
+      - matches: compat-code
+  inside:
+    kind: import_from_statement
+    field: module_name
+    any: [{ regex: '^from\s+sklearn\.base\.\w+\s+import\s+\(?[\s,]*((AttrsDict|BaseEstimator|BiclusterMixin|ClassNamePrefixFeaturesOutMixin|ClassifierMixin|ClassifierTags|ClusterMixin|DensityMixin|InconsistentVersionWarning|MetaEstimatorMixin|MultiOutputMixin|OneToOneFeatureMixin|OutlierMixin|ParamsDict|RegressorMixin|RegressorTags|ReprHTMLMixin|Tags|TargetTags|TransformerMixin|TransformerTags|check_array|check_is_fitted|clone|config_context|copy|defaultdict|estimator_html_repr|functools|get_config|get_tags|inspect|is_classifier|is_clusterer|is_outlier_detector|is_pandas_na|is_regressor|is_scalar_nan|np|numbers|platform|re|validate_parameter_constraints|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.calibration\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|CalibratedClassifierCV|CalibrationDisplay|ClassifierMixin|FrozenEstimator|HalfBinomialLoss|HalfMultinomialLoss|HalfMultinomialLossArrayAPI|HasMethods|Integral|Interval|IsotonicRegression|LabelEncoder|LeaveOneOut|LinearSVC|MetaEstimatorMixin|MetadataRouter|MethodMapping|Parallel|Real|RegressorMixin|StrOptions|calibration_curve|check_array|check_classification_targets|check_consistent_length|check_cv|check_is_fitted|clone|column_or_1d|cross_val_predict|delayed|expit|get_namespace|get_namespace_and_device|get_tags|indexable|label_binarize|log|minimize|minimize_scalar|move_to|np|process_routing|signature|softmax|validate_params|warnings|xpx)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.callback\.\w+\s+import\s+\(?[\s,]*((AutoPropagatedCallback|CallbackContext|CallbackSupportMixin|FitCallback|ProgressBar|ScoringMonitor|ScoringMonitorLog|with_callbacks)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.cluster\.\w+\s+import\s+\(?[\s,]*((AffinityPropagation|AgglomerativeClustering|Birch|BisectingKMeans|DBSCAN|FeatureAgglomeration|HDBSCAN|KMeans|MeanShift|MiniBatchKMeans|OPTICS|SpectralBiclustering|SpectralClustering|SpectralCoclustering|affinity_propagation|cluster_optics_dbscan|cluster_optics_xi|compute_optics_graph|dbscan|estimate_bandwidth|get_bin_seeds|k_means|kmeans_plusplus|linkage_tree|mean_shift|spectral_clustering|ward_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.compose\.\w+\s+import\s+\(?[\s,]*((ColumnTransformer|TransformedTargetRegressor|make_column_selector|make_column_transformer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.covariance\.\w+\s+import\s+\(?[\s,]*((EllipticEnvelope|EmpiricalCovariance|GraphicalLasso|GraphicalLassoCV|LedoitWolf|MinCovDet|OAS|ShrunkCovariance|empirical_covariance|fast_mcd|graphical_lasso|ledoit_wolf|ledoit_wolf_shrinkage|log_likelihood|oas|shrunk_covariance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.cross_decomposition\.\w+\s+import\s+\(?[\s,]*((CCA|PLSCanonical|PLSRegression|PLSSVD)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.datasets\.\w+\s+import\s+\(?[\s,]*((clear_data_home|dump_svmlight_file|fetch_20newsgroups|fetch_20newsgroups_vectorized|fetch_california_housing|fetch_covtype|fetch_file|fetch_kddcup99|fetch_lfw_pairs|fetch_lfw_people|fetch_olivetti_faces|fetch_openml|fetch_rcv1|fetch_species_distributions|get_data_home|load_breast_cancer|load_diabetes|load_digits|load_files|load_iris|load_linnerud|load_sample_image|load_sample_images|load_svmlight_file|load_svmlight_files|load_wine|make_biclusters|make_blobs|make_checkerboard|make_circles|make_classification|make_friedman1|make_friedman2|make_friedman3|make_gaussian_quantiles|make_hastie_10_2|make_low_rank_matrix|make_moons|make_multilabel_classification|make_regression|make_s_curve|make_sparse_coded_signal|make_sparse_spd_matrix|make_sparse_uncorrelated|make_spd_matrix|make_swiss_roll)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.decomposition\.\w+\s+import\s+\(?[\s,]*((DictionaryLearning|FactorAnalysis|FastICA|IncrementalPCA|KernelPCA|LatentDirichletAllocation|MiniBatchDictionaryLearning|MiniBatchNMF|MiniBatchSparsePCA|NMF|PCA|SparseCoder|SparsePCA|TruncatedSVD|dict_learning|dict_learning_online|fastica|non_negative_factorization|randomized_svd|sparse_encode)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.discriminant_analysis\.\w+\s+import\s+\(?[\s,]*((LinearDiscriminantAnalysis|QuadraticDiscriminantAnalysis)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.dummy\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|ClassifierMixin|DummyClassifier|DummyRegressor|Integral|Interval|MultiOutputMixin|Real|RegressorMixin|StrOptions|check_array|check_consistent_length|check_is_fitted|check_random_state|class_distribution|np|sp|validate_data|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.ensemble\.\w+\s+import\s+\(?[\s,]*((AdaBoostClassifier|AdaBoostRegressor|BaggingClassifier|BaggingRegressor|BaseEnsemble|ExtraTreesClassifier|ExtraTreesRegressor|GradientBoostingClassifier|GradientBoostingRegressor|HistGradientBoostingClassifier|HistGradientBoostingRegressor|IsolationForest|RandomForestClassifier|RandomForestRegressor|RandomTreesEmbedding|StackingClassifier|StackingRegressor|VotingClassifier|VotingRegressor)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.exceptions\.\w+\s+import\s+\(?[\s,]*((ConvergenceWarning|DataConversionWarning|DataDimensionalityWarning|EfficiencyWarning|EstimatorCheckFailedWarning|FitFailedWarning|NotFittedError|PositiveSpectrumWarning|SkipTestWarning|UndefinedMetricWarning|UnsetMetadataPassedError)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.experimental\.\w+\s+import\s+\(?[\s,]*((enable_halving_search_cv|enable_iterative_imputer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.externals\.\w+\s+import\s+\(?[\s,]*((array_api_compat|array_api_extra)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.feature_extraction\.\w+\s+import\s+\(?[\s,]*((DictVectorizer|FeatureHasher|grid_to_graph|image|img_to_graph|text)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.feature_selection\.\w+\s+import\s+\(?[\s,]*((GenericUnivariateSelect|RFE|RFECV|SelectFdr|SelectFpr|SelectFromModel|SelectFwe|SelectKBest|SelectPercentile|SelectorMixin|SequentialFeatureSelector|VarianceThreshold|chi2|f_classif|f_oneway|f_regression|mutual_info_classif|mutual_info_regression|r_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.frozen\.\w+\s+import\s+\(?[\s,]*((FrozenEstimator)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.gaussian_process\.\w+\s+import\s+\(?[\s,]*((GaussianProcessClassifier|GaussianProcessRegressor|kernels)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.impute\.\w+\s+import\s+\(?[\s,]*((IterativeImputer|KNNImputer|MissingIndicator|SimpleImputer)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.inspection\.\w+\s+import\s+\(?[\s,]*((DecisionBoundaryDisplay|PartialDependenceDisplay|partial_dependence|permutation_importance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.isotonic\.\w+\s+import\s+\(?[\s,]*((IsotonicRegression|check_increasing|isotonic_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.kernel_approximation\.\w+\s+import\s+\(?[\s,]*((AdditiveChi2Sampler|BaseEstimator|ClassNamePrefixFeaturesOutMixin|Integral|Interval|KERNEL_PARAMS|Nystroem|PAIRWISE_KERNEL_FUNCTIONS|PolynomialCountSketch|RBFSampler|Real|SkewedChi2Sampler|StrOptions|TransformerMixin|check_is_fitted|check_random_state|fft|get_namespace_and_device|ifft|np|pairwise_kernels|safe_sparse_dot|sp|validate_data|warnings)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.kernel_ridge\.\w+\s+import\s+\(?[\s,]*((BaseEstimator|Interval|KernelRidge|MultiOutputMixin|PAIRWISE_KERNEL_FUNCTIONS|Real|RegressorMixin|StrOptions|check_is_fitted|np|pairwise_kernels|validate_data)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.linear_model\.\w+\s+import\s+\(?[\s,]*((ARDRegression|BayesianRidge|ElasticNet|ElasticNetCV|GammaRegressor|HuberRegressor|Lars|LarsCV|Lasso|LassoCV|LassoLars|LassoLarsCV|LassoLarsIC|LinearRegression|LogisticRegression|LogisticRegressionCV|MultiTaskElasticNet|MultiTaskElasticNetCV|MultiTaskLasso|MultiTaskLassoCV|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|PassiveAggressiveClassifier|PassiveAggressiveRegressor|Perceptron|PoissonRegressor|QuantileRegressor|RANSACRegressor|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|SGDClassifier|SGDOneClassSVM|SGDRegressor|TheilSenRegressor|TweedieRegressor|enet_path|lars_path|lars_path_gram|lasso_path|orthogonal_mp|orthogonal_mp_gram|ridge_regression)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.manifold\.\w+\s+import\s+\(?[\s,]*((ClassicalMDS|Isomap|LocallyLinearEmbedding|MDS|SpectralEmbedding|TSNE|locally_linear_embedding|smacof|spectral_embedding|trustworthiness)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.metrics\.\w+\s+import\s+\(?[\s,]*((ConfusionMatrixDisplay|DetCurveDisplay|DistanceMetric|PrecisionRecallDisplay|PredictionErrorDisplay|RocCurveDisplay|accuracy_score|adjusted_mutual_info_score|adjusted_rand_score|auc|average_precision_score|balanced_accuracy_score|brier_score_loss|calinski_harabasz_score|check_scoring|class_likelihood_ratios|classification_report|cluster|cohen_kappa_score|completeness_score|confusion_matrix|confusion_matrix_at_thresholds|consensus_score|coverage_error|d2_absolute_error_score|d2_brier_score|d2_log_loss_score|d2_pinball_score|d2_tweedie_score|davies_bouldin_score|dcg_score|det_curve|euclidean_distances|explained_variance_score|f1_score|fbeta_score|fowlkes_mallows_score|get_scorer|get_scorer_names|hamming_loss|hinge_loss|homogeneity_completeness_v_measure|homogeneity_score|jaccard_score|label_ranking_average_precision_score|label_ranking_loss|log_loss|make_scorer|matthews_corrcoef|max_error|mean_absolute_error|mean_absolute_percentage_error|mean_gamma_deviance|mean_pinball_loss|mean_poisson_deviance|mean_squared_error|mean_squared_log_error|mean_tweedie_deviance|median_absolute_error|metric_at_thresholds|multilabel_confusion_matrix|mutual_info_score|nan_euclidean_distances|ndcg_score|normalized_mutual_info_score|pair_confusion_matrix|pairwise_distances|pairwise_distances_argmin|pairwise_distances_argmin_min|pairwise_distances_chunked|pairwise_kernels|precision_recall_curve|precision_recall_fscore_support|precision_score|r2_score|rand_score|recall_score|roc_auc_score|roc_curve|root_mean_squared_error|root_mean_squared_log_error|silhouette_samples|silhouette_score|top_k_accuracy_score|v_measure_score|zero_one_loss)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.mixture\.\w+\s+import\s+\(?[\s,]*((BayesianGaussianMixture|GaussianMixture)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.model_selection\.\w+\s+import\s+\(?[\s,]*((BaseCrossValidator|BaseShuffleSplit|FixedThresholdClassifier|GridSearchCV|GroupKFold|GroupShuffleSplit|HalvingGridSearchCV|HalvingRandomSearchCV|KFold|LearningCurveDisplay|LeaveOneGroupOut|LeaveOneOut|LeavePGroupsOut|LeavePOut|ParameterGrid|ParameterSampler|PredefinedSplit|RandomizedSearchCV|RepeatedKFold|RepeatedStratifiedKFold|ShuffleSplit|StratifiedGroupKFold|StratifiedKFold|StratifiedShuffleSplit|TimeSeriesSplit|TunedThresholdClassifierCV|ValidationCurveDisplay|check_cv|cross_val_predict|cross_val_score|cross_validate|learning_curve|permutation_test_score|train_test_split|validation_curve)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.multiclass\.\w+\s+import\s+\(?[\s,]*((OneVsOneClassifier|OneVsRestClassifier|OutputCodeClassifier)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.multioutput\.\w+\s+import\s+\(?[\s,]*((ClassifierChain|MultiOutputClassifier|MultiOutputRegressor|RegressorChain)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.naive_bayes\.\w+\s+import\s+\(?[\s,]*((BernoulliNB|CategoricalNB|ComplementNB|GaussianNB|MultinomialNB)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.neighbors\.\w+\s+import\s+\(?[\s,]*((BallTree|KDTree|KNeighborsClassifier|KNeighborsRegressor|KNeighborsTransformer|KernelDensity|LocalOutlierFactor|NearestCentroid|NearestNeighbors|NeighborhoodComponentsAnalysis|RadiusNeighborsClassifier|RadiusNeighborsRegressor|RadiusNeighborsTransformer|VALID_METRICS_SPARSE|kneighbors_graph|radius_neighbors_graph|sort_graph_by_row_values)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.neural_network\.\w+\s+import\s+\(?[\s,]*((BernoulliRBM|MLPClassifier|MLPRegressor)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.pipeline\.\w+\s+import\s+\(?[\s,]*((FeatureUnion|Pipeline|make_pipeline|make_union)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.preprocessing\.\w+\s+import\s+\(?[\s,]*((Binarizer|FunctionTransformer|KBinsDiscretizer|KernelCenterer|LabelBinarizer|LabelEncoder|MaxAbsScaler|MinMaxScaler|MultiLabelBinarizer|Normalizer|OneHotEncoder|OrdinalEncoder|PolynomialFeatures|PowerTransformer|QuantileTransformer|RobustScaler|SplineTransformer|StandardScaler|TargetEncoder|add_dummy_feature|binarize|label_binarize|maxabs_scale|minmax_scale|normalize|power_transform|quantile_transform|robust_scale|scale)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.random_projection\.\w+\s+import\s+\(?[\s,]*((GaussianRandomProjection|SparseRandomProjection|johnson_lindenstrauss_min_dim)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.semi_supervised\.\w+\s+import\s+\(?[\s,]*((LabelPropagation|LabelSpreading|SelfTrainingClassifier)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.svm\.\w+\s+import\s+\(?[\s,]*((LinearSVC|LinearSVR|NuSVC|NuSVR|OneClassSVM|SVC|SVR|l1_min_c)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.tree\.\w+\s+import\s+\(?[\s,]*((BaseDecisionTree|DecisionTreeClassifier|DecisionTreeRegressor|ExtraTreeClassifier|ExtraTreeRegressor|export_graphviz|export_text|plot_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }, { regex: '^from\s+sklearn\.utils\.\w+\s+import\s+\(?[\s,]*((Bunch|ClassifierTags|DataConversionWarning|InputTags|RegressorTags|Tags|TargetTags|TransformerTags|_align_api_if_sparse|_safe_indexing|as_float_array|assert_all_finite|check_X_y|check_array|check_consistent_length|check_random_state|check_scalar|check_symmetric|column_or_1d|compute_class_weight|compute_sample_weight|deprecated|estimator_html_repr|gen_batches|gen_even_slices|get_tags|indexable|metadata_routing|murmurhash3_32|resample|safe_mask|safe_sqr|shuffle)(\s+as\s+\w+)?[\s,]*)+\)?\s*$' }]
+transform:
+  P: { replace: { source: $M, replace: '\.\w+$', by: '' } }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $P
+metadata: { fix: safe }
+---
+# The same dotted paths, where a module was not in scikit-learn 0.19.2 to 0.23.2, or the import
+# brings in VALID_METRICS from a neighbors module or all_estimators from sklearn.utils.testing.
+# Unsafe: on scikit-learn 0.23.2 neither name was the same object as the one in its subpackage.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -159,6 +215,9 @@ rule:
       - regex: '^(sklearn\.base|sklearn\.calibration|sklearn\.callback|sklearn\.cluster|sklearn\.compose|sklearn\.covariance|sklearn\.cross_decomposition|sklearn\.datasets|sklearn\.datasets\.data|sklearn\.datasets\.descr|sklearn\.datasets\.images|sklearn\.decomposition|sklearn\.discriminant_analysis|sklearn\.dummy|sklearn\.ensemble|sklearn\.exceptions|sklearn\.experimental|sklearn\.experimental\.enable_halving_search_cv|sklearn\.experimental\.enable_hist_gradient_boosting|sklearn\.experimental\.enable_iterative_imputer|sklearn\.externals|sklearn\.externals\.array_api_compat|sklearn\.externals\.array_api_extra|sklearn\.externals\.conftest|sklearn\.feature_extraction|sklearn\.feature_extraction\.image|sklearn\.feature_extraction\.text|sklearn\.feature_selection|sklearn\.frozen|sklearn\.gaussian_process|sklearn\.gaussian_process\.kernels|sklearn\.impute|sklearn\.inspection|sklearn\.isotonic|sklearn\.kernel_approximation|sklearn\.kernel_ridge|sklearn\.linear_model|sklearn\.manifold|sklearn\.metrics|sklearn\.metrics\.cluster|sklearn\.metrics\.pairwise|sklearn\.mixture|sklearn\.model_selection|sklearn\.multiclass|sklearn\.multioutput|sklearn\.naive_bayes|sklearn\.neighbors|sklearn\.neural_network|sklearn\.pipeline|sklearn\.preprocessing|sklearn\.random_projection|sklearn\.semi_supervised|sklearn\.svm|sklearn\.tests|sklearn\.tests\.metadata_routing_common|sklearn\.tests\.test_base|sklearn\.tests\.test_build|sklearn\.tests\.test_calibration|sklearn\.tests\.test_check_build|sklearn\.tests\.test_common|sklearn\.tests\.test_config|sklearn\.tests\.test_discriminant_analysis|sklearn\.tests\.test_docstring_parameters|sklearn\.tests\.test_docstring_parameters_consistency|sklearn\.tests\.test_docstrings|sklearn\.tests\.test_dummy|sklearn\.tests\.test_init|sklearn\.tests\.test_isotonic|sklearn\.tests\.test_kernel_approximation|sklearn\.tests\.test_kernel_ridge|sklearn\.tests\.test_metadata_routing|sklearn\.tests\.test_metaestimators|sklearn\.tests\.test_metaestimators_metadata_routing|sklearn\.tests\.test_min_dependencies_consistency|sklearn\.tests\.test_multiclass|sklearn\.tests\.test_multioutput|sklearn\.tests\.test_naive_bayes|sklearn\.tests\.test_pipeline|sklearn\.tests\.test_public_functions|sklearn\.tests\.test_random_projection|sklearn\.tree|sklearn\.utils|sklearn\.utils\.arrayfuncs|sklearn\.utils\.class_weight|sklearn\.utils\.deprecation|sklearn\.utils\.discovery|sklearn\.utils\.estimator_checks|sklearn\.utils\.extmath|sklearn\.utils\.fixes|sklearn\.utils\.graph|sklearn\.utils\.metadata_routing|sklearn\.utils\.metaestimators|sklearn\.utils\.multiclass|sklearn\.utils\.murmurhash|sklearn\.utils\.optimize|sklearn\.utils\.parallel|sklearn\.utils\.random|sklearn\.utils\.sparsefuncs|sklearn\.utils\.sparsefuncs_fast|sklearn\.utils\.stats|sklearn\.utils\.validation)$'
       - regex: '^sklearn\.externals\.'
       - matches: compat-code
+  any:
+    - not: { regex: '^(sklearn\.cluster\.affinity_propagation_|sklearn\.cluster\.bicluster|sklearn\.cluster\.birch|sklearn\.cluster\.dbscan_|sklearn\.cluster\.hierarchical|sklearn\.cluster\.k_means_|sklearn\.cluster\.mean_shift_|sklearn\.cluster\.optics_|sklearn\.cluster\.spectral|sklearn\.covariance\.elliptic_envelope|sklearn\.covariance\.empirical_covariance_|sklearn\.covariance\.graph_lasso_|sklearn\.covariance\.outlier_detection|sklearn\.covariance\.robust_covariance|sklearn\.covariance\.shrunk_covariance_|sklearn\.cross_decomposition\.cca_|sklearn\.cross_decomposition\.pls_|sklearn\.datasets\.base|sklearn\.datasets\.california_housing|sklearn\.datasets\.covtype|sklearn\.datasets\.kddcup99|sklearn\.datasets\.lfw|sklearn\.datasets\.mlcomp|sklearn\.datasets\.mldata|sklearn\.datasets\.olivetti_faces|sklearn\.datasets\.openml|sklearn\.datasets\.rcv1|sklearn\.datasets\.samples_generator|sklearn\.datasets\.species_distributions|sklearn\.datasets\.svmlight_format|sklearn\.datasets\.twenty_newsgroups|sklearn\.decomposition\.dict_learning|sklearn\.decomposition\.factor_analysis|sklearn\.decomposition\.fastica_|sklearn\.decomposition\.incremental_pca|sklearn\.decomposition\.kernel_pca|sklearn\.decomposition\.nmf|sklearn\.decomposition\.online_lda|sklearn\.decomposition\.pca|sklearn\.decomposition\.sparse_pca|sklearn\.decomposition\.truncated_svd|sklearn\.ensemble\.bagging|sklearn\.ensemble\.base|sklearn\.ensemble\.forest|sklearn\.ensemble\.gradient_boosting|sklearn\.ensemble\.iforest|sklearn\.ensemble\.voting|sklearn\.ensemble\.voting_classifier|sklearn\.ensemble\.weight_boosting|sklearn\.feature_extraction\.dict_vectorizer|sklearn\.feature_extraction\.hashing|sklearn\.feature_selection\.base|sklearn\.feature_selection\.from_model|sklearn\.feature_selection\.mutual_info|sklearn\.feature_selection\.mutual_info_|sklearn\.feature_selection\.rfe|sklearn\.feature_selection\.univariate_selection|sklearn\.feature_selection\.variance_threshold|sklearn\.gaussian_process\.gpc|sklearn\.gaussian_process\.gpr|sklearn\.inspection\.partial_dependence|sklearn\.linear_model\.base|sklearn\.linear_model\.bayes|sklearn\.linear_model\.coordinate_descent|sklearn\.linear_model\.huber|sklearn\.linear_model\.least_angle|sklearn\.linear_model\.logistic|sklearn\.linear_model\.omp|sklearn\.linear_model\.passive_aggressive|sklearn\.linear_model\.perceptron|sklearn\.linear_model\.randomized_l1|sklearn\.linear_model\.ransac|sklearn\.linear_model\.ridge|sklearn\.linear_model\.stochastic_gradient|sklearn\.linear_model\.theil_sen|sklearn\.manifold\.isomap|sklearn\.manifold\.locally_linear|sklearn\.manifold\.mds|sklearn\.manifold\.spectral_embedding_|sklearn\.manifold\.t_sne|sklearn\.metrics\.classification|sklearn\.metrics\.ranking|sklearn\.metrics\.regression|sklearn\.metrics\.scorer|sklearn\.mixture\.bayesian_mixture|sklearn\.mixture\.gaussian_mixture|sklearn\.neighbors\.ball_tree|sklearn\.neighbors\.base|sklearn\.neighbors\.classification|sklearn\.neighbors\.graph|sklearn\.neighbors\.kd_tree|sklearn\.neighbors\.kde|sklearn\.neighbors\.lof|sklearn\.neighbors\.nca|sklearn\.neighbors\.nearest_centroid|sklearn\.neighbors\.regression|sklearn\.neighbors\.unsupervised|sklearn\.neural_network\.multilayer_perceptron|sklearn\.neural_network\.rbm|sklearn\.preprocessing\.data|sklearn\.preprocessing\.label|sklearn\.semi_supervised\.label_propagation|sklearn\.svm\.bounds|sklearn\.svm\.classes|sklearn\.tree\.export|sklearn\.tree\.tree|sklearn\.utils\.arpack|sklearn\.utils\.mocking|sklearn\.utils\.sparsetools|sklearn\.utils\.testing)$' }
+    - inside: { kind: import_from_statement, regex: '^from\s+sklearn\.(neighbors\.\w+\s+import\b[^#]*\bVALID_METRICS\b|utils\.\w+\s+import\b[^#]*\ball_estimators\b)' }
   inside:
     kind: import_from_statement
     field: module_name
@@ -217,6 +276,8 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
+# Safe: on scikit-learn 0.19.2 to 0.23.2 sklearn.feature_extraction.stop_words.ENGLISH_STOP_WORDS
+# was the same object as sklearn.feature_extraction.text.ENGLISH_STOP_WORDS.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -232,7 +293,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: sklearn.feature_extraction.text
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
 # get_feature_names returned a list. get_feature_names_out returns an array, and on a frame it
 # names the input columns where get_feature_names named them x0, x1 and so on. A file that
@@ -253,6 +314,8 @@ fix: $X.get_feature_names_out($$$A)
 metadata: { fix: unsafe, since: "1.0" }
 ---
 # The 1.9.1 docstring says sparse was renamed sparse_output in 1.2.
+# Safe: on scikit-learn 1.3.2 sparse= and sparse_output= gave equal pickles of fit_transform and
+# the fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -273,9 +336,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: sparse_output
-metadata: { fix: unsafe, since: "1.2" }
+metadata: { fix: safe, since: "1.2" }
 ---
 # The 1.9.1 docstring says base_estimator was renamed estimator in 1.2.
+# Safe: on scikit-learn 1.3.2 base_estimator= and estimator= gave equal pickles of predict and the
+# fitted attributes for all four classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -296,9 +361,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: estimator
-metadata: { fix: unsafe, since: "1.2" }
+metadata: { fix: safe, since: "1.2" }
 ---
 # The 1.9.1 docstring adds estimator in 1.2. It takes the same object.
+# Safe: on scikit-learn 1.3.2 base_estimator= and estimator= gave equal pickles of predict_proba
+# and the fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -319,9 +386,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: estimator
-metadata: { fix: unsafe, since: "1.2" }
+metadata: { fix: safe, since: "1.2" }
 ---
 # The 1.9.1 docstring says n_iter was renamed max_iter in 1.5.
+# Safe: on scikit-learn 1.6.1 n_iter= and max_iter= gave equal pickles of the embedding and the
+# fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -342,9 +411,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: max_iter
-metadata: { fix: unsafe, since: "1.5" }
+metadata: { fix: safe, since: "1.5" }
 ---
 # The 1.9.1 docstring says store_cv_values was renamed store_cv_results in 1.5.
+# Safe: on scikit-learn 1.6.1 store_cv_values= and store_cv_results= gave equal pickles of predict
+# and the fitted attributes for both classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -365,9 +436,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: store_cv_results
-metadata: { fix: unsafe, since: "1.5" }
+metadata: { fix: safe, since: "1.5" }
 ---
 # The 1.9.1 docstring says force_all_finite was renamed ensure_all_finite in 1.6.
+# Safe: on scikit-learn 1.7.2 force_all_finite= and ensure_all_finite= gave equal pickles of the
+# result, or the same error, for True, False and "allow-nan".
 id: removed-in-sklearn
 language: python
 severity: error
@@ -388,9 +461,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: ensure_all_finite
-metadata: { fix: unsafe, since: "1.6" }
+metadata: { fix: safe, since: "1.6" }
 ---
 # The 1.9.1 docstring adds metric in 1.2. It takes the same object.
+# Safe: on scikit-learn 1.3.2 affinity= and metric= gave equal pickles of the fit and its output
+# for both classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -411,9 +486,11 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: metric
-metadata: { fix: unsafe, since: "1.2" }
+metadata: { fix: safe, since: "1.2" }
 ---
 # The 1.9.1 docstring says alphas takes an integer since 1.7, which removes the need for n_alphas.
+# Safe: on scikit-learn 1.8.0 n_alphas= and alphas= gave equal pickles of predict and the fitted
+# attributes for all four classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -434,7 +511,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: alphas
-metadata: { fix: unsafe, since: "1.7" }
+metadata: { fix: safe, since: "1.7" }
 ---
 id: removed-in-sklearn
 language: python
@@ -484,6 +561,8 @@ utils:
 fix: n_splits
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 0.24.2 KMeans with each n_jobs and without it gave equal pickles of predict
+# and the fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -493,7 +572,43 @@ rule:
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^n_jobs$ } } }
   not: { matches: compat-code }
 constraints:
-  C: { regex: '(^|\.)(KMeans|MiniBatchKMeans)$' }
+  C: { regex: '(^|\.)(KMeans)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^n_jobs$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^n_jobs$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: safe }
+---
+# Unsafe: MiniBatchKMeans took no n_jobs in scikit-learn 0.19.2 to 0.24.2, so no release ran both
+# forms.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes n_jobs=. Drop it.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^n_jobs$ } } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(MiniBatchKMeans)$' }
 rewriters:
   - id: drop
     rule: { kind: keyword_argument, has: { field: name, regex: ^n_jobs$ } }
@@ -518,6 +633,44 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 0.23.2 behaviour="new" and behaviour="deprecated" gave the same
+# decision_function and fitted attributes as no behaviour, in equal pickles.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes behaviour=. Drop it.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^behaviour\s*=\s*["''](new|deprecated)["'']$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(IsolationForest)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^behaviour$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^behaviour$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: safe }
+---
+# Unsafe: behaviour="old" ran another algorithm, which 0.23.2 refuses and the default does not run,
+# and a value from a variable may hold it.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -525,7 +678,10 @@ message: $C no longer takes behaviour=. Drop it.
 rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^behaviour$ } } }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - has: { field: arguments, has: { kind: keyword_argument, regex: '^behaviour\s*=\s*["''](new|deprecated)["'']$' } }
 constraints:
   C: { regex: '(^|\.)(IsolationForest)$' }
 rewriters:
@@ -552,6 +708,44 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 1.7.2 algorithm="SAMME" and no algorithm gave equal pickles of
+# predict_proba and the fitted attributes.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes algorithm=. Drop it, because 1.9.1 always runs the discrete SAMME algorithm.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^algorithm\s*=\s*["'']SAMME["'']$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(AdaBoostClassifier)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^algorithm$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^algorithm$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: safe }
+---
+# Unsafe: algorithm="SAMME.R" was another algorithm than the SAMME that 1.9.1 runs without the
+# keyword, and a value from a variable may hold it.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -559,7 +753,10 @@ message: $C no longer takes algorithm=. Drop it, because 1.9.1 always runs the d
 rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^algorithm$ } } }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - has: { field: arguments, has: { kind: keyword_argument, regex: '^algorithm\s*=\s*["'']SAMME["'']$' } }
 constraints:
   C: { regex: '(^|\.)(AdaBoostClassifier)$' }
 rewriters:
@@ -586,6 +783,44 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 0.23.2 iid=False and no iid gave equal pickles of cv_results_ without the
+# times, best_score_ and predict_proba for both classes.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes iid=. Drop it.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^iid\s*=\s*False$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^iid$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^iid$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: safe }
+---
+# Unsafe: on scikit-learn 0.23.2 iid=True weighted the fold scores, so cv_results_ and best_score_
+# differed from the call without iid, and a value from a variable may be True.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -593,7 +828,10 @@ message: $C no longer takes iid=. Drop it.
 rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^iid$ } } }
-  not: { matches: compat-code }
+  not:
+    any:
+      - matches: compat-code
+      - has: { field: arguments, has: { kind: keyword_argument, regex: '^iid\s*=\s*False$' } }
 constraints:
   C: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV)$' }
 rewriters:
@@ -620,6 +858,8 @@ utils:
 fix: $C($REST)
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 0.24.2 dropping min_impurity_split=None gave equal pickles of the output
+# and the fitted attributes for all ten classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -652,8 +892,10 @@ transform:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: $C($REST)
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
+# Safe: on scikit-learn 1.1.3 normalize=False and no normalize gave equal pickles of predict and the
+# fitted attributes for all fifteen classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -663,7 +905,43 @@ rule:
   has: { field: arguments, has: { kind: keyword_argument, regex: '^normalize\s*=\s*False$' } }
   not: { matches: compat-code }
 constraints:
-  C: { regex: '(^|\.)(LinearRegression|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|Lars|LarsCV|LassoLars|LassoLarsCV|LassoLarsIC|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV|BayesianRidge|ARDRegression|MultiTaskLasso|MultiTaskElasticNet|MultiTaskLassoCV|MultiTaskElasticNetCV)$' }
+  C: { regex: '(^|\.)(LinearRegression|Ridge|RidgeCV|RidgeClassifier|RidgeClassifierCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|BayesianRidge|ARDRegression|MultiTaskLasso|MultiTaskElasticNet|MultiTaskLassoCV|MultiTaskElasticNetCV)$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^normalize$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^normalize$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: safe }
+---
+# Unsafe: on scikit-learn 1.1.3 the Lars and orthogonal matching pursuit classes still defaulted to
+# normalize=True, so the call without normalize fitted another model.
+id: removed-in-sklearn
+language: python
+severity: error
+message: $C no longer takes normalize=. Drop normalize=False, which was its default.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^normalize\s*=\s*False$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)(Lars|LarsCV|LassoLars|LassoLarsCV|LassoLarsIC|OrthogonalMatchingPursuit|OrthogonalMatchingPursuitCV)$' }
 rewriters:
   - id: drop
     rule: { kind: keyword_argument, has: { field: name, regex: ^normalize$ } }
@@ -690,13 +968,51 @@ metadata: { fix: unsafe }
 ---
 # multi_class="multinomial" is what 1.9.1 always fits for three or more classes, and "auto" chose
 # it too, except for binary targets and liblinear, where 1.9.1 fits the binary model itself.
+# Safe: on scikit-learn 1.7.2 multi_class="auto" and no multi_class gave equal pickles of
+# predict_proba and the fitted attributes for both classes, every solver, and two and three classes.
 id: removed-in-sklearn
 language: python
 severity: error
 message: LogisticRegression no longer takes multi_class=, and every multiclass fit uses the multinomial loss. Drop the keyword.
 rule:
   pattern: $C($$$ARGS)
-  has: { field: arguments, has: { kind: keyword_argument, regex: '^multi_class\s*=\s*["''](multinomial|auto)["'']$' } }
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^multi_class\s*=\s*["'']auto["'']$' } }
+  not: { matches: compat-code }
+constraints:
+  C: { regex: '(^|\.)LogisticRegression(CV)?$' }
+rewriters: 
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^multi_class$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^multi_class$ }
+    fix: "$ARG, "
+transform: 
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
+fix: $C($REST)
+metadata: { fix: safe }
+---
+# Unsafe: on scikit-learn 1.7.2 multi_class="multinomial" on a binary target fitted another model
+# than the call without multi_class.
+id: removed-in-sklearn
+language: python
+severity: error
+message: LogisticRegression no longer takes multi_class=, and every multiclass fit uses the multinomial loss. Drop the keyword.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^multi_class\s*=\s*["'']multinomial["'']$' } }
   not: { matches: compat-code }
 constraints:
   C: { regex: '(^|\.)LogisticRegression(CV)?$' }
@@ -818,8 +1134,9 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 ---
-# Unsafe: the old form raises on 1.9.1. The fix holds only when max_iter and tol are not passed,
-# because the fixed form would then repeat them.
+# Safe: on scikit-learn 0.20.4 n_iter=$V and max_iter=$V, tol=None gave equal pickles of predict
+# and the fitted attributes for all five classes. The fix holds only when max_iter and tol are not
+# passed, because the fixed form would then repeat them.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -835,7 +1152,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: max_iter=$V, tol=None
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
 # No fix, because max_iter or tol is already passed, or ** can hold them.
 id: removed-in-sklearn
@@ -858,7 +1175,8 @@ utils:
 # With alphas=None the number of alphas came from n_alphas, and alphas takes that number since
 # 1.7. The fix rewrites the whole call, so it holds only when n_alphas is on the first line of the
 # call, where the report is.
-# Unsafe: the old form raises on 1.9.1.
+# Safe: on scikit-learn 1.8.0 n_alphas=$V, alphas=None and alphas=$V gave equal pickles of predict
+# and the fitted attributes for all four classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -895,7 +1213,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $C($REST)
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
 # No fix, because alphas may hold a list, or n_alphas is on a later line than the call, and the
 # fix rewrites the whole call.
@@ -923,6 +1241,8 @@ utils:
 ---
 # The docstrings of the forest and extra-tree classes say the default of max_features changed
 # from "auto" to "sqrt" for classifiers and to 1.0 for regressors in 1.1.
+# Safe: on scikit-learn 1.2.2 max_features="auto" and "sqrt" gave equal pickles of predict_proba
+# and the fitted attributes for all three classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -937,8 +1257,10 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: max_features="sqrt"
-metadata: { fix: unsafe, since: "1.1" }
+metadata: { fix: safe, since: "1.1" }
 ---
+# Safe: on scikit-learn 1.2.2 max_features="auto" and 1.0 gave equal pickles of predict and the
+# fitted attributes for all three classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -953,7 +1275,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: max_features=1.0
-metadata: { fix: unsafe, since: "1.1" }
+metadata: { fix: safe, since: "1.1" }
 ---
 # No fix, because the message names several values, and the code does not show which one is meant.
 id: removed-in-sklearn
@@ -987,6 +1309,8 @@ rule:
       field: value
       has: { field: key, regex: '^["''](\w+__)?max_features["'']$' }
 ---
+# Safe: on scikit-learn 1.2.2 loss="log" and loss="log_loss" gave equal pickles of predict_proba
+# and the fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1001,8 +1325,10 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: loss="log_loss"
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
+# Safe: on scikit-learn 1.1.3 criterion="mse" and "squared_error" gave equal pickles of predict
+# and the fitted attributes for all four classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1017,8 +1343,10 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: criterion="squared_error"
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
+# Safe: on scikit-learn 1.1.3 criterion="mae" and "absolute_error" gave equal pickles of predict
+# and the fitted attributes for all four classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1033,8 +1361,10 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: criterion="absolute_error"
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
+# Safe: on scikit-learn 1.1.3 loss="ls" and loss="squared_error" gave equal pickles of predict and
+# the fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1049,8 +1379,10 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: loss="squared_error"
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
+# Safe: on scikit-learn 1.2.2 loss="deviance" and loss="log_loss" gave equal pickles of
+# predict_proba and the fitted attributes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1065,7 +1397,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: loss="log_loss"
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
 # A frozen estimator is not fitted again, which is what cv="prefit" did. The fix rewrites the whole
 # call, so it holds only when cv is on the first line of the call, where the report is, and the
@@ -1147,8 +1479,10 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 metadata: { since: "1.6" }
 ---
-# Unsafe: the old form raises on 1.9.1. The fix holds only when C and l1_ratio are not passed,
-# because the fixed form would then repeat C or let l1_ratio pick a penalty.
+# Safe: on scikit-learn 1.3.2 penalty="none" and C=np.inf gave equal pickles of predict_proba and
+# the fitted attributes with every solver that took "none", and the same random_state. The fix
+# holds only when C and l1_ratio are not passed, because the fixed form would then repeat C or let
+# l1_ratio pick a penalty.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1164,7 +1498,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 fix: C=np.inf
-metadata: { fix: unsafe, since: "1.8" }
+metadata: { fix: safe, since: "1.8" }
 ---
 # No fix, because C or l1_ratio is already passed, or ** can hold them.
 id: removed-in-sklearn
@@ -1185,7 +1519,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
 metadata: { since: "1.8" }
 ---
-# Unsafe: the old form raises on 1.9.1.
+# Safe: on scikit-learn 0.17.1 min_samples_split=1 and 2 gave equal pickles of predict and of
+# every fitted tree for all ten classes.
 id: removed-in-sklearn
 language: python
 severity: error
@@ -1200,7 +1535,7 @@ rule:
 fix: min_samples_split=2
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } } }] }
-metadata: { fix: unsafe }
+metadata: { fix: safe }
 ---
 # A splitter called the way the removed sklearn.cross_validation module took it, with the data or
 # its length first. model_selection splitters take n_splits first and get the data in split. No fix,

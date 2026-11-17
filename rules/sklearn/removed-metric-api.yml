@@ -1,5 +1,6 @@
-# Each document finds one metric API that scikit-learn removed. Every form raises on 1.9.1, so no
-# fix is bit equal to the old form and every fix is unsafe.
+# Each document finds one metric API that scikit-learn removed. Every form raises on 1.9.1. A fix
+# is safe when an older release ran both forms and they gave equal pickles on real data, and the
+# comment above it names that release.
 # No fix, because the message names two calls, one for the names and one for a scorer.
 id: removed-metric-api
 language: python
@@ -65,6 +66,8 @@ rule:
 # from-sklearn-metrics reads the whole file for a bare name, so each document that uses it tests
 # the keyword first in all, which keeps its order. ast-grep checks the name in constraints only
 # after the whole rule.
+# Safe: on scikit-learn 1.5.2 squared=False and root_$F gave equal pickles for one and two outputs
+# and both multioutput values.
 id: removed-metric-api
 language: python
 severity: error
@@ -111,8 +114,9 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $ROOT($REST)
-metadata: { fix: unsafe, since: "1.4" }
+metadata: { fix: safe, since: "1.4" }
 ---
+# Safe: on scikit-learn 1.5.2 squared=True and the call without it gave equal pickles.
 id: removed-metric-api
 language: python
 severity: error
@@ -157,7 +161,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $FN($REST)
-metadata: { fix: unsafe, since: "1.4" }
+metadata: { fix: safe, since: "1.4" }
 ---
 # No fix, because the value of squared is not in the file.
 id: removed-metric-api
@@ -225,6 +229,54 @@ utils:
               - has: { kind: wildcard_import }
 metadata: { since: "1.4" }
 ---
+# Safe: on scikit-learn 1.4.2 eps="auto" and no eps gave equal pickles of the loss.
+id: removed-metric-api
+language: python
+severity: error
+message: log_loss no longer takes eps=, so this raises. Drop it, since log_loss clips the probabilities itself.
+rule:
+  kind: call
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^eps\s*=\s*["'']auto["'']$' } }
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
+    - pattern: $FN($$$ARGS)
+constraints:
+  F: { regex: '^log_loss$' }
+utils:
+  from-sklearn-metrics:
+    any:
+      - kind: attribute
+        has: { field: object, regex: '^(sklearn\.)?metrics$' }
+      - kind: identifier
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            has: { field: module_name, regex: '^sklearn\.metrics$' }
+            any:
+              - has: { stopBy: end, kind: identifier, pattern: $F }
+              - has: { kind: wildcard_import }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(eps)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(eps)$ } }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: safe }
+---
+# Unsafe: on scikit-learn 1.4.2 a number for eps clipped the probabilities at another bound than the
+# call without eps, so the loss differed where a probability was 0 or 1.
 id: removed-metric-api
 language: python
 severity: error
@@ -233,6 +285,7 @@ rule:
   kind: call
   all:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^eps$ } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, regex: '^eps\s*=\s*["'']auto["'']$' } } }
     - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $F } }, { pattern: $F }], matches: from-sklearn-metrics }
     - pattern: $FN($$$ARGS)
 constraints:
@@ -270,6 +323,8 @@ transform:
 fix: $FN($REST)
 metadata: { fix: unsafe }
 ---
+# Safe: on scikit-learn 1.5.2 the old and the fixed make_scorer gave equal pickles of the scorer and
+# its score.
 id: removed-metric-api
 language: python
 severity: error
@@ -317,7 +372,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $FN($REST)
-metadata: { fix: unsafe, since: "1.4" }
+metadata: { fix: safe, since: "1.4" }
 ---
 # No fix, because the value of needs_proba is not in the file, or response_method is already passed.
 id: removed-metric-api
@@ -353,6 +408,8 @@ utils:
               - has: { kind: wildcard_import }
 metadata: { since: "1.4" }
 ---
+# Safe: on scikit-learn 1.5.2 the old and the fixed make_scorer gave equal pickles of the scorer and
+# its score, on a LogisticRegression and a LinearSVC.
 id: removed-metric-api
 language: python
 severity: error
@@ -400,7 +457,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $FN($REST)
-metadata: { fix: unsafe, since: "1.4" }
+metadata: { fix: safe, since: "1.4" }
 ---
 # No fix, because the value of needs_threshold is not in the file, or response_method is already passed.
 id: removed-metric-api
@@ -436,6 +493,8 @@ utils:
               - has: { kind: wildcard_import }
 metadata: { since: "1.4" }
 ---
+# Safe: on scikit-learn 1.8.0 estimator_name= and name= drew the same pixels and gave equal pickles
+# of the display data, the lines and the labels.
 id: removed-metric-api
 language: python
 severity: error
@@ -462,7 +521,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $FN($REST)
-metadata: { fix: unsafe, since: "1.7" }
+metadata: { fix: safe, since: "1.7" }
 ---
 # No fix, because name= is already passed, or ** can hold it.
 id: removed-metric-api
@@ -477,6 +536,8 @@ rule:
     - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^name$ } }] } }
 metadata: { since: "1.7" }
 ---
+# Safe: on scikit-learn 1.8.0 y_pred= and y_score= drew the same pixels and gave equal pickles of
+# the display data, the lines and the labels.
 id: removed-metric-api
 language: python
 severity: error
@@ -503,7 +564,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $FN($REST)
-metadata: { fix: unsafe, since: "1.7" }
+metadata: { fix: safe, since: "1.7" }
 ---
 # No fix, because y_score= is already passed, or ** can hold it.
 id: removed-metric-api
@@ -521,6 +582,8 @@ metadata: { since: "1.7" }
 # The keywords below are the ones the three methods take on 1.9.1. Any other keyword was a
 # matplotlib argument, which these methods no longer pass on. The fix holds only without label=,
 # which the message moves to name= instead.
+# Safe: on scikit-learn 1.8.0 the matplotlib keywords and the same keywords in curve_kwargs drew the
+# same pixels and gave equal pickles of the display data, the lines and the labels.
 id: removed-metric-api
 language: python
 severity: error
@@ -529,7 +592,56 @@ rule:
   kind: call
   pattern: $FN($$$ARGS)
   all:
-    - has: { field: function, regex: '(^|\.)RocCurveDisplay\.(from_estimator|from_predictions|from_cv_results)$|^RocCurveDisplay\(.*\)\.plot$', pattern: $F }
+    - has: { field: function, regex: '(^|\.)RocCurveDisplay\.(from_estimator|from_predictions)$|^RocCurveDisplay\(.*\)\.plot$', pattern: $F }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          has:
+            field: name
+            pattern: $KW
+            not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|chance_level_kwargs|despine|cv_results)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: keyword_argument, has: { field: name, regex: ^curve_kwargs$ } }, { kind: keyword_argument, has: { field: name, regex: ^label$ } }] } } }
+rewriters:
+  - id: move
+    rule:
+      kind: keyword_argument
+      all:
+        - has: { field: name, pattern: $K, not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|chance_level_kwargs|despine|cv_results)$' } }
+        - has: { field: value, pattern: $V }
+    fix: '"$K": $V, '
+  - id: skip-moved
+    rule: { kind: keyword_argument, has: { field: name, not: { regex: '^(estimator|X|y|y_true|y_score|y_pred|sample_weight|drop_intermediate|response_method|pos_label|name|ax|curve_kwargs|plot_chance_level|chance_level_kw|chance_level_kwargs|despine|cv_results)$' } } }
+    fix: ""
+  - id: skip-kept
+    rule: { pattern: $ARG }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not: { any: [{ kind: comment }, { kind: line_continuation }] }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [skip-moved, keep], joinBy: "" }
+  MOVED:
+    rewrite: { source: $$$ARGS, rewriters: [move, skip-kept], joinBy: "" }
+  DICT:
+    replace: { source: $MOVED, replace: ", $", by: "" }
+fix: $FN($KEPTcurve_kwargs={$DICT})
+metadata: { fix: safe, since: "1.7" }
+---
+# Unsafe: from_cv_results took no matplotlib keywords in scikit-learn 1.7.2 or 1.8.0, so no release
+# ran both forms.
+id: removed-metric-api
+language: python
+severity: error
+message: $F no longer passes $KW= on to matplotlib, so this raises. Write the matplotlib arguments as curve_kwargs={...}.
+rule:
+  kind: call
+  pattern: $FN($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)RocCurveDisplay\.from_cv_results$', pattern: $F }
     - has:
         field: arguments
         has:
