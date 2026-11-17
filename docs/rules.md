@@ -6326,16 +6326,16 @@ The replacement is advice. xpd does not apply it automatically.
 
 The rule is info, because the default Barnes-Hut method approximates the forces between distant
 points. Its embedding is therefore another one, and no speed proof applies. Over 20 seeds on
-`make_classification` data, Barnes-Hut gave a trustworthiness with 5 neighbours within 0.001 of
-the exact method:
+`make_classification` data, with the default number of threads, Barnes-Hut gave a trustworthiness
+with 5 neighbours within 0.001 of the exact method:
 
 | Rows | Barnes-Hut was faster, as a median | Slowest seed |
 | --- | --- | --- |
-| 300 | 2.2 times | the exact method took 0.39 times as long |
-| 1,000 | 4.0 times | not given |
+| 300 | 4.5 times | 4.1 times |
+| 1,000 | 16.0 times | 11.4 times |
 
-The gain is therefore not certain on small data. Recall was 21 of 30. The rule misses `TSNE`
-imported under another name and a method held in a variable.
+Recall was 21 of 30. The rule misses `TSNE` imported under another name and a method held in a
+variable.
 
 ### Reproducible results
 
@@ -7256,9 +7256,9 @@ The replacement is advice. xpd does not apply it automatically.
 | Data | `split` at 4 splits | At 5 splits | At 6 splits |
 | --- | --- | --- | --- |
 | 3,000 rows in 60 groups | 0.09 s | 1.08 s | 10.48 s |
-| 40 groups | not given | 0.21 s | 1.07 s |
+| 3,000 rows in 40 groups, with the default number of threads | 0.015 s | 0.10 s | 1.07 s |
 
-The class warns itself above 5 splits from 30 groups on. With a few groups the search is short, so
+The class warns itself above 5 splits when there are more than 30 groups. With a few groups the search is short, so
 the rule is a warning.
 
 #### unseeded-random-estimator
@@ -7739,8 +7739,11 @@ is a class that is given a `.fit(...)` chain. `fit` is reported on an object tha
 from a split class without `prefit=False` and from nothing else.
 
 `ConformalizedQuantileRegressor` has `prefit=False` as its default. With `prefit=True` it needs
-three fitted estimators, for the lower quantile, the upper quantile and the median, and one
-estimator raised "Estimator for prefit must be an iterable object". The rule reads only a class
+three fitted estimators, for the lower quantile, the upper quantile and the median. A
+`QuantileRegressor` or a `HistGradientBoostingRegressor` alone raised "Estimator for prefit must
+be an iterable object". A `GradientBoostingRegressor` alone, which can be iterated over its trees,
+raised AttributeError when it was not fitted and "You need to have provided 3 different
+estimators" when it was. The rule reads only a class
 built in the argument list, with or without a `fit` chained to it, as one estimator. A call of a
 function may return the list of three, and
 `ConformalizedQuantileRegressor(fit_three(X, y), prefit=True)` ran.
@@ -8158,7 +8161,8 @@ The replacement is advice. xpd does not apply it automatically.
 | --- | --- | --- |
 | `TargetEncoder` fitted on every row before the split | 0.624, 13.4 standard errors above 0.5 | 0.500 with the split first |
 | `TargetEncoder` fitted on every row before `cross_val_score` | 0.610 | 0.495 for a Pipeline that holds the encoder and the model |
-| `LeaveOneOutEncoder`, `CatBoostEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder` or `CountTargetEncoder` fitted on every row before the split | 0.620 to 0.623 | not given |
+| `LeaveOneOutEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder` or `CountTargetEncoder` fitted on every row before the split, and `CatBoostEncoder` fitted with `fit(X, y)` and then `transform(X)` | 0.620 to 0.623 | not given |
+| `CatBoostEncoder(...).fit_transform(X, y)` on every row before the split | 0.490 in the rerun, because it codes each row from the labels of the rows before it | not given |
 
 [`fit-before-split`](#fit-before-split) and
 [`cross-val-on-fitted-data`](#cross-val-on-fitted-data) of the scikit-learn pack report the form
@@ -8301,10 +8305,11 @@ hold. A call that passes the number by position, a call inside `isinstance`, and
 
 The pack measured and dropped other advice about the class:
 
-- `max_process=1` was 9.81 times faster than the default at 1,000 rows and 2.2 times slower at
-  100,000 rows, so no setting is right for both.
-- `FeatureHasher` of scikit-learn was 5.4 times faster at 10,000 and 100,000 rows, but it returns
-  a sparse matrix and takes no column names, so it can't take the place of the encoder.
+- With the default number of threads, `max_process=1` was 23 times faster than the default at
+  1,000 rows and 2.2 times slower at 100,000 rows, so no setting is right for both.
+- `FeatureHasher` of scikit-learn was 23 times faster at 10,000 rows and 5.4 times faster at
+  100,000 rows with the default number of threads, but it returns a sparse matrix and takes no
+  column names, so it can't take the place of the encoder.
 
 #### cols-left-to-dtype
 
@@ -8740,7 +8745,9 @@ The pack has no rule for the following habits, which were looked at:
   documentation asks for was the worse one here, so no rule reports the other.
 - `LeaveOneOutEncoder()` without `sigma` scored 0.541 against 0.551 with `sigma=0.05` in a
   forest, and the same in a logistic regression, which is no proof.
-- One encoder per column in a loop was 1.03 to 1.16 times slower than one encoder with `cols`.
+- With the default number of threads, one encoder per column in a loop was 1.15 to 1.25 times
+  slower than one encoder with `cols` for `OrdinalEncoder` and `TargetEncoder`, and 3.5 to 5.4
+  times slower for `OneHotEncoder`.
 - `GLMMEncoder` needs statsmodels, which category_encoders stopped installing in 2.11, and
   raises `ImportError` without it. A package check runs for every project that has
   category_encoders and cannot ask whether a file uses that class, so the pack has none.
@@ -8840,7 +8847,7 @@ After the runs, the rules below were narrowed, and the table gives the reports t
 
 | Rule | Severity | Proof | Reports on the library | Reports on 950 real files | Fix |
 | --- | --- | --- | --- | --- | --- |
-| [`formula-without-constant`](#formula-without-constant) | warning | result: 0.2184 against 0.0338 | 3 | 17 | none |
+| [`formula-without-constant`](#formula-without-constant) | warning | result: 0.2184 against 0.0338 | 3 | 13 | none |
 | [`effects-outside-panel-ols`](#effects-outside-panel-ols) | error | result: equal coefficients with and without the term | 0 | 0 | none |
 | [`effects-keyword-with-formula`](#effects-keyword-with-formula) | error | interpreter: TypeError | 0 | 3 | none |
 | [`formula-power-term`](#formula-power-term) | error | result: 2 columns where 3 were written | 1 | 1 | none |
@@ -8862,13 +8869,13 @@ After the runs, the rules below were narrowed, and the table gives the reports t
 | [`absorb-not-categorical`](#absorb-not-categorical) | info | result: 3.397 against 1.022 for a true 1.0 | 0 | 5 | none |
 | [`statsmodels-result-name`](#statsmodels-result-name) | error | interpreter: TypeError, AttributeError | 0 | 15 | unsafe |
 | [`invalid-compare-precision`](#invalid-compare-precision) | error | interpreter: ValueError | 0 | 0 | none |
-| [`hand-written-hausman`](#hand-written-hausman) | info | none: the method runs on 7.1 and is absent on 7.0 | 6 | 27 | none |
+| [`hand-written-hausman`](#hand-written-hausman) | info | none: the method runs on 7.1 and is absent on 7.0 | 4 | 25 | none |
 | [`removed-in-linearmodels`](#removed-in-linearmodels) | error | interpreter: ModuleNotFoundError, AttributeError | 0 | 0 | unsafe |
 | [`deprecated-in-linearmodels`](#deprecated-in-linearmodels) | warning | interpreter: FutureWarning. Result: equal order | 12 | 0 | safe |
 
 A result proof gives the old form's number against the new form's number.
 
-Of the 424 reports on the library, 401 are in its tests, which call the forms on purpose. They are
+Of the 422 reports on the library, 399 are in its tests, which call the forms on purpose. They are
 308 fits with the default covariance, 42 `PanelOLS` models without effects that are compared with
 `PooledOLS`, 22 kernel estimators with the default bandwidth, and 11 uses of the deprecated names
 inside the tests of the deprecations. One report names a line where the advice is wrong, which is a
@@ -8876,9 +8883,9 @@ documentation page that shows `set_index(['year','firm'])` for the `PanelOLS` th
 2017, which took the time first. One report is a defect of the library's own README, whose first
 example writes `exper + exper ** 2` and fits a model without the squared term.
 
-Of the 516 reports on the 950 real files, 112 are errors or warnings, and each was read. None names
-a line where the rule's claim is false. The other 404 are `info`. Of them, 20 of the 372
-`panel-default-covariance` reports, 14 of the 27 `hand-written-hausman` reports and all 5
+Of the 510 reports on the 950 real files, 108 are errors or warnings, and each was read. None names
+a line where the rule's claim is false. The other 402 are `info`. Of them, 20 of the 372
+`panel-default-covariance` reports, 14 `hand-written-hausman` reports and all 5
 `absorb-not-categorical` reports were read, and each is a fit or a model of the kind the rule
 describes. `unknown-cov-type` reports none of the 583 `cov_type=` strings with a statsmodels name,
 and the 20 of them that were read are calls on statsmodels models.
@@ -9646,7 +9653,7 @@ Use instead:
 test = random_effects_result.hausman(fixed_effects_result)
 ```
 
-On 7.1 the method returned a `HausmanTestResults` with the fields `statistic` and `estimates`, and 7.0 has no such method. The rule reports 27 functions in 27 of the 950 real files. It cannot see what a function tests, so it is info, and the message names both tests.
+On 7.1 the method returned a `HausmanTestResults` with the fields `statistic` and `estimates`, and 7.0 has no such method. The rule reports 25 functions in 25 of the 950 real files. It cannot see what a function tests, so it is info, and the message names both tests.
 
 ### Removed and deprecated forms
 
@@ -9759,8 +9766,8 @@ The pack has no rule for the following forms:
 - `SUR`, `IV3SLS`, `IVSystemGMM` and the factor models, which have no rule of their own. The
   formula, covariance and result rules read them.
 - xxhash, which `AbsorbingLS` uses for its cache when it is installed, as a package check. A fit
-  with two absorbed columns took 0.345 s with it and 0.361 s without on 100,000 rows, and 1.418 s
-  against 1.289 s on 1,000,000.
+  with two absorbed columns took 0.134 s with it and 0.134 s without on 100,000 rows, and 1.130 s
+  against 1.123 s on 1,000,000, with the default number of threads.
 
 ## arch
 

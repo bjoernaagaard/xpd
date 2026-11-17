@@ -111,14 +111,16 @@ utils:
       - not: { has: { field: arguments, has: { kind: call, not: { kind: keyword_argument }, has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit$' } } } } }
 ---
 # ConformalizedQuantileRegressor with prefit=True needs three fitted estimators, for the lower
-# quantile, the upper quantile and the median, in that order. One estimator raises "Estimator
-# for prefit must be an iterable object". Only a class that is built in the argument list, with
+# quantile, the upper quantile and the median, in that order. A QuantileRegressor alone raises
+# "Estimator for prefit must be an iterable object", and a GradientBoostingRegressor alone, which
+# iterates over its trees, raises AttributeError unfitted and "You need to have provided 3
+# different estimators" fitted. Only a class that is built in the argument list, with
 # or without a fit chained to it, is one estimator for sure. A call of a function may return the
 # list of three.
 id: prefit-estimator-not-fitted
 language: python
 severity: error
-message: ConformalizedQuantileRegressor with prefit=True needs a list of three fitted estimators, for the lower quantile, the upper quantile and the median, and one estimator raises ValueError. Pass the three, or pass prefit=False and call fit.
+message: ConformalizedQuantileRegressor with prefit=True needs a list of three fitted estimators, for the lower quantile, the upper quantile and the median, and one estimator raises ValueError, or AttributeError for a GradientBoostingRegressor that is not fitted. Pass the three, or pass prefit=False and call fit.
 rule:
   pattern: ConformalizedQuantileRegressor($$$ARGS)
   all:
