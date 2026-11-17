@@ -7,17 +7,30 @@
 #
 # The rule stays silent when either keyword is given, whatever its value, and when the call
 # unpacks keywords from a dictionary.
+#
+# On 7.1 optimal_bw=True gave estimates and standard errors bit equal to the default, without the
+# warning. Unsafe: on 7.0 the fix changes the bandwidth from nobs - 2 to one selected from the data.
 id: kernel-default-bandwidth
 language: python
 severity: warning
-message: weight_type="kernel" with no bandwidth and no optimal_bw uses a default that linearmodels 7.1 changed, from nobs - 2 to a bandwidth selected from the data, and 7.1 gives DefaultBandwidthWarning. On the mroz data the J statistic of IVGMM went from 0.8022 on 7.0 to 0.3794 on 7.1. Pass optimal_bw=True or a bandwidth, which give the same numbers on both.
+message: weight_type="kernel" with no bandwidth and no optimal_bw uses a default that linearmodels 7.1 changed, from nobs - 2 to a bandwidth selected from the data, and 7.1 gives DefaultBandwidthWarning. On the mroz data the J statistic of IVGMM went from 0.8022 on 7.0 to 0.3794 on 7.1. Write optimal_bw=True, which gives the numbers of 7.1 on both releases and no warning. A bandwidth of your own also gives the same numbers on both.
 rule:
   kind: call
   all:
+    - pattern: $C($$$ARGS)
     - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(weight_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:kernel)["'']+$' } }] } } }
     - matches: lm-build
     - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(bandwidth|optimal_bw)$' } }] } } }
     - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+rewriters:
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [keep], joinBy: "" }
+fix: $C($KEPToptimal_bw=True)
+metadata: { fix: unsafe }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(IVGMMCUE|IVSystemGMM)$' }, { all: [{ regex: '(^|\.)(IVGMM)$' }, { matches: from-linearmodels }] }] }
@@ -53,18 +66,28 @@ utils:
 # The kernel covariance of IVGMM.fit changed in the same way: 0.35929 on 7.0 and 0.4658 on 7.1,
 # with the warning, and 0.46795 on both with bandwidth=4. IVSystemGMM.fit(cov_type="kernel") gave
 # 0.4658 on both releases with no warning, and IV2SLS always selected its bandwidth, so neither is
-# reported.
+# reported. The fix is unsafe for the same reason as the first document.
 id: kernel-default-bandwidth
 language: python
 severity: warning
-message: cov_type="kernel" with no bandwidth and no optimal_bw uses a default that linearmodels 7.1 changed, from nobs - 2 to a bandwidth selected from the data, and 7.1 gives DefaultBandwidthWarning. On the mroz data the first standard error of IVGMM went from 0.3593 on 7.0 to 0.4658 on 7.1. Pass optimal_bw=True or a bandwidth.
+message: cov_type="kernel" with no bandwidth and no optimal_bw uses a default that linearmodels 7.1 changed, from nobs - 2 to a bandwidth selected from the data, and 7.1 gives DefaultBandwidthWarning. On the mroz data the first standard error of IVGMM went from 0.3593 on 7.0 to 0.4658 on 7.1. Write optimal_bw=True, which gives the numbers of 7.1 on both releases and no warning. A bandwidth of your own also gives the same numbers on both.
 rule:
   kind: call
   all:
+    - pattern: $C($$$ARGS)
     - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }, { has: { field: value, kind: string, regex: '^[a-zA-Z]*["'']+(?i:kernel)["'']+$' } }] } } }
     - matches: lm-fit
     - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(bandwidth|optimal_bw)$' } }] } } }
     - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+rewriters:
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [keep], joinBy: "" }
+fix: $C($KEPToptimal_bw=True)
+metadata: { fix: unsafe }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(IVGMMCUE)$' }, { all: [{ regex: '(^|\.)(IVGMM)$' }, { matches: from-linearmodels }] }] }

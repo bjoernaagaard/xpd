@@ -3,6 +3,7 @@
 # "lwage ~ 1 + exper + exper**2" gave the columns Intercept and exper on IV2SLS and on PooledOLS,
 # and "lwage ~ 1 + exper + I(exper**2)" gave three columns. The rule reports a term that is a
 # name, ** and a number. It leaves (a + b)**2 alone, which is the use the operator is for.
+# Unsafe: the fix squares the values, which changes the model on purpose.
 id: formula-power-term
 language: python
 severity: error
@@ -17,6 +18,13 @@ rule:
         - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } }
         - { inside: { kind: keyword_argument, has: { field: name, regex: '^formula$' }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } }
         - { inside: { kind: pair, inside: { kind: dictionary, nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, matches: lm-from-formula } } } } }
+transform:
+  # A match takes the separator after the term, so the second pass wraps the terms that the first
+  # one skipped.
+  T1: { replace: { source: $F, replace: '([~+]\s*)([A-Za-z_]\w*\s*\*\*\s*\d+)(\s*([+\[\]}"'']|$))', by: '${1}I($2)$3' } }
+  NEW: { replace: { source: $T1, replace: '([~+]\s*)([A-Za-z_]\w*\s*\*\*\s*\d+)(\s*([+\[\]}"'']|$))', by: '${1}I($2)$3' } }
+fix: $NEW
+metadata: { fix: unsafe }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth|IVLIML|IVGMMCUE|IVJIVE|AbsorbingLS|IV3SLS|IVSystemGMM|TradedFactorModel|LinearFactorModel|LinearFactorModelGMM)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM|SUR)$' }, { matches: from-linearmodels }] }] }

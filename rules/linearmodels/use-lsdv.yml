@@ -4,7 +4,7 @@
 # 0.298 s against 0.017 s for 500 entities and 77.1 s against 0.051 s for 3,000. The coefficients
 # differed by at most 2.2e-16 and the standard errors by at most 1.7e-18. 7.0 gave 18 times and
 # 1,382 times. The time grows with the cube of the number of entities, since the dummy matrix is
-# dense. The estimates are not bit equal, so the rule has no fix.
+# dense. Unsafe: the fix leaves the option out, and the estimates are not bit equal.
 id: use-lsdv
 language: python
 severity: warning
@@ -12,8 +12,30 @@ message: use_lsdv=True builds a dummy column for each entity and solves the whol
 rule:
   kind: call
   all:
+    - pattern: $C($$$ARGS)
     - { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(use_lsdv)$' } }, { has: { field: value, regex: '^True$' } }] } } }
     - matches: lm-fit
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^use_lsdv$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^use_lsdv$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS)$' }] }

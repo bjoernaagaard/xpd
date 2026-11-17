@@ -5,6 +5,7 @@
 # name starts with hausman in a file that imports linearmodels, and only when the venv has 7.1 or
 # later. hausman_taylor is the Hausman and Taylor estimator and not a test, and a name such as
 # hausman_table or hausman_data prepares data or shows results, so both are left alone. It cannot see what the function tests, so it is info.
+# No fix, because the advice is a method of linearmodels in place of a function of the file.
 id: hand-written-hausman
 language: python
 severity: info

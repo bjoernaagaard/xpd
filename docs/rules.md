@@ -9072,7 +9072,7 @@ On 7.1 and 7.0, each of the five classes returned the same coefficients for `"lw
 
 #### effects-keyword-with-formula
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: the term `EntityEffects` or `TimeEffects` is added to a formula written as a string, in place of `entity_effects=True` or `time_effects=True`. The call raised before the fix. A formula that is not a string, a keyword that is not `True`, and a call with both keywords have no fix.
 
 The rule reports `entity_effects=` or `time_effects=` given to `PanelOLS.from_formula`. The
 constructor takes the two keywords, but `from_formula` reads the effects from the formula.
@@ -9093,7 +9093,7 @@ model = PanelOLS.from_formula("lwage ~ 1 + exper + EntityEffects", data)
 
 #### formula-power-term
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `I(exper**2)` for `exper**2`, which changes the model on purpose.
 
 The rule reports a term that is a name, `**` and a number, such as `exper**2`, in a formula of any
 model. A formula reads `**` as a power of interactions, so `exper**2` is `exper`. The squared values
@@ -9115,7 +9115,7 @@ On 7.1 and 7.0 the first formula gave a model with the columns `Intercept` and `
 
 #### first-difference-constant
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: the `1` term is taken out of the formula, and `add_constant(X)` becomes `X`. The call raised before the fix. A formula whose only term is the `1` has no fix.
 
 The rule reports a `1` term in a formula of `FirstDifferenceOLS`, and `add_constant(...)` as its
 `exog`. A first difference removes everything that is constant over time, so the model refuses a
@@ -9139,7 +9139,7 @@ Both forms raised `ValueError: Constants are not allowed in first difference reg
 
 #### weights-column-name
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `weights=data["hours"]` for `weights="hours"` in `from_formula` when the data is a name. The call raised before the fix. A model built from arrays has no fix, because the frame is not in the call.
 
 The rule reports `weights="name"` on a model or on its `from_formula`. statsmodels and R take the
 weights of a formula model as the name of a column, but linearmodels takes the values.
@@ -9276,7 +9276,7 @@ A list with a comment inside is reported without the fix, which would delete the
 
 #### use-lsdv
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `use_lsdv=True` is left out, and the estimates are equal but not bit equal.
 
 The rule reports `use_lsdv=True` in `fit` of a `PanelOLS`. The option estimates each effect as a
 dummy column, where the default removes the effects by subtracting group means and gives the same
@@ -9303,7 +9303,7 @@ forms took the following times:
 | 3,000 | 77.1 s | 0.051 s | 1,508 times | 1,382 times |
 
 The coefficients differed by at most 2.2e-16 and the standard errors by at most 1.7e-18, so the
-estimates are equal but not bit equal. The rule therefore has no fix. `use_lsmr=True` and
+estimates are equal but not bit equal, and the fix is unsafe. `use_lsmr=True` and
 `low_memory=True` ran within 10% of the default and are not reported.
 
 ### Covariance
@@ -9315,7 +9315,7 @@ name.
 
 #### clustered-without-clusters
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `cluster_entity=True` is added to `fit` of `PanelOLS`, `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS`. It changes the standard errors on purpose, and it clusters by entity where the code may have meant time. The models that take `clusters=` have no fix, because the groups are not in the file.
 
 The rule reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and
 `clusters`. Without them every observation is a cluster of its own, which is the
@@ -9352,7 +9352,7 @@ and its rows are the entities already.
 
 #### cov-option-without-cov-type
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `cov_type="clustered"` or `cov_type="kernel"` is added to a call that names no `cov_type`. The call raised before the fix, except on `FamaMacBeth` and on the factor models of 7.0, where the fix changes the standard errors on purpose. A call that names another `cov_type` has no fix, because the code doesn't show which covariance is meant.
 
 The rule reports `cluster_entity`, `cluster_time` or `clusters` in a `fit` call whose `cov_type` is
 absent or is a name other than `"clustered"`. It also reports `bandwidth` or `kernel` in a call
@@ -9397,7 +9397,7 @@ returned the standard error of the default, and they raise `ValueError` on 7.1.
 
 #### unknown-cov-type
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: on OLS, IV2SLS, IVLIML and AbsorbingLS, `"robust"` for `"HC0"`, `"robust", debiased=True` for `"HC1"` and `"unadjusted", debiased=True` for `"nonrobust"`, in a call that doesn't pass `debiased`. The call raised before the fix. Any other name has no fix, because the code doesn't show which name of the model is meant.
 
 The rule reports a `cov_type` string that the model doesn't take, such as `"HC1"`, `"HAC"`,
 `"cluster"` or `"nonrobust"` of statsmodels, `"clustered"` on `FamaMacBeth` or `IVSystemGMM`,
@@ -9449,7 +9449,7 @@ of statsmodels.
 
 #### kernel-default-bandwidth
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `optimal_bw=True` is added. On 7.1 it gave estimates and standard errors bit equal to the default, without the warning, and on 7.0 it changes the bandwidth from `nobs - 2` to the one selected from the data.
 
 The rule reports `weight_type="kernel"` on `IVGMM`, `IVGMMCUE` and `IVSystemGMM`, and
 `cov_type="kernel"` in `fit` of `IVGMM` and `IVGMMCUE`, with neither `bandwidth` nor `optimal_bw`.
@@ -9545,7 +9545,7 @@ model = IV2SLS(y, exog, endog, instruments)
 
 #### iv-arguments-swapped
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: the second and third arguments change places. The fix trusts the names, and it changes the estimates on purpose.
 
 The rule reports an instrument model whose second argument has `endog` in its name and whose third
 has `exog`. linearmodels takes exog and then endog, and it doesn't check the roles.
@@ -9667,7 +9667,7 @@ Read a linearmodels result by its own attribute names, pass `compare` a precisio
 
 #### statsmodels-result-name
 
-**Severity:** error. **Fix:** unsafe: `summary` for `summary()`, `std_errors` for `bse`, `tstats` for `tvalues`, `resids` for `resid` and `fitted_values` for `fittedvalues`. The other names have no fix.
+**Severity:** error. **Fix:** unsafe: `summary` for `summary()`, `std_errors` for `bse`, `tstats` for `tvalues`, `resids` for `resid` and `fitted_values` for `fittedvalues`. On the results of the panel models, OLS, IV2SLS, IVLIML, IVGMM, IVGMMCUE, IVJIVE and AbsorbingLS, also `resid_ss` for `ssr`, `s2` for `mse_resid`, `f_statistic.stat` for `fvalue` and `f_statistic.pval` for `f_pvalue`. The other names, and those four on the system and factor models, have no fix.
 
 The rule reports a statsmodels result name read on a linearmodels result, such as `summary()`
 called, `bse`, `tvalues`, `resid`, `fittedvalues`, `aic`, `bic`, `llf`, `fvalue`, `f_pvalue`,
@@ -9711,7 +9711,7 @@ On `OLS` with the mroz data, each pair of the table from `bse` to `mse_resid` wa
 
 #### invalid-compare-precision
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `"std_errors"` for `"se"`, `"stderr"`, `"std_err"` and `"bse"`, `"tstats"` for `"t"`, `"tstat"` and `"t-stats"`, and `"pvalues"` for `"p"` and `"pvalue"`. The call raised before the fix. Any other string has no fix.
 
 The rule reports `compare(..., precision=...)` of `linearmodels.panel` or `linearmodels.iv` with a
 string other than `"tstats"`, `"std_errors"`, `"std-errors"` and `"pvalues"`.
@@ -9808,7 +9808,7 @@ Code inside a try block with an except clause is a compatibility path and is lef
 
 #### deprecated-in-linearmodels
 
-**Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module. unsafe: `absorb_options=` with `method="lsmr"` for `lsmr_options=` in a call that names neither `method` nor `absorb_options`. With `lsmr_options=None` or an empty dictionary the old call kept the default method, which may pick HDFE. The other forms have no fix.
 
 The rule reports `from linearmodels.__future__ import ordering`, the `lsmr_options` keyword of
 `AbsorbingLS.fit`, and `linearmodels.DROP_MISSING`. 7.1 gives `FutureWarning` for each, and 8.0
@@ -9847,8 +9847,9 @@ it may be the only statement there.
 | `lsmr_options` | gave `FutureWarning` on 4.31, 5.0, 7.0 and 7.1 |
 | reading `DROP_MISSING` | ran clean on 7.0, and gave `FutureWarning: linearmodels.DROP_MISSING has no effect` on 7.1 |
 
-`lsmr_options` has no fix, because the new form needs `method="lsmr"` next to the options. The
-default method may pick an algorithm that doesn't take them.
+The new form needs `method="lsmr"` next to the options, because the default method may pick an
+algorithm that doesn't take them. On 7.1 `fit` turns the default method into `"lsmr"` when
+`lsmr_options` is a dictionary that is not empty, and the fixed call gave bit equal estimates.
 
 ### What the pack leaves out
 

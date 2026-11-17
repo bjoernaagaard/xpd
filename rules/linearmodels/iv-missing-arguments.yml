@@ -8,6 +8,7 @@
 # of the import: the module in front of the name, or an import of the name from linearmodels with
 # no second import of it from elsewhere. A call that names one of the four as a keyword or unpacks
 # its arguments is left alone.
+# No fix, because the code does not show which of the four arrays is missing.
 id: iv-missing-arguments
 language: python
 severity: error
@@ -55,6 +56,7 @@ utils:
 ---
 # instrument is the keyword of statsmodels. linearmodels 7.1 raised "TypeError: IV2SLS.__init__()
 # got an unexpected keyword argument 'instrument'. Did you mean 'instruments'?".
+# No fix, because a call written for statsmodels also passes its arrays in another order, which the file does not show.
 id: iv-missing-arguments
 language: python
 severity: error

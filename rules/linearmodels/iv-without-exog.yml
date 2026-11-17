@@ -3,6 +3,7 @@
 # mean estimate of the coefficient on x was 2.002 without exog and 0.990 with a constant as exog.
 # On the mroz data the coefficient on educ was 0.0928 without exog and 0.0664 with a constant and
 # exper. The rule reports None written as the second argument next to an endogenous regressor.
+# No fix, because the column of ones is not in the file.
 id: iv-without-exog
 language: python
 severity: warning

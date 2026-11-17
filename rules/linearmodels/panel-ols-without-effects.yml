@@ -5,6 +5,7 @@
 #
 # A call that passes any of the three keywords is left alone, also when the value is False, and so
 # is a call that unpacks its keywords from a dictionary.
+# No fix, because the message names two rewrites, effects or PooledOLS, and the code does not show which is meant.
 id: panel-ols-without-effects
 language: python
 severity: warning
@@ -48,6 +49,7 @@ utils:
   expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
 ---
 # The same with a formula, which holds the effects as terms. A formula with a C() term may hold the effects as dummies and is left alone.
+# No fix, for the same reason as the first document.
 id: panel-ols-without-effects
 language: python
 severity: warning

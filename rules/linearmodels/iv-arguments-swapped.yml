@@ -5,6 +5,7 @@
 #
 # The rule knows the roles only from the names. It reports when the second argument has endog in
 # its name and the third has exog, and no other case.
+# Unsafe: the fix trusts the names, and it changes the estimates on purpose.
 id: iv-arguments-swapped
 language: python
 severity: warning
@@ -17,6 +18,8 @@ rule:
 constraints:
   A: { any: [{ kind: identifier }, { kind: subscript }, { kind: attribute }], regex: '(?i)endog', not: { regex: '(?i)exog' } }
   B: { any: [{ kind: identifier }, { kind: subscript }, { kind: attribute }], regex: '(?i)exog', not: { regex: '(?i)endog' } }
+fix: $C($Y, $B, $A, $$$REST)
+metadata: { fix: unsafe }
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(IVLIML|IVGMMCUE|IVJIVE)$' }, { all: [{ regex: '(^|\.)(IV2SLS|IVGMM)$' }, { matches: from-linearmodels }] }] }

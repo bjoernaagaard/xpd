@@ -15,6 +15,7 @@
 # column that looks like a constant, such as const, when it has a C() term, whose dummies span the
 # intercept, and when a PanelOLS formula has effects, which absorb it. FirstDifferenceOLS takes no
 # constant and the factor models have their own formula, so both are left out.
+# No fix, because 1 + and - 1 are both right, and the code does not show which model is meant.
 id: formula-without-constant
 language: python
 severity: warning
@@ -63,6 +64,7 @@ utils:
   lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
   expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
 ---
+# No fix, for the same reason as the first document.
 id: formula-without-constant
 language: python
 severity: warning

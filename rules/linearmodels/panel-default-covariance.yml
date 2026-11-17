@@ -10,6 +10,7 @@
 # It reports a fit call with no cov_type on PanelOLS, PooledOLS, RandomEffects and
 # FirstDifferenceOLS. BetweenOLS has one row for each entity, and FamaMacBeth has its own
 # covariance, so both are left alone.
+# No fix, because the code does not show whether the errors of one entity are related.
 id: panel-default-covariance
 language: python
 severity: info

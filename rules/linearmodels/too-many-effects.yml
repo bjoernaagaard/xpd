@@ -4,6 +4,7 @@
 # both effect terms and other_effects. The rule reads the two flags only when they are written as
 # True, and other_effects only when its value is written as data. With other_effects=None, or a
 # name that holds None, the same call ran on 7.1.
+# No fix, because the advice is another model.
 id: too-many-effects
 language: python
 severity: error
@@ -69,6 +70,7 @@ utils:
   lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
   expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
 ---
+# No fix, because the advice is another model.
 id: too-many-effects
 language: python
 severity: error

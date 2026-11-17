@@ -43,8 +43,9 @@ def absorb_options():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
         old = model.fit(method="lsmr", lsmr_options={"atol": 1e-10, "btol": 1e-10})  # xpd: deprecated-in-linearmodels
+        default_method = model.fit(lsmr_options={"atol": 1e-10, "btol": 1e-10})  # xpd: deprecated-in-linearmodels
     new = model.fit(method="lsmr", absorb_options={"atol": 1e-10, "btol": 1e-10})
-    return old.params, new.params
+    return old.params, default_method.params, new.params
 
 
 @case

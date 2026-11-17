@@ -8,6 +8,7 @@
 # The code does not show a dtype, so the rule is info. It reports an absorb argument only in a
 # file that never says category, Categorical or cut, where no column can have been made
 # categorical in that file. Data that is categorical when it is loaded is reported without need.
+# No fix, because absorb also takes a continuous variable on purpose, and the code does not show which is meant.
 id: absorb-not-categorical
 language: python
 severity: info

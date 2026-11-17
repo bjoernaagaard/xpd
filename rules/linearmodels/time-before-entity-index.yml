@@ -12,9 +12,7 @@
 # silent when another statement in that function can change the index of the same name, such as a
 # second set_index, swaplevel, a merge or an assignment to .index, when the same chain goes on
 # with such a call, as in set_index(["year", "nr"]).swaplevel(), and when a later statement
-# assigns the name again. The fix changes the estimates on purpose, so it is unsafe. The second
-# document reports a list with a comment inside and has no fix, because the fix would delete the
-# comment.
+# assigns the name again. The fix changes the estimates on purpose, so it is unsafe.
 id: time-before-entity-index
 language: python
 severity: warning
@@ -92,6 +90,7 @@ utils:
 fix: '[$B, $A]'
 metadata: { fix: unsafe }
 ---
+# A list with a comment inside has no fix, because the fix would delete the comment.
 id: time-before-entity-index
 language: python
 severity: warning

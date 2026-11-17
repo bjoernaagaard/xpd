@@ -236,6 +236,60 @@ metadata: { fix: unsafe }
 # f_statistic.pval of an unadjusted fit with debiased=True were equal to cov_params(), ssr,
 # mse_resid, fvalue and f_pvalue of statsmodels to 1e-11, and loglik of PooledOLS was equal to
 # llf.
+# ssr, mse_resid, fvalue and f_pvalue have one linearmodels name each on the results of the panel
+# models, OLS, IV2SLS, IVLIML, IVGMM, IVGMMCUE, IVJIVE and AbsorbingLS, and the fix writes it.
+id: statsmodels-result-name
+language: python
+severity: error
+message: $A is a name of a statsmodels result, and a linearmodels result has none of that name and raises AttributeError. Write the linearmodels name, which is resid_ss for ssr, s2 for mse_resid, f_statistic.stat for fvalue and f_statistic.pval for f_pvalue.
+rule:
+  kind: attribute
+  all:
+    - has: { field: attribute, pattern: $A, regex: '^(f_pvalue|fvalue|mse_resid|ssr)$' }
+    - has: { field: object, pattern: $R, matches: lm-result }
+    - not: { matches: expected-to-raise }
+transform:
+  T1: { replace: { source: $A, replace: '^ssr$', by: resid_ss } }
+  T2: { replace: { source: $T1, replace: '^mse_resid$', by: s2 } }
+  T3: { replace: { source: $T2, replace: '^fvalue$', by: f_statistic.stat } }
+  NEW: { replace: { source: $T3, replace: '^f_pvalue$', by: f_statistic.pval } }
+fix: $R.$NEW
+metadata: { fix: unsafe }
+utils:
+  # The class names that another library also has count only with proof of the import.
+  lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth|IVLIML|IVGMMCUE|IVJIVE|AbsorbingLS)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM)$' }, { matches: from-linearmodels }] }] }
+  from-linearmodels:
+    any:
+      - { kind: attribute, regex: '^linearmodels\.' }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^linearmodels(\.|$)' } }, { has: { field: alias, pattern: $LMMOD } }] } } }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { has: { kind: dotted_name, pattern: $LMMOD } }] } } }
+      - kind: identifier
+        pattern: $LMCLS
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { any: [{ has: { kind: dotted_name, pattern: $LMCLS } }, { has: { kind: wildcard_import } }] }] } }
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^linearmodels(\.|$)' } } }, { has: { kind: dotted_name, pattern: $LMCLS } }] } } }
+  # A call that builds a model: the class itself, or one of its constructors.
+  lm-build:
+    kind: call
+    any:
+      - has: { field: function, matches: lm-class }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: lm-class } }] }
+  lm-from-formula:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^from_formula$' } }, { has: { field: object, matches: lm-class } }] }
+  # A model is a build call, or a name that its function, or the module outside any function,
+  # assigns from build calls and from nothing else. A name that a loop, a with statement, an
+  # except clause, a walrus or a lambda parameter also binds is left alone.
+  lm-model: { any: [{ matches: lm-build }, { kind: identifier, pattern: $LMV, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { has: { field: right, matches: lm-build } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { not: { has: { field: right, matches: lm-build } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMV } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMV } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] }, { kind: named_expression, has: { field: name, pattern: $LMV } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMV } } }] } } }] } }] }
+  lm-fit: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: lm-model } }] } }
+  # A result is a fit call on a model, or a name assigned from such calls and from nothing else.
+  lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
+  expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
+
+---
+# The other names have no fix, because linearmodels has no name for them, or a name that is read
+# in another way, such as cov for the method cov_params().
 id: statsmodels-result-name
 language: python
 severity: error
@@ -243,10 +297,66 @@ message: $A is a name of a statsmodels result, and a linearmodels result has non
 rule:
   kind: attribute
   all:
-    - has: { field: attribute, pattern: $A, regex: '^(HC0_se|HC1_se|HC2_se|HC3_se|aic|bic|centered_tss|compare_f_test|compare_lm_test|compare_lr_test|condition_number|conf_int_el|cov_HC0|cov_HC1|cov_HC2|cov_HC3|cov_kwds|cov_params|eigenvals|el_test|ess|f_pvalue|f_test|fvalue|get_influence|get_prediction|get_robustcov_results|info_criteria|initialize|k_constant|llf|load|mse_model|mse_resid|mse_total|normalized_cov_params|outlier_test|remove_data|resid_pearson|save|scale|ssr|summary2|t_test|t_test_pairwise|uncentered_tss|use_t|wald_test_terms|wresid)$' }
+    - has: { field: attribute, pattern: $A, regex: '^(HC0_se|HC1_se|HC2_se|HC3_se|aic|bic|centered_tss|compare_f_test|compare_lm_test|compare_lr_test|condition_number|conf_int_el|cov_HC0|cov_HC1|cov_HC2|cov_HC3|cov_kwds|cov_params|eigenvals|el_test|ess|f_test|get_influence|get_prediction|get_robustcov_results|info_criteria|initialize|k_constant|llf|load|mse_model|mse_total|normalized_cov_params|outlier_test|remove_data|resid_pearson|save|scale|summary2|t_test|t_test_pairwise|uncentered_tss|use_t|wald_test_terms|wresid)$' }
     - has: { field: object, matches: lm-result }
     - not: { matches: expected-to-raise }
 utils:
+  # The class names that another library also has count only with proof of the import.
+  lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth|IVLIML|IVGMMCUE|IVJIVE|AbsorbingLS|IV3SLS|IVSystemGMM|TradedFactorModel|LinearFactorModel|LinearFactorModelGMM)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM|SUR)$' }, { matches: from-linearmodels }] }] }
+  from-linearmodels:
+    any:
+      - { kind: attribute, regex: '^linearmodels\.' }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: aliased_import, all: [{ has: { field: name, regex: '^linearmodels(\.|$)' } }, { has: { field: alias, pattern: $LMMOD } }] } } }
+      - { kind: attribute, has: { field: object, pattern: $LMMOD }, inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { has: { kind: dotted_name, pattern: $LMMOD } }] } } }
+      - kind: identifier
+        pattern: $LMCLS
+        all:
+          - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^linearmodels(\.|$)' } }, { any: [{ has: { kind: dotted_name, pattern: $LMCLS } }, { has: { kind: wildcard_import } }] }] } }
+          # A second import of the same name from another library leaves open which class a call builds.
+          - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^linearmodels(\.|$)' } } }, { has: { kind: dotted_name, pattern: $LMCLS } }] } } }
+  # A call that builds a model: the class itself, or one of its constructors.
+  lm-build:
+    kind: call
+    any:
+      - has: { field: function, matches: lm-class }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: lm-class } }] }
+  lm-from-formula:
+    kind: call
+    has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^from_formula$' } }, { has: { field: object, matches: lm-class } }] }
+  # A model is a build call, or a name that its function, or the module outside any function,
+  # assigns from build calls and from nothing else. A name that a loop, a with statement, an
+  # except clause, a walrus or a lambda parameter also binds is left alone.
+  lm-model: { any: [{ matches: lm-build }, { kind: identifier, pattern: $LMV, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { has: { field: right, matches: lm-build } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMV } }, { not: { has: { field: right, matches: lm-build } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMV } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMV } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMV }, { has: { stopBy: end, kind: identifier, pattern: $LMV } }] }, { kind: named_expression, has: { field: name, pattern: $LMV } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMV } } }] } } }] } }] }
+  lm-fit: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: lm-model } }] } }
+  # A result is a fit call on a model, or a name assigned from such calls and from nothing else.
+  lm-result: { any: [{ matches: lm-fit }, { kind: identifier, pattern: $LMR, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { has: { field: right, matches: lm-fit } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMR } }, { not: { has: { field: right, matches: lm-fit } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMR } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMR } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMR }, { has: { stopBy: end, kind: identifier, pattern: $LMR } }] }, { kind: named_expression, has: { field: name, pattern: $LMR } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMR } } }] } } }] } }] }
+  expected-to-raise: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises|pytest\.warns)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }, { inside: { kind: conditional_expression, stopBy: end, regex: 'hasattr|getattr' } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: 'hasattr|getattr|__version__' } } }] }
+
+---
+# The same four names on the results of SUR, IV3SLS, IVSystemGMM and the factor models have no fix,
+# because those results lack s2 and f_statistic, and the factor results also lack resid_ss.
+id: statsmodels-result-name
+language: python
+severity: error
+message: $A is a name of a statsmodels result, and a linearmodels result has none of that name and raises AttributeError. linearmodels has cov for cov_params(), f_statistic.stat and f_statistic.pval for fvalue and f_pvalue, resid_ss for ssr, s2 for mse_resid, loglik on the panel results for llf, wald_test on the panel and instrument results for t_test and f_test, and a new fit(cov_type=...) for get_robustcov_results. It has no aic and no bic.
+rule:
+  kind: attribute
+  all:
+    - has: { field: attribute, pattern: $A, regex: '^(f_pvalue|fvalue|mse_resid|ssr)$' }
+    - has: { field: object, matches: lm-result }
+    - not: { has: { field: object, matches: lm-result-fixed } }
+    - not: { matches: expected-to-raise }
+utils:
+  # The classes whose results have the four linearmodels names.
+  lm-class-fixed: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth|IVLIML|IVGMMCUE|IVJIVE|AbsorbingLS)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM)$' }, { matches: from-linearmodels }] }] }
+  lm-build-fixed:
+    kind: call
+    any:
+      - has: { field: function, matches: lm-class-fixed }
+      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: lm-class-fixed } }] }
+  lm-model-fixed: { any: [{ matches: lm-build-fixed }, { kind: identifier, pattern: $LMVF, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMVF } }, { has: { field: right, matches: lm-build-fixed } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMVF } }, { not: { has: { field: right, matches: lm-build-fixed } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMVF } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMVF } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMVF }, { has: { stopBy: end, kind: identifier, pattern: $LMVF } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMVF }, { has: { stopBy: end, kind: identifier, pattern: $LMVF } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMVF }, { has: { stopBy: end, kind: identifier, pattern: $LMVF } }] }, { kind: named_expression, has: { field: name, pattern: $LMVF } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMVF } } }] } } }] } }] }
+  lm-fit-fixed: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: lm-model-fixed } }] } }
+  lm-result-fixed: { any: [{ matches: lm-fit-fixed }, { kind: identifier, pattern: $LMRF, inside: { stopBy: { kind: function_definition }, any: [{ kind: function_definition }, { kind: module }], all: [{ has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMRF } }, { has: { field: right, matches: lm-fit-fixed } }] } }, { not: { has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $LMRF } }, { not: { has: { field: right, matches: lm-fit-fixed } } }] } } }, { not: { has: { stopBy: end, any: [{ kind: assignment, has: { field: left, not: { kind: identifier }, has: { stopBy: end, kind: identifier, pattern: $LMRF } } }, { kind: augmented_assignment, has: { field: left, pattern: $LMRF } }, { kind: for_statement, has: { field: left, any: [{ pattern: $LMRF }, { has: { stopBy: end, kind: identifier, pattern: $LMRF } }] } }, { kind: for_in_clause, has: { field: left, any: [{ pattern: $LMRF }, { has: { stopBy: end, kind: identifier, pattern: $LMRF } }] } }, { kind: as_pattern_target, any: [{ pattern: $LMRF }, { has: { stopBy: end, kind: identifier, pattern: $LMRF } }] }, { kind: named_expression, has: { field: name, pattern: $LMRF } }, { kind: lambda, has: { field: parameters, has: { stopBy: end, kind: identifier, pattern: $LMRF } } }] } } }] } }] }
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FirstDifferenceOLS|FamaMacBeth|IVLIML|IVGMMCUE|IVJIVE|AbsorbingLS|IV3SLS|IVSystemGMM|TradedFactorModel|LinearFactorModel|LinearFactorModelGMM)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM|SUR)$' }, { matches: from-linearmodels }] }] }
   from-linearmodels:

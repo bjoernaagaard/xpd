@@ -10,6 +10,7 @@
 # The rule reports a model whose exog argument holds .fitted_values, the name linearmodels gives
 # them. The model is OLS or a panel class, or IV2SLS, IVLIML or IVGMM with None for endog and for
 # instruments, which is how linearmodels itself runs least squares. A second stage that reads the fitted values from a column it stored earlier is not seen.
+# No fix, because the advice is another model in place of the two regressions.
 id: manual-two-stage
 language: python
 severity: warning

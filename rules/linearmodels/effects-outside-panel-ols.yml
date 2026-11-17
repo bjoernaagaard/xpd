@@ -4,6 +4,7 @@
 # coefficients on PooledOLS, RandomEffects, BetweenOLS and FamaMacBeth, and so did the two forms
 # without the 1 on FirstDifferenceOLS, each for all three effect names. No error and no warning
 # was raised, so the reader of the formula sees fixed effects that the model does not have.
+# No fix, because the message names two rewrites, PanelOLS or no term, and the code does not show which is meant.
 id: effects-outside-panel-ols
 language: python
 severity: error
