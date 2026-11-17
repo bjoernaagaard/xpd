@@ -83,8 +83,8 @@ def register(mcp: FastMCP) -> None:
    here, and say so. Don't silence rules.
 4. If an issue has an unsafe fix, you may call `fix` with `unsafe` true. The user is asked to
    confirm. Read the diff afterwards.
-5. A `missing-<package>` warning names a package the project lacks. Ask the user before you add
-   it.
+5. A `pandas/missing-<package>` warning names a package the project lacks. Ask the user before
+   you add it.
 6. Call `check` again. You are done when it reports no error and every warning left has a
    reason."""
 

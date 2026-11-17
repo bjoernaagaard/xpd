@@ -36,6 +36,11 @@ READS = ToolAnnotations(
 WRITES = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
 )
+# A structural rewrite whose result still matches its pattern rewrites the code again on a
+# second call with the same arguments.
+REWRITES = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
+)
 # Runs the user's scripts, which may do anything a Python script does.
 RUNS_CODE = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True
@@ -143,7 +148,7 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
         Run it after you write or change Python. Fix every `error`. Fix a `warning` unless you
         can say why the code is right here, and don't silence rules. An issue whose `fix` is set
-        can be fixed with the `fix` tool. A `missing-<package>` warning names a package the
+        can be fixed with the `fix` tool. A `pandas/missing-<package>` warning names a package the
         project lacks, so ask the user before you add the dependency. The `rule` tool explains
         any rule with examples.
 

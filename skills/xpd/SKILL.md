@@ -12,7 +12,7 @@ Use `xpd` whenever you write or change Python code.
   unless you can state why the pattern is right here. Don't silence rules.
   In a test file, `python/test-skip`, `python/test-rerun` and `python/test-sleep` report
   a test that hides a failure. Find why the test fails, or delete it and write down why.
-  A `missing-<package>` warning names a package the project lacks. Ask the user
+  A `pandas/missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
   Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per

@@ -1,6 +1,7 @@
 """Runs the xpd binary, which owns every rule and result, and parses what it prints."""
 
 import asyncio
+import json
 import os
 import shutil
 import subprocess
@@ -64,6 +65,17 @@ EQUIV = Command(("equiv",), TypeAdapter(Equivalence), FINDINGS)
 RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]), SUCCESS)
 BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.output, SUCCESS)
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]), SUCCESS)
+
+
+def _json_error(stdout: bytes) -> bytes | None:
+    """The error that equiv and refit report as JSON on stdout. The script's own prints and
+    warnings go to stderr, so stderr alone would hide the reason."""
+    try:
+        report = json.loads(stdout)
+    except ValueError:
+        return None
+    error = report.get("error") if isinstance(report, dict) else None
+    return error.encode() if isinstance(error, str) else None
 
 
 def argv(paths: Sequence[str], flags: Sequence[str]) -> tuple[str, ...]:
@@ -133,8 +145,7 @@ class Xpd:
         stderr: bytes,
     ) -> T:
         if code not in command.results:
-            # equiv reports a failing script in its JSON on stdout, the others on stderr.
-            reason = (stderr or stdout).decode(errors="replace").strip()
+            reason = (_json_error(stdout) or stderr or stdout).decode(errors="replace").strip()
             shown = " ".join([*command.args[:1], *args])
             msg = f"xpd {shown} exited with {code}: {reason}"
             raise ToolError(msg)

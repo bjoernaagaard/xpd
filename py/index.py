@@ -395,10 +395,11 @@ def from_wildcard(member: griffe.Alias, target: griffe.Object) -> bool:
 
 
 def is_public(member: griffe.Object | griffe.Alias, target: griffe.Object) -> bool:
-    """Apply Griffe's rules, with three exceptions that named symbols prove.
+    """Apply Griffe's rules, with four exceptions that named symbols prove.
 
     `pandas.tests.frame.test_api.TestDataFrameMisc` is in a test folder that the wheel ships,
-    which Griffe treats as public.
+    which Griffe treats as public. `sklearn.conftest.fetch_species_distributions` is in a
+    pytest file that the wheel ships, which Griffe treats as public too.
 
     `pandas.tseries.holiday.USFederalHolidayCalendar` is defined in its module, has a public
     name and is in the pandas user guide, but `__all__` leaves it out, which Griffe treats
@@ -408,7 +409,9 @@ def is_public(member: griffe.Object | griffe.Alias, target: griffe.Object) -> bo
     which Griffe treats as private. Griffe names this convention public wildcard imports.
     """
     if target.is_module:
-        return member.name != "tests" and (member.is_exported or not member.is_alias)
+        return member.name not in {"tests", "conftest"} and (
+            member.is_exported or not member.is_alias
+        )
     if not member.is_alias:
         return True
     if member.wildcard_imported:

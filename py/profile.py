@@ -105,7 +105,7 @@ def main() -> None:
         df = reader(path)
     except ImportError as e:  # pandas names the optional package it needs, such as openpyxl
         sys.exit(f"xpd profile: reading {path.suffix} files needs an extra package. {e}")
-    except OSError as e:
+    except (OSError, ValueError) as e:  # pandas raises ValueError subclasses on a malformed file
         sys.exit(f"xpd profile: cannot read {path}. {e}")
 
     mem = df.memory_usage(deep=True)

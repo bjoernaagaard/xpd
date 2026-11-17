@@ -18,11 +18,14 @@ from typing import NoReturn
 # carries any result the old single process could compare, and this script reads only a file
 # that its own child wrote.
 RUNNER = """
+import os
 import pickle
 import runpy
 import sys
 
 script, left = sys.argv[1:]
+# The script's own folder comes first on the import path, as it does under `python script.py`.
+sys.path.insert(0, os.path.dirname(os.path.abspath(script)))
 try:
     ns = runpy.run_path(script, run_name="__xpd_equiv__")
     found = ("result", ns["result"]) if "result" in ns else ("error", "defines no `result`")
@@ -82,6 +85,8 @@ def main() -> None:
     except AssertionError as e:
         print(json.dumps({"equivalent": False, "detail": str(e)}))
         sys.exit(1)
+    except Exception as e:  # noqa: BLE001  numpy raises its own errors on values it cannot compare
+        fail(f"cannot compare the two results. {type(e).__name__}: {e}")
     print(json.dumps({"equivalent": True}))
 
 

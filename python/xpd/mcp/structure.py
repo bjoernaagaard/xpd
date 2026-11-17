@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from xpd.mcp.binary import NEW, OUTLINE, QUERY, REWRITE, TEST, Xpd
 from xpd.mcp.models import CaseReport, CodeMatch, CreatedFiles, FixSafety, OutlineFile, Severity
 from xpd.mcp.root import Project, Root
-from xpd.mcp.tools import READS, WRITES, confirmed, run
+from xpd.mcp.tools import READS, REWRITES, WRITES, confirmed, run
 
 
 class Query(BaseModel):
@@ -39,7 +39,7 @@ class Query(BaseModel):
 
 class OutlineOptions(BaseModel):
     language: str | None = None
-    items: Literal["all", "structure", "imports", "exports"] = "all"
+    items: Literal["auto", "all", "structure", "imports", "exports"] = "auto"
     rules: str | None = Field(default=None, description="Project-relative outline rule file.")
 
 
@@ -133,7 +133,7 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             return root
         return await run(ctx, xpd, QUERY, root, root.all_inside(paths or ["."]), *query.flags())
 
-    @mcp.tool(tags={"structure", "fix"}, annotations=WRITES, task=True)
+    @mcp.tool(tags={"structure", "fix"}, annotations=REWRITES, task=True)
     async def rewrite(
         ctx: Context, query: Query, paths: list[str] | None = None
     ) -> list[CodeMatch] | InputRequiredResult:
