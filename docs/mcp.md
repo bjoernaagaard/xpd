@@ -90,8 +90,9 @@ The call above returns five issues, and the following is one of them.
 ```
 
 The server holds no rules and no results of its own. It reads the built-in rules and skills from
-the binary when it starts, and it reads the project's own rules again for each rule call and
-each completion.
+the binary when it starts. It reads the project's own rules at the first rule call or
+completion, and reads them again only after the project's `sgconfig.yml`, its `xpd.yml` or a
+YAML file in a rule or utility folder they name has changed.
 
 The tools in the table below differ from the call above.
 

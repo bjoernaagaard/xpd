@@ -3,8 +3,10 @@ package and rule arguments of templates and prompts."""
 
 import json
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
+import yaml
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import (
@@ -26,6 +28,13 @@ PACK_URI = "xpd://rules/{package}"
 RULE_URI = "xpd://rules/{package}/{rule}"
 # The rule docs serve the agent. The catalog is a reference it reads when it needs one.
 FOR_AGENT = Annotations(audience=["assistant"], priority=0.5)
+# The files of a rule project, as the binary looks for them in the root and each folder above.
+CONFIG_NAMES = ("sgconfig.yml", "sgconfig.yaml")
+MANIFEST_NAME = "xpd.yml"
+RULE_SUFFIXES = {".yml", ".yaml"}
+
+# Each file `xpd rules` reads in one root, with its modification time and size.
+Inputs = tuple[tuple[str, int, int], ...]
 
 
 def summary(rule: Rule) -> RuleSummary:
@@ -34,8 +43,8 @@ def summary(rule: Rule) -> RuleSummary:
 
 @dataclass(frozen=True)
 class Catalog:
-    """Every rule of the binary, read once, since the binary's rules do not change while the
-    server runs."""
+    """Every rule that `xpd rules` lists: the built-in rules, and those of the project's own
+    rule project when the root has one."""
 
     rules: tuple[Rule, ...]
 
@@ -72,14 +81,88 @@ class Catalog:
         return [name for name in names if name.startswith(argument.value)]
 
 
-async def load(ctx: Context, xpd: Xpd, project: Project, fallback: Catalog) -> Catalog:
-    root = await project.root(ctx)
-    if isinstance(root, InputRequiredResult):
-        return fallback
-    return Catalog(tuple(await xpd.run(RULES, root.path, [])))
+def folders(config: Path, key: str) -> list[Path]:
+    """The folders that the YAML file `config` names under `key`, at the top or in each entry of
+    `packs`, as the binary reads `sgconfig.yml` and `xpd.yml`. A file the binary would reject
+    names none, since its own time and size already show when it changes."""
+    try:
+        data = yaml.safe_load(config.read_text())
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    entries = [data, *(pack for pack in data.get("packs") or [] if isinstance(pack, dict))]
+    named = [entry.get(key) for entry in entries]
+    return [
+        config.parent / name
+        for names in named
+        if isinstance(names, list)
+        for name in names
+        if isinstance(name, str)
+    ]
+
+
+def stamp(path: Path) -> tuple[str, int, int] | None:
+    try:
+        status = path.stat()
+    except OSError:
+        return None
+    return (str(path), status.st_mtime_ns, status.st_size)
+
+
+def inputs(root: Path) -> Inputs:
+    """What the rules of `root` depend on: the project files in the root and each folder above
+    it up to the nearest `sgconfig.yml`, then each YAML file under the rule and utility folders
+    of that project."""
+    files: list[Path] = []
+    for folder in (root, *root.parents):
+        files.extend(folder / name for name in (*CONFIG_NAMES, MANIFEST_NAME))
+        config = next((folder / name for name in CONFIG_NAMES if (folder / name).is_file()), None)
+        if config is None:
+            continue
+        manifest = folder / MANIFEST_NAME
+        dirs = [
+            *folders(config, "ruleDirs"),
+            *folders(config, "utilDirs"),
+            *folders(manifest, "ruleDirs"),
+        ]
+        files.extend(
+            path
+            for found in dirs
+            for path in sorted(found.rglob("*"))
+            if path.suffix in RULE_SUFFIXES and path.is_file()
+        )
+        break
+    return tuple(found for path in dict.fromkeys(files) if (found := stamp(path)))
+
+
+@dataclass
+class Catalogs:
+    """The catalog of each project root. It is read once, and again only when a file that
+    `xpd rules` reads there has changed, since a run takes over a second."""
+
+    xpd: Xpd
+    project: Project
+    fallback: Catalog
+    read: dict[Path, tuple[Inputs, Catalog]] = field(default_factory=dict)
+
+    async def load(self, ctx: Context) -> Catalog:
+        root = await self.project.root(ctx)
+        if isinstance(root, InputRequiredResult):
+            return self.fallback
+        # The files are stamped before the run, so an edit during the run shows on the next call.
+        stamps = inputs(root.path)
+        cached = self.read.get(root.path)
+        if cached is not None and cached[0] == stamps:
+            return cached[1]
+        catalog = Catalog(tuple(await self.xpd.run(RULES, root.path, [])))
+        self.read[root.path] = (stamps, catalog)
+        return catalog
 
 
 def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
+    catalogs = Catalogs(xpd, project, catalog)
+
     @mcp.tool(name="rules", tags={"rules"}, annotations=READS)
     async def list_rules(
         ctx: Context,
@@ -100,7 +183,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
             query: Only rules whose id, message or documentation contains this text, in any
                 case.
         """
-        selected = await load(ctx, xpd, project, catalog)
+        selected = await catalogs.load(ctx)
         rules = selected.of(package) if package else list(selected.rules)
         needle = query.casefold() if query else None
         return RuleList(
@@ -124,7 +207,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
             package: The rule's pack, by module name, such as pandas.
             rule: The rule id, such as chained-assignment.
         """
-        return (await load(ctx, xpd, project, catalog)).find(package, rule)
+        return (await catalogs.load(ctx)).find(package, rule)
 
     @mcp.resource(
         RULES_URI,
@@ -135,7 +218,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
     )
     async def all_rules(ctx: Context) -> str:
         """Every rule and package check of xpd, without their documentation."""
-        return dumps(summary(rule) for rule in (await load(ctx, xpd, project, catalog)).rules)
+        return dumps(summary(rule) for rule in (await catalogs.load(ctx)).rules)
 
     @mcp.resource(
         PACK_URI,
@@ -146,7 +229,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
     )
     async def pack_rules(ctx: Context, package: str) -> str:
         """The rules of one pack, such as xpd://rules/pandas, without their documentation."""
-        return dumps(summary(rule) for rule in (await load(ctx, xpd, project, catalog)).of(package))
+        return dumps(summary(rule) for rule in (await catalogs.load(ctx)).of(package))
 
     @mcp.resource(
         RULE_URI,
@@ -157,7 +240,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
     )
     async def rule_doc(ctx: Context, package: str, rule: str) -> str:
         """One rule's documentation, such as xpd://rules/pandas/chained-assignment."""
-        found = (await load(ctx, xpd, project, catalog)).find(package, rule)
+        found = (await catalogs.load(ctx)).find(package, rule)
         return found.doc or f"#### {found.rule}\n\n{found.message}\n"
 
     @mcp.completion
@@ -167,9 +250,9 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
         context: CompletionContext | None,
     ) -> list[str] | None:
         if isinstance(ref, ResourceTemplateReference) and ref.uri in {PACK_URI, RULE_URI}:
-            return (await load(Context(mcp), xpd, project, catalog)).complete(argument, context)
+            return (await catalogs.load(Context(mcp))).complete(argument, context)
         if isinstance(ref, PromptReference):
-            return (await load(Context(mcp), xpd, project, catalog)).complete(argument, context)
+            return (await catalogs.load(Context(mcp))).complete(argument, context)
         return None
 
 
