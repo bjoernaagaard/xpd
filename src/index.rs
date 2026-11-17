@@ -7,7 +7,7 @@ use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
 use crate::embed::{DIMENSIONS, Model};
-use crate::outline::{self, Callable};
+use crate::outline::{self, Callable, ParameterText};
 use crate::{pack, venv};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
@@ -33,7 +33,13 @@ impl Kind {
 pub(crate) struct Member {
     pub(crate) name: String,
     pub(crate) parameters: Vec<String>,
+    /// The parameter list as the source writes it, as in `Entry`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) parameters_written: Vec<String>,
     pub(crate) summary: String,
+    /// The member is a property, which is read and not called.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) property: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,8 +47,15 @@ pub(crate) struct Entry {
     pub(crate) kind: Kind,
     pub(crate) package: String,
     pub(crate) name: String,
+    /// `class` or `function` for a symbol, and `method` or `property` for a member of a class
+    /// that `api` was asked for.
     pub(crate) callable: Option<String>,
     pub(crate) parameters: Vec<String>,
+    /// The parameter list as the source writes it: each parameter with its type annotation and
+    /// its default, and a `*` or `/` that stands alone between parameters. Empty for a function
+    /// that only overloads declare, and in an index from an xpd that kept the names only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) parameters_written: Vec<String>,
     pub(crate) summary: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) keywords: Vec<String>,
@@ -73,8 +86,8 @@ enum Definition {
         line: usize,
     },
     /// A function that Griffe builds, such as the `__init__` of a dataclass, which has no
-    /// definition to read.
-    Built { parameters: Vec<String> },
+    /// definition to read. Griffe writes its parameters from the fields of the class.
+    Built { parameters: Vec<ParameterText> },
 }
 
 /// A member as py/index.py writes it, with the definitions whose parameters it takes.
@@ -83,6 +96,7 @@ struct ResolvedMember {
     name: String,
     definitions: Vec<Definition>,
     summary: String,
+    property: bool,
 }
 
 /// An entry as py/index.py writes it: Griffe's public name and documentation, and the
@@ -112,11 +126,19 @@ struct ResolvedIndex {
 #[derive(Debug, Default)]
 struct Sources(HashMap<PathBuf, Vec<Callable>>);
 
+/// The parameters of a symbol, by name and as the source writes them.
+#[derive(Debug)]
+struct Parameters {
+    names: Vec<String>,
+    written: Vec<String>,
+}
+
 impl Sources {
     /// The parameters of `name`: those of each of its definitions, each name once, without
-    /// `self` and `cls`.
-    fn parameters(&mut self, name: &str, definitions: &[Definition]) -> Result<Vec<String>> {
-        let mut parameters: Vec<String> = Vec::new();
+    /// `self` and `cls`. Only one definition gives a written list, because several overloads
+    /// write a parameter in several ways.
+    fn parameters(&mut self, name: &str, definitions: &[Definition]) -> Result<Parameters> {
+        let mut parameters: Vec<ParameterText> = Vec::new();
         for definition in definitions {
             let read = match definition {
                 Definition::Source {
@@ -139,13 +161,25 @@ impl Sources {
                 Definition::Built { parameters } => parameters,
             };
             for parameter in read {
-                if !parameters.contains(parameter) {
+                // A `*` or `/` that stands alone has no name, and a definition writes it once.
+                let known = (parameter.name.as_ref())
+                    .is_some_and(|name| parameters.iter().any(|p| p.name.as_ref() == Some(name)));
+                if !known {
                     parameters.push(parameter.clone());
                 }
             }
         }
-        parameters.retain(|parameter| parameter != "self" && parameter != "cls");
-        Ok(parameters)
+        parameters.retain(|p| !matches!(p.name.as_deref(), Some("self" | "cls")));
+        // `def method(self, /, value)` leaves a `/` with no parameter before it.
+        if parameters.first().is_some_and(|p| p.written == "/") {
+            parameters.remove(0);
+        }
+        let names = parameters.iter().filter_map(|p| p.name.clone()).collect();
+        let written = match definitions {
+            [_] => parameters.into_iter().map(|p| p.written).collect(),
+            _ => Vec::new(),
+        };
+        Ok(Parameters { names, written })
     }
 }
 
@@ -174,14 +208,19 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         let mut members = Vec::with_capacity(entry.members.len());
         for member in entry.members {
             let name = format!("{}.{}", entry.name, member.name);
+            let parameters = sources.parameters(&name, &member.definitions)?;
             members.push(Member {
-                parameters: sources.parameters(&name, &member.definitions)?,
+                parameters: parameters.names,
+                parameters_written: parameters.written,
                 name: member.name,
                 summary: member.summary,
+                property: member.property,
             });
         }
+        let parameters = sources.parameters(&entry.name, &entry.definitions)?;
         entries.push(Entry {
-            parameters: sources.parameters(&entry.name, &entry.definitions)?,
+            parameters: parameters.names,
+            parameters_written: parameters.written,
             kind: entry.kind,
             package: entry.package,
             name: entry.name,
@@ -254,15 +293,50 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
     })
 }
 
-pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
-    if let Some(entries) = &library.local {
-        return Ok(entries.iter().find(|e| e.name == name).cloned());
+impl Entry {
+    /// The method or property `name` of this class, as an entry of its own.
+    fn member(self, name: &str) -> Option<Self> {
+        let member = self.members.into_iter().find(|m| m.name == name)?;
+        let callable = if member.property {
+            "property"
+        } else {
+            "method"
+        };
+        Some(Self {
+            kind: Kind::Symbol,
+            package: self.package,
+            name: format!("{}.{}", self.name, member.name),
+            callable: Some(callable.to_owned()),
+            parameters: member.parameters,
+            parameters_written: member.parameters_written,
+            summary: member.summary,
+            keywords: Vec::new(),
+            members: Vec::new(),
+            rules: Vec::new(),
+            recipe: None,
+        })
     }
-    RECORDS
-        .iter()
-        .find(|e| e.name == name)
-        .map(|e| e.entry().context("embedded entry"))
-        .transpose()
+}
+
+/// The entry named `name`, or else the member that `name` names as `Class.member`.
+pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
+    let entry = |name: &str| -> Result<Option<Entry>> {
+        if let Some(entries) = &library.local {
+            return Ok(entries.iter().find(|e| e.name == name).cloned());
+        }
+        RECORDS
+            .iter()
+            .find(|e| e.name == name)
+            .map(|e| e.entry().context("embedded entry"))
+            .transpose()
+    };
+    if let Some(found) = entry(name)? {
+        return Ok(Some(found));
+    }
+    let Some((class, member)) = name.rsplit_once('.') else {
+        return Ok(None);
+    };
+    Ok(entry(class)?.and_then(|class| class.member(member)))
 }
 
 use crate::search::tokens;

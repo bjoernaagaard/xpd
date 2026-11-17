@@ -15,7 +15,7 @@ flags of the xpd you have installed.
 | [`equiv`](#equiv) | Runs two scripts and compares their `result` | Yes, with pandas |
 | [`refit`](#refit) | Refits a saved scikit-learn Pipeline and compares its outputs and scores | Yes, with pandas and scikit-learn |
 | [`find`](#find) | Searches library symbols, rules and recipes for a task | Only once, to download the search model |
-| [`api`](#api) | Prints one symbol, rule or recipe in full | No |
+| [`api`](#api) | Prints one symbol, method, rule or recipe in full | No |
 | [`index`](#index) | Builds a search index from library source | Yes, with Griffe 2.4.1 |
 | [`new`](#new) | Creates a rule project, a rule, a test case or a utility | No |
 | [`test`](#test) | Checks the test cases and snapshots of project rules | No |
@@ -636,8 +636,9 @@ Round to nearest integer towards zero.
 ```
 
 Without `--kind`, the text output has the headings `Symbols`, `Rules` and `Recipes`, each ranked on
-its own. A symbol line shows its parameters and its rule links, and a long signature ends in `...`
-in text. JSON and [`api`](#api) keep every parameter.
+its own. A symbol line shows the names of its parameters and its rule links, and a long signature
+ends in `...` in text. JSON keeps every name, and [`api`](#api) prints each parameter as the source
+writes it.
 
 | Flag | Effect |
 | --- | --- |
@@ -694,12 +695,14 @@ Round to nearest integer towards zero.
 
 ## api
 
-`xpd api` prints one symbol, rule or recipe in full, with the parameter names, the first paragraph
-of the docstring, the public methods and the rules that may guard it.
+`xpd api` prints one symbol, method, rule or recipe in full, with each parameter as the source
+writes it, the first paragraph of the docstring, the public methods and the rules that may guard
+it. A parameter keeps its type annotation and its default, so you can write the call without
+importing the library.
 
 ```console
 $ xpd api sklego.meta.GroupedPredictor
-sklego.meta.GroupedPredictor(estimator, groups, shrinkage, use_global_model, check_X, shrinkage_kwargs) [class]
+sklego.meta.GroupedPredictor(estimator, groups, shrinkage=None, use_global_model=True, check_X=True, shrinkage_kwargs=None) [class]
 `GroupedPredictor` is a meta-estimator that fits a separate estimator for each group in the input data.
   decision_function(X) Predict confidence scores for samples in `X`.
   fit(X, y) Fit one estimator for each group of training data `X` and `y`.
@@ -708,16 +711,47 @@ sklego.meta.GroupedPredictor(estimator, groups, shrinkage, use_global_model, che
 Rules: sklego/grouped-shrinkage-arguments
 ```
 
-`--format json` prints a list with the one entry, with the same fields as `find`. `--index FILE`
-adds a local index. A name that is not in the index exits 2.
+The member lines of a class show the parameter names only. To read one method or property on its
+own, add its name to the name of its class. An inherited member works the same way.
+
+```console
+$ xpd api mapie.regression.TimeSeriesRegressor.update
+mapie.regression.TimeSeriesRegressor.update(X: ArrayLike, y: ArrayLike, ensemble: bool = False, confidence_level: Optional[Union[float, Iterable[float]]] = None, gamma: float = 0.0, optimize_beta: bool = False) [method]
+Update conformity scores
+$ xpd api arch.univariate.base.ARCHModelResult.forecast
+arch.univariate.base.ARCHModelResult.forecast(params: ArrayLike1D | None = None, horizon: int = 1, start: int | DateLike | None = None, align: ForecastAlignment = "origin", method: ForecastingMethod = "analytic", simulations: int = 1000, rng: Callable[[int | tuple[int, ...]], Float64Array] | None = None, random_state: np.random.RandomState | None = None, *, reindex: bool = False, x: dict[Label, ArrayLike] | ArrayLike | None = None) [method]
+Construct forecasts from estimated model.
+$ xpd api arch.unitroot.KPSS.pvalue
+arch.unitroot.KPSS.pvalue [property]
+The p-value for the test statistic.
+```
+
+`--format json` prints a list with the one entry. `parameters` holds the names, and
+`parameters_written` holds the parameter list as the source writes it. An entry without parameters
+has no `parameters_written`. `callable` is `class` or `function` for a symbol, `method` or
+`property` for a member of a class, and `null` for a rule or a recipe.
+
+```console
+$ xpd api sklearn.model_selection.TimeSeriesSplit.split --format json
+[{"kind":"symbol","package":"sklearn","name":"sklearn.model_selection.TimeSeriesSplit.split","callable":"method","parameters":["X","y","groups"],"parameters_written":["X","y=None","groups=None"],"summary":"Generate indices to split data into training and test set.","members":[],"rules":[]}]
+```
+
+`--index FILE` adds a local index. A name that is not in the index exits 2.
 
 | Entry | What `api` shows |
 | --- | --- |
 | A class | The parameters of its nearest `__init__`, or of its nearest `__new__` when it has no `__init__`, and its public methods and properties, with the inherited ones |
-| A function that exists only as overloads in a stub file | The parameters of all its overloads |
-| Any parameter | The name from the source or stub file, without a default or a type annotation |
+| A method or property of a class, as `Class.member` | The parameters of the method without `self` or `cls`, and the first paragraph of its docstring. A property has no parameter list. The entry has no rule links |
+| Any parameter | The text of the source or stub file, with its type annotation and its default. A parameter that the source writes over several lines is joined into one line, without its comments |
+| A `*` or `/` that stands alone in the parameter list | The same character, so the parameters after `*` are keyword-only and those before `/` are positional-only. `parameters_written` holds it as an item of its own |
+| A function that exists only as overloads in a stub file, such as `numpy.zeros` | The parameter names of all its overloads, without type annotations and defaults, because each overload writes them in its own way |
+| The `__init__` that Python builds for a dataclass | Each field as Griffe reads it, with its annotation and default, because the source has no parameter list |
 | A compiled function without a stub | No entry, because the index leaves it out |
 | A NumPy universal function, such as `numpy.add` | No entry, because its stub declares it as an attribute |
+| A local index that an earlier xpd built | The parameter names only, until you build the index again |
+
+The printed text says how to call the symbol. It does not say what a parameter means, so read the
+library's documentation for that.
 
 The rule links come from the words of the symbol's name in the pack's rule patterns, regex
 patterns included. They show rules that may apply, and they do not prove that every use of the
@@ -795,6 +829,8 @@ Each index file has `schema_version`, `package`, `version` and `entries`.
 | Key | What it holds |
 | --- | --- |
 | Every entry | `kind`, `package`, `name`, `callable`, `parameters`, `summary`, `members` and `rules`, and `keywords` taken from the source when there are any |
+| An entry or a member with parameters | `parameters_written`, the parameter list as the source writes it. `parameters` holds the names |
+| A member | `name`, `parameters` and `summary`, and `property`, which is `true` for a property and left out for a method |
 | A recipe entry | `recipe`, with `title`, `symbols`, `source`, `code`, `license` and `modified`, and `attribution` with the copyright lines of the source file when it has any |
 | `recipes` | The counts of a harvest, with `candidates`, `clean`, `fixed`, `dropped`, `capped` and `retained` |
 

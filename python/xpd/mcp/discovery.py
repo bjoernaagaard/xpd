@@ -87,7 +87,7 @@ async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Disco
                 failures.append(f"{place} {name} is not known to api.")
                 continue
             entry = next((item for item in entries if item.name == name), None)
-            if entry is None or entry.kind != "symbol" or entry.callable is None:
+            if entry is None or entry.kind != "symbol" or entry.callable in {None, "property"}:
                 failures.append(f"{place} {name} is not an indexed callable symbol.")
                 continue
             used.add(name)

@@ -97,7 +97,7 @@ xpd
 │   └── hook                   lint the files that an agent's edit changed
 ├── look up a library
 │   ├── find "<task>"          find library symbols, rules and worked recipes for a task
-│   ├── api <name>             read one symbol or recipe in full
+│   ├── api <name>             read one symbol, method or recipe in full
 │   └── index <source>         build a search index from library source
 ├── read and rewrite code
 │   ├── run [paths]            find a code pattern, and preview or apply a rewrite (alias: query)
@@ -124,7 +124,8 @@ environment. Every other command reads files.
 
 `xpd find "<task>"` names the classes, the rules and the worked examples for a task in your own
 words, also for a library you haven't installed. `xpd api <name>` then prints one of them in
-full.
+full, with each parameter as the source writes it, so you see the type annotation and the
+default. The name can also be a method of a class, such as `Class.method`.
 
 ```console
 $ xpd find "time series bootstrap for cross validation" --limit 1
@@ -134,17 +135,22 @@ Time Series cross-validator.
 Rules: sklearn/groups-ignored, sklearn/removed-in-sklearn
 Rules
 sklego/group-time-series-split-folds [rule]
-Reports `GroupTimeSeriesSplit` with 6 or more splits. The class tries every combination of split points over the groups to find the most even folds, so each extra fold multiplies the time.
+The rule reports `GroupTimeSeriesSplit` with 6 or more splits. The class tries every combination of
+split points over the groups to find the most even folds, so each extra fold multiplies the time.
 Recipes
 mapie/recipe/generate-a-sampling-method-that-block-bootstraps-the [recipe]
 Generate a sampling method, that block bootstraps the training set.
 
 $ xpd api mapie.subsample.BlockBootstrap
-mapie.subsample.BlockBootstrap(n_resamplings, length, n_blocks, overlapping, random_state) [class]
+mapie.subsample.BlockBootstrap(n_resamplings: int = 30, length: Optional[int] = None, n_blocks: Optional[int] = None, overlapping: bool = False, random_state: Optional[Union[int, RandomState]] = None) [class]
 Generate a sampling method, that block bootstraps the training set. It can replace KFold, LeaveOneOut or SubSample as cv argument in the TimeSeriesRegressor class.
   get_n_splits(args, kargs) Returns the number of splitting iterations in the cross-validator.
   split(X, args, kargs) Generate indices to split data into training and test sets.
 Rules: mapie/unseeded-resampling
+
+$ xpd api mapie.subsample.BlockBootstrap.split
+mapie.subsample.BlockBootstrap.split(X: NDArray, *args: Any, **kargs: Any) [method]
+Generate indices to split data into training and test sets.
 ```
 
 | Fact about `find` | Value |

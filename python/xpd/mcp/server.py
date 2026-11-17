@@ -20,7 +20,8 @@ MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Apache Hamilton,
 dataflow of step code and Hamilton modules, profiles data files, and checks that a refactor keeps \
 its result. Every path is relative to the project root.
 
-- Before choosing a library, call `find` with the task, then `api` with a returned name.\
+- Before choosing a library, call `find` with the task, then `api` with a returned name. Call \
+`api` with `Class.method` to read a method's parameters with their defaults before you call it.\
 
 - After choosing and writing code, call `discovery_gate` on its files before `equiv`.\
 

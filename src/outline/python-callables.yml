@@ -1,6 +1,7 @@
 # Every function and method of a Python file with its parameters, which `xpd index` reads for
 # the definitions Griffe resolves. Classes are no items here, so their methods are. A decorated
-# definition starts at its first decorator, which is the line Griffe reports.
+# definition starts at its first decorator, which is the line Griffe reports. A parameter is the
+# whole node, with its type annotation and its default, so `xpd index` reads its text by its range.
 id: python-callable
 language: Python
 role: item
@@ -50,4 +51,7 @@ rule:
       has: {field: name, pattern: $NAME}
     - any: [{kind: list_splat_pattern}, {kind: dictionary_splat_pattern}]
       has: {kind: identifier, pattern: $NAME}
+    # The `*` before the keyword-only parameters and the `/` after the positional-only ones.
+    - any: [{kind: keyword_separator}, {kind: positional_separator}]
+      pattern: $NAME
 name: $NAME

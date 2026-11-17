@@ -566,6 +566,7 @@ pub(crate) fn harvest(
                 name: recipe_name(package, &title),
                 callable: None,
                 parameters: Vec::new(),
+                parameters_written: Vec::new(),
                 summary: title,
                 keywords: vec![fixed],
                 members: Vec::new(),

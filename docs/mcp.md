@@ -120,7 +120,7 @@ Every path is relative to the project root, and the server refuses a path outsid
 | `rules` | `package`, `severity`, `fixable`, `query`, all optional | Lists the rules that match every filter you give. `package` is a module name, such as `numpy` or `sklearn` | No |
 | `rule` | `package`, `rule` | Shows one rule with its documentation and examples | No |
 | `find` | `task`, and optional `package`, `kind`, `limit` | Searches the binary's index, which includes libraries the project has not installed | No |
-| `api` | `name` | Reads one indexed name with its parameter names and the rules that guard it | No |
+| `api` | `name` | Reads one indexed name, or a method or property of an indexed class, with its parameters as the source writes them and the rules that guard it | No |
 | `discovery_gate` | `paths`, `discovery` | Checks the direct calls to imported names against the index, before any code runs | No |
 | `contract` | `file` | Reads the contract that a training script saved beside its model, as [Code mode](code-mode.md#the-stages) describes | No |
 | `gates` | `profile`, `contract`, `proof` | Judges a run from a data file to a saved model, from the results of the other tools, as [the gates](code-mode.md#the-gates) describe | No |
@@ -269,19 +269,26 @@ find(task, package=None, kind=None, limit=None)
   returns    {"symbols": [...], "rules": [...], "recipes": [...]}, each ranked on its own
 
 api(name)
-  returns    kind, package, name, callable, parameters, summary, members, rules,
-             signature, and recipe for a recipe
+  name       a name that find returned, or Class.member for a method or property
+  returns    kind, package, name, callable, parameters, parameters_written, summary,
+             members, rules, signature, and recipe for a recipe
 ```
 
 The first `find` downloads the 333 MB embedding model that ranks by meaning, as the
-[commands page](commands.md#find) explains, so the first call can take a few minutes. `api`
-adds `signature`, which shows the indexed parameter names only, with no defaults, parameter
-kinds or type annotations. `signature` is `null` for an entry that is not a callable symbol.
-The server keeps any field that the binary adds to an entry.
+[commands page](commands.md#find) explains, so the first call can take a few minutes.
+`parameters_written` holds the parameter list as the source writes it, so each parameter has its
+type annotation and its default, and a `*` or `/` that stands alone is an item of its own. Read
+it before you write a call. It is empty in the results of `find`, and for a function that
+exists only as overloads in a stub file, as the [commands page](commands.md#api) explains.
+`api` adds `signature`, which shows the indexed parameter names only. `signature` is `null`
+for an entry that is not a callable symbol. The server keeps any field that the binary adds to
+an entry.
 
 ```console
 $ xpd api --format json numpy.zeros | jq -c '.[0] | {name, kind, callable, parameters, rules}'
 {"name":"numpy.zeros","kind":"symbol","callable":"function","parameters":["shape","dtype","order","device","like"],"rules":["numpy/array-default-argument"]}
+$ xpd api --format json mapie.regression.TimeSeriesRegressor.update | jq -c '.[0] | {name, callable, parameters_written}'
+{"name":"mapie.regression.TimeSeriesRegressor.update","callable":"method","parameters_written":["X: ArrayLike","y: ArrayLike","ensemble: bool = False","confidence_level: Optional[Union[float, Iterable[float]]] = None","gamma: float = 0.0","optimize_beta: bool = False"]}
 ```
 
 A recipe entry adds `recipe` with the title, the symbols its code uses, the source URL with its
@@ -318,7 +325,7 @@ a candidate and doesn't install a package.
 | Model | Fields |
 | --- | --- |
 | `DiscoveryQuestion` | `task` |
-| `DiscoveryEntry` | `kind`, `name`, `signature`, `summary`, `parameters`, `members` and the guarding `rules` of one candidate |
+| `DiscoveryEntry` | `kind`, `name`, `signature`, `summary`, `parameters`, `parameters_written`, `members` and the guarding `rules` of one candidate |
 | `DiscoveryChoice` | the chosen `name`, a `reason`, and the callable `symbols` that the code must call, which for a recipe are the indexed symbols its code uses |
 | `Discovery` | `question`, `candidates` as `{"symbols": [...], "rules": [...], "recipes": [...]}`, and `choice` |
 | `DiscoveryProof` | the `discovery` record, the checked `paths`, and the `gate` |

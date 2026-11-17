@@ -126,8 +126,17 @@ enum Cmd {
         #[arg(long, hide = true, conflicts_with_all = ["query", "check", "index"])]
         write_vectors: Option<PathBuf>,
     },
-    /// Show a public symbol's parameters, summary, own members and guarding rules.
+    /// Show a public symbol's parameters as the source writes them, with its summary, members
+    /// and guarding rules.
+    ///
+    /// A parameter keeps its type annotation and its default. The name is a class or a function
+    /// that `find` returns, a method or property of a class, a rule or a recipe.
+    #[command(after_long_help = "Examples:
+  xpd api sklego.model_selection.TimeGapSplit
+  xpd api mapie.regression.TimeSeriesRegressor.update
+  xpd api pandas.DataFrame.merge --format json")]
     Api {
+        /// A dotted name, such as `pandas.DataFrame` or `pandas.DataFrame.merge`.
         name: String,
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
@@ -368,12 +377,14 @@ fn command_result(result: Result<ExitCode>) -> ExitCode {
     })
 }
 
-/// Prints what `find` found, each entry with the first paragraph of its summary.
+/// Prints what `find` found, each entry with the first paragraph of its summary and the names
+/// of its parameters. `api` prints the members and the parameters as the source writes them.
 fn print_matches(mut found: index::Matches, kind: Option<Kind>, format: Format) -> Result<()> {
     for group in [&mut found.symbols, &mut found.rules, &mut found.recipes] {
         for entry in group {
             entry.keywords.clear();
             entry.members.clear();
+            entry.parameters_written.clear();
             entry.summary = entry
                 .summary
                 .split("\n\n")
@@ -809,11 +820,13 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
         Format::Json => println!("{}", serde_json::to_string(&entries)?),
         Format::Text => {
             for entry in entries {
-                let signature = if entry.kind == Kind::Symbol {
-                    let params = if matches!(detail, Detail::Summary)
-                        && entry.parameters.join(", ").len() > 70
-                    {
-                        format!(
+                let signature = if entry.kind != Kind::Symbol
+                    || entry.callable.as_deref() == Some("property")
+                {
+                    String::new()
+                } else {
+                    let params = match detail {
+                        Detail::Summary if entry.parameters.join(", ").len() > 70 => format!(
                             "{}, ...",
                             entry
                                 .parameters
@@ -822,13 +835,14 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
                                 .cloned()
                                 .collect::<Vec<_>>()
                                 .join(", ")
-                        )
-                    } else {
-                        entry.parameters.join(", ")
+                        ),
+                        // A function that only overloads declare has no written list.
+                        Detail::Full if !entry.parameters_written.is_empty() => {
+                            entry.parameters_written.join(", ")
+                        }
+                        Detail::Summary | Detail::Full => entry.parameters.join(", "),
                     };
                     format!("({params})")
-                } else {
-                    String::new()
                 };
                 println!(
                     "{}{signature} [{}]\n{}",

@@ -98,7 +98,7 @@ discovery
 │   ├── rules[]              up to three from find
 │   └── recipes[]            up to three from find
 │       each entry is what api returned: kind, package, name, callable,
-│       parameters, signature, summary, members and rules
+│       parameters, parameters_written, signature, summary, members and rules
 └── choice
     ├── name                 the exact name of one candidate
     ├── reason
@@ -111,13 +111,14 @@ sklego.meta.GroupedPredictor --format json` gave the output below in a folder wi
 where the Python on `PATH` has no scikit-lego.
 
 ```json
-{"name":"sklego.meta.GroupedPredictor","kind":"symbol","callable":"class","parameters":["estimator","groups","shrinkage","use_global_model","check_X","shrinkage_kwargs"]}
+{"name":"sklego.meta.GroupedPredictor","kind":"symbol","callable":"class","parameters":["estimator","groups","shrinkage","use_global_model","check_X","shrinkage_kwargs"],"parameters_written":["estimator","groups","shrinkage=None","use_global_model=True","check_X=True","shrinkage_kwargs=None"]}
 ```
 
 An entry that the agent reads with `api` is a candidate too, also when `find` did not return
 it, so the agent adds it to the list of its kind. A `signature` lists the parameter names of
-the index, without defaults or parameter kinds. For a recipe, `choice.symbols` names the
-callables that the recipe's code uses.
+the index, and `parameters_written` holds each parameter as the source writes it, with its type
+annotation and its default. For a recipe, `choice.symbols` names the callables that the recipe's
+code uses.
 
 `discovery_gate` takes `paths` and `discovery`, and it runs no code. It checks the record and
 the files in the order below.

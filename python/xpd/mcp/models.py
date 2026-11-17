@@ -288,15 +288,30 @@ class Written(BaseModel):
 class ApiMember(Output):
     name: str
     parameters: list[str]
+    parameters_written: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The parameter list as the source writes it: each parameter with its type "
+            "annotation and default, and a * or / that stands alone between parameters."
+        ),
+    )
     summary: str
+    property: bool = Field(default=False, description="The member is read and not called.")
 
 
 class DiscoveryEntry(Output):
     kind: str
     package: str
     name: str
-    callable: Literal["class", "function"] | None
+    callable: Literal["class", "function", "method", "property"] | None
     parameters: list[str]
+    parameters_written: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The parameter list as the source writes it: each parameter with its type "
+            "annotation and default, and a * or / that stands alone between parameters."
+        ),
+    )
     summary: str
     members: list[ApiMember]
     rules: list[str]
@@ -304,8 +319,8 @@ class DiscoveryEntry(Output):
     @computed_field
     @property
     def signature(self) -> str | None:
-        """Return indexed parameter names without inventing defaults or parameter kinds."""
-        if self.kind != "symbol" or self.callable is None:
+        """Return indexed parameter names. `parameters_written` has the defaults and kinds."""
+        if self.kind != "symbol" or self.callable in {None, "property"}:
             return None
         return f"{self.name}({', '.join(self.parameters)})"
 

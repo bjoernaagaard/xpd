@@ -243,14 +243,25 @@ pub(crate) fn python_module(root: &Root) -> Module<'_> {
     module
 }
 
+/// One part of the parameter list of a Python function: a parameter, or a `*` or `/` that
+/// stands alone between parameters.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct ParameterText {
+    /// The name of a parameter, with `args` for `*args` and `kwargs` for `**kwargs`. `None` for
+    /// a `*` or `/` that stands alone.
+    pub(crate) name: Option<String>,
+    /// The part as the source writes it, with its type annotation and its default, on one line.
+    pub(crate) written: String,
+}
+
 /// A function or method of a Python file.
 #[derive(Debug)]
 pub(crate) struct Callable {
     pub(crate) name: String,
     /// The line of its first decorator, or of its `def`, counted from 1.
     pub(crate) line: usize,
-    /// The names of its parameters, with `args` for `*args` and `kwargs` for `**kwargs`.
-    pub(crate) parameters: Vec<String>,
+    /// Its parameter list, in the order of the source.
+    pub(crate) parameters: Vec<ParameterText>,
 }
 
 /// Every function and method of the Python source `src`.
@@ -259,14 +270,64 @@ pub(crate) fn python_callables(src: &str) -> Vec<Callable> {
     let root = scan::parse(src);
     compiled(PYTHON_CALLABLE_RULES, &RULES)
         .extract(root.root())
-        .map(|item| Callable {
-            line: item.entry.range.start.line + 1,
-            parameters: (item.members.iter())
-                .map(|member| member.entry.name.to_string())
-                .collect(),
-            name: item.entry.name.into_owned(),
+        .map(|item| {
+            let definition = node_at(root.root(), &item.entry);
+            Callable {
+                line: item.entry.range.start.line + 1,
+                parameters: (item.members.iter())
+                    .map(|member| {
+                        let stands_alone = matches!(
+                            member.entry.ast_kind.as_ref(),
+                            "keyword_separator" | "positional_separator"
+                        );
+                        ParameterText {
+                            name: (!stands_alone).then(|| member.entry.name.to_string()),
+                            written: one_line(src, &node_at(definition.clone(), &member.entry)),
+                        }
+                    })
+                    .collect(),
+                name: item.entry.name.into_owned(),
+            }
         })
         .collect()
+}
+
+/// The source of `node` on one line, without comments. A line break becomes a space, or nothing
+/// when it follows an opening bracket or comes before a closing one.
+fn one_line(src: &str, node: &Node<'_>) -> String {
+    let mut tokens = Vec::new();
+    collect_tokens(node, &mut tokens);
+    let mut text = String::new();
+    let mut previous: Option<&Node<'_>> = None;
+    for token in &tokens {
+        if let Some(previous) = previous {
+            let between = &src[previous.range().end..token.range().start];
+            if !between.contains('\n') {
+                text.push_str(between);
+            } else if !matches!(previous.kind().as_ref(), "(" | "[" | "{")
+                && !matches!(token.kind().as_ref(), ")" | "]" | "}")
+            {
+                text.push(' ');
+            }
+        }
+        text.push_str(&src[token.range()]);
+        previous = Some(token);
+    }
+    text
+}
+
+/// The tokens below `node`, in the order of the source. A string is one token, so a line break
+/// inside it stays, and a comment is none.
+fn collect_tokens<'r>(node: &Node<'r>, tokens: &mut Vec<Node<'r>>) {
+    match node.kind().as_ref() {
+        "comment" => {}
+        kind if kind != "string" && node.children().len() > 0 => {
+            for child in node.children() {
+                collect_tokens(&child, tokens);
+            }
+        }
+        _ => tokens.push(node.clone()),
+    }
 }
 
 /// Which top-level items `xpd outline` lists.

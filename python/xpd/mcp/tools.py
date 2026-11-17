@@ -280,6 +280,11 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
 
     @mcp.tool(tags={"discovery"}, annotations=READS)
     async def api(name: str) -> DiscoveryEntry:
-        """Read a public dotted name's parameters, summary, own class members and rule links."""
+        """Read a public dotted name's parameters, summary, own class members and rule links.
+
+        The name is a class or function that find returns, or a method or property of a class,
+        such as pandas.DataFrame.merge. parameters_written holds each parameter as the source
+        writes it, with its type annotation and default.
+        """
         entries = await xpd.run(API, Path.cwd(), [name])
         return entries[0]

@@ -1,7 +1,8 @@
 """Write xpd entries from Griffe's static API model.
 
 Griffe resolves the public names and reads the documentation. Each entry names the definitions
-whose parameters it lists, by file and line, and xpd reads the parameters there.
+whose parameters it lists, by file and line, and xpd reads each parameter there as the source
+writes it.
 """
 
 import ast
@@ -45,11 +46,18 @@ class Source(TypedDict):
     line: int
 
 
+class Parameter(TypedDict):
+    """One part of a parameter list: a parameter, or the `*` before the keyword-only ones."""
+
+    name: str | None
+    written: str
+
+
 class Built(TypedDict):
     """A function that Griffe builds, such as the `__init__` of a dataclass, with its parameters."""
 
     name: str
-    parameters: list[str]
+    parameters: list[Parameter]
 
 
 Definition = Source | Built
@@ -59,6 +67,7 @@ class Member(TypedDict):
     name: str
     definitions: list[Definition]
     summary: str
+    property: bool
 
 
 class Entry(TypedDict):
@@ -297,8 +306,26 @@ def definitions(obj: griffe.Object | griffe.Alias) -> list[Definition]:
 def definition(function: griffe.Function) -> Definition:
     file = function.extra["xpd"].get("file")
     if file is None:
-        return Built(name=function.name, parameters=[p.name for p in function.parameters])
+        return Built(name=function.name, parameters=built_parameters(function))
     return Source(name=function.name, file=file, line=function.lineno)
+
+
+def built_parameters(function: griffe.Function) -> list[Parameter]:
+    """The parameters of a function that no source defines, each as a `def` would write it."""
+    result = []
+    keyword_only = False
+    for parameter in function.parameters:
+        if parameter.kind is griffe.ParameterKind.keyword_only and not keyword_only:
+            keyword_only = True
+            result.append(Parameter(name=None, written="*"))
+        written = parameter.name
+        if parameter.annotation is not None:
+            written += f": {parameter.annotation}"
+        if parameter.default is not None:
+            equals = " = " if parameter.annotation is not None else "="
+            written += f"{equals}{parameter.default}"
+        result.append(Parameter(name=parameter.name, written=written))
+    return result
 
 
 def members(obj: griffe.Class) -> list[Member]:
@@ -310,10 +337,17 @@ def members(obj: griffe.Class) -> list[Member]:
                 continue
             if member.is_function:
                 result.append(
-                    Member(name=name, definitions=definitions(member), summary=summary(member))
+                    Member(
+                        name=name,
+                        definitions=definitions(member),
+                        summary=summary(member),
+                        property=False,
+                    )
                 )
             elif member.is_attribute and member.has_labels("property"):
-                result.append(Member(name=name, definitions=[], summary=summary(member)))
+                result.append(
+                    Member(name=name, definitions=[], summary=summary(member), property=True)
+                )
         except Unresolved:
             continue
     return result

@@ -17,7 +17,9 @@ Use `xpd` whenever you write or change Python code.
   kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.
   In code mode, read these lists directly. Record inspected candidates in the same grouped
   shape. A symbol read directly through `api` counts as a candidate when recorded there.
-  `xpd api <dotted.name>` reads a result with its parameters and guarding rules.
+  `xpd api <dotted.name>` reads a result with its guarding rules and with each parameter as
+  the source writes it, so it shows the type annotation and the default. Read a method with
+  `xpd api <Class>.<method>` before you call it, instead of importing the library to inspect it.
 - `xpd rules --format json`: every rule with its documentation. Read a rule's
   `doc` before you change code it reports.
 - `xpd check <paths…> --fix`: apply safe fixes. Add `--unsafe-fixes` for fixes
