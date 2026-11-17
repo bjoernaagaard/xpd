@@ -1,13 +1,13 @@
 # A SciPy metric function passed to cdist or pdist as a callable runs once per pair in Python,
-# where the metric's name runs the same metric in C. On 1,000 by 1,000 points the name ran 720
-# to 7,600 times faster for euclidean, cityblock and cosine in cdist and euclidean in pdist, and
-# 12 to 870 times on 25 by 40 points, on float64 and float32, in speed/runs/bench.jsonl and bench2.jsonl. Unsafe: cosine
+# where the metric's name runs the same metric in C. On 1,000 by 1,000 points the name ran 1,100
+# to 2,100 times faster for euclidean, cityblock and cosine in cdist and euclidean in pdist, and
+# 12 to 870 times on 25 by 40 points, on float64 and float32, in speed/runs/bench.jsonl and bench2.jsonl. The 1,000 by 1,000 range is from a rerun on one idle core with NumPy 2.5.5. Unsafe: cosine
 # and correlation differ in the last bits, the C metrics cast complex input to float, and V or
 # VI given by keyword still reach the named metric.
 id: callable-metric
 language: python
 severity: warning
-message: Passing $F as a function makes $CD call it once per pair in Python. Pass the name '$F', which runs the same metric in C and ran 720 to 7,600 times faster on 1,000,000 pairs.
+message: Passing $F as a function makes $CD call it once per pair in Python. Pass the name '$F', which runs the same metric in C and ran 1,100 to 2,100 times faster on 1,000,000 pairs.
 rule:
   any:
     - { pattern: $D.$F, matches: distance-module }

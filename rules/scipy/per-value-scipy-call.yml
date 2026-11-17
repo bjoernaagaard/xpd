@@ -59,15 +59,16 @@ utils:
 ---
 # A distribution method of scipy.stats called once per value of a comprehension. Each call
 # checks its arguments in Python for about 50 microseconds. On 1,000,000 values one call on the
-# array ran 34 to 1,045 times faster for norm.cdf and t.sf, and 54 to 165 times on 1,000
+# array ran 92 to 730 times faster for norm.cdf and t.sf, and 54 to 165 times on 1,000
 # values, on float64 and float32. The cost is 68 Python calls of argument checks per value, in
 # speed/runs/profile_loops.txt, in
-# speed/runs/bench_stats.jsonl and bench_stats2.jsonl. No fix, because the loop may run over a
+# speed/runs/bench_stats.jsonl and bench_stats2.jsonl. The 1,000,000 range is from a rerun on one idle core with
+# NumPy 2.5.5. No fix, because the loop may run over a
 # list of arrays.
 id: per-value-scipy-call
 language: python
 severity: warning
-message: This calls $D.$METH once per value of $IT, and every argument of $METH broadcasts. Pass np.asarray($IT) in place of $X and call it once, which ran 34 to 1,045 times faster on 1,000,000 values.
+message: This calls $D.$METH once per value of $IT, and every argument of $METH broadcasts. Pass np.asarray($IT) in place of $X and call it once, which ran 92 to 730 times faster on 1,000,000 values.
 rule:
   kind: call
   pattern: $CALL
@@ -127,13 +128,14 @@ utils:
 ---
 # A scipy.stats distribution frozen once per value of a comprehension, then evaluated. Freezing
 # checks the parameters in Python. For 1,000 means and 1,000 points, one call with the means as
-# a column ran 4.9 to 23 times faster, and 18 to 49 times for 10 means and 100 points, on float64
-# and float32, with bit equal results, in speed/runs/bench.jsonl and bench2.jsonl. No fix,
+# a column ran 16 to 17 times faster, and 18 to 49 times for 10 means and 100 points, on float64
+# and float32, with bit equal results, in speed/runs/bench.jsonl and bench2.jsonl. The 1,000 by 1,000 range is from a
+# rerun on one idle core with NumPy 2.5.5. No fix,
 # because the parameters need an axis when the points are an array too.
 id: per-value-scipy-call
 language: python
 severity: warning
-message: This freezes $D once per value of $IT. Call $D.$METH once with np.asarray($IT) in place of $X, as a column with [:, None] when the points are an array, which ran 4.9 to 23 times faster for 1,000 values of $X and 1,000 points.
+message: This freezes $D once per value of $IT. Call $D.$METH once with np.asarray($IT) in place of $X, as a column with [:, None] when the points are an array, which ran 16 to 17 times faster for 1,000 values of $X and 1,000 points.
 rule:
   kind: call
   pattern: $CALL

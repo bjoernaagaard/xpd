@@ -1,13 +1,14 @@
 # A SciPy metric function called inside a comprehension or a loop computes one distance per
-# Python call. On 1,000 by 1,000 points of 3 dimensions cdist ran 960 to 9,600 times faster
+# Python call. On 1,000 by 1,000 points of 3 dimensions cdist ran 960 to 2,100 times faster
 # than a nested comprehension of euclidean, cityblock or cosine, and 30 to 790 times faster on
-# 25 by 40 points, on float64 and float32, in speed/runs/bench.jsonl and bench2.jsonl. The cost
+# 25 by 40 points, on float64 and float32, in speed/runs/bench.jsonl and bench2.jsonl. The 1,000 by 1,000 range is from a rerun on one idle core
+# with NumPy 2.5.5. The cost
 # is 23 Python calls of input checks and norms per pair, in speed/runs/profile_loops.txt. No fix, because the loop decides which pairs
 # are wanted.
 id: distance-per-pair
 language: python
 severity: warning
-message: This calls $F once per pair of points. Stack the points into arrays and call cdist(XA, XB, '$F') once, or pdist(X, '$F') for the pairs within one array, which ran 960 to 9,600 times faster on 1,000,000 pairs.
+message: This calls $F once per pair of points. Stack the points into arrays and call cdist(XA, XB, '$F') once, or pdist(X, '$F') for the pairs within one array, which ran 960 to 2,100 times faster on 1,000,000 pairs.
 rule:
   kind: call
   all:

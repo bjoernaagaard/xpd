@@ -2912,9 +2912,9 @@ Add the package to the project environment, not to xpd itself.
 
 The NumPy rules find code that gives a wrong result or raises on NumPy 2.5, and code that has a
 faster or more exact form. They run on files that import `numpy`, and examples assume
-`import numpy as np`. Every claim was run on NumPy 2.5.4, as the table shows.
+`import numpy as np`. Every claim was run on NumPy 2.5.5, as the table shows.
 
-| Claim | What it means on NumPy 2.5.4 |
+| Claim | What it means on NumPy 2.5.5 |
 | --- | --- |
 | a form is removed | it raises |
 | a form is wrong | it gives the wrong value |
@@ -3384,7 +3384,7 @@ grid = grid.reshape((2, 3))
 
 Each rule in this group finds code that calls Python once per value, or that copies the whole
 array once per pass, and the message of each rule names the whole array form. The table shows the
-speed that each message reports, as medians of 7 runs on one core with NumPy 2.5.4, on float64
+speed that each message reports, as medians of 7 runs on one core with NumPy 2.5.5, on float64
 and int64.
 
 | Rule | Write instead | Faster by |
@@ -3565,7 +3565,7 @@ data = np.load("cache.npy")
 Each rule in this group names the NumPy function that does the same work without a full sort, a
 temporary array or a step that loses digits, and every rule is a warning. The table shows the
 speed that the message of each rule reports, measured on one core with BLAS and LAPACK on one
-thread and NumPy 2.5.4. The other rules in the group give a more exact result and have no
+thread and NumPy 2.5.5. The other rules in the group give a more exact result and have no
 measured speed.
 
 | Rule | Reported form | Size |
@@ -3873,7 +3873,7 @@ chain = np.einsum("ij,jk,kl->il", a, b, c, optimize=True)
 
 ### The API that NumPy's docs prefer on NumPy 2.5
 
-Each rule in this group finds an old form that still runs without a warning on NumPy 2.5.4, and
+Each rule in this group finds an old form that still runs without a warning on NumPy 2.5.5, and
 names the form that NumPy's docs prefer. The docs call the old form legacy, not recommended, or
 kept for backwards compatibility, or the newer form measured at least 1.5 times faster. A rule
 that states only a preference of the docs is info, and the rest are warnings. xpd skips the rules
@@ -4152,7 +4152,7 @@ The SciPy rules report code that raises or warns on SciPy 1.18.1, code that lose
 SciPy calls made once per value, in each file that imports `scipy`. The examples assume
 `import numpy as np`.
 
-Each word in a message stands for a measurement on SciPy 1.18.1 with NumPy 2.5.4:
+Each word in a message stands for a measurement on SciPy 1.18.1 with NumPy 2.5.5:
 
 | Word in the message | What was measured |
 | --- | --- |
@@ -4741,7 +4741,7 @@ at 1,000,000 values unless the rule says what the 1,000,000 counts.
 
 The rule reports a metric function of `scipy.spatial.distance`, such as `euclidean`, `cityblock`
 or `cosine`, called inside a comprehension, a generator or a loop body. On 1,000 by 1,000 points,
-`cdist` ran 960 to 9,600 times faster.
+`cdist` ran 960 to 2,100 times faster.
 
 Example:
 
@@ -4761,7 +4761,7 @@ D = distance.cdist(X, Y, "euclidean")
 
 The rule reports a metric function of `scipy.spatial.distance` passed to `cdist` or `pdist` as
 the metric, by position or as `metric=`. The name runs the same metric in C, and on 1,000 by
-1,000 points it ran 720 to 7,600 times faster.
+1,000 points it ran 1,100 to 2,100 times faster.
 
 Example:
 
@@ -4786,8 +4786,8 @@ are left alone.
 | Element of the comprehension | One call on the array was faster by |
 | --- | --- |
 | a `scipy.special` ufunc | 7 to 23 times |
-| a `scipy.stats` distribution method, such as `norm.cdf` | 34 to 1,045 times |
-| a distribution frozen from the loop name, such as `norm(m, 2.0).pdf(x)` | 4.9 to 23 times |
+| a `scipy.stats` distribution method, such as `norm.cdf` | 92 to 730 times |
+| a distribution frozen from the loop name, such as `norm(m, 2.0).pdf(x)` | 16 to 17 times |
 | `stats.scoreatpercentile(x, p)` over 1,000 percentiles, which sorts the data on every call | 2.1 to 3.2 times |
 
 Example:
@@ -4808,7 +4808,7 @@ p = stats.norm.cdf(x)
 
 The rule reports `tree.query(q)` inside a comprehension or a `for` loop, where `q` is the loop
 name or a row indexed by it, and `tree` comes from a `KDTree` or `cKDTree` call in the same
-function. For 1,000,000 points on a tree of 10,000, one query of all points ran 17 to 36 times
+function. For 1,000,000 points on a tree of 10,000, one query of all points ran 16 to 17 times
 faster.
 
 Example:
@@ -4857,7 +4857,7 @@ xs = [lu.solve(b) for b in sides]
 
 The rule reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`. The inverse of most
 sparse matrices is dense. On a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000
-values, `spsolve` ran 260 to 620 times faster.
+values, `spsolve` ran 260 to 270 times faster.
 
 Example:
 

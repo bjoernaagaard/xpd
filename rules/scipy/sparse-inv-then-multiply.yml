@@ -1,12 +1,13 @@
 # sparse.linalg.inv solves for every column of the identity and stores the whole inverse, which
-# is dense for most matrices. On a tridiagonal csc matrix spsolve ran 260 to 620 times faster with
+# is dense for most matrices. On a tridiagonal csc matrix spsolve ran 260 to 270 times faster with
 # n = 1,000, where the inverse holds 1,000,000 values, and 21 to 53 times with n = 32, on float64
-# and float32, in speed/runs/bench.jsonl and bench2.jsonl. Unsafe: the last bits differ, and
+# and float32, in speed/runs/bench.jsonl and bench2.jsonl. The n = 1,000 range is from a rerun on one idle core
+# with NumPy 2.5.5. Unsafe: the last bits differ, and
 # spsolve returns a 1-D result for a b of shape (n, 1).
 id: sparse-inv-then-multiply
 language: python
 severity: warning
-message: $L.inv($A) builds the whole inverse, which is dense for most sparse matrices. Write $L.spsolve($A, $B), which ran 260 to 620 times faster with an inverse of 1,000,000 values.
+message: $L.inv($A) builds the whole inverse, which is dense for most sparse matrices. Write $L.spsolve($A, $B), which ran 260 to 270 times faster with an inverse of 1,000,000 values.
 rule:
   any:
     - pattern: $L.inv($A) @ $B
@@ -64,7 +65,7 @@ utils:
 id: sparse-inv-then-multiply
 language: python
 severity: warning
-message: inv($A) builds the whole inverse, which is dense for most sparse matrices. Write spsolve($A, $B) from scipy.sparse.linalg, which ran 260 to 620 times faster with an inverse of 1,000,000 values.
+message: inv($A) builds the whole inverse, which is dense for most sparse matrices. Write spsolve($A, $B) from scipy.sparse.linalg, which ran 260 to 270 times faster with an inverse of 1,000,000 values.
 rule:
   any:
     - pattern: $F($A) @ $B
