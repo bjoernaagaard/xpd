@@ -2912,7 +2912,7 @@ Add the package to the project environment, not to xpd itself.
 
 The NumPy rules find code that gives a wrong result or raises on NumPy 2.5, and code that has a
 faster or more exact form. They run on files that import `numpy`, and examples assume
-`import numpy as np`. Every claim was run on NumPy 2.5.5, as the table shows.
+`import numpy as np`. Each claim in a message was measured on NumPy 2.5.5, and the table says what each claim means.
 
 | Claim | What it means on NumPy 2.5.5 |
 | --- | --- |
@@ -2921,10 +2921,11 @@ faster or more exact form. They run on files that import `numpy`, and examples a
 | a form is faster | the median of 7 runs on one core, at 1,000,000 values unless the rule says otherwise |
 
 A fix that writes `np.` applies only in a file with `import numpy as np`. A safe fix returns a
-value of the same dtype that is equal bit for bit, and an unsafe fix names what can differ.
+value of the same dtype that is equal bit for bit, and the **Fix:** line of an unsafe fix names
+what can differ.
 
 xpd skips a rule, or one form of a rule, that asks for an API newer than the NumPy in the
-project's venv. When the venv has no NumPy, or there is no venv, every rule runs.
+project's virtual environment (venv). When the venv has no NumPy, or there is no venv, every rule runs.
 
 | Rule | Runs on |
 | --- | --- |
@@ -2935,15 +2936,15 @@ project's venv. When the venv has no NumPy, or there is no venv, every rule runs
 
 ### Code that gives a wrong result or raises on NumPy 2.5
 
-Each rule in this group finds code that gives a wrong value without an error, or that raises on
-every input. Every fix in this group changes the result to the one the code meant, so each fix is
-unsafe, and the notes of each rule say what changes.
+Fix every report in the group, because the reported code gives a wrong value without an error,
+or raises on every input. Every fix in the group is unsafe, because it changes the result to the
+one the code meant.
 
 #### compare-to-nan
 
 **Severity:** error. **Fix:** unsafe: `np.isnan(x)`. `np.nan in np.unique(x)` has no fix.
 
-Reports `x == np.nan`, `x != np.nan`, `x == float("nan")`, `x == math.nan` and `np.nan in np.unique(x)`, which never find NaN, because NaN equals nothing.
+The rule reports `x == np.nan`, `x != np.nan`, `x == float("nan")`, `x == math.nan` and `np.nan in np.unique(x)`. None of them finds NaN, because NaN equals nothing.
 
 Example:
 
@@ -2963,7 +2964,7 @@ In a file that imports pandas, the pandas rule [`compare-to-missing`](#compare-t
 
 **Severity:** error. **Fix:** unsafe: `np.zeros((3, 4))`. The linspace form and a quantile call with more arguments have no fix.
 
-Reports `np.zeros(3, 4)`, `np.full(3, 4, 0)`, `np.reshape(a, 2, 3)`, `np.vstack(a, b)`, `np.concatenate(a, [4, 5])`, `np.random.rand((3, 4))`, `np.random.random(3, 4)`, `np.linspace(0, 1, 0.1)` and `np.quantile(x, 95)`, which raise, because an argument sits in the place of another parameter.
+The rule reports `np.zeros(3, 4)`, `np.full(3, 4, 0)`, `np.reshape(a, 2, 3)`, `np.vstack(a, b)`, `np.concatenate(a, [4, 5])`, `np.random.rand((3, 4))`, `np.random.random(3, 4)`, `np.linspace(0, 1, 0.1)` and `np.quantile(x, 95)`. Each call puts an argument in the place of another parameter, so it raises.
 
 Example:
 
@@ -2981,7 +2982,7 @@ grid = np.zeros((3, 4))
 
 **Severity:** warning. **Fix:** unsafe: `np.quantile(x, 0.95)`.
 
-Reports `np.percentile(x, 0.95)` and `np.percentile(x, [0.25, 0.75])`, which ask for percentiles near the minimum, because `np.percentile` takes percents from 0 to 100.
+The rule reports `np.percentile(x, 0.95)` and `np.percentile(x, [0.25, 0.75])`. `np.percentile` takes percents from 0 to 100, so both calls ask for values near the minimum.
 
 Example:
 
@@ -3001,7 +3002,7 @@ The rule leaves a list such as `[0.5, 99.5]` alone, where one number is a percen
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.isclose(a, b, 1e-3)` and `np.allclose(a, b, 1e-3)`, where the third argument is `rtol` and `atol` stays 1e-8.
+The rule reports `np.isclose(a, b, 1e-3)` and `np.allclose(a, b, 1e-3)`. The third argument sets `rtol`, and `atol` stays 1e-8.
 
 Example:
 
@@ -3015,13 +3016,13 @@ Use instead:
 same = np.isclose(a, b, atol=1e-3)
 ```
 
-The rule leaves a call alone that also passes `atol`, or that passes a value named like `rtol`. The replacement is advice. xpd does not apply it automatically.
+The rule leaves a call alone that also passes `atol`, or that passes a value named like `rtol`. xpd gives the replacement as advice and doesn't apply it.
 
 #### arange-float-step
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.arange(0, 1, 0.1)`, whose length depends on rounding, so `np.arange(1, 1.3, 0.1)` ends with 1.3000000000000003. The [NumPy docs for arange](https://numpy.org/doc/stable/reference/generated/numpy.arange.html) recommend `np.linspace` for a step that is not whole.
+The rule reports `np.arange(0, 1, 0.1)`, whose length depends on rounding. For example, `np.arange(1, 1.3, 0.1)` ends with 1.3000000000000003. The [NumPy docs for arange](https://numpy.org/doc/stable/reference/generated/numpy.arange.html) recommend `np.linspace` for a step that is not whole.
 
 Example:
 
@@ -3035,13 +3036,13 @@ Use instead:
 ticks = np.linspace(0, 0.9, 10)
 ```
 
-The rule leaves a step alone that is a multiple of 1/64, such as 0.5 or 0.25, because such a step is exact. The replacement is advice. xpd does not apply it automatically.
+The rule leaves a step alone that is a multiple of 1/64, such as 0.5 or 0.25, because such a step is exact. xpd gives the replacement as advice and doesn't apply it.
 
 #### randint-single-value
 
 **Severity:** error. **Fix:** none.
 
-Reports `np.random.randint(0, 1, n)`, `np.random.randint(1)` and `rng.integers(0, 1)`, which always return 0, because the upper bound is excluded.
+The rule reports `np.random.randint(0, 1, n)`, `np.random.randint(1)` and `rng.integers(0, 1)`. Each call always returns 0, because the upper bound is excluded.
 
 Example:
 
@@ -3055,13 +3056,13 @@ Use instead:
 coin = rng.integers(0, 2, size=10)
 ```
 
-The replacement is advice. xpd does not apply it automatically.
+xpd gives the replacement as advice and doesn't apply it.
 
 #### result-is-none
 
 **Severity:** error. **Fix:** unsafe: `x.sort()`. A result assigned to another name, or returned, has no fix.
 
-Reports `x = x.sort()`, `m = np.fill_diagonal(m, 0)`, `y = rng.shuffle(y)`, `w = w.fill(0)` and `return v.sort()`, which set the name to None, because the calls change the array in place and return None.
+The rule reports `x = x.sort()`, `m = np.fill_diagonal(m, 0)`, `y = rng.shuffle(y)`, `w = w.fill(0)` and `return v.sort()`. The calls change the array in place and return None, so the code gets None in place of the array.
 
 Example:
 
@@ -3081,7 +3082,7 @@ The rule leaves a sort alone that has an argument other than an axis, such as `x
 
 **Severity:** error. **Fix:** unsafe: `x = np.sort(x)`.
 
-Reports `np.sort(x)`, `np.append(x, 4)`, `np.clip(x, 0, 1)`, `x.astype(float)` and `m.reshape(3, 2)` standing alone as a statement, which do nothing, because they return a new array and the code drops it.
+The rule reports `np.sort(x)`, `np.append(x, 4)`, `np.clip(x, 0, 1)`, `x.astype(float)` and `m.reshape(3, 2)` standing alone as a statement. Each call returns a new array that the code drops, so the statement does nothing.
 
 Example:
 
@@ -3095,13 +3096,13 @@ Use instead:
 lengths = np.append(lengths, 1)
 ```
 
-The rule leaves alone a call with `out=`, a call in a `try` block or in a `with pytest.raises` block, and a call in an asv benchmark method. After the fix, other names bound to the old array keep its old values.
+The rule leaves alone a call with `out=`, a call in a `try` block or in a `with pytest.raises` block, and a call in a benchmark method of asv (airspeed velocity). After the fix, other names bound to the old array keep its old values.
 
 #### write-to-copy
 
 **Severity:** error. **Fix:** none.
 
-Reports `x[x > 2][0] = v`, `x[[0, 1]][0] = v`, `m.flatten()[0] = v` and `x.astype(int)[0] = v`, which write to a copy, so the array keeps its old values.
+The rule reports `x[x > 2][0] = v`, `x[[0, 1]][0] = v`, `m.flatten()[0] = v` and `x.astype(int)[0] = v`. Each one writes to a copy, so the array keeps its old values.
 
 Example:
 
@@ -3115,13 +3116,13 @@ Use instead:
 x[np.flatnonzero(x > 2)[0]] = -1
 ```
 
-The rule leaves `x[1:4][0] = v` and `m[0][mask] = v` alone, because a slice or a whole number returns a view. The replacement is advice. xpd does not apply it automatically.
+The rule leaves `x[1:4][0] = v` and `m[0][mask] = v` alone, because indexing with a slice or a whole number returns a view. xpd gives the replacement as advice and doesn't apply it.
 
 #### array-truth-value
 
 **Severity:** error. **Fix:** none.
 
-Reports `x[(x > 2) and (x < 8)]`, `x[not (x > 2)]` and `x[2 < x < 8]`, which raise ValueError, because `and`, `or`, `not` and a chained comparison ask for the truth of a whole array.
+The rule reports `x[(x > 2) and (x < 8)]`, `x[not (x > 2)]` and `x[2 < x < 8]`. Each one raises ValueError, because `and`, `or`, `not` and a chained comparison ask for the truth value of a whole array.
 
 Example:
 
@@ -3135,13 +3136,13 @@ Use instead:
 inside = x[(x > 2) & (x < 8)]
 ```
 
-The replacement is advice. xpd does not apply it automatically.
+xpd gives the replacement as advice and doesn't apply it.
 
 #### mask-operator-precedence
 
 **Severity:** error. **Fix:** none.
 
-Reports `x > 2 & x < 8`, where Python applies `&` before the comparisons, so it compares `x` with `2 & x`.
+The rule reports `x > 2 & x < 8`. Python applies `&` before the comparisons, so the code compares `x` with `2 & x`.
 
 Example:
 
@@ -3155,13 +3156,13 @@ Use instead:
 inside = x[(x > 2) & (x < 8)]
 ```
 
-In a file that imports pandas, the pandas rule [`mask-precedence`](#mask-precedence) reports the code instead. The replacement is advice. xpd does not apply it automatically.
+In a file that imports pandas, the pandas rule [`mask-precedence`](#mask-precedence) reports the code instead. xpd gives the replacement as advice and doesn't apply it.
 
 #### int-mask-as-index
 
 **Severity:** error. **Fix:** unsafe: `y[y > 15]`. The `~` form has no fix.
 
-Reports `y[(y > 15).astype(int)]`, which picks element 0 and element 1 over and over, and `~(y > 15).astype(int)`, which gives -1 and -2.
+The rule reports `y[(y > 15).astype(int)]`, which picks element 0 and element 1 over and over. It also reports `~(y > 15).astype(int)`, which gives -1 and -2.
 
 Example:
 
@@ -3175,13 +3176,13 @@ Use instead:
 large = y[y > 15]
 ```
 
-The rule leaves a lookup alone such as `labels[(score > t).astype(int)]`, where the mask comes from another array, because it maps each value to one of two labels.
+The rule leaves alone a lookup such as `labels[(score > t).astype(int)]`, where the mask comes from another array. Such a lookup maps each value to one of two labels.
 
 #### iterator-to-array
 
 **Severity:** error. **Fix:** unsafe: `np.array([v * 2 for v in y])`. A set has no fix.
 
-Reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy doesn't read the values out of an iterator. The table shows what each call returned on NumPy 2.5.5.
+The rule reports `np.array(v * 2 for v in y)`, `np.array(map(float, y))`, `np.array(d.values())`, `np.array({1, 2})`, `np.max(v for v in y)` and `np.sum(map(f, y))`, because NumPy doesn't read the values out of an iterator. The table shows what each call returned on NumPy 2.5.5.
 
 | Call on a generator | Result |
 | --- | --- |
@@ -3208,7 +3209,7 @@ The rule leaves `np.fromiter` alone, because it reads the values out of an itera
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.where(m, x, np.nan).astype(int)`, which turns each NaN into -9223372036854775808.
+The rule reports `np.where(m, x, np.nan).astype(int)`, which turns each NaN into -9223372036854775808.
 
 Example:
 
@@ -3222,13 +3223,13 @@ Use instead:
 counts = np.where(seen, totals, 0).astype(int)
 ```
 
-The replacement is advice. xpd does not apply it automatically.
+xpd gives the replacement as advice and doesn't apply it.
 
 #### read-uninitialized
 
 **Severity:** error. **Fix:** none.
 
-Reports `np.empty(n).sum()` and `np.empty_like(x) + 1`, which compute with whatever bytes were in memory.
+The rule reports `np.empty(n).sum()` and `np.empty_like(x) + 1`, which compute with whatever bytes were in memory.
 
 Example:
 
@@ -3242,13 +3243,13 @@ Use instead:
 total = np.zeros(n) + offset
 ```
 
-The rule leaves `np.empty(n) * np.nan` alone, because it gives NaN everywhere. The replacement is advice. xpd does not apply it automatically.
+The rule leaves `np.empty(n) * np.nan` alone, because it gives NaN everywhere. xpd gives the replacement as advice and doesn't apply it.
 
 #### array-default-argument
 
 **Severity:** warning. **Fix:** none.
 
-Reports `def f(acc=np.zeros(2))` when the function writes into `acc`, because every call shares the one default array.
+The rule reports `def f(acc=np.zeros(2))` when the function writes into `acc`, because every call shares the one default array.
 
 Example:
 
@@ -3267,13 +3268,13 @@ def add_one(acc=None):
     return acc
 ```
 
-The replacement is advice. xpd does not apply it automatically.
+xpd gives the replacement as advice and doesn't apply it.
 
 #### append-flattens
 
 **Severity:** error. **Fix:** none.
 
-Reports `np.append(m, [[5, 5]])` and `np.insert(m, 0, [[5, 5]])` without `axis`, which flatten the array, so the row becomes separate values in one dimension.
+The rule reports `np.append(m, [[5, 5]])` and `np.insert(m, 0, [[5, 5]])` without `axis`. Both calls flatten the array, so the row becomes separate values in one dimension.
 
 Example:
 
@@ -3287,13 +3288,13 @@ Use instead:
 grown = np.append(m, [[5, 5]], axis=0)
 ```
 
-The replacement is advice. xpd does not apply it automatically.
+xpd gives the replacement as advice and doesn't apply it.
 
 #### compare-reductions
 
 **Severity:** error. **Fix:** unsafe: `np.array_equal(a, b)`.
 
-Reports `a.all() == b.all()` and `np.any(a) == np.any(b)`, which compare two single booleans and not the arrays.
+The rule reports `a.all() == b.all()` and `np.any(a) == np.any(b)`, which compare two single booleans and not the arrays.
 
 Example:
 
@@ -3311,7 +3312,7 @@ assert np.array_equal(a, b)
 
 **Severity:** error. **Fix:** unsafe: `np.count_nonzero(z > 0)`.
 
-Reports `len(np.where(z > 0))`, `len(np.nonzero(z))` and `if np.where(z > 9):`, because `np.where` with one argument returns a tuple with one array per dimension. The length of the tuple is the number of dimensions, and the tuple is always true.
+The rule reports `len(np.where(z > 0))`, `len(np.nonzero(z))` and `if np.where(z > 9):`, because `np.where` with one argument returns a tuple with one array per dimension. The length of the tuple is the number of dimensions, and the tuple is always true.
 
 Example:
 
@@ -3327,14 +3328,14 @@ matches = np.count_nonzero(z > 0)
 
 ### Code that raises or warns on NumPy 2.5
 
-Each rule in this group finds a name, method, module or keyword that NumPy removed or deprecated,
-and names what to write instead.
+Replace each name, method, module or keyword that NumPy removed or deprecated with the form that
+the rule's message names, because the old form raises or warns on NumPy 2.5.
 
 #### removed-in-numpy-2
 
 **Severity:** error. **Fix:** safe: the builtin for `np.int`, `np.float`, `np.complex`, `np.object`, `np.str` and `np.unicode`, `np.float64` for `np.float_` and the other scalar aliases, `np.nan` and `np.inf` for `np.NaN`, `np.Inf` and their kin, `np.prod`, `np.cumprod`, `np.any`, `np.all`, `np.round` and `np.vstack` for the renamed functions, `np.exceptions.AxisError` and the other warnings and errors, `np.trapezoid`, `np.sort(a, axis=0)`, `a.item()`, `np.pad` for `np.lib.pad` and the other functions that `np.lib` re-exported, a shape by position for `newshape=`, `method=` for `interpolation=` and `minlength=0`. unsafe: `"S"` for the dtype code `"a"`, because a `dtype=` keyword of another library can give the text another meaning, deleting `fix_imports=`, `bias=` and `ddof=`, because a call in the deleted value no longer runs, `np.ptp(a)`, `a.tobytes()` and `a[i, j] = v` for `a.itemset`, because the pattern cannot tell an array from another object with a method of that name, `np.isin` for `np.in1d`, `density=` for `normed=`, `np.asarray` for `np.array(x, copy=False)`, `np.frombuffer` for `np.fromstring`, deleting `style=`, and the module path for `numpy.linalg.linalg`, `numpy.fft.helper`, `numpy.testing.utils` and the private modules of `numpy.lib`. The other forms have no fix.
 
-Reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, each with what to write instead. The rule leaves code alone under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches ImportError or AttributeError, because the code exists for old NumPy.
+The rule reports the names, methods, modules and keywords that NumPy 1.24 through 2.5 removed, and its message says what to write instead. The rule leaves alone code under a NumPy version check, a `hasattr(np, ...)` check, or a `try` that catches ImportError or AttributeError. Such code exists to support old NumPy.
 
 Example:
 
@@ -3358,7 +3359,14 @@ warning = np.exceptions.ComplexWarning
 
 **Severity:** warning. **Fix:** safe: `np.trunc` for `np.fix`, `np.ma.round` for `np.ma.round_`, `out=` for an output passed by position to `np.maximum` and `np.minimum`, and a datetime64 string without its `Z`. unsafe: `np.rec` and `np.char` for `np.core.records` and `np.core.defchararray`, which export fewer names, `np.<name>` for `np.core.<name>`, `randint(low, high + 1)` for `random_integers(low, high)`, with or without a size, `x = x.reshape(shape)` for `x.shape = shape`, and `x = x.view(dtype)` for `x.dtype = dtype`. The other forms have no fix.
 
-Reports `numpy.core`, `np.typename`, `np.char.array`, `np.char.asarray` and `np.char.chararray`, `np.testing.assert_warns` and `suppress_warnings`, a timedelta64 without a unit, a time zone in a datetime64 string, `fftn` and its kin with `s=` and no `axes=`, and setting `shape`, `dtype` or `strides` on a name bound from an `np.` call in the same function. Each warns on NumPy 2.5.
+The rule reports the forms in the table, and each of them warns on NumPy 2.5.
+
+| Kind | Reported form |
+| --- | --- |
+| Modules and names | `numpy.core`, `np.typename`, `np.char.array`, `np.char.asarray` and `np.char.chararray` |
+| Testing helpers | `np.testing.assert_warns` and `suppress_warnings` |
+| Dates and times | a timedelta64 without a unit, and a time zone in a datetime64 string |
+| Calls and attributes | `fftn` and its kin with `s=` and no `axes=`, and setting `shape`, `dtype` or `strides` on a name bound from an `np.` call in the same function |
 
 Example:
 
@@ -3382,10 +3390,10 @@ grid = grid.reshape((2, 3))
 
 ### Python work per value on arrays
 
-Each rule in this group finds code that calls Python once per value, or that copies the whole
-array once per pass, and the message of each rule names the whole array form. The table shows the
-speed that each message reports, as medians of 7 runs on one core with NumPy 2.5.5, on float64
-and int64.
+Write one expression on whole arrays in place of code that calls Python once per value or copies
+the whole array once per pass, because the whole array form ran up to 530 times faster. The
+message of each rule names the whole array form. The table shows the speed that the message
+reports, as medians of 7 runs on one core with NumPy 2.5.5, on float64 and int64.
 
 | Rule | Write instead | Faster by |
 | --- | --- | --- |
@@ -3399,7 +3407,7 @@ and int64.
 
 **Severity:** warning. **Fix:** none.
 
-Reports a `for` loop over `range`, `np.arange` or `np.ndindex`, and a `while i < n` loop with `i += 1`, whose only statement writes one element of a NumPy array from arithmetic on the loop position. It also reports a loop over `np.nditer` or `np.ndenumerate` without `external_loop`. The rule leaves a loop alone whose body calls another function, reads the array it writes, or writes a slice.
+The rule reports a `for` loop over `range`, `np.arange` or `np.ndindex`, and a `while i < n` loop with `i += 1`, when the loop's only statement writes one element of a NumPy array from arithmetic on the loop position. It also reports a loop over `np.nditer` or `np.ndenumerate` without `external_loop`. The rule leaves a loop alone whose body calls another function, reads the array it writes, or writes a slice.
 
 Example:
 
@@ -3419,7 +3427,7 @@ out = a * 2 + np.sqrt(b)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `out = np.append(out, x)`, `out = np.concatenate((out, x))` and the same with `vstack`, `hstack`, `column_stack`, `dstack` and `stack` inside a loop, when the loop doesn't reset `out` or read it elsewhere, because each call copies every earlier value.
+The rule reports `out = np.append(out, x)`, `out = np.concatenate((out, x))` and the same with `vstack`, `hstack`, `column_stack`, `dstack` and `stack` inside a loop that doesn't reset `out` or read it elsewhere. Each call copies every earlier value.
 
 Example:
 
@@ -3439,7 +3447,7 @@ out = np.concatenate(parts)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.array([x * 2 + 1 for x in a])`, `np.array([math.sqrt(x) for x in a])`, `np.array([i * 0.5 for i in range(n)])` and `map(np.sqrt, a)`, where the element is arithmetic or a NumPy or math function on the loop variable.
+The rule reports `np.array([x * 2 + 1 for x in a])`, `np.array([math.sqrt(x) for x in a])`, `np.array([i * 0.5 for i in range(n)])` and `map(np.sqrt, a)`, where the element is arithmetic or a NumPy or math function on the loop variable.
 
 Example:
 
@@ -3457,7 +3465,7 @@ roots = np.sqrt(np.asarray(values))
 
 **Severity:** warning. **Fix:** unsafe: `np.abs(a).sum(axis=0)`, `np.abs(a).max(axis=0)`. `sorted` and `list` have no fix.
 
-Reports `sum`, `min`, `max`, `sorted` and `list` around a NumPy call, as in `sum(np.abs(a))`, or around a comparison of one, as in `sum(np.abs(a) > 1)`.
+The rule reports `sum`, `min`, `max`, `sorted` and `list` around a NumPy call, as in `sum(np.abs(a))`, or around a comparison with a NumPy call, as in `sum(np.abs(a) > 1)`.
 
 Example:
 
@@ -3475,7 +3483,7 @@ peak = np.abs(signal).max(axis=0)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.vectorize`, `np.frompyfunc` and `np.apply_along_axis`, called or used as a decorator.
+The rule reports `np.vectorize`, `np.frompyfunc` and `np.apply_along_axis`, whether called or used as a decorator.
 
 Example:
 
@@ -3494,9 +3502,9 @@ def clipped(x):
 
 ### Arrays built, copied and stored the slow way
 
-Each rule in this group finds an array that the code builds, copies or stores in a slower way
-than NumPy offers. The table shows the speed that the message of each rule reports, on 1,000,000
-values.
+Build, copy and store each array with the NumPy function that the rule names, because it ran 1.6
+to 880 times faster on 1,000,000 values. The table shows the speed that the message of each rule
+reports.
 
 | Rule | Write instead | Faster by |
 | --- | --- | --- |
@@ -3508,7 +3516,7 @@ values.
 
 **Severity:** warning. **Fix:** safe: `np.zeros(n, dtype=np.float32)`. unsafe: `np.full(n, 3, dtype=np.float64)`, which gives a zero dimensional array where the product of an empty shape gave a scalar, `np.arange(n)`, `np.full(n, 0)`, `np.arange(n, dtype=float)`.
 
-Reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`, which build the values once and then build them again, or build a Python int for every value.
+The rule reports `np.array(range(n))`, `np.array([0] * n)`, `np.ones(n) * 3`, `np.zeros(n).astype(np.float32)` and `np.arange(n).astype(float)`. Each one builds the values twice, or builds a Python int for every value.
 
 Example:
 
@@ -3526,7 +3534,7 @@ weights = np.full(n, 0.5, dtype=np.float64)
 
 **Severity:** warning. **Fix:** unsafe: `np.abs(m).ravel()`, `x.astype(np.float32)`, `np.array(x)`. ravel can return a view of an output array that was passed by position, and the other two can change the memory order.
 
-Reports `.flatten()` on the result of a NumPy call that returns a new array, `x.copy().astype(t)` and `np.array(x).copy()`, which copy an array that is already new.
+The rule reports `.flatten()` on the result of a NumPy call that returns a new array, `x.copy().astype(t)` and `np.array(x).copy()`. Each one copies an array that is already a new copy.
 
 Example:
 
@@ -3544,7 +3552,7 @@ flat = np.concatenate([a, b]).ravel()
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.loadtxt(f)` and `np.genfromtxt(f)` in a file that also calls `np.savetxt(f, ...)`, and `np.fromfile(f)` in a file that also calls `x.tofile(f)`, with the same file argument. `np.save` and `np.load` keep the dtype and the shape.
+The rule reports `np.loadtxt(f)` and `np.genfromtxt(f)` in a file that also calls `np.savetxt(f, ...)`, and `np.fromfile(f)` in a file that also calls `x.tofile(f)`, with the same file argument. `np.save` and `np.load` keep the dtype and the shape.
 
 Example:
 
@@ -3560,12 +3568,12 @@ np.save("cache.npy", data)
 data = np.load("cache.npy")
 ```
 
-### Whole-array math with a faster or more exact function
+### Math on whole arrays with a faster or more exact function
 
-Each rule in this group names the NumPy function that does the same work without a full sort, a
-temporary array or a step that loses digits, and every rule is a warning. The table shows the
-speed that the message of each rule reports, measured on one core with BLAS and LAPACK on one
-thread and NumPy 2.5.5. The other rules in the group give a more exact result and have no
+Call the NumPy function that each rule names, because it does the same work without a full sort,
+a temporary array or a step that loses digits. Every rule in the group is a warning. The table
+shows the speed that the message of each rule reports, measured with NumPy 2.5.5 on one core,
+with BLAS and LAPACK, the linear algebra libraries that NumPy calls, on one thread. The other rules in the group give a more exact result and have no
 measured speed.
 
 | Rule | Reported form | Size |
@@ -3579,7 +3587,7 @@ measured speed.
 | [`norm-by-hand`](#norm-by-hand) | 3.9 times slower than `np.linalg.norm` | 1,000,000 values |
 | [`vecdot`](#vecdot) | 2 to 3.5 times slower than `np.vecdot` | 1,000,000 values |
 | [`inv-then-multiply`](#inv-then-multiply) | 3.8 times slower than `np.linalg.solve` for a vector | a 1,000 by 1,000 matrix |
-| [`eig-on-symmetric`](#eig-on-symmetric) | 3.6 times slower than `np.linalg.eigh` | not stated |
+| [`eig-on-symmetric`](#eig-on-symmetric) | 3.6 times slower than `np.linalg.eigh` | a 1,000 by 1,000 matrix |
 | [`matmul-diagonal`](#matmul-diagonal) | 34 times slower than `np.einsum` | 1,000 by 1,000 matrices |
 | [`einsum-optimize`](#einsum-optimize) | 339 times slower than `optimize=True` | three 100 by 100 matrices |
 
@@ -3587,7 +3595,7 @@ measured speed.
 
 **Severity:** warning. **Fix:** unsafe: `np.min(x)`, `np.max(x)`, `np.sort(np.partition(x, 5)[:5])`, `np.sort(np.partition(x, -5)[-5:])`, `np.sort(x)`, `np.argmin(x)`, `np.argmax(x)`. The positions of the k smallest or largest and the rank by a double argsort have no fix.
 
-Reports `np.sort(x)[0]`, `np.sort(x)[-1]`, `np.sort(x)[:5]`, `np.sort(x)[-5:]`, `np.sort(x)[::-1][:5]`, `x[np.argsort(x)]`, `np.argsort(x)[0]`, `np.argsort(x)[-1]`, `np.argsort(x)[:5]`, `np.argsort(x)[-5:]` and `np.argsort(np.argsort(x))`, with a literal count under 100.
+The rule reports `np.sort(x)[0]`, `np.sort(x)[-1]`, `np.sort(x)[:5]`, `np.sort(x)[-5:]`, `np.sort(x)[::-1][:5]`, `x[np.argsort(x)]`, `np.argsort(x)[0]`, `np.argsort(x)[-1]`, `np.argsort(x)[:5]`, `np.argsort(x)[-5:]` and `np.argsort(np.argsort(x))`, with a literal count under 100.
 
 Example:
 
@@ -3605,7 +3613,7 @@ top = np.sort(np.partition(scores, -5)[-5:])
 
 **Severity:** warning. **Fix:** safe: `np.any(x > 2)`. unsafe: `np.count_nonzero(x > 0)`. `len(x[x > 0])` has no fix.
 
-Reports `np.sum(x > 0)`, `len(np.where(c)[0])`, `len(np.nonzero(c)[0])`, `len(np.flatnonzero(c))`, `len(x[x > 0])` and `np.sum(x > 2) > 0`.
+The rule reports `np.sum(x > 0)`, `len(np.where(c)[0])`, `len(np.nonzero(c)[0])`, `len(np.flatnonzero(c))`, `len(x[x > 0])` and `np.sum(x > 2) > 0`.
 
 Example:
 
@@ -3623,7 +3631,7 @@ changed = np.count_nonzero(before != after)
 
 **Severity:** warning. **Fix:** unsafe: `np.asarray(x > 0)`, `np.asarray(x > 0, dtype=int)`, `np.maximum(x, 0)`, `np.flatnonzero(x > 1)`.
 
-Reports `np.where(x > 0, True, False)`, `np.where(x > 0, 1, 0)`, `np.where(x > 0, x, 0)`, `np.where(x < 0, 0, x)` and `np.arange(len(x))[x > 1]`.
+The rule reports `np.where(x > 0, True, False)`, `np.where(x > 0, 1, 0)`, `np.where(x > 0, x, 0)`, `np.where(x < 0, 0, x)` and `np.arange(len(x))[x > 1]`.
 
 Example:
 
@@ -3641,7 +3649,7 @@ relu = np.maximum(z, 0)
 
 **Severity:** warning. **Fix:** unsafe: `np.expm1(x)`, `-np.expm1(x)`, `np.log1p(x)`, `np.log1p(-p)`.
 
-Reports `np.exp(x) - 1`, `1 - np.exp(x)`, `np.log(1 + x)`, `np.log(x + 1)` and `np.log(1 - p)`, but not on a number literal.
+The rule reports `np.exp(x) - 1`, `1 - np.exp(x)`, `np.log(1 + x)`, `np.log(x + 1)` and `np.log(1 - p)`, but not on a number literal.
 
 Example:
 
@@ -3659,7 +3667,7 @@ log_survival = np.log1p(-p)
 
 **Severity:** warning. **Fix:** unsafe: `np.logaddexp(a, b)`, `np.logaddexp(0, x)`. The log of a sum of exponentials and the softmax have no fix.
 
-Reports `np.log(np.exp(a) + np.exp(b))`, `np.log(1 + np.exp(x))`, `np.log1p(np.exp(x))`, `np.log(np.sum(np.exp(x)))` and `np.exp(x) / np.sum(np.exp(x))`.
+The rule reports `np.log(np.exp(a) + np.exp(b))`, `np.log(1 + np.exp(x))`, `np.log1p(np.exp(x))`, `np.log(np.sum(np.exp(x)))` and `np.exp(x) / np.sum(np.exp(x))`.
 
 Example:
 
@@ -3677,7 +3685,7 @@ softplus = np.logaddexp(0, z)
 
 **Severity:** warning. **Fix:** unsafe: `np.sum(np.log(x))`.
 
-Reports `np.log(np.prod(x))`.
+The rule reports `np.log(np.prod(x))`.
 
 Example:
 
@@ -3695,7 +3703,7 @@ log_likelihood = np.sum(np.log(probabilities))
 
 **Severity:** warning. **Fix:** unsafe: `np.sum(x)`, `np.prod(x)`.
 
-Reports `np.cumsum(x)[-1]` and `np.cumprod(x)[-1]`.
+The rule reports `np.cumsum(x)[-1]` and `np.cumprod(x)[-1]`.
 
 Example:
 
@@ -3713,7 +3721,7 @@ total = np.sum(amounts)
 
 **Severity:** warning. **Fix:** unsafe: `np.sqrt(x)`.
 
-Reports `np.power(x, 0.5)`.
+The rule reports `np.power(x, 0.5)`.
 
 Example:
 
@@ -3731,7 +3739,7 @@ root = np.sqrt(area)
 
 **Severity:** warning. **Fix:** unsafe: `np.vdot(a, b)`, `np.vdot(x, x)`. The mean of squared differences has no fix.
 
-Reports `np.sum(a * b)`, `np.sum(x ** 2)`, `np.sum(np.square(x))` and `np.mean((a - b) ** 2)`, but not when an operand is a number, a comparison, a conjugate or a new axis.
+The rule reports `np.sum(a * b)`, `np.sum(x ** 2)`, `np.sum(np.square(x))` and `np.mean((a - b) ** 2)`, but not when an operand is a number, a comparison, a conjugate or a new axis.
 
 Example:
 
@@ -3749,7 +3757,7 @@ energy = np.vdot(signal, signal)
 
 **Severity:** warning. **Fix:** unsafe: `np.linalg.norm(x)`.
 
-Reports `np.sqrt(np.sum(x ** 2))`, `np.sqrt(np.sum(x * x))`, `np.sqrt(np.sum(np.square(x)))`, `np.sqrt((x ** 2).sum())` and `np.sqrt((x * x).sum())`.
+The rule reports `np.sqrt(np.sum(x ** 2))`, `np.sqrt(np.sum(x * x))`, `np.sqrt(np.sum(np.square(x)))`, `np.sqrt((x ** 2).sum())` and `np.sqrt((x * x).sum())`.
 
 Example:
 
@@ -3767,7 +3775,7 @@ distance = np.linalg.norm(a - b)
 
 **Severity:** warning. **Fix:** unsafe: `np.vecdot(x, x)` and `np.vecdot(a, b)`. Floats can differ in the last bits, int8 products can wrap where `np.sum` counted in int64, two bool arrays give bool, and vecdot conjugates a complex first argument. Needs NumPy 2.0.
 
-Reports `np.sum(x ** 2, axis=-1)` and `np.sum(np.square(x), axis=-1)`. It also reports `np.sum(a * b, axis=-1)` and `np.sum(a.conj() * b, axis=-1)` where `a` and `b` are names or subscripts. `np.vecdot` multiplies and sums in one pass without the temporary array, and ran 2 to 3.5 times faster on 1,000,000 values.
+The rule reports `np.sum(x ** 2, axis=-1)` and `np.sum(np.square(x), axis=-1)`. It also reports `np.sum(a * b, axis=-1)` and `np.sum(a.conj() * b, axis=-1)` where `a` and `b` are names or subscripts. `np.vecdot` multiplies and sums in one pass without the temporary array, and ran 2 to 3.5 times faster on 1,000,000 values.
 
 Example:
 
@@ -3785,7 +3793,7 @@ squared_length = np.vecdot(points, points)
 
 **Severity:** warning. **Fix:** unsafe: `np.linalg.solve(a, b)`, `np.linalg.solve(a, b @ c)`.
 
-Reports `np.linalg.inv(a) @ b`, `np.linalg.inv(a).dot(b)`, `np.dot(np.linalg.inv(a), b)` and `np.linalg.inv(a) @ b @ c`, as in the normal equations.
+The rule reports `np.linalg.inv(a) @ b`, `np.linalg.inv(a).dot(b)`, `np.dot(np.linalg.inv(a), b)` and `np.linalg.inv(a) @ b @ c`, as in the normal equations.
 
 Example:
 
@@ -3803,7 +3811,7 @@ beta = np.linalg.solve(X.T @ X, X.T @ y)
 
 **Severity:** warning. **Fix:** unsafe: `np.linalg.slogdet(a).logabsdet`. Needs NumPy 2.0.
 
-Reports `np.log(np.linalg.det(a))` and `np.log(np.abs(np.linalg.det(a)))`.
+The rule reports `np.log(np.linalg.det(a))` and `np.log(np.abs(np.linalg.det(a)))`.
 
 Example:
 
@@ -3821,7 +3829,7 @@ log_det = np.linalg.slogdet(cov).logabsdet
 
 **Severity:** warning. **Fix:** unsafe: `np.linalg.eigh(m)`, `np.linalg.eigvalsh(m)`.
 
-Reports `np.linalg.eig` and `np.linalg.eigvals` on a matrix the code made symmetric: `x @ x.T`, `x.T @ x`, `np.dot(x, x.T)`, `np.dot(x.T, x)`, `a + a.T`, `np.cov(...)` and `np.corrcoef(...)`.
+The rule reports `np.linalg.eig` and `np.linalg.eigvals` on a matrix the code made symmetric: `x @ x.T`, `x.T @ x`, `np.dot(x, x.T)`, `np.dot(x.T, x)`, `a + a.T`, `np.cov(...)` and `np.corrcoef(...)`.
 
 Example:
 
@@ -3839,7 +3847,7 @@ values, vectors = np.linalg.eigh(np.cov(data, rowvar=False))
 
 **Severity:** warning. **Fix:** unsafe: `np.einsum("ij,ji->i", a, b)`, `np.einsum("ij,ij->i", a, b)`, `np.einsum("ij,ji->", a, b)`.
 
-Reports `np.diag(a @ b)`, `np.diag(np.dot(a, b))`, `np.diagonal(a @ b)`, `np.diag(a @ b.T)`, `np.trace(a @ b)` and `np.trace(np.dot(a, b))`.
+The rule reports `np.diag(a @ b)`, `np.diag(np.dot(a, b))`, `np.diagonal(a @ b)`, `np.diag(a @ b.T)`, `np.trace(a @ b)` and `np.trace(np.dot(a, b))`.
 
 Example:
 
@@ -3857,7 +3865,7 @@ leverage = np.einsum("ij,ij->i", X @ cov, X)
 
 **Severity:** warning. **Fix:** unsafe: add `optimize=True`.
 
-Reports `np.einsum` with three or more 2-D operands and a 2-D result, such as `"ij,jk,kl->il"`, and no `optimize=`.
+The rule reports `np.einsum` with three or more 2-D operands and a 2-D result, such as `"ij,jk,kl->il"`, and no `optimize=`.
 
 Example:
 
@@ -3873,17 +3881,23 @@ chain = np.einsum("ij,jk,kl->il", a, b, c, optimize=True)
 
 ### The API that NumPy's docs prefer on NumPy 2.5
 
-Each rule in this group finds an old form that still runs without a warning on NumPy 2.5.5, and
-names the form that NumPy's docs prefer. The docs call the old form legacy, not recommended, or
-kept for backwards compatibility, or the newer form measured at least 1.5 times faster. A rule
-that states only a preference of the docs is info, and the rest are warnings. xpd skips the rules
-that name an API added in NumPy 2.0 on an older NumPy.
+Write the form that NumPy's docs prefer in place of each old form that the rules report, although
+the old form still runs without a warning on NumPy 2.5.5. A rule reports an old form when NumPy's
+docs call it legacy, not recommended or kept for backwards compatibility, or when the newer form
+ran at least 1.5 times faster. A rule that states only a preference of the docs is info, and the
+rest are warnings, as the table shows. xpd skips the rules that name an API added in NumPy 2.0 on
+an older NumPy.
+
+| Severity | Rules |
+| --- | --- |
+| warning | [`legacy-random`](#legacy-random), [`rng-in-loop`](#rng-in-loop), [`clock-seed`](#clock-seed) and [`unpackbits-popcount`](#unpackbits-popcount) |
+| info | the other 10 rules of the group |
 
 #### legacy-random
 
 **Severity:** warning. **Fix:** none. A Generator draws a different stream from the same seed, and `np.random.seed` elsewhere would no longer reach the rewritten call.
 
-Reports `np.random.seed`, `np.random.rand`, `np.random.randint`, `np.random.randn`, `np.random.choice`, every other distribution function in `np.random`, `np.random.get_state`, `np.random.RandomState(...)` outside files that import scikit-learn, and imports of these names from `numpy.random`. The message gives the Generator method, such as `integers` for `randint`, and its measured speed where it was at least 1.5 times faster, as the table shows.
+The rule reports `np.random.seed`, `np.random.rand`, `np.random.randint`, `np.random.randn`, `np.random.choice`, every other distribution function in `np.random`, `np.random.get_state`, `np.random.RandomState(...)` outside files that import scikit-learn, and imports of the same names from `numpy.random`. The message names the Generator method, such as `integers` for `randint`. When the method ran at least 1.5 times faster, the message also gives the speedup in the table.
 
 | Generator method | Faster by |
 | --- | --- |
@@ -3910,7 +3924,7 @@ idx = rng.choice(len(x), 100, replace=False)
 
 **Severity:** warning. **Fix:** none.
 
-Reports `np.random.default_rng()` without a seed inside a `for` or `while` body or a comprehension. Each call gathers entropy from the operating system, which takes about 5 microseconds. The rule leaves a loop alone that seeds each pass from its loop variable.
+The rule reports `np.random.default_rng()` without a seed inside a `for` or `while` body or a comprehension. Each call gathers entropy, the random bits for a seed, from the operating system, which takes about 5 microseconds. The rule leaves a loop alone that seeds each pass from its loop variable.
 
 Example:
 
@@ -3929,7 +3943,7 @@ noise = rng.normal(size=n)
 
 **Severity:** warning. **Fix:** unsafe: `np.random.default_rng()`, `np.random.seed()`, `np.random.RandomState()`, `np.random.SeedSequence()`. The numbers change, and a seed recovered from a logged start time no longer repeats the run.
 
-Reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick of the clock get the same numbers. NumPy recommends entropy from the operating system, and a log of the seed when a run must be repeatable.
+The rule reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick of the clock get the same numbers. NumPy recommends a seed from the operating system, and a log of the seed when a run must be repeatable.
 
 Example:
 
@@ -3948,7 +3962,7 @@ print(rng.bit_generator.seed_seq.entropy)
 
 **Severity:** info. **Fix:** none, because `numpy.polynomial` takes coefficients from degree zero up, the reverse of the old order.
 
-Reports `np.polyfit`, `np.poly1d`, `np.polyval`, `np.roots`, `np.poly`, `np.polyder`, `np.polyint`, `np.polyadd`, `np.polysub`, `np.polymul` and `np.polydiv`.
+The rule reports `np.polyfit`, `np.poly1d`, `np.polyval`, `np.roots`, `np.poly`, `np.polyder`, `np.polyint`, `np.polyadd`, `np.polysub`, `np.polymul` and `np.polydiv`.
 
 Example:
 
@@ -3966,7 +3980,7 @@ intercept, slope = np.polynomial.Polynomial.fit(x, y, 1).convert().coef
 
 **Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)`, with `1.5e-6` for `assert_array_almost_equal` and `1.5e-<decimal>` for a literal decimal. A difference of exactly `atol` failed before and passes after, dicts and ragged lists are no longer compared item by item, and complex values are compared by magnitude. A bare imported name, an `err_msg` argument, a computed decimal and `assert_approx_equal` have no fix.
 
-Reports `assert_almost_equal`, `assert_array_almost_equal` and `assert_approx_equal`, which NumPy lists under "Asserts (not recommended)".
+The rule reports `assert_almost_equal`, `assert_array_almost_equal` and `assert_approx_equal`, which NumPy lists under "Asserts (not recommended)".
 
 Example:
 
@@ -3984,7 +3998,7 @@ np.testing.assert_allclose(result, expected, rtol=0, atol=1.5e-4)
 
 **Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)` and `np.testing.assert_array_equal(a, b)`. assert_allclose fails on shapes that `np.allclose` broadcasts, assert_array_equal treats NaN in the same place as equal, and both still run under `python -O`. An assert with a message, or `np.allclose` with more arguments, has no fix.
 
-Reports `assert np.allclose(a, b)`, `assert np.array_equal(a, b)`, `assert np.all(a == b)` and `assert (a == b).all()`. A failed assert shows only False, where the testing functions show the elements that differ.
+The rule reports `assert np.allclose(a, b)`, `assert np.array_equal(a, b)`, `assert np.all(a == b)` and `assert (a == b).all()`. A failed assert shows only False, where the testing functions show the elements that differ.
 
 Example:
 
@@ -4002,7 +4016,7 @@ np.testing.assert_allclose(weights, expected, rtol=1e-05, atol=1e-08)
 
 **Severity:** info. **Fix:** unsafe: `assert x` and `assert x, msg`. The statement is skipped under `python -O`, and its message is built only on failure. `assert_raises` has no fix.
 
-Reports `numpy.testing.assert_`, which NumPy's testing guidelines call the legacy form of the assert statement, and `numpy.testing.assert_raises` and `assert_raises_regex`, where they prefer `pytest.raises`. The rule reports a bare `assert_raises` only in a file that imports it from `numpy.testing`, because SciPy imports `pytest.raises` under that name.
+The rule reports `numpy.testing.assert_`, which NumPy's testing guidelines call the legacy form of the assert statement. It also reports `numpy.testing.assert_raises` and `assert_raises_regex`, where the guidelines prefer `pytest.raises`. The rule reports a bare `assert_raises` only in a file that imports it from `numpy.testing`, because SciPy imports `pytest.raises` under that name.
 
 Example:
 
@@ -4020,7 +4034,7 @@ assert res.success, res.message
 
 **Severity:** info. **Fix:** safe: `np.strings.upper` and every other name that is the same function in both modules. Unsafe: the comparisons, such as `np.strings.equal`, which do not strip trailing whitespace, and `np.strings.multiply`, which raises a different error on bad input. `partition` and `rpartition` have no fix, because `np.strings` returns a tuple of three arrays.
 
-Reports a function of `np.char`, which NumPy's docs call legacy, when `np.strings` from NumPy 2.0 has a function of the same name.
+The rule reports a function of `np.char` when `np.strings`, added in NumPy 2.0, has a function of the same name. NumPy's docs call `np.char` legacy.
 
 Example:
 
@@ -4038,7 +4052,7 @@ names = np.strings.upper(names)
 
 **Severity:** info. **Fix:** unsafe: `a @ b` when both operands are names, attributes, subscripts, calls or parenthesized. `@` raises on a scalar and on two Python lists, and on arrays of more than two dimensions it works on stacks of matrices, where `np.dot` does not.
 
-Reports `np.dot(a, b)`, because the docs of `np.dot` prefer `matmul` or `a @ b` for two 2-D arrays.
+The rule reports `np.dot(a, b)`, because the docs of `np.dot` prefer `matmul` or `a @ b` for two 2-D arrays.
 
 Example:
 
@@ -4056,7 +4070,7 @@ cov = X.T @ X / n
 
 **Severity:** info. **Fix:** safe: `kind="stable"` in `np.sort` and `np.argsort`. unsafe: the same in a `sort` or `argsort` method, because the pattern cannot tell an array from another object.
 
-Reports `kind="mergesort"` in `np.sort`, `np.argsort` and the `sort` and `argsort` methods. The docs keep `"mergesort"` only for backwards compatibility, and both names select the same stable sort.
+The rule reports `kind="mergesort"` in `np.sort`, `np.argsort` and the `sort` and `argsort` methods. The docs keep `"mergesort"` only for backwards compatibility, and both names select the same stable sort.
 
 Example:
 
@@ -4074,7 +4088,7 @@ order = np.argsort(scores, kind="stable")
 
 **Severity:** info. **Fix:** none, because the code between the two calls has to move into the `with` block.
 
-Reports `np.set_printoptions(**saved)`, which restores options that the code changed for a while. The docs ask for `np.printoptions` as a context manager, which also restores the options when an error is raised.
+The rule reports `np.set_printoptions(**saved)`, which restores options that the code changed earlier. The docs ask for `np.printoptions` as a context manager, which also restores the options when an error is raised.
 
 Example:
 
@@ -4096,7 +4110,7 @@ with np.printoptions(precision=3):
 
 **Severity:** info. **Fix:** none, because the shape and strides decide which safe function fits.
 
-Reports `as_strided(...)`, because a wrong shape or stride reads memory outside the array. Its docs ask for extreme care and point to `sliding_window_view`, `broadcast_to` and `reshape`.
+The rule reports `as_strided(...)`, because a wrong shape or stride reads memory outside the array. Its docs ask for extreme care and point to `sliding_window_view`, `broadcast_to` and `reshape`.
 
 Example:
 
@@ -4114,7 +4128,7 @@ windows = np.lib.stride_tricks.sliding_window_view(x, 3)
 
 **Severity:** info. **Fix:** none, because every use of the old name changes with the import.
 
-Reports `import numpy as <name>` with a name other than `np` or `xp`, and `from numpy import *`, which replaces Python's `sum`, `min`, `max`, `round`, `abs`, `all` and `any`.
+The rule reports `import numpy as <name>` with a name other than `np` or `xp`, and `from numpy import *`, which replaces Python's `sum`, `min`, `max`, `round`, `abs`, `all` and `any`.
 
 Example:
 
@@ -4132,7 +4146,7 @@ import numpy as np
 
 **Severity:** warning. **Fix:** none, because the view, reshape and axis around unpackbits vary.
 
-Reports `np.unpackbits(...).sum()`, `np.sum(np.unpackbits(...))` and `np.count_nonzero(np.unpackbits(...))`. `np.bitwise_count`, added in NumPy 2.0, counts the set bits of each value, and ran 37 times faster on 1,000,000 uint64 values.
+The rule reports `np.unpackbits(...).sum()`, `np.sum(np.unpackbits(...))` and `np.count_nonzero(np.unpackbits(...))`. `np.bitwise_count`, added in NumPy 2.0, counts the set bits of each value, and ran 37 times faster on 1,000,000 uint64 values.
 
 Example:
 
@@ -4152,7 +4166,8 @@ The SciPy rules report code that raises or warns on SciPy 1.18.1, code that lose
 SciPy calls made once per value, in each file that imports `scipy`. The examples assume
 `import numpy as np`.
 
-Each word in a message stands for a measurement on SciPy 1.18.1 with NumPy 2.5.5:
+When a message uses a word from the table, the word means the result of a check on SciPy 1.18.1
+with NumPy 2.5.5.
 
 | Word in the message | What was measured |
 | --- | --- |
@@ -4161,13 +4176,13 @@ Each word in a message stands for a measurement on SciPy 1.18.1 with NumPy 2.5.5
 | faster | The range over repeated runs on one core, at 1,000,000 values unless the rule says otherwise. The faster form was not slower at 1,000 values. |
 | legacy, preferred | SciPy's own source calls the old form legacy or prefers the new one. Such rules have severity info and claim nothing about speed or accuracy. |
 
-A rule reports a name only when the name starts at `scipy`, or when the file's own imports bind
-it from `scipy`. A form made only of NumPy names, such as `np.linalg.inv(a) @ b`, belongs to the
+A rule reports a name only when the dotted name starts with `scipy`, or when the file's own
+imports bind it from `scipy`. A form made only of NumPy names, such as `np.linalg.inv(a) @ b`, belongs to the
 [NumPy](#numpy) rules. A rule that asks for an API newer than the project's SciPy is skipped.
 
 | Fix | What it promises |
 | --- | --- |
-| safe | The same object, or a bit equal value of the same type. xpd offers no safe fix where the file binds the name again or the call spreads `*args` or `**kwargs`. |
+| safe | The same object, or a value of the same type that is equal bit for bit. xpd offers no safe fix where the file binds the name again or the call spreads `*args` or `**kwargs`. |
 | unsafe | The message names what can differ. |
 
 ### Names that are gone or that warn
@@ -4189,7 +4204,7 @@ instead, or says that SciPy has no public replacement.
 | NumPy functions and constants on the `scipy` namespace, such as `scipy.pi` | The name is gone. |
 
 The rule leaves alone code under a SciPy version check, a `hasattr` check, or a `try` that
-catches `ImportError` or `AttributeError`, because such code exists for old SciPy.
+catches `ImportError` or `AttributeError`. Such code exists to support old SciPy.
 
 Example:
 
@@ -4246,7 +4261,7 @@ cell = tri.find_simplex(points)
 D = scipy.spatial.distance.cdist(X, Y)
 ```
 
-### Arguments, defaults and legacy entry points
+### Arguments, defaults and legacy functions
 
 Change each argument that SciPy removed, deprecated or ignores, and move each legacy function to the interface that SciPy's documentation names as its replacement.
 
@@ -4291,8 +4306,8 @@ dist, idx = tree.query(points, k=3, workers=-1)
 
 **Severity:** warning. **Fix:** none.
 
-The rule reports arguments that warn on SciPy 1.18.1 and that SciPy will remove. The documents
-whose message names `variant=` are skipped on SciPy older than 1.17.
+The rule reports arguments that warn on SciPy 1.18.1 and that SciPy will remove. The forms whose
+message names `variant=` are skipped on SciPy older than 1.17.
 
 | Function | Argument that warns |
 | --- | --- |
@@ -4319,8 +4334,8 @@ res = optimize.linprog(c, A_ub=A, b_ub=b, method="highs")
 
 **Severity:** warning. **Fix:** safe: `callback_type='legacy'` for gmres with a callback, and `spmatrix=True` for hb_read and mmread. Each is what SciPy 1.18.1 does after it warns. The other forms have no fix.
 
-The rule reports calls that rely on a default that warns on SciPy 1.18.1. A document that names
-an argument added in SciPy 1.17 or 1.18 is skipped on an older SciPy.
+The rule reports calls that rely on a default that warns on SciPy 1.18.1. A form whose message
+names an argument added in SciPy 1.17 or 1.18 is skipped on an older SciPy.
 
 | Call | Default that warns | Fix |
 | --- | --- | --- |
@@ -4351,10 +4366,10 @@ result = stats.anderson(sample, method="interpolate")
 **Severity:** warning. **Fix:** none.
 
 The rule reports a key in the `options=` dict of `optimize.minimize` that the chosen `method=`
-doesn't take, when another method takes it, such as `disp` and `iprint` for L-BFGS-B, `maxiter`
+doesn't take but another method takes. Examples are `disp` and `iprint` for L-BFGS-B, `maxiter`
 for TNC and `maxfun` for BFGS. On SciPy 1.18.1, minimize warns OptimizeWarning and ignores such a
-key, and with `'trust-constr'` it raises TypeError. The keys of each method come from a run of
-each pair of method and key.
+key, and with `'trust-constr'` it raises TypeError. xpd took the keys of each method from a run of
+minimize with each pair of method and key.
 
 Example:
 
@@ -4399,15 +4414,15 @@ res = minimize(f, x0, method="L-BFGS-B", jac=grad, bounds=[(0, 1)] * n)
 **Severity:** info. **Fix:** none. The same integer gives a different stream under `rng=` than under `random_state=` or `seed=`.
 
 The rule reports `random_state=` and `seed=` passed by keyword to the functions and classes that
-SciPy 1.15 moved to `rng=`, because SciPy's docs say new code should pass `rng`. Examples are
+SciPy 1.15 moved to `rng=`. SciPy's docs say new code should pass `rng`. Examples are
 `sparse.random`, `svds`, `bootstrap`, `permutation_test`, `kmeans2`, `differential_evolution`,
 `basinhopping`, `dual_annealing`, `directed_hausdorff`, `Rotation.random` and the qmc engines.
 The old keywords run without a warning on SciPy 1.18.1.
 
 The rule is skipped on SciPy older than 1.15. It leaves alone a call under a SciPy version check,
 because `rng=` raises on an older SciPy. xpd reads only the installed SciPy and can't see which
-SciPy versions a library supports, so the message says to keep the old keyword when the code
-must also run on SciPy older than 1.15.
+SciPy versions a library supports. The message therefore says to keep the old keyword when the
+code must also run on SciPy older than 1.15.
 
 Example:
 
@@ -4497,9 +4512,14 @@ message names the replacement that SciPy recommends:
 | `spalde` | the derivative of a `BSpline` |
 | `sproot` | `PPoly.from_spline(spl).roots()` |
 
-Outside the data, `interp1d` raises, `make_interp_spline` extrapolates, and `numpy.interp`
-repeats the end value, and the message for `interp1d` says so. A document that names an API
-added in SciPy 1.7 or 1.15 is skipped on an older SciPy.
+The message for `interp1d` says what each function does outside the range of the data, as the
+table shows. A form whose replacement was added in SciPy 1.7 or 1.15 is skipped on an older SciPy.
+
+| Function | Outside the range of the data |
+| --- | --- |
+| `interp1d` | raises |
+| `make_interp_spline` | extrapolates |
+| `numpy.interp` | repeats the end value |
 
 Example:
 
@@ -4521,7 +4541,7 @@ smooth = spline(grid)
 
 The rule reports `signal.stft`, `istft`, `spectrogram` and `check_COLA`, which SciPy marks as
 legacy in favor of the `ShortTimeFFT` class. It also reports `signal.sosfreqz`, a legacy alias
-of `freqz_sos`, and skips that document on SciPy older than 1.15.
+of `freqz_sos`, but not on SciPy older than 1.15.
 
 Example:
 
@@ -4563,14 +4583,14 @@ u, p = stats.mannwhitneyu(x, y, use_continuity=False, method="asymptotic")
 
 ### Forms that keep digits
 
-Use the SciPy function that computes the quantity directly, because the two-step form loses digits when a value is close to 0 or 1.
+Use the SciPy function that computes the quantity directly, because the two-step form loses digits or overflows where the direct function doesn't.
 
 #### log-of-special
 
 **Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5. A function imported by name has no fix.
 
-The rule reports `np.log` of a `scipy.special` function that has a log form of its own. It reads
-any import of `scipy.special`. Where the old form overflowed or lost digits:
+The rule reports `np.log` of a `scipy.special` function that has a log form of its own, under
+any import of `scipy.special`. The table shows where the old form overflowed or lost digits.
 
 | Old form | Where the old form failed | Write instead |
 | --- | --- | --- |
@@ -4599,8 +4619,8 @@ loglike = special.log_ndtr(q * xb).sum()
 
 The rule reports `np.log` of the `pdf`, `pmf`, `cdf` or `sf` of a `scipy.stats` distribution,
 written as `stats.norm`, imported by name as `norm`, or frozen in the same expression as
-`stats.norm(0, 2)`. Each method has its own list of distributions, measured one by one in a
-tail. `np.log(stats.binom.pmf(k, n, p))` is not reported, because `binom.logpmf` lost up to 3.6
+`stats.norm(0, 2)`. Each method has its own list of distributions, and each distribution on a
+list was measured in a tail. `np.log(stats.binom.pmf(k, n, p))` is not reported, because `binom.logpmf` lost up to 3.6
 digits more near the mode.
 
 Example:
@@ -4692,7 +4712,7 @@ crit = stats.norm.isf(alpha / 2)
 
 The rule reports `special.factorial(n) / (special.factorial(k) * special.factorial(n - k))`, and
 the same with the factors in another order or divided one at a time. `factorial` overflows to inf
-above 170, so at n = 200 and k = 3 the ratio gave nan, where `comb` lost no digits.
+above 170, so at n = 200 and k = 3 the ratio gave nan. `comb` lost no digits at the same n and k.
 
 Example:
 
@@ -4711,10 +4731,15 @@ ways = special.comb(n, k)
 **Severity:** warning. **Fix:** unsafe: `np.linalg.slogdet(a)[1]`.
 
 The rule reports `np.log(linalg.det(a))`, `np.log(np.abs(linalg.det(a)))` and
-`np.log(abs(linalg.det(a)))`, where `linalg` is `scipy.linalg` or `det` was imported from it. On
-covariance matrices of 120 features at scale 1e-3 and of 80 features at scale 1e4 the old form
-gave -inf and inf, where `slogdet` lost 0.54 and 0.27 digits. `np.log(np.linalg.det(a))` belongs
-to the NumPy rule `log-of-det`.
+`np.log(abs(linalg.det(a)))`, where `linalg` is `scipy.linalg` or `det` was imported from it. On two
+covariance matrices the old form gave -inf and inf, where `slogdet` lost less than one digit, as
+the table shows. `np.log(np.linalg.det(a))` belongs to the NumPy rule
+[`log-of-det`](#log-of-det).
+
+| Covariance matrix | `np.log(linalg.det(a))` | Digits that `slogdet` lost |
+| --- | --- | --- |
+| 120 features at scale 1e-3 | -inf | 0.54 |
+| 80 features at scale 1e4 | inf | 0.27 |
 
 Example:
 
@@ -4730,10 +4755,10 @@ logdet = np.linalg.slogdet(cov)[1]
 
 ### SciPy calls made once per value or once per pair
 
-Each rule in the group reports a SciPy call made from Python once per value, once per pair of
-points or once per pass of a loop, where one call on whole arrays does the same work in compiled
-code. Each speedup is a median of 7 runs on one core with SciPy 1.18.1, on float64 and float32,
-at 1,000,000 values unless the rule says what the 1,000,000 counts.
+Replace each SciPy call that Python makes once per value, once per pair of points or once per
+pass of a loop with one call on whole arrays, which does the same work in compiled code. Each
+speedup is a median of 7 runs on one core with SciPy 1.18.1, on float64 and float32, at 1,000,000
+values unless the rule names another size.
 
 #### distance-per-pair
 
@@ -4760,8 +4785,8 @@ D = distance.cdist(X, Y, "euclidean")
 **Severity:** warning. **Fix:** unsafe: the metric's name as a string. `cosine` and `correlation` differ in the last bits, and complex input is cast to float.
 
 The rule reports a metric function of `scipy.spatial.distance` passed to `cdist` or `pdist` as
-the metric, by position or as `metric=`. The name runs the same metric in C, and on 1,000 by
-1,000 points it ran 1,100 to 2,100 times faster.
+the metric, by position or as `metric=`. The metric's name as a string runs the same metric in C, and
+on 1,000 by 1,000 points it ran 1,100 to 2,100 times faster.
 
 Example:
 
@@ -4807,9 +4832,9 @@ p = stats.norm.cdf(x)
 **Severity:** warning. **Fix:** none.
 
 The rule reports `tree.query(q)` inside a comprehension or a `for` loop, where `q` is the loop
-name or a row indexed by it, and `tree` comes from a `KDTree` or `cKDTree` call in the same
-function. For 1,000,000 points on a tree of 10,000, one query of all points ran 16 to 17 times
-faster.
+name or a row indexed by it. `tree` must come from a `KDTree` or `cKDTree` call in the same
+function. For 1,000,000 points on a tree of 10,000 points, one query of all points ran 16 to 17
+times faster.
 
 Example:
 
@@ -4855,8 +4880,8 @@ xs = [lu.solve(b) for b in sides]
 
 **Severity:** warning. **Fix:** unsafe: `spla.spsolve(A, b)` when `inv` is reached through its module. The last bits change, and a `b` of shape `(n, 1)` gives a 1-D result. `inv` imported by name has no fix.
 
-The rule reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`. The inverse of most
-sparse matrices is dense. On a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000
+The rule reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`, because the inverse of
+most sparse matrices is dense. On a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000
 values, `spsolve` ran 260 to 270 times faster.
 
 Example:
@@ -4882,8 +4907,9 @@ Build a sparse matrix in a format made for writes, and use the sparse array clas
 The rule reports a write into a `csr_matrix`, `csc_matrix`, `csr_array` or `csc_array` built from
 a shape alone, as in `A = csr_matrix((n, m))` followed by `A[i, j] = v`, `A[i, j] += v` or a slice
 write, in a function that doesn't assign `A` again. Each write adds a stored value and copies the
-whole matrix. On SciPy 1.18.1 it emits `SparseEfficiencyWarning`, which raises under
-`python -W error`, and 1,000 writes ran 30 times slower than into a `lil_matrix`.
+whole matrix. On SciPy 1.18.1 a write emits `SparseEfficiencyWarning`, which raises under
+`python -W error`. Moreover, 1,000 writes ran 30 times slower than the same writes into a
+`lil_matrix`.
 
 Example:
 
@@ -4958,7 +4984,7 @@ tree = KDTree(points)
 
 **Severity:** info. **Fix:** none, because `rfft` packs its output differently and the pseudo differential operators have no `scipy.fft` form.
 
-The rule reports an import of `scipy.fftpack`, whose module docstring is a legacy directive that
+The rule reports an import of `scipy.fftpack`, whose module docstring marks it as legacy and
 says new code should use `scipy.fft`. `scipy.fft` was no faster in the measurements, so the rule
 claims only the preference.
 
