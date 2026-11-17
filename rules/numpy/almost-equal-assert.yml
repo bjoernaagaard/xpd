@@ -68,8 +68,11 @@ language: python
 severity: info
 message: assert_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-7. Write assert_allclose($A, $B, rtol=0, atol=1.5e-7).
 rule:
-  pattern: "$F($A, $B)"
-  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+  # all checks in order, so the search for the import runs only on a call of that name.
+  all:
+    - pattern: "$F($A, $B)"
+    - has: { field: function, kind: identifier, regex: '^assert_(array_)?almost_equal$' }
+    - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
 constraints:
   F: { regex: '^assert_almost_equal$' }
   A: { not: { kind: keyword_argument } }
@@ -82,8 +85,11 @@ language: python
 severity: info
 message: assert_array_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-6. Write assert_allclose($A, $B, rtol=0, atol=1.5e-6).
 rule:
-  pattern: "$F($A, $B)"
-  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+  # all checks in order, so the search for the import runs only on a call of that name.
+  all:
+    - pattern: "$F($A, $B)"
+    - has: { field: function, kind: identifier, regex: '^assert_(array_)?almost_equal$' }
+    - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
 constraints:
   F: { regex: '^assert_array_almost_equal$' }
   A: { not: { kind: keyword_argument } }
@@ -96,8 +102,11 @@ language: python
 severity: info
 message: $F is on NumPy's not recommended list, and decimal=$D is an absolute tolerance of 1.5e-$D. Write assert_allclose($A, $B, rtol=0, atol=1.5e-$D).
 rule:
-  pattern: "$F($A, $B, $DECIMAL)"
-  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+  # all checks in order, so the search for the import runs only on a call of that name.
+  all:
+    - pattern: "$F($A, $B, $DECIMAL)"
+    - has: { field: function, kind: identifier, regex: '^assert_(array_)?almost_equal$' }
+    - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
 constraints:
   F: { regex: '^(assert_almost_equal|assert_array_almost_equal)$' }
   A: { not: { kind: keyword_argument } }
@@ -125,8 +134,9 @@ utils:
   qualified:
     has: { field: function, regex: '^(np\.testing|numpy\.testing|npt|nt|testing)\.' }
   imported-bare-name:
-    has: { field: function, kind: identifier, pattern: $F }
-    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+    all:
+      - has: { field: function, kind: identifier, pattern: $F, regex: '^assert_(array_)?almost_equal$' }
+      - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
   fixable-arguments:
     has:
       field: arguments
@@ -160,8 +170,11 @@ language: python
 severity: info
 message: assert_approx_equal is on NumPy's not recommended list, and its default compares 7 significant digits. Write assert_allclose($A, $B, rtol=1e-6).
 rule:
-  pattern: "$F($A, $B)"
-  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+  # all checks in order, so the search for the import runs only on a call of that name.
+  all:
+    - pattern: "$F($A, $B)"
+    - has: { field: function, kind: identifier, regex: '^assert_approx_equal$' }
+    - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
 constraints:
   F: { regex: '^assert_approx_equal$' }
   A: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
@@ -182,8 +195,8 @@ rule:
       - any:
           - has: { field: function, regex: '^(np\.testing|numpy\.testing|npt|nt|testing)\.' }
           - all:
-              - has: { field: function, kind: identifier }
-              - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, regex: '^assert_approx_equal$' } }] } }
+              - has: { field: function, kind: identifier, regex: '^assert_approx_equal$' }
+              - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, regex: '^assert_approx_equal$' } }] } }
       - has:
           field: arguments
           all:
