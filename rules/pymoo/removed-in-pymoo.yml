@@ -18,8 +18,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+pymoo\.factory\s+import\s+\(?\s*get_problem\s*,?\s*\)?$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: from pymoo.problems import get_problem
 metadata: { fix: unsafe, since: "0.6.1" }
 ---
@@ -31,8 +29,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+pymoo\.factory\s+import\s+\(?\s*get_termination\s*,?\s*\)?$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: from pymoo.termination import get_termination
 metadata: { fix: unsafe, since: "0.6.1" }
 ---
@@ -44,8 +40,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+pymoo\.factory\s+import\s+\(?\s*get_reference_directions\s*,?\s*\)?$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: from pymoo.util.ref_dirs import get_reference_directions
 metadata: { fix: unsafe, since: "0.6.1" }
 ---
@@ -67,8 +61,6 @@ rule:
     any:
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1" }
 ---
 # The functions that built an operator or another object from a name. Each raises an Exception
@@ -84,8 +76,6 @@ rule:
   regex: '^get_sampling$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_crossover passes.
@@ -98,8 +88,6 @@ rule:
   regex: '^get_crossover$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_mutation passes.
@@ -112,8 +100,6 @@ rule:
   regex: '^get_mutation$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_selection passes.
@@ -126,8 +112,6 @@ rule:
   regex: '^get_selection$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_algorithm passes.
@@ -140,8 +124,6 @@ rule:
   regex: '^get_algorithm$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_performance_indicator passes.
@@ -154,8 +136,6 @@ rule:
   regex: '^get_performance_indicator$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_decision_making passes.
@@ -168,8 +148,6 @@ rule:
   regex: '^get_decision_making$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_decomposition passes.
@@ -182,8 +160,6 @@ rule:
   regex: '^get_decomposition$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the class depends on the name that each call of get_visualization passes.
@@ -196,8 +172,6 @@ rule:
   regex: '^get_visualization$'
   inside: { stopBy: end, kind: import_from_statement, has: { field: module_name, regex: '^pymoo\.factory$' } }
   not: { any: [{ inside: { kind: aliased_import, field: alias } }, { matches: compat-code }] }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # Any other name of pymoo.factory, such as the functions that listed the options, and the module
@@ -223,8 +197,6 @@ rule:
         - inside: { kind: import_statement }
         - inside: { kind: aliased_import, inside: { kind: import_statement } }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1" }
 ---
 # One document for each removed module that 0.6.2 has a module for. The fix writes the new module
@@ -241,8 +213,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.ctaea\s+import\s+\(?[\s,]*((CADASurvival|CTAEA|RestrictedMating|comp_by_cv_dom_then_random)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.ctaea
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -258,8 +228,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.genetic_algorithm\s+import\s+\(?[\s,]*((GeneticAlgorithm)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.base.genetic
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -275,8 +243,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.moead\s+import\s+\(?[\s,]*((MOEAD)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.moead
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -292,8 +258,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.nsga2\s+import\s+\(?[\s,]*((NSGA2|RankAndCrowdingSurvival|binary_tournament)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.nsga2
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -309,8 +273,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.nsga3\s+import\s+\(?[\s,]*((NSGA3|ReferenceDirectionSurvival|associate_to_niches|calc_niche_count|comp_by_cv_then_random|get_extreme_points_c|get_nadir_point|niching)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.nsga3
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -326,8 +288,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.rnsga2\s+import\s+\(?[\s,]*((RNSGA2|RankAndModifiedCrowdingSurvival|calc_norm_pref_distance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.rnsga2
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -343,8 +303,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.rnsga3\s+import\s+\(?[\s,]*((AspirationPointSurvival|RNSGA3|get_ref_dirs_from_points|line_plane_intersection)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.rnsga3
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -360,8 +318,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_brkga\s+import\s+\(?[\s,]*((BRKGA|EliteBiasedSelection|EliteSurvival)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.brkga
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -377,8 +333,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_cmaes\s+import\s+\(?[\s,]*((CMAES)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.cmaes
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -394,8 +348,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_de\s+import\s+\(?[\s,]*((DE)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.de
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -411,8 +363,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_direct\s+import\s+\(?[\s,]*((DIRECT|norm_bounds|update_bounds)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.direct
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -428,8 +378,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_ga_niching\s+import\s+\(?[\s,]*((EpsilonClearingSurvival|NicheGA|NicheSingleObjectiveSpaceToleranceTermination|NicheTermination|comp_by_cv_and_clearing_fitness)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.ga_niching
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -445,8 +393,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_genetic_algorithm\s+import\s+\(?[\s,]*((FitnessSurvival|GA|comp_by_cv_and_fitness)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.ga
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -462,8 +408,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_local_search\s+import\s+\(?[\s,]*((LocalSearch)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.base.local
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -481,8 +425,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_nelder_mead\s+import\s+\(?[\s,]*((NelderAndMeadTermination|NelderMead|adaptive_params|default_params)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.nelder_mead
 metadata: { fix: unsafe, since: "0.5", until: "0.6" }
 ---
@@ -498,8 +440,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_nelder_mead\s+import\s+\(?[\s,]*((NelderAndMeadTermination|NelderMead|adaptive_params|default_params)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.nelder
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -517,8 +457,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_pattern_search\s+import\s+\(?[\s,]*((PatternSearch)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.pattern_search
 metadata: { fix: unsafe, since: "0.5", until: "0.6" }
 ---
@@ -534,8 +472,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_pattern_search\s+import\s+\(?[\s,]*((PatternSearch)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.pattern
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -551,8 +487,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_pso\s+import\s+\(?[\s,]*((PSO|S1_exploration|S2_exploitation|S3_convergence|S4_jumping_out)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.pso
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -568,8 +502,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.so_random_search\s+import\s+\(?[\s,]*((RandomSearch)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.random_search
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -585,8 +517,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.unsga3\s+import\s+\(?[\s,]*((UNSGA3|comp_by_rank_and_ref_line_dist)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.moo.unsga3
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -602,8 +532,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.decision_making\.compromise_programming\s+import\s+\(?[\s,]*((CompromiseProgramming)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.mcdm.compromise_programming
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -619,8 +547,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.decision_making\.high_tradeoff\s+import\s+\(?[\s,]*((HighTradeoffPoints)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.mcdm.high_tradeoff
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -636,8 +562,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.decision_making\.pseudo_weights\s+import\s+\(?[\s,]*((PseudoWeights)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.mcdm.pseudo_weights
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -653,8 +577,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.algorithm\s+import\s+\(?[\s,]*((Algorithm|filter_optimum)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.algorithm
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -670,8 +592,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.callback\s+import\s+\(?[\s,]*((Callback)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.callback
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -687,8 +607,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.crossover\s+import\s+\(?[\s,]*((Crossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.crossover
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -704,8 +622,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.decision_making\s+import\s+\(?[\s,]*((DecisionMaking|NeighborFinder|find_outliers_upper_tail)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.decision_making
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -721,8 +637,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.decomposition\s+import\s+\(?[\s,]*((Decomposition)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.decomposition
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -738,8 +652,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.duplicate\s+import\s+\(?[\s,]*((DefaultDuplicateElimination|DuplicateElimination|ElementwiseDuplicateElimination|HashDuplicateElimination|NoDuplicateElimination|default_attr|to_hash)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.duplicate
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -755,8 +667,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.evaluator\s+import\s+\(?[\s,]*((Evaluator)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.evaluator
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -772,8 +682,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.indicator\s+import\s+\(?[\s,]*((Indicator)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.indicator
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -789,8 +697,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.individual\s+import\s+\(?[\s,]*((Individual)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.individual
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -806,8 +712,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.infill\s+import\s+\(?[\s,]*((InfillCriterion)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.infill
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -823,8 +727,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.initialization\s+import\s+\(?[\s,]*((Initialization)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.initialization
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -840,8 +742,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.mating\s+import\s+\(?[\s,]*((Mating)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.mating
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -857,8 +757,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.mutation\s+import\s+\(?[\s,]*((Mutation)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.mutation
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -874,8 +772,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.plot\s+import\s+\(?[\s,]*((Plot|get_parameter_with_options)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.plot
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -891,8 +787,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.population\s+import\s+\(?[\s,]*((Population|interleaving_args|pop_from_array_or_individual)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.population
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -908,8 +802,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.problem\s+import\s+\(?[\s,]*((Problem)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.problem
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -925,8 +817,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.repair\s+import\s+\(?[\s,]*((NoRepair|Repair)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.repair
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -942,8 +832,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.replacement\s+import\s+\(?[\s,]*((ImprovementReplacement|is_better)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.replacement
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -959,8 +847,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.result\s+import\s+\(?[\s,]*((Result)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.result
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -976,8 +862,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.sampling\s+import\s+\(?[\s,]*((Sampling)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.sampling
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -993,8 +877,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.selection\s+import\s+\(?[\s,]*((Selection)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.selection
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1010,8 +892,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.survival\s+import\s+\(?[\s,]*((Survival|split_by_feasibility)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.survival
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1027,8 +907,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.model\.termination\s+import\s+\(?[\s,]*((Termination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.termination
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1044,8 +922,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.edge_recombination_crossover\s+import\s+\(?[\s,]*((EdgeRecombinationCrossover|calc_adjency_matrix|erx|has_duplicates|letter_to_number|letters_to_numbers|number_to_letter|numbers_to_letters|remove_from_adj_list)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.erx
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1061,8 +937,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.exponential_crossover\s+import\s+\(?[\s,]*((ExponentialCrossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.expx
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1078,8 +952,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.half_uniform_crossover\s+import\s+\(?[\s,]*((HalfUniformCrossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.hux
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1095,8 +967,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.no_crossover\s+import\s+\(?[\s,]*((NoCrossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.nox
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1112,8 +982,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.order_crossover\s+import\s+\(?[\s,]*((OrderCrossover|ox|random_sequence)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.ox
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1129,8 +997,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.parent_centric_crossover\s+import\s+\(?[\s,]*((PCX|ParentCentricCrossover|pcx)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.pcx
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1146,8 +1012,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.point_crossover\s+import\s+\(?[\s,]*((PointCrossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.pntx
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1163,8 +1027,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.simulated_binary_crossover\s+import\s+\(?[\s,]*((SBX|SimulatedBinaryCrossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.sbx
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1180,8 +1042,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.uniform_crossover\s+import\s+\(?[\s,]*((UniformCrossover)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.crossover.ux
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1197,8 +1057,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.mutation\.inversion_mutation\s+import\s+\(?[\s,]*((InversionMutation|inversion_mutation)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.mutation.inversion
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1214,8 +1072,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.mutation\.no_mutation\s+import\s+\(?[\s,]*((NoMutation)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.mutation.nom
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1231,8 +1087,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.mutation\.polynomial_mutation\s+import\s+\(?[\s,]*((PM|PolynomialMutation)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.mutation.pm
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1248,8 +1102,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.sampling\.latin_hypercube_sampling\s+import\s+\(?[\s,]*((LatinHypercubeSampling)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.sampling.lhs
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1265,8 +1117,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.sampling\.random_permutation_sampling\s+import\s+\(?[\s,]*((PermutationRandomSampling)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.sampling.rnd
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1282,8 +1132,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.sampling\.random_sampling\s+import\s+\(?[\s,]*((BinaryRandomSampling|FloatRandomSampling)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.sampling.rnd
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1299,8 +1147,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.selection\.random_selection\s+import\s+\(?[\s,]*((RandomSelection)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.selection.rnd
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1316,8 +1162,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.selection\.tournament_selection\s+import\s+\(?[\s,]*((TournamentSelection|compare)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.operators.selection.tournament
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1333,8 +1177,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.distance_indicator\s+import\s+\(?[\s,]*((DistanceIndicator|euclidean_distance|modified_distance)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.distance_indicator
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1350,8 +1192,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.gd\s+import\s+\(?[\s,]*((GD)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.gd
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1367,8 +1207,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.gd_plus\s+import\s+\(?[\s,]*((GDPlus)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.gd_plus
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1384,8 +1222,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.hv\s+import\s+\(?[\s,]*((Hypervolume)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.hv
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1401,8 +1237,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.igd\s+import\s+\(?[\s,]*((IGD)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.igd
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1418,8 +1252,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.igd_plus\s+import\s+\(?[\s,]*((IGDPlus)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.igd_plus
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1435,8 +1267,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.kktpm\s+import\s+\(?[\s,]*((KKTPM|solve)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.kktpm
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1452,8 +1282,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.performance_indicator\.rmetric\s+import\s+\(?[\s,]*((RMetric)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.indicators.rmetric
 metadata: { fix: unsafe, since: "0.5" }
 ---
@@ -1469,8 +1297,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.soo\.nonconvex\.nelder_mead\s+import\s+\(?[\s,]*((NelderAndMeadTermination|NelderMead|adaptive_params|default_params)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.nelder
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1486,8 +1312,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.algorithms\.soo\.nonconvex\.pattern_search\s+import\s+\(?[\s,]*((PatternSearch|calc_sign)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.algorithms.soo.nonconvex.pattern
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1503,8 +1327,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.operators\.crossover\.util\s+import\s+\(?[\s,]*((crossover_mask|row_at_least_once_true)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.util.misc
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1520,8 +1342,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.problems\.autodiff\s+import\s+\(?[\s,]*((AutomaticDifferentiation)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.gradient.automatic
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1537,8 +1357,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.problems\.constr_as_penalty\s+import\s+\(?[\s,]*((ConstraintsAsPenalty)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.constraints.as_penalty
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1554,8 +1372,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.termination\.collection\s+import\s+\(?[\s,]*((TerminationCollection)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.termination.collection
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1571,8 +1387,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.termination\.max_eval\s+import\s+\(?[\s,]*((MaximumFunctionCallTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.termination.max_eval
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1588,8 +1402,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.termination\.max_gen\s+import\s+\(?[\s,]*((MaximumGenerationTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.termination.max_gen
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1605,8 +1417,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.termination\.max_time\s+import\s+\(?[\s,]*((TimeBasedTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.termination.max_time
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1622,8 +1432,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.termination\.no_termination\s+import\s+\(?[\s,]*((NoTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.core.termination
 metadata: { fix: unsafe, since: "0.6" }
 ---
@@ -1639,8 +1447,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.function_loader\s+import\s+\(?[\s,]*((FunctionLoader|get_functions|is_compiled|load_function)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions
 metadata: { fix: unsafe, since: "0.6.1.6" }
 ---
@@ -1656,8 +1462,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.mnn\s+import\s+\(?[\s,]*((calc_2nn|calc_mnn|calc_mnn_base)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions.standard.mnn
 metadata: { fix: unsafe, since: "0.6.1.6" }
 ---
@@ -1673,8 +1477,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.plotting\s+import\s+\(?[\s,]*((animate|plot|plot_2d|plot_3d|plot_problem_surface)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.visualization.util
 metadata: { fix: unsafe, since: "0.6.1.6" }
 ---
@@ -1690,8 +1492,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.pruning_cd\s+import\s+\(?[\s,]*((calc_pcd)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions.standard.pruning_cd
 metadata: { fix: unsafe, since: "0.6.1.6" }
 ---
@@ -1707,8 +1507,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.stochastic_ranking\s+import\s+\(?[\s,]*((stochastic_ranking)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions.standard.stochastic_ranking
 metadata: { fix: unsafe, since: "0.6.1.6" }
 ---
@@ -1724,8 +1522,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.nds\.dominance_degree_non_dominated_sort\s+import\s+\(?[\s,]*((construct_comp_matrix|construct_domination_matrix|dda_ens|dda_ns|dominance_degree_non_dominated_sort)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions.standard.non_dominated_sorting
 metadata: { fix: unsafe, since: "0.6.2" }
 ---
@@ -1741,8 +1537,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.nds\.efficient_non_dominated_sort\s+import\s+\(?[\s,]*((binary_search|efficient_non_dominated_sort|sequential_search)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions.standard.non_dominated_sorting
 metadata: { fix: unsafe, since: "0.6.2" }
 ---
@@ -1758,8 +1552,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.nds\.find_non_dominated\s+import\s+\(?[\s,]*((find_non_dominated)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.util.nds.non_dominated_sorting
 metadata: { fix: unsafe, since: "0.6.2" }
 ---
@@ -1775,8 +1567,6 @@ rule:
     field: module_name
     regex: '^from\s+pymoo\.util\.nds\.tree_based_non_dominated_sort\s+import\s+\(?[\s,]*((Tree|check_tree|tree_based_non_dominated_sort|update_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: pymoo.functions.standard.non_dominated_sorting
 metadata: { fix: unsafe, since: "0.6.2" }
 ---
@@ -1873,8 +1663,6 @@ rule:
             - regex: '^from\s+pymoo\.performance_indicator\.igd_plus\s+import\s+\(?[\s,]*((IGDPlus)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.performance_indicator\.kktpm\s+import\s+\(?[\s,]*((KKTPM|solve)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.performance_indicator\.rmetric\s+import\s+\(?[\s,]*((RMetric)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.5" }
 ---
 # Every module that pymoo 0.6.0 removed. These are the 25 module files that the release
@@ -1910,8 +1698,6 @@ rule:
             - regex: '^from\s+pymoo\.util\.termination\.max_gen\s+import\s+\(?[\s,]*((MaximumGenerationTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.util\.termination\.max_time\s+import\s+\(?[\s,]*((TimeBasedTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.util\.termination\.no_termination\s+import\s+\(?[\s,]*((NoTermination)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # Every module that pymoo 0.6.1.6 removed. These are the 7 module files that the release
@@ -1942,8 +1728,6 @@ rule:
             - regex: '^from\s+pymoo\.util\.plotting\s+import\s+\(?[\s,]*((animate|plot|plot_2d|plot_3d|plot_problem_surface)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.util\.pruning_cd\s+import\s+\(?[\s,]*((calc_pcd)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.util\.stochastic_ranking\s+import\s+\(?[\s,]*((stochastic_ranking)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # Every module that pymoo 0.6.2 removed. These are the 9 module files that the release
@@ -1973,8 +1757,6 @@ rule:
             - regex: '^from\s+pymoo\.util\.nds\.efficient_non_dominated_sort\s+import\s+\(?[\s,]*((binary_search|efficient_non_dominated_sort|sequential_search)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.util\.nds\.find_non_dominated\s+import\s+\(?[\s,]*((find_non_dominated)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
             - regex: '^from\s+pymoo\.util\.nds\.tree_based_non_dominated_sort\s+import\s+\(?[\s,]*((Tree|check_tree|tree_based_non_dominated_sort|update_tree)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.2" }
 ---
 # Names that a module of 0.6.2 no longer has. Each was imported from the last release that has
@@ -1992,8 +1774,6 @@ rule:
   regex: '^from[ \t]+pymoo\.algorithms\.moo\.nsga2[ \t]+import[ \t]+((calc_crowding_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_crowding_distance)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(calc_crowding_distance)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.algorithms\.moo\.nsga2', by: 'from pymoo.operators.survival.rank_and_crowding.metrics' } }
 fix: $FIXED
@@ -2019,8 +1799,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.algorithms\.moo\.nsga2[ \t]+import[ \t]+((calc_crowding_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_crowding_distance)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2041,8 +1819,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # pymoo 0.6.0 to 0.6.1.6 have no module that holds DES. No fix, because the module that the
@@ -2064,8 +1840,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6", until: "0.6.2" }
 ---
 # From pymoo 0.6.2 on, a statement on one line that imports only DES from
@@ -2080,8 +1854,6 @@ rule:
   regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.de[ \t]+import[ \t]+((DES)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DES)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(DES)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.de', by: 'from pymoo.operators.selection.des' } }
 fix: $FIXED
@@ -2107,8 +1879,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.de[ \t]+import[ \t]+((DES)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DES)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.2" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2129,8 +1899,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2151,8 +1919,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # A statement on one line that imports only names that moved to pymoo.visualization.app.pso. The
@@ -2167,8 +1933,6 @@ rule:
   regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.pso[ \t]+import[ \t]+((PSOAnimation)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(PSOAnimation)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(PSOAnimation)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.pso', by: 'from pymoo.visualization.app.pso' } }
 fix: $FIXED
@@ -2194,8 +1958,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.pso[ \t]+import[ \t]+((PSOAnimation)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(PSOAnimation)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2216,8 +1978,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2238,8 +1998,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2260,8 +2018,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the replacement is an argument of the problem, which another statement builds.
@@ -2282,8 +2038,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6", until: "0.6.1.6" }
 ---
 # The same form from pymoo 0.6.1.6 on, which moved DaskParallelization to pymoo.parallelization. No
@@ -2305,8 +2059,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # No fix, because the replacement is an argument of the problem, which another statement builds.
@@ -2327,8 +2079,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6", until: "0.6.1.6" }
 ---
 # The same form from pymoo 0.6.1.6 on, which moved StarmapParallelization to pymoo.parallelization.
@@ -2350,8 +2100,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # A statement on one line that imports only names that moved to pymoo.parallelization.dask. The
@@ -2366,8 +2114,6 @@ rule:
   regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((DaskParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DaskParallelization)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(DaskParallelization)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.core\.problem', by: 'from pymoo.parallelization.dask' } }
 fix: $FIXED
@@ -2393,8 +2139,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((DaskParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DaskParallelization)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # A statement on one line that imports only names that moved to pymoo.parallelization.joblib. The
@@ -2409,8 +2153,6 @@ rule:
   regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((JoblibParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(JoblibParallelization)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(JoblibParallelization)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.core\.problem', by: 'from pymoo.parallelization.joblib' } }
 fix: $FIXED
@@ -2436,8 +2178,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((JoblibParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(JoblibParallelization)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # A statement on one line that imports only names that moved to pymoo.parallelization.ray. The fix
@@ -2452,8 +2192,6 @@ rule:
   regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((RayParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(RayParallelization)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(RayParallelization)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.core\.problem', by: 'from pymoo.parallelization.ray' } }
 fix: $FIXED
@@ -2479,8 +2217,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((RayParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(RayParallelization)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2501,8 +2237,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2523,8 +2257,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2545,8 +2277,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2567,8 +2297,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.2" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2589,8 +2317,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.2" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2611,8 +2337,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the code uses the old name in other statements, which the import does not reach.
@@ -2633,8 +2357,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2655,8 +2377,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1" }
 ---
 # A statement on one line that imports only names that moved to pymoo.core.algorithm. The fix
@@ -2671,8 +2391,6 @@ rule:
   regex: '^from[ \t]+pymoo\.optimize[ \t]+import[ \t]+((default_termination)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(default_termination)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(default_termination)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.optimize', by: 'from pymoo.core.algorithm' } }
 fix: $FIXED
@@ -2698,8 +2416,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.optimize[ \t]+import[ \t]+((default_termination)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(default_termination)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2720,8 +2436,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # A statement on one line that imports only names that moved to pymoo.util.display.output. The fix
@@ -2736,8 +2450,6 @@ rule:
   regex: '^from[ \t]+pymoo\.util\.display[ \t]+import[ \t]+((Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(Output|pareto_front_if_possible)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.util\.display', by: 'from pymoo.util.display.output' } }
 fix: $FIXED
@@ -2763,8 +2475,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.util\.display[ \t]+import[ \t]+((Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the replacement is a class that the code has to define.
@@ -2785,8 +2495,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the replacement is a class that the code has to define.
@@ -2807,8 +2515,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because the replacement is a class that the code has to define.
@@ -2829,8 +2535,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2851,8 +2555,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.5" }
 ---
 # A statement on one line that imports only names that moved to
@@ -2867,8 +2569,6 @@ rule:
   regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((euclidean_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(euclidean_distance)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(euclidean_distance)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.util\.misc', by: 'from pymoo.indicators.distance_indicator' } }
 fix: $FIXED
@@ -2894,8 +2594,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((euclidean_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(euclidean_distance)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.5" }
 ---
 # No fix, because pymoo 0.6.2 has no replacement for the name.
@@ -2916,8 +2614,6 @@ rule:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.5" }
 ---
 # A statement on one line that imports only names that moved to
@@ -2932,8 +2628,6 @@ rule:
   regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?$'
   has: { stopBy: end, kind: dotted_name, regex: '^(calc_perpendicular_distance)$', pattern: $N }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 transform:
   FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.util\.misc', by: 'from pymoo.functions.standard.calc_perpendicular_distance' } }
 fix: $FIXED
@@ -2959,8 +2653,6 @@ rule:
       - inside: { kind: aliased_import, field: alias }
       - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
 # The termination names that get_termination and the tuple form took up to 0.5.0. Each of the ten
@@ -2985,8 +2677,6 @@ rule:
           - inside: { kind: argument_list, inside: { matches: pymoo-minimize } }
           - inside: { kind: keyword_argument, has: { field: name, regex: '^termination$' }, inside: { kind: argument_list, inside: { matches: pymoo-minimize } } }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
 # An indicator is run with do since 0.5.0, and can be called since 0.6.0. calc raises
@@ -3028,7 +2718,5 @@ rule:
     - inside: { kind: module, stopBy: end, has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.(indicators|performance_indicator|factory)\b[^#]*\bimport\b[^#]*\b(GD|GDPlus|IGD|IGDPlus|HV|Hypervolume|RMetric|get_performance_indicator)\b' } }
     - not: { inside: { kind: module, stopBy: end, has: { stopBy: end, kind: class_definition, has: { field: name, pattern: $CLS } } } }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: $I.do($$$A)
 metadata: { fix: unsafe, since: "0.5" }

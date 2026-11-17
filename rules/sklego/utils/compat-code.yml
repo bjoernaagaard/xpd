@@ -1,0 +1,3 @@
+id: compat-code
+language: python
+rule: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }

@@ -21,8 +21,6 @@ rule:
     - kind: attribute
       regex: '^mapie\.regression\.MapieRegressor$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # No fix, because the class to use depends on cv, and the constructor, fit and predict change
@@ -38,8 +36,6 @@ rule:
     - kind: attribute
       regex: '^mapie\.classification\.MapieClassifier$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # No fix, because the new class takes other arguments or methods at every use of the class,
@@ -52,8 +48,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieQuantileRegressor\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # No fix, because the new class takes other arguments or methods at every use of the class,
@@ -66,8 +60,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieTimeSeriesRegressor\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # No fix, because the new class takes other arguments or methods at every use of the class,
@@ -80,8 +72,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieCalibrator\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # No fix, because the new class takes other arguments or methods at every use of the class,
@@ -94,8 +84,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bMapieMultiLabelClassifier\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # MAPIE 1.0 and 1.1 had PrecisionRecallController, and 1.3.0 has only the new name. No fix,
@@ -108,8 +96,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+mapie(\.\w+)*\s+import\b[^#]*\bPrecisionRecallController\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.3" }
 ---
 # No fix, because MAPIE 1 has no class in its place.
@@ -124,8 +110,6 @@ rule:
     - kind: import_statement
       regex: '\bmapie\.mondrian\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # No fix, because the message names two base classes and the import does not show which one
@@ -141,8 +125,6 @@ rule:
     any:
       - regex: '^from\s+mapie\.conformity_scores(\.\w+)*\s+import\s+\(?[\s,]*((Absolute|Gamma|Std|Naive|LAC|APS|RAPS|TopK)ConformityScore(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
       - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # The modules that 1.0 removed or made private. A statement that also names a removed class is
@@ -161,8 +143,6 @@ rule:
     - inside: { kind: import_statement }
     - inside: { kind: aliased_import, inside: { kind: import_statement } }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # mapie._typing held ArrayLike and NDArray, which it took from numpy.typing.
@@ -179,8 +159,6 @@ rule:
     field: module_name
     regex: '^from\s+mapie\._typing\s+import\s+\(?[\s,]*((ArrayLike|NDArray)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: numpy.typing
 metadata: { fix: safe, since: "1.0" }
 ---
@@ -198,8 +176,6 @@ rule:
     field: module_name
     regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((coverage_width_based|hsic|regression_coverage_score|regression_mean_width_score|regression_mwi_score|regression_ssc|regression_ssc_score)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: mapie.metrics.regression
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -215,8 +191,6 @@ rule:
     field: module_name
     regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((classification_coverage_score|classification_mean_width_score|classification_ssc|classification_ssc_score)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: mapie.metrics.classification
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -232,8 +206,6 @@ rule:
     field: module_name
     regex: '^from\s+mapie\.metrics\s+import\s+\(?[\s,]*((add_jitter|cumulative_differences|expected_calibration_error|kolmogorov_smirnov_cdf|kolmogorov_smirnov_p_value|kolmogorov_smirnov_statistic|kuiper_cdf|kuiper_p_value|kuiper_statistic|length_scale|sort_xy_by_y|spiegelhalter_p_value|spiegelhalter_statistic|top_label_ece)(\s+as\s+\w+)?[\s,]*)+\)?\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: mapie.metrics.calibration
 metadata: { fix: unsafe, since: "1.0" }
 ---
@@ -257,8 +229,6 @@ rule:
     - kind: import_from_statement
       regex: '^from\s+mapie\.metrics\.\w+\s+import\b[^#]*\b(regression|classification)_coverage_score_v2\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
 # The 0.x metrics took the two bounds as two arrays. On the same bounds, the fixed call on 1.6.0

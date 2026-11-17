@@ -25,8 +25,6 @@ rule:
     - kind: import_statement
       regex: '^import\s+arch\.__future__\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: ""
 metadata: { fix: unsafe, since: "9.0" }
 ---
@@ -56,7 +54,6 @@ rule:
             - has: { field: object, matches: result }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -104,7 +101,6 @@ rule:
             - not: { has: { field: object, matches: result } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   model-call: { kind: call, has: { field: function, regex: '(^|\.)(arch_model|ConstantMean|ZeroMean|ARX|HARX|LS|MAMean|ARCHInMean)$' } }
   model:
     any:
@@ -149,8 +145,6 @@ rule:
         kind: call
         has: { field: function, pattern: $C, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap)$' }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: seed
 metadata: { fix: safe, since: "8.0" }
 ---
@@ -172,8 +166,6 @@ rule:
         kind: call
         has: { field: function, pattern: $C, regex: '(^|\.)LocalBlockBootstrap$' }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: seed
 metadata: { fix: unsafe, since: "8.0" }
 ---
@@ -198,7 +190,6 @@ rule:
         has: { field: function, pattern: $C, matches: distribution-class }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   distribution-class:
     any:
       - kind: attribute
@@ -234,7 +225,6 @@ rule:
     - not: { has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   distribution-class:
     any:
       - kind: attribute
@@ -268,7 +258,6 @@ rule:
     - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   distribution-class:
     any:
       - kind: attribute
@@ -302,7 +291,6 @@ rule:
   has: { field: function, kind: attribute, has: { field: object, matches: resampler } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap)$' } }
   resampler:
     kind: identifier
@@ -326,7 +314,6 @@ rule:
   has: { field: function, kind: attribute, has: { field: object, matches: resampler, not: { matches: old-resampler } } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   resampler:
     kind: identifier
@@ -362,7 +349,6 @@ rule:
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap)$' } }
   resampler:
     kind: identifier
@@ -389,7 +375,6 @@ rule:
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   resampler:
     kind: identifier
@@ -439,7 +424,6 @@ rule:
                   - inside: { kind: expression_statement }
                   - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap|SPA|StepM|MCS|RealityCheck)$' } }
   bootstrap-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   bootstrap:
@@ -474,7 +458,6 @@ rule:
     - not: { inside: { kind: call, field: function } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap)$' } }
   resampler:
     kind: identifier
@@ -500,7 +483,6 @@ rule:
     - not: { inside: { kind: call, field: function } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   resampler-call: { kind: call, has: { field: function, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   resampler:
     kind: identifier
@@ -537,7 +519,6 @@ rule:
     - not: { has: { matches: other-name } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   cov-name: { any: [{ kind: dotted_name, regex: '^cov_nw$' }, { kind: aliased_import, has: { field: name, regex: '^cov_nw$' } }] }
   other-name: { any: [{ kind: dotted_name, not: { regex: '^(cov_nw|arch\.utility)$' } }, { kind: aliased_import, not: { has: { field: name, regex: '^cov_nw$' } } }] }
 fix: from arch.utility.cov import $COV
@@ -559,7 +540,6 @@ rule:
     - has: { matches: other-name }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   cov-name: { any: [{ kind: dotted_name, regex: '^cov_nw$' }, { kind: aliased_import, has: { field: name, regex: '^cov_nw$' } }] }
   other-name: { any: [{ kind: dotted_name, not: { regex: '^(cov_nw|arch\.utility)$' } }, { kind: aliased_import, not: { has: { field: name, regex: '^cov_nw$' } } }] }
 rewriters:
@@ -593,7 +573,6 @@ rule:
     - not: { has: { matches: cov-name } }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   cov-name: { any: [{ kind: dotted_name, regex: '^cov_nw$' }, { kind: aliased_import, has: { field: name, regex: '^cov_nw$' } }] }
   other-name: { any: [{ kind: dotted_name, not: { regex: '^(cov_nw|arch\.utility)$' } }, { kind: aliased_import, not: { has: { field: name, regex: '^cov_nw$' } } }] }
 metadata: { since: "8.0" }
@@ -619,7 +598,6 @@ rule:
           - has: { field: object, matches: comparison }
   not: { matches: compat-code }
 utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
   block-call: { kind: call, has: { field: function, regex: '(^|\.)(StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' } }
   block-bootstrap:
     kind: identifier
@@ -668,6 +646,4 @@ rule:
                   stopBy: end
                   has: { kind: import_from_statement, stopBy: end, all: [{ has: { field: module_name, regex: '^arch\.bootstrap(\.multiple_comparison)?$' } }, { has: { stopBy: end, kind: identifier, pattern: $C } }] }
   not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|arch_version|ARCH_V' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "9.0" }

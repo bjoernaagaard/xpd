@@ -1,0 +1,6 @@
+id: deprecated-compat-code
+language: python
+rule:
+  any:
+    - inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(TypeError|ValueError)' } }
+    - inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } }

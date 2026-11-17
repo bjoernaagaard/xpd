@@ -18,8 +18,6 @@ rule:
     kind: import_from_statement
     regex: '^from\s+sklego\.preprocessing(\.patsytransformer)?\s+import\b'
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 metadata: { since: "0.8" }
 ---
 # FairClassifier was a subclass of DemographicParityClassifier that added nothing, so the new
@@ -36,8 +34,6 @@ rule:
     kind: module
     has: { stopBy: end, kind: import_from_statement, regex: '^from\s+sklego\.linear_model\s+import\b[^#]*\bFairClassifier\b' }
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: DemographicParityClassifier
 metadata: { fix: unsafe, since: "0.8" }
 ---
@@ -54,8 +50,6 @@ rule:
     kind: module
     has: { stopBy: end, kind: import_from_statement, regex: '^from\s+sklego\.meta\s+import\b[^#]*\bGroupedEstimator\b' }
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: GroupedPredictor
 metadata: { fix: unsafe, since: "0.8" }
 ---
@@ -69,8 +63,6 @@ rule:
   kind: import_from_statement
   regex: '^from\s+sklego\.meta\s+import\s+OutlierRemover\s*$'
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: from sklego.preprocessing import OutlierRemover
 metadata: { fix: unsafe, since: "0.8" }
 ---
@@ -89,8 +81,6 @@ rule:
       - regex: '^from\s+sklego\.meta\s+import\b'
       - not: { regex: '^from\s+sklego\.meta\s+import\s+OutlierRemover\s*$' }
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 metadata: { since: "0.8" }
 ---
 # The module that held it. Every name it had is in sklego.preprocessing.
@@ -103,8 +93,6 @@ rule:
   regex: '^sklego\.meta\.outlier_remover$'
   inside: { kind: import_from_statement, field: module_name }
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: sklego.preprocessing
 metadata: { fix: unsafe, since: "0.8" }
 ---
@@ -120,8 +108,6 @@ rule:
   regex: '^sklego\.(meta\.grouped_estimator|preprocessing\.patsytransformer)$'
   any: [{ inside: { kind: import_from_statement, field: module_name } }, { inside: { kind: import_statement } }, { inside: { kind: aliased_import, inside: { kind: import_statement } } }]
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 metadata: { since: "0.8" }
 ---
 # The dataset loaders renamed give_pandas= to as_frame= and dropped the old keyword in 0.6.6.
@@ -143,8 +129,6 @@ rule:
   not: { matches: compat-code }
 constraints:
   F: { regex: '^(load_(penguins|arrests|chicken|abalone|heroes|hearts)|make_simpleseries)$' }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: as_frame=$V
 metadata: { fix: safe, since: "0.6.6" }
 ---
@@ -166,8 +150,6 @@ rule:
       kind: call
       has: { field: function, regex: '(^|\.)DecayEstimator$' }
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: 'decay_kwargs={"decay_rate": $V}'
 metadata: { fix: unsafe, since: "0.7" }
 ---
@@ -186,6 +168,4 @@ rule:
       kind: call
       has: { field: function, regex: '(^|\.)DecayEstimator$' }
   not: { matches: compat-code }
-utils:
-  compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 metadata: { since: "0.7" }

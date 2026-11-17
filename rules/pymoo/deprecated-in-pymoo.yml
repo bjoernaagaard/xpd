@@ -13,9 +13,7 @@ message: StarmapParallelization moved to pymoo.parallelization in pymoo 0.6.1.6.
 rule:
   kind: import_from_statement
   regex: '^from\s+pymoo\.core\.problem\s+import\s+\(?\s*StarmapParallelization\s*,?\s*\)?$'
-  not: { matches: compat-code }
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+  not: { matches: deprecated-compat-code }
 fix: from pymoo.parallelization import StarmapParallelization
 metadata: { fix: safe, since: "0.6.1.6" }
 ---
@@ -37,9 +35,7 @@ rule:
   not:
     any:
       - inside: { kind: aliased_import, field: alias }
-      - matches: compat-code
-utils:
-  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+      - matches: deprecated-compat-code
 metadata: { since: "0.6.1.6" }
 ---
 # Population.get("feasible") reads the feasible property of every individual, which warns since

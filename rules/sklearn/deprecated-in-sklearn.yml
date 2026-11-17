@@ -13,14 +13,9 @@ message: $C(probability=True) is deprecated since 1.9 and will be removed in 1.1
 rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, regex: '^probability\s*=\s*True$' } }
-  not: { matches: compat-code }
+  not: { matches: deprecated-compat-code }
 constraints:
   C: { regex: '(^|\.)(SVC|NuSVC)$' }
-utils:
-  compat-code:
-    any:
-      - inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(TypeError|ValueError)' } }
-      - inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } }
 rewriters:
   - id: drop
     rule: { kind: keyword_argument, has: { field: name, regex: ^probability$ } }
@@ -54,14 +49,9 @@ rule:
   not:
     any:
       - has: { field: arguments, has: { kind: keyword_argument, regex: '^probability\s*=\s*(True|False)$' } }
-      - matches: compat-code
+      - matches: deprecated-compat-code
 constraints:
   C: { regex: '(^|\.)(SVC|NuSVC)$' }
-utils:
-  compat-code:
-    any:
-      - inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*\(?[\w\s,.]*(TypeError|ValueError)' } }
-      - inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|sklearn_version|SKLEARN' } }
 metadata: { since: "1.9" }
 ---
 # probability=False is what the default does, so the keyword can go. The parameter that the
