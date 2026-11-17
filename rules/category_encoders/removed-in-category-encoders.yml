@@ -182,7 +182,8 @@ metadata: { since: "2.7" }
 # feature_names_out_ was a list until 2.6 and is a NumPy array since 2.7, which has no list
 # methods: "AttributeError: 'numpy.ndarray' object has no attribute 'index'".
 # feature_names_in_ is still a list. No scikit-learn estimator has feature_names_out_.
-# Unsafe: index and count raised before the fix, which reads them on a list of the names.
+# Safe: on category_encoders 2.6.4 feature_names_out_ is a list, and index and count gave the
+# same values on it and on list() of it.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -193,7 +194,7 @@ rule:
 constraints:
   M: { regex: '^(index|count)$' }
 fix: list($E.feature_names_out_).$M($$$A)
-metadata: { fix: unsafe, since: "2.7" }
+metadata: { fix: safe, since: "2.7" }
 
 ---
 # remove, append, extend, insert and pop have no fix, because on a copy of the names they would
@@ -211,7 +212,8 @@ metadata: { since: "2.7" }
 ---
 # get_feature_names_out returned the list on 2.6.0 and wraps it in np.array since 2.6.1, one
 # release series before the attribute changed.
-# Unsafe: index and count raised before the fix, which reads them on a list of the names.
+# Safe: on category_encoders 2.6.0 get_feature_names_out() is a list, and index and count gave
+# the same values on it and on list() of it.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -222,7 +224,7 @@ rule:
 constraints:
   M: { regex: '^(index|count)$' }
 fix: list($E.get_feature_names_out()).$M($$$A)
-metadata: { fix: unsafe, since: "2.6.1" }
+metadata: { fix: safe, since: "2.6.1" }
 
 ---
 # remove, append, extend, insert and pop have no fix, for the same reason as above.

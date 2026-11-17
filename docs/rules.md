@@ -7156,7 +7156,7 @@ removed form turns code that raises into code that runs, so no such fix is safe.
 
 #### removed-in-sklego
 
-**Severity:** error. **Fix:** unsafe: `DemographicParityClassifier` for `FairClassifier`, `GroupedPredictor` for `GroupedEstimator`, `from sklego.preprocessing import OutlierRemover` for the import from `sklego.meta`, `as_frame=` for `give_pandas=`, and `decay_kwargs={"decay_rate": 0.99}` for `decay=0.99`. The other forms have no fix.
+**Severity:** error. **Fix:** safe: `as_frame=` for `give_pandas=` on the dataset loaders, which gave equal values with either keyword on scikit-lego 0.6.3. unsafe: `DemographicParityClassifier` for `FairClassifier`, `GroupedPredictor` for `GroupedEstimator`, and `sklego.preprocessing` for the import of `OutlierRemover` from `sklego.meta` or `sklego.meta.outlier_remover`, because on 0.7.4 each old name is another class than the new one, and `decay_kwargs={"decay_rate": 0.99}` for `decay=0.99`, which no release took beside `decay=` and which gives the same weights only to rounding. The other forms have no fix.
 
 The rule reports forms that scikit-lego removed. An import inside a `try` block that catches the
 error is left alone.
@@ -7453,7 +7453,7 @@ old form and is never safe.
 
 #### removed-in-mapie
 
-**Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based` when the value is a number or a name, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. A list of numbers given as `alpha=` on a constructor or on `TimeSeriesRegressor.predict` becomes `confidence_level=` with 1 minus each number, `fit_conformalize` replaces `fit` on a cross or jackknife object, `method=` becomes `conformity_score=` on a classifier when its value is `"lac"`, `"aps"`, `"raps"` or `"top_k"`, and `method=` is taken out of `TopLabelCalibrator`, which drops the comments between the arguments. The removed classes and modules, `alpha=` on `predict_interval`, `predict_set` and `predict`, `cv=` and the other values of `method` have no fix, because the rewrite reaches other calls or the message names more than one.
+**Severity:** error. **Fix:** safe: `numpy.typing` for `mapie._typing`, because on MAPIE 0.9.2 `ArrayLike` and `NDArray` of `mapie._typing` are the objects of `numpy.typing`. unsafe: `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based` when the value is a number or a name, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. A list of numbers given as `alpha=` on a constructor or on `TimeSeriesRegressor.predict` becomes `confidence_level=` with 1 minus each number, `fit_conformalize` replaces `fit` on a cross or jackknife object, `method=` becomes `conformity_score=` on a classifier when its value is `"lac"`, `"aps"`, `"raps"` or `"top_k"`, and `method=` is taken out of `TopLabelCalibrator`, which drops the comments between the arguments. The removed classes and modules, `alpha=` on `predict_interval`, `predict_set` and `predict`, `cv=` and the other values of `method` have no fix, because the rewrite reaches other calls or the message names more than one. No release ran an unsafe fix's old and new form side by side, except `sample_weight=` and `fit_params=` on `TimeSeriesRegressor.fit` in 1.4.0, which ignored `sample_weight=` and gave other values, and `partial_fit` and `update` in 1.1.0, which are two methods.
 
 The rule reports the MAPIE 0.x API that raises on MAPIE 1.6.0:
 
@@ -8606,7 +8606,7 @@ clause expects the error or handles both releases, and is left alone.
 
 #### removed-in-category-encoders
 
-**Severity:** error. **Fix:** unsafe for the two renamed names in `category_encoders.utils`, `handle_missing="value"` for `impute_missing=True` in a call without `handle_missing`, dropping `randomized=` from a `LeaveOneOutEncoder` that has `sigma` or says `randomized=False`, and `list(...)` around `feature_names_out_` and `get_feature_names_out()` before `index` and `count`. The calls raised before the fix. The other forms have no fix, and `remove`, `append`, `extend`, `insert` and `pop` have none because on a copy of the names they would change nothing that the code reads afterwards.
+**Severity:** error. **Fix:** safe: `list(...)` around `feature_names_out_` and `get_feature_names_out()` before `index` and `count`, which gave the same values on 2.6.4 and on 2.6.0, where the names were a list. unsafe: the two renamed names in `category_encoders.utils`, because the old mixin is another class and `get_categorical_cols` also names category and string columns, `handle_missing="value"` for `impute_missing=True` in a call without `handle_missing`, which no release took beside `impute_missing`, and dropping `randomized=` from a `LeaveOneOutEncoder` that has `sigma` or says `randomized=False`, because on 1.3.0 `sigma` alone added no noise. The other forms have no fix, and `remove`, `append`, `extend`, `insert` and `pop` have none because on a copy of the names they would change nothing that the code reads afterwards.
 
 The rule reports forms that a release of category_encoders removed and that raise on 2.11.2.
 
@@ -9738,7 +9738,7 @@ the release before and the release at the version the rule names, both installed
 
 #### removed-in-linearmodels
 
-**Severity:** error. **Fix:** unsafe: `wald_test` for `test_linear_constraint`. The import has no fix.
+**Severity:** error. **Fix:** unsafe: `wald_test` for `test_linear_constraint`, because on 4.14 `test_linear_constraint` is a method of its own that warns and then calls `wald_test`. The import has no fix.
 
 The rule reports an import of `linearmodels.utility`, which 4.18 split into the modules of
 `linearmodels.shared`. It also reports `test_linear_constraint` on a result of `OLS`, `IV2SLS`,
@@ -9782,7 +9782,7 @@ Code inside a try block with an except clause is a compatibility path and is lef
 
 #### deprecated-in-linearmodels
 
-**Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module. unsafe: `absorb_options=` with `method="lsmr"` for `lsmr_options=` in a call that names neither `method` nor `absorb_options`. With `lsmr_options=None` or an empty dictionary the old call kept the default method, which may pick HDFE. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: the import of `linearmodels.__future__.ordering` is deleted when it is a statement of the module, and `absorb_options=` with `method="lsmr"` for `lsmr_options=` in a call that names neither `method` nor `absorb_options`, when the value is a dictionary written with at least one key. The two calls gave equal results on 7.1. unsafe: the same fix for any other value. With `lsmr_options=None` or an empty dictionary the old call kept the default method, which may pick HDFE. The other forms have no fix.
 
 The rule reports `from linearmodels.__future__ import ordering`, the `lsmr_options` keyword of
 `AbsorbingLS.fit`, and `linearmodels.DROP_MISSING`. 7.1 gives `FutureWarning` for each, and 8.0
@@ -9983,7 +9983,7 @@ the old form raises and its result cannot be compared with the result of the new
 
 #### removed-in-arch
 
-**Severity:** error. **Fix:** unsafe, because the old form raises: the `arch.__future__` import is deleted, `seed=` replaces `random_state=` on a bootstrap or a distribution and names the one positional argument of a distribution, `plot_type=` replaces `type=` on `hedgehog_plot` of a result that the file gets from an arch model, `bs.state` replaces `bs.get_state()`, `bs.state = s` replaces the statement `bs.set_state(s)`, and `bs.generator` replaces `bs.random_state`. The import of `cov_nw` from `arch.utility` moves to `arch.utility.cov`, and the other names of the same import stay in a line of their own. Deleting `import arch.__future__.reindexing` also stops that line from binding `arch`. `seed()` on an object, a distribution with more than one argument, `hedgehog_plot` of an object the file does not tie to arch, the read only attributes and the `nested` and `studentize` pair have no fix.
+**Severity:** error. **Fix:** safe, because arch 7.2.0 ran the old and the new form and gave equal values or the same object: `seed=` replaces `random_state=` on a distribution or on one of the five bootstraps that 7.2.0 has, and names the one positional argument of a distribution, `bs.state` replaces `bs.get_state()`, `bs.state = s` replaces the statement `bs.set_state(s)`, and `bs.generator` replaces `bs.random_state` on those bootstraps. The import of `cov_nw` from `arch.utility` moves to `arch.utility.cov`, and the other names of the same import stay in a line of their own. Also safe: `plot_type=` replaces `type=` on `hedgehog_plot` of a result that the file gets from an arch model, which drew the same figure with either keyword on 8.0.0. unsafe: the same bootstrap fixes on a `LocalBlockBootstrap`, which came in 9.0 and never took the old forms, and the deleted `arch.__future__` import. Deleting `import arch.__future__.reindexing` also stops that line from binding `arch`. `seed()` on an object, a distribution with more than one argument, `hedgehog_plot` of an object the file does not tie to arch, the read only attributes and the `nested` and `studentize` pair have no fix.
 
 The rule reports a form that arch 8.0 or 9.0 removed. The table after the example lists every form, with
 what it did on the release before the removal and what it does now.
@@ -10866,7 +10866,7 @@ accepted and do nothing on pymoo 0.6.2.
 
 #### removed-in-pymoo
 
-**Severity:** error. **Fix:** unsafe: the new module for 89 removed modules when every imported name is still in it, such as `pymoo.core.problem` for `pymoo.model.problem` and `pymoo.algorithms.moo.nsga2` for `pymoo.algorithms.nsga2`, the new import for `get_problem`, `get_termination` or `get_reference_directions` imported alone from `pymoo.factory`, `do` for `calc` on an indicator, and the new module for a name that moved, such as `pymoo.parallelization.dask` for `DaskParallelization` from `pymoo.core.problem`, when the statement is on one line and imports only names that moved there. `DES` gets the new module from pymoo 0.6.2 on, the first release that has it. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: the new module for 89 removed modules when every imported name is still in it, such as `pymoo.core.problem` for `pymoo.model.problem` and `pymoo.algorithms.moo.nsga2` for `pymoo.algorithms.nsga2`, the new import for `get_problem`, `get_termination` or `get_reference_directions` imported alone from `pymoo.factory`, `do` for `calc` on an indicator, and the new module for a name that moved, such as `pymoo.parallelization.dask` for `DaskParallelization` from `pymoo.core.problem`, when the statement is on one line and imports only names that moved there. `DES` gets the new module from pymoo 0.6.2 on, the first release that has it. No release from 0.4.2.2 to 0.6.2 had an old and a new form as one object. The new modules of 0.5.0 and the new homes of the moved names came after the old ones went, the `pymoo.factory` functions of 0.6.0 are wrappers that warn and call the new ones, the sorting functions of 0.6.1.6 are other objects than their new copies, and no release has both `calc` and `do` on an indicator. The other forms have no fix.
 
 The rule reports a module, a name or an option that pymoo removed between 0.5.0 and 0.6.2, and the
 message names what took its place where there is one.

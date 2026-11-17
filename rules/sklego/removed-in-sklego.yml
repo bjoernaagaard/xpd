@@ -2,7 +2,8 @@
 # removed, or a keyword that a signature no longer has. Code inside a try block that catches the
 # error is a compatibility path and stays silent.
 #
-# A fix here turns code that raises into code that runs, so every fix is unsafe.
+# A fix here turns code that raises into code that runs. It is safe only where an older release
+# ran the old and the new form and gave an equal value, and unsafe everywhere else.
 
 # No fix, because every use of the name has to change too, and formulaic reads some formulas in another way.
 id: removed-in-sklego
@@ -124,6 +125,7 @@ utils:
 metadata: { since: "0.8" }
 ---
 # The dataset loaders renamed give_pandas= to as_frame= and dropped the old keyword in 0.6.6.
+# Safe: on scikit-lego 0.6.3 each loader gave equal pickles with give_pandas and with as_frame.
 id: removed-in-sklego
 language: python
 severity: error
@@ -144,7 +146,7 @@ constraints:
 utils:
   compat-code: { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|Exception))' } } }
 fix: as_frame=$V
-metadata: { fix: unsafe, since: "0.6.6" }
+metadata: { fix: safe, since: "0.6.6" }
 ---
 # DecayEstimator took decay= until 0.7.0, which built the weights decay ** (n - i). The
 # exponential decay function now takes that number as decay_rate through decay_kwargs.

@@ -5,8 +5,8 @@
 # try block that catches the error, or behind a version check, is a compatibility path and stays
 # silent, and so does code inside pytest.raises or pytest.warns, which is meant to raise.
 #
-# A fix here turns code that raises into code that runs, so no fix can be compared with the old
-# form and every fix is unsafe.
+# A fix here turns code that raises into code that runs. It is safe only where a 0.x release ran
+# the old and the new form and gave the same object, and unsafe everywhere else.
 
 # No fix, because the class to use depends on cv, and the constructor, fit and predict change
 # at every use of the class.
@@ -166,6 +166,7 @@ utils:
 metadata: { since: "1.0" }
 ---
 # mapie._typing held ArrayLike and NDArray, which it took from numpy.typing.
+# Safe: on MAPIE 0.9.2 mapie._typing.ArrayLike and NDArray are the objects of numpy.typing.
 id: removed-in-mapie
 language: python
 severity: error
@@ -181,7 +182,7 @@ rule:
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 fix: numpy.typing
-metadata: { fix: unsafe, since: "1.0" }
+metadata: { fix: safe, since: "1.0" }
 ---
 # mapie.metrics is a package since 1.0, and each function is in one of its modules. The fix
 # writes the module when every imported name is in the same one.
