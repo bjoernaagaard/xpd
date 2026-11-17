@@ -25,8 +25,11 @@ flags of the xpd you have installed.
 | [`skill`](#skill) | Prints the agent skill | No |
 | [`completions`](#completions) | Prints shell completion | No |
 
-The project's Python is the one in `$VIRTUAL_ENV`, or else in the nearest `.venv` at or above the
-current folder, or else `python3` on `PATH`.
+xpd uses the first of these Pythons that it finds as the project's Python:
+
+1. The one in `$VIRTUAL_ENV`
+2. The one in the nearest `.venv` at or above the current folder
+3. `python3` on `PATH`
 
 ## check
 
@@ -43,22 +46,26 @@ samples/bad.py:11:5: warning [pandas/concat-in-loop] out grows by one concat per
 xpd: 5 issues, 2 fixable with --fix --unsafe-fixes
 ```
 
-Each line gives the place, the severity, the rule and the message. `[*]` marks an issue that
-`--fix` fixes with the flags you passed. Folders respect `.gitignore`.
+Each line gives the place, the severity, the rule and the message, and `[*]` marks an issue that
+`--fix` fixes with the flags you passed. In a folder, xpd skips the files that `.gitignore` lists.
+
+Which rules run on a file depends on what the file imports and on what the project's Python has
+installed.
 
 | Rules | Run on |
 | --- | --- |
 | The rules of a library, such as `pandas/row-loop` | Files that import the library |
 | The Python rules | Every file |
-| A rule for a newer library version than the project's venv holds | No file, because xpd skips the rule |
-| A package check, such as `pandas/missing-pyarrow` | The project, once per run, when its venv has the library and lacks the package |
+| A rule for a newer library version than the project's Python has | No file, because xpd skips the rule |
+| A package check, such as `pandas/missing-pyarrow` | The project, once per run, when the project's Python has the library and lacks the package |
 
 See [Rules](rules.md) for every rule.
 
 ### Fixes
 
-`--fix` writes the fixes and then lints what is left. A safe fix keeps what the code does. An
-unsafe fix may change it, for example because another name still points at the old object.
+`--fix` writes the safe fixes and then lints what is left, and `--unsafe-fixes` adds the unsafe
+fixes. A fix is unsafe when it may change what the code does, for example when another name still
+points at the old object.
 
 | Flags | Effect |
 | --- | --- |
@@ -77,7 +84,7 @@ The output is text on a terminal and JSON otherwise, and `--format` picks one of
 | --- | --- |
 | `text` | One line per issue, then a summary line |
 | `json` | `fixed`, `fixable` and `issues`, as below |
-| `sarif` | SARIF 2.1.0, with an entry for each rule, with its id, message and link, and a result for each issue, with its level, message and place |
+| `sarif` | SARIF 2.1.0, the results format that code scanning tools read, with an entry for each rule, with its id, message and link, and a result for each issue, with its level, message and place |
 | `github` | One GitHub Actions workflow command per issue, such as `::error file=samples/bad.py,line=6,col=5,title=pandas/chained-assignment::...` |
 
 ```console
@@ -99,7 +106,8 @@ $ xpd check samples/bad.py --format json | jq '{fixed, fixable, issue: .issues[1
 ```
 
 `fixed` counts the fixes that `--fix` wrote, and `fixable` counts the issues that `--fix` would fix
-with the same `--unsafe-fixes` setting. `fix` is `safe`, `unsafe` or `null`. A package check is
+with the same `--unsafe-fixes` setting. In each issue, `fix` is `safe`, `unsafe`, or `null` when
+the rule has no fix. A package check is
 about the project and not about a place in a file, so its `line` and `column` are `null`.
 
 | Exit code | Meaning |
@@ -123,8 +131,8 @@ The format never changes the exit code or the rules that run.
 
 ### Project rules
 
-A project adds its own rules in the nearest `sgconfig.yml` or `sgconfig.yaml` at or above the
-current folder, and `--config` (`-c`) names another file.
+You add your own rules in the nearest `sgconfig.yml` or `sgconfig.yaml` at or above the current
+folder, or in another file that `--config` (`-c`) names.
 
 | File or key | What it holds |
 | --- | --- |
@@ -132,13 +140,20 @@ current folder, and `--config` (`-c`) names another file.
 | `utilDirs` in `sgconfig.yml` | Utilities that rules use with `matches: <name>` |
 | `xpd.yml` beside `sgconfig.yml` | Library packs, each with a Python module and its own `ruleDirs` |
 
-[`xpd new project`](#new) writes both files. A rule in a library pack gets the import gate,
-version bounds and value proofs of a bundled pack, and a plain rule runs without them. A project
-rule whose fix has no `metadata.fix` gets an unsafe fix.
+[`xpd new project`](#new) writes both files. A rule in a library pack gets the three checks of a
+bundled pack, and a plain rule runs without them.
 
-xpd finds the language of each file by its file name. It warns when `sgconfig.yml` sets
-`languageGlobs` or `languageInjections`, which it does not read, and it skips the rules and
-utilities of `customLanguages`.
+| Check | What it does |
+| --- | --- |
+| Import gate | Runs the rule only on files that import the pack's module |
+| Version bounds | Runs the rule only for the library versions that its `since` and `until` name |
+| Value proofs | Keeps a match only when a variable holds a value of the shape that the rule names |
+
+A project rule gets an unsafe fix unless its `metadata.fix` says `safe`.
+
+xpd finds the language of each file by its file name, so it ignores the keys of `sgconfig.yml`
+that set languages in other ways. It warns when `sgconfig.yml` sets `languageGlobs` or
+`languageInjections`. It skips the rules and utilities of `customLanguages`.
 
 ### Suppress an issue
 
@@ -151,14 +166,15 @@ for i, row in df.iterrows():
     pass
 ```
 
-A comment without a rule name turns off every rule. Suppressions use public rule names, so one
-name covers every variant of a rule. xpd reports a comment that suppresses nothing as
-`xpd/unused-suppression`, with severity hint. A run with `--rule` or `--severity` skips the check for
-unused suppressions, because a rule it left out could use the comment.
+A comment without a rule name turns off every rule. A comment names a rule as the issues show it, so
+one name covers every variant of the rule. xpd reports a comment that suppresses nothing as
+`xpd/unused-suppression`, with severity hint. A run with `--rule` or `--severity` skips the check
+for unused suppressions, because a rule it left out could use the comment.
 
 ## rules
 
-`xpd rules` lists every rule and package check of every pack, whatever the project's venv holds.
+`xpd rules` lists every rule and package check of every pack, whatever the project's Python has
+installed.
 
 ```console
 $ xpd rules --format text | grep '(since' | head -3
@@ -187,15 +203,15 @@ The JSON is a list with one object per rule.
 | `url` | The rule's section on [Rules](rules.md) |
 | `doc` | The rule's section as Markdown |
 
-A rule file may hold several documents, one for each form that the rule matches. `rules` lists
+A rule file may hold several YAML documents, one for each form that the rule matches. `rules` lists
 them as one rule, with the highest severity of the documents, the message of the first and the
 least safe fix. `since` is the lowest version, or `null` when one document applies to every
 version.
 
 ## run
 
-`xpd run` finds code that matches a syntax pattern or a node kind, without running the code, and
-can rewrite each match.
+`xpd run` finds code that matches a syntax pattern or a syntax kind, without running the code, and
+it can rewrite each match.
 
 ```console
 $ xpd run --lang python --pattern '$X.iterrows()' samples/bad.py
@@ -203,7 +219,8 @@ samples/bad.py
 5│for i, row in df.iterrows():
 ```
 
-A rewrite is a preview until you pass a flag that writes it.
+A rewrite only prints a diff until you pass `-U` to write every rewrite or `-i` to choose each one.
+The example uses `query`, which is another name for `run`.
 
 ```console
 $ xpd query -p 'pd.merge($$$A)' -r 'df.merge(other, on="k")' samples/bad.py
@@ -219,12 +236,12 @@ samples/bad.py
 11 11│     out = pd.concat([out, pd.read_csv(f)])
 ```
 
-`query` is another name for `run`. A rewrite has no xpd value proof and no safe or unsafe class, so
-read the preview before you write it.
+xpd does not check a rewrite or mark it safe the way it does a rule fix, so read the diff before you
+write it.
 
 | Flag | Effect |
 | --- | --- |
-| `--pattern`, `-p` | The code to match, with metavariables such as `$X` and `$$$ARGS` |
+| `--pattern`, `-p` | The code to match. A metavariable such as `$X` matches one syntax node, and `$$$ARGS` matches zero or more |
 | `--kind`, `-k` | A syntax kind to match, or a selector such as `call > identifier` |
 | `--selector KIND` | Makes the part of the pattern with that kind the match |
 | `--lang`, `-l` | The language of the pattern. Without it, each file's extension names its language |
@@ -242,8 +259,8 @@ $ xpd run -p '$X.iterrows()' samples/bad.py --format json | jq -c '.[0] | keys, 
 {"byteOffset":{"start":99,"end":112},"start":{"line":4,"column":14},"end":{"line":4,"column":27}}
 ```
 
-Each JSON match has the file, the text, the byte range, the line and column range, the language
-and the captured metavariables. Lines and columns in the JSON count from zero.
+Lines and columns in the JSON count from zero, so `"line":4` is the line that the text output shows
+as `5│`.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -303,7 +320,7 @@ function: margin, costs, costs_again, report
 | `--outline-rules FILE` | Adds outline rules in the schema of `ast-grep outline --outline-rules` |
 | `--no-default-outline-rules` | Uses only the rules of `--outline-rules` |
 | `--format json` or `--json` | Prints JSON, with each item's range, signature, kind and members |
-| `--stdin` | Reads the code from stdin, in the language of `--lang` |
+| `--stdin --lang LANG` | Reads the code from stdin, in that language |
 
 ```console
 $ xpd outline samples/graph --type function --match '^(totals|flags)' --view signatures
@@ -314,22 +331,23 @@ samples/graph/steps.py
 
 ## graph
 
-`xpd graph` prints the dataflow of Python files, which part of the code reads the result of which
-other part, and what does not connect. It imports nothing and runs nothing, so it needs no Python.
+`xpd graph` prints which part of the code in Python files reads the result of which other part,
+and it reports the reads that would fail and the results that nothing reads. It imports nothing
+and runs nothing, so it needs no Python.
 
 ```sh
 xpd graph [PATHS]... [--format text|json]
 ```
 
-It reads a file in one of two ways.
+`graph` reads each file as step code, as Hamilton modules, or both ways, by what the file holds.
+A frame is a pandas DataFrame.
 
 | A file with | Is read as |
 | --- | --- |
 | A function that passes a frame through other functions of the file | [Step code](#step-code) |
+| A pipeline, and an import of `hamilton` | Step code and Hamilton modules |
+| Pipelines that are all [method chains](#method-chains) | Step code and Hamilton modules |
 | Anything else | [Hamilton modules](#hamilton-modules) |
-
-A file with a pipeline that also imports `hamilton` is read both ways. So is a file whose only
-pipelines are [method chains](#method-chains).
 
 ### Step code
 
@@ -389,9 +407,16 @@ xpd: 1 pipeline with 3 steps in 1 file, 2 errors
 | The tree in the module docstring differs from the pipeline | warning | The description is out of date |
 | A frame of new columns is not joined to the result | note | The result lacks the new columns |
 
-Two formulas are the same when they are equal after each local name is replaced by what it stands
-for and the terms of each sum and product are sorted. So `a + b` in one step equals `b + a` in
-another.
+`graph` compares two formulas in the order below, so `a + b` in one step equals `b + a` in another.
+
+```text
+same_formula(left, right)
+  replace each local name with the expression it stands for
+  sort the terms of each sum and product
+  return left == right
+```
+
+`graph` sees a column only when the code reads or adds it in one of the ways below.
 
 | `graph` reads | As in |
 | --- | --- |
@@ -402,19 +427,34 @@ another.
 | A step defined at module level | `def totals(orders): ...`. A method of a class is not read |
 
 A step whose column names the file computes, as in `frame[prefix + "_total"]` or a join of
-`pd.get_dummies(...)`, is marked `and computed names`. `graph` still reads its named columns, and
-it leaves the step out of `order is free for`, because not all of its columns are known.
+`pd.get_dummies(...)`, is marked `and computed names`. `graph` still reads the step's named
+columns. It leaves the step out of `order is free for`, because it does not know all of the
+step's columns.
 
-The docstring check applies to a file with one pipeline of functions whose module docstring draws
-its steps as `├── step()` lines.
+`graph` compares the module docstring with the pipeline only in a file with one pipeline of
+functions, and only when the docstring lists the steps as `├── step()` lines, as
+`samples/graph/steps.py` does.
+
+```python
+"""A pipeline of steps, for `xpd graph samples/graph/steps.py`.
+
+Each step takes the frame and returns it with columns added. `xpd graph` reads which step needs
+which, and reports what the comments below name.
+
+    features(orders)
+    ├── totals()      net and gross amount per order
+    ├── shares()      each order's share of its customer's spending
+    └── flags()       large and discounted orders
+"""
+```
 
 #### Method chains
 
-`graph` reads a method chain as a pipeline too, with each `.assign(...)` of a chain of two or more
-steps as one step, named by the columns it adds. The chain can stand in a function or in a
-module statement, and it can mix `.assign(...)` with `.pipe(step)`. Formulas compare across the
-three ways to read a column, so `pd.col("a") * 2` in one step equals `d["a"] * 2` in the lambda of
-another.
+`graph` reads a method chain, such as `orders.assign(...).assign(...)`, as a pipeline too, with each
+`.assign(...)` of a chain of two or more steps as one step, named by the columns it adds. The chain
+can stand in a function or in a module statement, and it can mix `.assign(...)` with `.pipe(step)`.
+`graph` compares formulas across the three ways to read a column, so `pd.col("a") * 2` in one step
+equals `d["a"] * 2` in the lambda of another.
 
 ```console
 $ xpd graph samples/graph/chain.py
@@ -439,7 +479,7 @@ xpd: 2 pipelines with 6 steps in 1 file, 2 nodes from 2 functions, 2 inputs, 2 w
 
 A pipeline in a module statement is named after the variable it is assigned to, as `margins` is
 above. A function that another pipeline runs as a step counts as one step, and its own chain
-is not listed as a second pipeline. The file has only chains as pipelines, so its functions are
+is not listed as a second pipeline. `chain.py` has only chains as pipelines, so its functions are
 also listed as [Hamilton nodes](#hamilton-modules), in the lines from `orders -> features` to
 `read by no node`.
 
@@ -448,11 +488,11 @@ also listed as [Hamilton nodes](#hamilton-modules), in the lines from `orders ->
 `graph` prints which node of [Apache Hamilton](https://hamilton.apache.org/) modules reads which,
 and it reports names that would make the Driver fail. Hamilton turns each function of a module
 into a node, with the function name as the output and the parameter names as the inputs. `graph`
-needs no Python and no Hamilton.
+does not need Hamilton installed.
 
 Pass the modules that you give to one Driver, as in `with_modules(loaders, features)`, because
-together they make one dataflow. A folder means every `.py` file in it. Leave out the script that
-builds the Driver, or its functions show as nodes.
+together they make one dataflow. When you pass a folder, `graph` reads every `.py` file in it.
+Leave out the script that builds the Driver, or its functions show as nodes.
 
 ```console
 $ xpd graph samples/graph/features.py
@@ -480,6 +520,9 @@ xpd: 4 nodes from 4 functions in 1 file, 1 input, 1 warning
 | The return value or a parameter has no type hint | error | The Driver raises "Missing type hint" when it is built |
 | An input is one edit from a node name | warning | If it is a typing error, execute raises "Required input ... not provided" |
 | `graph` cannot read a decorator | note | Nothing, but the graph may lack nodes |
+
+`graph` reads the common Hamilton decorators when their arguments are literals, and it prints a
+note for the others.
 
 | Decorators | What `graph` does |
 | --- | --- |
@@ -530,7 +573,7 @@ $ xpd profile samples/data.csv
 {"file": "samples/data.csv", "pandas": "3.1.1", "rows": 3, "memory_bytes": 306, "columns": [{"column": "a", "dtype": "float64", "nulls": 1, "unique": 2, "memory_bytes": 24}, {"column": "b", "dtype": "str", "nulls": 0, "unique": 2, "memory_bytes": 150}], "findings": []}
 ```
 
-It reads `.csv`, `.parquet`, `.feather`, `.json` and `.xlsx` files, and it runs with the project's
+It reads `.csv`, `.parquet`, `.feather`, `.json` and `.xlsx` files. It runs with the project's
 Python, which needs pandas. Each finding has `finding`, `columns` and a `message` with what was
 measured on the file.
 
@@ -548,10 +591,11 @@ sex holds 2 distinct texts in 344 rows. As a category it took 452 bytes, where i
 
 ## refit
 
-`xpd refit` loads a saved scikit-learn Pipeline, fits a clone of it on the raw training rows, and
-tells you whether the outputs and scores match the ones its training script saved. Run it in the
-project root, with pandas and scikit-learn in the project's Python. The training script in
-`samples/pipeline` writes a model and a contract that you can try it on.
+`xpd refit` tells you whether a saved scikit-learn Pipeline, fitted again on the raw training rows,
+gives the outputs and scores that its training script saved. Run it in the project root, with
+pandas and scikit-learn in the project's Python. The contract is a JSON file that the training
+script saves, with the data file, the split, the scores and the model file. The script in
+`samples/pipeline` writes a model and a contract that you can try `refit` on.
 
 ```sh
 cd samples/pipeline
@@ -578,11 +622,16 @@ The contract must record `validation.splitter`, with `class` naming a splitter i
 `{"class": "StratifiedKFold", "args": {"n_splits": 5, "shuffle": true, "random_state": 0}}`. Every
 path in the contract must be inside the current folder. `refit` changes no saved file.
 
-`largest_gap` is null for a prediction that is not numeric, and `refit` still compares it.
-DataFrames and Series are compared as in [`equiv`](#equiv), with the pandas default relative
-tolerance of 0.00001 and absolute tolerance of 0.00000001 for floats. Other outputs and the
-scores must be exactly equal under `numpy.testing.assert_equal`, so save the contract scores
-without rounding.
+`refit` compares floats in DataFrames and Series with a tolerance, and it compares the other
+outputs and the scores exactly.
+
+| Output | How `refit` compares it |
+| --- | --- |
+| A DataFrame or a Series | As in [`equiv`](#equiv), with the pandas default relative tolerance of 0.00001 and absolute tolerance of 0.00000001 for floats |
+| Any other output, and the scores | Exactly, under `numpy.testing.assert_equal` |
+
+Save the contract scores without rounding, because `refit` compares them exactly. `largest_gap`
+is null for a prediction that is not numeric, and `refit` still compares that prediction.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -610,8 +659,8 @@ DataFrames and Series are compared with `pandas.testing`, and anything else with
 
 Each script runs in its own Python process, in the folder where you run `xpd equiv`. The second
 script gets no module, no `sys.path` entry and no variable from the first. What a script prints
-goes to stderr, so stdout holds only the JSON. Each `result` comes back as a pickle, so it cannot
-be an object of a class that the script itself defines.
+goes to stderr, so stdout holds only the JSON. xpd gets each `result` back from the script with
+Python's `pickle`, so it cannot be an object of a class that the script itself defines.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -621,8 +670,9 @@ be an object of a class that the script itself defines.
 
 ## find
 
-`xpd find` searches the library symbols, rules and worked recipes that ship with xpd for a task
-you describe in words, and it needs no library installed.
+`xpd find` searches the library symbols, rules and recipes that ship with xpd for a task you
+describe in words, and it needs no library installed. A recipe is a short worked example from a
+library's documentation.
 
 ```console
 $ xpd find "rounded bars" --kind recipe
@@ -637,8 +687,17 @@ Round to nearest integer towards zero.
 
 Without `--kind`, the text output has the headings `Symbols`, `Rules` and `Recipes`, each ranked on
 its own. A symbol line shows the names of its parameters and its rule links, and a long signature
-ends in `...` in text. JSON keeps every name, and [`api`](#api) prints each parameter as the source
-writes it.
+ends in `...` in text.
+
+```console
+$ xpd find "rounded bars" --kind symbol --package plotly --limit 1
+Symbols
+plotly.graph_objs.Bar(arg, alignmentgroup, base, cliponaxis, ...) [class]
+Construct a new Bar object
+Rules: plotly/bar-axis-without-zero, plotly/free-facet-scales, plotly/pattern-fill, plotly/redundant-color, plotly/table-for-small-data
+```
+
+JSON keeps every name, and [`api`](#api) prints each parameter as the source writes it.
 
 | Flag | Effect |
 | --- | --- |
@@ -661,14 +720,14 @@ questions about the properties of a method, such as which linear models need no 
 
 | Part | How it ranks |
 | --- | --- |
-| Keywords | BM25 over the words of names, signatures, docstring summaries, rule texts and recipe titles. Names are split at underscores and camel case, and name words get weight three. Parameter names, source documentation and member summaries get lower weights. Queries and entries share one suffix stemming |
+| Keywords | BM25, a standard keyword score, over the words of names, signatures, docstring summaries, rule texts and recipe titles. Names are split at underscores and camel case, and name words get weight three. Parameter names, source documentation and member summaries get lower weights. Queries and entries lose the same word endings, so `rounded` matches `round` |
 | Bonuses | Exact acronym names and phrases get a bonus, and shorter public paths rank higher |
-| Meaning | The query is embedded with the EmbeddingGemma 300M model and compared with a stored vector of each entry. `indexes/vectors.bin` keeps the first 256 values of each vector |
-| Combined | Within each group, reciprocal rank fusion combines the two rankings, and the top keyword matches get a bonus, so an exact match keeps its place |
+| Meaning | The EmbeddingGemma 300M model turns the query into a vector of numbers, and `find` compares it with a stored vector of each entry. `indexes/vectors.bin` keeps the first 256 values of each vector |
+| Combined | Within each group, reciprocal rank fusion adds up a score from the entry's place in each of the two rankings, and the top keyword matches get a bonus, so an exact match keeps its place |
 
-The first `find` downloads the model once, 333 MB, and prints a line on stderr before it starts.
-The download runs with the project's Python and writes under a temporary name, then moves the file
-into place. Later searches run offline.
+The first `find` downloads the 333 MB model once with the project's Python, and it prints a line
+on stderr before the download starts. The download writes the file under a temporary name and
+then moves it into place. Later searches run offline.
 
 | System | Where the model is kept |
 | --- | --- |
@@ -696,10 +755,9 @@ Round to nearest integer towards zero.
 ## api
 
 `xpd api` prints one symbol, method, rule or recipe in full, with each parameter as the source
-writes it, the first paragraph of the docstring, the public methods and the rules that may guard
-it. A parameter keeps its type annotation and its default, so you can write the call without
-importing the library. A stub file writes `...` in place of a default, so such a parameter is
-optional and the text does not give its value.
+writes it, the first paragraph of the docstring, the public methods and the rules that may apply
+to it. A parameter keeps its type annotation and its default, so you can write the call without
+importing the library.
 
 ```console
 $ xpd api sklego.meta.GroupedPredictor
@@ -738,15 +796,15 @@ $ xpd api sklearn.model_selection.TimeSeriesSplit.split --format json
 [{"kind":"symbol","package":"sklearn","name":"sklearn.model_selection.TimeSeriesSplit.split","callable":"method","parameters":["X","y","groups"],"parameters_written":["X","y=None","groups=None"],"summary":"Generate indices to split data into training and test set.","members":[],"rules":[]}]
 ```
 
-`--index FILE` adds a local index, which must have the [index schema](#index-file) of this xpd. A
-name that is not in the index exits 2.
+`--index FILE` adds a local index, which must have the [index schema](#index-file) of this xpd.
+`api` exits 2 for a name that is not in the index.
 
 | Entry | What `api` shows |
 | --- | --- |
 | A class | The parameters of its nearest `__init__`, or of its nearest `__new__` when it has no `__init__`, and its public methods and properties, with the inherited ones |
 | A method or property of a class, as `Class.member` | The parameters of the method and the first paragraph of its docstring. A property has no parameter list. The entry has no rule links |
 | The first parameter of a method or of a constructor, such as `self` or `cls` | Nothing, because Python binds it to the object or the class and a call does not pass it. A static method keeps its first parameter. A function of a module keeps a parameter named `self` or `cls`, such as the `cls` of `pandas.compat.set_function_name` |
-| Any parameter | The text of the source or stub file, with its type annotation and its default |
+| Any parameter | The text of the source or stub file, with its type annotation and its default. A stub file is a `.pyi` file of type annotations |
 | A parameter that the source writes over several lines | One line, without its comments and without a comma before a closing bracket. A line break inside a string is printed as `\n` |
 | A default that the source writes as `...`, such as those of `pandas.Timestamp.replace` | `= ...`. A stub file writes it in place of the real default, so the parameter is optional and the library's documentation has the value. Many numpy, pandas and scipy stubs do so |
 | A `*` or `/` that stands alone in the parameter list | The same character, so the parameters after `*` are keyword-only and those before `/` are positional-only. `parameters_written` holds it as an item of its own |
@@ -759,14 +817,15 @@ name that is not in the index exits 2.
 The printed text says how to call the symbol. It does not say what a parameter means, so read the
 library's documentation for that.
 
-The rule links come from the words of the symbol's name in the pack's rule patterns, regex
-patterns included. They show rules that may apply, and they do not prove that every use of the
-symbol matches a rule. A rule entry holds the rule's full documentation, so a search for words such
-as "small multiples" finds it. A rule prints as `plotly/bar-axis-without-zero [rule]`, without a
-call signature or the metavariables of its pattern.
+xpd links a rule to a symbol when the words of the symbol's name appear in the rule's patterns,
+regex patterns included. The links show rules that may apply, and they do not prove that every use
+of the symbol matches a rule.
 
-A recipe prints its title, its source pinned to a revision, the symbols it uses, its license name,
-whether xpd fixes changed it, the copyright lines of its source file when it has any, and the code.
+A rule entry holds the rule's full documentation, so a search for words such as "small multiples"
+finds it. A rule prints as `plotly/bar-axis-without-zero [rule]`, without a call signature or the
+metavariables of its pattern.
+
+A recipe prints its source, its license and whether xpd fixes changed it, above the code.
 
 ````console
 $ xpd api numpy/recipe/returns-array-of-indices-of-the-maximum-values
@@ -806,9 +865,9 @@ xpd find "grouped regression" --index local.json
 xpd api sklego.meta.GroupedPredictor --index local.json
 ```
 
-`xpd index` parses the source with Griffe 2.4.1 in the project's Python, so start it with
-`uv run --with griffe==2.4.1`. No other command needs Griffe. Without it, the command stops
-and prints the command to run.
+`xpd index` parses the source with Griffe 2.4.1, a Python package that reads the API of Python
+source, in the project's Python, so start it with `uv run --with griffe==2.4.1`. No other command
+needs Griffe. Without Griffe, `xpd index` stops and prints the command to run.
 
 ```console
 $ xpd index samples/sklego --package sklego --version 0.9.10
@@ -820,7 +879,7 @@ xpd: Index building needs griffe==2.4.1. Run uv run --with griffe==2.4.1 xpd ind
 | `--package NAME` | The Python import name of the library. Required |
 | `--version V` | The library version. Without it, the version comes from the wheel metadata, so pass it for a source checkout |
 | `--output FILE` | The file to write. The default is `indexes/<package>.json`, and the folder must exist |
-| `--examples DIR` | The documentation and gallery folder to harvest recipes from. Needs `--source-url` and `--license` |
+| `--examples DIR` | The documentation and gallery folder to collect recipes from. Needs `--source-url` and `--license` |
 | `--source-url URL` | The repository URL, ending in `/blob/<revision>` with a tag or commit |
 | `--license FILE` | The license file of the source, which names the license of each recipe |
 
@@ -832,7 +891,7 @@ works for a library without an xpd rule pack.
 
 Each index file has `schema_version`, `package`, `version` and `entries`. `schema_version` is 2.
 Schema 1 did not record which members of a class are properties, so `find` and `api` refuse a
-local index that has it.
+local index with schema 1.
 
 ```console
 $ xpd api arch.unitroot.ADF.pvalue --index old.json
@@ -845,14 +904,22 @@ xpd: old.json has index schema 1, and this xpd reads schema 2. Build the index a
 | An entry or a member with parameters | `parameters_written`, the parameter list as the source writes it. `parameters` holds the names |
 | A member | `name`, `parameters` and `summary`, and `property`, which is `true` for a property and left out for a method |
 | A recipe entry | `recipe`, with `title`, `symbols`, `source`, `code`, `license` and `modified`, and `attribution` with the copyright lines of the source file when it has any |
-| `recipes` | The counts of a harvest, with `candidates`, `clean`, `fixed`, `dropped`, `capped` and `retained` |
+| `recipes` | The counts from collecting recipes, with `candidates`, `clean`, `fixed`, `dropped`, `capped` and `retained` |
 
 ### Public names
 
-The index lists a name when it is public. A name is public when Griffe says it is. A module is
-public when its name has no leading underscore. Another name is public when its module lists it in
-`__all__`, or, in a module without `__all__`, when it has no leading underscore and the module
-defines it. The index adds four rules, and each one comes from a named symbol.
+The index lists a name when Griffe calls it public, by the rules below.
+
+```text
+is_public(name)
+  if name is a module
+    return name has no leading underscore
+  if the module of name has __all__
+    return name is in __all__
+  return name has no leading underscore and the module defines it
+```
+
+xpd adds the four rules below to those of Griffe, and each rule comes from the symbol in its row.
 
 | Rule | Symbol that needs it |
 | --- | --- |
@@ -861,13 +928,13 @@ defines it. The index adds four rules, and each one comes from a named symbol.
 | A name from `from module import *` is public, even when the `__all__` of the importing module leaves it out. The module that the import reads must give the name | `pandas.api.types.is_numeric_dtype` is public. `scipy.stats.interp1d` is not a name |
 | An import into a module without a readable `__all__` is public, when the name is defined in that module's package or below it | `numpy.lib.stride_tricks.as_strided` is public. `pymoo.vendor.vendor_scipy.LocalSearch` is imported from another package and stays private |
 
-Each definition gets one entry for each public name it has. When several public paths reach the
-same name, the entry uses the path with the fewest parts, then the shortest text, then lexical
-order. `numpy.concat` and `numpy.concatenate` are two names for one function, and both have an
-entry.
+Each definition gets one entry for each public name it has. When several public paths lead to the
+same definition, the entry uses the path with the fewest parts, then the shortest text, then
+alphabetical order. `numpy.concat` and `numpy.concatenate` are two names for one function, and both
+have an entry.
 
-Griffe drops some callables that a library has, and the index keeps them through a Griffe
-extension and a Griffe loader subclass in `py/index.py`.
+Griffe drops some functions and classes that a library has, and the index keeps them through a
+Griffe extension and a Griffe loader subclass in `py/index.py`.
 
 | Case | Symbol |
 | --- | --- |
@@ -880,8 +947,8 @@ extension and a Griffe loader subclass in `py/index.py`.
 
 ### Recipes
 
-`--examples` harvests worked recipes from the documentation of a library checkout that is pinned
-to a version. Unpack the library source into a new empty folder under `/var/tmp`, and run the index
+`--examples` collects recipes from the documentation of a library checkout that is pinned to a
+version. Unpack the library source into a new empty folder under `/var/tmp`, and run the index
 command with all three recipe flags.
 
 ```sh
@@ -891,33 +958,39 @@ uv run --with griffe==2.4.1 xpd index /var/tmp/xpd-source/scikit-lego-0.9.10 --p
   --license /var/tmp/xpd-source/scikit-lego-0.9.10/LICENSE
 ```
 
+The folder to pass to `--examples` depends on the library.
+
 | Library | Folder for `--examples` |
 | --- | --- |
 | Plotly | The repository's `doc/python` folder, with `/doc/python` after the revision in `--source-url` |
-| scikit-learn | The repository root, so the harvest reads `examples/` and the source docstrings |
+| scikit-learn | The repository root, so `--examples` reads `examples/` and the source docstrings |
 
-The harvester reads the Examples sections of Python docstrings, Python files under examples or
-gallery folders, Python fences in Markdown, RST doctests and notebook code cells. It never imports
-or runs the code it reads.
+`--examples` reads the Examples sections of Python docstrings, Python files under examples or
+gallery folders, Python code blocks in Markdown, doctests in reStructuredText files and notebook
+code cells. It never imports or runs the code it reads.
 
-| Step | What the harvester does |
+| Step | What `--examples` does |
 | --- | --- |
 | Reject | Snippets with syntax errors, placeholders, missing names, no imports, or no call into the library |
 | Fix | Runs the rule engine, applies safe and unsafe fixes, and rejects a snippet with any issue left, including info issues |
 | License | Names the license as `Apache-2.0`, `NCSA`, `MIT` or `BSD-3-Clause` from the `--license` file, and keeps the copyright lines of the source file. Another license gives a pointer to the source with no copied code |
 | Select | Keeps up to 24 recipes and 96,000 code bytes per pack, and 8,000 bytes per snippet. It prefers short examples of public APIs with different primary symbols |
 
-`capped` counts clean examples that the limits or a repeated primary symbol left out, and
-`dropped` counts candidates rejected before selection. Copy the license and any NOTICE, DISCLAIMER
-or third party notices into `licenses/`, which ships with xpd. Parsing and linting do not prove
-that external datasets or optional dependencies are there. To refresh a pack, change the source
-version and the pinned URL together, and run the command again to rebuild both symbols and
-recipes.
+`capped` counts the clean examples that xpd left out because of the limits or because another
+recipe has the same primary symbol. `dropped` counts the candidates that xpd rejected before it
+selected recipes.
+
+Copy the license and any NOTICE, DISCLAIMER or third party notices into `licenses/`, which ships
+with xpd. Parsing and linting do not prove that external datasets or optional dependencies are
+there.
+
+To refresh a pack, change the source version and the pinned URL together, and run the command
+again to rebuild both symbols and recipes.
 
 ### Discovery questions
 
-`xpd find --check indexes/questions.json` asks the discovery questions in the file and exits 2 when
-an expected entry is not in the top five of its own kind.
+`xpd find --check indexes/questions.json` runs the search questions in the file, each with the
+entries it should find, and exits 2 when an expected entry is not in the top five of its own kind.
 
 ```console
 $ xpd find --check indexes/questions.json
@@ -933,20 +1006,21 @@ $ xpd find --check indexes/questions.json
 | `"needs_model": true` | Asks the question with the model only |
 | `"open": true` | Records what a user asked and the answer they expect, for later work on search. The check skips it |
 
-The check prints every failure. It looks at the top five also for rules and recipes, whatever
-the display defaults are, and it also exits 2 when an index entry has no vector of its current text. Lefthook runs the
-check before a commit that changes `indexes/*.json` or a Rust file, and it tolerates no miss. A
-question that still fails stays as it is, without a change to its wording and without a ranking
-rule for that question.
+The check prints every failure, and it looks at the top five for rules and recipes too, whatever
+the display defaults are. It also exits 2 when an index entry has no vector of its current text.
+Lefthook, the Git hook tool of the repository, runs the check before a commit that changes
+`indexes/*.json` or a Rust file, and it tolerates no miss. When a question fails, leave its wording
+as it is and add no ranking rule for that one question.
 
 After a change to `indexes/` or to a rule's text, write the vectors with
-`xpd find --write-vectors indexes/vectors.bin`. The flag is hidden from `--help`. It embeds the
-entries that are new or whose text changed, and it keeps the vector of every other entry.
+`xpd find --write-vectors indexes/vectors.bin`. The flag is hidden from `--help`. It computes the
+vectors of the entries that are new or whose text changed, and it keeps the vector of every other
+entry.
 
 ## new
 
-`xpd new` creates a rule project, or a rule, a test case or a utility in one, and asks for what is
-missing when you name no item.
+`xpd new` creates a rule project, or adds a rule, a test case or a utility to one, and it asks for
+what is missing when you name no item.
 
 ```sh
 xpd new
@@ -982,9 +1056,9 @@ Each new folder also gets an empty `.gitkeep`.
 | `--directory DIR` | The project folder. The default is the nearest folder with `sgconfig.yml`, or the current folder for a new project |
 | `--format json` | Prints `createdFiles` and `modifiedFiles` as absolute paths |
 
-A rule needs a valid `--pattern` and a `--message`, and xpd checks it as `xpd check` and
-`ast-grep scan` read it before it writes the file. `new` never overwrites a rule file, and it
-exits 2 when the rule exists.
+A rule needs a valid `--pattern` and a `--message`. Before `new` writes the rule file, it checks
+that both `xpd check` and `ast-grep scan` can read the rule. `new` never overwrites a rule file, and
+it exits 2 when the rule exists.
 
 | Rule flag | Effect |
 | --- | --- |
@@ -1003,8 +1077,9 @@ exits 2 when the rule exists.
 ## test
 
 `xpd test` checks the valid and invalid examples of each project rule, and the snapshots of their
-issues and fixes. In the project that [`xpd new`](#new) makes, with the test file below, the first
-run fails because no snapshot exists yet, and `-U` writes the snapshot.
+issues and fixes. A snapshot is a saved file of the issues and fixes that a rule gives on its
+invalid examples. With the test file below in the project that [`xpd new`](#new) makes, the first
+run fails because no snapshot exists yet. `xpd test -U` then writes the snapshot.
 
 ```yaml
 id: team/no-print
@@ -1025,10 +1100,11 @@ team/no-print: updated
 2 cases, 0 failed
 ```
 
-A test file has the ast-grep fields `id`, `valid` and `invalid`. A valid example must give no
-issue from its rule, and an invalid example must give one. A case can set `path`, which rule path
-filters and language detection read. The default engine runs each example through the same
-scanner as `check`, with import gates, value proofs and version selection.
+A test file has the ast-grep fields `id`, `valid` and `invalid`. A valid example must give no issue
+from its rule, and an invalid example must give one. A case can set `path`, so that the rule's
+`files` and `ignores` globs and the language detection see that file name. The default engine runs
+each example through the same scanner as `check`, with import gates, value proofs and version
+bounds.
 
 | Flag | Effect |
 | --- | --- |
@@ -1062,6 +1138,14 @@ and reads the hook event on stdin. See [Claude Code](claude-code.md) for the set
 | --- | --- |
 | A client of the Agent Plugins 1.1.0 draft | Prints the issues as `additional_context` in JSON, and exits 0 |
 | A hook in the Claude Code settings | Prints the issues on stderr, and exits 2 when there is an issue |
+
+A hook in the Claude Code settings prints the issues of `check` on stderr.
+
+```console
+$ echo '{"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"samples/bad.py"}}' | xpd hook 2>&1 | head -2
+samples/bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
+samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
+```
 
 In a project with `sgconfig.yml`, the hook also lints the files that the project's rules are for.
 When a file holds a pipeline of steps, the hook also prints the errors and warnings of
