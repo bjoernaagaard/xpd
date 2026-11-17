@@ -234,7 +234,7 @@ def frame_built_once(df):
 
 @case
 def len_of_filter(df):
-    return len(df[df["a"] > 50]), len(df[(df["a"] > 50) & (df["b"] < 0)])  # xpd: len-of-filter, count-nonzero
+    return len(df[df["a"] > 50]), len(df[(df["a"] > 50) & (df["b"] < 0)])  # xpd: len-of-filter, len-of-filter
 
 
 @case

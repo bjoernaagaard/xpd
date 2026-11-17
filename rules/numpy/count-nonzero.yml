@@ -35,12 +35,16 @@ fix: $NP.count_nonzero($C)
 metadata: { fix: unsafe }
 ---
 # Unsafe: len returns a Python int and count_nonzero a NumPy integer, and when $X is a dict,
-# len counted the value that the comparison looked up.
+# len counted the value that the comparison looked up. A file that imports pandas is left to
+# the pandas rule len-of-filter, because $X may be a frame or a series, where count_nonzero
+# raises on missing values, and its fix int((mask).sum()) also counts an array.
 id: count-nonzero
 language: python
 severity: warning
 message: This copies the selected values to count them, which ran 14 times slower on 1,000,000 values. Write np.count_nonzero($C).
-rule: { pattern: "len($X[$C])" }
+rule:
+  pattern: len($X[$C])
+  not: { inside: { stopBy: end, kind: module, has: { stopBy: end, matches: pandas-import } } }
 constraints:
   C: { kind: comparison_operator, not: { regex: '\b(in|is|not)\b' } }
 fix: np.count_nonzero($C)

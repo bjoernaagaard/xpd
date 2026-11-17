@@ -3634,7 +3634,7 @@ top = np.sort(np.partition(scores, -5)[-5:])
 
 **Severity:** warning. **Fix:** safe: `np.any(x > 2)`. unsafe: `np.count_nonzero(x > 0)`, also for `len(x[x > 0])`, which gave a Python int.
 
-The rule reports `np.sum(x > 0)`, `len(np.where(c)[0])`, `len(np.nonzero(c)[0])`, `len(np.flatnonzero(c))`, `len(x[x > 0])` and `np.sum(x > 2) > 0`.
+The rule reports `np.sum(x > 0)`, `len(np.where(c)[0])`, `len(np.nonzero(c)[0])`, `len(np.flatnonzero(c))`, `len(x[x > 0])` and `np.sum(x > 2) > 0`. In a file that imports pandas, the pandas rule [`len-of-filter`](#len-of-filter) reports `len(x[x > 0])` instead, because `x` may be a frame or a series.
 
 Example:
 
@@ -4586,7 +4586,6 @@ The rule reports names that SciPy keeps for old code:
 | --- | --- | --- |
 | `ndimage.sum` | kept for backwards compatibility | `ndimage.sum_labels` |
 | `stats.ranksums` | legacy | `stats.mannwhitneyu`, which gives the same p-value and the U statistic in place of z |
-| `sparse.bmat` | returns a sparse matrix | `sparse.block_array`, which returns a sparse array |
 
 Example:
 

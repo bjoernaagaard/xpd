@@ -264,7 +264,7 @@ def legacy_entry_points(f, x0, x, y, t, y0, sos, image, labels):
     interpolate.Rbf(x, y)  # xpd: legacy-interpolate
     signal.stft(y, nperseg=16)  # xpd: legacy-signal
     stats.ranksums(x, y)  # xpd: legacy-api
-    sparse.bmat([[None]])  # xpd: legacy-api, sparse-matrix-api
+    sparse.bmat([[None]])  # xpd: sparse-matrix-api
 
 
 @case
