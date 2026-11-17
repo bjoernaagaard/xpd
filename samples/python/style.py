@@ -126,7 +126,7 @@ def decode(body: bytes) -> Item:
 
 
 def spread(values: np.ndarray) -> float:
-    return float(values.std())  # xpd: float-of-float
+    return float(values.std())  # xpd: same-type-conversion
 
 
 def spread_without_float(values: np.ndarray) -> float:
@@ -134,7 +134,28 @@ def spread_without_float(values: np.ndarray) -> float:
 
 
 def by_column(values: np.ndarray) -> list[float]:
-    return [float(value) for value in values.mean(axis=0)]
+    return list(values.mean(axis=0))
+
+
+def first_value(values: np.ndarray) -> float:
+    return float(values[0])  # xpd: float-around-number
+
+
+def parsed(fields: list[str]) -> float:
+    return float(fields[0])
+
+
+def shape(values: np.ndarray, name: str, day: object) -> tuple[int, str, bool, float]:
+    return (
+        int(values.size),  # xpd: same-type-conversion
+        str(f"{name}:{day}"),  # xpd: same-type-conversion
+        bool(name.startswith("a")),  # xpd: same-type-conversion
+        float(np.sqrt(values[0])),  # xpd: same-type-conversion
+    )
+
+
+def counts(values: np.ndarray) -> tuple[int, bool]:
+    return int(values.argmax()), bool(values[0] < 1)
 
 
 def decoded(body: bytes) -> Item:  # xpd: pass-through-function

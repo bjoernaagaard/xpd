@@ -1,0 +1,51 @@
+# mean, median, std, var, min, max and quantile of an empty Series return nan and raise and warn
+# nothing: with warnings turned into errors, pd.Series([], dtype=float).mean(), .median() and
+# .std() each returned nan on pandas 3.1.1. A conditional that returns nan for an empty frame
+# repeats that. The rule reports the guard only when the reduction is taken from a column picked
+# with a string key, which a NumPy array does not have, because np.mean of an empty array does
+# warn. sum is left alone, because the sum of an empty Series is 0. The fix is unsafe, because
+# the frame in the test and the frame in the reduction can differ.
+id: empty-guard
+language: python
+severity: warning
+message: $VALUE is nan for an empty Series already, with no error and no warning. Drop the test for an empty frame.
+rule:
+  kind: conditional_expression
+  all:
+    - has:
+        nthChild: 1
+        pattern: $VALUE
+        any:
+          - matches: column-reduction
+          - pattern: float($INNER)
+            has: { field: arguments, has: { matches: column-reduction } }
+    - has:
+        nthChild: 2
+        any:
+          - pattern: len($FRAME)
+          - pattern: not $FRAME.empty
+          - pattern: $FRAME.size
+          - pattern: len($FRAME) > 0
+    - has:
+        nthChild: 3
+        any:
+          - pattern: float("nan")
+          - pattern: np.nan
+          - pattern: math.nan
+          - pattern: numpy.nan
+          - pattern: pd.NA
+utils:
+  column-reduction:
+    kind: call
+    all:
+      - has: { field: function, kind: attribute, has: { field: attribute, regex: ^(mean|median|std|var|min|max|quantile|sem|skew|kurt)$ } }
+      - has:
+          field: function
+          has:
+            field: object
+            any:
+              - kind: subscript
+                has: { field: subscript, kind: string }
+              - has: { stopBy: end, kind: subscript, has: { field: subscript, kind: string } }
+fix: $VALUE
+metadata: { fix: unsafe }

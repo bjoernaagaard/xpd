@@ -182,3 +182,19 @@ def models(df: pd.DataFrame) -> list[np.ndarray]:
     for _, part in df.groupby("region"):
         fitted.append(np.polyfit(part["hour"], part["load"], 1))
     return fitted
+
+
+def share_below(df: pd.DataFrame, low: float) -> float:
+    return (df["load"] < low).mean() if len(df) else float("nan")  # xpd: empty-guard
+
+
+def share_below_without_guard(df: pd.DataFrame, low: float) -> float:
+    return (df["load"] < low).mean()
+
+
+def total_or_nan(df: pd.DataFrame) -> float:
+    return df["load"].sum() if len(df) else float("nan")
+
+
+def loads(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    return df["load"].astype(float).to_numpy(), df["load"].to_numpy(dtype=float)  # xpd: astype-then-to-numpy

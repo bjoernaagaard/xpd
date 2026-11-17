@@ -1,0 +1,150 @@
+# float() around a value that is a float already. mean, median, std, var, sem, skew, kurt, corr
+# and autocorr of an array or a Series return np.float64 when no axis is given, and np.float64
+# is a subclass of float: isinstance(np.arange(4.0).mean(), float) was True on NumPy 2.5.5 and
+# pandas 3.1.1, and ty 0.0.105 accepted `return x.mean()` in a function that returns float. The
+# rule runs only in a file that imports numpy or pandas, and not in one that imports a library
+# whose mean returns its own array type. The fix is unsafe, because the mean of a float32 array
+# is an np.float32, which is not a subclass of float.
+id: same-type-conversion
+language: python
+severity: warning
+message: $VALUE is a float already, because np.float64 is a subclass of float. Drop the float() around it.
+rule:
+  pattern: float($VALUE)
+  has:
+    field: arguments
+    has:
+      kind: call
+      pattern: $VALUE
+      all:
+        - has: { field: function, kind: attribute, has: { field: attribute, regex: ^(mean|median|std|var|sem|skew|kurt|corr|autocorr)$ } }
+        - not: { has: { field: arguments, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^(axis|level|dtype|out|keepdims)$ } } } }
+        - not: { has: { field: arguments, has: { any: [{ kind: integer }, { kind: tuple }] } } }
+  inside:
+    stopBy: end
+    kind: module
+    matches: numeric-file
+utils:
+  numeric-file:
+    all:
+      - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(numpy|pandas)\b }
+      - not: { has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(torch|jax|tensorflow|xarray|cupy|dask|mlx|polars|sympy)\b } }
+fix: $VALUE
+metadata: { fix: unsafe }
+---
+# float() around a NumPy function that returns a float for one value. On NumPy 2.5.5, np.sqrt,
+# np.median, np.percentile, np.interp, np.hypot, np.linalg.norm and np.trapezoid each returned
+# np.float64, for which isinstance(value, float) was True. With an axis the function returns an
+# array, so the rule leaves that call alone. The fix is unsafe for the same float32 reason.
+id: same-type-conversion
+language: python
+severity: warning
+message: $VALUE is a float already, because np.float64 is a subclass of float. Drop the float() around it.
+rule:
+  pattern: float($VALUE)
+  has:
+    field: arguments
+    has:
+      kind: call
+      pattern: $VALUE
+      all:
+        - has:
+            field: function
+            kind: attribute
+            regex: ^(np|numpy)\.(linalg\.norm|sqrt|exp|expm1|log|log1p|log2|log10|hypot|mean|median|std|var|nanmean|nanmedian|nanstd|nanvar|percentile|quantile|nanpercentile|nanquantile|average|interp|trapezoid)$
+        - not: { has: { field: arguments, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^(axis|dtype|out|keepdims)$ } } } }
+fix: $VALUE
+metadata: { fix: unsafe }
+---
+# float() around a true division. In Python 3, `/` on two ints or two floats returns a float,
+# and on NumPy float64 or int64 values it returned np.float64 on NumPy 2.5.5. No fix, because a
+# Decimal, a Fraction or a float32 on either side gives another type.
+id: same-type-conversion
+language: python
+severity: warning
+message: A division with / returns a float already. Drop the float() around it.
+rule:
+  pattern: float($A / $B)
+---
+# int() around a value that is an int already. On pandas 3.1.1 and NumPy 2.5.5, nunique(),
+# .size, .ndim and .shape[0] each returned a Python int. ruff's RUF046 reports int(len(x)) and
+# int(round(x)), so this rule leaves them alone. The rule also leaves int() around sum, count,
+# argmax and np.count_nonzero alone: they returned np.int64, which is not a subclass of int,
+# and ty 0.0.105 rejected `return x.argmax()` in a function that returns int.
+id: same-type-conversion
+language: python
+severity: warning
+message: $VALUE is an int already. Drop the int() around it.
+rule:
+  pattern: int($VALUE)
+  has:
+    field: arguments
+    has:
+      pattern: $VALUE
+      any:
+        - kind: call
+          has: { field: function, kind: attribute, has: { field: attribute, regex: ^nunique$ } }
+        - kind: attribute
+          has: { field: attribute, regex: ^(size|ndim)$ }
+        - kind: subscript
+          has: { field: value, kind: attribute, has: { field: attribute, regex: ^shape$ } }
+fix: $VALUE
+metadata: { fix: safe }
+---
+# str() around a value that is a str already: an f-string, or a method that returns str.
+# ruff's UP018 reports str("text"), so this rule leaves a plain string alone.
+id: same-type-conversion
+language: python
+severity: warning
+message: $VALUE is a str already. Drop the str() around it.
+rule:
+  pattern: str($VALUE)
+  has:
+    field: arguments
+    has:
+      pattern: $VALUE
+      any:
+        - kind: string
+          has: { kind: interpolation }
+        - kind: call
+          has:
+            field: function
+            kind: attribute
+            has:
+              field: attribute
+              regex: ^(isoformat|strftime|format|join|strip|lstrip|rstrip|lower|upper|title|casefold|removeprefix|removesuffix|read_text|decode|hexdigest|as_posix)$
+fix: $VALUE
+metadata: { fix: safe }
+---
+# bool() around a value that is a bool already: a test with in, not in, is, is not or not, a
+# call of isinstance, any or all, a str or Path method that answers yes or no, and .empty and
+# .is_unique of a frame, which returned a Python bool on pandas 3.1.1. A comparison such as
+# a < b is left alone, because on NumPy values it returned np.bool, which is not a bool.
+id: same-type-conversion
+language: python
+severity: warning
+message: $VALUE is a bool already. Drop the bool() around it.
+rule:
+  pattern: bool($VALUE)
+  has:
+    field: arguments
+    has:
+      pattern: $VALUE
+      any:
+        - kind: not_operator
+        - kind: comparison_operator
+          regex: \s(in|is)\s
+          not: { regex: '[<>=!]=|[<>]' }
+        - kind: call
+          has: { field: function, kind: identifier, regex: ^(isinstance|issubclass|callable|any|all|hasattr)$ }
+        - kind: call
+          has:
+            field: function
+            kind: attribute
+            has:
+              field: attribute
+              regex: ^(startswith|endswith|exists|is_file|is_dir|is_absolute|isdigit|isnumeric|isalpha|isidentifier)$
+        - kind: attribute
+          has: { field: attribute, regex: ^(empty|is_unique|is_monotonic_increasing|is_monotonic_decreasing)$ }
+fix: $VALUE
+metadata: { fix: safe }

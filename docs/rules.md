@@ -2384,6 +2384,57 @@ xpd gives the replacement as advice and doesn't apply it. A time window starts w
 Each rule in this group asks for an argument that states what the code expects, so that pandas
 raises when the data doesn't match instead of giving a wrong result.
 
+#### empty-guard
+
+**Severity:** warning. **Fix:** unsafe: the reduction without the test, because the frame in the test and the frame in the reduction can differ.
+
+The rule reports `x if len(frame) else nan` where `x` is `mean`, `median`, `std`, `var`, `min`,
+`max` or `quantile` of a column picked with a string key. It leaves `sum` alone, because the sum
+of an empty Series is 0, and it leaves a NumPy array alone, because `np.mean` of an empty array
+warns.
+
+Example:
+
+```python
+share = (capped["upper"] < LOW_PRICE).mean() if len(capped) else float("nan")
+```
+
+Use instead:
+
+```python
+share = (capped["upper"] < LOW_PRICE).mean()
+```
+
+xpd applies the replacement with `--fix --unsafe-fixes`.
+
+With warnings turned into errors, `mean`, `median`, `std`, `var`, `min`, `max` and
+`quantile(0.5)` of `pd.Series([], dtype=float)` each returned nan on pandas 3.1.1. The test
+repeats what pandas does, and a reader has to check that both branches give the same answer.
+
+#### astype-then-to-numpy
+
+**Severity:** warning. **Fix:** unsafe: `s.to_numpy(dtype=float)`, because a missing value in a nullable column can convert in another way.
+
+The rule reports `s.astype(float).to_numpy()`.
+
+Example:
+
+```python
+limit = rows["Economic Maximum"].astype(float).to_numpy()
+```
+
+Use instead:
+
+```python
+limit = rows["Economic Maximum"].to_numpy(dtype=float)
+```
+
+xpd applies the replacement with `--fix --unsafe-fixes`.
+
+`astype` builds a second Series with the new dtype only for `to_numpy` to take its values.
+`to_numpy` takes the dtype itself. On pandas 3.1.1 both forms gave an equal float64 array for an
+int column.
+
 #### merge-without-validate
 
 **Severity:** warning. **Fix:** none.
@@ -13021,7 +13072,7 @@ and the `python-review` skill reviews code against it.
 | --- | --- |
 | Names | `module-private-name`, `vague-module-name` |
 | Modules | `import-side-effect` |
-| Types | `typing-cast`, `dict-str-any`, `record-without-msgspec`, `json-without-type`, `float-of-float` |
+| Types | `typing-cast`, `dict-str-any`, `record-without-msgspec`, `json-without-type`, `same-type-conversion`, `float-around-number` |
 | Functions | `pass-through-function` |
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
@@ -13354,39 +13405,91 @@ msgspec 0.22.0, decoding `{"price": "x"}` into `Quote` raised
 ``Expected `float`, got `str` - at `$.price` ``. The code after the decode needs no `isinstance`
 check and no conversion, because the value already has the type.
 
-#### float-of-float
+#### same-type-conversion
 
-**Severity:** warning. **Fix:** safe: the call without `float()`.
+**Severity:** warning. **Fix:** safe: the value without `int()`, `str()` or `bool()`. unsafe: the value without `float()`, because the mean of a float32 array is an `np.float32`, which is not a float. `float()` around a division has no fix.
 
-The rule reports `float()` around `mean`, `median`, `std` or `var` of an array or a Series, when
-the call has no `axis` and the file imports numpy or pandas. It leaves a file alone that imports
-torch, jax, tensorflow, xarray, cupy, dask, mlx, polars or sympy, where `mean` can return an
-array of that library.
+The rule reports `float()`, `int()`, `str()` and `bool()` around a value that has that type
+already. The table lists what it reports and what it leaves alone.
+
+| Call | Reported around | Left alone |
+| --- | --- | --- |
+| `float()` | `mean`, `median`, `std`, `var`, `sem`, `skew`, `kurt`, `corr` and `autocorr` without an axis, in a file that imports numpy or pandas. `np.sqrt`, `np.exp`, `np.log`, `np.hypot`, `np.mean`, `np.median`, `np.percentile`, `np.quantile`, `np.average`, `np.interp`, `np.trapezoid`, `np.linalg.norm` and the `nan` forms without an axis. A division with `/` | A call with `axis=`, and a file that imports torch, jax, tensorflow, xarray, cupy, dask, mlx, polars or sympy |
+| `int()` | `nunique()`, `.size`, `.ndim` and `.shape[0]` | `sum`, `count`, `argmax` and `np.count_nonzero`, which return `np.int64`. `len(x)` and `round(x)`, which ruff's `RUF046` reports |
+| `str()` | An f-string, and `isoformat`, `strftime`, `format`, `join`, `strip`, `lower`, `upper`, `title`, `removeprefix`, `removesuffix`, `read_text`, `decode`, `hexdigest` and `as_posix` | A plain string, which ruff's `UP018` reports |
+| `bool()` | `not x`, `x in y`, `x is y`, `isinstance`, `any`, `all`, `startswith`, `endswith`, `exists`, `is_file`, `is_dir`, `.empty` and `.is_unique` | A comparison such as `a < b`, which returns `np.bool` on NumPy values |
 
 Example:
 
 ```python
-def spread(prices: pd.Series) -> float:
-    return float(prices.std())
+def summary(prices: pd.Series, day: date) -> tuple[str, int, float, bool]:
+    return (
+        str(day.isoformat()),
+        int(prices.nunique()),
+        float(prices.std()),
+        bool(prices.empty),
+    )
 ```
 
 Use instead:
 
 ```python
-def spread(prices: pd.Series) -> float:
-    return prices.std()
+def summary(prices: pd.Series, day: date) -> tuple[str, int, float, bool]:
+    return day.isoformat(), prices.nunique(), prices.std(), prices.empty
 ```
 
-xpd applies the replacement with `--fix`.
+xpd applies the replacement with `--fix`, and the one for `float()` with `--fix --unsafe-fixes`.
 
-The four methods return `np.float64`, and `np.float64` is a subclass of `float`. On NumPy 2.5
-and pandas 3.1, `isinstance(np.arange(4.0).mean(), float)` was `True`, and ty 0.0.105 accepted
-`return x.mean()` in a function that returns `float`. The same holds for the mean of a boolean
-Series, as in `(prices < 1).mean()`. The mean of an empty Series is `nan` and raises nothing,
-so it needs no `if len(prices) else float("nan")` either.
+Each call converts a value to the type it has. The table shows what Python returned on NumPy
+2.5.5 and pandas 3.1.1, and ty 0.0.105 accepted `return x.mean()` in a function that returns
+`float`.
 
-`int()` is another matter and the rule leaves it alone. `np.int64` is not a subclass of `int`,
-and ty rejects `return x.argmax()` in a function that returns `int`.
+| Expression | Type | `isinstance` of the type in the name |
+| --- | --- | --- |
+| `a.mean()`, `s.median()`, `s.quantile(0.5)`, `s.corr(s)` | `np.float64` | `float`: True |
+| `np.sqrt(a[0])`, `np.median(a)`, `np.percentile(a, 50)`, `np.interp(1.5, a, a)`, `np.linalg.norm(a)` | `np.float64` | `float`: True |
+| `a.astype("float32").mean()` | `np.float32` | `float`: False |
+| `s.nunique()`, `s.size`, `a.ndim`, `a.shape[0]` | `int` | `int`: True |
+| `(s > 1).sum()`, `s.count()`, `a.argmax()`, `np.count_nonzero(a)` | `np.int64` | `int`: False |
+| `s.empty`, `s.is_unique` | `bool` | `bool`: True |
+| `(s > 1).any()`, `a[0] < 1` | `np.bool` | `bool`: False |
+
+`int()` around `sum`, `count` and `argmax` does change the type, and ty rejects
+`return x.argmax()` in a function that returns `int`, so the rule leaves those calls alone. An
+`np.int64` works as an index and in arithmetic without a conversion. Convert it once, where the
+value is written to JSON or returned as an `int`, and not at every step on the way.
+
+#### float-around-number
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `float()` around a subscript, a name, an attribute or arithmetic, in a file
+that imports numpy or pandas. It leaves alone a string and a value whose name points at text,
+such as a regex group, a split, a header or the environment.
+
+Example:
+
+```python
+def cheapest(prices: np.ndarray, sold: np.ndarray) -> tuple[float, float]:
+    best = prices.argmin()
+    return float(prices[best]), float(sold[best] * 2)
+```
+
+Use instead:
+
+```python
+def cheapest(prices: np.ndarray, sold: np.ndarray) -> tuple[float, float]:
+    best = prices.argmin()
+    return prices[best], sold[best] * 2
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A number taken from a float64 array or a Series is an `np.float64`, and so is arithmetic on it.
+On NumPy 2.5.5 and pandas 3.1.1, `isinstance(value, float)` was True for `a[0]`, `a[0] * 3`,
+`s.iloc[0]`, `s.sum()` and `s.max()`. Keep the call in three cases: the value is text, the value is an int that has to become
+a float, or the array holds float32. The file does not show which case a call is, so the rule
+has no fix.
 
 ### Functions
 

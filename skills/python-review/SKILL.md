@@ -81,9 +81,11 @@ The first two groups are where real bugs live.
 - A record that is not a msgspec Struct (`python/record-without-msgspec`), a record that
   no function takes and that only carries two or three results to one caller, or a
   record with one field.
-- A typed value that is checked or converted again: `float()` around a float
-  (`python/float-of-float`), `str()` around a str, `isinstance` on a declared type, or an
-  `if` for a case the types rule out. Count them, and show the line without the guard.
+- A typed value that is checked or converted again: `float()`, `int()`, `str()` or
+  `bool()` around a value of that type (`python/same-type-conversion`,
+  `python/float-around-number`), `isinstance` on a declared type, a test for an empty
+  frame around a pandas reduction (`pandas/empty-guard`), or an `if` for a case the types
+  rule out. Count them, and show the line without the conversion or the guard.
 - A `Protocol` or `ABC` with one implementation, or an interface added only for a test.
 - Bare strings compared in several places where a `StrEnum` or `Literal` would do.
 

@@ -1,0 +1,35 @@
+# In a file that works with NumPy or pandas, a number taken from a float64 array or a Series is
+# an np.float64, and so is the result of arithmetic on it. np.float64 is a subclass of float:
+# on NumPy 2.5.5 and pandas 3.1.1, isinstance was True for a[0], a[0] * 3, s.iloc[0], s.sum()
+# and s.max(). float() around such a value converts a float to a float. The rule reports float()
+# around a subscript, a name, an attribute or arithmetic. It leaves a string alone, and a value
+# that comes from a text source such as a regex group, a split or the environment. It has no
+# fix, because the same call is needed for text, for an int that has to become a float, and for
+# an np.float32, and the file does not show which the value is.
+id: float-around-number
+language: python
+severity: warning
+message: A number from a float64 array or a Series is a float already, and so is arithmetic on it. Drop this float(), and keep it only for text, for an int that has to become a float, or for a float32.
+rule:
+  pattern: float($VALUE)
+  has:
+    field: arguments
+    has:
+      pattern: $VALUE
+      any:
+        - kind: subscript
+        - kind: identifier
+        - kind: attribute
+        - kind: binary_operator
+          not: { has: { regex: ^/$ } }
+        - kind: unary_operator
+      not:
+        any:
+          - regex: (environ|argv|getenv|headers|match|group|split|strip|text|line|token|field|raw|\bargs\b)
+          - has: { stopBy: end, kind: string }
+  inside:
+    stopBy: end
+    kind: module
+    all:
+      - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(numpy|pandas)\b }
+      - not: { has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(torch|jax|tensorflow|xarray|cupy|dask|mlx|polars|sympy)\b } }

@@ -1,0 +1,11 @@
+# astype builds a second Series with the new dtype, and to_numpy then takes its values. to_numpy
+# takes the dtype itself and converts once. The fix is unsafe, because a missing value in a
+# nullable column can convert in another way.
+id: astype-then-to-numpy
+language: python
+severity: warning
+message: astype builds a Series only to take its values. Pass the dtype to to_numpy, as in $X.to_numpy(dtype=$T).
+rule:
+  pattern: $X.astype($T).to_numpy()
+fix: $X.to_numpy(dtype=$T)
+metadata: { fix: unsafe }

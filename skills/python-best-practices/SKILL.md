@@ -131,10 +131,15 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   rest of the code takes the Struct. No `json.loads`, and no `dict[str, Any]` passed
   between functions.
 - **Trust a typed value.** After the decode, don't check or convert it again: no
-  `isinstance` on a value whose type is declared, no `float()` around a float, no `str()`
-  around a str, and no `if` for a case the types rule out. `mean`, `median`, `std` and
-  `var` of an array or a Series already return a float, and the mean of an empty Series
-  is `nan`.
+  `isinstance` on a value whose type is declared, no `float()`, `int()`, `str()` or
+  `bool()` around a value of that type, and no `if` for a case the types rule out.
+- **A NumPy number is a number.** `np.float64` is a subclass of `float`, so an element of
+  a float64 array, arithmetic on it, and `mean`, `median`, `std` and `var` need no
+  `float()`. `np.int64` is not an `int`, but it indexes and adds like one. Convert it
+  once, where the value is written out or returned as an `int`, not at every step.
+- **pandas handles the empty case.** `mean`, `median`, `min` and `max` of an empty Series
+  are `nan` with no warning, so don't write `x.mean() if len(x) else float("nan")`. Pass
+  a dtype to `to_numpy(dtype=float)` instead of `astype(float).to_numpy()`.
 - **No `typing.cast`.** Fix the type where the value is made, or narrow it with
   `isinstance`, `match` or a `TypeIs` function.
 - **No `Any`** except at the edge of an untyped library, and then in one function that
@@ -248,7 +253,8 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | A function that only passes its parameters on | `xpd check`: `python/pass-through-function` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
 | A dataclass, `NamedTuple`, `TypedDict` or attrs class, `json.loads` | `xpd check`: `python/record-without-msgspec`, `python/json-without-type` |
-| `float()` around a mean, median, std or var | `xpd check`: `python/float-of-float` |
+| `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |
+| A test for an empty frame around a mean, `astype(...).to_numpy()` | `xpd check`: `pandas/empty-guard`, `pandas/astype-then-to-numpy` |
 | A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
 | Mock imports | `xpd check`: `python/mock-import` |
 | A skipped test, a test that is rerun, a sleep in a test | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep` |
