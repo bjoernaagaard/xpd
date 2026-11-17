@@ -3,6 +3,7 @@
 # rows came back as 800 rows and 1 column, with the two probabilities of each row stacked. A
 # pipeline or FeatureUnion around it then raises ValueError on the row counts.
 
+# No fix, because the message names two rewrites, and the code does not show which is meant.
 id: estimator-transformer-proba
 language: python
 severity: error

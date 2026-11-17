@@ -6,6 +6,7 @@
 # classifier and regressor of sklearn.utils.all_estimators() on scikit-learn 1.9.1 that takes
 # no argument to build and whose fit raised that TypeError inside a DecayEstimator, 22 in all.
 
+# No fix, because the advice is another layout of the pipeline.
 id: decay-without-sample-weight
 language: python
 severity: error
@@ -24,6 +25,7 @@ utils:
     kind: call
     has: { field: function, regex: '(^|\.)(make_pipeline|Pipeline|make_debug_pipeline|DebugPipeline)$' }
 ---
+# No fix, because the advice is another model.
 id: decay-without-sample-weight
 language: python
 severity: error

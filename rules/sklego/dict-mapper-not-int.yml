@@ -4,6 +4,7 @@
 # no fraction, such as 1.0, keeps its value and is left alone. So is a string that holds a
 # whole number, such as "1" or " -2 ", which int() reads.
 
+# No fix, because the message names two rewrites, and the whole numbers are not in the file.
 id: dict-mapper-not-int
 language: python
 severity: error
@@ -28,6 +29,7 @@ utils:
     kind: dictionary
     has: { kind: pair, has: { field: value, matches: fraction } }
 ---
+# No fix, for the same reason as the first document.
 id: dict-mapper-not-int
 language: python
 severity: error

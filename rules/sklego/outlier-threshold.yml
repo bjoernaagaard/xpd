@@ -12,6 +12,7 @@
 # documents about the share run only when the call leaves method out or writes
 # method="quantile". A method given as a variable may be "stddev".
 
+# No fix, because the threshold is not in the file.
 id: outlier-threshold
 language: python
 severity: error
@@ -26,6 +27,7 @@ rule:
 constraints:
   C: { regex: '^(PCAOutlierDetection|UMAPOutlierDetection)$' }
 ---
+# No fix, because the new number has to be computed, and a transform cannot subtract.
 id: outlier-threshold
 language: python
 severity: error
@@ -55,6 +57,7 @@ utils:
             - { kind: dictionary_splat }
             - { kind: list_splat }
 ---
+# No fix, because the message names two rewrites, and the share is not in the file.
 id: outlier-threshold
 language: python
 severity: error

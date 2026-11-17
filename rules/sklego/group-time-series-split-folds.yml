@@ -4,6 +4,7 @@
 # with 40 groups 0.10 s at 5 and 1.07 s at 6. The class warns itself above 30 groups at
 # n_splits above 5. With a few groups the search is short, so the rule is a warning.
 
+# No fix, because the number of folds is a choice that the file does not hold.
 id: group-time-series-split-folds
 language: python
 severity: warning

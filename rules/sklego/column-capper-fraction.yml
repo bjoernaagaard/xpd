@@ -3,6 +3,7 @@
 # 10,000 normal values (0.05, 0.95) changed 9,910 of them and left 92 distinct values between
 # -3.272 and -2.379, where (5, 95) changed 1,000 and kept the range -1.628 to 1.640.
 
+# No fix, because the new numbers have to be computed, and a transform cannot multiply a number.
 id: column-capper-fraction
 language: python
 severity: error

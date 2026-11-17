@@ -4,6 +4,7 @@
 #
 # A fix here turns code that raises into code that runs, so every fix is unsafe.
 
+# No fix, because every use of the name has to change too, and formulaic reads some formulas in another way.
 id: removed-in-sklego
 language: python
 severity: error
@@ -72,6 +73,7 @@ utils:
 fix: from sklego.preprocessing import OutlierRemover
 metadata: { fix: unsafe, since: "0.8" }
 ---
+# An import that names other names as well has no fix, because the name has to move to a second import.
 id: removed-in-sklego
 language: python
 severity: error
@@ -106,6 +108,7 @@ fix: sklego.preprocessing
 metadata: { fix: unsafe, since: "0.8" }
 ---
 # The other modules that went away with those names.
+# No fix, because the names imported from these modules changed too.
 id: removed-in-sklego
 language: python
 severity: error
@@ -166,6 +169,7 @@ utils:
 fix: 'decay_kwargs={"decay_rate": $V}'
 metadata: { fix: unsafe, since: "0.7" }
 ---
+# No fix, because the old setting has to go into the decay_kwargs or decay_func that the call already has.
 id: removed-in-sklego
 language: python
 severity: error

@@ -5,6 +5,7 @@
 # kept rows. The rule reports the remover when the pipeline holds a step named like a regressor
 # or a classifier.
 
+# No fix, because the advice is another layout of the code around the pipeline.
 id: outlier-remover-before-model
 language: python
 severity: error

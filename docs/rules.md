@@ -7276,7 +7276,7 @@ file's own and are left alone. Each document carries `since` with the release th
 
 #### superseded-estimator
 
-**Severity:** warning for the classes that warn, and info for `IdentityTransformer()`. **Fix:** none.
+**Severity:** warning for the classes that warn, and info for `IdentityTransformer()`. **Fix:** unsafe: `FunctionTransformer()` for `IdentityTransformer()`, in a file that imports `FunctionTransformer` from `sklearn.preprocessing`. The step is then another class, whose parameters and repr differ. The other classes have no fix.
 
 The rule reports the classes that scikit-lego tells users to replace since 0.9.8, where building
 one raises a UserWarning that names the replacement. It also reports `IdentityTransformer()`
@@ -7305,11 +7305,11 @@ season = ColumnTransformer([("season", SplineTransformer(n_knots=13, extrapolati
 keep = FunctionTransformer()
 ```
 
-xpd gives the replacement as advice and doesn't apply it, because each replacement is
-another model with other parameter names. On 500 rows `QuantileRegression(quantile=0.8)` and
+xpd gives the other replacements as advice and doesn't apply them, because each one is another
+model with other parameter names. On 500 rows `QuantileRegression(quantile=0.8)` and
 `QuantileRegressor(quantile=0.8, alpha=0)` gave the same coefficients to three decimals. The spline
 is another basis than the radial one, so its columns are other numbers. `IdentityTransformer()` and
-`FunctionTransformer()` returned the same array.
+`FunctionTransformer()` both returned their input itself.
 
 ### Speed and repeatable runs
 

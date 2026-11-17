@@ -19,7 +19,8 @@ constraints:
 fix: $S($$$B)
 metadata: { fix: unsafe }
 ---
-# The same call with more arguments to make_scorer, which the scorer has no place for.
+# The same call with more arguments to make_scorer, which the scorer has no place for. No fix,
+# because the other arguments would have to go.
 id: scorer-called-as-metric
 language: python
 severity: error
@@ -33,6 +34,7 @@ constraints:
 ---
 # Called as a metric, the factory takes the target as the column and the predictions as the
 # positive label, and returns a function where the code expects a number. Nothing raises.
+# No fix, because the sensitive column is not in the file.
 id: scorer-called-as-metric
 language: python
 severity: error

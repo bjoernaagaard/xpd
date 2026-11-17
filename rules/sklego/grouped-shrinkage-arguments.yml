@@ -6,6 +6,7 @@
 # were equal to those without it, bit for bit, and differed by up to 0.29 from
 # HierarchicalClassifier(shrinkage="relative"), which does shrink.
 
+# No fix, because the message names two rewrites, HierarchicalClassifier or no keyword, and the code does not show which is meant.
 id: grouped-shrinkage-arguments
 language: python
 severity: error
@@ -21,6 +22,7 @@ rule:
 ---
 # The constant and min_n_obs functions each need one setting, and fit raises TypeError without
 # it: "constant_shrinkage() missing 1 required positional argument: 'alpha'".
+# No fix, because the value of the setting is not in the file.
 id: grouped-shrinkage-arguments
 language: python
 severity: error

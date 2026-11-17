@@ -5,6 +5,7 @@
 # data and 320 rows, 19 of them planted, after StandardScaler, where 510 rows had a negative
 # ratio. variant="absolute" flagged the 20 planted rows in both cases.
 
+# No fix, because the new threshold is not in the file.
 id: pca-outlier-after-scaler
 language: python
 severity: error

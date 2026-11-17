@@ -9,6 +9,7 @@
 # number, none matches, and the first column becomes the target. Only the array form works, and
 # a pattern cannot see what fit is given, so the rule reports the name.
 
+# No fix, because the position of the column is not in the call, and the fit has to take an array.
 id: regression-outlier-column-name
 language: python
 severity: error

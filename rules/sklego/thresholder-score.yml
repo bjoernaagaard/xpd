@@ -3,6 +3,7 @@
 # with 20 percent positives, a 5-fold grid search over the thresholds 0.1, 0.5 and 0.9 gave 0.887
 # three times, and 0.740, 0.887 and 0.847 with scoring="accuracy".
 
+# No fix, because the message names two rewrites, and the scoring is not in the file.
 id: thresholder-score
 language: python
 severity: error
@@ -15,6 +16,7 @@ rule:
 constraints:
   F: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|cross_val_score|cross_validate|learning_curve|validation_curve|permutation_importance)$' }
 ---
+# No fix, because the advice is another way to score.
 id: thresholder-score
 language: python
 severity: error
@@ -27,6 +29,7 @@ constraints:
   T: { regex: '(^|\.)Thresholder$' }
 ---
 # The same call on a name that the file assigns a Thresholder to.
+# No fix, because the advice is another way to score.
 id: thresholder-score
 language: python
 severity: error

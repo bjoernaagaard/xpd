@@ -8,6 +8,7 @@
 # The rule reports a train_test_split that may shuffle in a file that builds a DecayEstimator. A
 # pattern cannot see which rows the estimator is fitted on, so the rule is a warning.
 
+# No fix, because the message names two rewrites, and the code does not show which rows the estimator is fitted on.
 id: decay-on-shuffled-rows
 language: python
 severity: warning

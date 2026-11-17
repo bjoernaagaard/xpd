@@ -4,6 +4,7 @@
 # where the code expects a frame, and nothing raises until the result is used. With empty
 # parentheses it raises ValueError "Supply at least one log_function for log_step_extra".
 
+# No fix, because the log functions are not in the file.
 id: log-step-extra-bare
 language: python
 severity: error
@@ -12,6 +13,7 @@ rule:
   kind: decorator
   regex: '^@\s*(\w+\.)*log_step_extra\s*(#[^\n]*)?$'
 ---
+# No fix, because the message names two rewrites, and the log functions are not in the file.
 id: log-step-extra-bare
 language: python
 severity: error

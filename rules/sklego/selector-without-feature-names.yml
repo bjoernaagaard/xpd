@@ -5,6 +5,7 @@
 # get_feature_names_out" on get_feature_names_out. A ColumnTransformer with "passthrough" on the
 # same columns did both.
 
+# No fix, because the advice is another step.
 id: selector-without-feature-names
 language: python
 severity: error
@@ -23,6 +24,7 @@ utils:
 ---
 # The same call on a name that the file assigns such a pipeline to. fit returns the pipeline,
 # so a call chained after fit counts too.
+# No fix, because the advice is another step.
 id: selector-without-feature-names
 language: python
 severity: error

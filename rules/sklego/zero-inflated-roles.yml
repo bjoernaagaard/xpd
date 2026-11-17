@@ -3,6 +3,7 @@
 # ValueError "`classifier` has to be a classifier" or "`regressor` has to be a regressor". The
 # rule reads the class names, and LogisticRegression is a classifier.
 
+# No fix, because the advice is another model.
 id: zero-inflated-roles
 language: python
 severity: error
@@ -25,6 +26,7 @@ utils:
 constraints:
   M: { regex: '^(\w*Regressor|LinearRegression|\w*Ridge(CV)?|Lasso(CV)?|ElasticNet(CV)?|SVR|NuSVR|LinearSVR)$' }
 ---
+# No fix, because the advice is another model.
 id: zero-inflated-roles
 language: python
 severity: error
