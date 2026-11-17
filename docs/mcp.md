@@ -267,8 +267,9 @@ network you trust.
 
 ## Other ways to run it
 
-FastMCP's own commands work with the server. `fastmcp run -m xpd.mcp` starts it as a module with
-the environment settings above, and the client commands below start `xpd mcp` and call it.
+FastMCP's own commands work with the server. `fastmcp run -m xpd.mcp` runs `python -m xpd.mcp`,
+the command that `xpd mcp` runs, so the server takes the environment settings above, and the
+client commands below start `xpd mcp` and call it.
 
 ```sh
 fastmcp list --command 'xpd mcp' --resources --prompts
