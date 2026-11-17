@@ -817,8 +817,8 @@ $ xpd api sklearn.model_selection.TimeSeriesSplit.split --format json
 The printed text says how to call the symbol. It does not say what a parameter means, so read the
 library's documentation for that.
 
-xpd links a rule to a symbol when the words of the symbol's name appear in the rule's patterns,
-regex patterns included. The links show rules that may apply, and they do not prove that every use
+xpd links a rule to a symbol when the last part of the symbol's name, such as `GARCH` in
+`arch.univariate.GARCH`, is a name in the rule's patterns, regex patterns included. The links show rules that may apply, and they do not prove that every use
 of the symbol matches a rule.
 
 A rule entry holds the rule's full documentation, so a search for words such as "small multiples"
