@@ -1,7 +1,7 @@
 # Code mode
 
-With `xpd mcp --code-mode`, an agent can take a data file to a saved scikit-learn model in one
-`execute` call, and the `gates` tool tells it whether the run is done.
+With `xpd mcp --code-mode`, an agent can train and save a scikit-learn model from a data file
+in one `execute` call, and the `gates` tool tells it whether the run is done.
 
 The [`--code-mode`](mcp.md#settings) flag makes the server show FastMCP's three
 [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) tools, `search`,
@@ -23,7 +23,7 @@ sequenceDiagram
     Sandbox->>Server: equiv twice
     Server->>Python: train.py twice, then train.py and predict.py
     Sandbox->>Server: contract, then refit
-    Server->>Python: fit a clone on the raw training rows
+    Server->>Python: fit clones on the raw training rows and on each fold
     Sandbox->>Server: gates with every result
     Sandbox-->>Agent: passed, and one line per gate
 ```
@@ -44,22 +44,23 @@ mode settings.
 
 ## The run in order
 
-The `build_pipeline` prompt takes `data`, `target` and an optional `task`, and it tells the
-agent to do the run in the order below.
+The `build_pipeline` prompt, which takes `data`, `target` and an optional `task`, tells the
+agent to write three scripts and then call `execute` until `gates` returns `passed: true`.
 
-1. The agent calls `find` with the task and `api` on each candidate. It chooses one candidate
-   and states the reason.
-2. It calls `profile` on the data file, and it picks the steps from the real dtypes, nulls and
-   distinct values.
-3. It writes `features.py`, `train.py` and `predict.py` in the project root. When a chosen
-   library is missing, it says so and asks before it adds the library through the project's
-   dependency manager.
-4. It calls `execute` once with the script that the prompt returns. The script repeats
+1. Before it calls `execute`, the agent prepares the scripts.
+   - It calls `find` with the task and `api` on each candidate, and it chooses one candidate
+     and states the reason.
+   - It calls `profile` on the data file, and it picks the steps from the real dtypes, nulls
+     and distinct values.
+   - It writes `features.py`, `train.py` and `predict.py` in the project root. When a chosen
+     library is not installed, it tells the user, and it adds the library through the
+     project's dependency manager only with the user's permission.
+2. It calls `execute` once with the script that the prompt returns. The script repeats
    discovery and stops at a failed `discovery_gate` or at an error from `check`, before any
    project code runs.
-5. The run is done when `gates` returns `passed: true`. For a gate that fails, the agent reads
-   its `detail`, fixes the scripts and calls `execute` again. It never edits the contract by
-   hand.
+3. The run is done when `gates` returns `passed: true`. For a gate that fails, the agent reads
+   its `detail`, fixes the scripts and calls `execute` again, and it never edits the contract
+   by hand.
 
 The script that the prompt returns calls the tools in the order below.
 
@@ -85,9 +86,10 @@ execute(script)
 
 ## Discovery before execution
 
-Discovery gives the run a saved record of the library call the agent chose and why, and
-`discovery_gate` checks that the scripts call it with names that xpd's index knows. The record
-has the shape below.
+The run stops before any project code runs when `discovery_gate` finds that the scripts don't
+call the chosen library with names that xpd's index knows. The agent records its choice and
+the reason in a discovery record with the shape below, and `find` ranks the candidates in it by
+meaning and by keywords.
 
 ```text
 discovery
@@ -105,43 +107,50 @@ discovery
     └── symbols[]            the indexed callables that the code must call
 ```
 
-`find` ranks by meaning and by keywords. `find` and `api` read the index in the xpd binary, so
-they work when the library is not installed. For example, `xpd api
-sklego.meta.GroupedPredictor --format json` gave the output below in a folder with no `.venv`,
-where the Python on `PATH` has no scikit-lego.
+`find` and `api` read the index in the xpd binary, so they work when the library is not
+installed. For example, `xpd api sklego.meta.GroupedPredictor --format json` ran in a folder
+with no `.venv`, where the Python on `PATH` has no scikit-lego, and it returned a list of one
+entry. The entry's name, kind, callable and parameter keys follow, and its `package`,
+`summary`, `members` and `rules` keys are left out.
 
 ```json
 {"name":"sklego.meta.GroupedPredictor","kind":"symbol","callable":"class","parameters":["estimator","groups","shrinkage","use_global_model","check_X","shrinkage_kwargs"],"parameters_written":["estimator","groups","shrinkage=None","use_global_model=True","check_X=True","shrinkage_kwargs=None"]}
 ```
 
-An entry that the agent reads with `api` is a candidate too, also when `find` did not return
-it, so the agent adds it to the list of its kind. A `signature` lists the parameter names of
-the index, and `parameters_written` holds each parameter as the source writes it, with its type
-annotation and its default. For a recipe, `choice.symbols` names the callables that the recipe's
-code uses.
+The agent adds each entry that it reads with `api` to the candidates of its kind, even when
+`find` did not return it. An entry's `signature` holds only the indexed parameter names, and
+`parameters_written` holds each parameter as the source writes it, with its type annotation and
+its default. For a recipe, `choice.symbols` names the callables that the recipe's code uses.
 
-`discovery_gate` takes `paths` and `discovery`, and it runs no code. It checks the record and
-the files in the order below.
+`discovery_gate` takes `paths` and `discovery`, runs no code, and checks the record and the
+files in the order below.
 
-1. The chosen name must be one of the candidates. When the choice is a symbol, it must also be
-   in `choice.symbols`.
-2. The gate parses each file and resolves import aliases by their spelling.
-3. It keeps each direct call into a module of a chosen symbol. For example, choosing
-   `sklego.meta.GroupedPredictor` keeps the direct calls into `sklego.meta`.
-4. It asks `api` about each kept call. A name that `api` doesn't know fails, and so does a
-   literal keyword that is not one of the indexed parameters, or a `**` argument.
-5. Each chosen symbol must have at least one direct call.
+```text
+discovery_gate(paths, discovery)
+  fail unless choice.name is one of the candidates
+  fail when the choice is a symbol and choice.symbols doesn't list it
+  for each file in paths
+    parse it and resolve import aliases by their spelling
+    keep each direct call into a module of a chosen symbol
+                                  sklego.meta for sklego.meta.GroupedPredictor
+    for each kept call
+      fail when api doesn't know the name, or knows it as no callable symbol
+      fail on a literal keyword that is not one of the indexed parameters
+      fail on a ** argument
+  fail when a chosen symbol has no direct call
+  return discovery, paths and gate
+```
 
-The gate returns `discovery`, `paths` and `gate`. The script passes that result to `gates` as
-`proof.discovery`, and the training script saves the same record as `discovery` in the
-contract. In the sample, `samples/pipeline/discovery.json` holds the record, and `train.py`
-copies it into `model/contract.json`. After a new choice, save the new record in
-`discovery.json` and run `train.py` again.
+The script passes the result of the gate to `gates` as `proof.discovery`, and the training
+script saves the same record as `discovery` in the contract. In the sample,
+`samples/pipeline/discovery.json` holds the record, and `train.py` copies it into
+`model/contract.json`. After a new choice, save the new record in `discovery.json` and run
+`train.py` again.
 
 ## The stages
 
-A run hands one typed result from each stage to the next, and the training script writes most
-of them into one JSON file, the contract.
+A run hands one result of a fixed shape from each stage to the next, and the training script
+writes most of them into one JSON file, the contract.
 
 | Stage | What it hands on | Model in `python/xpd/mcp/models.py` | Where it comes from |
 | --- | --- | --- | --- |
@@ -155,8 +164,8 @@ of them into one JSON file, the contract.
 | Proof | What `discovery_gate`, `check`, `graph`, `equiv` and `refit` found | `Proof` | The same tools |
 | Persisted model | The model file, the class of the saved object, the versions that wrote it and the code files it imports | `SavedModel` | The contract |
 
-The contract names every file that a script needs to serve the model, which is the data, the
-model and each code file under `model.code`. joblib saves the function of a
+The contract names the data file, the model file and each code file under `model.code`, which
+are the files that a script needs to serve the model. joblib saves the function of a
 `FunctionTransformer` by its module and name, so the sample's model loads only where
 `features.py` can be imported. The sample run wrote the contract below, shown without its
 `discovery` record.
@@ -203,16 +212,23 @@ model and each code file under `model.code`. joblib saves the function of a
 }
 ```
 
-The `contract` tool refuses a file without one of the required fields. For example, a contract
+The `contract` tool refuses a file that lacks a required field. For example, a contract
 without `validation.splitter` fails with `validation.splitter Field required`. It also refuses a
 contract that names a data file, a model file or a code file that is not in the project.
 
 ## The gates
 
-A run is done when every gate of the `gates` report passes. A run without discovery has 13
-gates, and a run whose contract or proof has a discovery record has 15. The report lists them in
-the order of this table, and each gate has `passed` and a `detail`. The last column names the
-tools whose results decide the gate.
+A run is done when every gate of the `gates` report passes. The number of gates depends on
+where the run has a discovery record.
+
+| Discovery record in | Gates in the report |
+| --- | --- |
+| Neither the contract nor the proof | 13 |
+| The proof | 15 |
+| Only the contract | 14, because `indexed-api-calls` is missing, and `discovery-is-recorded` fails |
+
+The report lists the gates in the order of the table below, and each gate has `passed` and a
+`detail`. The last column names the tools whose results decide the gate.
 
 | Gate | Stage | The gate passes when | Decided by |
 | --- | --- | --- | --- |
@@ -229,13 +245,13 @@ tools whose results decide the gate.
 | `refit-matches-scores` | Validation | The recorded held out score, fold scores, row counts and fold count equal the values that refit computes | `refit`, `contract` |
 | `saved-model-predicts` | Persisted model | The prediction script, in a new Python process that loads the model from disk, leaves the `result` of the training script | `equiv` |
 | `versions-recorded` | Persisted model | The contract records Python, scikit-learn and pandas, and its pandas is the one `profile` ran with | `profile`, `contract` |
-| `indexed-api-calls` | Discovery | `discovery_gate` passed, as the discovery section describes | `api`, `source` |
+| `indexed-api-calls` | Discovery | `discovery_gate` passed, as [discovery before execution](#discovery-before-execution) describes | `api`, `source` |
 | `discovery-is-recorded` | Discovery | The contract and `proof.discovery` hold the same discovery record | `contract` |
 
 `split-is-seeded` reads the rules in the second column below. The server refuses to start when
-the binary no longer has one of them, because a renamed rule would never match and the gate
-would pass every run. `check-reports-no-error` counts every error of every pack, and the third
-column names the errors about a leak.
+the binary no longer has one of them, because a renamed rule would let the gate pass every run.
+`check-reports-no-error` counts every error of every pack, and the third column names the
+errors about a leak.
 
 | Pack | Rules that fail `split-is-seeded` | Errors about a leak that fail `check-reports-no-error` |
 | --- | --- | --- |
@@ -246,14 +262,16 @@ column names the errors about a leak.
 | arch | `arch-unseeded-draws` | None |
 | pymoo | `unseeded-run`, `numpy-seed-ignored` | None |
 
-A draw from another library, such as `np.random.default_rng()` without a seed, is in no list.
-It still fails `reproducible` when it changes the `result` of the training script.
+No rule in the table reports a draw from another library, e.g., `np.random.default_rng()`
+without a seed, but such a draw still fails `reproducible` when it changes the `result` of the
+training script.
 
 ## A run from raw rows to a saved model
 
-The sample project `samples/pipeline/` trains a species classifier on the
-[Palmer penguins](https://github.com/allisonhorst/palmerpenguins) table, which is under the CC0
-license and has 344 rows with nulls in five columns.
+The sample project `samples/pipeline/` passes all 15 gates in one `execute` call, with a
+species classifier that it trains on the
+[Palmer penguins](https://github.com/allisonhorst/palmerpenguins) table. The table is under the
+CC0 license and has 344 rows with nulls in five columns.
 
 ```text
 samples/pipeline/
@@ -274,10 +292,10 @@ samples/pipeline/
 
 The client below starts the server with code mode on and sends the script that
 `build_pipeline` returns for `data` set to `penguins.csv` and `target` set to `species`. Run it
-from the repository root in an environment that has xpd, pandas and scikit-learn. The client
-passes `VIRTUAL_ENV` to the server, because `equiv` and `refit` run the scripts with the Python
-of `VIRTUAL_ENV`, or else of the nearest `.venv`, and FastMCP's stdio client passes on only a
-few environment variables.
+from the repository root in an environment that has xpd, pandas and scikit-learn. `equiv` and
+`refit` run the scripts with the Python of `VIRTUAL_ENV`, or else with the Python of the nearest
+`.venv`. FastMCP's stdio client passes on only a few environment variables, so the client passes
+`VIRTUAL_ENV` to the server itself.
 
 ```python
 import asyncio
@@ -354,9 +372,9 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-The outputs on the page came from xpd 0.31.1 built from the repository and FastMCP 4.2.0,
-with Python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, NumPy 2.5.5 and joblib 1.6.0 in the
-project's Python. The run took 12.0 seconds and returned `passed: true`, and the table shows its `gates` list.
+The run took 12.0 seconds and returned `passed: true` with the `gates` list below. The outputs
+on the page came from xpd 0.31.1, built from the repository, and FastMCP 4.2.0. The project's
+Python was Python 3.15.2 with scikit-learn 1.9.1, pandas 3.1.1, NumPy 2.5.5 and joblib 1.6.0.
 
 | Gate | Passed | Detail |
 | --- | --- | --- |
@@ -376,7 +394,7 @@ project's Python. The run took 12.0 seconds and returned `passed: true`, and the
 | `indexed-api-calls` | Yes | Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run. |
 | `discovery-is-recorded` | Yes | The contract records the discovery question, candidates and reason of the proof. |
 
-The report's `refit` part follows.
+The `refit` key of the result holds what the `refit` tool returned.
 
 ```json
 {
@@ -397,18 +415,29 @@ The report's `refit` part follows.
 }
 ```
 
-`refit` loads the saved Pipeline, clones it and fits the clone on the raw training rows of the
-contract's split. It scores the folds with the contract's splitter and the held out rows with
-the contract's scorer, so the training script must save its scores without rounding. It
-compares the output of the first method the model has among `predict_proba`,
-`decision_function` and `predict`. Arrays and scores must be exactly equal under
-`numpy.testing.assert_equal`, and a DataFrame or Series is compared with the defaults of
-`pandas.testing`.
+`refit` repeats the training on the raw rows of the contract and compares the results
+exactly, so the training script must save its scores without rounding. The steps below use the
+values of the sample contract.
 
-`refit` does not replace `reproducible`. A clone keeps the saved parameters, so a training
-script that draws `C` without a seed passes refit and fails only `reproducible`. The training
-script therefore runs three times in a run, twice for `reproducible` and once for
-`saved-model-predicts`, and xpd fits one clone.
+```text
+refit(model/contract.json)
+  repeat the contract's split of penguins.csv, stratified with seed 0 and test_size 0.25
+  load model/model.joblib and clone the saved Pipeline
+  fit the clone on the 258 raw training rows
+  score 5 folds of the training rows with a new clone for each fold
+    StratifiedKFold(n_splits=5, shuffle=True, random_state=0), scoring accuracy
+  score the 86 held out rows with accuracy
+  compare the held out outputs of the clone and the saved model
+    method   the first of predict_proba, decision_function and predict that the model has
+    arrays and scores   exactly equal under numpy.testing.assert_equal
+    DataFrame or Series   the defaults of pandas.testing
+```
+
+`refit` doesn't replace `reproducible`, because a clone keeps the saved parameters. For
+example, a training script that draws `C` without a seed passes `refit` and fails only
+`reproducible`. A run therefore runs the training script three times, twice for `reproducible`
+and once for `saved-model-predicts`, and `refit` fits the Pipeline six times, once on the
+training rows and once for each of the five folds.
 
 ### The prediction script
 
@@ -423,9 +452,9 @@ follow.
 137  0.9884     0.0113  0.0003
 ```
 
-`predict.py` raises an error before it loads the model when the input columns or dtypes differ
-from the contract, when scikit-learn has another version, or when a code file is missing. A
-missing `features.py` gives the error below.
+`predict.py` compares the input columns and dtypes, the scikit-learn version and the code
+files with the contract, and it raises an error before it loads the model when one of them
+differs. A missing `features.py` gives the error below.
 
 ```text
 FileNotFoundError: The model imports ['features.py'], and no such file is here.
@@ -433,11 +462,12 @@ FileNotFoundError: The model imports ['features.py'], and no such file is here.
 
 ## A leaky script stops at check
 
-A script with a leak that a rule knows stops at `check`, before `equiv` runs its code. To see
-it, set `TRAIN = "leaky.py"` in the script above. `leaky.py` tries four strengths of
-regularization and keeps the one with the best score on the held out rows, and the run
-returned `passed: false` with the keys `passed`, `lint` and `discovery`. `lint` held one
-error.
+A script with a leak that one of xpd's rules reports stops at `check`, before `equiv` runs its
+code. A leak lets the held out rows affect the model or its settings, so the held out score is
+too high. To see the stop, set `TRAIN = "leaky.py"` in the script above. `leaky.py` tries four
+strengths of regularization and keeps the one with the best score on the held out rows. The run
+returned `passed: false` with the keys `passed`, `lint` and `discovery`, and `lint` held the one
+error below.
 
 ```text
 leaky.py:72 sklearn/tune-on-test
@@ -446,11 +476,11 @@ of 30 such scores was 0.597 accuracy on data with no signal. Pick strength with 
 cross_val_score on the training rows, and score the test rows once.
 ```
 
-## Run the scripts through the server
+## Check a library choice in other scripts
 
-The same pattern of discovery, `discovery_gate`, `check` and `equiv` checks a choice in any
-script that leaves a `result`. Each example below sets its constants and then runs the
-script below.
+The script below checks the library choice in any script that leaves a `result`, and it passed
+`grouped.py`, `bootstrap.py` and `figure.py` and refused `invalid_api.py` without running it. It calls
+`find`, `api`, `discovery_gate`, `check` and `equiv` in the same order as the pipeline script.
 
 ```python
 found = await call_tool("find", {"task": TASK})
@@ -483,6 +513,8 @@ return {
 }
 ```
 
+Each example sets the constants in the table below, and it sets `REASON` to one sentence.
+
 | `FILE` | `TASK` | `CHOICE` | `SYMBOLS` after `CHOICE` | `ARCH` |
 | --- | --- | --- | --- | --- |
 | `grouped.py` | `going from one model on all data to one model per group, 24 groups` | `sklego.meta.GroupedPredictor` | None | `False` |
@@ -490,8 +522,8 @@ return {
 | `figure.py` | `build a plotly scatter figure from scratch` | `plotly.express.scatter` | None | `False` |
 | `invalid_api.py` | `going from one model on all data to one model per group, 24 groups` | `sklego.meta.GroupedPredictor` | None | `False` |
 
-Each example also sets `REASON` to one sentence. The project's Python had scikit-lego 0.9.10,
-MAPIE 1.6.0, arch 9.0.0 and Plotly 7.1.0, and the table shows what the runs returned.
+With scikit-lego 0.9.10, MAPIE 1.6.0, arch 9.0.0 and Plotly 7.1.0 in the project's Python, the
+runs returned the results below.
 
 | `FILE` | `passed` | Detail of `indexed-api-calls` | `lint.issues` | `repeat` |
 | --- | --- | --- | --- | --- |
@@ -535,8 +567,8 @@ figure.py
               plotly/recipe/figures-as-dictionaries
 ```
 
-The three passing scripts ran in `samples/pipeline` with the same Python and printed the
-lines below. Their rows are made up.
+The three passing scripts ran in `samples/pipeline` with the same Python, and they printed the
+lines below from rows that the scripts make up.
 
 ```text
 groups=24, models=24, predictions=192, max_error=0.000000
@@ -546,8 +578,8 @@ forward_bounds=[(21, 24), (29, 32), (37, 40)]
 traces=1, points=3, title=Daily count
 ```
 
-A recipe lookup through the same server returns the recipe's license name and source with its
-code:
+A recipe lookup through the same server returns the recipe's code with its license name and
+source, as the script and its output below show.
 
 ```python
 found = await call_tool("find", {"task": "rounded bars", "kind": "recipe"})
@@ -562,17 +594,16 @@ return {"name": entry["name"], "kind": entry["kind"],
 {"name":"plotly/recipe/rounded-bars","kind":"recipe","license":"MIT","source":"https://github.com/plotly/plotly.py/blob/v7.1.0/doc/python/bar-charts.md#L746","code_bytes":498}
 ```
 
-## What is open
+## Limits that no gate checks
 
-A passed report shows only what each gate checks, and the limits below are not checked by any
-gate.
+A passed report doesn't prove anything in the table below, because no gate checks it.
 
 | Limit | What happens now |
 | --- | --- |
-| `gates` can't tell which files a result is about | It trusts the script. A script that lints another file, or that passes an old result, still passes. `gates` also doesn't check whether a file changed after `discovery_gate` read it |
+| `gates` can't tell which files a result is about | `gates` trusts the script, so a script that lints another file, or that passes an old result, still passes. `gates` also doesn't check whether a file changed after `discovery_gate` read it |
 | The contract declares some facts about the model | Refit checks the Pipeline and its outputs and scores. Nothing compares the declared step list or every recorded library version with the saved object |
 | The training script runs three times | `reproducible` stays, because a clone keeps the saved parameters and doesn't repeat the choices of the training script |
-| The model needs its code files | The contract lists them under `model.code`, `contract` refuses a contract that names a missing file, and `predict.py` checks them. Nothing finds a file that the training script left out of the list |
+| The model needs its code files | The contract lists them under `model.code`, and both the `contract` tool and `predict.py` refuse a listed file that is missing. Nothing finds a file that the training script left out of the list |
 | No gate judges the score | A model that is no better than guessing passes. No gate compares the scores with a baseline, or the held out score with the folds |
 | The model file is a joblib pickle | Loading it runs code, so load only a file you wrote. The scikit-learn guide names `skops.io` as the safer format |
 | The contract describes one file and one random split | It has no place for groups, a split by time, rows held out for calibration, or data from several files |
@@ -581,4 +612,4 @@ gate.
 | `inputs-are-file-columns` compares names and dtypes, not values | Code outside the Pipeline that writes new values of the same dtype over a column passes, and so does a raw column that stands in for the target |
 | Refit compares held out outputs | Fitted attributes can differ while the outputs on the held out rows agree, and no check sees choices made over several separate runs |
 | A leak under another name | `tune-on-test` knows the held out rows by a name with `test` in it, so the same loop over `X_hold` passes. Code alone doesn't show whether a split holds validation rows or the rows of the final score |
-| `discovery_gate` reads spelling, not Python | It doesn't see instance methods, runtime aliases, shadowing, required arguments, positional binding, argument values, whether a library is installed, or calls into other modules. A valid name that is not in the index fails |
+| `discovery_gate` matches names by their spelling and runs no Python | It doesn't see instance methods, runtime aliases or shadowing, and it doesn't check required arguments, positional binding or argument values. It also doesn't see whether a library is installed, or calls into other modules. A valid name that is not in the index fails |
