@@ -1,6 +1,6 @@
-# The solvers raise TypeError for tol=, in runs/probe2.jsonl. The fix is unsafe because
-# the old tol came with an atol default of 'legacy', which 1.18.1 rejects, so the stopping point
-# can differ.
+# The solvers raise TypeError for tol=, in runs/probe2.jsonl. Safe: on scipy 1.13.1 each solver
+# gives results with equal pickles for tol= and rtol=, with atol= left out, set to a number, or set
+# to 'legacy'.
 id: removed-keyword
 language: python
 severity: error
@@ -122,7 +122,7 @@ rule:
 constraints:
   F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
 fix: rtol=$V
-metadata: {fix: unsafe}
+metadata: {fix: safe}
 ---
 # No fix, because the call already passes rtol=, or unpacks a dict that may hold it.
 id: removed-keyword
@@ -480,7 +480,8 @@ rule:
 constraints:
   F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
 ---
-# gmres raises TypeError for restrt=, in runs/probe2.jsonl. The source no longer says what restrt meant, so the fix is unsafe.
+# gmres raises TypeError for restrt=, in runs/probe2.jsonl. Safe: on scipy 1.13.1 gmres gives
+# results with equal pickles for restrt= and restart=.
 id: removed-keyword
 language: python
 severity: error
@@ -601,7 +602,7 @@ rule:
 constraints:
   F: {regex: ^gmres$}
 fix: restart=$V
-metadata: {fix: unsafe}
+metadata: {fix: safe}
 ---
 # No fix, because the call already passes restart=, or unpacks a dict that may hold it.
 id: removed-keyword
@@ -726,7 +727,8 @@ rule:
 constraints:
   F: {regex: ^gmres$}
 ---
-# solve raises TypeError for sym_pos=, in runs/probe2.jsonl. assume_a='pos' asks for the same Cholesky path, but the source no longer shows the old code, so the fix is unsafe.
+# solve raises TypeError for sym_pos=, in runs/probe2.jsonl. Safe: on scipy 1.10.1 solve gives
+# results with equal pickles for sym_pos=True and assume_a='pos'.
 id: removed-keyword
 language: python
 severity: error
@@ -843,7 +845,7 @@ rule:
 constraints:
   F: {regex: ^solve$}
 fix: assume_a='pos'
-metadata: {fix: unsafe}
+metadata: {fix: safe}
 ---
 # No fix, because the call already gives assume_a, by keyword, by position or in unpacked arguments.
 id: removed-keyword
@@ -1055,7 +1057,8 @@ rule:
 constraints:
   F: {regex: ^solve$}
 ---
-# eigh raises TypeError for eigvals=, in runs/probe2.jsonl. subset_by_index takes the same pair of indices, but the source no longer shows the old code, so the fix is unsafe.
+# eigh raises TypeError for eigvals=, in runs/probe2.jsonl. Safe: on scipy 1.13.1 eigh and eigvalsh
+# give results with equal pickles for eigvals= and subset_by_index=.
 id: removed-keyword
 language: python
 severity: error
@@ -1152,7 +1155,7 @@ rule:
 constraints:
   F: {regex: ^(eigh|eigvalsh)$}
 fix: subset_by_index=$V
-metadata: {fix: unsafe}
+metadata: {fix: safe}
 ---
 # No fix, because the call already passes subset_by_index=, or unpacks a dict that may hold it.
 id: removed-keyword
@@ -1614,11 +1617,11 @@ rule:
 constraints:
   F: {regex: ^cumulative_trapezoid$}
 ---
-# The tree methods raise TypeError for n_jobs=, in runs/probe2.jsonl, and
-# scipy/spatial/_ckdtree.pyx line 733 says n_jobs was renamed workers. The fix is unsafe because no
-# older source here shows the wrapper. Only query and query_ball_point take workers, as the fifth
-# parameter of query_ball_point and the sixth of query, so a call with five positional arguments
-# gets no fix.
+# The tree methods raise TypeError for n_jobs=, in runs/probe2.jsonl, and scipy/spatial/_ckdtree.pyx
+# line 733 says n_jobs was renamed workers. Only query and query_ball_point take workers, as the
+# fifth parameter of query_ball_point and the sixth of query, so a call with five positional
+# arguments gets no fix. Safe: on scipy 1.8.1 cKDTree.query and cKDTree.query_ball_point give
+# results with equal pickles for n_jobs= and workers=.
 id: removed-keyword
 language: python
 severity: error
@@ -1645,9 +1648,9 @@ rule:
                 has: &id001
                   field: function
                   any:
-                  - {regex: ^scipy\.spatial\.((KDTree|cKDTree))$, pattern: scipy.spatial.$F}
+                  - {regex: ^scipy\.spatial\.((cKDTree))$, pattern: scipy.spatial.$F}
                   - all:
-                    - {regex: \.spatial\.((KDTree|cKDTree))$, pattern: $Q.spatial.$F}
+                    - {regex: \.spatial\.((cKDTree))$, pattern: $Q.spatial.$F}
                     - inside:
                         stopBy: end
                         kind: module
@@ -1661,7 +1664,7 @@ rule:
                               - has: {field: name, regex: ^scipy$}
                               - has: {field: alias, pattern: $Q}
                   - all:
-                    - {regex: \.((KDTree|cKDTree))$, pattern: $Q.$F}
+                    - {regex: \.((cKDTree))$, pattern: $Q.$F}
                     - inside:
                         stopBy: end
                         kind: module
@@ -1685,7 +1688,7 @@ rule:
                                   - has: {field: name, regex: ^spatial$}
                                   - has: {field: alias, pattern: $Q}
                   - all:
-                    - {kind: identifier, regex: ^((KDTree|cKDTree))$, pattern: $F}
+                    - {kind: identifier, regex: ^((cKDTree))$, pattern: $F}
                     - inside:
                         stopBy: end
                         kind: module
@@ -1709,7 +1712,7 @@ rule:
                             - has:
                                 kind: aliased_import
                                 all:
-                                - has: {field: name, pattern: $F, regex: ^((KDTree|cKDTree))$}
+                                - has: {field: name, pattern: $F, regex: ^((cKDTree))$}
                                 - has: {field: alias, pattern: $F_AS}
             - all:
               - has: {field: object, kind: identifier, pattern: $T}
@@ -1760,7 +1763,158 @@ rule:
                 field: arguments
                 has: {kind: list_splat}
 constraints:
-  F: {regex: ^(KDTree|cKDTree)$}
+  F: {regex: ^(cKDTree)$}
+  M: {regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
+fix: workers=$V
+metadata: {fix: safe}
+---
+# The tree methods raise TypeError for n_jobs=, in runs/probe2.jsonl, and scipy/spatial/_ckdtree.pyx
+# line 733 says n_jobs was renamed workers. Only query and query_ball_point take workers, as the
+# fifth parameter of query_ball_point and the sixth of query, so a call with five positional
+# arguments gets no fix. Unsafe: KDTree.query and KDTree.query_ball_point raise TypeError for
+# n_jobs= on scipy 1.6.3, 1.7.3 and 1.8.1, so there is no old value to compare.
+id: removed-keyword
+language: python
+severity: error
+message: $M no longer takes n_jobs= and raises TypeError. SciPy renamed it workers=.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^n_jobs$}
+  - has: {field: value, pattern: $V}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          kind: attribute
+          all:
+          - has: {field: attribute, pattern: $M, regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
+          - any:
+            - has:
+                field: object
+                kind: call
+                has: &id001
+                  field: function
+                  any:
+                  - {regex: ^scipy\.spatial\.((KDTree))$, pattern: scipy.spatial.$F}
+                  - all:
+                    - {regex: \.spatial\.((KDTree))$, pattern: $Q.spatial.$F}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          any:
+                          - kind: import_statement
+                            has:
+                              kind: aliased_import
+                              all:
+                              - has: {field: name, regex: ^scipy$}
+                              - has: {field: alias, pattern: $Q}
+                  - all:
+                    - {regex: \.((KDTree))$, pattern: $Q.$F}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          any:
+                          - kind: import_statement
+                            has:
+                              kind: aliased_import
+                              all:
+                              - has: {field: name, regex: ^scipy\.spatial$}
+                              - has: {field: alias, pattern: $Q}
+                          - kind: import_from_statement
+                            all:
+                            - has: {field: module_name, regex: ^scipy$}
+                            - any:
+                              - has: {kind: dotted_name, pattern: $Q, regex: ^spatial$}
+                              - has:
+                                  kind: aliased_import
+                                  all:
+                                  - has: {field: name, regex: ^spatial$}
+                                  - has: {field: alias, pattern: $Q}
+                  - all:
+                    - {kind: identifier, regex: ^((KDTree))$, pattern: $F}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          any:
+                          - kind: import_from_statement
+                            all:
+                            - has: {field: module_name, regex: ^scipy\.spatial$}
+                            - has: {kind: dotted_name, pattern: $F}
+                  - all:
+                    - {kind: identifier, pattern: $F_AS}
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          any:
+                          - kind: import_from_statement
+                            all:
+                            - has: {field: module_name, regex: ^scipy\.spatial$}
+                            - has:
+                                kind: aliased_import
+                                all:
+                                - has: {field: name, pattern: $F, regex: ^((KDTree))$}
+                                - has: {field: alias, pattern: $F_AS}
+            - all:
+              - has: {field: object, kind: identifier, pattern: $T}
+              - inside:
+                  stopBy: end
+                  any:
+                  - {kind: function_definition}
+                  - {kind: module}
+                  has:
+                    stopBy: end
+                    kind: assignment
+                    all:
+                    - has: {field: left, pattern: $T}
+                    - has:
+                        field: right
+                        kind: call
+                        has: *id001
+      - has:
+          field: function
+          has: {field: attribute, regex: ^(query|query_ball_point)$}
+      - not:
+          has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              has: {field: name, regex: ^workers$}
+      - not:
+          has:
+            field: arguments
+            has: {kind: dictionary_splat}
+      - not:
+          has:
+            field: arguments
+            has: {kind: list_splat}
+      - not:
+          all:
+          - has:
+              field: arguments
+              has:
+                nthChild: 5
+                not:
+                  any:
+                  - {kind: keyword_argument}
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+          - not:
+              has:
+                field: arguments
+                has: {kind: list_splat}
+constraints:
+  F: {regex: ^(KDTree)$}
   M: {regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
 fix: workers=$V
 metadata: {fix: unsafe}
@@ -1912,8 +2066,8 @@ constraints:
   F: {regex: ^(KDTree|cKDTree)$}
   M: {regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
 ---
-# The fix deletes initial_lexsort= with the comma before it. Unsafe: the old form raises TypeError,
-# so there is no value to compare.
+# The fix deletes initial_lexsort= with the comma before it. Safe: on scipy 1.13.1 kendalltau gives
+# results with equal pickles with initial_lexsort= True, False or None and without it.
 id: removed-keyword
 language: python
 severity: error
@@ -2000,9 +2154,10 @@ constraints:
 fix:
   template: ''
   expandStart: {regex: '^,$'}
-metadata: {fix: unsafe}
+metadata: {fix: safe}
 ---
-# scale='raw' raises ValueError, in runs/probe2.jsonl. The docstring says the default 1.0 divides nothing out, which is what raw meant, but no older source here shows it, so the fix is unsafe.
+# scale='raw' raises ValueError, in runs/probe2.jsonl. Safe: on scipy 1.11.4 iqr gives results with
+# equal pickles for scale='raw' and scale=1.0.
 id: removed-keyword
 language: python
 severity: error
@@ -2020,9 +2175,9 @@ rule:
       - has:
           field: function
           any:
-          - {regex: ^scipy\.stats\.((iqr|median_abs_deviation))$, pattern: scipy.stats.$F}
+          - {regex: ^scipy\.stats\.((iqr))$, pattern: scipy.stats.$F}
           - all:
-            - {regex: \.stats\.((iqr|median_abs_deviation))$, pattern: $R.stats.$F}
+            - {regex: \.stats\.((iqr))$, pattern: $R.stats.$F}
             - inside:
                 stopBy: end
                 kind: module
@@ -2036,7 +2191,7 @@ rule:
                       - has: {field: name, regex: ^scipy$}
                       - has: {field: alias, pattern: $R}
           - all:
-            - {regex: \.((iqr|median_abs_deviation))$, pattern: $R.$F}
+            - {regex: \.((iqr))$, pattern: $R.$F}
             - inside:
                 stopBy: end
                 kind: module
@@ -2060,7 +2215,7 @@ rule:
                           - has: {field: name, regex: ^stats$}
                           - has: {field: alias, pattern: $R}
           - all:
-            - {kind: identifier, regex: ^((iqr|median_abs_deviation))$, pattern: $F}
+            - {kind: identifier, regex: ^((iqr))$, pattern: $F}
             - inside:
                 stopBy: end
                 kind: module
@@ -2084,15 +2239,106 @@ rule:
                     - has:
                         kind: aliased_import
                         all:
-                        - has: {field: name, pattern: $F, regex: ^((iqr|median_abs_deviation))$}
+                        - has: {field: name, pattern: $F, regex: ^((iqr))$}
                         - has: {field: alias, pattern: $F_AS}
 constraints:
-  F: {regex: ^(iqr|median_abs_deviation)$}
+  F: {regex: ^(iqr)$}
+fix: scale=1.0
+metadata: {fix: safe}
+---
+# scale='raw' raises ValueError, in runs/probe2.jsonl. Unsafe: median_abs_deviation raises
+# ValueError for scale='raw' on scipy 1.8.1, 1.10.1, 1.11.4 and 1.13.1, so there is no old value to
+# compare.
+id: removed-keyword
+language: python
+severity: error
+message: $F rejects scale='raw' and raises ValueError. Write scale=1.0, the default, which leaves the result unscaled.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^scale$}
+  - has: {field: value, kind: string, regex: '^[''\"]raw[''\"]$'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.stats\.((median_abs_deviation))$, pattern: scipy.stats.$F}
+          - all:
+            - {regex: \.stats\.((median_abs_deviation))$, pattern: $R.stats.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.((median_abs_deviation))$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.stats$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^stats$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^stats$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^((median_abs_deviation))$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.stats$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^((median_abs_deviation))$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^(median_abs_deviation)$}
 fix: scale=1.0
 metadata: {fix: unsafe}
 ---
-# The fix deletes iprint= or disp= with the comma before it. Unsafe: the old form raises TypeError,
-# and the call no longer prints its progress.
+# The fix deletes iprint= or disp= with the comma before it. Safe: on scipy 1.17.1 fmin_l_bfgs_b
+# gives results with equal pickles with and without iprint= or disp=, and prints nothing either way.
 id: removed-keyword
 language: python
 severity: error
@@ -2180,7 +2426,7 @@ constraints:
 fix:
   template: ''
   expandStart: {regex: '^,$'}
-metadata: {fix: unsafe}
+metadata: {fix: safe}
 ---
 # No fix, because minkowski applies the weights after the power, so w must change too.
 id: removed-keyword

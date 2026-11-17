@@ -3,7 +3,8 @@
 # Code under a SciPy version check, a hasattr check, or a try that catches ImportError or
 # AttributeError is left alone, because it exists for old SciPy.
 # statsmodels replaced `from scipy.integrate import trapz` with `trapezoid` (93f56dc2b2, 410bf74b3e
-# in runs/pairs.txt). The old bodies are not in the research material, so the fix is unsafe.
+# in runs/pairs.txt). Safe: on scipy 1.13.1 cumtrapz, simps and trapz give results with equal
+# pickles to cumulative_trapezoid, simpson and trapezoid, with x passed by keyword or by position.
 id: removed-in-scipy
 language: python
 severity: error
@@ -129,10 +130,12 @@ transform:
       by: trapezoid
 fix: $OBJ.$NEW
 metadata:
-  fix: unsafe
+  fix: safe
 
 ---
-# The fix keeps the old name bound, as `from ... import new as old`.
+# Safe: on scipy 1.13.1 cumtrapz, simps and trapz give results with equal pickles to
+# cumulative_trapezoid, simpson and trapezoid, with x passed by keyword or by position. The fix
+# keeps the old name bound, as `from ... import new as old`.
 id: removed-in-scipy
 language: python
 severity: error
@@ -167,9 +170,11 @@ transform:
       by: trapezoid
 fix: $NEW as $N
 metadata:
-  fix: unsafe
+  fix: safe
 
 ---
+# Safe: on scipy 1.13.1 cumtrapz, simps and trapz give results with equal pickles to
+# cumulative_trapezoid, simpson and trapezoid, with x passed by keyword or by position.
 id: removed-in-scipy
 language: python
 severity: error
@@ -207,7 +212,7 @@ transform:
       by: trapezoid
 fix: $NEW
 metadata:
-  fix: unsafe
+  fix: safe
 
 ---
 # The interpreter suggests pinv for pinv2, in runs/proof.jsonl. The old body is not in the research
@@ -759,8 +764,9 @@ metadata:
   fix: unsafe
 
 ---
-# Each window is in scipy.signal.windows under the same name, by runs/relocate.jsonl. The old alias
-# is not in the research material, so the fix is unsafe.
+# Each window is in scipy.signal.windows under the same name, by runs/relocate.jsonl. Safe: on scipy
+# 1.12.0 each window here gives results with equal pickles from scipy.signal and from
+# scipy.signal.windows.
 id: removed-in-scipy
 language: python
 severity: error
@@ -770,7 +776,122 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(kaiser_bessel_derived|general_gaussian|general_hamming|blackmanharris|general_cosine|exponential|barthann|bartlett|blackman|gaussian|chebwin|flattop|hamming|lanczos|nuttall|bohman|boxcar|cosine|kaiser|parzen|taylor|triang|tukey|dpss|hann)$
+      regex: ^(general_gaussian|blackmanharris|exponential|barthann|bartlett|blackman|gaussian|chebwin|flattop|hamming|nuttall|bohman|boxcar|cosine|kaiser|parzen|triang|tukey|hann)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.signal$
+      - pattern: $S.signal
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^signal$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+fix: $OBJ.windows.$N
+metadata:
+  fix: safe
+
+---
+# Each window is in scipy.signal.windows under the same name, by runs/relocate.jsonl. Unsafe:
+# scipy.signal has none of these windows on scipy 1.8.1, 1.10.1 or 1.12.0, so there is no old value
+# to compare.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N is no longer in scipy.signal and raises AttributeError on SciPy 1.18.1. Write $OBJ.windows.$N.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(kaiser_bessel_derived|general_hamming|general_cosine|lanczos|taylor|dpss)$
   - pattern: $OBJ.$N
   - not:
       inside:
@@ -4926,9 +5047,8 @@ metadata:
   fix: unsafe
 ---
 # Each name is public in NumPy 2.5.4 and raises on the scipy namespace, by runs/probe.jsonl. Humans
-# made this change in scikit-learn 823ed5a8d0 (runs/pairs.txt). The old scipy/__init__.py is not in
-# the research material, so which NumPy function each name was cannot be shown, and the fix is
-# unsafe.
+# made this change in scikit-learn 823ed5a8d0 (runs/pairs.txt). Safe: on scipy 1.3.3 with NumPy
+# 1.17.5 each scipy.<name> here is numpy.<name>.
 id: removed-in-scipy
 language: python
 severity: error
@@ -4938,7 +5058,72 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(format_float_positional|format_float_scientific|bitwise_right_shift|histogram_bin_edges|bitwise_left_shift|datetime_as_string|asarray_chkfinite|ascontiguousarray|diag_indices_from|ravel_multi_index|tril_indices_from|triu_indices_from|apply_along_axis|broadcast_arrays|broadcast_shapes|get_printoptions|matrix_transpose|may_share_memory|savez_compressed|set_printoptions|apply_over_axes|complexfloating|cumulative_prod|min_scalar_type|take_along_axis|unsignedinteger|asfortranarray|bitwise_invert|busdaycalendar|cumulative_sum|put_along_axis|unique_inverse|bitwise_count|busday_offset|count_nonzero|datetime_data|fill_diagonal|greater_equal|little_endian|nanpercentile|promote_types|real_if_close|shares_memory|signedinteger|unique_counts|unique_values|unravel_index|argpartition|array2string|broadcast_to|busday_count|column_stack|diag_indices|floor_divide|fromfunction|iscomplexobj|mask_indices|nested_iters|permute_dims|printoptions|searchsorted|show_runtime|sort_complex|tril_indices|triu_indices|array_equal|array_equiv|array_split|binary_repr|bitwise_and|bitwise_not|bitwise_xor|clongdouble|common_type|concatenate|einsum_path|euler_gamma|expand_dims|flatnonzero|float_power|from_dlpack|get_include|histogram2d|histogramdd|intersect1d|logical_and|logical_not|logical_xor|mintypecode|nanquantile|ndenumerate|result_type|right_shift|timedelta64|true_divide|ScalarType|array_repr|asanyarray|atleast_1d|atleast_2d|atleast_3d|bitwise_or|complex128|complex256|datetime64|empty_like|exceptions|frombuffer|frompyfunc|fromstring|genfromtxt|getbufsize|geterrcall|issubdtype|left_shift|less_equal|logaddexp2|logical_or|longdouble|nan_to_num|nancumprod|percentile|polynomial|reciprocal|sctypeDict|setbufsize|seterrcall|trim_zeros|unique_all|unpackbits|zeros_like|array_str|base_repr|broadcast|character|complex64|conjugate|correlate|ctypeslib|fromregex|full_like|geomspace|heaviside|histogram|index_exp|is_busday|iscomplex|isfortran|isrealobj|logaddexp|nanargmax|nanargmin|nancumsum|nanmedian|nextafter|not_equal|ones_like|partition|piecewise|remainder|setdiff1d|tensordot|transpose|trapezoid|typecodes|ulonglong|vectorize|absolute|allclose|argwhere|asmatrix|bartlett|bincount|blackman|can_cast|compress|convolve|copysign|corrcoef|diagflat|diagonal|digitize|errstate|flatiter|flexible|float128|floating|fromfile|fromiter|gradient|identity|isfinite|isneginf|isposinf|isscalar|iterable|linspace|logspace|longlong|meshgrid|moveaxis|multiply|negative|packbits|positive|quantile|recarray|rollaxis|setxor1d|subtract|swapaxes|typename|arccosh|arcsinh|arctan2|arctanh|argsort|asarray|average|cdouble|csingle|cumprod|deg2rad|degrees|ediff1d|extract|float16|float32|float64|generic|greater|hamming|hanning|indices|inexact|integer|isclose|isdtype|lexsort|loadtxt|maximum|minimum|nanmean|nanprod|ndarray|ndindex|newaxis|nonzero|object_|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|putmask|rad2deg|radians|require|reshape|savetxt|signbit|spacing|squeeze|strings|testing|union1d|unstack|False_|append|arange|arccos|arcsin|arctan|argmax|argmin|around|astype|bytes_|choose|concat|copyto|cumsum|delete|divide|divmod|double|dsplit|dstack|dtypes|einsum|fliplr|flipud|geterr|hsplit|hstack|insert|interp|invert|isreal|kaiser|matmul|matrix|matvec|median|memmap|nanmax|nanmin|nanstd|nansum|nanvar|nditer|number|poly1d|random|record|repeat|resize|select|seterr|single|square|typing|uint16|uint32|uint64|unique|unwrap|ushort|vander|vecdot|vecmat|vsplit|vstack|True_|acosh|angle|array|asinh|atan2|atanh|block|bool_|cross|dtype|emath|empty|equal|expm1|finfo|floor|frexp|hypot|iinfo|inner|int16|int32|int64|isinf|isnan|isnat|ldexp|log10|log1p|mgrid|ogrid|outer|place|power|ravel|roots|rot90|round|savez|shape|short|split|stack|trace|trunc|ubyte|ufunc|uint8|uintc|uintp|ulong|where|zeros|acos|amax|amin|asin|atan|bmat|bool|byte|cbrt|ceil|char|clip|conj|copy|core|cosh|diag|diff|exp2|f2py|fabs|flip|fmax|fmin|fmod|full|half|imag|info|int8|int_|intc|intp|isin|kron|less|load|log2|long|mean|modf|ndim|ones|poly|prod|real|rint|roll|save|sign|sinc|sinh|size|sort|sqrt|str_|take|tanh|tile|tril|triu|uint|vdot|void|abs|add|all|any|cos|cov|dot|exp|eye|fix|gcd|inf|ix_|lcm|lib|log|max|min|mod|nan|pad|pow|ptp|put|rec|sin|std|sum|tan|tri|var|c_|i0|ma|pi|r_|s_|e)$
+      regex: ^(format_float_positional|format_float_scientific|histogram_bin_edges|datetime_as_string|asarray_chkfinite|ascontiguousarray|diag_indices_from|ravel_multi_index|tril_indices_from|triu_indices_from|apply_along_axis|broadcast_arrays|get_printoptions|may_share_memory|savez_compressed|set_printoptions|apply_over_axes|complexfloating|min_scalar_type|take_along_axis|unsignedinteger|asfortranarray|busdaycalendar|put_along_axis|busday_offset|count_nonzero|datetime_data|fill_diagonal|greater_equal|little_endian|nanpercentile|promote_types|real_if_close|shares_memory|signedinteger|unravel_index|argpartition|array2string|broadcast_to|busday_count|column_stack|diag_indices|floor_divide|fromfunction|iscomplexobj|mask_indices|nested_iters|printoptions|searchsorted|sort_complex|tril_indices|triu_indices|array_equal|array_equiv|array_split|binary_repr|bitwise_and|bitwise_not|bitwise_xor|clongdouble|common_type|concatenate|einsum_path|euler_gamma|expand_dims|flatnonzero|float_power|get_include|histogram2d|histogramdd|intersect1d|logical_and|logical_not|logical_xor|mintypecode|nanquantile|ndenumerate|result_type|right_shift|timedelta64|true_divide|ScalarType|array_repr|asanyarray|atleast_1d|atleast_2d|atleast_3d|bitwise_or|complex128|complex256|datetime64|empty_like|frombuffer|frompyfunc|fromstring|genfromtxt|getbufsize|geterrcall|issubdtype|left_shift|less_equal|logaddexp2|logical_or|longdouble|nan_to_num|nancumprod|percentile|reciprocal|sctypeDict|setbufsize|seterrcall|trim_zeros|unpackbits|zeros_like|array_str|base_repr|broadcast|character|complex64|conjugate|correlate|ctypeslib|fromregex|full_like|geomspace|heaviside|histogram|index_exp|is_busday|iscomplex|isfortran|isrealobj|logaddexp|nanargmax|nanargmin|nancumsum|nanmedian|nextafter|not_equal|ones_like|partition|piecewise|remainder|setdiff1d|tensordot|transpose|typecodes|ulonglong|vectorize|absolute|allclose|argwhere|asmatrix|bartlett|bincount|blackman|can_cast|compress|convolve|copysign|corrcoef|diagflat|diagonal|digitize|errstate|flatiter|flexible|float128|floating|fromfile|fromiter|gradient|identity|isfinite|isneginf|isposinf|isscalar|iterable|linspace|logspace|longlong|meshgrid|moveaxis|multiply|negative|packbits|positive|quantile|recarray|rollaxis|setxor1d|subtract|swapaxes|typename|arccosh|arcsinh|arctan2|argsort|asarray|average|cdouble|csingle|cumprod|deg2rad|degrees|ediff1d|extract|float16|float32|float64|generic|greater|hamming|hanning|indices|inexact|integer|isclose|lexsort|loadtxt|maximum|minimum|nanmean|nanprod|ndarray|ndindex|newaxis|nonzero|object_|polyadd|polyder|polydiv|polyfit|polyint|polymul|polysub|polyval|putmask|rad2deg|radians|require|reshape|savetxt|signbit|spacing|squeeze|union1d|False_|append|arange|arctan|argmax|argmin|around|bytes_|choose|copyto|cumsum|delete|divide|divmod|double|dsplit|dstack|einsum|fliplr|flipud|geterr|hsplit|hstack|insert|interp|invert|isreal|kaiser|matmul|matrix|median|memmap|nanmax|nanmin|nanstd|nansum|nanvar|nditer|number|poly1d|random|record|repeat|resize|select|seterr|single|square|uint16|uint32|uint64|unique|unwrap|ushort|vander|vsplit|vstack|True_|angle|array|block|bool_|cross|dtype|emath|empty|equal|expm1|finfo|floor|frexp|hypot|iinfo|inner|int16|int32|int64|isinf|isnan|isnat|ldexp|log1p|mgrid|ogrid|outer|place|ravel|roots|rot90|savez|shape|short|split|stack|trace|trunc|ubyte|ufunc|uint8|uintc|uintp|where|zeros|amax|amin|bmat|byte|cbrt|ceil|char|clip|conj|copy|cosh|diag|diff|exp2|fabs|flip|fmax|fmin|fmod|full|half|imag|info|int8|int_|intc|intp|isin|kron|less|load|long|mean|modf|ndim|ones|poly|prod|real|rint|roll|save|sign|sinc|sinh|size|sort|str_|take|tanh|tile|tril|triu|uint|vdot|void|add|all|any|cos|cov|dot|exp|eye|fix|gcd|inf|ix_|lcm|mod|nan|pad|ptp|put|rec|sin|std|sum|tan|tri|var|c_|i0|ma|pi|r_|s_|e)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy$
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+  - not:
+      matches: compat-code
+fix: np.$N
+metadata:
+  fix: safe
+
+---
+# Each name is public in NumPy 2.5.4 and raises on the scipy namespace, by runs/probe.jsonl. Humans
+# made this change in scikit-learn 823ed5a8d0 (runs/pairs.txt). Unsafe: on scipy 1.3.3 with NumPy
+# 1.17.5 arccos, arcsin, arctanh, log, log10, log2, power and sqrt on the scipy namespace are the
+# numpy.lib.scimath functions, which return a complex number for an input outside the real domain
+# where NumPy returns nan, and the other names are not on the scipy namespace.
+id: removed-in-scipy
+language: python
+severity: error
+message: SciPy no longer re-exports NumPy, so $OBJ.$N raises AttributeError on SciPy 1.18.1. Write np.$N.
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(bitwise_right_shift|bitwise_left_shift|broadcast_shapes|matrix_transpose|cumulative_prod|bitwise_invert|cumulative_sum|unique_inverse|bitwise_count|unique_counts|unique_values|permute_dims|show_runtime|from_dlpack|exceptions|polynomial|unique_all|trapezoid|arctanh|isdtype|strings|testing|unstack|arccos|arcsin|astype|concat|dtypes|matvec|typing|vecdot|vecmat|acosh|asinh|atan2|atanh|log10|power|round|ulong|acos|asin|atan|bool|core|f2py|log2|sqrt|abs|lib|log|max|min|pow)$
   - pattern: $OBJ.$N
   - not:
       inside:
