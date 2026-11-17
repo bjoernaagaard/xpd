@@ -2964,7 +2964,8 @@ faster or more exact form. They run on files that import `numpy`, and examples a
 | a form is wrong | it gives the wrong value |
 | a form is faster | the median of 7 runs on one core, at 1,000,000 values unless the rule says otherwise |
 
-A fix that writes `np.` applies only in a file with `import numpy as np`. A safe fix returns a
+A fix that writes `np.` applies only in a file with `import numpy as np`, and a fix that writes
+`assert_allclose` only in a file with `from numpy.testing import assert_allclose`. A safe fix returns a
 value of the same dtype that is equal bit for bit, and the **Fix:** line of an unsafe fix names
 what can differ.
 
@@ -4022,7 +4023,7 @@ intercept, slope = np.polynomial.Polynomial.fit(x, y, 1).convert().coef
 
 #### almost-equal-assert
 
-**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)`, with `1.5e-6` for `assert_array_almost_equal` and `1.5e-<decimal>` for a literal decimal. A difference of exactly `atol` failed before and passes after, dicts and ragged lists are no longer compared item by item, and complex values are compared by magnitude. A bare imported name, an `err_msg` argument, a computed decimal and `assert_approx_equal` have no fix.
+**Severity:** info. **Fix:** unsafe: `np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)`, with `1.5e-6` for `assert_array_almost_equal` and `1.5e-<decimal>` for a literal decimal. A difference of exactly `atol` failed before and passes after, dicts and ragged lists are no longer compared item by item, and complex values are compared by magnitude. A bare name that the file imports from `numpy.testing` gets `assert_allclose(a, b, rtol=0, atol=1.5e-7)` in a file that also imports `assert_allclose` from `numpy.testing`. Any other bare name, an `err_msg` argument, a computed decimal and `assert_approx_equal` have no fix.
 
 The rule reports `assert_almost_equal`, `assert_array_almost_equal` and `assert_approx_equal`, which NumPy lists under "Asserts (not recommended)".
 
@@ -4058,7 +4059,7 @@ np.testing.assert_allclose(weights, expected, rtol=1e-05, atol=1e-08)
 
 #### legacy-testing-helper
 
-**Severity:** info. **Fix:** unsafe: `assert x` and `assert x, msg`. The statement is skipped under `python -O`, and its message is built only on failure. `assert_raises` has no fix.
+**Severity:** info. **Fix:** unsafe: `assert x` and `assert x, msg`, with each part in parentheses when the call is on more than one line. The statement is skipped under `python -O`, and its message is built only on failure. `assert_raises` has no fix.
 
 The rule reports `numpy.testing.assert_`, which NumPy's testing guidelines call the legacy form of the assert statement. It also reports `numpy.testing.assert_raises` and `assert_raises_regex`, where the guidelines prefer `pytest.raises`. The rule reports a bare `assert_raises` only in a file that imports it from `numpy.testing`, because SciPy imports `pytest.raises` under that name.
 
@@ -13488,6 +13489,7 @@ with `xpd test`, which [the commands page](commands.md#new) describes.
 | --- | --- |
 | `fix:` | One ast-grep fix for the rule. The rule must then say whether the fix keeps what the code does, with `metadata: { fix: safe }` or `metadata: { fix: unsafe }`. |
 | `aliases` in `pack.yml` | A fix may write an alias that the pack lists, such as `pd.`, and xpd applies the fix only in a file that imports the module under that alias. |
+| `members` in `pack.yml` | A fix may write a bare name that the pack lists with its module, such as `assert_allclose: numpy.testing`, and xpd applies the fix only in a file that imports the name from that module. |
 | `metadata: { since: "3.1" }` | xpd skips the rule when the project's venv holds an older version of the pack's library. |
 | `metadata: { since: "0.6", until: "0.6.1.6" }` | The rule's advice holds only up to a release, and a second document with `since: "0.6.1.6"` gives the newest advice. |
 | [`files` and `ignores`](https://ast-grep.github.io/reference/yaml.html#files) | Globs that limit the files a rule runs on. xpd matches a glob against the path as it was given, so start it with `**/` to match at any depth, as in `ignores: ["**/__main__.py"]`. |
@@ -13505,6 +13507,43 @@ on(run a rule document)
   else
     run the document unless it has until
 ```
+
+### When a rule has a fix
+
+Give a rule document a fix when its message names one rewrite of the code it matches, and mark
+the fix safe only when the result cannot differ. Every pack follows the same three steps.
+
+```text
+on(a rule document)
+  if the message names one rewrite, and the matched code holds everything the rewrite needs
+    if the fixed code gives the same object, or a value of the same type that is equal bit for bit
+      fix, with metadata: { fix: safe }
+    else
+      fix, with metadata: { fix: unsafe }     # the comment above the document says what can differ
+  else
+    no fix                                    # the comment above the document names what is missing
+```
+
+| Case | What the document gets |
+| --- | --- |
+| The old form raises on the library version that the pack is written for | An unsafe fix. A form that raises leaves no value to compare, so its fix is never safe |
+| The rewrite returns another type, such as an array where the old form returned a list | An unsafe fix |
+| The rewrite changes what the code does on purpose, because the old form gave a wrong result | An unsafe fix |
+| The rewrite drops, adds or renames one argument of a call | A fix that builds the argument list again with `rewriters`, as `deprecated-in-sklearn` does |
+| The rewrite adds a statement next to the matched statement | A fix whose template has the new line and the matched statement |
+| The rewrite writes a name that the file may not import | A fix, with the name under `aliases` or `members` in `pack.yml`, so that xpd applies it only where the file imports the name |
+| The rewrite needs a value that the file does not hold, such as a seed, a unit, a separator or a column name | No fix |
+| The rewrite needs a new name, such as a variable for a value that is used twice | No fix |
+| The rewrite changes a second place that the match does not reach, such as the body of a loop, another statement or another file | No fix |
+| The message names two rewrites and the code does not show which one is meant | No fix |
+| The advice is to use another design, such as another chart, another model or a function in place of a loop | No fix |
+
+Split a document when only some of its forms have one rewrite, so that those forms get the fix
+and the other forms keep the report. A rule document has at most one fix.
+
+xpd checks each fix again where it applies it. It drops the fix at a match, and keeps the report,
+when the fixed file has a syntax error that the file did not have. The parser does not see every
+error that Python sees, so run the fixed sample too.
 
 A new folder under `rules/` is a new pack, with no Rust change. Build xpd and run it on a sample:
 

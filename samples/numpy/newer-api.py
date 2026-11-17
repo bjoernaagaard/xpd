@@ -11,7 +11,13 @@ import numpy as np
 import numpy.testing as npt
 from numpy.random import default_rng
 from numpy.random import SeedSequence, rand as legacy_rand  # xpd: legacy-random
-from numpy.testing import assert_, assert_raises
+from numpy.testing import (
+    assert_,
+    assert_allclose,
+    assert_almost_equal,
+    assert_array_almost_equal,
+    assert_raises,
+)
 from numpy.random import randn, seed  # xpd: legacy-random
 
 CASES = {}
@@ -112,6 +118,10 @@ def almost_equal_asserts():
     npt.assert_array_almost_equal(a, b, decimal=5)  # xpd: almost-equal-assert
     npt.assert_array_almost_equal(a, b, err_msg="drift")  # xpd: almost-equal-assert
     npt.assert_approx_equal(1.0, 1.0 + 1e-9)  # xpd: almost-equal-assert
+    assert_almost_equal(a, b)  # xpd: almost-equal-assert
+    assert_array_almost_equal(a, b)  # xpd: almost-equal-assert
+    assert_array_almost_equal(a, b, decimal=5)  # xpd: almost-equal-assert
+    assert_almost_equal(a, b, err_msg="drift")  # xpd: almost-equal-assert
     np.testing.assert_allclose(a, b, rtol=0, atol=1.5e-7)
     npt.assert_array_equal(a, a)
 
@@ -223,6 +233,12 @@ def legacy_testing_helpers():
     a = np.ones(2)
     assert_(a.shape == (2,))  # xpd: legacy-testing-helper
     np.testing.assert_(a.sum() == 2, "sum is off")  # xpd: legacy-testing-helper
+    assert_(  # xpd: legacy-testing-helper
+        a.sum()
+        == 2
+    )
+    assert_(a.sum() == 2, "the sum of "  # xpd: legacy-testing-helper
+            "the ones is off")
     assert_raises(ValueError, int, "x")  # xpd: legacy-testing-helper
     with np.testing.assert_raises(ValueError):  # xpd: legacy-testing-helper
         int("x")

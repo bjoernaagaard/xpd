@@ -73,6 +73,7 @@ struct PackEntry<'a> {
     rule_dirs: &'a [String],
     every_file: bool,
     aliases: BTreeMap<String, String>,
+    members: BTreeMap<String, String>,
     packages: Vec<Value>,
 }
 
@@ -136,6 +137,7 @@ impl Pack {
             rule_dirs: &self.rule_dirs,
             every_file: self.gate == Gate::EveryFile,
             aliases: BTreeMap::new(),
+            members: BTreeMap::new(),
             packages: Vec::new(),
         }
     }

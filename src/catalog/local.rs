@@ -120,6 +120,8 @@ struct PackEntry {
     #[serde(default)]
     aliases: BTreeMap<String, String>,
     #[serde(default)]
+    members: BTreeMap<String, String>,
+    #[serde(default)]
     packages: Vec<PackageCheck>,
     #[serde(default)]
     every_file: bool,
@@ -340,6 +342,7 @@ impl LocalProject {
             });
             manifests.push(Manifest {
                 aliases: entry.aliases,
+                members: entry.members,
                 packages: entry.packages,
                 every_file: entry.every_file,
                 also_on: entry.also_on,

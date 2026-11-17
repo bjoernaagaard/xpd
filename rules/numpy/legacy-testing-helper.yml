@@ -2,7 +2,8 @@
 # statement, which pytest rewrites to show the values, and prefer pytest.raises over
 # numpy.testing.assert_raises: https://numpy.org/doc/stable/reference/testing.html
 # Unsafe: the assert statement is skipped under python -O, and its message is built only when
-# the test fails, where assert_ built it on every call.
+# the test fails, where assert_ built it on every call. The parentheses of the call let its
+# arguments run over several lines, so an argument on more than one line keeps a pair.
 id: legacy-testing-helper
 language: python
 severity: info
@@ -13,7 +14,7 @@ rule:
   not: { has: { kind: call, has: { field: arguments, has: { kind: keyword_argument } } } }
 constraints:
   F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_$' }
-  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { regex: '\n' }] } }
 fix: assert $X
 metadata: { fix: unsafe }
 ---
@@ -26,9 +27,40 @@ rule:
   has: { pattern: "$F($X, $MSG)" }
 constraints:
   F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_$' }
+  X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { regex: '\n' }] } }
+  MSG: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { regex: '\n' }] } }
+fix: assert $X, $MSG
+metadata: { fix: unsafe }
+---
+id: legacy-testing-helper
+language: python
+severity: info
+message: assert_ is the legacy form of the assert statement, which pytest rewrites to show the compared values. Write assert ($X), with the parentheses, because the condition is on more than one line.
+rule:
+  kind: expression_statement
+  has: { pattern: $F($X) }
+  not: { has: { kind: call, has: { field: arguments, has: { kind: keyword_argument } } } }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_$' }
+  X: { regex: '\n', not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+fix: assert ($X)
+metadata: { fix: unsafe }
+---
+id: legacy-testing-helper
+language: python
+severity: info
+message: assert_ is the legacy form of the assert statement, which pytest rewrites to show the compared values. Write assert ($X), ($MSG), with the parentheses, because the call is on more than one line.
+rule:
+  kind: expression_statement
+  has: { pattern: "$F($X, $MSG)" }
+  any:
+    - has: { has: { field: arguments, has: { nthChild: 1, regex: '\n' } } }
+    - has: { has: { field: arguments, has: { nthChild: 2, regex: '\n' } } }
+constraints:
+  F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?assert_$' }
   X: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
   MSG: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
-fix: assert $X, $MSG
+fix: assert ($X), ($MSG)
 metadata: { fix: unsafe }
 ---
 # No fix, because pytest may not be imported and the call form has to become a with block.

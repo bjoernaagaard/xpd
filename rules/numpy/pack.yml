@@ -4,3 +4,8 @@
 # has no fix.
 aliases:
   np: numpy
+
+# Names a fix may write bare, each with the module it must be imported from. A fix that writes
+# `assert_allclose(` applies only in a file with `from numpy.testing import assert_allclose`.
+members:
+  assert_allclose: numpy.testing

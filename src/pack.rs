@@ -73,6 +73,8 @@ pub(crate) struct Manifest {
     #[serde(default)]
     pub(crate) aliases: BTreeMap<String, String>,
     #[serde(default)]
+    pub(crate) members: BTreeMap<String, String>,
+    #[serde(default)]
     pub(crate) packages: Vec<PackageCheck>,
     /// The pack is not about one library, so its rules run on every file.
     #[serde(default)]
@@ -161,6 +163,9 @@ pub(crate) struct Pack {
     /// Short names a fix may write, each with the module it must be imported as, such as `pd`
     /// for `pandas`.
     pub(crate) aliases: BTreeMap<String, String>,
+    /// Names a fix may write bare, each with the module it must be imported from, such as
+    /// `assert_allclose` from `numpy.testing`.
+    pub(crate) members: BTreeMap<String, String>,
     /// Packages the library works better with.
     pub(crate) package_checks: Vec<PackageCheck>,
     docs: &'static [DocSource],
@@ -294,6 +299,7 @@ impl Pack {
             rules,
             inactive_rules: Vec::new(),
             aliases: manifest.aliases,
+            members: manifest.members,
             package_checks: manifest.packages,
             docs: &[],
             root,
@@ -309,6 +315,7 @@ impl Pack {
             rules,
             inactive_rules: Vec::new(),
             aliases: BTreeMap::new(),
+            members: BTreeMap::new(),
             package_checks: Vec::new(),
             docs: &[],
             root: Some(root),
@@ -332,6 +339,7 @@ impl Pack {
             rules: vec![rule],
             inactive_rules: Vec::new(),
             aliases: BTreeMap::new(),
+            members: BTreeMap::new(),
             package_checks: Vec::new(),
             docs: &[],
             root: None,
@@ -449,6 +457,7 @@ impl fmt::Debug for Pack {
             .field("module", &self.module)
             .field("rules", &self.rules)
             .field("aliases", &self.aliases)
+            .field("members", &self.members)
             .field("package_checks", &self.package_checks)
             .finish_non_exhaustive()
     }

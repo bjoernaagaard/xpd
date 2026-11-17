@@ -1,6 +1,6 @@
 //! Walks paths, fixes and lints each file with the rule packs that apply to it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -40,11 +40,39 @@ fn language_of(path: &Path) -> SupportLang {
     SupportLang::from_path(path).unwrap_or(SupportLang::Python)
 }
 
-/// One `import <module> as <alias>` in a file.
+/// How a file binds a name that it imports.
+#[derive(Debug, PartialEq, Eq)]
+enum Binding {
+    /// `import <module> as <name>`, which a fix uses as the start of a dotted name.
+    Alias,
+    /// `from <module> import <name>`, which a fix uses bare.
+    Member,
+}
+
+/// One name that a file imports from `module` under its own name or as an alias.
 #[derive(Debug)]
-struct AliasedImport {
+struct Import {
     module: String,
-    alias: String,
+    name: String,
+    binding: Binding,
+}
+
+/// A name that a fix of a pack may write, which the file does not bind to its module.
+#[derive(Debug)]
+struct Unbound<'p> {
+    name: &'p str,
+    binding: Binding,
+}
+
+/// The number of syntax errors in a parsed file.
+fn syntax_errors(root: &Root) -> usize {
+    let top = root.root();
+    if !top.get_inner_node().has_error() {
+        return 0;
+    }
+    top.dfs()
+        .filter(|node| node.is_error() || node.is_missing())
+        .count()
 }
 
 /// One file, as a lint run names it.
@@ -303,7 +331,12 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
         return Vec::new();
     }
     let root = parse_as(src, language);
-    let imports = aliased_imports(&root, language);
+    let imports = imports(&root, language);
+    let parsed = Parsed {
+        src,
+        language,
+        errors: syntax_errors(&root),
+    };
     let mut found = Vec::new();
     for MatchedRule {
         pack,
@@ -311,10 +344,10 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
         matches,
     } in matched_rules(&root, src, file, language, packs)
     {
-        let unbound = unbound_aliases(pack, imports.as_deref());
+        let unbound = unbound_names(pack, imports.as_deref());
         for m in matches {
             let start = m.start_pos();
-            let edit = usable_edit(rule, &m, &unbound, src);
+            let edit = usable_edit(rule, &m, &unbound, parsed);
             let issue = Issue {
                 package: pack.module.clone(),
                 rule: rule.id.clone(),
@@ -366,7 +399,12 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
         return (src.to_owned(), 0);
     }
     let root = parse_as(src, language);
-    let imports = aliased_imports(&root, language);
+    let imports = imports(&root, language);
+    let parsed = Parsed {
+        src,
+        language,
+        errors: syntax_errors(&root),
+    };
     let mut edits = Vec::new();
     for MatchedRule {
         pack,
@@ -374,12 +412,12 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
         matches,
     } in matched_rules(&root, src, file, language, packs)
     {
-        let unbound = unbound_aliases(pack, imports.as_deref());
+        let unbound = unbound_names(pack, imports.as_deref());
         if rule.fix.is_none_or(|a| a > allowed) {
             continue;
         }
         for m in matches {
-            edits.extend(usable_edit(rule, &m, &unbound, src));
+            edits.extend(usable_edit(rule, &m, &unbound, parsed));
         }
     }
     edits.sort_by_key(|e| e.position);
@@ -400,66 +438,129 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
     (out, applied)
 }
 
-/// Every aliased import in the file, at any depth. `None` for a file that is not Python, where
-/// no alias of a pack needs an import.
-fn aliased_imports(root: &Root, language: SupportLang) -> Option<Vec<AliasedImport>> {
+/// Every import in the file that binds a name a fix can write, at any depth. `None` for a file
+/// that is not Python, where no name of a pack needs an import.
+fn imports(root: &Root, language: SupportLang) -> Option<Vec<Import>> {
     if language != SupportLang::Python {
         return None;
     }
-    let imports = root
-        .root()
-        .dfs()
-        .filter(|node| node.kind() == "aliased_import")
-        .filter_map(|node| {
-            Some(AliasedImport {
-                module: node.field("name")?.text().into_owned(),
-                alias: node.field("alias")?.text().into_owned(),
-            })
-        })
-        .collect();
+    let mut imports = Vec::new();
+    for node in root.root().dfs() {
+        match &*node.kind() {
+            "aliased_import" => {
+                let (Some(module), Some(alias)) = (node.field("name"), node.field("alias")) else {
+                    continue;
+                };
+                // `from m import a as b` binds neither `a` nor the module `m` under an alias.
+                if node
+                    .parent()
+                    .is_some_and(|p| p.kind() == "import_statement")
+                {
+                    imports.push(Import {
+                        module: module.text().into_owned(),
+                        name: alias.text().into_owned(),
+                        binding: Binding::Alias,
+                    });
+                }
+            }
+            "import_from_statement" => {
+                let Some(module) = node.field("module_name") else {
+                    continue;
+                };
+                let members = node
+                    .field_children("name")
+                    .filter(|name| name.kind() == "dotted_name");
+                for member in members {
+                    imports.push(Import {
+                        module: module.text().into_owned(),
+                        name: member.text().into_owned(),
+                        binding: Binding::Member,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
     Some(imports)
 }
 
-/// The pack's aliases that the file does not bind to their module. A fix that writes `pd.`
-/// applies only in a file with `import pandas as pd`.
-fn unbound_aliases<'p>(pack: &'p Pack, imports: Option<&[AliasedImport]>) -> Vec<&'p str> {
+/// The names of the pack that the file does not bind to their module. A fix that writes `pd.`
+/// applies only in a file with `import pandas as pd`, and a fix that writes `assert_allclose`
+/// only in a file with `from numpy.testing import assert_allclose`.
+fn unbound_names<'p>(pack: &'p Pack, imports: Option<&[Import]>) -> Vec<Unbound<'p>> {
     let Some(imports) = imports else {
         return Vec::new();
     };
-    pack.aliases
-        .iter()
-        .filter(|(alias, module)| {
-            !imports
-                .iter()
-                .any(|import| import.module == **module && import.alias == **alias)
-        })
-        .map(|(alias, _)| alias.as_str())
+    let names = |names: &'p BTreeMap<String, String>, binding: fn() -> Binding| {
+        names
+            .iter()
+            .filter(move |(name, module)| {
+                !imports.iter().any(|import| {
+                    import.binding == binding()
+                        && import.module == **module
+                        && import.name == **name
+                })
+            })
+            .map(move |(name, _)| Unbound {
+                name,
+                binding: binding(),
+            })
+    };
+    names(&pack.aliases, || Binding::Alias)
+        .chain(names(&pack.members, || Binding::Member))
         .collect()
 }
 
-/// The edit `rule` makes for `m` in `src`, or `None` when the rule has no fix, its fix writes
-/// one of the `unbound` aliases, or its fix leaves the text as it is.
+/// The source of one file as a fix sees it.
+#[derive(Clone, Copy)]
+struct Parsed<'s> {
+    src: &'s str,
+    language: SupportLang,
+    /// The number of syntax errors in `src`.
+    errors: usize,
+}
+
+/// The edit `rule` makes for `m`, or `None` when the rule has no fix, its fix writes one of the
+/// `unbound` names, its fix leaves the text as it is, or the fixed file has a syntax error that
+/// the file did not have. A fix is a text template, so it cannot know every form of the code
+/// around a match, such as an argument list that ends in a comment.
 fn usable_edit(
     rule: &Rule,
     m: &NodeMatch<'_, StrDoc<SupportLang>>,
-    unbound: &[&str],
-    src: &str,
+    unbound: &[Unbound<'_>],
+    parsed: Parsed<'_>,
 ) -> Option<Edit<String>> {
     let fixer = rule.config.fixer.first()?;
     let edit = m.make_edit(&rule.config.matcher, fixer);
-    let writes_unbound = unbound
-        .iter()
-        .any(|alias| writes_name(&edit.inserted_text, alias));
-    let old = &src.as_bytes()[edit.position..edit.position + edit.deleted_length];
-    (!writes_unbound && edit.inserted_text != old).then_some(edit)
+    let end = edit.position + edit.deleted_length;
+    let src = parsed.src.as_bytes();
+    if edit.inserted_text == src[edit.position..end]
+        || unbound
+            .iter()
+            .any(|name| name.written_in(&edit.inserted_text))
+    {
+        return None;
+    }
+    let after = [&src[..edit.position], &edit.inserted_text, &src[end..]].concat();
+    let after = String::from_utf8(after).expect("a fix splices UTF-8 text at node boundaries");
+    (syntax_errors(&parse_as(&after, parsed.language)) <= parsed.errors).then_some(edit)
 }
 
-/// Whether `text` uses `name` as the start of a dotted name, such as `pd.col`.
-fn writes_name(text: &[u8], name: &str) -> bool {
-    let needle = format!("{name}.");
-    text.windows(needle.len()).enumerate().any(|(i, w)| {
-        w == needle.as_bytes()
-            && (i == 0
-                || !(text[i - 1].is_ascii_alphanumeric() || matches!(text[i - 1], b'_' | b'.')))
-    })
+impl Unbound<'_> {
+    /// Whether `text` uses the name: an alias as the start of a dotted name, such as `pd.col`,
+    /// and a member as a whole name that is not an attribute, such as `assert_allclose(`.
+    fn written_in(&self, text: &[u8]) -> bool {
+        let part_of_name = |byte: &u8| byte.is_ascii_alphanumeric() || *byte == b'_';
+        let name = self.name.as_bytes();
+        text.windows(name.len()).enumerate().any(|(i, window)| {
+            let before = i.checked_sub(1).map(|i| &text[i]);
+            let after = text.get(i + name.len());
+            window == name
+                && !before.is_some_and(|byte| part_of_name(byte) || *byte == b'.')
+                && match self.binding {
+                    Binding::Alias => after == Some(&b'.'),
+                    Binding::Member => !after.is_some_and(part_of_name),
+                }
+        })
+    }
 }

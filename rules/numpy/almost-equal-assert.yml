@@ -4,8 +4,7 @@
 # The decimal test is abs(desired - actual) < 1.5 * 10**-decimal, so the fix writes rtol=0 and
 # that atol. Unsafe: a difference of exactly atol fails before and passes after, dicts and
 # ragged nested lists are no longer compared item by item, and complex values are compared by
-# magnitude instead of by each part. The fix keeps the module the call came from, so a bare
-# name imported from numpy.testing has no fix.
+# magnitude instead of by each part. The fix keeps the module the call came from.
 id: almost-equal-assert
 language: python
 severity: info
@@ -61,19 +60,71 @@ transform:
 fix: $M.assert_allclose($A, $B, rtol=0, atol=1.5e-$D)
 metadata: { fix: unsafe }
 ---
-# Every other call, such as a bare name, an err_msg argument or a computed decimal.
+# A bare name that the file imports from numpy.testing. The fix writes assert_allclose bare, so
+# it applies only in a file that also imports assert_allclose from numpy.testing, which
+# pack.yml says under members.
+id: almost-equal-assert
+language: python
+severity: info
+message: assert_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-7. Write assert_allclose($A, $B, rtol=0, atol=1.5e-7).
+rule:
+  pattern: "$F($A, $B)"
+  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+constraints:
+  F: { regex: '^assert_almost_equal$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+fix: assert_allclose($A, $B, rtol=0, atol=1.5e-7)
+metadata: { fix: unsafe }
+---
+id: almost-equal-assert
+language: python
+severity: info
+message: assert_array_almost_equal is on NumPy's not recommended list, and its default test is an absolute tolerance of 1.5e-6. Write assert_allclose($A, $B, rtol=0, atol=1.5e-6).
+rule:
+  pattern: "$F($A, $B)"
+  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+constraints:
+  F: { regex: '^assert_array_almost_equal$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+fix: assert_allclose($A, $B, rtol=0, atol=1.5e-6)
+metadata: { fix: unsafe }
+---
+id: almost-equal-assert
+language: python
+severity: info
+message: $F is on NumPy's not recommended list, and decimal=$D is an absolute tolerance of 1.5e-$D. Write assert_allclose($A, $B, rtol=0, atol=1.5e-$D).
+rule:
+  pattern: "$F($A, $B, $DECIMAL)"
+  inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
+constraints:
+  F: { regex: '^(assert_almost_equal|assert_array_almost_equal)$' }
+  A: { not: { kind: keyword_argument } }
+  B: { not: { kind: keyword_argument } }
+  DECIMAL: { regex: '^(decimal\s*=\s*)?\d+$' }
+transform:
+  D: { replace: { source: $DECIMAL, replace: '^decimal\s*=\s*', by: '' } }
+fix: assert_allclose($A, $B, rtol=0, atol=1.5e-$D)
+metadata: { fix: unsafe }
+---
+# Every other call, such as a bare name that the file does not import from numpy.testing, an
+# err_msg argument or a computed decimal.
 id: almost-equal-assert
 language: python
 severity: info
 message: $F is on NumPy's not recommended list. Write assert_allclose with rtol=0 and atol=1.5 * 10**-decimal, where decimal defaults to 7 for assert_almost_equal and 6 for assert_array_almost_equal.
 rule:
   pattern: $F($$$ARGS)
-  not: { all: [{ matches: qualified }, { matches: fixable-arguments }] }
+  not: { all: [{ any: [{ matches: qualified }, { matches: imported-bare-name }] }, { matches: fixable-arguments }] }
 constraints:
   F: { regex: '^((np\.testing|numpy\.testing|npt|nt|testing)\.)?(assert_almost_equal|assert_array_almost_equal)$' }
 utils:
   qualified:
     has: { field: function, regex: '^(np\.testing|numpy\.testing|npt|nt|testing)\.' }
+  imported-bare-name:
+    has: { field: function, kind: identifier, pattern: $F }
+    inside: { stopBy: end, kind: module, has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^numpy\.testing$' } }, { has: { stopBy: end, kind: identifier, pattern: $F } }] } }
   fixable-arguments:
     has:
       field: arguments
