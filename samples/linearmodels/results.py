@@ -28,7 +28,7 @@ def panel():
 
 
 def women():
-    data = mroz.load().dropna().reset_index(drop=True)
+    data = mroz.load().dropna().reset_index(drop=True)  # xpd: sort-then-reset-index
     return data.assign(const=1.0)
 
 
@@ -73,7 +73,7 @@ def random_against_fixed():
         return (fe.params + re.params) / 2
 
     def hausman_table(fe, re):
-        return pd.concat([fe.params, re.params], axis=1)
+        return pd.concat([fe.params, re.params], axis=1)  # xpd: concat-columns-unchecked
 
     return hausman(fixed, random), difference(fixed, random), random.hausman(fixed), hausman_taylor(fixed, random), hausman_table(fixed, random).shape
 

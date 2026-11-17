@@ -42,7 +42,7 @@ def distances_in_one_call():
     a = cdist(X, Y)
     b = distance.cdist(X, Y, "cityblock")
     c = distance.cosine(X[0], Y[0])
-    d = [np.linalg.norm(x - y) for x in X for y in Y]
+    d = [np.linalg.norm(x - y) for x in X for y in Y]  # xpd: comprehension-two-fors
     return a, b, c, d
 
 

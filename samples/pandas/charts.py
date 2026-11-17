@@ -6,7 +6,7 @@ code computes, so a copy fixed with `xpd check --fix` can be compared with this 
 
 import matplotlib
 
-matplotlib.use("Agg")
+matplotlib.use("Agg")  # xpd: import-side-effect
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns

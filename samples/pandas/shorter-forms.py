@@ -96,7 +96,7 @@ def set_index_for_upsampling(df):
 
 @case
 def subtract_shift(df):
-    return df["b"] - df["b"].shift(), df["a"] - df["a"].shift(1), df["d"] - df["d"].shift()  # xpd: subtract-shift
+    return df["b"] - df["b"].shift(), df["a"] - df["a"].shift(1), df["d"] - df["d"].shift()  # xpd: subtract-shift, subtract-shift, subtract-shift
 
 
 @case

@@ -40,7 +40,7 @@ def apply_to_datetime(df):
 
 @case
 def apply_missing_check(df):
-    return df["b"].apply(pd.isna), df["b"].map(pd.notna)  # xpd: apply-known-function
+    return df["b"].apply(pd.isna), df["b"].map(pd.notna)  # xpd: apply-known-function, apply-known-function
 
 
 @case
@@ -163,7 +163,7 @@ def text_method_that_stays(df):
 
 @case
 def apply_date_part(df):
-    return df["d"].apply(lambda t: t.year), (df["d"] - pd.Timestamp("2022-01-01")).map(lambda t: t.days)  # xpd: apply-date-part
+    return df["d"].apply(lambda t: t.year), (df["d"] - pd.Timestamp("2022-01-01")).map(lambda t: t.days)  # xpd: apply-date-part, apply-date-part
 
 
 @case
@@ -186,7 +186,7 @@ def condition_on_whole_column(df):
 
 @case
 def apply_arithmetic(df):
-    return df["b"].apply(lambda v: v * 2 + 1), df["a"].map(lambda v: -v // 3)  # xpd: apply-arithmetic
+    return df["b"].apply(lambda v: v * 2 + 1), df["a"].map(lambda v: -v // 3)  # xpd: apply-arithmetic, apply-arithmetic
 
 
 @case
@@ -197,7 +197,7 @@ def arithmetic_that_stays(df):
 
 @case
 def builtin_on_column(df):
-    return sum(df["a"]), max(df["w"]), len(set(df["k"]))  # xpd: builtin-on-column
+    return sum(df["a"]), max(df["w"]), len(set(df["k"]))  # xpd: builtin-on-column, builtin-on-column, builtin-on-column
 
 
 @case

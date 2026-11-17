@@ -50,7 +50,7 @@ def other_cells():
     by_hand.add_trace(go.Bar(x=[1, 2], y=[5, 6]), row=1, col=1)
     by_hand.add_trace(go.Bar(x=[1, 2], y=[10, 12]), row=1, col=2)
     # A long table from pd.melt holds a different measure in each panel under one column name.
-    long = df.melt(id_vars=["shop", "month"], value_vars=["sales", "staff"])
+    long = df.melt(id_vars=["shop", "month"], value_vars=["sales", "staff"])  # xpd: melt-default-names
     melted = make_subplots(rows=1, cols=2)
     for i, (measure, part) in enumerate(long.groupby("variable")):
         melted.add_trace(go.Bar(x=part["month"], y=part["value"], name=measure), row=1, col=i + 1)

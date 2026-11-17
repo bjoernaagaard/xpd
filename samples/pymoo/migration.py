@@ -78,7 +78,7 @@ def removed_names():
     from pymoo.core.problem import JoblibParallelization  # xpd: removed-in-pymoo
     from pymoo.core.problem import RayParallelization as Ray  # xpd: removed-in-pymoo
     from pymoo.optimize import default_termination  # xpd: removed-in-pymoo
-    from pymoo.util.display import Output, pareto_front_if_possible as front  # xpd: removed-in-pymoo, removed-in-pymoo
+    from pymoo.util.display import Output, pareto_front_if_possible as front  # xpd: removed-in-pymoo
     from pymoo.util.misc import euclidean_distance  # xpd: removed-in-pymoo
     from pymoo.util.misc import calc_perpendicular_distance  # xpd: removed-in-pymoo
     from pymoo.core.problem import (

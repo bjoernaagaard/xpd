@@ -13,8 +13,8 @@ def features(orders: pd.DataFrame) -> pd.DataFrame:
     return (
         orders.assign(gross_amount=pd.col("quantity") * pd.col("unit_price"))
         .assign(
-            net_amount=lambda d: d["gross_amount"] - d["discount"],
-            before_discount=lambda d: d["unit_price"] * d["quantity"],
+            net_amount=lambda d: d["gross_amount"] - d["discount"],  # xpd: lambda-in-assign
+            before_discount=lambda d: d["unit_price"] * d["quantity"],  # xpd: lambda-in-assign
         )
         .assign(customer_share=orders["net_amount"] / orders["net_amount"].sum())
         .assign(is_large=pd.col("net_amount") > LIMIT)
@@ -28,5 +28,5 @@ def load(path: str) -> pd.DataFrame:
 margins = (
     load("orders.parquet")
     .assign(unit_margin=pd.col("unit_price") - pd.col("unit_cost"))
-    .assign(margin=lambda d: d["unit_margin"] * d["quantity"])
+    .assign(margin=lambda d: d["unit_margin"] * d["quantity"])  # xpd: lambda-in-assign
 )

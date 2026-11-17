@@ -1,4 +1,5 @@
-"""A file that seeds NumPy. scikit-learn then draws from that seed, so xpd reports nothing here."""
+"""A file that seeds NumPy. scikit-learn then draws from that seed, so xpd reports no missing
+random_state here. The NumPy rule legacy-random reports the global seed and the draw from it."""
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier

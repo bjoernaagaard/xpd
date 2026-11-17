@@ -132,7 +132,7 @@ def isna_and_text_compare(df):
 
 @case
 def in_column(df):
-    return 37 in df["a"], 5000 not in df["a"]  # xpd: in-column
+    return 37 in df["a"], 5000 not in df["a"]  # xpd: in-column, in-column
 
 
 @case
@@ -217,7 +217,7 @@ def groupby_apply_reads_key(df):
 
 @case
 def groupby_apply_reads_name(df):
-    return df.groupby("k").apply(lambda g: g.name + str(len(g))), df.groupby("k").apply(lambda g: g["a"].sum())  # xpd: groupby-apply
+    return df.groupby("k").apply(lambda g: g.name + str(len(g))), df.groupby("k").apply(lambda g: g["a"].sum())  # xpd: groupby-apply, groupby-apply
 
 
 @case
@@ -412,7 +412,7 @@ def writes_that_reach_the_frame(df):
 
 @case
 def compare_to_none(df):
-    return df[df["b"] == None], df.loc[df["b"] != None, "a"]  # xpd: compare-to-missing
+    return df[df["b"] == None], df.loc[df["b"] != None, "a"]  # xpd: compare-to-missing, compare-to-missing
 
 
 @case

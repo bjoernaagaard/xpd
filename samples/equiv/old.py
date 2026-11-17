@@ -1,7 +1,7 @@
 import pandas as pd
 df = pd.DataFrame({"g": ["a", "a", "b"], "v": [1, 2, 3]})
 rows = []
-for _, r in df.iterrows():
+for _, r in df.iterrows():  # xpd: row-loop
     rows.append(r["v"] * 2)
 df["w"] = rows
 result = df

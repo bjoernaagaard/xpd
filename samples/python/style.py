@@ -66,8 +66,7 @@ def rows(items: list[dict]) -> dict:
 def flat(item: dict) -> dict:
     return {
         "id": item["id"],
-        # xpd reports the next line as unpacked-comprehension.
-        **{f"tag_{name}": value for name, value in item["tags"].items()},
+        **{f"tag_{name}": value for name, value in item["tags"].items()},  # xpd: unpacked-comprehension
     }
 
 

@@ -1,8 +1,10 @@
 """The training script of train.py with one leak, to show a gate of docs/code-mode.md failing.
 
 It picks the regularization strength by the score on the held out rows, so the score it reports
-for those rows is too high. `xpd check leaky.py` reports the loop as sklearn/tune-on-test. It
-saves its model and contract where train.py does, so run train.py again afterwards.
+for those rows is too high. `xpd check leaky.py` reports the loop as sklearn/tune-on-test. The
+file defines a function, so xpd also reports the four calls at module level that fit and save
+the model as python/import-side-effect. It saves its model and contract where train.py does, so
+run train.py again afterwards.
 """
 
 import inspect
@@ -79,11 +81,11 @@ model = pipeline(strength=best_strength)
 
 folds = StratifiedKFold(FOLDS, shuffle=True, random_state=SEED)
 cv_scores = cross_val_score(model, X_train, y_train, cv=folds, scoring=SCORING)
-model.fit(X_train, y_train)
+model.fit(X_train, y_train)  # xpd: import-side-effect
 test_score = model.score(X_test, y_test)
 
-MODEL.parent.mkdir(exist_ok=True)
-joblib.dump(model, MODEL)
+MODEL.parent.mkdir(exist_ok=True)  # xpd: import-side-effect
+joblib.dump(model, MODEL)  # xpd: import-side-effect
 contract = {
     "discovery": json.loads(Path("discovery.json").read_text(encoding="utf-8")),
     "data": {"file": DATA.as_posix(), "target": TARGET, "rows": len(penguins)},
@@ -120,6 +122,6 @@ contract = {
         "code": [Path(inspect.getfile(add_features)).relative_to(Path.cwd()).as_posix()],
     },
 }
-CONTRACT.write_text(json.dumps(contract, indent=2) + "\n")
+CONTRACT.write_text(json.dumps(contract, indent=2) + "\n")  # xpd: import-side-effect
 
 result = pd.DataFrame(model.predict_proba(X_test), index=X_test.index, columns=model.classes_)

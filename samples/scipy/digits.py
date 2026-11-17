@@ -31,7 +31,7 @@ def log_of_special():
         np.log(special.ndtr(x)),  # xpd: log-of-special
         special.log_ndtr(x),
         np.log(sc.gamma(x + 41)),  # xpd: log-of-special
-        np.log(sc.gamma(x + 41) + 1),
+        np.log(sc.gamma(x + 41) + 1),  # xpd: expm1-log1p
         np.log(sp.special.factorial(n)),  # xpd: log-of-special
         np.log(special.factorial(n - 1)),  # xpd: log-of-special
         np.log(special.factorial(5, exact=True)),

@@ -105,7 +105,7 @@ def several_pies():
 
 
 def tips_by_size():
-    return px.data.tips().groupby(["size", "sex", "smoker"], as_index=False)["tip"].mean()
+    return px.data.tips().groupby(["size", "sex", "smoker"], as_index=False)["tip"].mean()  # xpd: inline-column-list
 
 
 @case
