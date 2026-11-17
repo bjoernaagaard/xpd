@@ -1,6 +1,7 @@
 # A test that is run again until it passes hides the run where the code was wrong. The marker
 # comes from pytest-rerunfailures and from flaky, and both accept a test that fails some of the
 # time.
+# No fix, because the cause of the failure has to be found first.
 id: test-rerun
 language: python
 severity: warning

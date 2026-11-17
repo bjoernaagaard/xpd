@@ -2,6 +2,7 @@
 # comes back unseen. `skipif` is left alone, because it states the platform or version where the
 # test cannot run. `xfail` is left alone too, because `xfail_strict` in the project's settings
 # decides whether it can hide a failure, and a rule reads one file.
+# No fix, because the test has to be repaired or deleted, and the file does not show which.
 id: test-skip
 language: python
 severity: warning

@@ -1,6 +1,7 @@
 # A sleep in a test waits a fixed time and hopes the work is done by then. The test fails on a
 # slow machine and wastes the time on a fast one. `asyncio.sleep(0)` is left alone, because it
 # hands control to the event loop and waits for nothing.
+# No fix, because the condition to wait for is not in the file.
 id: test-sleep
 language: python
 severity: warning
