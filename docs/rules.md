@@ -9778,9 +9778,8 @@ The pack has no rule for the following forms:
 
 The arch rules find code that raises on arch 9.0, options and arguments that arch refuses or
 never reads, returns in units that break the fit, and random draws without a seed. They run on
-files that import `arch`, the module of [arch](https://bashtage.github.io/arch/), which fits
-ARCH and GARCH volatility models, tests for unit roots and cointegration, and runs bootstraps
-and multiple comparison tests.
+files that import [arch](https://bashtage.github.io/arch/), a library for ARCH and GARCH
+volatility models, unit root and cointegration tests, bootstraps and multiple comparison tests.
 
 | Group | What its rules report |
 | --- | --- |
@@ -9797,9 +9796,9 @@ for values from your program.
 
 xpd skips a rule document about a newer arch than the one in the project's venv. arch 8.0
 removed the `RandomState` paths of the bootstraps and the distributions. arch 9.0 removed
-`arch.__future__` and the `type` keyword of `hedgehog_plot`, made some attributes read only and
-started to check every argument. A rule document about such a change carries `since`, and xpd
-reads the installed version from the venv as it does for pandas:
+`arch.__future__` and the `type` keyword of `hedgehog_plot`, and it made some attributes read
+only. It also started to check every argument. A rule document about such a change carries
+`since`, and xpd reads the installed version from the venv as it does for pandas.
 
 ```text
 on(check a file that imports arch)
@@ -9811,8 +9810,9 @@ on(check a file that imports arch)
     run the document
 ```
 
-Each rule ties its report to a name that the file binds to arch, because a pattern sees no
-types. `samples/arch/names.py` shows each case.
+Each rule ties its report to a name that the file binds to arch, because the rules match the
+shape of the code and do not know the type of a variable. `samples/arch/names.py` shows each
+case.
 
 | Code | Read by the rules |
 | --- | --- |
@@ -9825,7 +9825,7 @@ types. `samples/arch/names.py` shows each case.
 
 ### How a rule earns its place
 
-Every rule document ships on a proof that was run, and the proof is one of five kinds.
+Every rule document has a proof that was run, and the table gives the five kinds of proof.
 
 | Proof | How it was run | What it shows |
 | --- | --- | --- |
@@ -9847,9 +9847,9 @@ narrowed or dropped.
 | arch's own code at the 9.0.0 tag | 202 | 69 library files, 104 test files, the code blocks of 16 documentation pages, 9 notebooks and 4 scripts |
 | public code | 1,303 from 861 repositories | 795 Python files and 508 notebooks that GitHub code search found for the import lines of arch, of which 1,268 import arch |
 
-Every report was read, except the 291 reports of `arch-unseeded-draws`. A script checked the 291
+Every report was read except the 291 reports of `arch-unseeded-draws`, which a script checked
 by looking in each file for a later `seed` call or `state` assignment on the same variable. The
-table gives what is left after the rules were narrowed.
+table gives the reports that were left after the rules were narrowed.
 
 | Rule | Severity | Proof | Reports on arch's own code | Reports on public code | Wrong advice | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -9861,14 +9861,15 @@ table gives what is left after the rules were narrowed.
 | [`rescaled-units`](#rescaled-units) | warning | numbers: a variance forecast 10,000 times the data's | 4 | 14 | 7 | none |
 | [`analytic-forecast-horizon`](#analytic-forecast-horizon) | error | interpreter: ValueError | 0 | 0 | no reports | none |
 | [`forecast-per-origin`](#forecast-per-origin) | warning | speed: 0.106 seconds against 0.0005 | 1 | 0 | 0 | none |
-| [`reindex-is-default`](#reindex-is-default) | info | equal frames with and without the argument | 20 | 61 | 0 | safe |
-| [`fit-output-in-loop`](#fit-output-in-loop) | info | output: 240 lines for 20 fits | 0 | 15 | 0 | none |
+| [`reindex-is-default`](#reindex-is-default) | info | same result: equal frames with and without the argument | 20 | 61 | 0 | safe |
+| [`fit-output-in-loop`](#fit-output-in-loop) | info | numbers: 240 lines for 20 fits against 0 | 0 | 15 | 0 | none |
 | [`arch-unseeded-draws`](#arch-unseeded-draws) | info | rerun: the result differs | 109 | 182 | 1 | none |
 | [`results-before-compute`](#results-before-compute) | error | interpreter: RuntimeError | 2 | 0 | 2 | none |
 | [`opt-bandwidth-as-bandwidth`](#opt-bandwidth-as-bandwidth) | warning | numbers: 0.5245 against 0.5158 | 0 | 0 | no reports | none |
 
 Wrong advice counts the reports where following the message would not fix a real problem in that
-code, and each rule's section says which reports they are. The first run made 508 reports.
+code, and each rule's section says which reports they are. Before the rules were narrowed, the
+first run made 508 reports.
 
 | Code | Reports | Wrong advice |
 | --- | --- | --- |
@@ -9880,9 +9881,9 @@ code, and each rule's section says which reports they are. The first run made 50
 ran over the 189 Python files of arch's repository and made one report, in a test that checks
 the error it reports.
 
-One rule was written and dropped. It reported `forecast(start=...)` on a result whose `fit` had
-no `last_obs`, because the parameters have then seen the rows that are forecast. The forecasts
-did change, and most reports were on right code.
+A rule that reported `forecast(start=...)` on a result whose `fit` had no `last_obs` was
+written and dropped. The parameters of such a fit have seen the rows that are forecast, and the
+forecasts did change, but most of the reports were on right code.
 
 | Measurement on 1,500 S&P 500 returns, forecasts from row 1,000 on | Value |
 | --- | --- |
@@ -9895,15 +9896,15 @@ did change, and most reports were on right code.
 Recall was not measured, because no set of real arch code was held back. The table says how
 often a rule is wrong when it reports, and not how often it misses. A rule that follows a
 variable is silent when the file binds the same name to something else anywhere, also in
-another function. So a file that uses `res` for an arch result and for another object gets no
-report on `res`.
+another function. For example, a file that uses `res` for an arch result and for another object
+gets no report on `res`.
 
 ### Removed API
 
 `removed-in-arch` reports code that raises on arch 9.0.0. Each form was run on the release
 before the removal and on the release that made it, both installed from PyPI, because the
 release notes of 8.0 do not list what 8.0 removed. No fix of a removed form is safe, because
-each fix turns code that raises into code that runs, so the two forms cannot be compared.
+the old form raises and its result cannot be compared with the result of the new form.
 
 #### removed-in-arch
 
@@ -9944,8 +9945,8 @@ fig = res.hedgehog_plot(plot_type="mean")
 | `nested=True` with `studentize=False` on `SPA`, `StepM` or `RealityCheck` | 8.0.0: runs | 9.0.0 | ValueError |
 
 The bootstraps take their data as keyword arguments, so 8.0.0 and 9.0.0 read `random_state` as
-one more series and raise because a `RandomState` is not an array. `seed` takes the same
-`RandomState`, a `Generator` or an integer, and it exists since arch 5.0, so on 4.19
+one more series, and they raise because a `RandomState` is not an array. `seed` takes the same
+`RandomState`, a `Generator` or an integer. It exists since arch 5.0, so on 4.19
 `IIDBootstrap(x, seed=0)` raised TypeError. `IIDBootstrap(x, seed=np.random.RandomState(0))` drew
 the same samples on 6.1.0, 7.2.0, 8.0.0 and 9.0.0. The `state` property reads and sets the
 state of the generator, and `generator` gives the generator itself.
@@ -9953,8 +9954,8 @@ state of the generator, and `generator` gives the generator itself.
 Other objects also have the names `seed`, `get_state`, `set_state`, `random_state`, `block_size`
 and `bootstrap`, such as a NumPy `RandomState`. The rule reports them only on a variable that the
 file assigns from one of the arch classes and from nothing else. It reports `hedgehog_plot` on
-any object, because no other library that was looked at has a method of that name, and it fixes
-the call only on a result that the file gets from `fit` or `fix` of an arch model.
+any object, because no other library that was looked at has a method with the name. It fixes the
+call only on a result that the file gets from `fit` or `fix` of an arch model.
 
 The rule leaves alone an import inside a `try` block that catches the error, code behind a
 version check, and code inside `pytest.raises`. The pack has no rule for deprecated API, because
@@ -9996,10 +9997,11 @@ adf = ADF(prices, trend="n")
 ```
 
 The lists in the rule are the ones that arch 9.0.0 uses, and none is typed by hand. arch checks
-each option against a table of accepted spellings, without regard to case. A script wrapped
-that check, called each API once and kept the table it was handed. The script then ran each API
-with every spelling of its table, in lower and in upper case. It also ran each API with 28 other
-strings, and each of the 28 raised ValueError.
+each option against a table of accepted spellings, without regard to case. A script read the
+tables in three steps. First, it wrapped arch's check, called each API once and kept the table
+that the check was handed. Second, it ran each API with every spelling of its table, in lower
+and in upper case. Third, it ran each API with 28 other strings, and each of the 28 raised
+ValueError.
 
 The tables hold more than the signatures show. For example, `vol="constant"` builds a model with
 a constant variance, and `conf_int` also takes `"var"`, `"cov"`, `"debiased"` and
@@ -10031,7 +10033,7 @@ a constant variance, and `conf_int` also takes `"var"`, `"cov"`, `"debiased"` an
 | `conf_int(method=)` | `basic`, `percentile`, `studentized`, `norm`, `var`, `cov`, `bc`, `debiased`, `bias-corrected`, `bca` |
 | `conf_int(tail=)` | `two`, `lower`, `upper` |
 
-The documents have no `since`, so the report also reaches a project on an older arch. Before 9.0
+The documents have no `since`, so xpd also reports on a project with an older arch. Before 9.0
 some of the options took any string and fell back to one value without a warning.
 
 | Call | Releases | Result | Value with a right option |
@@ -10041,8 +10043,8 @@ some of the options took any string and fell back to one value without a warning
 | `MCS(losses, 0.1, method="range")` | 5.0, 6.1.0, 6.2.0, 8.0.0 | the p-values of `"max"` | `"R"`: other p-values |
 
 Releases before 9.0 took some options in one case only. For example, `ADF(y, method="AIC")`
-raised on 8.0.0 and runs on 9.0.0, and the rule follows 9.0.0 and does not report it. A value
-that only 9.0 has, such as `method="maic"` or `align="horizon"`, is not reported either.
+raised on 8.0.0 and runs on 9.0.0. The rule follows 9.0.0 and does not report it, and it does not
+report a value that only 9.0 has, such as `method="maic"` or `align="horizon"`, either.
 
 The public code had 13 reports, and each was a value that arch refuses:
 
@@ -10140,7 +10142,7 @@ The public code had 21 reports, and none had wrong advice.
 | 1 | a `method` beside `lags=8` |
 
 Of the 10 reports on arch's own code, one is a test that passes `max_lags=2.5` to check that it
-raises, and there the advice is beside the point. The other nine are in tests and in the
+raises, and its advice is wrong. The other nine are in tests and in the
 documentation page on volatility forecasts.
 
 #### arch-rejected-number
@@ -10226,7 +10228,7 @@ returns = 100 * prices.pct_change().dropna()
 res = arch_model(returns).fit(disp="off")
 ```
 
-A constant mean GARCH(1,1) was fitted to the S&P 500 returns in three forms, on each release.
+The table gives a constant mean GARCH(1,1) fitted to the S&P 500 returns in four forms.
 
 | Returns | arch | Warnings | Optimizer code | mu | omega |
 | --- | --- | --- | --- | --- | --- |
@@ -10289,19 +10291,20 @@ factor as `scale`. On the S&P 500 returns as decimals, arch 9.0.0 and 8.0.0 chos
 | last conditional volatility | 1.9926 | 0.019926 |
 | variance forecast one step ahead | 3.5965 | 0.00035965, which is 3.5965 divided by `scale` squared |
 
-When the data already has a variance near 1 the scale is 1.0 and nothing changes. Results that
-have no unit, such as the standardized residuals, are right at any scale. The rule cannot see
-either case, so it is a warning.
+The rule is a warning, because it cannot see two cases where nothing is wrong. When the data
+already has a variance near 1, the scale is 1.0 and nothing changes. Results that have no unit,
+such as the standardized residuals, are right at any scale.
 
 Of its 14 reports on the public code, 11 used a volatility or a forecast in rescaled units. Two
-of the 11 divided by 10,000 in the code where the square of `scale` belongs. Three reports had
-wrong advice, because two fitted data that was made standard normal first, and one only divided
-the residuals by the volatility. The 4 reports on arch's own code are tests of `rescale` itself.
+of the 11 divided by 10,000 in the code where the square of `scale` belongs. The other three
+had wrong advice. Two fitted data that was made standard normal first, and one only divided the
+residuals by the volatility. The 4 reports on arch's own code are tests of `rescale` itself, and
+their advice is wrong as well.
 
 ### Forecasts and fits
 
 The rules in the group report forecasts that raise or repeat work, and fits that print. The
-defaults they rely on are in the table.
+table gives the defaults of the two calls.
 
 | Call | Default | Effect |
 | --- | --- | --- |
@@ -10328,8 +10331,8 @@ res = arch_model(returns, vol="EGARCH", p=1, o=1, q=1).fit(disp="off")
 forecasts = res.forecast(horizon=5, method="simulation")
 ```
 
-A volatility model that does not evolve in squares has no closed form beyond one step.
-`forecast(horizon=5)` was run for each `vol` on arch 9.0.0.
+arch has no analytic formula for a forecast beyond one step when the volatility model is not a
+model of the squared returns. `forecast(horizon=5)` was run for each `vol` on arch 9.0.0.
 
 | Model | `forecast(horizon=5)` | `forecast(horizon=1)` |
 | --- | --- | --- |
@@ -10353,8 +10356,8 @@ A `horizon` or a `method` that is a variable is not read, and `power` is read on
 
 `hedgehog_plot` forecasts 10 steps with `method="analytic"` unless the call says otherwise. On
 9.0.0 and on 8.0.0 it raised the same ValueError for `vol="egarch"`, and it ran with `horizon=1`
-and with `method="simulation"`. The rule reads it only when every argument is a keyword. The
-corpus had no report.
+and with `method="simulation"`. The rule reads it only when every argument is a keyword, and
+neither set of code had a report.
 
 #### forecast-per-origin
 
@@ -10376,8 +10379,8 @@ Use instead:
 variance = res.forecast(horizon=10, start=first).variance
 ```
 
-`forecast(start=i)` returns one row for every origin from `i` to the end of the data, so the
-loop computes the same rows many times over and keeps one. Both forms ran on the 5,030 S&P 500
+`forecast(start=i)` returns one row for every origin, the row a forecast starts from, from `i`
+to the end of the data. The loop computes the same rows many times over and keeps one. Both forms ran on the 5,030 S&P 500
 returns with `horizon=10` and gave equal values.
 
 | arch | Loop over the last 200 origins | One call |
@@ -10387,9 +10390,9 @@ returns with `horizon=10` and gave equal values.
 
 The rule leaves alone a loop that fits inside, because the loop is then a rolling estimate where
 each origin has its own parameters. It also leaves alone a loop over a few chosen origins, such
-as a tuple, and a call whose object or other arguments hold the loop variable, as in
-`fits[i].forecast(start=i)`, where each origin has its own result. The one report in the corpus
-is a test in arch that steps through the origins of a hedgehog plot.
+as a tuple. A call whose object or other arguments hold the loop variable is left alone too, as
+in `fits[i].forecast(start=i)`, because each origin has its own result there. The one report is
+a test in arch's own code that steps through the origins of a hedgehog plot.
 
 #### reindex-is-default
 
@@ -10411,9 +10414,9 @@ res = arch_model(returns).fit(disp="off")
 forecasts = res.forecast(horizon=5)
 ```
 
-Before arch 6.2 `forecast` returned a frame as long as the data and warned that the default would
-change, so code from before 6.2 passes `reindex=False` to get the short frame without the
-warning. The document carries `since: "6.2"`.
+Before arch 6.2, `forecast` returned a frame as long as the data and warned that the default
+would change. Code from before 6.2 passes `reindex=False` to get the short frame without the
+warning, and the document carries `since: "6.2"`.
 
 | arch | `forecast()` on 1,500 rows | `forecast(reindex=False)` |
 | --- | --- | --- |
@@ -10494,8 +10497,7 @@ interval = bs.conf_int(np.mean, 1000)
 
 arch draws from generators of its own, which start from a new seed in every process. Each form
 was run twice without a seed and twice with one, on arch 9.0.0 and on 8.0.0. The two runs
-without a seed differed on both releases, and the table gives the numbers of 9.0.0. The column
-`np.random.seed(0)` gives two runs that each called `np.random.seed(0)` first.
+without a seed differed on both releases, and the table gives the numbers of 9.0.0.
 
 | Form | Two runs without a seed | Two runs after `np.random.seed(0)` | Two runs with a seed | Seeded by |
 | --- | --- | --- | --- | --- |
@@ -10510,7 +10512,8 @@ without a seed differed on both releases, and the table gives the numbers of 9.0
 | `arch_model(None).simulate(params, 100)`, last value | -1.24, 0.07 | -1.27, 0.30 | 0.097 twice | `Normal(seed=0)` as the model's distribution |
 
 arch does not draw from NumPy's global generator, so `np.random.seed(0)` did not make any two
-runs equal. 49 of the 291 reports in the corpus are in a file that calls `np.random.seed`. One
+runs equal. Of the 291 reports on the two sets of code, 49 are in a file that calls
+`np.random.seed`. One
 report has wrong advice, on a placeholder bootstrap that a base class in arch's own source
 builds and never draws from.
 
@@ -10562,8 +10565,8 @@ a read before a later `compute` is not reported.
 The rule leaves alone a variable that the file also reads without a dot after it, such as an
 argument of a call, an item of a tuple or a list, or the right side of an assignment. Such a
 variable can reach `compute` under another name, as in `for test in (spa, mcs): test.compute()`.
-Both reports in the corpus have wrong advice. They are rows of a table in arch's tests that pass
-a bad `pvalue` to `critical_values` to check the ValueError that comes first.
+Both reports, on arch's own code, have wrong advice, because they are rows of a table in arch's
+tests that pass a bad `pvalue` to `critical_values` to check the ValueError that comes first.
 
 #### opt-bandwidth-as-bandwidth
 
@@ -10598,15 +10601,15 @@ say that `Bartlett(x, bandwidth=est.opt_bandwidth)` is not the same as `Bartlett
 | `Bartlett`, arch 8.0.0 | 19.221 | 19.221 | 0.45172 | 0.45172 |
 
 A script built every estimator class of `arch.covariance.kernel` on 9.0.0 and compared the two
-attributes. They differ for the ten classes the rule names. They are equal for `Andrews`,
-`QuadraticSpectral` and `ZeroLag`, which the rule leaves alone. The document carries
-`since: "9.0"`, and the corpus had no report. The automatic bandwidth itself also changed in 9.0,
+attributes. The two attributes differ for the ten classes the rule names, and the rule leaves
+alone `Andrews`, `QuadraticSpectral` and `ZeroLag`, where they are equal. The document carries
+`since: "9.0"`, and neither set of code had a report. The automatic bandwidth itself also changed in 9.0,
 from 19.221 to 10.943 for `Bartlett`, so an estimate without `bandwidth` differs between the
 two releases.
 
 ### What the pack leaves out
 
-The habits in the table were looked at and have no rule.
+The pack has no rule for the habits in the table, and the last column gives the reason for each.
 
 | Habit | What was measured | Why there is no rule |
 | --- | --- | --- |
@@ -10623,8 +10626,8 @@ The habits in the table were looked at and have no rule.
 The pymoo rules find code from older pymoo releases that raises or does nothing on pymoo 0.6.2,
 problem classes that hand pymoo wrong numbers, runs whose result is not the one the code asks
 for, and reference points and weights that give another number than the code means. They run on
-files that import `pymoo`, the module of [pymoo](https://pymoo.org/), which runs
-single-objective and multi-objective optimization with evolutionary algorithms.
+files that import [pymoo](https://pymoo.org/), a library for single-objective and
+multi-objective optimization with evolutionary algorithms.
 
 | Group | What its rules report |
 | --- | --- |
@@ -10639,8 +10642,8 @@ release is named. The examples assume that the pymoo names they use are imported
 as `problem`, `F` and `pf` stand for values from your program.
 
 xpd picks the rule documents that match the pymoo release in the project's venv. pymoo renamed
-its modules in 0.5.0, removed `pymoo.factory` and most keywords of the 0.4 API in 0.6.0 and
-0.6.1, and moved its random numbers to a generator of its own in 0.6.1.6. A rule document about
+its modules in 0.5.0, and it removed `pymoo.factory` and most keywords of the 0.4 API in 0.6.0
+and 0.6.1. It moved its random numbers to a generator of its own in 0.6.1.6. A rule document about
 such a change carries `since`. A document carries `until` as well when its advice differs by
 release, and a second document then gives the advice of the newer releases. xpd reads the
 installed version from the venv as it does for pandas:
@@ -10663,7 +10666,8 @@ the import from `pymoo.parallelization` raised ModuleNotFoundError.
 | `StarmapParallelization`, `DaskParallelization` | not in pymoo | `pymoo.core.problem` | `pymoo.parallelization` |
 | Nelder and Mead, pattern search | `pymoo.algorithms.soo.nonconvex.nelder_mead`, `pattern_search` | `pymoo.algorithms.soo.nonconvex.nelder`, `pattern` | `pymoo.algorithms.soo.nonconvex.nelder`, `pattern` |
 
-Every rule ties what it reports to pymoo by a name, because a pattern sees no types. A class or
+Every rule ties what it reports to pymoo by a name, because the rules match the shape of the code
+and do not know the type of a variable. A class or
 a function must be one that the file imports from pymoo, such as `Problem` from
 `pymoo.core.problem` or `minimize` from `pymoo.optimize`. An object must be a name that the file
 binds to such a class. One document of `deprecated-in-pymoo`, about the `"feasible"` key, reads
@@ -10671,7 +10675,7 @@ the name of a variable instead, and its section says so.
 
 ### How a rule earns its place
 
-Every rule document ships on a proof that was run, and the proof is one of four kinds.
+Every rule document has a proof that was run, and the table gives the four kinds of proof.
 
 | Proof | How it was run | What it shows |
 | --- | --- | --- |
@@ -10684,7 +10688,8 @@ A document is `error` only on an interpreter proof or a value proof, and its mes
 was measured. A document that can also match code that is meant, such as a mutation that few
 individuals should get, is a `warning`.
 
-The lists inside the rules were read from the installed wheels and not written by hand.
+The lists inside the rules were read from the installed wheels, the package files that PyPI
+serves for each release, and not written by hand.
 
 | List | Entries | Check |
 | --- | --- | --- |
@@ -10733,19 +10738,21 @@ correct code was narrowed, and the table after the list of sets gives what is le
 
 A value proof gives the old form's result against the new form's. Wrong advice counts the reports
 where following the message would not fix a real problem in that code. Where a rule has more
-reports than were read, the cell says how many were read. A rule with fewer reports had every
-report read.
+reports than were read, the cell says how many were read, and every report of the other rules
+was read.
 
 The one report with wrong advice is on a documentation page of pymoo that saves the history for
-a later page to plot, which xpd reads as another file. For the same reason the public reports of
-`unread-history` were not judged, and the rule is `info`, because 94 of the 110 are in a
-repository where another file names `history`. Apart from that one report, the 57 reports on pymoo's own code are real.
+a later page to plot, and xpd reads the later page as another file. The public reports of
+`unread-history` were not judged, because 94 of the 110 are in a repository where another file
+names `history`, and the rule is `info` for the same reason. Apart from the
+one report with wrong advice, the 57 reports on pymoo's own code are real.
 For example, its examples pass `n_gen=100` to `minimize`, where the keyword does nothing, and its
 documentation reads the deprecated `"feasible"` key. The custom operators in its guide draw from
 `np.random`.
 
-Rules were narrowed twice. The reports on pymoo's own code and on the public files were the same
-before and after the second change, line for line.
+The rules were narrowed in two rounds, the first after the first run and the second after a
+review. The reports on pymoo's own code and on the public files were the same before and after
+the second round, line for line.
 
 | Rule | Right code it matched | Change |
 | --- | --- | --- |
@@ -10756,14 +10763,14 @@ before and after the second change, line for line.
 | `reused-algorithm-without-copy` | a loop over the algorithms | leaves the loop alone |
 | `has-terminated-assignment`, the `calc` document of `removed-in-pymoo` | a name with no tie to pymoo | need a name that the file ties to pymoo |
 
-The first three changes came after the first run, and the others after a review. The review also
-added `positional-problem-bounds`, which made no report on either set.
+The first three rows are the first round. The review also added `positional-problem-bounds`,
+which made no report on either set.
 
-Recall was not measured, because no set of real pymoo code was held back. The table says how
-often a rule is wrong when it reports, and not how often it misses.
+Recall was not measured, because no set of real pymoo code was held back. The rule table says
+how often a rule is wrong when it reports, and not how often it misses.
 
-The pack has no rule for the habits in the table, because a pattern cannot see what decides
-them.
+The pack has no rule for the habits in the table, because a rule cannot tell from the code of one
+file whether the habit is a mistake. The last column gives the reason for each habit.
 
 | Habit | What was measured | Why there is no rule |
 | --- | --- | --- |
@@ -10847,10 +10854,10 @@ Reports two forms that pymoo deprecated.
 | `StarmapParallelization` imported from `pymoo.core.problem` | 0.6.1.6: ImportError. 0.6.2: DeprecationWarning. | the import from `pymoo.parallelization`, which gives the same class on 0.6.2 |
 | the key `"feasible"` given to `get` | since 0.6.1.2: a DeprecationWarning for every individual, 40 for a population of 20 | `"FEAS"`, which returned an equal array with no warning |
 
-The key is read in two ways. One document needs `res.pop`, `res.opt` or `res.off`, where `res`
-is the result of `minimize`, and it has the fix. Another reads the name of the object, a
-variable or an attribute named `pop`, `opt`, `off` or `population`, so `get` on a dictionary of
-such a name gets a wrong report, and it has no fix.
+Two documents read the key. One needs `res.pop`, `res.opt` or `res.off`, where `res` is the
+result of `minimize`, and it has the fix. The other reads the name of the object, a variable or
+an attribute named `pop`, `opt`, `off` or `population`, and it has no fix. It gives a wrong
+report on `get` of a dictionary with such a name.
 
 Example:
 
@@ -11070,7 +11077,7 @@ problem classes get `x` in different shapes, and both write their results to the
 
 **Severity:** error. **Fix:** unsafe: `np.column_stack` on the same list.
 
-Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. Such an array has one row per objective, and pymoo reshapes it to one row per solution without transposing. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10.
+Reports `out["F"]`, `out["G"]` or `out["H"]` set to `np.array`, `np.asarray`, `np.vstack`, `np.stack` or `np.row_stack` of a list, in a class that inherits from `Problem`. Such an array has one row per objective, and pymoo reshapes it to one row per solution without swapping its rows and columns. Two objectives over four solutions, `f1 = x0` and `f2 = 10 + x1`, came back as [[0.1, 0.3], [0.5, 0.7], [10.2, 10.4], [10.6, 10.8]], and `NSGA2` then reported a least `f2` of 0.003 where the true least is 10.
 
 The rule leaves alone an `ElementwiseProblem`, where a list of numbers is right, and a stack followed by `.T`. It also leaves alone a class that passes `elementwise=` with any value but `False`, such as `elementwise=elementwise`, or passes `**kwargs` on to `__init__`, because the caller can then build it with `elementwise=True`.
 
@@ -11446,8 +11453,8 @@ j = PseudoWeights(np.array([0.2, 0.8])).do(F)
 The plotly rules report figures whose drawn sizes do not follow the numbers, ink that shows no
 data, colors without an order, and chart forms and words that make a figure harder to read. They
 apply Edward Tufte's book "The Visual Display of Quantitative Information", second edition, to
-plotly figures. Each rule names the principle of the book that the figure breaks, says what the
-reader then sees, and names the plotly code to write instead. A page number in the plotly section is a
+plotly figures. Each rule names the principle of the book that the figure breaks and what the
+reader then sees, and it also names the plotly code to write instead. A page number in the plotly section is a
 printed page of the book.
 
 | Group | What its rules report |
@@ -11488,17 +11495,17 @@ not read
   a file where another module sets the backend
 ```
 
-[`plot-kind-argument`](#plot-kind-argument) is the pandas rule that rewrites the accessor call.
+[`plot-kind-argument`](#plot-kind-argument) is the pandas rule that rewrites `df.plot(kind=...)`.
 
 A rule about a method, such as `fig.update_xaxes(...)`, needs proof that the object is a plotly
-figure. The method is called on the call that makes the figure, as in
+figure. The proof holds when the method is called on the call that makes the figure, as in
 `px.bar(...).update_xaxes(...)`, or on a variable that holds one. xpd follows the variable to
 its value in three ways:
 
 - The nearest earlier statement that binds the variable is an assignment from such a call,
   however many statements lie between the two. The statement is in the same block as the
   method call or in a block around it, up to the start of the function. A variable assigned
-  from another variable, as in `chart = fig`, holds what that one held.
+  from another variable, as in `chart = fig`, holds what the other variable held.
 - The variable is a parameter with the annotation `go.Figure` or `go.FigureWidget`, or an
   assignment gives it that annotation, as in `fig: go.Figure = load()`.
 - The variable is a parameter without that annotation, and every call of its function in the
@@ -11526,7 +11533,7 @@ exist on plotly 5.0.0, 5.24.1, 6.0.0 and 7.1.0, where each was run.
 
 ### How a rule earns its place
 
-Every rule ships on a measurement that was run, and the message quotes what it measured. A
+Every rule has a measurement that was run, and its message quotes what was measured. A
 measurement is one of two kinds:
 
 - A resolved value is what plotly.js made of the figure, read from
@@ -11542,7 +11549,8 @@ measurement is one of two kinds:
 | `info` | the form is a choice that the book argues against |
 
 The rules were run over a corpus of 1,087 Python files, read as text and never imported or run.
-The reports in the table are what the current build gives on the corpus.
+The rule table after the next two paragraphs gives the reports that the current build makes on
+the corpus.
 
 | Part of the corpus | Files | What the files are |
 | --- | --- | --- |
@@ -11550,15 +11558,15 @@ The reports in the table are what the current build gives on the corpus.
 | Dash | 117 | Python files of Dash that name plotly |
 | public | 819 | public files that GitHub code search found for the import lines of plotly express, graph objects and `make_subplots` |
 
-Recall was measured on forms planted in copies of 47 of the corpus files. Each rule got 48
-planted forms in six groups, and `free-facet-scales` got 60 in eight groups, so there were 1,212
-in all. The groups hold settings written in the call, later updates, dictionaries, objects, and
+Recall, the share of planted mistakes that a rule finds, was measured on forms planted in copies
+of 47 of the corpus files. The 1,212 planted forms are 48 in six groups for each rule and 60 in
+eight groups for `free-facet-scales`. The groups hold settings written in the call, later updates, dictionaries, objects, and
 values held in a name where the form allows one. A planted form counts as found when its rule
 reports the lines of the form, and a report that was already in the file does not count. Every
 copy passed `ast.parse`, and none was run.
 
-The 47 files were seen while the rules were written, so they are not an unseen set, and some of
-their reports had been read before. A planted form counts only
+The 47 files are not an unseen set, because they were seen while the rules were written.
+Some of their reports had been read before. A planted form counts only
 when the data has the values that the form assumes, such as a numeric column. Forms that no rule
 reads stay in the count, such as a box given as a `**` dictionary, a bad axis title written out,
 and a flat `go.Surface`. An `info` report is a design choice and does not prove that the figure
@@ -11704,10 +11712,10 @@ as `dict(size=...)`. The rule leaves alone the sizes in the table.
 
 The rule is silent in a file that names `sizemode` in any other way than `sizemode="diameter"`,
 because the mode can be set on the figure afterwards. After
-`update_traces(marker_sizemode="diameter")` a px bubble chart resolved to `sizemode="diameter"`,
-so the size column is drawn as the diameter, and the rule reports the `update_traces` line. The
-rule has no fix, because `sizemode="area"` alone drew size 10 with a radius of 2.24 pixels, and
-the `sizeref` that keeps the markers visible depends on the data.
+`update_traces(marker_sizemode="diameter")`, a px bubble chart resolved to `sizemode="diameter"`
+and drew the size column as the diameter, so the rule reports the `update_traces` line. The rule
+has no fix, because the `sizeref` that keeps the markers visible depends on the data.
+`sizemode="area"` alone drew size 10 with a radius of 2.24 pixels.
 
 #### bar-axis-without-zero
 
@@ -11752,8 +11760,8 @@ When the differences are the message, `px.scatter` shows each value by its posit
 needs no zero.
 
 The rule reads a range only when both ends are written numbers above zero and the lower end
-has as many digits before the point as the upper end, or one fewer. So `[90, 101]` and `[2, 5]`
-are read, and `[1, 100]`, `[0, 101]`, `[-10, 101]` and `[low, high]` are not. A call with
+has as many digits before the point as the upper end, or one fewer. For example, `[90, 101]`
+and `[2, 5]` are read, and `[1, 100]`, `[0, 101]`, `[-10, 101]` and `[low, high]` are not. A call with
 `log_y` is left alone, and a range set on the figure afterwards is left alone in a file that
 names a log axis. A figure of upright bars is `px.bar` or `px.histogram` without `orientation`
 and `base`, or a `go.Figure(...)` whose own arguments hold a `go.Bar` without `orientation` and
@@ -11807,7 +11815,7 @@ as written and cuts the fill at the lower edge of the plot, a Lie Factor of 19 a
 | `[90, 101]` set in `px.area`, in `update_yaxes` or in `update_layout` | 90 to 101 | 163.6 and 327.3 |
 | `px.line` | 94.72 to 100.28, chosen by plotly | no fill |
 
-A line is the chart that needs no zero.
+A line chart needs no zero, so the replacement draws the narrow range with `px.line`.
 
 The rule reads a range as [`bar-axis-without-zero`](#bar-axis-without-zero) does. Both ends must
 be written numbers above zero, and the lower end must have as many digits before the point as
@@ -11836,7 +11844,7 @@ fig = px.bar(wind, x="direction", y="hours")
 
 The replacement is advice. xpd does not apply it automatically.
 
-A polar bar is a wedge, and plotly scales its radius with the value, so the area grows with the
+A polar bar is a wedge whose radius plotly scales with the value, so the area grows with the
 square of the value. From 1 to 2 the data grows by 100 percent and the area by 300 percent, a
 Lie Factor of 3.
 
@@ -11848,7 +11856,8 @@ Lie Factor of 3.
 | 4 | 171 | 16 |
 
 The book adds that "the number of information-carrying (variable) dimensions depicted should not
-exceed the number of dimensions in the data" (page 71), and a wedge varies in two. The radial
+exceed the number of dimensions in the data" (page 71), and a wedge varies in two dimensions to
+show one number. The radial
 axis takes the types linear, log, date and category, so no axis type draws the area in
 proportion.
 
@@ -11916,7 +11925,8 @@ fig.add_trace(go.Scatter(x=months, y=visits, name="visits"), row=2, col=1)
 The replacement is advice. xpd does not apply it automatically.
 
 "Show data variation, not design variation" (page 61). Two y axes in one plot have two free
-scales, so the ranges and not the data set where the lines cross and which one looks steeper.
+scales, so the ranges, and not the data, decide where the lines cross and which
+line looks steeper.
 The figure above resolved the second axis to `overlaying="y"` on the right with no `matches`,
 and the first trace got the range 8.6 to 31.4.
 
@@ -11927,7 +11937,7 @@ and the first trace got the range 8.6 to 31.4.
 
 The rule reports the cell of `specs` and not each `add_trace`, so a figure gets one report for
 each cell with two axes. It leaves alone an axis that sets `overlaying` together with `matches`,
-which shares its range with the first axis, and both resolved to -6 to 107. The underscore form
+because `matches` shares the range with the first axis. Both axes then resolved to -6 to 107. The underscore form
 `yaxis2_overlaying="y"` raised `ValueError` in `update_layout` on a `go.Figure`, so the rule
 does not read it.
 
@@ -11952,8 +11962,8 @@ fig = px.scatter(tips, x="total_bill", y="tip", facet_col="sex")
 
 The replacement is advice. xpd does not apply it automatically.
 
-The book says of small multiples, "The design remains constant through all the frames, so that
-attention is devoted entirely to shifts in the data" (page 170). px draws facets on one scale,
+The book says of small multiples, a grid of small charts drawn the same way, "The design remains
+constant through all the frames, so that attention is devoted entirely to shifts in the data" (page 170). px draws facets on one scale,
 and `matches=None` frees the scales. A reader who compares heights across the panels then reads
 a difference that the data does not have. Free scales are right when the panels hold different
 units, which is why the rule is info.
@@ -12011,7 +12021,7 @@ Reports a figure drawn with a template that tints the plot area and draws a grid
 | Form | Where it is reported |
 | --- | --- |
 | A file draws px or go figures with a plot area and never names a template or a `plot_bgcolor`. | once, on the first import of `plotly.express`, or on the first import of `plotly.graph_objects` when the file does not import `plotly.express` |
-| A file draws through pandas, imports no plotly module, and calls `line`, `bar`, `barh`, `area`, `scatter`, `box` or `hist` on the accessor. | on the statement that makes plotly the plotting backend |
+| A file draws through pandas, imports no plotly module, and calls `line`, `bar`, `barh`, `area`, `scatter`, `box` or `hist` on `df.plot`. | on the statement that makes plotly the plotting backend |
 | The template `"plotly"`, `"ggplot2"` or `"seaborn"` is written as a string in a px call, in `go.Layout`, in `go.Figure(layout_template=...)`, in `update_layout` on a plotly figure, or assigned to `pio.templates.default`. | on the string |
 
 Example:
@@ -12045,9 +12055,9 @@ grid should usually be muted or completely suppressed" (page 112).
 | `"seaborn"` | `rgb(234,234,242)` | 10, white | not recorded |
 | `"simple_white"` | white, with `showgrid=False` | 0 | yes, with outside ticks |
 
-`"plotly_white"`, `"none"`, `"presentation"`, `"gridon"`, `"xgridoff"` and `"ygridoff"` resolved
-to a white plot area, and `"plotly_dark"` is a dark theme, so the rule does not report the
-seven. Through the plotting backend of pandas, `df.plot.scatter(x="score", y="cost")` was equal,
+The rule does not report seven templates. `"plotly_white"`, `"none"`, `"presentation"`,
+`"gridon"`, `"xgridoff"` and `"ygridoff"` resolved to a white plot area, and `"plotly_dark"` is a
+dark theme. Through the plotting backend of pandas, `df.plot.scatter(x="score", y="cost")` was equal,
 as JSON, to `px.scatter(df, x="score", y="cost")`, also with `template="simple_white"`.
 
 The first form is silent in the cases in the table.
@@ -12062,9 +12072,10 @@ The first form is silent in the cases in the table.
 `hovertemplate` and `texttemplate` are other attributes and do not count as a template, and a
 scatter plot with a `hovertemplate` still resolved to `#E5ECF6`. To find a template set in
 another module, xpd reads the `__init__.py` of each package the file is in, each module of the
-project that the file imports, and each module that an imported module imports in turn. It does not read a module
-that imports the file, such as the script that starts the program, so it still reports a file
-beside the one with the assignment when the file does not import it. The fix is unsafe, because
+project that the file imports, and each module that an imported module imports in turn. It
+does not read a module that imports the file, such as the script that starts the program. xpd
+therefore still reports a file beside the one with the assignment when the file does not import
+it. The fix is unsafe, because
 `"simple_white"` also changes the colors of the marks.
 
 #### explicit-grid
@@ -12100,9 +12111,9 @@ does nothing or brings back the ink that the template left out.
 
 The rule leaves alone a call that sets `gridcolor` or `gridwidth` beside `showgrid=True`,
 because the call has chosen its grid. It reads black as `"black"`, `"#000"`, `"#000000"` and
-`"rgb(0,0,0)"`, in any case, because how dark another color is against the background cannot be
-read from the code. A black `gridcolor` beside `showgrid=False` draws nothing and is left alone,
-and so is the graticule of a map. The fix is unsafe, because it removes grid lines from a figure
+`"rgb(0,0,0)"`, in upper or lower case, because how dark another color is against the
+background cannot be read from the code. A black `gridcolor` beside `showgrid=False` draws
+nothing and is left alone, and so are the lines of latitude and longitude on a map. The fix is unsafe, because it removes grid lines from a figure
 drawn with `"simple_white"`.
 
 #### boxed-axis-frame
@@ -12167,9 +12178,9 @@ fig = go.Figure(go.Scatter(
 The five numbers above are an example, computed from the values 1 to 7 with linear quartiles.
 Compute the five numbers for each distribution, and choose the offset and the gap at the median
 for the scale of the data. Keep the box when its outliers, notches, hover information or
-statistical convention are needed. The whiskers of a default box end at the sample values inside
-the fences at 1.5 times the interquartile range, which need not be the minimum and the maximum,
-so a drawing from the minimum to the maximum shows another statistic.
+statistical convention are needed. The whiskers of a default box end at the last values within
+1.5 times the interquartile range of the box, and the two ends need not be the minimum and the
+maximum. A drawing from the minimum to the maximum therefore shows another statistic.
 
 The book prefers the quartile plot with the middle half offset (page 124), and says that the
 choice also rests on statistical and aesthetic criteria. The table gives what plotly 7.1.0 drew
@@ -12284,15 +12295,15 @@ The replacement is advice. xpd does not apply it automatically.
 
 "Maximize data density and the size of the data matrix, within reason" (page 168). The book
 calls a graphic that "purveys Graphical Style rather than quantitative information" a duck
-(page 116). A gauge shows one number.
+(page 116), and a gauge draws a dial around one number.
 
 | `go.Indicator` | Shapes drawn | Labels drawn |
 | --- | --- | --- |
 | `mode="gauge+number"` | 8 | 7 |
 | `mode="number"`, the default | 0 | 2 |
 
-plotly draws the dial only when `mode` names it, and a `gauge` argument with the default mode
-drew no shape, so the rule does not report it. A gauge with `shape="bullet"` is a bar and not a
+plotly draws the dial only when `mode` names it. The rule does not report a `gauge` argument
+with the default mode, because it drew no shape. A gauge with `shape="bullet"` is a bar and not a
 dial, and is left alone. The rule has no fix, because a gauge can carry a threshold that the
 number alone does not show.
 
@@ -12307,7 +12318,7 @@ of gray show varying quantities better than color" (page 154).
 
 **Severity:** warning. **Fix:** none.
 
-Reports the color scales Jet, Rainbow, Turbo and HSV, written as a string in any case with or without `_r`, or as `px.colors.sequential.Jet` and the like, when it is given to `colorscale`, `color_continuous_scale` or a setting that ends in `_colorscale` inside a plotly call, or assigned to `px.defaults.color_continuous_scale`.
+Reports the color scales Jet, Rainbow, Turbo and HSV, written as a string in upper or lower case with or without `_r`, or as an attribute of `px.colors` such as `px.colors.sequential.Jet`, when it is given to `colorscale`, `color_continuous_scale` or a setting that ends in `_colorscale` inside a plotly call, or assigned to `px.defaults.color_continuous_scale`.
 
 The rule reports a scale where the code sets it, also on a color axis that no trace uses. The
 advice applies only when a trace colors numbers with the scale. A scatter plot without numeric
@@ -12428,9 +12439,9 @@ fig = px.bar(df.sort_values("sales"), x="sales", y="shop", color="region", orien
 The replacement is advice. xpd does not apply it automatically.
 
 The book rejects pie charts for "their low data-density and failure to order numbers along a
-visual dimension" (page 178). A sunburst draws each value as a wedge, as a pie does, and its
-rings make the order worse, because the outer ring has three times the area of the inner ring
-for each degree. The angles keep the order only within one ring. `px.sunburst` and
+visual dimension" (page 178). A sunburst draws each value as a wedge, as a pie does. Its rings
+make the order worse, because the outer ring has three times the area of the inner ring for each
+degree. The angles keep the order only within one ring. `px.sunburst` and
 `go.Sunburst` resolved to a trace of type `sunburst`.
 
 The test sunburst had the regions west 60 and east 40 in the inner ring, and the shops c 15 and
@@ -12445,8 +12456,8 @@ Shop a with 30 against region east with 40 was reversed in the same way.
 
 The rule leaves alone a sunburst without numbers. A `go.Sunburst` with `labels` and `parents` and
 no `values` gave each leaf one equal share, so it draws a hierarchy, such as a flavor wheel, and
-not quantities. `px.sunburst` with `path` and no `values` counts the rows of each group, which
-are numbers, so the rule reports it.
+not quantities. `px.sunburst` with `path` and no `values` counts the rows of each group, and the
+rule reports it because the counts are numbers.
 
 #### spline-line
 
@@ -12478,7 +12489,7 @@ fig = px.line(df, x="hour", y="reading", line_shape="linear")
 "Above all else show the data" (page 92). A spline draws a smooth curve through the points,
 and the curve passes through values that the data does not hold. plotly computes the spline in
 pixels, so how far the curve leaves the data depends on the data, on the axis range and on the
-size of the figure, and the rule is info.
+size of the figure. Because the distance varies, the rule is info.
 
 | Readings 0, 0, 10, 10, 0, 0, drawn at 700 by 500 pixels | Highest point drawn | Lowest point drawn |
 | --- | --- | --- |
@@ -12531,8 +12542,8 @@ compares the frames from memory.
 `full_figure_for_development` keeps no frames, so the frames were counted in the figure and in
 the page that `to_html` wrote, which passed the three frames to `Plotly.addFrames`.
 
-The rule is info and has no fix, because panels need room, and with many frames an animation
-can be the better choice. 11 of the 28 functions have no `facet_col`, and
+The rule is info and has no fix, because panels need room and an animation can be the better
+choice when there are many frames. 11 of the 28 functions have no `facet_col`, and
 `px.scatter_3d(facet_col=...)` raised TypeError, "got an unexpected keyword argument
 'facet_col'". For the 11, which are `bar_polar`, `choropleth_map`, `density_map`, `line_3d`,
 `line_map`, `line_polar`, `line_ternary`, `scatter_3d`, `scatter_map`, `scatter_polar` and
@@ -12588,8 +12599,8 @@ attribute". `go.Image` takes `"fast"` or `False`, and `"best"` raised ValueError
 `update_traces(zsmooth="fast")` is left alone, because the rule cannot see which traces the
 figure holds.
 
-The fix is unsafe, because each cell is then drawn as a block of one color, so the figure looks
-different.
+The fix is unsafe, because the figure looks different when each cell is drawn as a block of one
+color.
 
 #### table-for-small-data
 
@@ -12624,9 +12635,8 @@ chart of a few numbers draws them as lengths or angles and does not write them.
 | `go.Pie` of 413, 378, 126 and 83 | the four shares as percentages, and none of the values |
 | `go.Table` of the same values | all four values |
 
-xpd cannot count the rows of a data frame or the traces of a figure, so the rule reads the one
-form where the code shows the whole data, which is a px call or a `go.Figure` whose data is the
-one trace. A pie is also reported by [`pie-chart`](#pie-chart), for its form. The rule leaves
+xpd cannot count the rows of a data frame or the traces of a figure. The rule therefore reads
+only a px call or a `go.Figure` whose data is one trace, where the code shows the whole data. A pie is also reported by [`pie-chart`](#pie-chart), for its form. The rule leaves
 alone the forms in the table.
 
 | Form | Why |
@@ -12755,9 +12765,9 @@ The replacement is advice. xpd does not apply it automatically.
 
 The book lists as friendly "words run from left to right, the usual direction for reading
 occidental languages", and as unfriendly "words run vertically, particularly along the Y-axis;
-words run in several different directions" (page 183). plotly keeps a `tickangle` as written,
-so `update_xaxes(tickangle=-90)` resolved to -90, and both category labels of a bar chart were
-drawn rotated. With the categories on y, as in `px.bar(orientation="h")`, every tick label was
+words run in several different directions" (page 183). plotly keeps a `tickangle` as written.
+`update_xaxes(tickangle=-90)` resolved to -90, and both category labels of a bar chart were drawn
+rotated. With the categories on y, as in `px.bar(orientation="h")`, every tick label was
 drawn level.
 
 The rule has no fix, because `tickangle=0` can make long labels run into each other, and the
@@ -12805,8 +12815,8 @@ because only the author knows the words.
 
 The Hamilton rule finds a node that changes an input that other nodes share. It runs on files
 that import `hamilton`, the module of [Apache Hamilton](https://hamilton.apache.org/), which PyPI
-ships as `apache-hamilton` and `sf-hamilton`. Hamilton builds a dataflow from plain functions, so
-the name of a function is its output and the names of its parameters are its inputs. The results
+ships as `apache-hamilton` and `sf-hamilton`. Hamilton builds a graph of steps from plain
+functions, so the name of a function is its output and the names of its parameters are its inputs. The results
 below are from sf-hamilton 1.90.0 with pandas 3.1.1.
 
 ```python
@@ -12854,7 +12864,7 @@ def total_uk(raw: pd.DataFrame) -> float:
 The replacement is advice. xpd does not apply it automatically.
 
 Hamilton calls each function once and hands its result, the same object, to every node that
-takes it, so the result of `total_uk` depends on whether `clipped` ran first. The Hamilton
+takes it. The result of `total_uk` therefore depends on whether `clipped` ran first. The Hamilton
 documentation asks for the same under
 [output immutability](https://hamilton.apache.org/concepts/best-practices/output-immutability/).
 
@@ -12868,8 +12878,8 @@ underscore. The rule also reports a write through a second name for the input, a
 `gdf = buildings` followed by `gdf["area"] = ...`. It leaves alone the cases in the list:
 
 - A parameter the function rebinds first, as in `raw = raw.copy()`.
-- A function under `@load_from` or `@dataloader`. No other node can take the frame they inject.
-- A function under `@mutate` or `@hamilton_exclude`.
+- A function under `@load_from`, `@dataloader`, `@mutate` or `@hamilton_exclude`. No other node
+  can take the frame that `@load_from` or `@dataloader` passes in.
 - `update`, `append` and the like when the result is used, as in `return state.update(row)`,
   because an immutable object returns a new one.
 - `inplace=True`, which [no-inplace](#no-inplace) reports.
@@ -12939,12 +12949,11 @@ and makes every use of the name harder to read.
 
 The rule leaves alone the cases in the list:
 
-- A method or attribute of a class, such as `def _load(self)`.
-- A name inside a function.
+- A method or attribute of a class, such as `def _load(self)`, and a name inside a function.
 - `_` alone, and names with two leading underscores such as `__all__` and `__version__`.
 - `_T = TypeVar("_T")`, and the same for `ParamSpec` and `TypeVarTuple`. A type variable is
-  never part of a module's API, and typeshed and the typing documentation write it with an
-  underscore. On Python 3.12, `def first[T](xs: list[T]) -> T` needs no module level name.
+  never part of a module's API, and typeshed, the type stubs of the standard library, and the
+  typing documentation write it with an underscore. On Python 3.12, `def first[T](xs: list[T]) -> T` needs no module level name.
 - A file that imports `hamilton`, where an underscore tells Hamilton that a function is not a
   node.
 
@@ -12974,8 +12983,8 @@ orders/
 
 The replacement is advice. xpd does not apply it automatically.
 
-The name says nothing about what the module holds, so unrelated code collects in it and every
-other module imports it. xpd reports the file on line 1.
+The name says nothing about what the module holds, so unrelated code collects in it. Every
+other module then imports it. xpd reports the file on line 1.
 
 ### Modules
 
@@ -13033,12 +13042,14 @@ has parsed its own arguments.
 
 The rule leaves alone the cases in the list:
 
-- A file with no function and no class. It is a script, which runs from top to bottom.
-- A `__main__.py`, which is run and never imported.
-- A method that edits a collection the module defines, such as `NAMES.append("id")`.
-- A call whose name starts with `register`, and `include_router`, `add_typer`,
-  `add_middleware` and `mount` on a web or command line app.
-- `pytest.importorskip`, which is how a test module skips itself.
+- A file that is run and never imported
+  - A file with no function and no class. It is a script, which runs from top to bottom.
+  - A `__main__.py`.
+- A call that sets up the module itself
+  - A method that edits a collection the module defines, such as `NAMES.append("id")`.
+  - A call whose name starts with `register`, and `include_router`, `add_typer`,
+    `add_middleware` and `mount` on a web or command line app.
+  - `pytest.importorskip`, which is how a test module skips itself.
 - A call inside `if`, `try`, `with` or a class body, and a call whose result is assigned.
 
 ### Types
@@ -13074,11 +13085,11 @@ def port(settings: dict[str, object]) -> int:
 The replacement is advice. xpd does not apply it automatically.
 
 `cast` tells the type checker to believe a type that nothing checks, so a wrong value fails at
-run time, far from the cast. `isinstance`, `match` and a `TypeIs` function narrow the type for
-the checker and check it in the program.
+run time, far from the cast. `isinstance`, `match` and a `TypeIs` function check the value in the
+program, and the type checker then knows its type.
 
 xpd reports `typing.cast(...)`, and `cast(...)` in a file that imports `cast` from `typing` or
-`typing_extensions`. ruff has no rule that reports a cast. Its `TC006` only asks for quotes
+`typing_extensions`. ruff has no rule that reports a cast, and its `TC006` only asks for quotes
 around the type.
 
 #### dict-str-any
@@ -13116,12 +13127,13 @@ def total(order: Order) -> float:
 
 The replacement is advice. xpd does not apply it automatically.
 
-The type says nothing about the keys or the values, so every function that takes the dict has
-to know its shape by heart, and the type checker cannot find a misspelled key. Decode the data
+The type says nothing about the keys or the values, so the type checker cannot find a
+misspelled key. Every function that takes the dict has to know its keys and the types of its
+values. Decode the data
 once, where it enters the program, into a dataclass or a `TypedDict`.
 
 ruff's `ANN401` reports a parameter or a return value annotated with `Any` alone, and leaves
-`dict[str, Any]`.
+`dict[str, Any]` alone.
 
 ### Tests
 
@@ -13191,9 +13203,9 @@ def table(models, catalog):
 The replacement is advice. xpd does not apply it automatically.
 
 The comprehension builds a whole row in one expression, and every part of the row has to be a
-helper that returns a dict. The loop reads from top to bottom, and a step in it can grow without
-the row being rewritten. A comprehension that maps or filters one value per item is still the
-right tool.
+helper that returns a dict. A reader follows the loop from top to bottom, and a step in it can
+grow without the row being rewritten. A comprehension that maps or filters one value per item is
+still fine.
 
 `{**d for d in dicts}`, which Python 3.15 added, is not reported.
 
@@ -13222,8 +13234,8 @@ def row(model, limits):
 
 The replacement is advice. xpd does not apply it automatically.
 
-The literal builds a dict, unpacks it and merges it in one expression, so a reader has to run
-the comprehension in their head to know which keys the result has.
+The literal builds a dict, unpacks it and merges it in one expression. A reader has to work
+through the comprehension to know which keys the result has.
 
 #### comprehension-two-fors
 
@@ -13250,8 +13262,9 @@ def checks(cases):
 
 The replacement is advice. xpd does not apply it automatically.
 
-The clauses run in the order of a nested loop, and the result stands before both, so a reader
-has to reorder the expression. Python 3.15 flattens with `[*case.checks for case in cases]`.
+The clauses run in the order of a nested loop, but the result stands before both of them. A
+reader has to reorder the expression to follow it. On Python 3.15,
+`[*case.checks for case in cases]` flattens the lists with one `for`.
 
 ## Write a rule
 
@@ -13347,8 +13360,8 @@ uv run --with griffe==2.4.1 xpd index /var/tmp/xpd-source/venv/lib/python3.15/si
 
 Use the Python version folder that uv created. Without Griffe 2.4.1, `xpd index` stops with exit
 code 2 and prints the command to run. The command reads the version from the distribution
-metadata and writes `indexes/sklego.json`, and a run on the pymoo 0.6.2 source printed
-`pymoo 0.6.2: 971 entries written`. For a new version, update the package in the same venv and
+metadata and writes `indexes/sklego.json`. A run on the pymoo 0.6.2 source with
+`--output /tmp/pymoo.json` printed `pymoo 0.6.2: 971 entries written to /tmp/pymoo.json`. For a new version, update the package in the same venv and
 run the last command again. Commit the file that the command writes, and never edit it by hand.
 
 `build.rs` builds the records that `xpd find` searches, and their word weights, from
@@ -13364,9 +13377,10 @@ When a question fails, keep it and improve the ranking for the general pattern o
 downloaded source as data, and never import it.
 
 Run the three commands below after you add or change a record, because every record needs a
-vector of its current text in `indexes/vectors.bin`, which the build compiles into xpd. The file
-stores a hash of each record's name and summary beside its vector, so the build drops the vector
-of a record whose text changed, and the check then fails and names the record.
+vector of its current text in `indexes/vectors.bin`. A vector is the list of numbers that the
+embedding model computes from the text, and the build compiles the file into xpd. The file stores
+a hash of each record's name and summary beside its vector. When a record's text changes, the
+build drops its vector, and the check fails and names the record.
 
 ```text
 on(add or change records)
@@ -13378,7 +13392,7 @@ on(add or change records)
 `--write-vectors` is not in `xpd find --help`, and it needs the embedding model. Commit
 `indexes/vectors.bin` with the change.
 
-A source index can also hold recipes, which are worked examples harvested from the library's
+A source index can also hold recipes, which are worked examples taken from the library's
 documentation. Refresh them in the same command as the names, with `--examples`, `--source-url`
 and `--license`, and [the index command](commands.md#index) shows the full command.
 
@@ -13388,11 +13402,11 @@ and `--license`, and [the index command](commands.md#index) shows the full comma
 | `--source-url` | a repository URL that ends in `/blob/<tag>` and the same folder, such as `/blob/<tag>/doc/python` for plotly |
 | `--license` | the license file of the source |
 
-The harvester parses the examples without running them, applies safe and unsafe fixes with the
-rule engine, and ships only examples with no issue left in the library's pack and the Python
-pack. Each recipe names its source license, and the full license texts ship once in
-`licenses/`. A license that xpd does not recognize gives a pointer to the source and no copied
-code. A pack keeps at most 24 recipes and 96,000 bytes of code, with at most 8,000 bytes for one
+`xpd index` parses the examples without running them, and it applies the safe and unsafe fixes
+of the rules. It keeps only examples with no issue left in the library's pack and the Python
+pack. Each recipe names its source license, and the full license texts are stored once in
+`licenses/`. For a license that xpd does not recognize, the recipe holds a link to the source
+and no copied code. A pack keeps at most 24 recipes and 96,000 bytes of code, with at most 8,000 bytes for one
 example, and the command reports the rejected and capped examples. Do not write recipes by hand
 or edit generated entries to raise a question's rank. To use a recipe, run
 `xpd find "<task>" --kind recipe` and pass a returned name to `xpd api` for the full example.
