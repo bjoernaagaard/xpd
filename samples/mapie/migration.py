@@ -6,6 +6,7 @@ the code computes, so a copy fixed with `xpd check --fix` can be compared with t
 """
 
 import numpy as np
+from mapie.calibration import TopLabelCalibrator
 from mapie.classification import SplitConformalClassifier
 from mapie.metrics.regression import coverage_width_based, regression_coverage_score, regression_mean_width_score, regression_mwi_score
 from mapie.regression import CrossConformalRegressor, JackknifeAfterBootstrapRegressor, SplitConformalRegressor
@@ -85,6 +86,8 @@ def removed_keywords():
     cross = CrossConformalRegressor(LinearRegression(), cv="split", random_state=0)  # xpd: removed-in-mapie
     naive = CrossConformalRegressor(LinearRegression(), method="naive", random_state=0)  # xpd: removed-in-mapie
     scored = SplitConformalClassifier(LogisticRegression().fit(X_train, y_train > 0), method="score")  # xpd: removed-in-mapie
+    ranked = SplitConformalClassifier(LogisticRegression().fit(X_train, y_train > 0), method="aps")  # xpd: removed-in-mapie
+    calibrator = TopLabelCalibrator(LogisticRegression().fit(X_train, y_train > 0), method="top_label", cv="prefit")  # xpd: removed-in-mapie
     conformal = SplitConformalRegressor(model, confidence_level=0.9).conformalize(X_conf, y_conf)
     y_pred, y_intervals = conformal.predict_interval(X_test, alpha=0.1)  # xpd: removed-in-mapie
     weights = np.ones(len(y_train))
@@ -95,7 +98,7 @@ def removed_keywords():
     kfolds = CrossConformalRegressor(LinearRegression(), random_state=0)
     kfolds.fit(X_train, y_train)  # xpd: removed-in-mapie
     y_old = conformal.predict(X_test, alpha=0.1)  # xpd: removed-in-mapie
-    return split, prefit, cross, naive, scored, y_pred, y_intervals, weighted, learner, levels, kfolds, y_old
+    return split, prefit, cross, naive, scored, ranked, calibrator, y_pred, y_intervals, weighted, learner, levels, kfolds, y_old
 
 
 def removed_metric_arguments():

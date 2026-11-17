@@ -8,6 +8,8 @@
 # A fix here turns code that raises into code that runs, so no fix can be compared with the old
 # form and every fix is unsafe.
 
+# No fix, because the class to use depends on cv, and the constructor, fit and predict change
+# at every use of the class.
 id: removed-in-mapie
 language: python
 severity: error
@@ -23,6 +25,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
+# No fix, because the class to use depends on cv, and the constructor, fit and predict change
+# at every use of the class.
 id: removed-in-mapie
 language: python
 severity: error
@@ -38,6 +42,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
+# No fix, because the new class takes other arguments or methods at every use of the class,
+# which the import does not reach.
 id: removed-in-mapie
 language: python
 severity: error
@@ -50,6 +56,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
+# No fix, because the new class takes other arguments or methods at every use of the class,
+# which the import does not reach.
 id: removed-in-mapie
 language: python
 severity: error
@@ -62,6 +70,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
+# No fix, because the new class takes other arguments or methods at every use of the class,
+# which the import does not reach.
 id: removed-in-mapie
 language: python
 severity: error
@@ -74,6 +84,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
+# No fix, because the new class takes other arguments or methods at every use of the class,
+# which the import does not reach.
 id: removed-in-mapie
 language: python
 severity: error
@@ -86,7 +98,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
-# MAPIE 1.0 and 1.1 had PrecisionRecallController, and 1.3.0 has only the new name.
+# MAPIE 1.0 and 1.1 had PrecisionRecallController, and 1.3.0 has only the new name. No fix,
+# because the new class takes other arguments at every use of the class.
 id: removed-in-mapie
 language: python
 severity: error
@@ -99,6 +112,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.3" }
 ---
+# No fix, because MAPIE 1 has no class in its place.
 id: removed-in-mapie
 language: python
 severity: error
@@ -114,6 +128,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|mapie_version|MAPIE' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "1.0" }
 ---
+# No fix, because the message names two base classes and the import does not show which one
+# is meant.
 id: removed-in-mapie
 language: python
 severity: error
@@ -130,7 +146,8 @@ utils:
 metadata: { since: "1.0" }
 ---
 # The modules that 1.0 removed or made private. A statement that also names a removed class is
-# reported by the document of that class.
+# reported by the document of that class. No fix, because the new module depends on the names
+# that the code takes from it.
 id: removed-in-mapie
 language: python
 severity: error
@@ -220,7 +237,8 @@ fix: mapie.metrics.calibration
 metadata: { fix: unsafe, since: "1.0" }
 ---
 # The same import with names from more than one module, or with a name that is gone, such as
-# regression_coverage_score_v2. The four modules of the package itself still import.
+# regression_coverage_score_v2. The four modules of the package itself still import. No fix,
+# because the names go to more than one module, or have no new name.
 id: removed-in-mapie
 language: python
 severity: error
@@ -293,6 +311,8 @@ rule:
 fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
 ---
+# Any other value has no fix, because the file does not show that it is one number, and these
+# metrics take one level.
 id: removed-in-mapie
 language: python
 severity: error
@@ -326,6 +346,34 @@ fix: confidence_level=1 - $A
 metadata: { fix: unsafe, since: "1.0" }
 ---
 # A list of alphas becomes a list of levels, one minus each value.
+# The fix writes 1 minus each number of a list.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C takes confidence_level since MAPIE 1.0, and alpha raises TypeError. For a list of alphas, write 1 minus each value, as in confidence_level=[1 - 0.05, 1 - 0.2] for alpha=[0.05, 0.2].
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, kind: list, pattern: '[$$$ITEMS]', regex: '^\[\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*(,\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*)*,?\s*\]$' }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
+  not: { matches: expected-to-raise }
+rewriters:
+  - id: level
+    rule: { any: [{ kind: float }, { kind: integer }], pattern: $X }
+    fix: "1 - $X, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ITEMS, rewriters: [level], joinBy: "" }
+  LEVELS:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: confidence_level=[$LEVELS]
+metadata: { fix: unsafe, since: "1.0" }
+---
+# Any other value has no fix, because the file does not show whether it is one number or a
+# list, and 1 - alpha raises TypeError for a list.
 id: removed-in-mapie
 language: python
 severity: error
@@ -335,12 +383,14 @@ rule:
   all:
     - has: { field: name, regex: '^alpha$' }
     - has: { field: value, not: { any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] } }
+    - not: { has: { field: value, kind: list, regex: '^\[\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*(,\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*)*,?\s*\]$' } }
     - inside:
         kind: argument_list
         inside: { kind: call, has: { field: function, pattern: $C, regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor)$' } }
   not: { matches: expected-to-raise }
 metadata: { since: "1.0" }
 ---
+# No fix, because the level moves to the constructor, which the match does not reach.
 id: removed-in-mapie
 language: python
 severity: error
@@ -386,6 +436,46 @@ metadata: { fix: unsafe, since: "1.0" }
 ---
 # predict(X, alpha=[0.05, 0.2]) was the common 0.x form. confidence_level=[0.95, 0.8] gave
 # intervals of shape (3, 2, 2) for 3 rows.
+# The fix writes 1 minus each number of a list.
+id: removed-in-mapie
+language: python
+severity: error
+message: TimeSeriesRegressor.predict takes confidence_level since MAPIE 1.0, and alpha raises TypeError. For a list of alphas, write 1 minus each value, as in confidence_level=[1 - 0.05, 1 - 0.2] for alpha=[0.05, 0.2].
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^alpha$' }
+    - has: { field: value, kind: list, pattern: '[$$$ITEMS]', regex: '^\[\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*(,\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*)*,?\s*\]$' }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^predict$' } }, { has: { field: object, pattern: $M } }] }
+            - inside:
+                kind: module
+                stopBy: end
+                has:
+                  stopBy: end
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $M }
+                    - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+  not: { matches: expected-to-raise }
+rewriters:
+  - id: level
+    rule: { any: [{ kind: float }, { kind: integer }], pattern: $X }
+    fix: "1 - $X, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ITEMS, rewriters: [level], joinBy: "" }
+  LEVELS:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: confidence_level=[$LEVELS]
+metadata: { fix: unsafe, since: "1.0" }
+---
+# Any other value has no fix, because the file does not show whether it is one number or a
+# list, and 1 - alpha raises TypeError for a list.
 id: removed-in-mapie
 language: python
 severity: error
@@ -395,6 +485,7 @@ rule:
   all:
     - has: { field: name, regex: '^alpha$' }
     - has: { field: value, not: { any: [{ kind: float }, { kind: integer }, { kind: identifier }, { kind: attribute }] } }
+    - not: { has: { field: value, kind: list, regex: '^\[\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*(,\s*[0-9][0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?\s*)*,?\s*\]$' } }
     - inside:
         kind: argument_list
         inside:
@@ -414,7 +505,8 @@ rule:
 metadata: { since: "1.0" }
 ---
 # predict of the other MAPIE 1 classes takes no alpha and no confidence_level, because the
-# level is set when the object is built. The object is one the file binds to such a class.
+# level is set when the object is built. The object is one the file binds to such a class. No
+# fix, because the level moves to the constructor, which the match does not reach.
 id: removed-in-mapie
 language: python
 severity: error
@@ -444,11 +536,12 @@ metadata: { since: "1.0" }
 # The cross classes and the jackknife class fit and conformalize in one call, so they have no
 # fit: "AttributeError: 'CrossConformalRegressor' object has no attribute 'fit'". The object is
 # a name the file binds to one of the three classes and to nothing else.
-# CrossConformalizedQuantileRegressor has a fit of its own and is left alone.
+# CrossConformalizedQuantileRegressor has a fit of its own and is left alone. The fix calls
+# fit_conformalize with the same arguments.
 id: removed-in-mapie
 language: python
 severity: error
-message: A cross conformal or jackknife class of MAPIE 1 has no fit, and the call raises AttributeError. Call fit_conformalize, which fits on the folds or samples and conformalizes on the rows each one leaves out.
+message: A cross conformal or jackknife class of MAPIE 1 has no fit, and the call raises AttributeError. Call $M.fit_conformalize, which fits on the folds or samples and conformalizes on the rows each one leaves out.
 rule:
   kind: attribute
   pattern: $M.fit
@@ -476,9 +569,11 @@ rule:
   not: { matches: expected-to-raise }
 constraints:
   M: { kind: identifier }
-metadata: { since: "1.0" }
+fix: $M.fit_conformalize
+metadata: { fix: unsafe, since: "1.0" }
 ---
-# The split classes take prefit and no cv, and the cross classes refuse a string.
+# The split classes take prefit and no cv, and the cross classes refuse a string. No fix,
+# because the message names two rewrites and the call does not show which one is meant.
 id: removed-in-mapie
 language: python
 severity: error
@@ -491,6 +586,7 @@ constraints:
   C: { regex: '(^|\.)(SplitConformal(Regressor|Classifier)|ConformalizedQuantileRegressor)$' }
 metadata: { since: "1.0" }
 ---
+# No fix, because the rewrite is another class, with arguments that the call does not show.
 id: removed-in-mapie
 language: python
 severity: error
@@ -504,6 +600,62 @@ constraints:
 metadata: { since: "1.0" }
 ---
 # The classifiers and the calibrator lost method. MapieClassifier took the score there.
+# A classifier with a score that conformity_score takes gets the same score there.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C has no method since MAPIE 1.0, and it raises TypeError. Pass the score as conformity_score, which takes the same "lac", "aps", "raps" or "top_k".
+rule:
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["''](lac|aps|raps|top_k)["'']$' } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^conformity_score$' } }, { kind: dictionary_splat }] } } }
+  not: { matches: expected-to-raise }
+constraints:
+  C: { regex: '(^|\.)(Split|Cross)ConformalClassifier$' }
+rewriters:
+  - id: rename
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { has: { field: value, pattern: $V } }] }
+    fix: "conformity_score=$V, "
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [rename, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe, since: "1.0" }
+---
+# TopLabelCalibrator reads no method, so the fix takes it out.
+id: removed-in-mapie
+language: python
+severity: error
+message: $C has no method since MAPIE 1.0, and it raises TypeError. Drop method, which TopLabelCalibrator does not need.
+rule:
+  pattern: $C($$$ARGS)
+  has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^method$' } } }
+  not: { matches: expected-to-raise }
+constraints:
+  C: { regex: '(^|\.)TopLabelCalibrator$' }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: '^method$' } }
+    fix: ""
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe, since: "1.0" }
+---
+# Any other method has no fix: a regressor has no score to move it to, and a 0.x name such as
+# "score" or "cumulated_score" is not a value of conformity_score.
 id: removed-in-mapie
 language: python
 severity: error
@@ -511,11 +663,20 @@ message: $C has no method since MAPIE 1.0, and it raises TypeError. A classifier
 rule:
   pattern: $C($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^method$' } } }
-  not: { matches: expected-to-raise }
+  not:
+    any:
+      - matches: expected-to-raise
+      - all:
+          - has: { field: function, regex: '(^|\.)(Split|Cross)ConformalClassifier$' }
+          - has: { field: arguments, has: { kind: keyword_argument, regex: '^method\s*=\s*["''](lac|aps|raps|top_k)["'']$' } }
+          - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^conformity_score$' } }, { kind: dictionary_splat }] } } }
+      - has: { field: function, regex: '(^|\.)TopLabelCalibrator$' }
 constraints:
   C: { regex: '(^|\.)((Split|Cross)ConformalClassifier|SplitConformalRegressor|TopLabelCalibrator)$' }
 metadata: { since: "1.0" }
 ---
+# No fix, because the message names two methods, or three, and the call does not show which
+# one is meant.
 id: removed-in-mapie
 language: python
 severity: error

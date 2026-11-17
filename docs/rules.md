@@ -7434,12 +7434,12 @@ narrowed, and the table gives what is left.
 | --- | --- | --- | --- | --- | --- |
 | [`removed-in-mapie`](#removed-in-mapie) | error | interpreter: ImportError, ModuleNotFoundError, TypeError, ValueError, AttributeError | 1 | 0 | unsafe |
 | [`deprecated-in-mapie`](#deprecated-in-mapie) | warning | interpreter: FutureWarning, and intervals equal with and without `gamma` | 2 | 0 | safe |
-| [`alpha-as-confidence-level`](#alpha-as-confidence-level) | warning, error | coverage: 0.108 against 0.907, and interpreter: ValueError | 0 | no reports | none |
+| [`alpha-as-confidence-level`](#alpha-as-confidence-level) | warning, error | coverage: 0.108 against 0.907, and interpreter: ValueError | 0 | no reports | unsafe |
 | [`calibrate-on-training-rows`](#calibrate-on-training-rows) | error | coverage: 0.468 against 0.907 | 6 | 1 | none |
 | [`coverage-on-seen-rows`](#coverage-on-seen-rows) | error, warning | coverage: 1.000 against 0.913 | 0 | no reports | none |
-| [`shuffled-time-series-split`](#shuffled-time-series-split) | warning | coverage: 0.921 against 0.536 | 0 | no reports | none |
+| [`shuffled-time-series-split`](#shuffled-time-series-split) | warning | coverage: 0.921 against 0.536 | 0 | no reports | unsafe |
 | [`prefit-estimator-not-fitted`](#prefit-estimator-not-fitted) | error | interpreter: NotFittedError, AttributeError, ValueError | 0 | no reports | none |
-| [`quantile-estimator-loss`](#quantile-estimator-loss) | error | interpreter: ValueError | 0 | no reports | none |
+| [`quantile-estimator-loss`](#quantile-estimator-loss) | error | interpreter: ValueError | 0 | no reports | unsafe |
 | [`predict-function-returns-labels`](#predict-function-returns-labels) | error | interpreter: IndexError | 0 | no reports | unsafe |
 | [`risk-control-method`](#risk-control-method) | error, warning | interpreter: ValueError, UserWarning | 0 | no reports | none |
 | [`predict-and-predict-interval`](#predict-and-predict-interval) | warning | speed: 1.97 times | 3 | 3 | none |
@@ -7477,7 +7477,7 @@ old form and is never safe.
 
 #### removed-in-mapie
 
-**Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based` when the value is a number or a name, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: `numpy.typing` for `mapie._typing`, `mapie.metrics.regression`, `mapie.metrics.classification` or `mapie.metrics.calibration` for `mapie.metrics` when every imported name is in that module, `confidence_level=1 - alpha` for `alpha=` on a constructor, on `TimeSeriesRegressor.predict`, on `regression_mwi_score` and on `coverage_width_based` when the value is a number or a name, `fit_params={"sample_weight": w}` for `sample_weight=w`, `update` for `partial_fit`, and one stacked array for the two bounds given to `regression_coverage_score` and `regression_mean_width_score`. A list of numbers given as `alpha=` on a constructor or on `TimeSeriesRegressor.predict` becomes `confidence_level=` with 1 minus each number, `fit_conformalize` replaces `fit` on a cross or jackknife object, `method=` becomes `conformity_score=` on a classifier when its value is `"lac"`, `"aps"`, `"raps"` or `"top_k"`, and `method=` is taken out of `TopLabelCalibrator`, which drops the comments between the arguments. The removed classes and modules, `alpha=` on `predict_interval`, `predict_set` and `predict`, `cv=` and the other values of `method` have no fix, because the rewrite reaches other calls or the message names more than one.
 
 The rule reports the MAPIE 0.x API that raises on MAPIE 1.6.0:
 
@@ -7541,9 +7541,10 @@ The forms around `partial_fit` and `sample_weight` changed in the following rele
 | `sample_weight=` on `fit` of the split classes | not given | 1.0.1 already |
 
 The fix `confidence_level=1 - alpha` is written only for a number or a name. `alpha=[0.05, 0.2]`
-was common in 0.x code, and `1 - [0.05, 0.2]` raises TypeError. A list or another expression is
-therefore reported without a fix, and the message says to write 1 minus each value.
-`confidence_level=[0.95, 0.8]` gave intervals of shape (3, 2, 2) for 3 rows.
+was common in 0.x code, and `1 - [0.05, 0.2]` raises TypeError, so a list of numbers gets
+`confidence_level=[1 - 0.05, 1 - 0.2]`. Another expression is reported without a fix, because the
+file does not show whether it is one number or a list. `confidence_level=[0.95, 0.8]` gave
+intervals of shape (3, 2, 2) for 3 rows.
 
 `predict(X, alpha=0.1)` raised TypeError on each of the split, cross, jackknife and quantile
 classes. Their level is set in the constructor, so the `predict` document has no fix. `fit` raised
@@ -7562,7 +7563,7 @@ digits.
 
 #### deprecated-in-mapie
 
-**Severity:** warning. **Fix:** safe: `BinaryRisk` for `BinaryClassificationRisk`, and `aggregate_point_predictions=` for `aggregate_predictions=` and for `ensemble=` on a `JackknifeAfterBootstrapRegressor`. `update` has no fix.
+**Severity:** warning. **Fix:** safe: `BinaryRisk` for `BinaryClassificationRisk`, and `aggregate_point_predictions=` for `aggregate_predictions=` and for `ensemble=` on a `JackknifeAfterBootstrapRegressor`. `update` has no fix, because the call of `adapt_conformal_inference` is a new statement.
 
 The rule reports forms that MAPIE renamed or stopped reading:
 
@@ -7618,7 +7619,7 @@ noise, split into 60, 20 and 20 percent by `train_conformalize_test_split`.
 
 #### alpha-as-confidence-level
 
-**Severity:** warning for a level below 0.5 and for a variable named `alpha` or `delta`, and error for a percent. **Fix:** none.
+**Severity:** warning for a level below 0.5 and for a variable named `alpha` or `delta`, and error for a percent. **Fix:** unsafe, because the level changes to the one the code meant: `confidence_level=1 - 0.1` for `confidence_level=0.1`, 1 minus each number of a list, `1 - alpha` for the level of `regression_mwi_score` and `coverage_width_based`, and `confidence_level=0.90` for `confidence_level=90`. A variable named `alpha` or `delta` and any other percent have no fix, because the file does not show whether the variable holds a list or which share the number means.
 
 The rule reports a `confidence_level` that holds the share to miss, such as
 `confidence_level=0.1`, `confidence_level=[0.05, 0.1]` and `confidence_level=alpha`. It also
@@ -7641,8 +7642,6 @@ mapie = SplitConformalRegressor(model, confidence_level=1 - alpha)
 score = regression_mwi_score(y_test, y_pis, 1 - alpha)
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
-
 | `confidence_level` | Share of test rows covered | Width of the intervals |
 | --- | --- | --- |
 | 0.1 | 0.108 | 0.292 |
@@ -7659,7 +7658,7 @@ from `predict_interval` or `predict_set`, after the model is fitted. A risk cont
 
 #### calibrate-on-training-rows
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** none. The rows held out from the fit are not in the file.
 
 The rule reports `conformalize` on the training rows, known by the name of its first argument or
 because an earlier `fit` got the same variable. It also reports `calibrate` of a risk controller on
@@ -7710,7 +7709,7 @@ A model picked from six settings by its score on the conformalization rows cover
 
 #### coverage-on-seen-rows
 
-**Severity:** error for rows given to `fit` or `fit_conformalize`, and warning for rows given to `conformalize`. **Fix:** none.
+**Severity:** error for rows given to `fit` or `fit_conformalize`, and warning for rows given to `conformalize`. **Fix:** none. The rows held out from the fit are not in the file.
 
 The rule reports `predict_interval` and `predict_set` on the variable that an earlier statement gave
 to `fit`, `fit_conformalize` or `conformalize` of the same object, where the result goes into a
@@ -7752,7 +7751,7 @@ assigns other rows to.
 
 #### shuffled-time-series-split
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `shuffle=False` is added at the end of the arguments, and the comments between them are dropped. The parts then hold other rows. A split with `stratify` has no fix, because scikit-learn refuses `stratify` with `shuffle=False`.
 
 The rule reports `train_test_split` and `train_conformalize_test_split` without `shuffle=False`,
 where the first result goes into `fit` of a `TimeSeriesRegressor`.
@@ -7773,8 +7772,6 @@ series = TimeSeriesRegressor(model, cv=blocks)
 series.fit(X_train, y_train)
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
-
 On a random walk of 900 rows, the intervals covered the following shares of the test rows:
 
 | Model | Test rows | Coverage |
@@ -7793,7 +7790,7 @@ inside `pytest.raises` or `pytest.warns` is left alone.
 
 #### prefit-estimator-not-fitted
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** none. Each message names two rewrites, and the code does not show which one is meant.
 
 The rule reports `SplitConformalRegressor` and `SplitConformalClassifier` with an estimator built
 in the argument list and no `prefit=False`, and `fit` on such an object without `prefit=False`. It
@@ -7845,7 +7842,7 @@ The conditional classes `ConditionalSplitConformalRegressor` and
 
 #### quantile-estimator-loss
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe, because the old fit raises: `loss="quantile"` in place of the loss of `GradientBoostingRegressor` and `HistGradientBoostingRegressor`, at the end of the arguments, which drops the comments between them. `LGBMRegressor`, which needs an alpha, a call with a positional argument and another model have no fix.
 
 The rule reports `ConformalizedQuantileRegressor` and `CrossConformalizedQuantileRegressor` with an
 estimator built in the argument list that has no quantile loss. Such an estimator is
@@ -7864,8 +7861,6 @@ Use instead:
 ```python
 mapie = ConformalizedQuantileRegressor(GradientBoostingRegressor(loss="quantile", random_state=0), confidence_level=0.9)
 ```
-
-xpd gives the replacement as advice and doesn't apply it.
 
 | Estimator | Result |
 | --- | --- |
@@ -7901,7 +7896,7 @@ because the controller reads the probability of the positive class from the seco
 
 #### risk-control-method
 
-**Severity:** error for a method the risk does not take and for a missing `confidence_level`, and warning for an argument that `"crc"` ignores. **Fix:** none.
+**Severity:** error for a method the risk does not take and for a missing `confidence_level`, and warning for an argument that `"crc"` ignores. **Fix:** none. A missing `confidence_level` is a value that the file does not hold, and each other message names two rewrites.
 
 The rule reports `MultiLabelClassificationController` and `SemanticSegmentationController` with a
 method that the risk doesn't take, or without a `confidence_level` that the method needs, or with
@@ -7934,7 +7929,7 @@ Take the points and the intervals from one call, and pass every confidence level
 
 #### predict-and-predict-interval
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** none. The rewrite needs a new name and changes two statements.
 
 The rule reports `predict` on the same object and the same rows as a `predict_interval` or
 `predict_set` in the same block.
@@ -7967,7 +7962,7 @@ The two calls must be statements of the same block and name the same object and 
 
 #### refit-per-confidence-level
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** none. The rewrite replaces the loop around the call.
 
 The rule reports a conformal object built inside a loop or a comprehension with the loop variable
 as its `confidence_level`.
@@ -8012,7 +8007,7 @@ Pass `random_state` to each MAPIE resampler, so two runs give the same intervals
 
 #### unseeded-resampling
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** none. The seed is not in the file.
 
 The rule reports objects that draw random numbers and get no `random_state`. They are
 `CrossConformalRegressor`, `CrossConformalClassifier` and `CrossConformalizedQuantileRegressor` with

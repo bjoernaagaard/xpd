@@ -1,7 +1,9 @@
 # MultiLabelClassificationController and SemanticSegmentationController control recall with
 # "crc" or "rcps" and precision with "ltt", and only "rcps" and "ltt" read confidence_level. Each
 # form below was run on MAPIE 1.6.0, where calibrate raised ValueError or warned. Code inside
-# pytest.raises or pytest.warns is meant to raise and stays silent.
+# pytest.raises or pytest.warns is meant to raise and stays silent. No document has a fix. A
+# missing confidence_level is a value that the file does not hold, and each other message names
+# two rewrites and the call does not show which one is meant.
 
 id: risk-control-method
 language: python

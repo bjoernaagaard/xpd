@@ -7,7 +7,8 @@
 # only plotted or checked for its shape misleads nobody. An earlier statement is
 # left out when a later one assigns to the variable before the prediction, because the name
 # then holds other rows. Each number is the mean over 30 seeds
-# on MAPIE 1.6.0 with a RandomForestRegressor and confidence_level=0.9.
+# on MAPIE 1.6.0 with a RandomForestRegressor and confidence_level=0.9. No document has a fix,
+# because the rows held out from the fit are not in the file.
 #
 # The patterns come first in `all`, so that $M and $X are bound before the earlier statements
 # are searched for them. A rule object with `any` beside `inside` searches first.

@@ -1,6 +1,9 @@
 # MAPIE 0.x took alpha, the share of rows an interval may miss. MAPIE 1 takes confidence_level,
 # the share it must cover, which is 1 - alpha. An alpha given as confidence_level runs without a
 # warning and gives intervals that cover almost nothing.
+#
+# A fix here changes the level to the one the code meant, so the intervals or sets change, and
+# every fix is unsafe.
 
 # A literal below 0.5. Over 30 seeds on MAPIE 1.6.0, confidence_level=0.1 covered 0.108 of the
 # test rows with a mean width of 0.292, against 0.907 and 3.609 for confidence_level=0.9. A level
@@ -10,7 +13,7 @@
 id: alpha-as-confidence-level
 language: python
 severity: warning
-message: confidence_level is the share of rows to cover, which is 1 - alpha, and $V looks like an alpha. With confidence_level=0.1 the intervals covered 0.108 of the test rows, against 0.907 with 0.9. Pass 1 - alpha, such as 0.9 for alpha=0.1.
+message: confidence_level is the share of rows to cover, which is 1 - alpha, and $V looks like an alpha. With confidence_level=0.1 the intervals covered 0.108 of the test rows, against 0.907 with 0.9. Write confidence_level=1 - $V, such as 0.9 for alpha=0.1.
 rule:
   kind: keyword_argument
   all:
@@ -18,11 +21,8 @@ rule:
     - has:
         field: value
         pattern: $V
-        any:
-          - kind: float
-            regex: '^0?\.[0-4]\d*$'
-          - kind: list
-            regex: '^\[\s*(0?\.[0-4]\d*\s*,?\s*)+\]$'
+        kind: float
+        regex: '^0?\.[0-4]\d*$'
     - inside:
         kind: argument_list
         inside:
@@ -33,8 +33,48 @@ rule:
               - regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor|ConditionalSplitConformal(Regressor|Classifier))$'
               - kind: attribute
                 has: { field: attribute, regex: '^predict$' }
+fix: confidence_level=1 - $V
+metadata: { fix: unsafe }
 ---
-# A variable named alpha or delta.
+# The same values in a list. The fix writes 1 minus each of them.
+id: alpha-as-confidence-level
+language: python
+severity: warning
+message: confidence_level is the share of rows to cover, which is 1 - alpha, and $V looks like an alpha. With confidence_level=0.1 the intervals covered 0.108 of the test rows, against 0.907 with 0.9. Write 1 minus each value, such as 0.9 for alpha=0.1.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^confidence_level$' }
+    - has: { field: value, pattern: '[$$$ITEMS]' }
+    - has:
+        field: value
+        pattern: $V
+        kind: list
+        regex: '^\[\s*(0?\.[0-4]\d*\s*,?\s*)+\]$'
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has:
+            field: function
+            any:
+              - regex: '(^|\.)((Split|Cross)Conformal(Regressor|Classifier)|JackknifeAfterBootstrapRegressor|(Cross)?ConformalizedQuantileRegressor|ConditionalSplitConformal(Regressor|Classifier))$'
+              - kind: attribute
+                has: { field: attribute, regex: '^predict$' }
+rewriters:
+  - id: level
+    rule: { any: [{ kind: float }, { kind: integer }], pattern: $X }
+    fix: "1 - $X, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ITEMS, rewriters: [level], joinBy: "" }
+  LEVELS:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: confidence_level=[$LEVELS]
+metadata: { fix: unsafe }
+---
+# A variable named alpha or delta. No fix, because the message names two rewrites, one for a
+# number and one for a list, and the file does not show which one the variable holds.
 id: alpha-as-confidence-level
 language: python
 severity: warning
@@ -49,11 +89,9 @@ rule:
 id: alpha-as-confidence-level
 language: python
 severity: warning
-message: $F takes confidence_level here since MAPIE 1.0, where 0.x took alpha, and $V looks like an alpha. Pass 1 - alpha, so that the score is computed for the level the intervals were built for.
+message: $F takes confidence_level here since MAPIE 1.0, where 0.x took alpha, and $V looks like an alpha. Write 1 - $V, so that the score is computed for the level the intervals were built for.
 rule:
-  any:
-    - pattern: $F($Y, $P, $V)
-    - pattern: $F($Y, $LOW, $UP, $ETA, $V)
+  pattern: $F($Y, $P, $V)
 constraints:
   F: { regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' }
   V:
@@ -62,10 +100,49 @@ constraints:
         regex: '^0?\.[0-4]\d*$'
       - kind: identifier
         regex: '^(alphas?|ALPHAS?|alpha_\w+|ALPHA_\w+)$'
+fix: $F($Y, $P, 1 - $V)
+metadata: { fix: unsafe }
+---
+# coverage_width_based takes the level as its fifth argument.
+id: alpha-as-confidence-level
+language: python
+severity: warning
+message: $F takes confidence_level here since MAPIE 1.0, where 0.x took alpha, and $V looks like an alpha. Write 1 - $V, so that the score is computed for the level the intervals were built for.
+rule:
+  pattern: $F($Y, $LOW, $UP, $ETA, $V)
+constraints:
+  F: { regex: '(^|\.)(regression_mwi_score|coverage_width_based)$' }
+  V:
+    any:
+      - kind: float
+        regex: '^0?\.[0-4]\d*$'
+      - kind: identifier
+        regex: '^(alphas?|ALPHAS?|alpha_\w+|ALPHA_\w+)$'
+fix: $F($Y, $LOW, $UP, $ETA, 1 - $V)
+metadata: { fix: unsafe }
 ---
 # A percent. MAPIE 1.6.0 raises "Invalid confidence_level or alpha. Allowed values are between 0
 # and 1" from predict_interval or predict_set, after the fit, and a risk controller raises "delta
 # must be in (0, 1]". Code inside pytest.raises or pytest.warns is meant to raise and stays silent.
+id: alpha-as-confidence-level
+language: python
+severity: error
+message: confidence_level is a share between 0 and 1, and $V raises ValueError, on a conformal class only once predict_interval or predict_set runs. Write confidence_level=0.$V for $V percent.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^confidence_level$' }
+    - has:
+        field: value
+        pattern: $V
+        kind: integer
+        regex: '^[1-9][0-9]$'
+  not: { matches: expected-to-raise }
+fix: confidence_level=0.$V
+metadata: { fix: unsafe }
+---
+# Any other number, such as 5, 99.5 or 100, has no fix, because the call does not show which
+# share is meant.
 id: alpha-as-confidence-level
 language: python
 severity: error
@@ -82,5 +159,6 @@ rule:
             regex: '^([2-9]|[1-9]\d+)$'
           - kind: float
             regex: '^([2-9]|[1-9]\d+)\.\d*$'
+    - not: { has: { field: value, kind: integer, regex: '^[1-9][0-9]$' } }
 
   not: { matches: expected-to-raise }

@@ -1,6 +1,7 @@
 # SplitConformalRegressor and SplitConformalClassifier have prefit=True as their default, which
 # says the estimator is already fitted. Each form below raises on MAPIE 1.6.0. Code inside
-# pytest.raises or pytest.warns is meant to raise and stays silent.
+# pytest.raises or pytest.warns is meant to raise and stays silent. No document has a fix,
+# because each message names two rewrites and the code does not show which one is meant.
 
 # An estimator built in the argument list is new, so it cannot be fitted. conformalize then
 # raises NotFittedError for a regressor and AttributeError for a classifier. The conditional

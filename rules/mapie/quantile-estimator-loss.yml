@@ -8,6 +8,53 @@
 # LGBMRegressor needs objective="quantile" and an alpha, without which fit raises "The matching
 # parameter `alpha_name` for estimator does not exist". A loss or objective that is not written
 # as text, such as loss=loss, may hold "quantile" and is left alone.
+# The two scikit-learn classes get loss="quantile" in place of their loss, at the end of the
+# arguments, and the comments between the arguments are dropped. A call with a positional
+# argument is left to the next document, because the first one may be the loss.
+id: quantile-estimator-loss
+language: python
+severity: error
+message: $E is built without the quantile loss, and fit raises "You need to set the loss/objective argument of your base model to `quantile`". Pass loss="quantile", and MAPIE then sets the quantile itself.
+rule:
+  kind: call
+  pattern: $E($$$EARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(Hist)?GradientBoostingRegressor$' }
+    - not: { has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^(loss|objective)$' } }, { not: { has: { field: value, kind: string, not: { regex: '^["'']quantile["'']$' } } } }] }, { kind: dictionary_splat }] } } }
+    - matches: quantile-estimator-argument
+  not: { matches: expected-to-raise }
+utils:
+  quantile-estimator-argument:
+    any:
+      - nthChild: 1
+        inside:
+          kind: argument_list
+          inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }
+      - inside:
+          kind: keyword_argument
+          field: value
+          has: { field: name, regex: '^estimator$' }
+          inside:
+            kind: argument_list
+            inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: '^loss$' } }
+    fix: ""
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$EARGS, rewriters: [drop, keep], joinBy: "" }
+  ARGUMENTS:
+    replace: { source: $KEPT, replace: "$", by: 'loss="quantile"' }
+fix: $E($ARGUMENTS)
+metadata: { fix: unsafe }
+---
+# LGBMRegressor has no fix, because it needs an alpha that the call does not hold, and neither
+# has a scikit-learn class with a positional argument.
 id: quantile-estimator-loss
 language: python
 severity: error
@@ -17,6 +64,7 @@ rule:
   pattern: $E($$$EARGS)
   all:
     - has: { field: function, regex: '(^|\.)(Hist)?GradientBoostingRegressor$|(^|\.)LGBMRegressor$' }
+    - not: { all: [{ has: { field: function, regex: '(^|\.)(Hist)?GradientBoostingRegressor$' } }, { not: { has: { field: arguments, has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { any: [{ kind: keyword_argument }, { kind: dictionary_splat }] } } } } }] }
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^(loss|objective)$' } }, { not: { has: { field: value, kind: string, not: { regex: '^["'']quantile["'']$' } } } }] }, { kind: dictionary_splat }] } } }
     - matches: quantile-estimator-argument
   not: { matches: expected-to-raise }
@@ -35,7 +83,8 @@ utils:
             kind: argument_list
             inside: { kind: call, has: { field: function, regex: '(^|\.)(Cross)?ConformalizedQuantileRegressor$' } }
 ---
-# A scikit-learn regressor with no quantile loss raises "The base model is not supported".
+# A scikit-learn regressor with no quantile loss raises "The base model is not supported". No
+# fix, because the advice is another model.
 id: quantile-estimator-loss
 language: python
 severity: error

@@ -8,6 +8,65 @@
 # The rule reports a split with no shuffle keyword whose first result, by its name, is the first
 # argument of a fit on a TimeSeriesRegressor in the same file. It cannot see that the rows are a
 # series in time order, so it is a warning.
+#
+# Unsafe: the fixed split keeps the order of the rows, so the parts hold other rows. The fix adds
+# shuffle=False at the end of the arguments and drops the comments between them.
+id: shuffled-time-series-split
+language: python
+severity: warning
+message: This split shuffles the rows, and $X goes into a TimeSeriesRegressor, so test rows sit between training rows in time. On a random walk the intervals covered 0.921 of a shuffled test part and 0.536 of the rows that came later, at confidence_level=0.9. Pass shuffle=False so that the test rows come after the training rows.
+rule:
+  kind: call
+  pattern: $F($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)(train_test_split|train_conformalize_test_split)$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(shuffle|stratify)$' } }, { kind: dictionary_splat }] } } }
+    - inside:
+        kind: assignment
+        has: { field: left, has: { nthChild: 1, kind: identifier, pattern: $X } }
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          kind: call
+          all:
+            - has: { field: arguments, has: { nthChild: 1, pattern: $X } }
+            - has:
+                field: function
+                kind: attribute
+                all:
+                  - has: { field: attribute, regex: '^fit$' }
+                  - has:
+                      field: object
+                      any:
+                        - kind: call
+                          regex: '^(\w+\.)*TimeSeriesRegressor\('
+                        - pattern: $M
+                          kind: identifier
+                          inside:
+                            kind: module
+                            stopBy: end
+                            has:
+                              stopBy: end
+                              kind: assignment
+                              all:
+                                - has: { field: left, pattern: $M }
+                                - has: { field: right, regex: '^(\w+\.)*TimeSeriesRegressor\(' }
+rewriters:
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [keep], joinBy: "" }
+  ARGUMENTS:
+    replace: { source: $KEPT, replace: "$", by: "shuffle=False" }
+fix: $F($ARGUMENTS)
+metadata: { fix: unsafe }
+---
+# The same split with stratify has no fix, because scikit-learn refuses stratify with
+# shuffle=False.
 id: shuffled-time-series-split
 language: python
 severity: warning
@@ -17,6 +76,7 @@ rule:
   all:
     - has: { field: function, regex: '(^|\.)(train_test_split|train_conformalize_test_split)$' }
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^shuffle$' } }, { kind: dictionary_splat }] } } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^stratify$' } } }
     - inside:
         kind: assignment
         has: { field: left, has: { nthChild: 1, kind: identifier, pattern: $X } }

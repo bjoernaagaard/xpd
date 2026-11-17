@@ -8,7 +8,7 @@ import numpy as np
 from mapie.calibration import TopLabelCalibrator, VennAbersCalibrator
 from mapie.classification import SplitConformalClassifier
 from mapie.metrics.classification import classification_coverage_score
-from mapie.metrics.regression import regression_coverage_score, regression_mwi_score
+from mapie.metrics.regression import coverage_width_based, regression_coverage_score, regression_mwi_score
 from mapie.regression import CrossConformalRegressor, SplitConformalRegressor
 from mapie.risk_control import BinaryClassificationController
 from mapie.utils import train_conformalize_test_split
@@ -187,8 +187,9 @@ def alpha_as_confidence_level():
     score = regression_mwi_score(y_test, y_intervals, 0.1)  # xpd: alpha-as-confidence-level
     by_name = regression_mwi_score(y_test, y_intervals, alpha)  # xpd: alpha-as-confidence-level
     right = regression_mwi_score(y_test, y_intervals, 1 - alpha)
+    width = coverage_width_based(y_test, y_intervals[:, 0, 0], y_intervals[:, 1, 0], 10, 0.1)  # xpd: alpha-as-confidence-level
     spread = [m.predict_interval(X_test)[1] for m in (tiny, named, several, levels, half)]
-    return spread, score, by_name, right
+    return spread, score, by_name, right, width
 
 
 def percent_as_confidence_level():

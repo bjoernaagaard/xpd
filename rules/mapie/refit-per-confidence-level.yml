@@ -4,6 +4,7 @@
 # CrossConformalRegressor per level took 2.87 times as long as one for the list on 1,000 rows
 # and 2.95 times on 5,000, and SplitConformalRegressor took 2.99 and 3.01 times. The intervals
 # were bit equal in both. ConformalizedQuantileRegressor takes one level only and is left alone.
+# No fix, because the rewrite replaces the loop around the call.
 id: refit-per-confidence-level
 language: python
 severity: warning

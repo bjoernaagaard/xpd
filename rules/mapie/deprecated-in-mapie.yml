@@ -84,7 +84,8 @@ metadata: { fix: safe, since: "1.4.1" }
 ---
 # TimeSeriesRegressor.update keeps gamma, confidence_level and optimize_beta in its signature and
 # reads none of them. With method="aci", the intervals after update(X, y, gamma=0.5) were bit
-# equal to the ones after update(X, y), and adapt_conformal_inference changed them.
+# equal to the ones after update(X, y), and adapt_conformal_inference changed them. No fix,
+# because the call of adapt_conformal_inference is a new statement that the match does not reach.
 id: deprecated-in-mapie
 language: python
 severity: warning

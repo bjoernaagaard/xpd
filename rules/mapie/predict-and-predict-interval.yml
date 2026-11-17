@@ -5,7 +5,8 @@
 # predict_set alone. Both forms returned the same arrays, bit for bit.
 #
 # predict_interval and predict_set are names only MAPIE has, so the rule needs no class. The two
-# calls must be statements of the same block and name the same object and the same rows.
+# calls must be statements of the same block and name the same object and the same rows. No
+# document has a fix, because the rewrite needs a new name and changes two statements.
 id: predict-and-predict-interval
 language: python
 severity: warning

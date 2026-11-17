@@ -1,7 +1,8 @@
 # Without random_state these draw from a new seed on every run, so the intervals or sets cannot
 # be reproduced. Each form listed gave other output in two fresh runs on MAPIE 1.6.0, and the
 # same output with random_state. A seed does not move the expected coverage, so the rule is info.
-# A file that seeds NumPy's global generator is left alone, because MAPIE then draws from it.
+# A file that seeds NumPy's global generator is left alone, because MAPIE then draws from it. No
+# document has a fix, because the seed is not in the file.
 
 # The cross classes shuffle their folds when cv is a number, which the default is. A splitter
 # given as cv, such as KFold(5), keeps its own order and is left alone.
