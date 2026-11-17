@@ -184,9 +184,10 @@ impl Report {
             .collect()
     }
 
-    /// Whether any issue has error severity, which makes `check` exit 1.
-    pub(crate) fn has_errors(&self) -> bool {
-        self.issues.iter().any(|i| i.severity == Severity::Error)
+    /// Whether any issue has the severity `lowest` or a higher one, which makes `check` exit 1.
+    pub(crate) fn has_issues_from(&self, lowest: &Severity) -> bool {
+        (self.issues.iter())
+            .any(|i| crate::catalog::rank(&i.severity) >= crate::catalog::rank(lowest))
     }
 
     /// `fixable` counts the issues that `--fix` fixes at the `allowed` level.

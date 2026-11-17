@@ -113,7 +113,7 @@ about the project and not about a place in a file, so its `line` and `column` ar
 | Exit code | Meaning |
 | --- | --- |
 | 0 | No issue of severity error is left, after fixes |
-| 1 | At least one issue of severity error is left |
+| 1 | At least one issue of severity error is left. `--fail-on warning` also exits 1 for a warning, and `--fail-on` takes `error`, `warning`, `info` or `hint` |
 | 2 | xpd could not run, or it could not read a file. It names that file on stderr and still reports the others |
 
 The format never changes the exit code or the rules that run.

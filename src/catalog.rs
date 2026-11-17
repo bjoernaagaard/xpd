@@ -229,7 +229,7 @@ impl Entry<'_> {
 }
 
 /// How severe a severity is, so that merging a rule's documents keeps the highest.
-fn rank(severity: &Severity) -> u8 {
+pub(crate) fn rank(severity: &Severity) -> u8 {
     match severity {
         Severity::Error => 4,
         Severity::Warning => 3,

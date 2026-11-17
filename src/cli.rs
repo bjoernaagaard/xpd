@@ -146,7 +146,8 @@ enum Cmd {
     },
     /// Parse library source into a versioned index. Never imports or runs library code.
     Index(IndexArgs),
-    /// Lint Python files. Exit 0 when clean, 1 on any error-severity issue, 2 if xpd can't run.
+    /// Lint Python files. Exit 0 when clean, 1 on any issue of the --fail-on severity, which is
+    /// error by default, 2 if xpd can't run.
     ///
     /// A library's rules run only on files that import it, and the Python rules run on every file.
     /// A project with an sgconfig.yml adds its own ast-grep rules, and its xpd.yml can make a
@@ -183,6 +184,9 @@ enum Cmd {
         /// Run only the rules of this severity and above: error, warning, info or hint.
         #[arg(long, value_parser = report::parse_severity)]
         severity: Option<Severity>,
+        /// Exit 1 when an issue of this severity or above is left: error, warning, info or hint.
+        #[arg(long, value_parser = report::parse_severity, default_value = "error")]
+        fail_on: Severity,
         #[arg(short, long)]
         config: Option<PathBuf>,
     },
@@ -283,6 +287,7 @@ pub(crate) fn run() -> ExitCode {
             unsafe_fixes,
             rules,
             severity,
+            fail_on,
             config,
         } => {
             let format = format.unwrap_or(match default_format {
@@ -305,6 +310,7 @@ pub(crate) fn run() -> ExitCode {
                 fixes,
                 allowed,
                 &Filters { rules, severity },
+                &fail_on,
                 config.as_deref(),
             )
         }
@@ -569,6 +575,7 @@ fn check(
     fixes: FixMode,
     allowed: Applicability,
     filters: &Filters,
+    fail_on: &Severity,
     config: Option<&Path>,
 ) -> ExitCode {
     let report = match lint(paths, fixes, Scope::Project, filters, config) {
@@ -595,7 +602,7 @@ fn check(
     }
     if report.skipped > 0 {
         ExitCode::from(CHECK_FAILED)
-    } else if report.has_errors() {
+    } else if report.has_issues_from(fail_on) {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
