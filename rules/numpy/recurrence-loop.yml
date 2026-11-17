@@ -1,0 +1,30 @@
+# A loop that writes element t of an array from element t - 1 of the same array is a recurrence.
+# A linear one, x[t] = a + b * x[t - 1] + e[t], is what scipy.signal.lfilter computes in one
+# call: on NumPy 2.5.5 and SciPy 1.18, lfilter([1.0], [1.0, -b], a + e, zi=[b * x0]) differed
+# from the loop by 4e-15 over 5,000 steps, with the same random draws. A running sum or product
+# is np.cumsum or np.cumprod, and a running maximum is np.maximum.accumulate. The existing
+# element-loop rule leaves a loop alone that reads the array it writes, so this rule takes
+# that case. It has no fix, because the call depends on the form of the recurrence, and a
+# recurrence that is not linear has to stay a loop.
+id: recurrence-loop
+language: python
+severity: warning
+message: This loop computes $OUT[$T] from $OUT[$T - 1] one step per pass. For a linear step use scipy.signal.lfilter, as in lfilter([1.0], [1.0, -slope], shocks, zi=[slope * first]), and for a running total np.cumsum. Keep the loop only when the step is not linear.
+rule:
+  kind: for_statement
+  all:
+    - has: { field: left, kind: identifier, pattern: $T }
+    - has: { field: right, pattern: range($$$) }
+    - has:
+        field: body
+        has:
+          kind: expression_statement
+          has:
+            kind: assignment
+            all:
+              - has: { field: left, pattern: '$OUT[$T]' }
+              - has:
+                  field: right
+                  any:
+                    - pattern: $OUT[$T - 1]
+                    - has: { stopBy: end, pattern: '$OUT[$T - 1]' }

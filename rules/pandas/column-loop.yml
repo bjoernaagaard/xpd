@@ -1,0 +1,69 @@
+# A loop over column names that reduces one column per pass, as in
+# for name in models: (table[name] - table["published"]).abs().mean(), runs the same
+# expression once per column. A frame takes a list of names and reduces every column in one
+# call: on pandas 3.1.1, table[models].sub(table["published"], axis=0) gave the same count,
+# mean absolute error, mean and root mean square as the loop, within 1e-16. The rule reports a
+# loop or a comprehension that selects a column with the loop variable and calls a reduction
+# on it. It has no fix, because the result changes from a list of rows to a frame.
+id: column-loop
+language: python
+severity: warning
+message: This reduces one column of $FRAME per pass. Select the columns at once and reduce them in one call, as in $FRAME[names].sub($FRAME["base"], axis=0).abs().mean(), which returns one value per column.
+rule:
+  any:
+    - kind: for_statement
+      all:
+        - has: { field: left, kind: identifier, pattern: $NAME }
+        - has: { field: body, has: { stopBy: end, matches: reduced-column } }
+    - any: [{ kind: list_comprehension }, { kind: dictionary_comprehension }, { kind: generator_expression }]
+      all:
+        - has: { kind: for_in_clause, has: { field: left, kind: identifier, pattern: $NAME } }
+        - has: { stopBy: end, matches: reduced-column }
+utils:
+  reduced-column:
+    any:
+      - kind: call
+        all:
+          - has: { field: function, kind: attribute, has: { field: attribute, regex: ^(mean|median|sum|std|var|min|max|count|nunique|abs|isna|any|all|fillna)$ } }
+          # The method is called on the column or on an expression that holds it.
+          - has:
+              field: function
+              has:
+                field: object
+                any:
+                  - pattern: $FRAME[$NAME]
+                  - has: { stopBy: end, kind: subscript, pattern: '$FRAME[$NAME]' }
+      # Arithmetic between the column and another column of the same frame.
+      - kind: binary_operator
+        all:
+          - has: { kind: subscript, pattern: '$FRAME[$NAME]' }
+          - has: { kind: subscript, pattern: '$FRAME[$OTHER]', has: { field: subscript, kind: string } }
+---
+# The same loop with the column name built from the loop variable, as in
+# lots[f"{ic}_mw"] = raw[f"{ic} Volume"].fillna(0.0). Build the list of names once and select
+# them together.
+id: column-loop
+language: python
+severity: warning
+message: This handles one column of $FRAME per pass, with a name built from $NAME. Build the list of names once and select the columns together, as in $FRAME[names].fillna(0.0).
+rule:
+  kind: for_statement
+  all:
+    - has:
+        field: left
+        any:
+          - { kind: identifier, pattern: $NAME }
+          - has: { stopBy: end, kind: identifier, pattern: $NAME }
+    - has:
+        field: body
+        has:
+          stopBy: end
+          kind: subscript
+          all:
+            - has: { field: value, pattern: $FRAME }
+            - has:
+                field: subscript
+                kind: string
+                has: { kind: interpolation, has: { kind: identifier, pattern: $NAME } }
+            # A method is called on the column, which a dict entry or a schema field does not have.
+            - inside: { kind: attribute, field: object, inside: { kind: call, field: function } }

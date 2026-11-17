@@ -165,3 +165,44 @@ def meant_builtins():
     magnitude = abs(a - 1)
     found = sum(np.where(a > 0))
     return whole, shape_max, hits, magnitude, found
+
+
+def recurrence(shocks, slope):
+    out = np.empty(shocks.size + 1)
+    out[0] = 0.0
+    for t in range(1, shocks.size + 1):  # xpd: recurrence-loop
+        out[t] = slope * out[t - 1] + shocks[t - 1]
+    return out
+
+
+def slice_fill(line, starts, edges):
+    out = np.zeros_like(line)
+    for start, edge in zip(starts, edges, strict=True):  # xpd: slice-fill-loop
+        out[start:] = line[edge]
+    return out
+
+
+def rows_per_label(labels, weights, count):
+    return np.array([np.where(labels == k, weights, 0.0) for k in range(count)])  # xpd: mask-per-label
+
+
+def rows_by_broadcast(labels, weights, count):
+    return (labels == np.arange(count)[:, None]) * weights
+
+
+def median_per_label(values, labels, count):
+    found = {}
+    for k in range(count):  # xpd: mask-per-label
+        found[k] = np.median(values[labels == k], axis=0)
+    return found
+
+
+def draws(rng, units, grid):
+    errors = []
+    for _ in range(units):  # xpd: random-draw-loop
+        errors.append(rng.uniform(20, 60) * grid)
+    return errors
+
+
+def draws_at_once(rng, units, grid):
+    return rng.uniform(20, 60, size=(units, 1)) * grid

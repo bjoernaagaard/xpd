@@ -1,0 +1,19 @@
+# A lambda in named aggregation, as in agg(share=("gap", lambda v: (v <= CENT).mean())), runs
+# in Python once per group. The condition or the square is the same for every row, so compute
+# it as a column first and name a built-in reduction: assign(near=gap <= CENT) and then
+# agg(share=("near", "mean")). The existing groupby-lambda rule reports a lambda passed to agg
+# directly, and this rule takes the lambda inside a named pair. It has no fix, because the new
+# column needs a name.
+id: named-agg-lambda
+language: python
+severity: warning
+message: This lambda runs in Python once per group. Compute its expression as a column before the groupby, and name a built-in reduction in the pair, as in agg(share=("near", "mean")).
+rule:
+  kind: lambda
+  inside:
+    kind: tuple
+    inside:
+      kind: keyword_argument
+      inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: ^(agg|aggregate)$ } } }

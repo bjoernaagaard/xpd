@@ -1,0 +1,15 @@
+# A comprehension with an `if` inside pd.DataFrame tests every record in Python before the
+# frame exists. Build the frame from all records and select the rows with a boolean mask, which
+# compares the whole column at once. The rule has no fix, because the test has to be rewritten
+# on a column.
+id: filter-before-frame
+language: python
+severity: warning
+message: This tests every record in Python before the frame is built. Build the frame from all records, and select the rows with a mask on the column.
+rule:
+  kind: list_comprehension
+  all:
+    - has: { kind: if_clause }
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.DataFrame$' } }

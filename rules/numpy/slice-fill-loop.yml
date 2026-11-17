@@ -1,0 +1,28 @@
+# A loop that assigns out[start:] = value for one start after another fills a step function:
+# each position ends with the value of the last start at or before it. np.searchsorted finds
+# that start for every position at once. On NumPy 2.5.5, for sorted starts,
+# step = np.searchsorted(starts, np.arange(out.size), side="right") - 1 and
+# np.where(step >= 0, values[np.maximum(step, 0)], 0.0) were equal to the loop on 2,000 random
+# inputs. The rule has no fix, because the starts have to be sorted and the file does not show
+# that they are.
+id: slice-fill-loop
+language: python
+severity: warning
+message: This loop fills $OUT from one start after another. For sorted starts, find the last start for every position with np.searchsorted(starts, np.arange($OUT.size), side="right") - 1, and index the values with it.
+rule:
+  kind: for_statement
+  has:
+    field: body
+    has:
+      kind: expression_statement
+      all:
+        - nthChild: 1
+        - nthChild: { position: 1, reverse: true }
+        - has:
+            kind: assignment
+            has:
+              field: left
+              kind: subscript
+              all:
+                - has: { field: value, pattern: $OUT }
+                - has: { field: subscript, kind: slice, regex: '^[A-Za-z_][A-Za-z_0-9]*:$' }

@@ -116,6 +116,13 @@ The first two groups are where real bugs live.
   `rename`.
 - A loop over `groupby` that appends a summary per group
   (`pandas/groupby-loop-collects`). Show the `agg` call.
+- A loop that one call on whole arrays or columns replaces: `x[t]` from `x[t - 1]`
+  (`numpy/recurrence-loop`), a mask per label (`numpy/mask-per-label`), a random draw
+  per pass (`numpy/random-draw-loop`), a reduction per column (`pandas/column-loop`), a
+  lambda in named `agg` (`pandas/named-agg-lambda`), or records filtered in Python
+  before the frame is built (`pandas/filter-before-frame`). Read every loop and every
+  comprehension for this, run the loop and the whole array form on the same input, and
+  show where they differ.
 - A function that works at several levels at once, or needs comments to separate its
   parts.
 - A Boolean positional parameter, deep nesting where an early return would do, or a

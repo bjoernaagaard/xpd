@@ -1,0 +1,26 @@
+# A loop that repeats the same draws, `for _ in range(units)`, calls the Generator once per
+# pass for each number. A Generator method takes size= and draws all of them in one call, and
+# the arithmetic after it then runs on arrays with one more axis. The numbers change, because
+# the draws come in another order, so results that are compared with an earlier run have to be
+# made again. The rule reports only a loop whose variable is `_`, which says that no pass
+# depends on its position, and it has no fix, because every line of the body gets a new axis.
+id: random-draw-loop
+language: python
+severity: warning
+message: This loop draws from $RNG once per pass. When no pass depends on another, draw every pass at once with size=, as in $RNG.$DRAW(low, high, size=(units, 1)), and compute on the whole array. The numbers then come in another order.
+rule:
+  kind: for_statement
+  all:
+    - has: { field: left, kind: identifier, regex: ^_$ }
+    - has: { field: right, pattern: range($$$) }
+    - has:
+        field: body
+        has:
+          stopBy: end
+          kind: call
+          has:
+            field: function
+            kind: attribute
+            all:
+              - has: { field: object, pattern: $RNG, regex: '(^|\.)(rng|generator|random_state|rs)$' }
+              - has: { field: attribute, pattern: $DRAW, regex: ^(uniform|normal|standard_normal|integers|random|choice|exponential|poisson|lognormal|gamma|beta|binomial|permutation)$ }

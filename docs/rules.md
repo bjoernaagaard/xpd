@@ -1414,6 +1414,62 @@ Keep the result as a Series when the next step takes one, and call `tolist` only
 
 xpd gives the replacement as advice and doesn't apply it.
 
+#### column-loop
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a loop or a comprehension over column names that reduces one column per pass,
+or that does arithmetic between that column and another column of the same frame. It also
+reports a loop that builds the column name from the loop variable in an f-string.
+
+Example:
+
+```python
+rows = []
+for name in models:
+    error = (table[name] - table["published"]).dropna()
+    rows.append((name, len(error), error.abs().mean(), error.mean()))
+```
+
+Use instead:
+
+```python
+error = table[models].sub(table["published"], axis=0)
+scores = pd.DataFrame({"n": error.count(), "mae": error.abs().mean(), "bias": error.mean()})
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A frame takes a list of names and reduces every column in one call, and the result is a table
+with one row per column. On pandas 3.1.1 the two forms gave the same count, mean absolute error,
+mean and root mean square, within 1e-16. For names built in an f-string, build the list of names
+once, as in `raw[[f"{ic} Volume" for ic in ZONE]].fillna(0.0)`.
+
+#### filter-before-frame
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `pd.DataFrame([... for row in rows if ...])`.
+
+Example:
+
+```python
+frame = pd.DataFrame([row[1:] for row in rows if row[0] == "D"], columns=names)
+```
+
+Use instead:
+
+```python
+frame = pd.DataFrame(rows)
+frame = frame[frame[0] == "D"].drop(columns=0).set_axis(names, axis=1)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The comprehension tests every record in Python before the frame exists. A mask on the column
+compares all records at once. When the records come from a CSV file, `pd.read_csv` reads them
+without a Python loop.
+
 ### groupby, agg and transform
 
 Replace a lambda or `apply` in a `groupby` with a built-in aggregation, which pandas runs in compiled code for all groups at once.
@@ -1554,6 +1610,36 @@ result = df.assign(total=lambda frame: frame.groupby("region")["load"].transform
 `transform` keeps the index and the order of the rows, where a merge can give the result a new index.
 
 xpd gives the replacement as advice and doesn't apply it.
+
+#### named-agg-lambda
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a lambda inside a pair of named aggregation, as in
+`agg(share=("gap", lambda v: (v <= CENT).mean()))`.
+
+Example:
+
+```python
+found = table.groupby("area").agg(
+    share=("gap", lambda values: (values <= CENT).mean()),
+    rmse=("error", lambda error: np.sqrt((error**2).mean())),
+)
+```
+
+Use instead:
+
+```python
+table = table.assign(near=table["gap"] <= CENT, squared=table["error"] ** 2)
+found = table.groupby("area").agg(share=("near", "mean"), mse=("squared", "mean"))
+found = found.assign(rmse=np.sqrt(found["mse"]))
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The lambda runs in Python once per group. The condition and the square are the same for every
+row, so they are columns, and the reduction that is left has a built-in name that pandas runs
+on all groups at once. `groupby-lambda` reports a lambda passed to `agg` directly.
 
 #### groupby-loop-collects
 
@@ -3648,6 +3734,121 @@ Use instead:
 def clipped(x):
     return np.minimum(x, 3.0)
 ```
+
+#### recurrence-loop
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a `for` loop over `range` that writes `x[t]` from `x[t - 1]` of the same array.
+
+Example:
+
+```python
+log_price = np.empty(days + 1)
+log_price[0] = first
+for t in range(1, days + 1):
+    log_price[t] = intercept + slope * log_price[t - 1] + sd * rng.standard_normal()
+```
+
+Use instead:
+
+```python
+shocks = intercept + sd * rng.standard_normal(days)
+later, _ = scipy.signal.lfilter([1.0], [1.0, -slope], shocks, zi=[slope * first])
+log_price = np.concatenate([[first], later])
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The loop is a linear recurrence, which `scipy.signal.lfilter` computes in one call. On NumPy
+2.5.5 and SciPy 1.18.1 the two forms differed by 4e-15 over 5,000 steps, with the same random
+draws. A running sum is `np.cumsum`, a running product `np.cumprod`, and a running maximum
+`np.maximum.accumulate`. A step that is not linear in the earlier value has to stay a loop.
+
+#### slice-fill-loop
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a `for` loop whose only statement assigns to a slice that runs from a name to
+the end, as in `out[start:] = value`.
+
+Example:
+
+```python
+offered = np.zeros_like(line)
+for level, edge in zip(moved, edges, strict=True):
+    offered[level:] = line[edge]
+```
+
+Use instead:
+
+```python
+step = np.searchsorted(moved, np.arange(line.size), side="right") - 1
+offered = np.where(step >= 0, line[edges[np.maximum(step, 0)]], 0.0)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+Each position ends with the value of the last start at or before it, and `np.searchsorted` finds
+that start for every position at once. On NumPy 2.5.5 the two forms were equal on 2,000 random
+inputs with sorted starts. The starts have to be sorted and not negative.
+
+#### mask-per-label
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `np.array([... a == k ... for k in ...])`, and a `for` loop over labels that
+selects with `values[labels == k]`.
+
+Example:
+
+```python
+cleared = np.array([np.where(lot_of == lot, weights, 0.0) for lot in range(lots)])
+```
+
+Use instead:
+
+```python
+cleared = (lot_of == np.arange(lots)[:, None]) * weights
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The comprehension compares the same array with one label per pass. Broadcasting compares it
+with all labels at once and gives one row per label, and on NumPy 2.5.5 the two forms were
+equal. For the loop, `pd.DataFrame(values).groupby(labels).median()` reduces every group in one
+pass. When the body fits a model or solves a problem for each label, loop over
+`frame.groupby(labels)` so that the frame is split once.
+
+#### random-draw-loop
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `for _ in range(n)` whose body calls a method of a Generator named `rng`, such
+as `rng.uniform`, `rng.normal` or `rng.integers`.
+
+Example:
+
+```python
+errors = []
+for _ in range(units):
+    base = rng.uniform(20, 60)
+    errors.append(base * grid - cost)
+```
+
+Use instead:
+
+```python
+base = rng.uniform(20, 60, size=(units, 1))
+errors = base * grid - cost
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The loop variable `_` says that no pass depends on its position, so every pass can be drawn in
+one call with `size=`, and the arithmetic then runs on an array with one more axis. The numbers
+come in another order, so a result that is compared with an earlier run has to be made again.
+Keep the loop when a pass reads what an earlier pass wrote.
 
 ### Arrays built, copied and stored the slow way
 

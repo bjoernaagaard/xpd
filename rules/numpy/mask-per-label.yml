@@ -1,0 +1,39 @@
+# An array built from one comparison per label, as in
+# np.array([np.where(lot_of == lot, 1.0, 0.0) for lot in range(n)]), compares the same array
+# with each label in Python. Broadcasting compares it with all labels at once: on NumPy 2.5.5,
+# (lot_of == np.arange(n)[:, None]).astype(float) was equal to the comprehension. The rule has
+# no fix, because the rest of the element, such as weights, has to move into the expression.
+id: mask-per-label
+language: python
+severity: warning
+message: This compares $ARRAY with one label per pass. Compare it with all labels at once, as in $ARRAY == np.arange(n)[:, None], which gives one row per label.
+rule:
+  kind: list_comprehension
+  all:
+    - inside:
+        kind: argument_list
+        inside: { kind: call, has: { field: function, regex: '^(np|numpy)\.(array|asarray|stack|vstack)$' } }
+    - has: { kind: for_in_clause, has: { field: left, kind: identifier, pattern: $LABEL } }
+    - has:
+        field: body
+        any:
+          - pattern: $ARRAY == $LABEL
+          - has: { stopBy: end, pattern: $ARRAY == $LABEL }
+---
+# A loop over labels that selects the values of each label with a mask, as in
+# values[labels == k], scans the whole array once per label. A groupby on the labels reduces
+# every group in one pass. The rule has no fix, because the reduction is spread over the body.
+id: mask-per-label
+language: python
+severity: warning
+message: This selects the values of one label per pass with $ARRAY[$LABELS == $LABEL], which scans the whole array for every label. Group by the labels once, and reduce every group in one call, as in pd.DataFrame($ARRAY).groupby($LABELS).median().
+rule:
+  kind: for_statement
+  all:
+    - has: { field: left, kind: identifier, pattern: $LABEL }
+    - has:
+        field: body
+        has:
+          stopBy: end
+          kind: subscript
+          pattern: $ARRAY[$LABELS == $LABEL]

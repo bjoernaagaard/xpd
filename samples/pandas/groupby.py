@@ -211,3 +211,39 @@ def renamed(df: pd.DataFrame) -> pd.DataFrame:
 
 def two_columns(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"area": df["region"], "mw": df["load"], "day": 1})
+
+
+def errors_by_loop(df: pd.DataFrame, names: list[str]) -> list[tuple[str, float]]:
+    rows = []
+    for name in names:  # xpd: column-loop
+        rows.append((name, (df[name] - df["load"]).abs().mean()))
+    return rows
+
+
+def errors_at_once(df: pd.DataFrame, names: list[str]) -> pd.Series:
+    return df[names].sub(df["load"], axis=0).abs().mean()
+
+
+def filled_by_loop(df: pd.DataFrame, raw: pd.DataFrame, zones: list[str]) -> pd.DataFrame:
+    for zone in zones:  # xpd: column-loop
+        df[f"{zone}_mw"] = raw[f"{zone} Volume"].fillna(0.0)
+    return df
+
+
+def schema(zones: list[str]) -> dict[str, str]:
+    types = {}
+    for zone in zones:
+        types[f"{zone}_mw"] = "float64"
+    return types
+
+
+def share_with_lambda(df: pd.DataFrame) -> pd.DataFrame:
+    return df.groupby("region").agg(share=("load", lambda v: (v <= 1).mean()))  # xpd: named-agg-lambda
+
+
+def share(df: pd.DataFrame) -> pd.DataFrame:
+    return df.assign(low=df["load"] <= 1).groupby("region").agg(share=("low", "mean"))
+
+
+def records(rows: list[list[str]]) -> pd.DataFrame:
+    return pd.DataFrame([row[1:] for row in rows if row[0] == "D"])  # xpd: filter-before-frame
