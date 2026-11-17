@@ -13,6 +13,10 @@
           "return_X_y",
           "as_frame"
         ],
+        "parameters_written": [
+          "return_X_y=False",
+          "as_frame=False"
+        ],
         "summary": "Loads the penguins dataset, which is a lovely alternative for the iris dataset. We've added this dataset for educational use.",
         "members": [],
         "rules": [],
@@ -39,6 +43,23 @@
           "warm_start",
           "n_jobs"
         ],
+        "parameters_written": [
+          "penalty=\"deprecated\"",
+          "*",
+          "C=1.0",
+          "l1_ratio=0.0",
+          "dual=False",
+          "tol=1e-4",
+          "fit_intercept=True",
+          "intercept_scaling=1",
+          "class_weight=None",
+          "random_state=None",
+          "solver=\"lbfgs\"",
+          "max_iter=100",
+          "verbose=0",
+          "warm_start=False",
+          "n_jobs=None"
+        ],
         "summary": "Logistic Regression (aka logit, MaxEnt) classifier.",
         "members": [
           {
@@ -46,12 +67,18 @@
             "parameters": [
               "X"
             ],
-            "summary": "Predict confidence scores for samples."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Predict confidence scores for samples.",
+            "property": false
           },
           {
             "name": "densify",
             "parameters": [],
-            "summary": "Convert coefficient matrix to dense array format."
+            "parameters_written": [],
+            "summary": "Convert coefficient matrix to dense array format.",
+            "property": false
           },
           {
             "name": "fit",
@@ -60,40 +87,64 @@
               "y",
               "sample_weight"
             ],
-            "summary": "Fit the model according to the given training data."
+            "parameters_written": [
+              "X",
+              "y",
+              "sample_weight=None"
+            ],
+            "summary": "Fit the model according to the given training data.",
+            "property": false
           },
           {
             "name": "get_metadata_routing",
             "parameters": [],
-            "summary": "Get metadata routing of this object."
+            "parameters_written": [],
+            "summary": "Get metadata routing of this object.",
+            "property": false
           },
           {
             "name": "get_params",
             "parameters": [
               "deep"
             ],
-            "summary": "Get parameters for this estimator."
+            "parameters_written": [
+              "deep=True"
+            ],
+            "summary": "Get parameters for this estimator.",
+            "property": false
           },
           {
             "name": "predict",
             "parameters": [
               "X"
             ],
-            "summary": "Predict class labels for samples in X."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Predict class labels for samples in X.",
+            "property": false
           },
           {
             "name": "predict_log_proba",
             "parameters": [
               "X"
             ],
-            "summary": "Predict logarithm of probability estimates."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Predict logarithm of probability estimates.",
+            "property": false
           },
           {
             "name": "predict_proba",
             "parameters": [
               "X"
             ],
-            "summary": "Probability estimates."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Probability estimates.",
+            "property": false
           },
           {
             "name": "score",
@@ -102,96 +153,152 @@
               "y",
               "sample_weight"
             ],
-            "summary": "Return :ref:`accuracy <accuracy_score>` on provided data and labels."
+            "parameters_written": [
+              "X",
+              "y",
+              "sample_weight=None"
+            ],
+            "summary": "Return :ref:`accuracy <accuracy_score>` on provided data and labels.",
+            "property": false
           },
           {
             "name": "set_callbacks",
             "parameters": [
               "callbacks"
             ],
-            "summary": "Set callbacks for the estimator."
+            "parameters_written": [
+              "*callbacks"
+            ],
+            "summary": "Set callbacks for the estimator.",
+            "property": false
           },
           {
             "name": "set_decision_function_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_fit_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_inverse_transform_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_params",
             "parameters": [
               "params"
             ],
-            "summary": "Set the parameters of this estimator."
+            "parameters_written": [
+              "**params"
+            ],
+            "summary": "Set the parameters of this estimator.",
+            "property": false
           },
           {
             "name": "set_partial_fit_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_predict_log_proba_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_predict_proba_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_predict_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_score_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_split_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_transform_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "sparsify",
             "parameters": [],
-            "summary": "Convert coefficient matrix to sparse format."
+            "parameters_written": [],
+            "summary": "Convert coefficient matrix to sparse format.",
+            "property": false
           }
         ],
         "rules": [
@@ -224,6 +331,26 @@
           "random_state",
           "use_legacy_attributes"
         ],
+        "parameters_written": [
+          "*",
+          "Cs=10",
+          "l1_ratios=\"warn\"",
+          "fit_intercept=True",
+          "cv=None",
+          "dual=False",
+          "penalty=\"deprecated\"",
+          "scoring=\"warn\"",
+          "solver=\"lbfgs\"",
+          "tol=1e-4",
+          "max_iter=100",
+          "class_weight=None",
+          "n_jobs=None",
+          "verbose=0",
+          "refit=True",
+          "intercept_scaling=1.0",
+          "random_state=None",
+          "use_legacy_attributes=\"warn\""
+        ],
         "summary": "Logistic Regression CV (aka logit, MaxEnt) classifier.",
         "members": [
           {
@@ -231,12 +358,18 @@
             "parameters": [
               "X"
             ],
-            "summary": "Predict confidence scores for samples."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Predict confidence scores for samples.",
+            "property": false
           },
           {
             "name": "densify",
             "parameters": [],
-            "summary": "Convert coefficient matrix to dense array format."
+            "parameters_written": [],
+            "summary": "Convert coefficient matrix to dense array format.",
+            "property": false
           },
           {
             "name": "fit",
@@ -246,40 +379,65 @@
               "sample_weight",
               "params"
             ],
-            "summary": "Fit the model according to the given training data."
+            "parameters_written": [
+              "X",
+              "y",
+              "sample_weight=None",
+              "**params"
+            ],
+            "summary": "Fit the model according to the given training data.",
+            "property": false
           },
           {
             "name": "get_metadata_routing",
             "parameters": [],
-            "summary": "Get metadata routing of this object."
+            "parameters_written": [],
+            "summary": "Get metadata routing of this object.",
+            "property": false
           },
           {
             "name": "get_params",
             "parameters": [
               "deep"
             ],
-            "summary": "Get parameters for this estimator."
+            "parameters_written": [
+              "deep=True"
+            ],
+            "summary": "Get parameters for this estimator.",
+            "property": false
           },
           {
             "name": "predict",
             "parameters": [
               "X"
             ],
-            "summary": "Predict class labels for samples in X."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Predict class labels for samples in X.",
+            "property": false
           },
           {
             "name": "predict_log_proba",
             "parameters": [
               "X"
             ],
-            "summary": "Predict logarithm of probability estimates."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Predict logarithm of probability estimates.",
+            "property": false
           },
           {
             "name": "predict_proba",
             "parameters": [
               "X"
             ],
-            "summary": "Probability estimates."
+            "parameters_written": [
+              "X"
+            ],
+            "summary": "Probability estimates.",
+            "property": false
           },
           {
             "name": "score",
@@ -289,96 +447,154 @@
               "sample_weight",
               "score_params"
             ],
-            "summary": "Score using the `scoring` option on the given test data and labels."
+            "parameters_written": [
+              "X",
+              "y",
+              "*",
+              "sample_weight=None",
+              "**score_params"
+            ],
+            "summary": "Score using the `scoring` option on the given test data and labels.",
+            "property": false
           },
           {
             "name": "set_callbacks",
             "parameters": [
               "callbacks"
             ],
-            "summary": "Set callbacks for the estimator."
+            "parameters_written": [
+              "*callbacks"
+            ],
+            "summary": "Set callbacks for the estimator.",
+            "property": false
           },
           {
             "name": "set_decision_function_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_fit_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_inverse_transform_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_params",
             "parameters": [
               "params"
             ],
-            "summary": "Set the parameters of this estimator."
+            "parameters_written": [
+              "**params"
+            ],
+            "summary": "Set the parameters of this estimator.",
+            "property": false
           },
           {
             "name": "set_partial_fit_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_predict_log_proba_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_predict_proba_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_predict_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_score_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_split_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "set_transform_request",
             "parameters": [
               "kwargs"
             ],
-            "summary": ""
+            "parameters_written": [
+              "**kwargs"
+            ],
+            "summary": "",
+            "property": false
           },
           {
             "name": "sparsify",
             "parameters": [],
-            "summary": "Convert coefficient matrix to sparse format."
+            "parameters_written": [],
+            "summary": "Convert coefficient matrix to sparse format.",
+            "property": false
           }
         ],
         "rules": [
@@ -399,6 +615,13 @@
           "n_retries",
           "delay"
         ],
+        "parameters_written": [
+          "*",
+          "data_home=None",
+          "download_if_missing=True",
+          "n_retries=3",
+          "delay=1.0"
+        ],
         "summary": "Loader for species distribution dataset from Phillips et. al. (2006).",
         "members": [],
         "rules": [
@@ -417,6 +640,12 @@
           "n_jobs",
           "kwargs"
         ],
+        "parameters_written": [
+          "*args",
+          "multi_class=\"ovr\"",
+          "n_jobs=1",
+          "**kwargs"
+        ],
         "summary": "`EqualOpportunityClassifier` is a logistic regression classifier which can be constrained on equal opportunity score.",
         "members": [],
         "rules": [],
@@ -430,7 +659,8 @@
         "name": "sklearn/pipeline-fit-params",
         "callable": null,
         "parameters": [],
-        "summary": "Reports `pipe.fit(X, y, sample_weight=w)` on a Pipeline built in the same block, with metadata routing off.\n\nExample:\n\n```python\npipe = make_pipeline(StandardScaler(), LogisticRegression())\npipe.fit(X, y, sample_weight=w)\n```\n\nUse instead:\n\n```python\npipe = make_pipeline(StandardScaler(), LogisticRegression())\npipe.fit(X, y, logisticregression__sample_weight=w)\n```\n\nThe replacement is advice. xpd does not apply it automatically.",
+        "parameters_written": [],
+        "summary": "The rule reports `pipe.fit(X, y, sample_weight=w)` on a Pipeline built in the same block, with\nmetadata routing off.\n\nExample:\n\n```python\npipe = make_pipeline(StandardScaler(), LogisticRegression())\npipe.fit(X, y, sample_weight=w)\n```\n\nUse instead:\n\n```python\npipe = make_pipeline(StandardScaler(), LogisticRegression())\npipe.fit(X, y, logisticregression__sample_weight=w)\n```\n\nThe replacement is advice. xpd does not apply it automatically.\n\nWith routing off, `Pipeline.fit` raises \"ValueError: Pipeline.fit does not accept the\nsample_weight parameter\". The rule reads the Pipeline from an assignment earlier in the same\nblock, or from the call itself. A file that turns routing on is left alone, because there a plain\nname is the right form.\n\nRecall was 23 of 30. The rule found none of 6 `sample_weight=` keywords given to the `fit` of a\nsearch over a Pipeline, which raises the same ValueError. It also misses a Pipeline built outside\na loop and fitted inside it.",
         "members": [],
         "rules": [],
         "signature": null
@@ -441,7 +671,8 @@
         "name": "sklearn/pipeline-step-form",
         "callable": null,
         "parameters": [],
-        "summary": "Reports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare estimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.\n\nExample:\n\n```python\nfrom sklearn.pipeline import Pipeline\n\npipe = Pipeline([(\"smote\", SMOTE()), (\"model\", LogisticRegression())])\n```\n\nUse instead:\n\n```python\nfrom imblearn.pipeline import Pipeline\n\npipe = Pipeline([(\"smote\", SMOTE()), (\"model\", LogisticRegression())])\n```\n\nThe replacement is advice. xpd does not apply it automatically.",
+        "parameters_written": [],
+        "summary": "The rule reports step names with `__`, `make_pipeline` given one list, `Pipeline` given bare\nestimators, and an imbalanced-learn sampler before another step in the Pipeline of scikit-learn.\n\nExample:\n\n```python\nfrom sklearn.pipeline import Pipeline\n\npipe = Pipeline([(\"smote\", SMOTE()), (\"model\", LogisticRegression())])\n```\n\nUse instead:\n\n```python\nfrom imblearn.pipeline import Pipeline\n\npipe = Pipeline([(\"smote\", SMOTE()), (\"model\", LogisticRegression())])\n```\n\nThe replacement is advice. xpd does not apply it automatically.\n\n| Form | Error |\n| --- | --- |\n| a step name with two underscores in a row, in the list given to `Pipeline`, `ColumnTransformer` or `FeatureUnion` | ValueError at fit |\n| `make_pipeline([a, b])` | TypeError at fit |\n| `Pipeline([a, b])` | \"TypeError: cannot unpack non-iterable\" |\n| a sampler such as `SMOTE` before another step | \"TypeError: All intermediate steps should be transformers\" |\n\nThe first three forms are reported only when the name comes from scikit-learn, imported from\n`sklearn.pipeline` or `sklearn.compose` or called through the two modules. Other libraries, such as\nxfeat, have a Pipeline that takes a plain list. The rule as the readers saw it made 4 reports on\nthe held-back files, on such Pipelines, and both readers called all 4 wrong. Files that import\nfrom `imblearn.pipeline` are left alone, and so is a sampler as the last step, which fits.\n\nRecall was 29 of 35, measured before the rule was narrowed to the Pipeline of scikit-learn. The\nrule found 4 of 10 plants of `Pipeline` given bare estimators. It misses them given by `steps=`,\nby names that hold the estimators, or as a single step.",
         "members": [],
         "rules": [],
         "signature": null
@@ -452,7 +683,8 @@
         "name": "category_encoders/nan-into-pipeline",
         "callable": null,
         "parameters": [],
-        "summary": "Reports an encoder with `handle_unknown=\"return_nan\"` or `handle_missing=\"return_nan\"` inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.\n\nExample:\n\n```python\nmodel = make_pipeline(ce.OneHotEncoder(cols=[\"city\"], handle_unknown=\"return_nan\"), LogisticRegression())\n```\n\nUse instead:\n\n```python\nmodel = make_pipeline(ce.OneHotEncoder(cols=[\"city\"], handle_unknown=\"value\"), LogisticRegression())\n```\n\nThe replacement is advice. xpd does not apply it automatically.\n\n`return_nan` codes a category that fit did not see as NaN, in every output column of that row.\nIn a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in\nfront of a `LogisticRegression`, `predict` on a row with an unseen city raised `ValueError:\nInput X contains NaN`, and so did an `OrdinalEncoder` with `handle_missing=\"return_nan\"` on a\nrow with a missing city. The fit passed, because the training rows had no\nunseen category, so the error first shows on new data. With `\"value\"`, the default, the same\n`predict` ran.\n\n| Encoder | Code of an unseen category with `\"value\"` | With `\"return_nan\"` |\n| --- | --- | --- |\n| `OrdinalEncoder` | -1.0 | NaN |\n| `OneHotEncoder` | 0 in every column | NaN in every column |\n| `BinaryEncoder` | 0 in every column | NaN in every column |\n| `TargetEncoder` | the mean of the target, 0.5 here | NaN |\n| `CountEncoder` | 0.0 | NaN |\n\nThe rule stays silent when the same pipeline call holds an imputer or a model that takes NaN,\nsuch as `HistGradientBoostingClassifier`. Outside a pipeline call the option is left alone,\nbecause the code may handle the NaN itself.",
+        "parameters_written": [],
+        "summary": "The rule reports an encoder with `handle_unknown=\"return_nan\"` or `handle_missing=\"return_nan\"`\ninside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.\n\nExample:\n\n```python\nmodel = make_pipeline(ce.OneHotEncoder(cols=[\"city\"], handle_unknown=\"return_nan\"), LogisticRegression())\n```\n\nUse instead:\n\n```python\nmodel = make_pipeline(ce.OneHotEncoder(cols=[\"city\"], handle_unknown=\"value\"), LogisticRegression())\n```\n\nThe replacement is advice. xpd does not apply it automatically.\n\n`return_nan` codes a category that fit did not see as NaN, in every output column of the row, and\nin a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in front\nof a `LogisticRegression`, `predict` on a row with an unseen city raised\n`ValueError: Input X contains NaN`. An `OrdinalEncoder` with `handle_missing=\"return_nan\"` raised\nthe same on a row with a missing city. The fit passed, because the training rows had no unseen\ncategory, so the error first shows on new data. With `\"value\"`, the default, the same `predict`\nran.\n\n| Encoder | Code of an unseen category with `\"value\"` | With `\"return_nan\"` |\n| --- | --- | --- |\n| `OrdinalEncoder` | -1.0 | NaN |\n| `OneHotEncoder` | 0 in every column | NaN in every column |\n| `BinaryEncoder` | 0 in every column | NaN in every column |\n| `TargetEncoder` | the mean of the target, 0.5 here | NaN |\n| `CountEncoder` | 0.0 | NaN |\n\nThe rule stays silent when the same pipeline call holds an imputer or a model that takes NaN,\nsuch as `HistGradientBoostingClassifier`. Outside a pipeline call the option is left alone,\nbecause the code may handle the NaN itself.",
         "members": [],
         "rules": [],
         "signature": null
@@ -465,6 +697,7 @@
         "name": "sklego/recipe/loads-the-penguins-dataset-which-is-a-lovely",
         "callable": null,
         "parameters": [],
+        "parameters_written": [],
         "summary": "Loads the penguins dataset, which is a lovely alternative for the iris dataset.",
         "members": [],
         "rules": [],
@@ -486,6 +719,7 @@
         "name": "hamilton/recipe/pipeline",
         "callable": null,
         "parameters": [],
+        "parameters_written": [],
         "summary": "pipeline",
         "members": [],
         "rules": [],
@@ -510,6 +744,7 @@
         "name": "hamilton/recipe/1-from-pipeline-to-driver",
         "callable": null,
         "parameters": [],
+        "parameters_written": [],
         "summary": "1. From `Pipeline` to `Driver`",
         "members": [],
         "rules": [],

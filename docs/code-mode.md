@@ -354,9 +354,9 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-The outputs on the page came from xpd 0.30.0 built from the repository and FastMCP 4.2.0,
+The outputs on the page came from xpd 0.31.0 built from the repository and FastMCP 4.2.0,
 with Python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, NumPy 2.5.5 and joblib 1.6.0 in the
-project's Python. The run took 12.1 seconds and returned `passed: true`, and the table shows its `gates` list.
+project's Python. The run took 11.8 seconds and returned `passed: true`, and the table shows its `gates` list.
 
 | Gate | Passed | Detail |
 | --- | --- | --- |
