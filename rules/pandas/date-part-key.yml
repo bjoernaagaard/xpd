@@ -1,6 +1,6 @@
-# A year and a month as two keys. On 2,000,000 quarter-hourly rows in Europe/Copenhagen the two
-# keys took 78 ms and one monthly key took 10 ms on pandas 3.1.1 and one thread. No fix: the result gets one timestamp per month in place of a year
-# and a month, and it also holds the months without rows.
+# A year and a month as two keys. On 2,000,000 quarter-hourly rows in Europe/Copenhagen the two keys
+# took 89 ms and one monthly key took 14 ms on pandas 3.1.1. No fix: the result gets one timestamp
+# per month in place of a year and a month, and it also holds the months without rows.
 id: date-part-key
 language: python
 severity: warning

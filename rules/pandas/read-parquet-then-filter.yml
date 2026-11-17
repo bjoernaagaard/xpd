@@ -1,15 +1,15 @@
-# read_parquet takes filters=, and pyarrow then skips each row group whose statistics show that
-# no row can pass. On pandas 3.1.1 with pyarrow 26.0.1, a file of 1,000,000 rows in 10 row groups
-# and a filter that keeps the last tenth of a sorted column was read 8.8 times faster on one
-# thread with filters= than read whole and masked. On one row group, where nothing can be skipped, it was
-# 1.3 to 1.5 times faster. The values were equal each time. A frame without a stored index came
-# back numbered from 0 with filters=, where the mask kept the old labels, and a frame with a
-# named index was equal both ways (research/modern-pandas/probes/storage.txt). The rule has no
-# fix, because of that index.
+# read_parquet takes filters=, and pyarrow then skips each row group whose statistics show that no
+# row can pass. On pandas 3.1.1 with pyarrow 26.0.1, a file of 1,000,000 rows in 10 row groups and a
+# filter that keeps the last tenth of a sorted column was read 5.3 and 4.6 times faster in two runs
+# with filters= than read whole and masked, with the reader's default threads on a 32-core machine.
+# On one row group, where nothing can be skipped, it was 1.3 to 1.5 times faster. The values were
+# equal each time. A frame without a stored index came back numbered from 0 with filters=, where the
+# mask kept the old labels, and a frame with a named index was equal both ways
+# (research/modern-pandas/probes/storage.txt). The rule has no fix, because of that index.
 id: read-parquet-then-filter
 language: python
 severity: info
-message: This reads every row of the file and then keeps the rows where $C passes the test. Pass the test to read_parquet, as in filters=[("id", ">=", 900000)], which skips the row groups that hold no such row. It read the last tenth of a file with 10 row groups 9 times faster on one thread. The rows come back numbered from 0 when the file stores no index, where the mask kept their old labels.
+message: This reads every row of the file and then keeps the rows where $C passes the test. Pass the test to read_parquet, as in filters=[("id", ">=", 900000)], which skips the row groups that hold no such row. It read the last tenth of a file with 10 row groups 5 times faster with the reader's default threads on a 32-core machine. The rows come back numbered from 0 when the file stores no index, where the mask kept their old labels.
 rule:
   kind: expression_statement
   has:
