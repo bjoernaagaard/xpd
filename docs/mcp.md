@@ -1,9 +1,9 @@
 # MCP server
 
-`xpd mcp` starts an [MCP](https://modelcontextprotocol.io) server, so an agent can lint, fix,
-search and check Python through tools instead of a shell. The server gets every rule and every
-result from the xpd binary, so it always matches the installed version. It is built on
-[FastMCP](https://gofastmcp.com) 4.2, which installs with xpd.
+`xpd mcp` starts a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server, so an
+agent can lint, fix, search and check Python through tools instead of a shell. The server gets
+every rule and every result from the xpd binary, so it always matches the installed version. It
+is built on [FastMCP](https://gofastmcp.com) 4.2, which installs with xpd.
 
 ```text
 xpd mcp
@@ -34,11 +34,11 @@ For another client, add the server to the `mcpServers` setting of the client.
 }
 ```
 
-The server uses its working directory as the project root, unless `--root` or `XPD_MCP_ROOT`
-names another folder, so set the root when your client starts servers in another folder. A
-client that loads xpd as an [agent plugin](claude-code.md#agent-plugin) sets `PLUGIN_ROOT`, and
-then the server asks the client for its
-[roots](https://modelcontextprotocol.io/specification/2025-06-18/client/roots) on each call.
+Set `--root` or `XPD_MCP_ROOT` when your client starts servers outside the project, because the
+server otherwise uses its working directory as the project root. A client that loads xpd as an
+[agent plugin](claude-code.md#agent-plugin) sets `PLUGIN_ROOT`, and then the server asks the
+client on each call for its [roots](https://modelcontextprotocol.io/specification/2025-06-18/client/roots),
+which are the folders that the client shares with servers.
 
 ```text
 project root of a call
@@ -47,9 +47,11 @@ project root of a call
 └── otherwise                        the working directory
 ```
 
-A tool fails with a message that names `--root` and `XPD_MCP_ROOT` when a plugin client names no
-such root. An xpd binary that you build with `cargo` has no Python package beside it, so its
-`xpd mcp` prints the command to use instead and exits 2.
+When a plugin client names no root that is a folder on this machine, a tool fails with a
+message that names `--root` and `XPD_MCP_ROOT`.
+
+An xpd binary that you build with `cargo` has no Python package beside it, so its `xpd mcp`
+prints the command to use instead and exits 2.
 
 ```console
 $ target/debug/xpd mcp
@@ -58,8 +60,7 @@ xpd: xpd mcp needs xpd installed as a Python package. Run it as: uvx xpd mcp
 
 ## How a call runs
 
-A tool checks that each path is inside the project root, and then it runs the xpd binary in
-the project root and returns the JSON that the binary prints as a typed result.
+A tool runs the xpd binary in the project root and returns the binary's JSON as a typed result.
 
 ```mermaid
 sequenceDiagram
@@ -90,7 +91,9 @@ The call above returns five issues, and the following is one of them.
 
 The server holds no rules and no results of its own. It reads the built-in rules and skills from
 the binary when it starts, and it reads the project's own rules again for each rule call and
-each completion. Some tools differ from the pattern above, as the table shows.
+each completion.
+
+The tools in the table below differ from the call above.
 
 | Tool | How it differs |
 | --- | --- |
@@ -109,7 +112,7 @@ Every path is relative to the project root, and the server refuses a path outsid
 | `check` | `paths` (default: the root), `unsafe_fixes` (default: `false`), `options` | Lints files and folders, as [`xpd check`](commands.md#check). With `unsafe_fixes`, `fixable` counts unsafe fixes too | No |
 | `fix` | `paths` (default: the root), `unsafe` (default: `false`), `options` | Writes the safe fixes, and then lints what is left. With `unsafe`, it also writes the unsafe fixes after the user confirms | Yes |
 | `query` | `query`, `paths` (default: the root) | Finds a code pattern or a syntax kind, and previews a replacement, as [`xpd run`](commands.md#run) | No |
-| `rewrite` | `query` with a `rewrite` template, `paths` (default: the root) | Shows the matches, asks the user to confirm, and then writes the replacement | Yes |
+| `rewrite` | `query` with a `rewrite` template, `paths` (default: the root) | Writes the replacement after the user confirms the matches that it shows | Yes |
 | `outline` | `paths` (default: the root), `options` | Lists the symbols, signatures, imports and members of the files, as [`xpd outline`](commands.md#outline) | No |
 | `new` | `item` | Creates a rule project, a rule, an empty test case or a shared utility, with the options of [`xpd new`](commands.md#new) | Yes |
 | `test` | `options` | Checks the valid and invalid examples of the project's rules and compares the snapshots, as [`xpd test`](commands.md#test) | Only with `update_snapshots` |
@@ -128,26 +131,34 @@ Every path is relative to the project root, and the server refuses a path outsid
 | `show_dataflow` | `paths` | Shows what `graph` reads as a chart and a table | No |
 | `show_columns` | `file` | Shows what `profile` reads as a table | No |
 
-The `options` argument of `check` and `fix` holds `rules`, `severity` and a project-relative
-`config`. `fix` uses the same options for the count of unsafe fixes as for the write.
+The arguments that hold an object take the fields below, and `fix` uses the same `options` for
+the count of unsafe fixes as for the write.
 
 ```text
-options of check and fix      rules: ["pandas", "pandas/chained-assignment"], severity, config
+options of check and fix      rules: ["pandas", "pandas/chained-assignment"], severity,
+                              config (a path relative to the project root)
 query of query and rewrite    exactly one of pattern or kind, and language, selector, rewrite
 options of outline            language, items (all, structure, imports or exports), rules
 item of new                   entity (project, rule, test or util), name, directory, pattern, ...
 options of test               config, test_dir, filter, skip_snapshots or update_snapshots
 ```
 
-`profile`, `refit` and `equiv` run the project's Python. The binary takes the Python of
-`VIRTUAL_ENV`, then of the nearest `.venv` in or above the project root, and then `python3` on
-`PATH`, so install pandas there. Both scripts that `equiv` runs must assign their output to
-`result`.
+`profile`, `refit` and `equiv` run the project's Python, so install pandas in the Python that
+the binary picks as below.
+
+```text
+Python of profile, refit and equiv
+├── VIRTUAL_ENV is set                         the Python of that venv
+├── a .venv is in or above the project root    the Python of the nearest one
+└── otherwise                                  python3 on PATH
+```
+
+Both scripts that `equiv` runs must assign their output to `result`.
 
 Every tool except the three `show_` tools returns a structured result with an output schema.
 The `show_` tools return a UI for hosts that render
-[MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps), and the same JSON as text for
-hosts that don't.
+[MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps), and the JSON of `check`,
+`graph` or `profile` as text for hosts that don't.
 
 ### Confirmation of unsafe fixes
 
@@ -166,16 +177,19 @@ fix(paths, unsafe=true)
   write the safe and the unsafe fixes and return what is left
 ```
 
-A client on an older protocol gets the question during the call. A client on the 2026-07-28
-protocol, and any background task, gets the question back as the result, and then it calls
-`fix` again with the answer. A client that can't ask its user gets an error, and the server
-writes no file.
+The client decides how the question reaches the user, as the table shows.
+
+| Client | How it gets the question |
+| --- | --- |
+| On a protocol older than 2026-07-28 | During the call |
+| On the 2026-07-28 protocol, or running `fix` as a background task | As the result of the call, and the client then calls `fix` again with the answer |
+| Can't ask its user | As an error, and the server writes no file |
 
 ### Background tasks
 
 A client can run `check`, `fix`, `query`, `rewrite`, `outline`, `new`, `test`, `profile`,
-`refit` and `equiv` as background tasks. Each of them reports progress and logs the xpd
-command it runs.
+`refit` and `equiv` as background tasks, so it gets a task at once and fetches the result when
+the tool is done. Each of them reports progress and logs the xpd command it runs.
 
 ## Resources
 
@@ -192,9 +206,12 @@ An agent can read every rule and every skill of xpd as a resource.
 | `skill://python-review/SKILL.md` | The Python review skill |
 | `skill://python-review/assets/review-template.md` | The template of the review report |
 
-Each skill also has a `skill://<name>/_manifest` resource that lists its files, and clients that
-support the Skills extension list the skills. A client can complete the `package` and `rule`
-parts of a URI, and the server completes a rule within the package already chosen.
+Each skill also has a `skill://<name>/_manifest` resource that lists its files. Clients that
+support the Skills extension list the skills.
+
+A client can ask the server to complete the `package` and `rule` parts of a URI, so the user picks
+a value from a list while typing. The server offers only the rules of the package that is
+already chosen.
 
 ## Prompts
 
@@ -209,7 +226,7 @@ and the result that ends it.
 | `add_to_dataflow` | `path`, `change` | Adds or changes a step or a node, with `graph` before and after |
 | `build_pipeline` | `data`, `target`, and optional `task` | Builds a scikit-learn model from a data file, saves it with its contract, and runs the stages until `gates` passes |
 
-The `package` and `rule` arguments complete as they do in resource URIs.
+The server completes the `package` and `rule` arguments as it does in resource URIs.
 
 ## Settings
 
@@ -223,9 +240,11 @@ Each flag has an environment setting, for clients that start the server without 
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to bind for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
 
-`XPD_MCP_CODE_MODE` also accepts `true`, `yes` and `on`, and `--no-code-mode` turns code mode off
-again. Set the environment settings in the `env` setting of the client, because a client may
-not pass on the variables of your shell. `xpd mcp -h` prints the flags.
+Set the environment settings in the `env` setting of the client, because a client may not pass
+on the variables of your shell. `XPD_MCP_CODE_MODE` also accepts `true`, `yes` and `on`, and
+`--no-code-mode` turns code mode off again.
+
+`xpd mcp -h` prints the flags.
 
 ```console
 $ xpd mcp -h
@@ -241,9 +260,9 @@ Start the server over HTTP to serve several clients, or a client on another mach
 uvx xpd mcp --transport http --port 8000
 ```
 
-Clients connect to `http://127.0.0.1:8000/mcp`. The server binds `127.0.0.1` unless `--host`
-names another address, and it has no authentication, so bind another address only on a network
-you trust.
+Clients then connect to `http://127.0.0.1:8000/mcp`, because the server binds `127.0.0.1` unless
+`--host` names another address. The server has no authentication, so use `--host` only on a
+network you trust.
 
 ## Other ways to run it
 
@@ -257,9 +276,9 @@ fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas
 
 ## Library discovery
 
-Call `find` with the task before you choose a library, and then call `api` with a returned name,
-also when the project has not installed the library. Both tools ask the installed binary, and
-the server holds no index of its own.
+Call `find` with the task before you choose a library, and then call `api` with a name that
+`find` returned. Both tools work for a library that the project has not installed, because they
+ask the index of the installed binary and the server holds no index of its own.
 
 ```text
 find(task, package=None, kind=None, limit=None)
@@ -274,17 +293,20 @@ api(name)
              members, rules, signature, and recipe for a recipe
 ```
 
-The first `find` downloads the 333 MB embedding model that ranks by meaning, as the
-[commands page](commands.md#find) explains, so the first call can take a few minutes.
-`parameters_written` holds the parameter list as the source writes it, so each parameter has its
-type annotation and its default, and a `*` or `/` that stands alone is an item of its own. Read
-it before you write a call. A stub file writes `...` for a default, which says only that the
-parameter is optional. `parameters_written` is empty in the results of `find`, and for a
-function that exists only as overloads in a stub file, as the
-[commands page](commands.md#api) explains.
-`api` adds `signature`, which shows the indexed parameter names only. `signature` is `null`
-for an entry that is not a callable symbol. The server keeps any field that the binary adds to
-an entry.
+The first `find` can take a few minutes, because it downloads the 333 MB model that ranks
+entries by meaning, as the [commands page](commands.md#find) explains.
+
+An entry holds its parameters in three fields, and the server keeps any other field that the
+binary adds to an entry.
+
+| Field | What it holds |
+| --- | --- |
+| `parameters` | The indexed parameter names |
+| `parameters_written` | Each parameter as the source writes it, with its type annotation and its default, and a `*` or `/` that stands alone as an item of its own. It is empty in the results of `find`, and for a function that exists only as overloads in a stub file, as the [commands page](commands.md#api) explains |
+| `signature` | The name and the indexed parameter names, which the server adds to each entry of `find` and `api`. It is `null` for a property and for an entry that is not a class, function or method |
+
+Read `parameters_written` before you write a call. A stub file writes `...` for a default, which
+says only that the parameter is optional.
 
 ```console
 $ xpd api --format json numpy.zeros | jq -c '.[0] | {name, kind, callable, parameters, rules}'
@@ -293,10 +315,9 @@ $ xpd api --format json mapie.regression.TimeSeriesRegressor.update | jq -c '.[0
 {"name":"mapie.regression.TimeSeriesRegressor.update","callable":"method","parameters_written":["X: ArrayLike","y: ArrayLike","ensemble: bool = False","confidence_level: Optional[Union[float, Iterable[float]]] = None","gamma: float = 0.0","optimize_beta: bool = False"]}
 ```
 
-A recipe entry adds `recipe` with the title, the symbols its code uses, the source URL with its
-line, the code, the license name and whether xpd changed the code. It also has `attribution`
-when the source file states its own copyright, and it has no code when the license is
-`pointer only`.
+A recipe entry adds a `recipe` object, which the first command below shows without its `code`.
+The object also has `attribution` when the source file states its own copyright, and it has no
+code when the license is `pointer only`.
 
 ```console
 $ xpd api --format json plotly/recipe/rounded-bars | jq '.[0].recipe | del(.code)'
@@ -320,8 +341,8 @@ $ xpd api --format json numpy/recipe/returns-array-of-indices-of-the-maximum-val
 
 ### The discovery record
 
-The agent writes down what it searched, what it read and what it chose as a `Discovery` record,
-and the training script saves the same record in `Contract.discovery`. The server doesn't choose
+The agent records its search, the entries it read and its choice in a `Discovery` record, and
+the training script saves the same record in `Contract.discovery`. The server doesn't choose
 a candidate and doesn't install a package.
 
 | Model | Fields |
@@ -332,8 +353,8 @@ a candidate and doesn't install a package.
 | `Discovery` | `question`, `candidates` as `{"symbols": [...], "rules": [...], "recipes": [...]}`, and `choice` |
 | `DiscoveryProof` | the `discovery` record, the checked `paths`, and the `gate` |
 
-An entry that the agent read with `api` counts as a candidate when the agent puts it in these
-lists.
+An entry that the agent read with `api` counts as a candidate when the agent puts it in
+`candidates`.
 
 ### The discovery gate
 
@@ -366,18 +387,26 @@ The gate checks how the source spells each call, and it can miss a call or fail 
 | Other paths to one name | `numpy.zeros` passes, and a longer path to the same function fails, because the index gives each name one public path |
 | What is installed | An indexed name may be absent from the installed library |
 
-[`xpd index`](commands.md#index) explains which names the index holds. The link between a
-recipe and its chosen symbols is the agent's own account.
+[`xpd index`](commands.md#index) explains which names the index holds. For a recipe, the gate
+takes the symbols in `choice.symbols` as the agent wrote them, and it doesn't check that the
+recipe's code uses them.
 
-Pass the `DiscoveryProof` as `proof.discovery` to `gates`. Without discovery in the contract or
-the proof, `gates` judges 13 gates. With discovery in either of them, it adds
-`indexed-api-calls` from the proof and `discovery-is-recorded`, which requires the record of
-the contract to match the record of the proof. `gates` judges the results you pass, so it does
-not prove that the files are unchanged or that a result is genuine.
+Pass the `DiscoveryProof` as `proof.discovery` to `gates`, which then judges two more gates.
 
-The `build_pipeline` prompt tells the agent to find, read and choose a library, and to say when
-a chosen library is missing. The agent asks the user before it adds a library with the
-project's dependency manager. The agent then writes the files and runs `discovery_gate`,
-`check` and the other stages. In code mode, the sandbox can only call tools, so the agent
-writes the files before the one `execute` call. The
+```text
+gates(profile, contract, proof)
+  judge 13 gates
+  if contract.discovery or proof.discovery is set
+    judge indexed-api-calls, the gate in proof.discovery
+    judge discovery-is-recorded, which passes when the contract and the proof hold the same record
+```
+
+`gates` judges the results you pass, so it does not prove that the files are unchanged or that a
+result is genuine.
+
+The `build_pipeline` prompt has the agent choose a library before it writes any code. First,
+the agent finds, reads and chooses a library, and it says when a chosen library is missing.
+Second, it asks the user before it adds a library with the project's dependency manager. Third,
+it writes the files and runs `discovery_gate`, `check` and the other stages. In code mode, the
+sandbox can only call tools, so the agent writes the files before the one `execute` call. The
 [discovery examples](code-mode.md#discovery-before-execution) show complete runs.

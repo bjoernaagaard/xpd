@@ -1,9 +1,10 @@
 # Language server
 
 Run `xpd lsp` from your editor to see xpd's issues while you type, apply its fixes, and read the
-documentation of each rule on hover. The server speaks the
-[Language Server Protocol](https://microsoft.github.io/language-server-protocol/) on stdin and
-stdout, and it is part of the xpd binary, so it needs no Python and no other install.
+documentation of each rule on hover. The server is part of the xpd binary, so it needs no Python
+and no other install. It speaks the
+[Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (LSP) on stdin
+and stdout.
 
 ```text
 xpd lsp
@@ -75,10 +76,10 @@ once.
 | The client's `initialize` request | How the client gets the issues |
 | --- | --- |
 | Has the capability `textDocument.diagnostic` | The client asks with `textDocument/diagnostic`, and the server reads a file that is not open from disk. The server sends `textDocument/publishDiagnostics` only for package warnings |
-| Lacks the capability | The server sends `textDocument/publishDiagnostics` when a document opens or changes, and after a save that gave the project other rules. It sends an empty list when the document closes |
+| Lacks the capability | The server sends `textDocument/publishDiagnostics` when a document opens or changes, and after a save that changed the project's rules. It sends an empty list when the document closes |
 
-A lint of a long file can take seconds, so the server lints a document once for each text it
-holds and not once for each message.
+A lint of a long file can take seconds, so the server lints only the newest text of a document,
+and it lints that text once however many messages ask about it.
 
 | The client sends | What the server does |
 | --- | --- |
@@ -95,9 +96,9 @@ first lint ran. The server published the issues once, for the last version.
 published versions [11]
 ```
 
-`xpd check` also warns about a package that the project's venv lacks, such as pyarrow. The
-warning is about the project and not about one file, so the server puts it where `xpd check`
-names it.
+`xpd check` also warns about a package that the project's virtual environment (venv) lacks, such
+as pyarrow. The warning is about the project and not about one file, so the server places it as
+the tree shows.
 
 ```text
 package warning
@@ -115,12 +116,14 @@ document. The titles below are what the server sends for `samples/pandas/time-se
 | --- | --- | --- | --- |
 | `xpd: fix pandas/convert-then-drop-zone` | `quickfix` | Yes | The cursor or the selection touches an issue that has a safe fix |
 | `xpd: fix pandas/chained-assignment (unsafe fix, may change behavior)` | `quickfix` | No | The cursor or the selection touches an issue that has an unsafe fix |
-| `xpd: apply every safe fix` | `source.fixAll.xpd` | No | The document has a safe fix. The action writes what `xpd check --fix` writes |
+| `xpd: apply every safe fix` | `source.fixAll.xpd` | No | `unsafeFixes` is `false` and the document has a safe fix. The action writes what `xpd check --fix` writes |
 | `xpd: apply every fix, also unsafe ones that may change behavior` | `source.fixAll.xpd` | No | `unsafeFixes` is `true` and the document has a fix. The action writes what `xpd check --fix --unsafe-fixes` writes |
 
 A safe fix keeps what the code does, so an editor's key for the preferred fix applies it. An
-unsafe fix may change what the code does, so its title says so, and you should read the code
-after you apply it. A client that asks only for `source.fixAll` also gets `source.fixAll.xpd`.
+unsafe fix has a title that says it may change what the code does, so read the code after you
+apply it.
+
+A client that asks only for `source.fixAll` also gets `source.fixAll.xpd`.
 
 ### Hover
 
@@ -133,7 +136,7 @@ A hover anywhere outside an issue shows nothing from xpd.
 
 **Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`. A write through `.iloc` or `.iat` on a column, and `update` on a column, have no fix.
 
-Reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy. Also reports `df[col][mask] = v` with the column named by a variable. A dict, list or set assigned to `x["a"][key]` is a nested dict being filled and is left alone.
+Reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy, so the frame keeps its old values. It also reports `df[col][mask] = v`, where a variable names the column.
 
 Example:
 
@@ -146,6 +149,29 @@ Use instead:
 ```python
 df.loc[row, "load"] = value
 ```
+
+The fix is unsafe, because xpd cannot see whether the value on the left is a frame. The table shows
+which forms get a fix.
+
+| Reported form | Fix |
+| --- | --- |
+| `df["a"][i] = v` and `df[col][mask] = v` | `df.loc[i, "a"] = v` and `df.loc[mask, col] = v` |
+| `df[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
+| `df.loc[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
+| any other chain with a text label, such as `df.iloc[0]["a"] = v` | none |
+| `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)` | none |
+
+A mask held in a name gets the fix when the enclosing function assigns that name only masks, such
+as a comparison or a call to `isin`. The rule reports `df.a[mask] = v` only when the mask reads the
+same frame, so `self.items[i > 3] = v` is left alone. It reports `update` only on a name such as
+`df` or `frame`, because `state["seen"].update(extra)` is how code updates a dict of dicts.
+
+The rule leaves alone code that more often fills a list or a dict, as the table shows.
+
+| Left alone | Reason |
+| --- | --- |
+| a dict, list or set assigned to `x["a"][key]` | the code fills a nested dict |
+| two plain keys, as in `rows[0]["name"] = v` | the value is more often a list or a dict |
 
 [pandas/chained-assignment](https://bjoernaagaard.github.io/xpd/rules.html#chained-assignment)
 ````
@@ -168,9 +194,11 @@ venv of a project
 └── otherwise                                              the nearest .venv in or above the project folder
 ```
 
-The `files` and `ignores` globs of a rule match the path of the document below its project
-folder. The server reads the venv again each time a document opens or is saved, so save a file
-after `uv add` or `uv sync` to get the rules for the new versions.
+Save a file after `uv add` or `uv sync` to get the rules for the new versions, because the server
+reads the venv again each time a document opens or is saved.
+
+The `files` and `ignores` patterns of a rule match the path of the document relative to its
+project folder.
 
 ### Project rules
 
@@ -184,7 +212,7 @@ A project with an `sgconfig.yml` gets its own rules in the editor, from the same
 | The new rules have an error | Keeps the last rules that loaded, and shows the error on each open YAML file of the project |
 | The editor sends `sgconfig.yml`, `xpd.yml`, a rule file or a utility file | Checks the text you edit, and shows an error as `xpd/invalid-rule` on line 1 |
 
-The server picks the language of a file from its extension. A project rule for another language
+The server picks the language of a file from its extension. A project rule for a language other
 than Python works in the editor when the editor sends files of that language to xpd.
 
 ### Settings
@@ -207,12 +235,13 @@ xpd: invalid settings. xpd reads {"unsafeFixes": true or false}: invalid type: s
 
 ### Client capabilities
 
-The server reads the capabilities in the client's `initialize` request and adjusts to each one.
-It syncs documents with incremental changes.
+The server changes what it sends for each capability in the client's `initialize` request, as
+the table shows. It asks for incremental document sync, so the client sends only the changed part
+of a document with each change.
 
 | The client's capability | What the server does |
 | --- | --- |
-| `general.positionEncodings` | Counts columns in the first of `utf-8`, `utf-16` and `utf-32` in the client's list. Without a list, it uses `utf-16`, as the protocol says |
+| `general.positionEncodings` | Counts columns in the first encoding of the client's list that is `utf-8`, `utf-16` or `utf-32`. Without a list, it uses `utf-16`, as the protocol says |
 | `textDocument.diagnostic` | Answers `textDocument/diagnostic`, and sends `textDocument/publishDiagnostics` only for package warnings |
 | `workspace.diagnostics.refreshSupport` | Sends `workspace/diagnostic/refresh` when the rules of a project or the workspace folders change |
 | `workspace.workspaceEdit.documentChanges` | Puts the document's version in each edit, so the editor refuses an edit for older text |
@@ -233,13 +262,13 @@ following names, types or imports across files.
 | Jupyter notebooks | `xpd check` reads `.py` files |
 | Settings that pick rules, as `--rule` and `--severity` do | The server runs every rule. Use a `# ast-grep-ignore` comment to silence one rule on one line |
 
-Any other request gets the error `MethodNotFound`, -32601, such as
+Any other request gets the error `MethodNotFound`, -32601, with a message such as
 `xpd does not answer textDocument/completion`.
 
 ## Set up an editor
 
-Install xpd so that the editor finds `xpd` on `PATH`, as [Install](index.md#install) shows, and
-then add the configuration for your editor below.
+Install xpd on `PATH`, as [Install](index.md#install) shows, and then add the configuration for
+your editor below.
 
 | Editor | What starts xpd | Fix every issue |
 | --- | --- | --- |
@@ -263,8 +292,15 @@ vim.lsp.config('xpd', {
 vim.lsp.enable('xpd')
 ```
 
-`:checkhealth vim.lsp` lists xpd under the enabled configurations. `K` shows the hover, and
-`gra` opens the code actions. The command below applies every safe fix of the buffer.
+You can then use the keys and commands below.
+
+| Key or command | What it does |
+| --- | --- |
+| `:checkhealth vim.lsp` | Lists xpd under the enabled configurations |
+| `K` | Shows the hover |
+| `gra` | Opens the code actions |
+
+The command below applies every safe fix of the buffer.
 
 ```vim
 :lua vim.lsp.buf.code_action({ context = { only = { 'source.fixAll.xpd' } }, apply = true })
@@ -297,11 +333,10 @@ rule documentation on hover. See
 
 ### Zed
 
-Zed starts a language server only from an
-[extension](https://zed.dev/docs/extensions/languages#language-servers), and xpd has no
-published extension. The three files below make a complete extension, which you install with the
-`zed: install dev extension` action. Zed builds the extension with Rust from
-[rustup](https://www.rust-lang.org/tools/install).
+Install the extension of three files below with the `zed: install dev extension` action, because
+xpd has no published Zed extension. Zed starts a language server only from an
+[extension](https://zed.dev/docs/extensions/languages#language-servers), and it builds the
+extension with Rust from [rustup](https://www.rust-lang.org/tools/install).
 
 ```text
 xpd-zed/
@@ -377,10 +412,11 @@ impl zed::Extension for Xpd {
 zed::register_extension!(Xpd);
 ```
 
-Zed then starts xpd beside its other Python servers. The settings below pass `unsafeFixes`, and
-they make the format action apply every safe fix. `formatter` replaces the formatter you have for
-Python. It also takes a list that runs in order, so put your formatter after the code action
-there.
+Zed then starts xpd beside its other Python servers. The settings below pass `unsafeFixes` and
+make the format action apply every safe fix.
+
+The `formatter` setting replaces the formatter you have for Python, so to keep yours, give
+`formatter` a list with your formatter after the code action. Zed runs the list in order.
 
 ```json
 {
@@ -403,8 +439,8 @@ See [Configuring languages](https://zed.dev/docs/configuring-languages).
 
 Install the
 [Generic LSP Client](https://marketplace.visualstudio.com/items?itemName=llllvvuu.llllvvuu-glspc)
-extension, which starts any language server from settings, because xpd has no extension for VS
-Code. Then add the following to `settings.json`.
+extension, because xpd has no extension for VS Code. The Generic LSP Client starts any language
+server from settings, so add the following to `settings.json`.
 
 ```json
 {
@@ -416,10 +452,12 @@ Code. Then add the following to `settings.json`.
 }
 ```
 
-The last line applies every safe fix when you save. Leave it out to apply fixes by hand with the
-Quick Fix command. The extension starts one server, so it can't run xpd beside another server
-that you also start through it. When VS Code doesn't find `xpd`, start VS Code from a terminal
-that has `xpd` on `PATH`, or set `PATH` in `glspc.environmentVariables`.
+The `editor.codeActionsOnSave` line applies every safe fix when you save, so leave it out to apply
+fixes by hand with the Quick Fix command.
+
+The extension starts one server, so it can't run xpd beside another server that you also start
+through it. When VS Code doesn't find `xpd`, start VS Code from a terminal that has `xpd` on
+`PATH`, or set `PATH` in `glspc.environmentVariables`.
 
 ### Another editor
 
