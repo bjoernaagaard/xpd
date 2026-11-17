@@ -4,7 +4,8 @@
 # and 100 solutions of 2 variables.
 #
 # The class must inherit from the class the file imports from pymoo, and the subscript must be
-# on the second parameter of _evaluate.
+# on the second parameter of _evaluate. The rule has no fix, because each message names two
+# rewrites, and the code does not show which one is meant.
 
 # x[:, 0] in an ElementwiseProblem raised IndexError, "too many indices for array: array is
 # 1-dimensional, but 2 were indexed". A class that passes elementwise with any value but True is

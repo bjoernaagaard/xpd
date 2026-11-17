@@ -19,7 +19,8 @@ utils:
 fix: from pymoo.parallelization import StarmapParallelization
 metadata: { fix: safe, since: "0.6.1.6" }
 ---
-# The same name in a statement that imports other names too.
+# The same name in a statement that imports other names too. No fix, because the fix would have to
+# split the statement in two.
 id: deprecated-in-pymoo
 language: python
 severity: warning

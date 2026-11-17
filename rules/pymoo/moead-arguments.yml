@@ -4,6 +4,10 @@
 
 # MOEAD(ref_dirs, pop_size=50) raised TypeError when it was built, "got multiple values for
 # keyword argument 'pop_size'".
+#
+# Unsafe: the old call raised, and the fixed MOEAD runs with one solution for each reference
+# direction. The fix takes the keyword out with the comma before it, or with the comma after it
+# when it is the first argument.
 id: moead-arguments
 language: python
 severity: error
@@ -21,10 +25,53 @@ utils:
           kind: module
           stopBy: end
           has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.algorithms(\.\w+)*\s+import\b[^#]*\bMOEAD\b' }
-metadata: { since: "0.5" }
+fix:
+  template: ''
+  expandStart: { regex: '^,$' }
+  expandEnd: { regex: '^,$', follows: { follows: { regex: '^[(]$' } } }
+metadata: { fix: unsafe, since: "0.5" }
 ---
 # pymoo 0.4 took the decomposition as a text such as "pbi". Since 0.5.0 it must be an object,
 # and a text raised AttributeError in the first generation, "'str' object has no attribute 'do'".
+#
+# pymoo 0.4.2.2 built the object from the text with get_decomposition, which knew six texts.
+# This document reads the five whose class pymoo 0.6.2 builds with no argument: "pbi" is PBI,
+# "tchebi" is Tchebicheff, "weighted-sum" is WeightedSum, "asf" is ASF and "perp_dist" is
+# PerpendicularDistance, each in the module of pymoo.decomposition that the message names.
+#
+# Unsafe: the old call raised, and the fixed MOEAD runs. The class is a name that pack.yml lists
+# as a member, so the fix applies only in a file that imports it.
+id: moead-arguments
+language: python
+severity: error
+message: MOEAD takes the decomposition as an object since pymoo 0.5.0, and $V raises AttributeError in the first generation, "'str' object has no attribute 'do'". Write the object that 0.4 built from the text, with PBI from pymoo.decomposition.pbi, Tchebicheff from pymoo.decomposition.tchebicheff, WeightedSum from pymoo.decomposition.weighted_sum, ASF from pymoo.decomposition.asf or PerpendicularDistance from pymoo.decomposition.perp_dist, as in decomposition=PBI().
+rule:
+  kind: keyword_argument
+  regex: '^decomposition\s*='
+  all:
+    - has: { field: value, kind: string, pattern: $V, regex: '^["''](pbi|tchebi|weighted-sum|asf|perp_dist)["'']$' }
+    - inside: { kind: argument_list, inside: { matches: moead-call } }
+utils:
+  moead-call:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(MOEAD|ParallelMOEAD)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.algorithms(\.\w+)*\s+import\b[^#]*\bMOEAD\b' }
+transform:
+  PBI: { replace: { source: $V, replace: '^["'']pbi["'']$', by: 'PBI()' } }
+  TCH: { replace: { source: $PBI, replace: '^["'']tchebi["'']$', by: 'Tchebicheff()' } }
+  WS: { replace: { source: $TCH, replace: '^["'']weighted-sum["'']$', by: 'WeightedSum()' } }
+  ASF: { replace: { source: $WS, replace: '^["'']asf["'']$', by: 'ASF()' } }
+  OBJ: { replace: { source: $ASF, replace: '^["'']perp_dist["'']$', by: 'PerpendicularDistance()' } }
+fix: decomposition=$OBJ
+metadata: { fix: unsafe, since: "0.5" }
+---
+# Any other text, such as "auto", which chose the class by the number of objectives, or "aasf",
+# whose class needs rho or beta. No fix, because the text names no class that pymoo 0.6.2 builds
+# with no argument.
 id: moead-arguments
 language: python
 severity: error
@@ -33,7 +80,7 @@ rule:
   kind: keyword_argument
   regex: '^decomposition\s*='
   all:
-    - has: { field: value, kind: string, pattern: $V }
+    - has: { field: value, kind: string, pattern: $V, not: { regex: '^["''](pbi|tchebi|weighted-sum|asf|perp_dist)["'']$' } }
     - inside: { kind: argument_list, inside: { matches: moead-call } }
 utils:
   moead-call:

@@ -263,6 +263,14 @@ class BoundsByPosition(Problem):
         out["F"] = (x**2).sum(axis=1)
 
 
+class BoundsAfterSelf(Problem):
+    def __init__(self):
+        Problem.__init__(self, 2, 1, 0, np.zeros(2), xu=np.ones(2))  # xpd: positional-problem-bounds
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = (x**2).sum(axis=1)
+
+
 class BoundsByKeyword(Problem):
     def __init__(self):
         super().__init__(2, 1, 0, xl=np.zeros(2), xu=np.ones(2))

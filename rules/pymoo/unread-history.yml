@@ -8,6 +8,10 @@
 # the result for another file to read. So a file that plots the convergence from res.history is
 # left alone. Another file can still read the history of a run, which the rule cannot see, so it
 # is info.
+#
+# Unsafe: the result's history is empty after the fix, where it held one algorithm for each
+# generation. The fix takes the keyword out with the comma before it, or with the comma after it
+# when it is the first argument.
 id: unread-history
 language: python
 severity: info
@@ -23,3 +27,8 @@ rule:
           kind: module
           stopBy: end
           has: { stopBy: end, any: [{ kind: attribute, has: { field: attribute, regex: 'history' } }, { kind: string, regex: 'history' }, { kind: identifier, regex: '^(dill|pickle|joblib)$' }] }
+fix:
+  template: ''
+  expandStart: { regex: '^,$' }
+  expandEnd: { regex: '^,$', follows: { follows: { regex: '^[(]$' } } }
+metadata: { fix: unsafe }

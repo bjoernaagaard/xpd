@@ -49,7 +49,8 @@ utils:
 fix: from pymoo.util.ref_dirs import get_reference_directions
 metadata: { fix: unsafe, since: "0.6.1" }
 ---
-# The same three names in a statement that imports more than one name.
+# The same three names in a statement that imports more than one name. No fix, because the fix
+# would have to split the statement into one import for each module.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -72,7 +73,8 @@ metadata: { since: "0.6.1" }
 ---
 # The functions that built an operator or another object from a name. Each raises an Exception
 # when called on 0.6.0, and the module is gone since 0.6.1. The classes named in each message
-# were imported on 0.6.2 from the modules given.
+# were imported on 0.6.2 from the modules given. These documents have no fix, because the class to
+# build depends on the name that each call passes, and the calls are other statements.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -86,6 +88,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_crossover passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -99,6 +102,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_mutation passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -112,6 +116,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_selection passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -125,6 +130,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_algorithm passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -138,6 +144,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_performance_indicator passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -151,6 +158,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_decision_making passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -164,6 +172,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_decomposition passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -177,6 +186,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the class depends on the name that each call of get_visualization passes.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -191,7 +201,7 @@ utils:
 metadata: { since: "0.6" }
 ---
 # Any other name of pymoo.factory, such as the functions that listed the options, and the module
-# imported as a whole.
+# imported as a whole. No fix, because these names have no replacement.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -1772,7 +1782,8 @@ metadata: { fix: unsafe, since: "0.6.2" }
 ---
 # Every module that pymoo 0.5.0 removed. These are the 89 module files that the release
 # before it has and that this release and 0.6.2 do not have. An import that a document above
-# rewrites is left to that document.
+# rewrites is left to that document. No fix, because these modules have no one replacement for
+# every name they held.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -1868,7 +1879,8 @@ metadata: { since: "0.5" }
 ---
 # Every module that pymoo 0.6.0 removed. These are the 25 module files that the release
 # before it has and that this release and 0.6.2 do not have. An import that a document above
-# rewrites is left to that document.
+# rewrites is left to that document. No fix, because these modules have no one replacement for
+# every name they held.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -1904,7 +1916,8 @@ metadata: { since: "0.6" }
 ---
 # Every module that pymoo 0.6.1.6 removed. These are the 7 module files that the release
 # before it has and that this release and 0.6.2 do not have. An import that a document above
-# rewrites is left to that document.
+# rewrites is left to that document. No fix, because these modules have no one replacement for
+# every name they held.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -1935,7 +1948,8 @@ metadata: { since: "0.6.1.6" }
 ---
 # Every module that pymoo 0.6.2 removed. These are the 9 module files that the release
 # before it has and that this release and 0.6.2 do not have. An import that a document above
-# rewrites is left to that document.
+# rewrites is left to that document. No fix, because these modules have no one replacement for
+# every name they held.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -1965,6 +1979,28 @@ metadata: { since: "0.6.2" }
 ---
 # Names that a module of 0.6.2 no longer has. Each was imported from the last release that has
 # it, and raised ImportError on the next release and on 0.6.2.
+#
+# A statement on one line that imports only names that moved to
+# pymoo.operators.survival.rank_and_crowding.metrics. The fix writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.algorithms.moo.nsga2 since pymoo 0.6.1, and the import raises ImportError. Import it from pymoo.operators.survival.rank_and_crowding.metrics.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.algorithms\.moo\.nsga2[ \t]+import[ \t]+((calc_crowding_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_crowding_distance)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(calc_crowding_distance)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.algorithms\.moo\.nsga2', by: 'from pymoo.operators.survival.rank_and_crowding.metrics' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.1" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -1981,11 +2017,13 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.algorithms\.moo\.nsga2[ \t]+import[ \t]+((calc_crowding_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_crowding_distance)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2007,6 +2045,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# pymoo 0.6.0 to 0.6.1.6 have no module that holds DES. No fix, because the module that the
+# message names came with pymoo 0.6.2.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2026,8 +2066,52 @@ rule:
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
-metadata: { since: "0.6" }
+metadata: { since: "0.6", until: "0.6.2" }
 ---
+# From pymoo 0.6.2 on, a statement on one line that imports only DES from
+# pymoo.algorithms.soo.nonconvex.de. The fix writes pymoo.operators.selection.des.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.algorithms.soo.nonconvex.de since pymoo 0.6.0, and the import raises ImportError. Import it from pymoo.operators.selection.des.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.de[ \t]+import[ \t]+((DES)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DES)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(DES)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.de', by: 'from pymoo.operators.selection.des' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.2" }
+---
+# From pymoo 0.6.2 on, DES in any other statement. No fix, because the statement spans lines or
+# imports a name that did not move there.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.algorithms.soo.nonconvex.de since pymoo 0.6.0, and the import raises ImportError. Import it from pymoo.operators.selection.des.
+rule:
+  kind: dotted_name
+  pattern: $N
+  regex: '^(DES)$'
+  inside:
+    stopBy: end
+    kind: import_from_statement
+    has: { field: module_name, regex: '^pymoo\.algorithms\.soo\.nonconvex\.de$' }
+  not:
+    any:
+      - inside: { kind: import_from_statement, field: module_name }
+      - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.de[ \t]+import[ \t]+((DES)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DES)([ \t]+as[ \t]+\w+)?$' }
+      - matches: compat-code
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+metadata: { since: "0.6.2" }
+---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2049,6 +2133,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2070,6 +2155,27 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# A statement on one line that imports only names that moved to pymoo.visualization.app.pso. The
+# fix writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.algorithms.soo.nonconvex.pso since pymoo 0.6.1.6, and the import raises ImportError. Import it from pymoo.visualization.app.pso.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.pso[ \t]+import[ \t]+((PSOAnimation)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(PSOAnimation)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(PSOAnimation)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.pso', by: 'from pymoo.visualization.app.pso' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.1.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2086,11 +2192,13 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.algorithms\.soo\.nonconvex\.pso[ \t]+import[ \t]+((PSOAnimation)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(PSOAnimation)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2112,6 +2220,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2133,6 +2242,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2154,6 +2264,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the replacement is an argument of the problem, which another statement builds.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2175,7 +2286,8 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6", until: "0.6.1.6" }
 ---
-# The same form from pymoo 0.6.1.6 on, which moved DaskParallelization to pymoo.parallelization.
+# The same form from pymoo 0.6.1.6 on, which moved DaskParallelization to pymoo.parallelization. No
+# fix, because the replacement is an argument of the problem, which another statement builds.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2197,6 +2309,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# No fix, because the replacement is an argument of the problem, which another statement builds.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2219,6 +2332,7 @@ utils:
 metadata: { since: "0.6", until: "0.6.1.6" }
 ---
 # The same form from pymoo 0.6.1.6 on, which moved StarmapParallelization to pymoo.parallelization.
+# No fix, because the replacement is an argument of the problem, which another statement builds.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2240,6 +2354,27 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# A statement on one line that imports only names that moved to pymoo.parallelization.dask. The
+# fix writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.core.problem since pymoo 0.6.1.6, and the import raises ImportError. Import it from pymoo.parallelization.dask.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((DaskParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DaskParallelization)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(DaskParallelization)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.core\.problem', by: 'from pymoo.parallelization.dask' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.1.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2256,11 +2391,33 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((DaskParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(DaskParallelization)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# A statement on one line that imports only names that moved to pymoo.parallelization.joblib. The
+# fix writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.core.problem since pymoo 0.6.1.6, and the import raises ImportError. Import it from pymoo.parallelization.joblib.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((JoblibParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(JoblibParallelization)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(JoblibParallelization)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.core\.problem', by: 'from pymoo.parallelization.joblib' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.1.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2277,11 +2434,33 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((JoblibParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(JoblibParallelization)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# A statement on one line that imports only names that moved to pymoo.parallelization.ray. The fix
+# writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.core.problem since pymoo 0.6.1.6, and the import raises ImportError. Import it from pymoo.parallelization.ray.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((RayParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(RayParallelization)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(RayParallelization)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.core\.problem', by: 'from pymoo.parallelization.ray' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.1.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2298,11 +2477,13 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.core\.problem[ \t]+import[ \t]+((RayParallelization)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(RayParallelization)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2324,6 +2505,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2345,6 +2527,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2366,6 +2549,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2387,6 +2571,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.2" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2408,6 +2593,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.2" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2429,6 +2615,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the code uses the old name in other statements, which the import does not reach.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2450,6 +2637,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2471,6 +2659,27 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1" }
 ---
+# A statement on one line that imports only names that moved to pymoo.core.algorithm. The fix
+# writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.optimize since pymoo 0.6.0, and the import raises ImportError. Import it from pymoo.core.algorithm.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.optimize[ \t]+import[ \t]+((default_termination)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(default_termination)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(default_termination)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.optimize', by: 'from pymoo.core.algorithm' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2487,11 +2696,13 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.optimize[ \t]+import[ \t]+((default_termination)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(default_termination)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2513,6 +2724,27 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# A statement on one line that imports only names that moved to pymoo.util.display.output. The fix
+# writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.util.display since pymoo 0.6.0, and the import raises ImportError. Import it from pymoo.util.display.output.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.util\.display[ \t]+import[ \t]+((Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(Output|pareto_front_if_possible)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.util\.display', by: 'from pymoo.util.display.output' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2529,11 +2761,13 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.util\.display[ \t]+import[ \t]+((Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(Output|pareto_front_if_possible)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the replacement is a class that the code has to define.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2555,6 +2789,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the replacement is a class that the code has to define.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2576,6 +2811,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because the replacement is a class that the code has to define.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2597,6 +2833,7 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2618,6 +2855,27 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.5" }
 ---
+# A statement on one line that imports only names that moved to
+# pymoo.indicators.distance_indicator. The fix writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.util.misc since pymoo 0.5.0, and the import raises ImportError. Import it from pymoo.indicators.distance_indicator.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((euclidean_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(euclidean_distance)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(euclidean_distance)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.util\.misc', by: 'from pymoo.indicators.distance_indicator' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.5" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2634,11 +2892,13 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((euclidean_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(euclidean_distance)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.5" }
 ---
+# No fix, because pymoo 0.6.2 has no replacement for the name.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2660,6 +2920,27 @@ utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
 metadata: { since: "0.6.1.5" }
 ---
+# A statement on one line that imports only names that moved to
+# pymoo.functions.standard.calc_perpendicular_distance. The fix writes the new module.
+id: removed-in-pymoo
+language: python
+severity: error
+message: $N is not in pymoo.util.misc since pymoo 0.6.1.6, and the import raises ImportError. Import it from pymoo.functions.standard.calc_perpendicular_distance.
+rule:
+  kind: import_from_statement
+  pattern: $S
+  regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?$'
+  has: { stopBy: end, kind: dotted_name, regex: '^(calc_perpendicular_distance)$', pattern: $N }
+  not: { matches: compat-code }
+utils:
+  compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
+transform:
+  FIXED: { replace: { source: $S, replace: '^from[ \t]+pymoo\.util\.misc', by: 'from pymoo.functions.standard.calc_perpendicular_distance' } }
+fix: $FIXED
+metadata: { fix: unsafe, since: "0.6.1.6" }
+---
+# The same names in any other statement. No fix, because the statement spans lines or imports
+# a name that did not move there.
 id: removed-in-pymoo
 language: python
 severity: error
@@ -2676,6 +2957,7 @@ rule:
     any:
       - inside: { kind: import_from_statement, field: module_name }
       - inside: { kind: aliased_import, field: alias }
+      - inside: { stopBy: end, kind: import_from_statement, regex: '^from[ \t]+pymoo\.util\.misc[ \t]+import[ \t]+((calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?[ \t]*,[ \t]*)*(calc_perpendicular_distance)([ \t]+as[ \t]+\w+)?$' }
       - matches: compat-code
 utils:
   compat-code: { any: [{ inside: { kind: try_statement, stopBy: end, has: { kind: except_clause, regex: '^except\s*(:|\(?[\w\s,.]*(ImportError|ModuleNotFoundError|AttributeError|TypeError|ValueError|Exception))' } } }, { inside: { kind: if_statement, stopBy: end, has: { field: condition, regex: '__version__|parse_version|pymoo_version|PYMOO' } } }, { inside: { kind: with_statement, stopBy: end, has: { kind: with_clause, regex: '\b(raises|warns|assertRaises|assertRaisesRegex|assertWarns|assertWarnsRegex)\b' } } }] }
@@ -2684,7 +2966,8 @@ metadata: { since: "0.6.1.6" }
 # The termination names that get_termination and the tuple form took up to 0.5.0. Each of the ten
 # built a termination on 0.5.0 and raises Exception on 0.6.0 and 0.6.2, with the text
 # "Termination not found." The string must be the first argument of get_termination, or the first
-# item of a tuple given to the minimize that the file imports from pymoo.optimize.
+# item of a tuple given to the minimize that the file imports from pymoo.optimize. No fix, because
+# the message names several replacements, and the tolerance to use is not in the file.
 id: removed-in-pymoo
 language: python
 severity: error

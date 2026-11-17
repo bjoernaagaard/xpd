@@ -9,7 +9,8 @@
 # ElementwiseProblem, and 0.6 accepts the keyword and evaluates the whole population at once. A
 # method written for one solution, x[0] ** 2 + x[1] ** 2 + x[2] ** 2, then returned
 # [0.66, 0.93, 1.26] for three solutions whose values are [0.14, 0.77, 1.94]. With another
-# number of solutions the same method raises, because the shape no longer fits.
+# number of solutions the same method raises, because the shape no longer fits. No fix, because the
+# base class is another place than the keyword.
 id: ignored-problem-keyword
 language: python
 severity: error
@@ -39,7 +40,10 @@ metadata: { since: "0.6" }
 # pymoo 0.4 took parallelization=("starmap", pool.starmap), and on 0.4.2.2 the starmap was called
 # 3 times in 3 generations. On pymoo 0.5.0 and on 0.6.2 an ElementwiseProblem given the tuple
 # called it 0 times, so the run was sequential. The replacement, elementwise_runner, is from
-# 0.6.0, which is what since names.
+# 0.6.0, which is what since names. No fix, because the fix would write StarmapParallelization, a
+# name the file may not import, and pack.yml cannot list it as a member. The module of the name
+# differs by release, and the fix of deprecated-in-pymoo writes the same name in the import that it
+# repairs.
 id: ignored-problem-keyword
 language: python
 severity: error
@@ -67,6 +71,7 @@ utils:
 metadata: { since: "0.6", until: "0.6.1.6" }
 ---
 # The same form from pymoo 0.6.1.6 on, which moved StarmapParallelization to pymoo.parallelization.
+# No fix, for the same reason as the document above.
 id: ignored-problem-keyword
 language: python
 severity: error
@@ -96,7 +101,10 @@ metadata: { since: "0.6.1.6" }
 # pymoo 0.4 kept type_var as an attribute of the problem. Since 0.5.0 Problem has no such
 # parameter and only stores the keyword in problem.data, and 0.6.0 added vtype. A problem built
 # with type_var=int had vtype None on pymoo 0.6.2. vtype is a hint that some operators and helpers
-# read, so the rename can change a run and the document has no fix.
+# read.
+#
+# Unsafe: the fixed problem has the vtype that type_var named, and an operator or a helper that
+# reads vtype can then run another way.
 id: ignored-problem-keyword
 language: python
 severity: warning
@@ -104,7 +112,38 @@ message: type_var is not a parameter of Problem since pymoo 0.5.0, which only st
 rule:
   kind: keyword_argument
   regex: '^type_var\s*='
-  inside: { kind: argument_list, inside: { matches: problem-init } }
+  all:
+    - has: { field: value, pattern: $V }
+    - inside: { kind: argument_list, inside: { matches: problem-init }, not: { has: { kind: keyword_argument, has: { field: name, regex: '^vtype$' } } } }
+utils:
+  problem-init:
+    kind: call
+    all:
+      - any:
+          - all:
+              - has: { field: function, regex: '^(super\(\)|Problem|ElementwiseProblem)\.__init__$' }
+              - inside:
+                  stopBy: end
+                  kind: class_definition
+                  has: { field: superclasses, has: { kind: identifier, regex: '^(Problem|ElementwiseProblem)$' } }
+          - has: { field: function, regex: '^(Problem|ElementwiseProblem)$' }
+      - inside:
+          kind: module
+          stopBy: end
+          has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\b(Problem|ElementwiseProblem)\b' }
+fix: vtype=$V
+metadata: { fix: unsafe, since: "0.6" }
+---
+# The same keyword in a call that passes vtype as well. No fix, because the rename would repeat
+# the keyword vtype.
+id: ignored-problem-keyword
+language: python
+severity: warning
+message: type_var is not a parameter of Problem since pymoo 0.5.0, which only stores it in problem.data. A problem built with type_var=int had vtype None. Write vtype, the name of the argument since pymoo 0.6.0.
+rule:
+  kind: keyword_argument
+  regex: '^type_var\s*='
+  inside: { kind: argument_list, inside: { matches: problem-init }, has: { kind: keyword_argument, has: { field: name, regex: '^vtype$' } } }
 utils:
   problem-init:
     kind: call

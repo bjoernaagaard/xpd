@@ -10757,7 +10757,7 @@ on(check a file that imports pymoo)
       and whose until, if it has one, is above it
 ```
 
-A project on pymoo 0.5.0 therefore gets no report about 0.6. The table gives the two moves that
+A project on pymoo 0.5.0 therefore gets no report about 0.6. The table gives the three moves that
 need `until`, and a project gets the module of the release in its venv. From 0.6.0 to 0.6.1.5
 the import from `pymoo.parallelization` raised ModuleNotFoundError.
 
@@ -10765,6 +10765,7 @@ the import from `pymoo.parallelization` raised ModuleNotFoundError.
 | --- | --- | --- | --- |
 | `StarmapParallelization`, `DaskParallelization` | not in pymoo | `pymoo.core.problem` | `pymoo.parallelization` |
 | Nelder and Mead, pattern search | `pymoo.algorithms.soo.nonconvex.nelder_mead`, `pattern_search` | `pymoo.algorithms.soo.nonconvex.nelder`, `pattern` | `pymoo.algorithms.soo.nonconvex.nelder`, `pattern` |
+| `DES` | `pymoo.algorithms.soo.nonconvex.de` | not in pymoo | `pymoo.operators.selection.des` from 0.6.2 |
 
 Every rule ties what it reports to pymoo by a name, because the rules match the shape of the code
 and do not know the type of a variable. A class or
@@ -10890,7 +10891,7 @@ accepted and do nothing on pymoo 0.6.2.
 
 #### removed-in-pymoo
 
-**Severity:** error. **Fix:** unsafe: the new module for 89 removed modules when every imported name is still in it, such as `pymoo.core.problem` for `pymoo.model.problem` and `pymoo.algorithms.moo.nsga2` for `pymoo.algorithms.nsga2`, the new import for `get_problem`, `get_termination` or `get_reference_directions` imported alone from `pymoo.factory`, and `do` for `calc` on an indicator. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: the new module for 89 removed modules when every imported name is still in it, such as `pymoo.core.problem` for `pymoo.model.problem` and `pymoo.algorithms.moo.nsga2` for `pymoo.algorithms.nsga2`, the new import for `get_problem`, `get_termination` or `get_reference_directions` imported alone from `pymoo.factory`, `do` for `calc` on an indicator, and the new module for a name that moved, such as `pymoo.parallelization.dask` for `DaskParallelization` from `pymoo.core.problem`, when the statement is on one line and imports only names that moved there. `DES` gets the new module from pymoo 0.6.2 on, the first release that has it. The other forms have no fix.
 
 The rule reports a module, a name or an option that pymoo removed between 0.5.0 and 0.6.2, and the
 message names what took its place where there is one.
@@ -10999,7 +11000,7 @@ class Welded(Problem):
 
 #### positional-problem-bounds
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `xl=` and `xu=` on the bounds given by position, as in `Problem(2, 1, 0, xl=np.zeros(2), xu=np.ones(2))`. The problem gets other bounds than before, and the fix drops comments inside the parentheses.
 
 The rule reports `xl` and `xu` given by position to `super().__init__` in a problem class, or to `Problem` and `ElementwiseProblem` called by name. pymoo 0.5 had `Problem(n_var, n_obj, n_constr, xl, xu)`. Since pymoo 0.6.0 the signature is `(n_var, n_obj, n_ieq_constr, n_eq_constr, xl, xu)`, so the fourth argument is read as the number of equality constraints and the fifth as `xl`.
 
@@ -11034,7 +11035,7 @@ count, as in `Problem(2, 1, 0, 0, xl)`, and is left alone.
 
 #### ignored-problem-keyword
 
-**Severity:** error for `elementwise_evaluation` and `parallelization`, warning for `type_var`. **Fix:** none.
+**Severity:** error for `elementwise_evaluation` and `parallelization`, warning for `type_var`. **Fix:** unsafe for `type_var`: `vtype=` with the same value, which operators and helpers that read `vtype` can act on. None for `elementwise_evaluation` and `parallelization`, and none for `type_var` in a call that passes `vtype` too.
 
 The rule reports a keyword of the pymoo 0.4 `Problem` that pymoo 0.6 stores in `problem.data` and never
 reads.
@@ -11203,7 +11204,7 @@ class TwoObjectives(Problem):
 
 #### evaluate-returns-value
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `out["F"] = <value>` for the `return`. pymoo then reads the value where it read inf, the method goes on past that line, and a value of another shape raises.
 
 The rule reports a `return` with a value in `_evaluate` when the method never names its `out` parameter. pymoo ignores the returned value, and every objective then comes back as inf. `GA` returned `res.F = [inf]` without an error. A method that hands `out` to a helper is left alone.
 
@@ -11314,7 +11315,7 @@ is read or run again after `minimize` copied it.
 
 #### minimize-ignored-keyword
 
-**Severity:** error. **Fix:** unsafe: `seed=` for `random_state=` and `random_seed=`. The stopping keywords have no fix.
+**Severity:** error. **Fix:** unsafe: `termination=("n_gen", 7)` for `n_gen=7`, with `n_gen` for `n_max_gen`, `max_gen` and `generations`, so the run stops where the keyword said. `seed=` for `random_state=` and `random_seed=`. A call that passes a termination, `**` or two stopping keywords has no fix.
 
 The rule reports a keyword that `minimize` hands to the algorithm, which stores it and reads it nowhere.
 
@@ -11337,7 +11338,7 @@ res = minimize(problem, NSGA2(pop_size=100), termination=("n_gen", 200), seed=1)
 
 #### algorithm-read-after-minimize
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `res.algorithm.pop` for `algorithm.pop`, with the name the code gave the result. The read then gets the algorithm that ran, and a name bound again between the run and the read gives another object.
 
 The rule reports `pop`, `opt`, `off`, `n_gen`, `n_iter`, `history`, `callback` and `result` read from an algorithm after it was given to `minimize`. `minimize` runs a deep copy and returns it as `res.algorithm`.
 
@@ -11390,7 +11391,7 @@ for problem in problems:
 
 #### unread-history
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe: drops `save_history=True`, so `res.history` is empty.
 
 The rule reports `save_history=True` given to `minimize` outside every function, in a file that never names `history` and does not use pickle, dill or joblib. The option keeps a deep copy of the algorithm for every generation. When another file reads the history of the run, the report is wrong.
 
@@ -11415,7 +11416,7 @@ print(res.F)
 
 #### moead-arguments
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: drops `pop_size`, and writes `PBI()`, `Tchebicheff()`, `WeightedSum()`, `ASF()` or `PerpendicularDistance()` for the texts `"pbi"`, `"tchebi"`, `"weighted-sum"`, `"asf"` and `"perp_dist"`, in a file that imports that class from its module in `pymoo.decomposition`. The old call raised. `"auto"`, `"aasf"` and other texts have no fix.
 
 The rule reports two `MOEAD` arguments that raise.
 
@@ -11525,7 +11526,7 @@ hv = HV(ref_point=np.array([1.1, 1.1]))(res.F)
 
 #### decision-weights
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe for ASF: `1 / weights`, which picks another solution, the one the code means when a larger weight stands for a more important objective. None for PseudoWeights.
 
 The rule reports weights that the decision method reads in another way than the code means.
 

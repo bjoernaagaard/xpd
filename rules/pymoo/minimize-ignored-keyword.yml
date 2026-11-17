@@ -5,6 +5,40 @@
 # evaluations, which is where the default termination stops.
 #
 # The call must be the minimize that the file imports from pymoo.optimize.
+#
+# The fix writes the termination that the keyword names. n_gen, n_iter, n_eval and n_evals are
+# names that get_termination takes on pymoo 0.6.2, and n_max_gen, max_gen and generations count
+# generations, so they become n_gen. It applies when the call passes no termination, by keyword
+# or as the third argument, and only one of these keywords.
+#
+# Unsafe: the fixed run stops where the keyword said, where the old run went on to the default
+# termination.
+id: minimize-ignored-keyword
+language: python
+severity: error
+message: minimize does not read $K. It stores the value on the algorithm and stops by the default termination, so a run given n_gen=7 went on for 1,000 generations. Pass the stopping rule as termination, as in termination=("n_gen", 7).
+rule:
+  kind: keyword_argument
+  regex: '^(n_gen|n_eval|n_evals|n_iter|n_max_gen|max_gen|generations)\s*='
+  all:
+    - has: { field: name, pattern: $K }
+    - has: { field: value, pattern: $V }
+    - inside:
+        kind: argument_list
+        all:
+          - inside: { matches: pymoo-minimize }
+          - not: { has: { kind: keyword_argument, has: { field: name, regex: '^termination$' } } }
+          - not: { has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } }
+          - not: { has: { kind: dictionary_splat } }
+    - not: { follows: { stopBy: end, kind: keyword_argument, regex: '^(n_gen|n_eval|n_evals|n_iter|n_max_gen|max_gen|generations)\s*=' } }
+    - not: { precedes: { stopBy: end, kind: keyword_argument, regex: '^(n_gen|n_eval|n_evals|n_iter|n_max_gen|max_gen|generations)\s*=' } }
+transform:
+  T: { replace: { source: $K, replace: '^(n_max_gen|max_gen|generations)$', by: 'n_gen' } }
+fix: termination=("$T", $V)
+metadata: { fix: unsafe }
+---
+# The same keyword in a call that passes a termination already, passes ** or has two of these
+# keywords. No fix, because the call would then get two terminations.
 id: minimize-ignored-keyword
 language: python
 severity: error
@@ -15,6 +49,15 @@ rule:
   all:
     - has: { field: name, pattern: $K }
     - inside: { kind: argument_list, inside: { matches: pymoo-minimize } }
+    - any:
+        - inside:
+            kind: argument_list
+            any:
+              - has: { kind: keyword_argument, has: { field: name, regex: '^termination$' } }
+              - has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } }
+              - has: { kind: dictionary_splat }
+        - follows: { stopBy: end, kind: keyword_argument, regex: '^(n_gen|n_eval|n_evals|n_iter|n_max_gen|max_gen|generations)\s*=' }
+        - precedes: { stopBy: end, kind: keyword_argument, regex: '^(n_gen|n_eval|n_evals|n_iter|n_max_gen|max_gen|generations)\s*=' }
 ---
 # random_state and random_seed are the names other libraries use for the seed. Two runs with
 # each of them set to 1 returned different fronts, and two runs with seed=1 the same front.

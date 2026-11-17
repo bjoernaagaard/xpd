@@ -73,8 +73,36 @@ def removed_names():
     from pymoo.operators.mutation.bitflip import BinaryBitflipMutation  # xpd: removed-in-pymoo
     from pymoo.core.problem import DaskParallelization  # xpd: removed-in-pymoo
     from pymoo.algorithms.moo.nsga2 import calc_crowding_distance  # xpd: removed-in-pymoo
+    from pymoo.algorithms.soo.nonconvex.de import DES  # xpd: removed-in-pymoo
+    from pymoo.algorithms.soo.nonconvex.pso import PSOAnimation  # xpd: removed-in-pymoo
+    from pymoo.core.problem import JoblibParallelization  # xpd: removed-in-pymoo
+    from pymoo.core.problem import RayParallelization as Ray  # xpd: removed-in-pymoo
+    from pymoo.optimize import default_termination  # xpd: removed-in-pymoo
+    from pymoo.util.display import Output, pareto_front_if_possible as front  # xpd: removed-in-pymoo, removed-in-pymoo
+    from pymoo.util.misc import euclidean_distance  # xpd: removed-in-pymoo
+    from pymoo.util.misc import calc_perpendicular_distance  # xpd: removed-in-pymoo
+    from pymoo.core.problem import (
+        JoblibParallelization as Joblib,  # xpd: removed-in-pymoo
+    )
 
-    return Display, Elementwise, starmap_parallelized_eval, BinaryBitflipMutation, DaskParallelization, calc_crowding_distance
+    return (
+        Display,
+        Elementwise,
+        starmap_parallelized_eval,
+        BinaryBitflipMutation,
+        DaskParallelization,
+        calc_crowding_distance,
+        DES,
+        PSOAnimation,
+        JoblibParallelization,
+        Ray,
+        default_termination,
+        Output,
+        front,
+        euclidean_distance,
+        calc_perpendicular_distance,
+        Joblib,
+    )
 
 
 def removed_termination_names():

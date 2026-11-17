@@ -5,6 +5,9 @@
 # (0.1, 0.9), the one best in the first objective, and with 1 / weights it picked (0.9, 0.1),
 # the one best in the second. The weights must be an array written out in the call, with values
 # that are not all the same, and the object must be built from the ASF that the file imports.
+#
+# Unsafe: the fixed call picks another solution. It is the one the code means when a larger
+# weight stands for a more important objective, as in the pymoo guide.
 id: decision-weights
 language: python
 severity: warning
@@ -29,11 +32,14 @@ rule:
         kind: module
         stopBy: end
         has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.decomposition\.asf\s+import\b[^#]*\bASF\b' }
+fix: ASF($$$ARGS).do($F, 1 / $W)
+metadata: { fix: unsafe }
 ---
 # PseudoWeights turns each solution into weights that sum to 1 and picks the solution nearest to
 # the weights given. With (0.2, 0.8) it picked row 3 of five solutions, and with (2, 8) and
 # (20, 80) it picked row 0. A weight above 1 cannot belong to weights that sum to 1. The class
-# must be the PseudoWeights that the file imports from pymoo.
+# must be the PseudoWeights that the file imports from pymoo. No fix, because the sum needs every
+# weight of the list, and the document matches one number of it.
 id: decision-weights
 language: python
 severity: warning

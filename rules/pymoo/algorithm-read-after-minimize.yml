@@ -8,6 +8,10 @@
 # not pass copy_algorithm, and the read must come in a later statement of the same block or
 # inside one. The rule is silent when the name is assigned again after the run, in a file that
 # binds the name with a walrus, and in a file that also drives the same name with setup or next.
+#
+# Unsafe: the fixed read gets the algorithm that ran, where the old read got the one that never
+# ran. A name that the code binds again between the run and the read makes the fix read another
+# result.
 id: algorithm-read-after-minimize
 language: python
 severity: error
@@ -71,4 +75,5 @@ utils:
             - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^copy_algorithm$' } } } }
             - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
             - matches: pymoo-minimize
-metadata: { since: "0.6" }
+fix: $RES.algorithm.$ATTR
+metadata: { fix: unsafe, since: "0.6" }

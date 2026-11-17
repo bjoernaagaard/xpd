@@ -5,7 +5,8 @@
 # they differed.
 
 # np.random.seed(1) before each of two runs without seed gave two different fronts on 0.6.2. The
-# file must hold a minimize, imported from pymoo.optimize, that gets no seed.
+# file must hold a minimize, imported from pymoo.optimize, that gets no seed. No fix, because the
+# seed goes to the minimize call, which is another statement.
 id: numpy-seed-ignored
 language: python
 severity: warning
@@ -45,7 +46,8 @@ metadata: { since: "0.6.1.6" }
 # A sampling, a crossover and a mutation that drew from np.random each gave different results in
 # two runs with seed=1 on 0.6.2. The same three drawing from the random_state that pymoo passes
 # to _do gave the same result twice. The call must be inside _do of a class that inherits from
-# the Sampling, Crossover or Mutation that the file imports from pymoo.core.
+# the Sampling, Crossover or Mutation that the file imports from pymoo.core. No fix, because the
+# fix would change the parameters of _do as well as the draw.
 id: numpy-seed-ignored
 language: python
 severity: warning

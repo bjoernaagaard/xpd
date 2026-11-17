@@ -8,7 +8,8 @@
 # and pass copy_algorithm=False. The first document needs the two calls in one block with no
 # assignment to the name after the first. The second needs the call in a loop that never binds
 # the name: not by an assignment, not as the loop variable, as in for algorithm in [NSGA2(),
-# SMSEMOA()], where each pass runs another object, and not by a walrus.
+# SMSEMOA()], where each pass runs another object, and not by a walrus. The rule has no fix,
+# because each message names two rewrites, and the code does not show which one is meant.
 id: reused-algorithm-without-copy
 language: python
 severity: error

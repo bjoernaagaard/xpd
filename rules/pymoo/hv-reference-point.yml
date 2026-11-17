@@ -4,7 +4,8 @@
 
 # A reference point taken as the largest value of each objective lies on the solutions that hold
 # those values, so they add no volume. Three solutions scored 0.09 with ref_point=F.max(axis=0)
-# and 0.37 with the point (1, 1), and the two extreme solutions alone scored 0.0.
+# and 0.37 with the point (1, 1), and the two extreme solutions alone scored 0.0. No fix, because
+# the fixed point is not in the file.
 id: hv-reference-point
 language: python
 severity: warning
@@ -33,7 +34,7 @@ utils:
 metadata: { since: "0.6" }
 ---
 # HV() with no reference point and no Pareto front raised AssertionError, "For Hypervolume a
-# reference point needs to be provided!"
+# reference point needs to be provided!" No fix, because the reference point is not in the file.
 id: hv-reference-point
 language: python
 severity: error

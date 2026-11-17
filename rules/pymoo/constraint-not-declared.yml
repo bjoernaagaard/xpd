@@ -5,7 +5,8 @@
 #
 # The class must inherit from the Problem or ElementwiseProblem the file imports from pymoo, and
 # it must call super().__init__ with keywords only. A class that names the count anywhere, passes
-# **kwargs or a positional argument, or has no __init__ call is left alone.
+# **kwargs or a positional argument, or has no __init__ call is left alone. The rule has no fix,
+# because the number of constraints is not in the file.
 id: constraint-not-declared
 language: python
 severity: error

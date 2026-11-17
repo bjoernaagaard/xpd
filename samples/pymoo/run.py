@@ -141,7 +141,9 @@ def stopping_rule_under_another_name():
 def run_that_does_not_stop_where_asked():
     problem = get_problem("zdt1")
     long = minimize(problem, NSGA2(pop_size=20), n_gen=7, seed=1)  # xpd: minimize-ignored-keyword
-    return long
+    longer = minimize(problem, NSGA2(pop_size=20), seed=1, generations=7)  # xpd: minimize-ignored-keyword
+    twice = minimize(problem, NSGA2(pop_size=20), ("n_gen", 5), n_gen=7, seed=1)  # xpd: minimize-ignored-keyword
+    return long, longer, twice
 
 
 @case
@@ -185,7 +187,8 @@ def moead_arguments_that_raise():
     ref_dirs = get_reference_directions("das-dennis", 3, n_partitions=6)
     sized = MOEAD(ref_dirs, pop_size=50)  # xpd: moead-arguments
     named = MOEAD(ref_dirs, decomposition="pbi")  # xpd: moead-arguments
-    return sized, named
+    chosen = MOEAD(ref_dirs, decomposition="auto")  # xpd: moead-arguments
+    return sized, named, chosen
 
 
 @case

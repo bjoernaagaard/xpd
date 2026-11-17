@@ -5,7 +5,8 @@
 #
 # The call must be the minimize that the file imports from pymoo.optimize. It is left alone when
 # it takes **kwargs, when the algorithm it gets was built with seed, and in a file that calls
-# np.random.seed, which numpy-seed-ignored reports.
+# np.random.seed, which numpy-seed-ignored reports. The rule has no fix, because the seed is a
+# value that the file does not hold.
 id: unseeded-run
 language: python
 severity: info

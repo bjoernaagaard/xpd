@@ -7,7 +7,8 @@
 # The object must be a name that the file assigns from np.load, pickle.load or dill.load, as the
 # recipe does, also as one name of a tuple, as in checkpoint, = np.load(...).flatten(). Another
 # object with an attribute of this name, such as a game, is left alone, and so is an attribute
-# of self, which is the class's own.
+# of self, which is the class's own. The rule has no fix, because the total number of generations
+# is not in the file.
 id: has-terminated-assignment
 language: python
 severity: error
