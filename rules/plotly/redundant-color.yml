@@ -5,25 +5,51 @@
 # traces and a legend of four entries, Fri, Sat, Sun and Thur, the same four words as the tick
 # labels of the x axis. With color="tip" it drew a colorbar for the numbers that the bar heights
 # show (runs/behavior.txt). The rule compares the two column names as written strings. The 13 px
-# functions are the ones whose signature has color, x and y (runs/lists.txt). The rule is info and
-# has no fix, because one color for each category can be meant to match another chart.
+# functions are the ones whose signature has color, x and y (runs/lists.txt). The rule is info.
+#
+# Unsafe: the fixed chart draws every mark in one color and no legend, where one color for each
+# category can be meant to match another chart. The fix drops the comments inside the
+# parentheses.
 id: redundant-color
 language: python
 severity: info
 message: color=$C repeats the column that $A already shows, so the chart encodes one variable twice and adds a legend or a colorbar for it. With x="day" and color="day" the legend held the same four names as the axis. Tufte asks to erase redundant data-ink. Drop color, or use it for another variable.
 rule:
   kind: call
+  pattern: $FN($$$ARGS)
   all:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|density_contour|ecdf|funnel|histogram|line|line_3d|scatter|scatter_3d|strip|violin)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(color)$' } }, { has: { field: value, kind: string, pattern: $C } }] } }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, pattern: $A, regex: '^[xy]$' } }, { has: { field: value, kind: string, pattern: $C } }] } }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^color$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^color$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe }
 ---
 # The same double encoding on go.Bar: marker_color, or color in marker, set to the same expression
 # as x or y. On plotly 7.1.0 go.Bar(x=["a", "b", "c"], y=v, marker_color=v) with v = [1, 2, 4]
 # resolved marker.color to (1, 2, 4) on the colorscale from #0d0887 to #f0f921, and drew the bars
 # in rgb(13, 8, 135), rgb(156, 23, 158) and rgb(240, 249, 33), where the same bars without
 # marker_color were all rgb(99, 110, 250) (runs/v2/A/probe_a.txt). The bar length already shows
-# the values, so the colors repeat them. A written string or number is left alone.
+# the values, so the colors repeat them. A written string or number is left alone. No fix, because
+# the one color to use is not in the file.
 id: redundant-color
 language: python
 severity: info

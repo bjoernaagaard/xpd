@@ -11763,7 +11763,7 @@ Lie Factor = size of the effect shown in the graphic / size of the effect in the
 
 #### marker-size-diameter
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe for `sizemode="diameter"` on a px figure: drops the argument, so the markers get the area that px set. None for a go trace, whose `sizeref` depends on the data.
 
 The rule reports a go trace whose marker size is read from the data and whose size mode is left at the default or written as `"diameter"`. It also reports `sizemode="diameter"` given to `update_traces` in a file that calls a px function with `size=`. The first form covers `marker=dict(size=...)`, `marker={"size": ...}`, `marker=go.scatter.Marker(size=...)` and `marker_size=...` on the 11 trace types that have `marker.sizemode`: `go.Scatter`, `go.Scatter3d`, `go.Scattercarpet`, `go.Scattergeo`, `go.Scattergl`, `go.Scattermap`, `go.Scatterpolar`, `go.Scatterpolargl`, `go.Scattersmith`, `go.Scatterternary` and `go.Splom`.
 
@@ -11964,7 +11964,7 @@ proportion.
 
 #### three-d-for-two-d
 
-**Severity:** error for a 3D trace without `z`, and warning for a `z` that is one constant. **Fix:** none.
+**Severity:** error for a 3D trace without `z`, and warning for a `z` that is one constant. **Fix:** unsafe: `px.scatter`, `px.line` or `go.Scatter` for the 3D function without `z`, and the same with `z` dropped when `z` is the constant and `x` and `y` vary. The 2D figure draws the points, and a `go.Scatter3d` line with a colorscale raises as a `go.Scatter`. A call with an argument that only a 3D trace takes, such as `range_z`, a constant `x` or `y`, or arguments by position has no fix.
 
 The rule reports `px.scatter_3d`, `px.line_3d` and `go.Scatter3d` with `x` and `y` and no `z`, and the same three with an `x`, `y` or `z` written as one constant: `[0] * n`, `np.zeros(n)`, `np.ones(n)`, `np.zeros_like(a)`, `np.ones_like(a)` or `np.full(n, v)`.
 
@@ -12044,7 +12044,7 @@ does not read it.
 
 #### free-facet-scales
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe for `matches=None`: drops the argument, so the panels share one scale again, and drops comments inside the parentheses. None for `make_subplots`, where `shared_yaxes` goes to another statement.
 
 The rule reports `update_yaxes(matches=None)` and `update_xaxes(matches=None)` on a px figure that was made with `facet_col`, `facet_row` or `facet_col_wrap`. It also reports a loop that adds a `go.Scatter`, `go.Scattergl`, `go.Bar`, `go.Box` or `go.Violin` with the same written column as `y` to the cells of a `make_subplots` figure without `shared_yaxes`, where the row or the col changes with the loop.
 
@@ -12219,7 +12219,7 @@ drawn with `"simple_white"`.
 
 #### boxed-axis-frame
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe: drops `mirror`, so the box around the plot is open.
 
 The rule reports `mirror=True`, `mirror="all"`, `mirror="ticks"` or `mirror="allticks"` beside `showline=True` on an x or y axis of a plotly figure, in `update_xaxes`, `update_yaxes`, `go.layout.XAxis`, `go.layout.YAxis`, and in `xaxis=dict(...)` or `xaxis={...}` in `update_layout`, `go.Layout` and `go.Figure`.
 
@@ -12296,7 +12296,7 @@ as statistics, so the rule has no fix.
 
 #### redundant-color
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe for px: drops `color`, so the chart draws one color and no legend, and drops comments inside the parentheses. None for `go.Bar`, where the one color to use is not in the code.
 
 The rule reports a px call whose `color` is the same column name as its `x` or its `y`, both written as strings. It covers the 13 px functions that take `color`, `x` and `y`: `px.area`, `px.bar`, `px.box`, `px.density_contour`, `px.ecdf`, `px.funnel`, `px.histogram`, `px.line`, `px.line_3d`, `px.scatter`, `px.scatter_3d`, `px.strip` and `px.violin`.
 

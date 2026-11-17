@@ -6,8 +6,8 @@
 # paths and 7 text elements for it, and the same value with the default mode "number" drew 0 paths
 # and 2 text elements (runs/behavior.txt). The gauge is drawn only when mode names it: a gauge
 # argument with the default mode drew no dial, so the rule reads the mode string. A gauge with the
-# shape "bullet" is a bar and not a dial, so it is left alone. The rule has no fix, because a
-# gauge may carry a threshold that the number alone does not show.
+# shape "bullet" is a bar and not a dial, so it is left alone. The rule has no fix, because the
+# message names two rewrites, and the code does not show which one is meant.
 id: gauge-indicator
 language: python
 severity: info

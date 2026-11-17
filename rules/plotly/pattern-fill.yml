@@ -7,7 +7,7 @@
 # plotly 7.1.0, and the drawn figure held two pattern images, where the same chart without
 # pattern_shape held none (runs/behavior.txt). The five px functions are the ones whose signature
 # has pattern_shape (runs/lists.txt). The rule reads a column name written as a string. It has no
-# fix, because dropping the argument drops a variable from the chart.
+# fix, because the shades or the labels that replace the hatching are not in the file.
 id: pattern-fill
 language: python
 severity: warning

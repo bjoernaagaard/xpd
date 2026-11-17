@@ -16,8 +16,9 @@
 # told not to. A module that the file imports can set the default for it, so the rule is also
 # silent when one of them assigns pio.templates.default or px.defaults.template: the __init__.py
 # of a package the file is in, a module of the project that the file imports, or a module that one
-# of those imports. A module that imports this file is not read. The rule has no fix, because the
-# template changes how every figure looks.
+# of those imports. A module that imports this file is not read. The rule has no fix, because each
+# message names two places for the template, once for the file or in each figure, and the code does
+# not show which one is meant.
 id: default-template
 language: python
 severity: info

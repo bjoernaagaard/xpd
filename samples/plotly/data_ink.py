@@ -75,6 +75,7 @@ def frames():
     boxed = px.scatter(df, x="day", y="tip")
     boxed.update_xaxes(showline=True, mirror=True)  # xpd: boxed-axis-frame
     boxed.update_layout(yaxis=dict(showline=True, mirror="allticks"))  # xpd: boxed-axis-frame
+    boxed.update_yaxes(mirror=True, showline=True)  # xpd: boxed-axis-frame
     open_frame = px.scatter(df, x="day", y="tip")
     open_frame.update_xaxes(showline=True)
     open_frame.update_yaxes(showline=True, mirror=False)

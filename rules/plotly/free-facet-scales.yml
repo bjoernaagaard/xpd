@@ -6,14 +6,17 @@
 # plotly 7.1.0, and both panels got the range (0.38, 10.62). update_yaxes(matches=None) frees
 # them. The panels then got (0.62, 6.88) and (0.38, 10.62), and a tip of 5 was drawn at 0.70 of
 # the height of one panel and at 0.45 of the other (runs/behavior.txt). The reader compares
-# heights across panels, so the rule is info. It has no fix, because free scales are sometimes
-# meant, for panels in different units.
+# heights across panels, so the rule is info.
+#
+# Unsafe: the fixed panels share one scale again, and free scales are sometimes meant, for panels
+# in different units. The fix drops the comments inside the parentheses.
 id: free-facet-scales
 language: python
 severity: info
-message: matches=None gives each facet its own scale, so the same value sits at a different height in each panel. A value of 5 was drawn at 0.70 of one panel and at 0.45 of the next. Tufte's small multiples keep one design in every frame so that only the data varies. Keep the shared axes that px draws, unless the panels have different units.
+message: matches=None gives each facet its own scale, so the same value sits at a different height in each panel. A value of 5 was drawn at 0.70 of one panel and at 0.45 of the next. Tufte's small multiples keep one design in every frame so that only the data varies. Drop matches=None to keep the shared axes that px draws, unless the panels have different units.
 rule:
   kind: call
+  pattern: $FN($$$ARGS)
   all:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_[xy]axes$' } }, { has: { field: object, matches: figure } }] }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^matches$' } }, { has: { field: value, kind: none } }] } }
@@ -42,7 +45,27 @@ utils:
     any:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^matches$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^matches$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { fix: unsafe, holds: { FIG: { matches: figure-expr } } }
 ---
 # The same free scales from make_subplots, which gives every cell its own y axis unless it is told
 # to share them. On plotly 7.1.0 make_subplots(rows=1, cols=2) with a bar of 5 in one cell and a
@@ -56,7 +79,8 @@ metadata: { holds: { FIG: { matches: figure-expr } } }
 # the name pd.melt gives the column of a long table, which holds a different measure in each
 # panel. A make_subplots that names shared_yaxes is left alone, and so is a file that names
 # matches, a y axis range or shared_yaxes anywhere, because it may set the scales afterwards. It
-# has no fix, because free scales are sometimes meant.
+# has no fix, because shared_yaxes goes to make_subplots, which is another statement than the
+# add_trace that the rule reports.
 id: free-facet-scales
 language: python
 severity: info

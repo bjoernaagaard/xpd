@@ -123,7 +123,8 @@ def empty_scene():
     missing = px.scatter_3d(df, x="area", y="rain")  # xpd: three-d-for-two-d
     missing_line = px.line_3d(df, x="area", y="rain")  # xpd: three-d-for-two-d
     missing_go = go.Scatter3d(x=df["area"], y=df["rain"], mode="markers")  # xpd: three-d-for-two-d
-    return missing, missing_line, missing_go
+    missing_range = px.scatter_3d(df, x="area", y="rain", range_z=[0, 1])  # xpd: three-d-for-two-d
+    return missing, missing_line, missing_go, missing_range
 
 
 @case

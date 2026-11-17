@@ -7,6 +7,48 @@
 # error. A call with a ** argument, or with z as the fourth positional argument of the px
 # functions, is left alone. So is a file that sets z on an object afterwards: go.Scatter3d with x
 # and y followed by trace.z = [3, 1, 2] resolved to visible=True with that z.
+#
+# The fix writes the function of the same name without 3d: px.scatter, px.line or go.Scatter. A
+# call with an argument that only a 3D trace takes, such as range_z or scene, is left to the next
+# document. Unsafe: the fixed figure draws the points that the old one hid. A go.Scatter3d line
+# with a colorscale raises ValueError as a go.Scatter, which has no colorscale on its line.
+id: three-d-for-two-d
+language: python
+severity: error
+message: This 3D trace has x and y but no z, and plotly draws nothing for it. The trace resolved to visible=False in an empty scene. Tufte asks that a chart show no more dimensions than the data has. Draw the two variables in 2D, with px.scatter for px.scatter_3d, px.line for px.line_3d and go.Scatter for go.Scatter3d.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $FN }
+    - has: { field: arguments, pattern: $AL }
+    - any:
+        - all:
+            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(scatter_3d|line_3d)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+            - not: { has: { field: arguments, has: { nthChild: { position: 4, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { kind: keyword_argument } } } }
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter3d)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(z)$' } } } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(error_z|log_z|range_z|projection|scene|surfaceaxis|surfacecolor|zcalendar|zhoverformat)(_\w+)?$' } } } }
+    # A file that sets z afterwards, as in trace.z = values or update_traces(z=values), draws the trace.
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            stopBy: end
+            any:
+              - { kind: assignment, has: { field: left, kind: attribute, has: { field: attribute, regex: '^z$' } } }
+              - { kind: assignment, has: { field: left, kind: subscript, has: { field: subscript, regex: '^["'']z["'']$' } } }
+              - { kind: keyword_argument, has: { field: name, regex: '^z$' }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_traces|update|restyle)$' } } } } }
+transform:
+  FLAT: { replace: { source: $FN, replace: '_?3d$', by: '' } }
+fix: $FLAT$AL
+metadata: { fix: unsafe }
+---
+# The same call with an argument that only a 3D trace takes. No fix, because px.scatter, px.line
+# and go.Scatter reject that argument.
 id: three-d-for-two-d
 language: python
 severity: error
@@ -23,6 +65,7 @@ rule:
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } }
     - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(z)$' } } } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(error_z|log_z|range_z|projection|scene|surfaceaxis|surfacecolor|zcalendar|zhoverformat)(_\w+)?$' } } }
     # A file that sets z afterwards, as in trace.z = values or update_traces(z=values), draws the trace.
     - not:
         inside:
@@ -39,6 +82,77 @@ rule:
 # plane. go.Scatter3d with z=[0, 0, 0] drew the points in a scene whose z axis ran from -1 to 1
 # (runs/behavior.txt), so the third axis and the perspective carry no data. The rule reads only
 # constants it can see in the call.
+#
+# When z is the constant and x and y are given, the fix writes the 2D function of the same name
+# without z, as in px.scatter(x=..., y=...). Unsafe: the fixed figure is a 2D chart, and a
+# go.Scatter3d line with a colorscale raises ValueError as a go.Scatter.
+id: three-d-for-two-d
+language: python
+severity: warning
+message: $A=$Z is the same for every point, so the points lie on one plane and the third axis shows no data. Tufte asks that a chart show no more dimensions than the data has. Draw the two variables in 2D, as px.scatter(x=..., y=...) or go.Scatter(x=..., y=...) does.
+rule:
+  kind: call
+  pattern: $FN($$$ARGS)
+  all:
+    - any:
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(scatter_3d|line_3d)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter3d)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^z$', pattern: $A }
+            - has:
+                field: value
+                pattern: $Z
+                any:
+                  - pattern: '[$N] * $M'
+                  - pattern: '$M * [$N]'
+                  - pattern: $NP.zeros($$$)
+                  - pattern: $NP.ones($$$)
+                  - pattern: $NP.zeros_like($$$)
+                  - pattern: $NP.ones_like($$$)
+                  - pattern: $NP.full($$$)
+    - all:
+        - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^x$' } } }
+        - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^y$' } } }
+        - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^[xy]$' } }, { has: { field: value, matches: constant } }] } } }
+        - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(error_z|log_z|range_z|projection|scene|surfaceaxis|surfacecolor|zcalendar|zhoverformat)(_\w+)?$' } } } }
+        - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+        - not: { has: { field: arguments, has: { not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] }, nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
+utils:
+  # A value written as the same number for every point.
+  constant: { any: [{ pattern: '[$C] * $D' }, { pattern: '$D * [$C]' }, { regex: '^(np|numpy)\.(zeros|ones|zeros_like|ones_like|full)\(' }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  N: { any: [{ kind: integer }, { kind: float }] }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^z$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^z$ }
+    fix: "$ARG, "
+transform:
+  FLAT: { replace: { source: $FN, replace: '_?3d$', by: '' } }
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FLAT($REST)
+metadata: { fix: unsafe }
+---
+# Any other constant: one on x or y, or a call that gives no x or y, passes an argument that only
+# a 3D trace takes, or passes arguments by position. No fix, because the 2D chart would need the
+# variables moved to other axes or the 3D argument dropped.
 id: three-d-for-two-d
 language: python
 severity: warning
@@ -66,6 +180,18 @@ rule:
                   - pattern: $NP.zeros_like($$$)
                   - pattern: $NP.ones_like($$$)
                   - pattern: $NP.full($$$)
+    - not:
+        all:
+          - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^z$' } }, { has: { field: value, matches: constant } }] } }
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^x$' } } }
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^y$' } } }
+          - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^[xy]$' } }, { has: { field: value, matches: constant } }] } } }
+          - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(error_z|log_z|range_z|projection|scene|surfaceaxis|surfacecolor|zcalendar|zhoverformat)(_\w+)?$' } } } }
+          - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
+          - not: { has: { field: arguments, has: { not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] }, nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
+utils:
+  # A value written as the same number for every point.
+  constant: { any: [{ pattern: '[$C] * $D' }, { pattern: '$D * [$C]' }, { regex: '^(np|numpy)\.(zeros|ones|zeros_like|ones_like|full)\(' }] }
 constraints:
   NP: { regex: '^(np|numpy)$' }
   N: { any: [{ kind: integer }, { kind: float }] }

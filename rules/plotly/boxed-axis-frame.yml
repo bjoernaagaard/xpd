@@ -5,8 +5,11 @@
 # showline=True with mirror=True draws the axis line a second time on the far side of the plot,
 # which closes a box around it. On plotly 7.1.0 the x axis line had one segment with showline
 # alone and two with mirror=True (runs/behavior.txt). mirror without showline drew no line under
-# the default template, so the rule reads the two together, on a plotly figure. It has no fix,
-# because a box is sometimes house style.
+# the default template, so the rule reads the two together, on a plotly figure.
+#
+# Unsafe: the fixed figure draws no axis line on the far side, so the box around the plot is open.
+# The fix takes the argument out with the comma before it, or with the comma after it when it is
+# the first one.
 id: boxed-axis-frame
 language: python
 severity: info
@@ -64,4 +67,8 @@ utils:
     any:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+fix:
+  template: ''
+  expandStart: { regex: '^,$' }
+  expandEnd: { regex: '^,$', follows: { follows: { regex: '^[({]$' } } }
+metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

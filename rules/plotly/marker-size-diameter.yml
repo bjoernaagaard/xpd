@@ -18,9 +18,9 @@
 # and 1,600 came out as 78.5, 314.2 and 1,256.6 square pixels, a Lie Factor of 1, so the message
 # would be false and sizemode="area" would understate. So is a column that is named size, which
 # the code made for the markers. The rule is silent in a file that names sizemode in any other way
-# than sizemode="diameter", because the mode may be set on the figure afterwards. It has no fix,
-# because sizemode="area" alone redraws size 10 with a radius of 2.24 pixels, and the sizeref that
-# keeps the markers visible depends on the data.
+# than sizemode="diameter", because the mode may be set on the figure afterwards. The first two
+# documents have no fix, because sizemode="area" alone redraws size 10 with a radius of 2.24
+# pixels, and the sizeref that keeps the markers visible depends on the data.
 id: marker-size-diameter
 language: python
 severity: error
@@ -187,6 +187,10 @@ utils:
 # update_traces(marker_sizemode="diameter") the px bubble chart resolved to sizemode "diameter"
 # (runs/behavior.txt), so the size column is drawn as the diameter. The file must call a px
 # function with size=.
+#
+# Unsafe: the fixed figure draws the markers with the area that px set, so their sizes change.
+# The fix takes the argument out with the comma before it, or with the comma after it when it is
+# the first one.
 id: marker-size-diameter
 language: python
 severity: error
@@ -207,3 +211,8 @@ rule:
           all:
             - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(scatter|scatter_3d|scatter_geo|scatter_map|scatter_mapbox|scatter_matrix|scatter_polar|scatter_ternary)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
             - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^size$' } } }
+fix:
+  template: ''
+  expandStart: { regex: '^,$' }
+  expandEnd: { regex: '^,$', follows: { follows: { regex: '^[({]$' } } }
+metadata: { fix: unsafe }
