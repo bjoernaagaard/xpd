@@ -49,7 +49,7 @@ struct Cli {
     cmd: Cmd,
 }
 
-/// How `check`, `graph`, `rules`, `run` and `outline` print what they found.
+/// How `graph`, `rules`, `find` and `api` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(crate) enum Format {
     Text,
@@ -371,6 +371,7 @@ fn discovery(result: Result<()>) -> ExitCode {
     command_result(result.map(|()| ExitCode::SUCCESS))
 }
 
+/// The exit code of a command that chooses its own, or 2 when it fails.
 fn command_result(result: Result<ExitCode>) -> ExitCode {
     result.unwrap_or_else(|error| {
         eprintln!("xpd: {error:#}");
@@ -412,7 +413,7 @@ fn print_matches(mut found: index::Matches, kind: Option<Kind>, format: Format) 
     Ok(())
 }
 
-/// Prints every rule of every pack, whatever the project's venv holds.
+/// Builds the search index of one library from its source.
 fn refresh_index(args: IndexArgs) -> Result<()> {
     let IndexArgs {
         source,
@@ -790,8 +791,6 @@ fn run_py(script: &str, args: &[PathBuf]) -> ExitCode {
         }
     }
 }
-
-/// The exit code of a command that chooses its own, or 2 when it fails.
 
 #[derive(Clone, Copy)]
 enum Detail {

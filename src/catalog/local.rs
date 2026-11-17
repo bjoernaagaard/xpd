@@ -224,7 +224,7 @@ fn yaml_files(dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
 
 /// Whether `module` can be the module of a pack. It goes into the pattern of the import gate,
 /// so only an identifier is allowed.
-fn is_module_name(module: &str) -> bool {
+pub(crate) fn is_module_name(module: &str) -> bool {
     let mut chars = module.chars();
     chars
         .next()

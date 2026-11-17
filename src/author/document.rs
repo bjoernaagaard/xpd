@@ -45,15 +45,8 @@ impl fmt::Display for Name {
 
 /// Checks a pack's module, the name its library is imported by, such as `category_encoders`.
 pub(super) fn module(text: &str) -> Result<String> {
-    let identifier = |part: &str| {
-        let mut chars = part.chars();
-        chars
-            .next()
-            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-    };
     ensure!(
-        text.split('.').all(identifier),
+        crate::catalog::is_module_name(text),
         "{text:?} is not a module name, such as pandas or category_encoders"
     );
     Ok(text.to_owned())

@@ -11,7 +11,7 @@ use anyhow::{Context, Result, bail, ensure};
 use ast_grep_config::Severity;
 use serde_json::{Value, json};
 
-pub(crate) use self::local::LocalProject;
+pub(crate) use self::local::{LocalProject, is_module_name};
 use crate::pack::{self, Pack};
 use crate::package_check;
 use crate::report::severity_name;

@@ -4,6 +4,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use crate::version::Version;
 
@@ -73,6 +74,7 @@ impl Venv {
                     name: normalized(name),
                     version: version.parse().ok()?,
                     dist_info,
+                    modules: OnceLock::new(),
                 })
             })
             .collect();
@@ -105,27 +107,56 @@ struct Distribution {
     name: String,
     version: Version,
     dist_info: PathBuf,
+    /// The modules it installs, read on the first lookup by module name.
+    modules: OnceLock<Vec<String>>,
 }
 
 impl Distributions {
     /// The installed version of `name`, which is a distribution name such as `pandas-stubs`, or
-    /// a module name that a distribution lists in its `top_level.txt`, as scikit-learn lists
-    /// `sklearn`. A distribution name wins over a module name.
+    /// a module name that a distribution installs, as scikit-learn installs `sklearn`. A
+    /// distribution name wins over a module name.
     pub(crate) fn version(&self, name: &str) -> Option<&Version> {
         let name = normalized(name);
         self.found
             .iter()
             .find(|dist| dist.name == name)
-            .or_else(|| self.found.iter().find(|dist| dist.lists_module(&name)))
+            .or_else(|| self.found.iter().find(|dist| dist.installs(&name)))
             .map(|dist| &dist.version)
     }
 }
 
 impl Distribution {
-    fn lists_module(&self, module: &str) -> bool {
-        fs::read_to_string(self.dist_info.join("top_level.txt"))
-            .is_ok_and(|text| text.lines().any(|line| line.trim() == module))
+    fn installs(&self, module: &str) -> bool {
+        self.modules
+            .get_or_init(|| top_level_modules(&self.dist_info))
+            .iter()
+            .any(|found| found == module)
     }
+}
+
+/// The importable names a distribution installs. `top_level.txt` lists them when the wheel has
+/// one. A wheel built without setuptools, such as scikit-learn's, has none, so the first part of
+/// each path in `RECORD` gives them.
+fn top_level_modules(dist_info: &Path) -> Vec<String> {
+    if let Ok(text) = fs::read_to_string(dist_info.join("top_level.txt")) {
+        return text.lines().map(|line| line.trim().to_owned()).collect();
+    }
+    let record = fs::read_to_string(dist_info.join("RECORD")).unwrap_or_default();
+    let mut modules: Vec<String> = record
+        .lines()
+        .filter_map(|line| {
+            let path = line.split(',').next()?;
+            let (first, rest) = path.split_once('/').unwrap_or((path, ""));
+            if rest.is_empty() {
+                first.strip_suffix(".py").map(str::to_owned)
+            } else {
+                Some(first.to_owned())
+            }
+        })
+        .collect();
+    modules.sort_unstable();
+    modules.dedup();
+    modules
 }
 
 /// Distribution names compare without case, and `-`, `.` and `_` count as the same character.

@@ -40,8 +40,9 @@ use crate::scan::{self, Node, Root};
 const PYTHON_RULES: &str = include_str!("outline/python.yml");
 /// Every function and method of a Python file with its parameters, for `xpd index`.
 const PYTHON_CALLABLE_RULES: &str = include_str!("outline/python-callables.yml");
-/// The ast-grep project file, which names a project's own outline rules.
-const PROJECT_FILE: &str = "sgconfig.yml";
+/// The ast-grep project file, which names a project's own outline rules, under either name
+/// that ast-grep reads.
+const PROJECT_FILES: [&str; 2] = ["sgconfig.yml", "sgconfig.yaml"];
 
 type Rules = Vec<SerializableOutlineRule<SupportLang>>;
 
@@ -613,13 +614,13 @@ impl OutlineArgs {
         Ok(ExitCode::SUCCESS)
     }
 
-    /// The outlines of the files under the paths, in path order. A file with no items is left
-    /// out when a directory was given.
     /// Whether a directory is among the paths, which changes what `auto` lists and shows.
     fn reads_directories(&self) -> bool {
         !self.stdin && self.paths.iter().any(|path| path.is_dir())
     }
 
+    /// The outlines of the files under the paths, in path order. A file with no items is left
+    /// out when a directory was given.
     fn read_files(&self, extractors: &Extractors) -> Result<Vec<File>> {
         let directories = self.reads_directories();
         let read = |(path, language): &(PathBuf, SupportLang)| -> Result<File> {
@@ -704,7 +705,7 @@ struct Project {
 fn project_rule_files() -> Result<Vec<PathBuf>> {
     let cwd = std::env::current_dir()?;
     let Some(config) = (cwd.ancestors())
-        .map(|dir| dir.join(PROJECT_FILE))
+        .flat_map(|dir| PROJECT_FILES.map(|name| dir.join(name)))
         .find(|path| path.is_file())
     else {
         return Ok(Vec::new());
