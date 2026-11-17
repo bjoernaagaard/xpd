@@ -1,0 +1,7 @@
+# A call of from_formula on CLASS.
+id: lm-from-formula
+language: python
+arguments: [CLASS]
+rule:
+  kind: call
+  has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^from_formula$' } }, { has: { field: object, matches: CLASS } }] }

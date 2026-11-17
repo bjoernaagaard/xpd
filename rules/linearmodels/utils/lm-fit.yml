@@ -1,0 +1,9 @@
+# A call of fit on a model of CLASS.
+id: lm-fit
+language: python
+arguments: [CLASS]
+# ast-grep reads the global utilities in the order of the matches it finds outside has and
+# inside, so the model is a utility of its own, which makes lm-model load first.
+utils:
+  model: { matches: { lm-model: { CLASS: { matches: CLASS } } } }
+rule: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^fit$' } }, { has: { field: object, matches: model } }] } }

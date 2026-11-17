@@ -1,0 +1,10 @@
+# A call that builds a model of CLASS, the classes a rule names in its own lm-class: the class
+# itself, or one of its constructors.
+id: lm-build
+language: python
+arguments: [CLASS]
+rule:
+  kind: call
+  any:
+    - has: { field: function, matches: CLASS }
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(from_formula|multivariate_ls|multivariate_iv)$' } }, { has: { field: object, matches: CLASS } }] }
