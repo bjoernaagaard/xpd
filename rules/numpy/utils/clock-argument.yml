@@ -1,0 +1,12 @@
+id: clock-argument
+language: python
+# A call whose arguments read a clock, such as default_rng(int(time.time())).
+rule:
+  has:
+    field: arguments
+    has:
+      stopBy: end
+      kind: call
+      has:
+        field: function
+        regex: '^(time\.(time|time_ns|perf_counter|perf_counter_ns|monotonic|monotonic_ns|process_time)|(datetime\.)?datetime\.(now|utcnow|today))$'

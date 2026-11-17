@@ -6,18 +6,42 @@
 id: clock-seed
 language: python
 severity: warning
-message: A seed from the clock repeats whenever two runs start in the same tick, and NumPy recommends entropy from the operating system. Call $F() and log its entropy when a run must be repeatable.
-rule:
-  pattern: $F($SEED)
-  has:
-    field: arguments
-    has:
-      stopBy: end
-      kind: call
-      has:
-        field: function
-        regex: '^(time\.(time|time_ns|perf_counter|perf_counter_ns|monotonic|monotonic_ns|process_time)|(datetime\.)?datetime\.(now|utcnow|today))$'
+message: A seed from the clock repeats whenever two runs start in the same tick, and NumPy recommends entropy from the operating system. Call $F() and log rng.bit_generator.seed_seq.entropy when a run must be repeatable.
+rule: { pattern: $F($SEED), matches: clock-argument }
 constraints:
-  F: { regex: '^(np|numpy)\.random\.(default_rng|seed|RandomState|SeedSequence)$' }
+  F: { regex: '^(np|numpy)\.random\.default_rng$' }
 fix: $F()
 metadata: { fix: unsafe }
+---
+id: clock-seed
+language: python
+severity: warning
+message: A seed from the clock repeats whenever two runs start in the same tick, and NumPy recommends entropy from the operating system. Call $F() and log its entropy attribute when a run must be repeatable.
+rule: { pattern: $F($SEED), matches: clock-argument }
+constraints:
+  F: { regex: '^(np|numpy)\.random\.SeedSequence$' }
+fix: $F()
+metadata: { fix: unsafe }
+---
+# A RandomState has no public attribute that holds the entropy it drew. numpy/legacy-random
+# reports RandomState on its own, outside files that import scikit-learn, whose random_state
+# takes a RandomState and rejects a Generator.
+id: clock-seed
+language: python
+severity: warning
+message: A seed from the clock repeats whenever two runs start in the same tick, and NumPy recommends entropy from the operating system. Call $F(), which takes its seed from the operating system.
+rule: { pattern: $F($SEED), matches: clock-argument }
+constraints:
+  F: { regex: '^(np|numpy)\.random\.RandomState$' }
+fix: $F()
+metadata: { fix: unsafe }
+---
+# np.random.seed() has no entropy to log, and numpy/legacy-random reports it. A Generator in its
+# place changes the calls that draw from the global state, so this document has no fix.
+id: clock-seed
+language: python
+severity: warning
+message: A seed from the clock repeats whenever two runs start in the same tick, and $NP.random.seed sets the legacy global RandomState. Create rng = $NP.random.default_rng() once, log rng.bit_generator.seed_seq.entropy when a run must be repeatable, and draw from rng.
+rule: { pattern: $NP.random.seed($SEED), matches: clock-argument }
+constraints:
+  NP: { regex: '^(np|numpy)$' }

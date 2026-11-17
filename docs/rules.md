@@ -3962,9 +3962,9 @@ noise = rng.normal(size=n)
 
 #### clock-seed
 
-**Severity:** warning. **Fix:** unsafe: `np.random.default_rng()`, `np.random.seed()`, `np.random.RandomState()`, `np.random.SeedSequence()`. The numbers change, and a seed recovered from a logged start time no longer repeats the run.
+**Severity:** warning. **Fix:** unsafe: `np.random.default_rng()`, `np.random.RandomState()`, `np.random.SeedSequence()`. The numbers change, and a seed recovered from a logged start time no longer repeats the run. `np.random.seed` has no fix.
 
-The rule reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick of the clock get the same numbers. NumPy recommends a seed from the operating system, and a log of the seed when a run must be repeatable.
+The rule reports a seed taken from `time.time()`, `time.time_ns()`, `time.perf_counter()`, `datetime.now()` and similar clocks. Two runs that start in the same tick of the clock get the same numbers. NumPy recommends a seed from the operating system, and a log of the seed when a run must be repeatable. For `np.random.seed(int(time.time()))` the rule advises the code under `Use instead:`, because `np.random.seed()` has no entropy to log and [`legacy-random`](#legacy-random) reports it.
 
 Example:
 
