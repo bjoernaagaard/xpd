@@ -4236,7 +4236,7 @@ Replace each name that SciPy removed or deprecated with the name the rule gives,
 
 #### removed-in-scipy
 
-**Severity:** error. **Fix:** unsafe: `trapezoid`, `cumulative_trapezoid` and `simpson` for `trapz`, `cumtrapz` and `simps`, `pinv` for `pinv2`, `eye` for `speye`, `median_abs_deviation` and `gibrat` for `median_absolute_deviation` and `gilbrat`, each in the module the code already names, `from scipy.integrate import trapezoid as trapz` for an import of the old name, `scipy.signal.windows.<name>` for a window on the `scipy.signal` namespace, `stats.mstats.find_repeats` and `kendalltau_seasonal`, and `np.<name>` for a NumPy name on the `scipy` namespace. Each is unsafe because the old body is not in SciPy 1.18.1, so the fix cannot be shown to give the same result. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: `trapezoid`, `cumulative_trapezoid` and `simpson` for `trapz`, `cumtrapz` and `simps`, `pinv` for `pinv2`, `eye` for `speye`, `median_abs_deviation` and `gibrat` for `median_absolute_deviation` and `gilbrat`, each in the module the code already names, `from scipy.integrate import trapezoid as trapz` for an import of the old name, `scipy.signal.windows.<name>` for a window on the `scipy.signal` namespace, `stats.mstats.find_repeats` and `kendalltau_seasonal`, and `np.<name>` for a NumPy name on the `scipy` namespace. It also writes the replacement that takes the same arguments: `impulse`, `lsim` and `step` for `impulse2`, `lsim2` and `step2`, `betainc` and `betaincinv` for `btdtr` and `btdtri`, and `expm` for `expm2` and `expm3`, each also in an import as `new as old`, `stats.chi2.sf` for `stats.chisqprob`, `scipy.special.betainc` and `erfc` for `scipy.stats.betai` and `erfc`, `np.kron`, `np.tri`, `np.tril`, `np.triu` and `np.linalg.slogdet` for the `scipy.linalg` names, `sparse.csgraph.connected_components` for `sparse.cs_graph_components`, `scipy.special` and `scipy.datasets` for `comb`, `factorial`, `face` and the other names on `scipy.misc` or the `scipy` namespace. Each is unsafe because the old form raises on SciPy 1.18.1, so the fix cannot be shown to give the same result. The other forms have no fix, because the name has no replacement that takes the same arguments, the message names two, or the new module is one that the code does not name, as in `from scipy import misc` or an import from the old module.
 
 The rule reports SciPy names that raise on SciPy 1.18.1. Its message says what to write
 instead, or says that SciPy has no public replacement.
@@ -4275,7 +4275,7 @@ angle = np.pi * frac
 
 #### deprecated-in-scipy
 
-**Severity:** warning. **Fix:** safe: the public namespace for a name taken from one of the 107 private modules that SciPy deprecated, such as `scipy.sparse.csr_matrix` for `scipy.sparse.csr.csr_matrix` and `from scipy.ndimage import gaussian_filter` for `from scipy.ndimage.filters import gaussian_filter`, which give the same object, and `tri.find_simplex(xi)` for `scipy.spatial.tsearch(tri, xi)`, which is what `tsearch` returns. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: the public namespace for a name taken from one of the 107 private modules that SciPy deprecated, such as `scipy.sparse.csr_matrix` for `scipy.sparse.csr.csr_matrix` and `from scipy.ndimage import gaussian_filter` for `from scipy.ndimage.filters import gaussian_filter`, which give the same object, and `tri.find_simplex(xi)` for `scipy.spatial.tsearch(tri, xi)`, which is what `tsearch` returns. Unsafe: `vq` for `scipy.cluster.vq.py_vq`, and `vq as py_vq` in an import, because `vq` returns the codes as int32 where `py_vq` returned int64, and float32 distances for float32 input. The other forms have no fix, because the public module lacks the name or holds another object, an import of a whole private module would change every later use, or the replacement takes other arguments or is another package.
 
 The rule reports names that warn with `DeprecationWarning` on SciPy 1.18.1, and its message
 names the replacement that SciPy's warning names. The names are:
@@ -4312,7 +4312,7 @@ Change each argument that SciPy removed, deprecated or ignores, and move each le
 
 #### removed-keyword
 
-**Severity:** error. **Fix:** unsafe: `rtol=` for `tol=` on the sparse.linalg solvers, because the old tol came with an atol default that SciPy 1.18 rejects, `restart=` for gmres `restrt=`, `assume_a='pos'` for linalg.solve `sym_pos=True`, `subset_by_index=` for eigh and eigvalsh `eigvals=`, `workers=` for `n_jobs=` on the KDTree and cKDTree query methods, and `scale=1.0` for iqr and median_abs_deviation `scale='raw'`, because no source on SciPy 1.18 shows the old code. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe: `rtol=` for `tol=` on the sparse.linalg solvers, because the old tol came with an atol default that SciPy 1.18 rejects, `restart=` for gmres `restrt=`, `assume_a='pos'` for linalg.solve `sym_pos=True`, `subset_by_index=` for eigh and eigvalsh `eigvals=`, `workers=` for `n_jobs=` on the KDTree and cKDTree query methods, and `scale=1.0` for iqr and median_abs_deviation `scale='raw'`, because no source on SciPy 1.18 shows the old code. It deletes simpson `even=`, kendalltau `initial_lexsort=` and fmin_l_bfgs_b `iprint=` and `disp=`, unsafe because each old form raises. The other forms have no fix, because the call already passes the new keyword, or the message names two rewrites, or the value the new form needs is not in the file.
 
 The rule reports keywords and argument values that SciPy removed and that raise on SciPy 1.18.1.
 
@@ -4323,12 +4323,12 @@ The rule reports keywords and argument values that SciPy removed and that raise 
 | `linalg.solve` | `sym_pos=` | `assume_a='pos'` for `sym_pos=True` |
 | `linalg.eigh`, `linalg.eigvalsh` | `eigvals=`, `turbo=` | `subset_by_index=` for `eigvals=` |
 | `linalg.pinv`, `linalg.pinvh` | `cond=`, `rcond=` | none |
-| `integrate.simpson` | `even=` | none |
+| `integrate.simpson` | `even=` | deletes it |
 | `integrate.cumulative_trapezoid` | an `initial` other than 0 | none |
 | the query methods of `KDTree` and `cKDTree` | `n_jobs=` | `workers=` |
-| `stats.kendalltau` | `initial_lexsort=` | none |
+| `stats.kendalltau` | `initial_lexsort=` | deletes it |
 | `stats.iqr`, `stats.median_abs_deviation` | `scale='raw'` | `scale=1.0` |
-| `optimize.fmin_l_bfgs_b` | `iprint=`, `disp=` | none |
+| `optimize.fmin_l_bfgs_b` | `iprint=`, `disp=` | deletes them |
 | `spatial.distance.cdist`, `spatial.distance.pdist` | the metric `'wminkowski'` | none |
 
 Example:
@@ -4349,7 +4349,7 @@ dist, idx = tree.query(points, k=3, workers=-1)
 
 #### deprecated-argument
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** safe: deletes lombscargle `precenter=False`, which is what the default does. Unsafe: deletes qr `lwork=`, because an `lwork` below the number of rows raised ValueError. The other forms have no fix, because `precenter=True` needs `y` centred too, the positional forms need the names of the arguments after them, and `variant=` and `method='highs'` change the result or its options.
 
 The rule reports arguments that warn on SciPy 1.18.1 and that SciPy will remove. The forms whose
 message names `variant=` are skipped on SciPy older than 1.17.
@@ -4377,7 +4377,7 @@ res = optimize.linprog(c, A_ub=A, b_ub=b, method="highs")
 
 #### default-that-warns
 
-**Severity:** warning. **Fix:** safe: `callback_type='legacy'` for gmres with a callback, and `spmatrix=True` for hb_read and mmread. Each is what SciPy 1.18.1 does after it warns. The other forms have no fix.
+**Severity:** warning. **Fix:** safe: `callback_type='legacy'` for gmres with a callback, and `spmatrix=True` for hb_read and mmread. Each is what SciPy 1.18.1 does after it warns. Unsafe: `mode='grid-constant'` for zoom with `grid_mode=True` and no `mode=`, because the grid mode pads in another way and the values near the edges change. The other forms have no fix, because the result of anderson and anderson_ksamp changes type, and an explicit zoom `mode=` is outside the match.
 
 The rule reports calls that rely on a default that warns on SciPy 1.18.1. A form whose message
 names an argument added in SciPy 1.17 or 1.18 is skipped on an older SciPy.
@@ -4388,7 +4388,7 @@ names an argument added in SciPy 1.17 or 1.18 is skipped on an older SciPy.
 | `stats.anderson` | no `method=` | none |
 | `stats.anderson_ksamp` | no `variant=` | none |
 | `io.hb_read`, `io.mmread` | no `spmatrix=` | `spmatrix=True` |
-| `ndimage.zoom` with `grid_mode=True` | mode `'constant'`, the default, or `'wrap'` | none |
+| `ndimage.zoom` with `grid_mode=True` | mode `'constant'`, the default, or `'wrap'` | `mode='grid-constant'` when the call passes no `mode=` |
 
 Example:
 
@@ -4456,7 +4456,7 @@ res = minimize(f, x0, method="L-BFGS-B", jac=grad, bounds=[(0, 1)] * n)
 
 #### rng-keyword
 
-**Severity:** info. **Fix:** none. The same integer gives a different stream under `rng=` than under `random_state=` or `seed=`.
+**Severity:** info. **Fix:** unsafe: `rng=` for `random_state=` and `seed=`. The same integer gives a different stream under `rng=`, and `qmc.Sobol` raises for a `RandomState` instance passed as `rng=`.
 
 The rule reports `random_state=` and `seed=` passed by keyword to the functions and classes that
 SciPy 1.15 moved to `rng=`. SciPy's docs say new code should pass `rng`. Examples are
@@ -4632,7 +4632,7 @@ Use the SciPy function that computes the quantity directly, because the two-step
 
 #### log-of-special
 
-**Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5. A function imported by name has no fix.
+**Severity:** warning. **Fix:** unsafe: `special.log_ndtr(x)`, `special.gammaln(x)`, `special.gammaln(n + 1)`, `special.betaln(a, b)`, `special.log_expit(x)`, `special.log_softmax(x)`. `log_expit` needs SciPy 1.8 and `log_softmax` SciPy 1.5. A function imported by name is fixed only in a file that imports the log form from `scipy.special`.
 
 The rule reports `np.log` of a `scipy.special` function that has a log form of its own, under
 any import of `scipy.special`. The table shows where the old form overflowed or lost digits.
@@ -4703,7 +4703,7 @@ pvalue = 2 * stats.norm.sf(np.abs(z))
 
 #### special-complement
 
-**Severity:** warning. **Fix:** unsafe: `special.erfc(x)`, `special.erf(x)`, `special.gammaincc(a, x)`, `special.gammainc(a, x)`, `special.betaincc(a, b, x)`, `special.erfc(-x)`, `special.ndtr(-x)`, `special.expit(-x)`. `betaincc` needs SciPy 1.11. `erf`, `erfc`, `gammainc`, `gammaincc` and `betainc` imported by name have no fix, because the new name is not imported.
+**Severity:** warning. **Fix:** unsafe: `special.erfc(x)`, `special.erf(x)`, `special.gammaincc(a, x)`, `special.gammainc(a, x)`, `special.betaincc(a, b, x)`, `special.erfc(-x)`, `special.ndtr(-x)`, `special.expit(-x)`. `betaincc` needs SciPy 1.11. `erf`, `erfc`, `gammainc`, `gammaincc` and `betainc` imported by name are fixed only in a file that imports the new name from `scipy.special`.
 
 The rule reports 1 plus or minus a `scipy.special` function, where SciPy has a function that
 keeps the digits of a small result. The old form lost 3 or more digits in the following ranges:
@@ -4753,7 +4753,7 @@ crit = stats.norm.isf(alpha / 2)
 
 #### comb-by-factorials
 
-**Severity:** warning. **Fix:** unsafe: `special.comb(n, k)`. `factorial` imported by name has no fix, because `comb` is not imported.
+**Severity:** warning. **Fix:** unsafe: `special.comb(n, k)`. `factorial` imported by name is fixed only in a file that imports `comb` from `scipy.special`.
 
 The rule reports `special.factorial(n) / (special.factorial(k) * special.factorial(n - k))`, and
 the same with the factors in another order or divided one at a time. `factorial` overflows to inf
@@ -4923,7 +4923,7 @@ xs = [lu.solve(b) for b in sides]
 
 #### sparse-inv-then-multiply
 
-**Severity:** warning. **Fix:** unsafe: `spla.spsolve(A, b)` when `inv` is reached through its module. The last bits change, and a `b` of shape `(n, 1)` gives a 1-D result. `inv` imported by name has no fix.
+**Severity:** warning. **Fix:** unsafe: `spla.spsolve(A, b)` when `inv` is reached through its module. The last bits change, and a `b` of shape `(n, 1)` gives a 1-D result. `inv` imported by name is fixed only in a file that imports `spsolve` from `scipy.sparse.linalg`.
 
 The rule reports `scipy.sparse.linalg.inv(A) @ b` and `inv(A).dot(b)`, because the inverse of
 most sparse matrices is dense. On a tridiagonal matrix of 1,000 rows, whose inverse holds 1,000,000
@@ -5008,7 +5008,7 @@ Use the class or module that SciPy's documentation prefers, because the older na
 
 #### ckdtree
 
-**Severity:** info. **Fix:** none, because the default `leafsize` differs, 16 against 10. Skipped on SciPy older than 1.6.
+**Severity:** info. **Fix:** unsafe: `KDTree` for `cKDTree`, with the same arguments. The default `leafsize` differs, 16 against 10, so a query can return another one of two equally near points, and the tree's node classes differ. `cKDTree` imported by name is fixed only in a file that imports `KDTree` from `scipy.spatial`. Skipped on SciPy older than 1.6.
 
 The rule reports a call to `cKDTree`, whose docstring says it is functionally identical to
 `KDTree` and kept only for backward compatibility.
