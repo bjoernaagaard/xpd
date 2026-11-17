@@ -2,13 +2,13 @@
 # reconstruction error of a row by the sum of the row's values. After a step that centres the
 # columns that sum is near zero and negative for half the rows, so the ratio is meaningless. On
 # 1,000 rows with 20 planted outliers the relative variant flagged the 20 planted rows on the raw
-# data and 287 rows, 10 of them planted, after StandardScaler, where 505 rows had a negative
+# data and 320 rows, 19 of them planted, after StandardScaler, where 510 rows had a negative
 # ratio. variant="absolute" flagged the 20 planted rows in both cases.
 
 id: pca-outlier-after-scaler
 language: python
 severity: error
-message: $C divides the reconstruction error by the sum of each row, which a centring step puts near zero. With 20 planted outliers in 1,000 rows it flagged 287 rows after StandardScaler and found 10 of the planted ones, where variant="absolute" flagged exactly the 20. Pass variant="absolute" and a threshold in the units of the scaled data.
+message: $C divides the reconstruction error by the sum of each row, which a centring step puts near zero. With 20 planted outliers in 1,000 rows it flagged 320 rows after StandardScaler, 19 of them planted, where variant="absolute" flagged exactly the 20. Pass variant="absolute" and a threshold in the units of the scaled data.
 rule:
   pattern: $F($$$A)
   all:

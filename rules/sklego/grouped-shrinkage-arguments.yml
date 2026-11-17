@@ -3,7 +3,7 @@
 #
 # GroupedClassifier ends its signature with **shrinkage_kwargs and does nothing with it, so
 # shrinkage= or any other extra keyword is dropped. With shrinkage="relative" its probabilities
-# were equal to those without it, bit for bit, and differed by up to 0.17 from
+# were equal to those without it, bit for bit, and differed by up to 0.29 from
 # HierarchicalClassifier(shrinkage="relative"), which does shrink.
 
 id: grouped-shrinkage-arguments

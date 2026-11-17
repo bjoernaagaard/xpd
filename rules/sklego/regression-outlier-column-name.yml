@@ -2,8 +2,8 @@
 # whose position equals `column` from the features. A name equals no position, so the target
 # stays among the features and the inner model predicts it from itself. On 500 rows with 10
 # planted outliers, column="y" on the frame fitted 3 features with the coefficients 0, 0 and 1
-# and a residual spread of 8.08e-16, and flagged 30 rows. column=2 on df.to_numpy() fitted 2
-# features, had a spread of 1.48 and flagged the 10 planted rows and no other.
+# and a residual spread of 9.50e-16, and flagged 11 rows. column=2 on df.to_numpy() fitted 2
+# features, had a spread of 3.25 and flagged the 10 planted rows and no other.
 #
 # A position on a frame is wrong in another way: the frame's column names are compared with the
 # number, none matches, and the first column becomes the target. Only the array form works, and
@@ -12,7 +12,7 @@
 id: regression-outlier-column-name
 language: python
 severity: error
-message: RegressionOutlierDetector with a column name keeps the target among the features, so the inner model predicts the target from itself. With 10 planted outliers it fitted the coefficients 0, 0 and 1 and flagged 30 rows, where column=2 on df.to_numpy() flagged the 10 planted rows. Pass the position of the column and fit on a NumPy array.
+message: RegressionOutlierDetector with a column name keeps the target among the features, so the inner model predicts the target from itself. With 10 planted outliers it fitted the coefficients 0, 0 and 1 and flagged 11 rows, where column=2 on df.to_numpy() flagged the 10 planted rows. Pass the position of the column and fit on a NumPy array.
 rule:
   pattern: $F($$$A)
   all:

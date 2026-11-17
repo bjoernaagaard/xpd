@@ -13,7 +13,7 @@
 id: calibrate-on-training-rows
 language: python
 severity: error
-message: This conformalizes on the training rows, where the model's errors are smaller than on new rows. A RandomForestRegressor conformalized this way covered 0.483 of the test rows at confidence_level=0.9, against 0.905 with rows held out, and a classifier covered 0.248 against 0.920. Conformalize on rows the model was not fitted on, as train_conformalize_test_split gives them, or use a cross conformal class and fit_conformalize.
+message: This conformalizes on the training rows, where the model's errors are smaller than on new rows. A RandomForestRegressor conformalized this way covered 0.468 of the test rows at confidence_level=0.9, against 0.907 with rows held out, and a classifier covered 0.467 against 0.906. Conformalize on rows the model was not fitted on, as train_conformalize_test_split gives them, or use a cross conformal class and fit_conformalize.
 rule:
   any:
     - pattern: $M.conformalize($X, $$$A1)
@@ -24,7 +24,7 @@ constraints:
 id: calibrate-on-training-rows
 language: python
 severity: error
-message: This conformalizes on $X, the rows a model was fitted on above, where its errors are smaller than on new rows. A RandomForestRegressor conformalized on its training rows covered 0.483 of the test rows at confidence_level=0.9, against 0.905 with rows held out, and a search fitted on the conformalization rows covered 0.819. Conformalize on rows that no fit and no search has seen.
+message: This conformalizes on $X, the rows a model was fitted on above, where its errors are smaller than on new rows. A RandomForestRegressor conformalized on its training rows covered 0.468 of the test rows at confidence_level=0.9, against 0.907 with rows held out, and a search fitted on the conformalization rows covered 0.679. Conformalize on rows that no fit and no search has seen.
 rule:
   pattern: $M.conformalize($X, $$$A1)
   any:
@@ -61,7 +61,7 @@ constraints:
 id: calibrate-on-training-rows
 language: python
 severity: error
-message: This calibrates the risk controller on the training rows, where the model looks better than it is. A BinaryClassificationController with a target precision of 0.85 that was calibrated this way gave a precision of 0.666 on test rows, below the target in 30 of 30 runs. Calibrate on rows the model was not fitted on.
+message: This calibrates the risk controller on the training rows, where the model looks better than it is. A BinaryClassificationController with a target precision of 0.85 that was calibrated this way gave a precision of 0.638 on test rows, below the target in 30 of 30 runs. Calibrate on rows the model was not fitted on.
 rule:
   pattern: $C.calibrate($X, $$$A1)
   inside:
@@ -76,7 +76,7 @@ constraints:
 id: calibrate-on-training-rows
 language: python
 severity: error
-message: With cv="prefit" this fits the calibrator on the rows given here, and these are the training rows, where the estimator's probabilities are too sure. On test rows a TopLabelCalibrator fitted this way had a top-label calibration error of 0.525, against 0.077 fitted on held-out rows and 0.119 with no calibration at all, and a VennAbersCalibrator had 0.272 against 0.051. Fit the calibrator on rows the estimator was not fitted on.
+message: With cv="prefit" this fits the calibrator on the rows given here, and these are the training rows, where the estimator's probabilities are too sure. On test rows a TopLabelCalibrator fitted this way had a top-label calibration error of 0.178, against 0.085 fitted on held-out rows and 0.124 with no calibration at all, and a VennAbersCalibrator had 0.128 against 0.061. Fit the calibrator on rows the estimator was not fitted on.
 rule:
   pattern: $C.fit($X, $$$A1)
   has:

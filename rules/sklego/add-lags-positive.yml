@@ -1,8 +1,8 @@
 # add_lags shifts by the negative of the lag, so lag 1 puts the value of the next row on each
 # row, and lag -1 the value of the row before. pandas shift(1) goes the other way. On a frame
 # with sales 10 to 50, add_lags(df, "sales", 1) gave sales1 = 20, 30, 40, 50. On a series of
-# pure noise, the column from lag 1 predicted the sign of the next row with accuracy 0.992, and
-# the column from lag -1 predicted the sign of its own row with accuracy 0.531.
+# pure noise, the column from lag 1 predicted the sign of the next row with accuracy 0.996, and
+# the column from lag -1 predicted the sign of its own row with accuracy 0.474.
 #
 # A positive lag is right when the column is the target of a forecast, so the rule is a warning.
 #
@@ -13,7 +13,7 @@
 id: add-lags-positive
 language: python
 severity: warning
-message: add_lags with a positive lag copies the value of a later row, so lag 1 is the next row and not the row before. On pure noise that column predicted the next row's sign with accuracy 0.992, where lag -1 scored 0.531. Use negative lags for features from the past.
+message: add_lags with a positive lag copies the value of a later row, so lag 1 is the next row and not the row before. On pure noise that column predicted the next row's sign with accuracy 0.996, where lag -1 scored 0.474. Use negative lags for features from the past.
 rule:
   pattern: $F($$$A)
   all:

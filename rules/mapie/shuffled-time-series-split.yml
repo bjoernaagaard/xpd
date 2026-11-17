@@ -1,8 +1,8 @@
 # A shuffled split puts test rows between the training rows in time, so a model that reads the
 # time or a lagged value scores well on them and badly on what comes later. On a random walk of
-# 900 rows, over 30 seeds on MAPIE 1.6.0, a TimeSeriesRegressor covered 0.923 of a shuffled test
-# part at confidence_level=0.9 and 0.153 of a test part that came after the training rows. A
-# split conformal regressor on a shuffled split covered 0.894 of its test rows and 0.128 of the
+# 900 rows, over 30 seeds on MAPIE 1.6.0, a TimeSeriesRegressor covered 0.921 of a shuffled test
+# part at confidence_level=0.9 and 0.536 of a test part that came after the training rows. A
+# split conformal regressor on a shuffled split covered 0.891 of its test rows and 0.144 of the
 # 300 rows after them.
 #
 # The rule reports a split with no shuffle keyword whose first result, by its name, is the first
@@ -11,7 +11,7 @@
 id: shuffled-time-series-split
 language: python
 severity: warning
-message: This split shuffles the rows, and $X goes into a TimeSeriesRegressor, so test rows sit between training rows in time. On a random walk the intervals covered 0.923 of a shuffled test part and 0.153 of the rows that came later, at confidence_level=0.9. Pass shuffle=False so that the test rows come after the training rows.
+message: This split shuffles the rows, and $X goes into a TimeSeriesRegressor, so test rows sit between training rows in time. On a random walk the intervals covered 0.921 of a shuffled test part and 0.536 of the rows that came later, at confidence_level=0.9. Pass shuffle=False so that the test rows come after the training rows.
 rule:
   kind: call
   all:

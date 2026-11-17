@@ -5121,9 +5121,9 @@ The rule leaves alone `PermutationImportance` and `permutation_importance`, a fi
 test rows joined, a `LabelBinarizer` or `MultiLabelBinarizer`, and a `LabelEncoder` whose result
 goes straight into another call, such as a plot.
 
-The fix scales or codes the test rows with the statistics of the training rows. It changed the
-test matrix by up to 0.43 and the predicted probabilities by up to 0.18, and a test level that the
-step hasn't seen now raises. At 4 of 17 held-back sites the fixed code raised, because the scaler
+The fix scales or codes the test rows with the statistics of the training rows. On the cases built
+for it, the fix changed the test matrix by up to 0.60 and some predicted labels, and a test level
+that the step hasn't seen now raises. At 4 of 17 held-back sites the fixed code raised, because the scaler
 was built again on the line before, or one `LabelEncoder` was last fitted on another column.
 
 The rule as the readers saw it gave wrong advice in 3 and 3 of 23 labelled reports, and the
@@ -5678,7 +5678,7 @@ means:
 | `get_feature_names_out()` | It returns an array where `get_feature_names()` returned a list, so `print` shows `array([...])`. At 1 held-back site the fix broke a project class that defined its own `get_feature_names`. |
 | dropping `multi_class` | Every multiclass fit uses the multinomial loss. With liblinear on three or more classes the fixed call raises ValueError. |
 | dropping `algorithm="SAMME.R"` | A SAMME.R model becomes a SAMME model. |
-| `OneHotEncoder(sparse_output=False, dtype=np.int)` | At 2 held-back sites the fixed call still raised, because `np.int` is gone from NumPy. |
+| `OneHotEncoder(sparse_output=False, dtype=np.int)` | At 2 held-back sites the call also held `np.int`, which is gone from NumPy. The same run with `--fix --unsafe-fixes` rewrote it to `int`, and the fixed call ran. |
 
 Of 321 held-back reports, 58 were labelled, and reader A called 1 wrong. Recall was 517 of 600.
 Of the misses, 36 were `SCORERS`, the `plot_*` functions and `jaccard_similarity_score`, which
@@ -6250,8 +6250,7 @@ faster:
 
 The fitted vectorizer is bit equal. The fix is unsafe, because `fit_transform` leaves the column
 indices of each row unsorted, and `TfidfVectorizer` values differ by up to 1.1e-16. A
-`MultinomialNB` fitted on the matrix gave probabilities that differ by up to 3e-15, and a
-`LogisticRegression` gave coefficients that differ by up to 1.3e-15.
+`MultinomialNB` fitted on the matrix gave probabilities that differ by up to 3e-15.
 
 Reader B called 4 of the 12 held-back reports wrong advice, and reader A called none wrong. Recall
 was 19 of 25. The 6 misses were a fitted vectorizer assigned back to its own name, as in
@@ -6472,16 +6471,16 @@ was narrowed to leave test files alone, which removed 7.
 
 | Rule | Severity | Proof | Reports on scikit-lego's files | On code that is right | Fix |
 | --- | --- | --- | --- | --- | --- |
-| [`thresholder-score`](#thresholder-score) | error | number: 0.875 at three thresholds against 0.700, 0.875 and 0.850 | 0 | 0 | none |
+| [`thresholder-score`](#thresholder-score) | error | number: 0.887 at three thresholds against 0.740, 0.887 and 0.847 | 0 | 0 | none |
 | [`estimator-transformer-proba`](#estimator-transformer-proba) | error | number: shape (800, 1) for 400 rows | 0 | 0 | none |
 | [`column-capper-fraction`](#column-capper-fraction) | error | number: 9,910 of 10,000 values changed against 1,000 | 0 | 0 | none |
 | [`dict-mapper-not-int`](#dict-mapper-not-int) | error | number: 0.5 and 1.7 became 0 and 1. Interpreter: ValueError | 0 | 0 | none |
-| [`regression-outlier-column-name`](#regression-outlier-column-name) | error | number: coefficients 0, 0 and 1, and 30 rows flagged against 10 | 2 | 0 | none |
-| [`pca-outlier-after-scaler`](#pca-outlier-after-scaler) | error | number: 287 rows flagged against 20 | 0 | 0 | none |
+| [`regression-outlier-column-name`](#regression-outlier-column-name) | error | number: coefficients 0, 0 and 1, and 11 rows flagged against 10 | 2 | 0 | none |
+| [`pca-outlier-after-scaler`](#pca-outlier-after-scaler) | error | number: 320 rows flagged against 20 | 0 | 0 | none |
 | [`outlier-threshold`](#outlier-threshold) | error | interpreter: ValueError. Number: 380 of 400 rows flagged against 20 | 1 | 1 | none |
 | [`grouped-shrinkage-arguments`](#grouped-shrinkage-arguments) | error | number: probabilities bit equal with and without the keyword. Interpreter: TypeError | 0 | 0 | unsafe |
-| [`add-lags-positive`](#add-lags-positive) | warning | number: accuracy 0.992 against 0.531 on noise | 2 | 2 | none |
-| [`decay-on-shuffled-rows`](#decay-on-shuffled-rows) | warning | number: slope 1.648 against 2.989 | 0 | 0 | none |
+| [`add-lags-positive`](#add-lags-positive) | warning | number: accuracy 0.996 against 0.474 on noise | 2 | 2 | none |
+| [`decay-on-shuffled-rows`](#decay-on-shuffled-rows) | warning | number: slope 1.621 against 3.028 | 0 | 0 | none |
 | [`outlier-remover-before-model`](#outlier-remover-before-model) | error | interpreter: ValueError | 0 | 0 | none |
 | [`decay-without-sample-weight`](#decay-without-sample-weight) | error | interpreter: ValueError, TypeError | 0 | 0 | none |
 | [`zero-inflated-roles`](#zero-inflated-roles) | error | interpreter: ValueError | 2 | 0 | none |
@@ -6531,17 +6530,18 @@ accuracy = model.fit(X_train, y_train).score(X_test, y_test)
 
 The replacement is advice. xpd does not apply it automatically.
 
-On 400 rows with 20 percent positives, the grid search gave its mean test score, and `score` and
-`predict` ran on the test rows:
+On 400 rows with 20 percent positives, from `make_classification(n_samples=400, weights=[0.8],
+random_state=0)` and `train_test_split(random_state=0)`, the grid search on the training rows gave
+its mean test score, and `score` and `predict` ran on the test rows:
 
 | Threshold | Grid search without `scoring` | With `scoring="accuracy"` | `Thresholder.score` | Accuracy of `predict` |
 | --- | --- | --- | --- | --- |
-| 0.1 | 0.875 | 0.700 | 0.890 | 0.770 |
-| 0.5 | 0.875 | 0.875 | 0.890 | 0.890 |
-| 0.9 | 0.875 | 0.850 | 0.890 | 0.810 |
+| 0.1 | 0.887 | 0.740 | 0.850 | 0.710 |
+| 0.5 | 0.887 | 0.887 | 0.850 | 0.850 |
+| 0.9 | 0.887 | 0.847 | 0.850 | 0.840 |
 
 scikit-learn's `FixedThresholdClassifier` made the same predictions as `Thresholder` at each
-threshold, and its `score` gave 0.770, 0.890 and 0.810.
+threshold, and its `score` gave 0.710, 0.850 and 0.840.
 
 #### estimator-transformer-proba
 
@@ -6657,8 +6657,8 @@ On 500 rows with 10 planted outliers:
 
 | Form | Features | Coefficients | Spread of the residuals | Rows flagged |
 | --- | --- | --- | --- | --- |
-| `column="y"` on the frame | 3 | 0, 0 and 1 | 8.08e-16 | 30 |
-| `column=2` on `frame.to_numpy()` | 2 | not given | 1.48 | the 10 planted rows and no other |
+| `column="y"` on the frame | 3 | 0, 0 and 1 | 9.50e-16 | 11 |
+| `column=2` on `frame.to_numpy()` | 2 | not given | 3.25 | the 10 planted rows and no other |
 
 A position on a frame is wrong in another way, which a pattern can't see. The detector compares the
 frame's column names with the number and finds no match, so the first column becomes the target.
@@ -6689,12 +6689,12 @@ detector = make_pipeline(StandardScaler(), PCAOutlierDetection(n_components=1, t
 The replacement is advice. xpd does not apply it automatically, because the threshold has other
 units.
 
-| Data, 1,000 rows with 20 planted outliers | Rows flagged by the relative variant | By `variant="absolute"` |
+| Data, 1,000 rows near a line with 20 planted outliers | Rows flagged by the relative variant, with `threshold=0.1` | By `variant="absolute"`, with `threshold=2.0` |
 | --- | --- | --- |
 | raw | the 20 planted rows | the 20 planted rows |
-| after `StandardScaler` | 287, of which 10 were planted | the 20 planted rows |
+| after `StandardScaler` | 320, of which 19 were planted | the 20 planted rows |
 
-After the scaler, 505 rows had a negative ratio. A scaler built with `with_mean=False`,
+After the scaler, 510 rows had a negative ratio. A scaler built with `with_mean=False`,
 `with_centering=False` or `standardize=False` doesn't centre, and the rule leaves it alone.
 
 #### outlier-threshold
@@ -6764,7 +6764,7 @@ regressor = GroupedRegressor(LinearRegression(), groups=["region", "shop"], shri
 
 `GroupedClassifier` ends its signature with `**shrinkage_kwargs` and never reads it. With
 `shrinkage="relative"` its probabilities were bit equal to the probabilities without the keyword. They
-differed by up to 0.17 from `HierarchicalClassifier(shrinkage="relative")`, which does shrink.
+differed by up to 0.29 from `HierarchicalClassifier(shrinkage="relative")`, which does shrink.
 
 | Form | Error |
 | --- | --- |
@@ -6809,8 +6809,8 @@ On a frame with sales 10 to 50:
 | `add_lags(frame, "sales", -1)` | 10, 20, 30, 40, from the second row on |
 
 On a series of pure noise, a model given the column from lag 1 predicted the sign of the next row
-with accuracy 0.992. A model given the column from lag -1 predicted the sign of its own row with
-accuracy 0.531. A positive lag is right when the new column is the target of a forecast, so the
+with accuracy 0.996. A model given the column from lag -1 predicted the sign of its own row with
+accuracy 0.474. A positive lag is right when the new column is the target of a forecast, so the
 rule is a warning.
 
 A `range` is reported when its numbers are written out and it holds a positive lag, which means it
@@ -6846,8 +6846,8 @@ On 2,000 rows whose slope changed from 1 to 3 at row 1,000, the model was fitted
 
 | Order of the 1,500 training rows | Slope | Mean absolute error |
 | --- | --- | --- |
-| in time order | 2.989 | 0.079 |
-| shuffled, as the mean of 30 shuffles | 1.648 | 1.135 |
+| in time order | 3.028 | 0.078 |
+| shuffled, as the mean of 30 shuffles | 1.621 | 0.648 |
 
 A pattern can't see which rows the estimator is fitted on, so the rule is a warning.
 
@@ -6875,8 +6875,8 @@ model = LinearRegression().fit(X[kept], y[kept])
 
 The replacement is advice. xpd does not apply it automatically.
 
-`fit` raised ValueError "Found input variables with inconsistent numbers of samples: [356, 400]".
-A pipeline that ended in `KMeans`, which reads no y, fitted on the 356 kept rows, and the rule
+`fit` raised ValueError "Found input variables with inconsistent numbers of samples: [328, 400]".
+A pipeline that ended in `KMeans`, which reads no y, fitted on the 328 kept rows, and the rule
 leaves it alone.
 
 #### decay-without-sample-weight
@@ -7290,8 +7290,8 @@ one `RandomAdder()` on its training rows. Both pairs were equal with `random_sta
 The pack has no rule for the following habits:
 
 - `MaximumRelevanceMinimumRedundancy` with the default `kind="auto"` scores a whole-number
-  regression target as classes. On one such target it picked the features 1, 2 and 3, against 1, 2
-  and 5 with `kind="regression"`. A pattern can't see the target, and a rule on every call without
+  regression target as classes. On one such target it picked the features 0, 1 and 3, against 0, 1
+  and 4 with `kind="regression"`. A pattern can't see the target, and a rule on every call without
   `kind` would report the library's own tests.
 - `RegressionOutlierDetector` with a column position on a frame, and `TimeGapSplit`, `RandomAdder`
   and `OutlierRemover` given an input type they don't take, depend on what `fit` is given, which a
@@ -7350,10 +7350,10 @@ narrowed, and the table gives what is left.
 | --- | --- | --- | --- | --- | --- |
 | [`removed-in-mapie`](#removed-in-mapie) | error | interpreter: ImportError, ModuleNotFoundError, TypeError, ValueError, AttributeError | 1 | 0 | unsafe |
 | [`deprecated-in-mapie`](#deprecated-in-mapie) | warning | interpreter: FutureWarning, and intervals equal with and without `gamma` | 2 | 0 | safe |
-| [`alpha-as-confidence-level`](#alpha-as-confidence-level) | warning, error | coverage: 0.101 against 0.905, and interpreter: ValueError | 0 | no reports | none |
-| [`calibrate-on-training-rows`](#calibrate-on-training-rows) | error | coverage: 0.483 against 0.905 | 6 | 1 | none |
-| [`coverage-on-seen-rows`](#coverage-on-seen-rows) | error, warning | coverage: 1.000 against 0.914 | 0 | no reports | none |
-| [`shuffled-time-series-split`](#shuffled-time-series-split) | warning | coverage: 0.923 against 0.153 | 0 | no reports | none |
+| [`alpha-as-confidence-level`](#alpha-as-confidence-level) | warning, error | coverage: 0.108 against 0.907, and interpreter: ValueError | 0 | no reports | none |
+| [`calibrate-on-training-rows`](#calibrate-on-training-rows) | error | coverage: 0.468 against 0.907 | 6 | 1 | none |
+| [`coverage-on-seen-rows`](#coverage-on-seen-rows) | error, warning | coverage: 1.000 against 0.913 | 0 | no reports | none |
+| [`shuffled-time-series-split`](#shuffled-time-series-split) | warning | coverage: 0.921 against 0.536 | 0 | no reports | none |
 | [`prefit-estimator-not-fitted`](#prefit-estimator-not-fitted) | error | interpreter: NotFittedError, AttributeError, ValueError | 0 | no reports | none |
 | [`quantile-estimator-loss`](#quantile-estimator-loss) | error | interpreter: ValueError | 0 | no reports | none |
 | [`predict-function-returns-labels`](#predict-function-returns-labels) | error | interpreter: IndexError | 0 | no reports | unsafe |
@@ -7509,8 +7509,10 @@ ends with `BinaryRisk` twice in its import.
 
 `ensemble=` is reported only on an object that the file assigns from
 `JackknifeAfterBootstrapRegressor` and from no other class, because `TimeSeriesRegressor.predict`
-still takes it. With `method="aci"`, the intervals after `update(X, y, gamma=0.5)` were bit equal to
-the ones after `update(X, y)` on MAPIE 1.3.0, 1.4.0 and 1.6.0, and they differed on MAPIE 1.2.0.
+still takes it. With `method="aci"`, the intervals after
+`update(X, y, confidence_level=0.9, gamma=0.5)` were bit equal to the ones after
+`update(X, y, confidence_level=0.9)` on MAPIE 1.3.0, 1.4.0 and 1.6.0, and they differed on MAPIE
+1.2.0, which needs `confidence_level` in `update`.
 The `update` document therefore carries `since: "1.3"`.
 
 ### Coverage that does not hold
@@ -7522,8 +7524,10 @@ promise is that the intervals cover a share of new rows, and it needs the follow
 - a level that is the share to cover
 - test rows that the method has not seen
 
-Each number below is the mean share of test rows covered over 30 seeds, with a
-`RandomForestRegressor` unless another model is named.
+Each number below is the mean share of test rows covered over the seeds 0 to 29, with a
+`RandomForestRegressor` of 50 trees unless another model is named. The regression data are 1,000
+rows of 5 normal columns, with a target of the first column, the sine of the second and normal
+noise, split into 60, 20 and 20 percent by `train_conformalize_test_split`.
 
 #### alpha-as-confidence-level
 
@@ -7554,8 +7558,8 @@ The replacement is advice. xpd does not apply it automatically.
 
 | `confidence_level` | Share of test rows covered | Width of the intervals |
 | --- | --- | --- |
-| 0.1 | 0.101 | 0.289 |
-| 0.9 | 0.905 | 3.854 |
+| 0.1 | 0.108 | 0.292 |
+| 0.9 | 0.907 | 3.609 |
 
 MAPIE runs both without a warning. A literal below 0.5 is read on the constructors of the
 conformal classes and on `TimeSeriesRegressor.predict`. A risk controller is left alone, because
@@ -7598,13 +7602,13 @@ The replacement is advice. xpd does not apply it automatically.
 
 | Form | Old form | Right form |
 | --- | --- | --- |
-| a regressor conformalized on its training rows | 0.483 coverage | 0.905 with held-out rows |
-| a `RandomForestClassifier` conformalized on its training rows | 0.248 coverage | 0.920 |
-| a model fitted on rows that include the conformalization rows | 0.478 coverage | not given |
-| a `GridSearchCV` fitted on the conformalization rows | 0.819 coverage | 0.902 |
-| a `BinaryClassificationController` with a target precision of 0.85, calibrated on the training rows | precision 0.666 on test rows, below the target in 30 of 30 runs | with held-out rows, a threshold in 10 of 30 runs and none below the target |
-| a `TopLabelCalibrator` with `cv="prefit"` fitted on the training rows | top-label calibration error 0.525 | 0.077 with held-out rows, and 0.119 without calibration |
-| a `VennAbersCalibrator` fitted on the training rows | top-label calibration error 0.272 | 0.051 |
+| a regressor conformalized on its training rows | 0.468 coverage | 0.907 with held-out rows |
+| a `RandomForestClassifier` conformalized on its training rows | 0.467 coverage | 0.906 |
+| a model fitted on rows that include the conformalization rows | 0.473 coverage | not given |
+| a `GridSearchCV` fitted on the conformalization rows | 0.679 coverage | 0.902 |
+| a `BinaryClassificationController` with a target precision of 0.85, calibrated on the training rows | precision 0.638 on test rows, below the target in 30 of 30 runs | with held-out rows, a threshold in 1 of 30 runs and none below the target |
+| a `TopLabelCalibrator` with `cv="prefit"` fitted on the training rows | top-label calibration error 0.178 | 0.085 with held-out rows, and 0.124 without calibration |
+| a `VennAbersCalibrator` fitted on the training rows | top-label calibration error 0.128 | 0.061 |
 
 The rule reads the name for `train`, `trn`, `tr`, `fit` and `training`, and leaves alone a name
 with `conf`, `calib`, `cal`, `val`, `hold`, `test` or `res` in it. The form without a name needs an
@@ -7614,8 +7618,8 @@ conformalization rows is therefore left alone, and so is a class that calls `fit
 assigns to the variable, as in `X, y = load("conformalize")`, because the name then holds other
 rows.
 
-A model picked from six settings by its score on the conformalization rows covered 0.898 against
-0.899, so the rule doesn't report it.
+A model picked from six settings by its score on the conformalization rows covered 0.901, against
+0.904 for a model picked by cross-validation on the training rows, so the rule doesn't report it.
 
 #### coverage-on-seen-rows
 
@@ -7645,11 +7649,11 @@ The replacement is advice. xpd does not apply it automatically.
 
 | Object | Rows given to | Coverage of the same rows | Coverage of the test rows |
 | --- | --- | --- | --- |
-| `CrossConformalRegressor` | `fit_conformalize` | 1.000 | 0.914 |
-| `SplitConformalRegressor` | `fit` | 1.000 | 0.905 |
-| any | `conformalize` | 0.903 in each of the 30 runs | not given |
+| `CrossConformalRegressor` | `fit_conformalize` | 1.000 | 0.913 |
+| `SplitConformalRegressor` | `fit` | 1.000 | 0.907 |
+| any | `conformalize` | 0.905, between 0.900 and 0.905 in each of the 30 runs | not given |
 
-`conformalize` picks the quantile that covers its rows, so the 0.903, with a standard error of
+`conformalize` picks the quantile that covers its rows, so the 0.905, with a standard error of
 0.000, shows nothing, and the `conformalize` document is a warning.
 
 The rule reports only where the result reaches a coverage metric. The call is an argument of
@@ -7687,10 +7691,10 @@ On a random walk of 900 rows:
 
 | Model | Test rows | Coverage |
 | --- | --- | --- |
-| `TimeSeriesRegressor` | a shuffled test part | 0.923 |
-| `TimeSeriesRegressor` | a test part after the training rows | 0.153 |
-| `SplitConformalRegressor` on a shuffled split | its own test rows | 0.894 |
-| `SplitConformalRegressor` on a shuffled split | the 300 rows that came after them | 0.128 |
+| `TimeSeriesRegressor` | a shuffled test part | 0.921 |
+| `TimeSeriesRegressor` | a test part after the training rows | 0.536 |
+| `SplitConformalRegressor` on a shuffled split | its own test rows | 0.891 |
+| `SplitConformalRegressor` on a shuffled split | the 300 rows that came after them | 0.144 |
 
 The rule can't see that the rows are in time order, so it is a warning.
 
@@ -8040,8 +8044,8 @@ After the runs, the rules below were narrowed, and the table gives the reports t
 
 | Rule | Severity | Proof | Reports on the library | Reports on 55 real files | Fix |
 | --- | --- | --- | --- | --- | --- |
-| [`transform-with-test-target`](#transform-with-test-target) | error, info | score: 0.582 against 0.498 AUC | 4 | 0 | unsafe |
-| [`encode-before-split`](#encode-before-split) | error | score: 0.624 against 0.500 AUC | 0 | 0 | none |
+| [`transform-with-test-target`](#transform-with-test-target) | error, info | score: 0.691 against 0.517 AUC | 4 | 0 | unsafe |
+| [`encode-before-split`](#encode-before-split) | error | score: 0.655 against 0.495 AUC | 0 | 0 | none |
 | [`ordinal-mapping-pairs`](#ordinal-mapping-pairs) | error | result: every code is -1.0 | 0 | 0 | unsafe |
 | [`ordinal-mapping-unknown`](#ordinal-mapping-unknown) | info | result: -1.0 for a category the mapping lacks | 3 | 1 | none |
 | [`zero-regularization`](#zero-regularization) | error | result: inf. Interpreter: ValueError | 0 | 0 | none |
@@ -8055,7 +8059,7 @@ After the runs, the rules below were narrowed, and the table gives the reports t
 | [`removed-in-category-encoders`](#removed-in-category-encoders) | error | interpreter: TypeError, AttributeError, KeyError | 0 | 0 | unsafe |
 | [`deprecated-in-category-encoders`](#deprecated-in-category-encoders) | warning, info | interpreter: FutureWarning. Result: equal frames | 0 | 0 | safe |
 | [`sklearn-ships-encoder`](#sklearn-ships-encoder) | info | speed: 1.67 times at the lowest | 61 | 16 | none |
-| [`encoder-noise-without-seed`](#encoder-noise-without-seed) | info | result: two runs differ by up to 0.14 | 4 | 0 | none |
+| [`encoder-noise-without-seed`](#encoder-noise-without-seed) | info | result: two runs differ by up to 0.15 | 4 | 0 | none |
 
 A score proof gives the old form's mean against the new form's mean. The speed proof gives the
 lowest ratio over the three classes and both sizes.
@@ -8110,8 +8114,8 @@ X_test = encoder.transform(X_test)
 
 | Encoder | Test AUC with `transform(X_test, y_test)` | With `transform(X_test)` |
 | --- | --- | --- |
-| `LeaveOneOutEncoder` | 0.582, 7.3 standard errors above 0.5 | 0.498 |
-| `CatBoostEncoder` | 0.507, 0.8 standard errors from 0.5 | not given |
+| `LeaveOneOutEncoder` | 0.691, 11.4 standard errors above 0.5 | 0.517 |
+| `CatBoostEncoder` | 0.499, 0.1 standard errors from 0.5 | 0.516 |
 | `TargetEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder`, `QuantileEncoder`, `CountTargetEncoder` | the same as without the test labels | the same |
 
 With the target, `LeaveOneOutEncoder` takes each row's own label out of the mean of its category,
@@ -8159,10 +8163,10 @@ The replacement is advice. xpd does not apply it automatically.
 
 | Old form, on data with no signal | Test AUC | Right form |
 | --- | --- | --- |
-| `TargetEncoder` fitted on every row before the split | 0.624, 13.4 standard errors above 0.5 | 0.500 with the split first |
-| `TargetEncoder` fitted on every row before `cross_val_score` | 0.610 | 0.495 for a Pipeline that holds the encoder and the model |
-| `LeaveOneOutEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder` or `CountTargetEncoder` fitted on every row before the split, and `CatBoostEncoder` fitted with `fit(X, y)` and then `transform(X)` | 0.620 to 0.623 | not given |
-| `CatBoostEncoder(...).fit_transform(X, y)` on every row before the split | 0.490 in the rerun, because it codes each row from the labels of the rows before it | not given |
+| `TargetEncoder` fitted on every row before the split | 0.655, 19.8 standard errors above 0.5 | 0.495 with the split first |
+| `TargetEncoder` fitted on every row before `cross_val_score` | 0.650 | 0.502 for a Pipeline that holds the encoder and the model |
+| `LeaveOneOutEncoder`, `WOEEncoder`, `JamesSteinEncoder`, `MEstimateEncoder` or `CountTargetEncoder` fitted on every row before the split, and `CatBoostEncoder` fitted with `fit(X, y)` and then `transform(X)` | 0.654 to 0.688 | not given |
+| `CatBoostEncoder(...).fit_transform(X, y)` on every row before the split | 0.490, because it codes each row from the labels of the rows before it | not given |
 
 [`fit-before-split`](#fit-before-split) and
 [`cross-val-on-fitted-data`](#cross-val-on-fitted-data) of the scikit-learn pack report the form
@@ -8294,8 +8298,8 @@ The replacement is advice. xpd does not apply it automatically.
 | `n_components` | Distinct encoded rows for a column of 100 distinct values |
 | --- | --- |
 | 8, the default | 8 |
-| 64 | 48 |
-| 1024 | 95 |
+| 64 | 50 |
+| 1024 | 94 |
 
 Two columns encoded by one `HashingEncoder()` gave 8 output columns in all, and the rows `(x, y)`
 and `(y, x)` got the same code. The encoder therefore also loses which column a value came from.
@@ -8685,8 +8689,8 @@ an encoder without `cols` inside a `ColumnTransformer` is left to
 
 The pack also tested whether a Pipeline with the scikit-learn `TargetEncoder` scores better on the
 test rows than one with the category_encoders class, and it didn't. On 2,000 rows with a target
-that depends on a column of 300 levels, the category_encoders `TargetEncoder` scored 0.599 AUC and
-the scikit-learn class 0.544, over 30 seeds with a random forest. The rule therefore claims the
+that depends on a column of 300 levels, the category_encoders `TargetEncoder` scored 0.655 AUC and
+the scikit-learn class 0.616, over 30 seeds with a random forest. The rule therefore claims the
 speed and nothing about the score.
 
 ### Reproducible results
@@ -8718,12 +8722,12 @@ Two `fit_transform` calls on the same 400 rows, and the largest gap between thei
 
 | Form | Largest gap between two runs |
 | --- | --- |
-| `WOEEncoder(randomized=True)` | 0.07 |
-| `JamesSteinEncoder(randomized=True)` | 0.11 |
-| `MEstimateEncoder(randomized=True)` | 0.13 |
-| `LeaveOneOutEncoder(sigma=0.05)` | 0.14 |
-| `CatBoostEncoder(sigma=0.05)` | 0.12 |
-| `NestedCVWrapper(TargetEncoder())` | 0.07 |
+| `WOEEncoder(randomized=True)` | 0.15 |
+| `JamesSteinEncoder(randomized=True)` | 0.13 |
+| `MEstimateEncoder(randomized=True)` | 0.15 |
+| `LeaveOneOutEncoder(sigma=0.05)` | 0.15 |
+| `CatBoostEncoder(sigma=0.05)` | 0.15 |
+| `NestedCVWrapper(TargetEncoder())` | 0.10 |
 
 With `random_state=0` the two calls were equal in each row of the table, and a
 `NestedCVWrapper` with `shuffle=False` was equal too. A seed does not move the expected score,
@@ -8740,11 +8744,13 @@ The pack has no rule for the following habits, which were looked at:
   pattern cannot see how many classes a target has. `WOEEncoder` raises `ValueError: The target
   column y must be binary` in the same case.
 - `encoder.fit(X_train, y_train)` followed by `encoder.transform(X_train)` gives the training
-  rows of a `LeaveOneOutEncoder` the plain mean of their category. With a random forest, the form
-  scored 0.599 AUC on the test rows against 0.541 with the target passed. The form the
-  documentation asks for was the worse one here, so no rule reports the other.
-- `LeaveOneOutEncoder()` without `sigma` scored 0.541 against 0.551 with `sigma=0.05` in a
-  forest, and the same in a logistic regression, which is no proof.
+  rows of a `LeaveOneOutEncoder` the plain mean of their category. On 600 rows whose 100 levels
+  each carry their own share of positives, with a random forest over 30 seeds, the form scored
+  0.637 AUC on the test rows against 0.580 with the target passed. The form the documentation
+  asks for was the worse one here, so no rule reports the other.
+- On the same data `LeaveOneOutEncoder()` without `sigma` scored 0.580 against 0.559 with
+  `sigma=0.05` in a forest, and both scored 0.636 in a logistic regression, so there is no proof
+  that the noise helps.
 - With the default number of threads, one encoder per column in a loop was 1.15 to 1.25 times
   slower than one encoder with `cols` for `OrdinalEncoder` and `TargetEncoder`, and 3.5 to 5.4
   times slower for `OneHotEncoder`.
@@ -8793,7 +8799,7 @@ Such an object is a call on the class itself, such as `PanelOLS(y, X).fit(...)`,
 its function, or the module outside any function, assigns from such calls and from nothing else.
 The rule leaves alone a name that is also assigned from anything else, that a loop, a `with`
 statement or a lambda parameter binds, or that comes in as an argument. A statsmodels model in the
-same file is therefore not reported. The 950 real files hold 583 `cov_type=` strings with a
+same file is therefore not reported. The 950 real files hold 585 `cov_type=` strings with a
 statsmodels name, such as `"HC3"` and `"cluster"`, and no rule reports one of them.
 
 A rule reads an argument only when it is written out. A `cov_type`, a formula or a flag that is a
@@ -8887,11 +8893,10 @@ Of the 510 reports on the 950 real files, 108 are errors or warnings, and each w
 a line where the rule's claim is false. The other 402 are `info`. Of them, 20 of the 372
 `panel-default-covariance` reports, 14 `hand-written-hausman` reports and all 5
 `absorb-not-categorical` reports were read, and each is a fit or a model of the kind the rule
-describes. `unknown-cov-type` reports none of the 583 `cov_type=` strings with a statsmodels name,
+describes. `unknown-cov-type` reports none of the 585 `cov_type=` strings with a statsmodels name,
 and the 20 of them that were read are calls on statsmodels models.
 
-Recall was not measured, so nothing here says how often a rule misses the form it describes. With
-the pack, xpd took 7% more processor time on the 950 files than without it, 744 s against 696 s.
+Recall was not measured, so nothing here says how often a rule misses the form it describes.
 
 ### Formulas
 

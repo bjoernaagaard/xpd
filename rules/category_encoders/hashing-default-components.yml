@@ -1,6 +1,6 @@
 # HashingEncoder hashes every value into n_components columns, 8 by default, and all encoded
 # columns share them. On 2.11.2 a column of 100 distinct values gave 8 distinct encoded rows with
-# the default, 48 with n_components=64 and 95 with n_components=1024. Two columns encoded by one
+# the default, 50 with n_components=64 and 94 with n_components=1024. Two columns encoded by one
 # HashingEncoder() gave 8 output columns in all, and the rows (x, y) and (y, x) got the same
 # code, so the encoder also loses which column a value came from. The default is a choice the
 # code should state, so the rule is a warning. It has no fix, because the right number depends
@@ -8,7 +8,7 @@
 id: hashing-default-components
 language: python
 severity: warning
-message: HashingEncoder hashes into 8 columns by default, shared by all encoded columns. A column of 100 distinct values gave 8 distinct encoded rows, against 95 with n_components=1024. Pass n_components.
+message: HashingEncoder hashes into 8 columns by default, shared by all encoded columns. A column of 100 distinct values gave 8 distinct encoded rows, against 94 with n_components=1024. Pass n_components.
 rule:
   kind: call
   pattern: $C($$$ARGS)

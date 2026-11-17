@@ -1,7 +1,7 @@
 # Some encoders add random noise to the codes of the training rows, and without random_state
 # they draw it from a new seed on every run. On 2.11.2 two fit_transform calls on the same 400
-# rows differed by up to 0.07 with WOEEncoder(randomized=True), 0.11 with JamesSteinEncoder, 0.13
-# with MEstimateEncoder, 0.14 with LeaveOneOutEncoder(sigma=0.05) and 0.12 with
+# rows differed by up to 0.15 with WOEEncoder(randomized=True), 0.13 with JamesSteinEncoder, 0.15
+# with MEstimateEncoder, 0.15 with LeaveOneOutEncoder(sigma=0.05) and 0.15 with
 # CatBoostEncoder(sigma=0.05). With random_state=0 the two calls were equal. A seed does not move
 # the expected score, so the rule is info, as missing-random-state of the scikit-learn pack is. A
 # file that calls np.random.seed is left alone, because the encoders then draw from that seed.
@@ -40,7 +40,7 @@ rule:
           - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
 ---
 # NestedCVWrapper builds StratifiedKFold(shuffle=True) from a whole-number cv, 5 by default, so
-# its folds change from run to run: two fit_transform calls differed by up to 0.07. With
+# its folds change from run to run: two fit_transform calls differed by up to 0.10. With
 # random_state=0 or shuffle=False they were equal. A splitter passed as cv brings its own seed.
 id: encoder-noise-without-seed
 language: python

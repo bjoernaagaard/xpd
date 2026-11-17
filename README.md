@@ -70,8 +70,8 @@ plotting backend of pandas.
 | NumPy | `append-flattens` | `np.append` without `axis` flattens both arrays |
 | SciPy | `removed-keyword` | `tol=` on the sparse iterative solvers was removed and raises `TypeError` |
 | scikit-learn | `fit-on-test` | A fit on the test rows scored 0.997 AUC on data with no signal |
-| scikit-lego | `thresholder-score` | `Thresholder.score` ignores `threshold`, so a grid search over 0.1, 0.5 and 0.9 gave 0.875 three times |
-| MAPIE | `calibrate-on-training-rows` | `conformalize` on the training rows covered 0.483 of the test rows where 0.9 was asked |
+| scikit-lego | `thresholder-score` | `Thresholder.score` ignores `threshold`, so a grid search over 0.1, 0.5 and 0.9 gave 0.887 three times |
+| MAPIE | `calibrate-on-training-rows` | `conformalize` on the training rows covered 0.468 of the test rows where 0.9 was asked |
 | Category Encoders | `ordinal-mapping-pairs` | An `OrdinalEncoder` mapping given as a list of pairs codes every row as -1.0 |
 | linearmodels | `clustered-without-clusters` | `cov_type="clustered"` without clusters gives the robust standard errors |
 | arch | `unscaled-returns` | Returns as decimals stopped the optimizer with code 4 and gave a mean of 4.02 where 0.056 was right |

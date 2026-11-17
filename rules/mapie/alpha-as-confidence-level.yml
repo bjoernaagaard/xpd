@@ -2,15 +2,15 @@
 # the share it must cover, which is 1 - alpha. An alpha given as confidence_level runs without a
 # warning and gives intervals that cover almost nothing.
 
-# A literal below 0.5. Over 30 seeds on MAPIE 1.6.0, confidence_level=0.1 covered 0.101 of the
-# test rows with a mean width of 0.289, against 0.905 and 3.854 for confidence_level=0.9. A level
+# A literal below 0.5. Over 30 seeds on MAPIE 1.6.0, confidence_level=0.1 covered 0.108 of the
+# test rows with a mean width of 0.292, against 0.907 and 3.609 for confidence_level=0.9. A level
 # below 0.5 can be meant, as in a plot of coverage against the level, so this is a warning. It
 # reads the constructors of the conformal classes and TimeSeriesRegressor.predict. A risk
 # controller is left alone, because its confidence_level is 1 - delta and a low one is a choice.
 id: alpha-as-confidence-level
 language: python
 severity: warning
-message: confidence_level is the share of rows to cover, which is 1 - alpha, and $V looks like an alpha. With confidence_level=0.1 the intervals covered 0.101 of the test rows, against 0.905 with 0.9. Pass 1 - alpha, such as 0.9 for alpha=0.1.
+message: confidence_level is the share of rows to cover, which is 1 - alpha, and $V looks like an alpha. With confidence_level=0.1 the intervals covered 0.108 of the test rows, against 0.907 with 0.9. Pass 1 - alpha, such as 0.9 for alpha=0.1.
 rule:
   kind: keyword_argument
   all:
@@ -38,7 +38,7 @@ rule:
 id: alpha-as-confidence-level
 language: python
 severity: warning
-message: confidence_level is the share of rows to cover, and $V is named as the share to miss. With confidence_level=0.1 the intervals covered 0.101 of the test rows, against 0.905 with 0.9. Pass 1 - $V for one value, or one minus each value of a list.
+message: confidence_level is the share of rows to cover, and $V is named as the share to miss. With confidence_level=0.1 the intervals covered 0.108 of the test rows, against 0.907 with 0.9. Pass 1 - $V for one value, or one minus each value of a list.
 rule:
   kind: keyword_argument
   all:
