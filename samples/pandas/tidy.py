@@ -25,13 +25,15 @@ def wide(n=50, seed=0):
 def column_loop_to_long():
     df = wide()
     in_a_list = pd.concat([df[["id", year]].rename(columns={year: "sales"}).assign(year=year) for year in YEARS], ignore_index=True)  # xpd: column-loop-to-long
+    named = [df[["id", year]].rename(columns={year: "sales"}).assign(year=year) for year in YEARS]  # xpd: column-loop-to-long
+    from_name = pd.concat(named, ignore_index=True)
     parts = []
     for year in YEARS:  # xpd: column-loop-to-long
         part = df[["id", "city", year]].rename(columns={year: "sales"})
         parts.append(part.assign(year=year))
     appended = pd.concat(parts, ignore_index=True)
     melted = df.melt(id_vars=["id", "city"], value_vars=YEARS, var_name="year", value_name="sales")
-    return in_a_list, appended, appended[melted.columns].equals(melted)
+    return in_a_list, from_name, appended, appended[melted.columns].equals(melted)
 
 
 @case

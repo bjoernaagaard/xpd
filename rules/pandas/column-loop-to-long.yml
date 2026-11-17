@@ -12,7 +12,21 @@ rule:
   kind: list_comprehension
   all:
     - has: { kind: for_in_clause, has: { field: left, kind: identifier, pattern: $C } }
-    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.concat$' } } }
+    # The list goes to pd.concat, directly or through a name that the same function or module
+    # passes to pd.concat.
+    - any:
+        - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.concat$' } } }
+        - inside:
+            kind: assignment
+            has: { field: left, kind: identifier, pattern: $PARTS }
+            inside:
+              stopBy: { any: [{ kind: function_definition }, { kind: module }] }
+              any: [{ kind: function_definition }, { kind: module }]
+              has:
+                stopBy: end
+                kind: identifier
+                pattern: $PARTS
+                inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.concat$' } } }
     # The loop variable names a column: it is a key of rename(columns={...}) and it selects from
     # a frame, alone or in a list.
     - has:

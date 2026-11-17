@@ -1585,7 +1585,7 @@ variable. The measurements used pandas 3.1.1.
 
 **Severity:** info. **Fix:** none.
 
-The rule reports a loop over column names that selects one column at a time, renames it to a shared name and stacks the parts with `pd.concat`. The loop can be a list comprehension or a `for` statement that appends. For 100,000 rows and 20 columns, `melt` gave the same 2,000,000 rows in the same order and ran 1.4 times faster.
+The rule reports a loop over column names that selects one column at a time, renames it to a shared name and stacks the parts with `pd.concat`. The loop can be a list comprehension, passed to `pd.concat` directly or through a name that the same function passes to it, or a `for` statement that appends. For 100,000 rows and 20 columns, `melt` gave the same 2,000,000 rows in the same order and ran 1.4 times faster.
 
 Example:
 
