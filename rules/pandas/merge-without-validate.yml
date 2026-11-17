@@ -1,5 +1,6 @@
 # A cross merge pairs every row with every row on purpose, and validate= checks nothing there,
 # so how="cross" is left alone.
+# No fix, because the relation of the keys, such as one_to_one or many_to_one, is not in the file.
 id: merge-without-validate
 language: python
 severity: warning

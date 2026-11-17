@@ -48,9 +48,24 @@ constraints:
 fix: $DF[$C] / $DF.groupby($$$K)[$C].transform("$A")
 metadata: { fix: unsafe }
 ---
+# Unsafe: the fix reads the frame and runs the group-by three times, so code in them with side
+# effects runs again, and transform("min") raises on a dtype that the lambda could still compare.
+id: groupby-lambda-arithmetic
+language: python
+severity: warning
+message: This lambda runs in Python once per group. Take the group minimum and maximum with transform("min") and transform("max") and scale the whole column, as in ($DF[$C] - $G.transform("min")) / ($G.transform("max") - $G.transform("min")).
+rule:
+  pattern: "$G.transform(lambda $X: ($X - $X.min()) / ($X.max() - $X.min()))"
+  has: { field: function, has: { field: object, pattern: "$DF.groupby($$$K)[$C]" } }
+fix: ($DF[$C] - $G.transform("min")) / ($G.transform("max") - $G.transform("min"))
+metadata: { fix: unsafe }
+---
+# A group-by that does not select one column of a frame by name. No fix, because the column to
+# scale is not apart in the code.
 id: groupby-lambda-arithmetic
 language: python
 severity: warning
 message: This lambda runs in Python once per group. Take the group minimum and maximum with transform("min") and transform("max") and scale the whole column.
 rule:
   pattern: "$G.transform(lambda $X: ($X - $X.min()) / ($X.max() - $X.min()))"
+  not: { has: { field: function, has: { field: object, pattern: "$DF.groupby($$$K)[$C]" } } }

@@ -2,6 +2,7 @@
 # the expected value row by row is the point of the test.
 # A for loop or comprehension over zip(...) whose arguments are all columns taken by a text
 # label, or the .values, .to_numpy() or .tolist() of something. dict(zip(...)) is not a loop.
+# No fix, because the column expression depends on the body of the loop.
 id: zip-over-columns
 language: python
 severity: warning

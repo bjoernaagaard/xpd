@@ -61,6 +61,8 @@ constraints:
 fix: set($DF[$C].unique())
 metadata: { fix: unsafe }
 ---
+# Unsafe: value_counts returns a Series, not a Counter, sorted by count, and it leaves out the
+# missing values.
 id: builtin-on-column
 language: python
 severity: warning
@@ -72,6 +74,8 @@ rule:
     - pattern: collections.Counter($DF[$C])
 constraints:
   C: { kind: string }
+fix: $DF[$C].value_counts()
+metadata: { fix: unsafe }
 ---
 id: builtin-on-column
 language: python

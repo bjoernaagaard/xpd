@@ -1,5 +1,6 @@
 # The lambda computes a reduction of a whole column again for every row, so the time grows with
 # the square of the row count.
+# No fix, because the lambda's name would have to be replaced by the column in its body.
 id: apply-recomputes-aggregate
 language: python
 severity: warning

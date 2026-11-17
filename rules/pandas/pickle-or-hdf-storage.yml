@@ -19,6 +19,7 @@ constraints:
 # to_hdf and read_hdf need the PyTables package. On pandas 3.1.1 without it, to_hdf raised
 # ImportError "`Import pytables` failed" (research/modern-pandas/probes/storage.txt). Parquet
 # needs pyarrow, which the missing-pyarrow check of this pack already asks for.
+# No fix, because Parquet changes the file on disk and every program that reads it.
 id: pickle-or-hdf-storage
 language: python
 severity: info

@@ -1,5 +1,7 @@
 # A lambda whose condition reduces its argument, as in x.isnull().all(), receives a whole Series,
 # one per group, and np.where cannot write that.
+# No fix, because the message names two rewrites, np.where and clip, and np.where needs the lambda's
+# name replaced by the column in its body.
 id: apply-condition
 language: python
 severity: warning

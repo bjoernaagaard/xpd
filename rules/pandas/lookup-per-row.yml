@@ -14,6 +14,8 @@ rule:
 fix: $S.map($T[$C])
 metadata: { fix: unsafe }
 ---
+# No fix, because the message names two rewrites, map and merge, and the key column of the table is
+# not apart in the code.
 id: lookup-per-row
 language: python
 severity: warning

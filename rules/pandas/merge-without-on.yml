@@ -1,3 +1,4 @@
+# No fix, because the key columns are not in the file.
 id: merge-without-on
 language: python
 severity: warning

@@ -1,4 +1,8 @@
 # Only a mapping held in a name is reported. With a few literal keys replace is fast enough.
+# Unsafe: on pandas 3.1.1, a key of NaN replaced the missing values and the lambda left them, text
+# mapped to integers stayed object with replace and became int64 with map, and a dict of dicts on
+# a frame replaced per column with replace and nothing with map. The name may also hold a list,
+# which has no get.
 id: replace-with-mapping
 language: python
 severity: warning
@@ -7,3 +11,5 @@ rule: { pattern: $S.replace($M) }
 constraints:
   M: { kind: identifier }
   S: { not: { regex: '\.str$' } }
+fix: '$S.map(lambda v: $M.get(v, v))'
+metadata: { fix: unsafe }

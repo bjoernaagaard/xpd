@@ -99,7 +99,8 @@ transform:
 fix: $X.bfill($REST)
 metadata: { fix: unsafe }
 ---
-# Any other fillna(method=), such as one with a value or with a method held in a name, has no fix.
+# Any other fillna(method=), such as one with a value or with a method held in a name, has no fix,
+# because ffill and bfill take no value, and a name does not say which of the two is meant.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -231,7 +232,7 @@ fix: $NEW
 metadata: { fix: unsafe }
 ---
 # "A" inside resample, asfreq or shift. It raises for datetimes and for periods, and the new
-# alias differs between them.
+# alias differs between them, so there is no fix.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -342,6 +343,27 @@ rule:
 fix: sep=r"\s+"
 metadata: { fix: safe }
 ---
+# delim_whitespace=False is what the default did. The fix takes it out with the comma before it.
+# Unsafe: the old call raises TypeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: The delim_whitespace argument was removed in pandas 3, and False was its default. Drop delim_whitespace=False.
+rule:
+  kind: keyword_argument
+  regex: '^delim_whitespace\s*=\s*False$'
+  follows: { regex: '^,$' }
+  inside:
+    kind: argument_list
+    inside: { kind: call, has: { field: function, regex: '(^|\.)(read_csv|read_table)$' } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: unsafe }
+---
+# No fix for delim_whitespace=True beside sep, because only the author knows which separator is
+# meant, for a value held in a name, or for False with no comma before it, which taking out
+# would leave a comma with nothing before it.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -353,12 +375,16 @@ rule:
     kind: argument_list
     inside: { kind: call, has: { field: function, regex: '(^|\.)(read_csv|read_table)$' } }
   not:
-    all:
-      - has: { field: value, regex: ^True$ }
-      - inside:
-          kind: argument_list
-          not:
-            has: { kind: keyword_argument, has: { field: name, regex: ^(sep|delimiter)$ } }
+    any:
+      - all:
+          - has: { field: value, regex: ^True$ }
+          - inside:
+              kind: argument_list
+              not:
+                has: { kind: keyword_argument, has: { field: name, regex: ^(sep|delimiter)$ } }
+      - all:
+          - regex: '^delim_whitespace\s*=\s*False$'
+          - follows: { regex: '^,$' }
 ---
 # Unsafe: isocalendar().week has dtype UInt32, and dt.week had int32.
 id: removed-in-pandas-3
@@ -372,23 +398,123 @@ fix: $X.dt.isocalendar().week
 metadata: { fix: unsafe }
 ---
 # Arguments and names that pandas 2.0 to 3.0 removed. Each raises on pandas 3.1.
+# verbose, infer_datetime_format and mangle_dupe_cols=True changed nothing in the frame, so the
+# fix takes the argument out with the comma before it. Unsafe: the old call raises TypeError on
+# pandas 3, and verbose=True printed the parse times.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: read_csv no longer takes this argument and raises TypeError on pandas 3. Drop it.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: '^(verbose|infer_datetime_format|mangle_dupe_cols)$' }
+  follows: { regex: '^,$' }
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.read_(csv|table)$' } } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: unsafe }
+---
+# No fix for the same arguments with no comma before them, because taking one out would leave a
+# comma with nothing before it.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: read_csv no longer takes this argument and raises TypeError on pandas 3. Drop it.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: '^(verbose|infer_datetime_format|mangle_dupe_cols)$' }
+  not: { follows: { regex: '^,$' } }
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.read_(csv|table)$' } } }
+---
+# No fix, because error_bad_lines and warn_bad_lines together decide between on_bad_lines="skip"
+# and on_bad_lines="warn", and keep_date_col and prefix need code around the call.
 id: removed-in-pandas-3
 language: python
 severity: error
 message: read_csv no longer takes this argument and raises TypeError on pandas 3. For bad lines, pass on_bad_lines="skip".
 rule:
   kind: keyword_argument
-  has: { field: name, regex: '^(error_bad_lines|warn_bad_lines|squeeze|verbose|keep_date_col|infer_datetime_format|mangle_dupe_cols|prefix)$' }
+  has: { field: name, regex: '^(error_bad_lines|warn_bad_lines|keep_date_col|prefix)$' }
   inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.read_(csv|table)$' } } }
 ---
+# squeeze=True returned a Series when the file had one column. The fix builds the argument list
+# again without squeeze and calls squeeze("columns") on the result, which does the same. It
+# rewrites the whole call, so it applies only to a call on one line, where the call and the
+# argument are reported on the same line. Unsafe: the old call raises TypeError on pandas 3.
 id: removed-in-pandas-3
 language: python
 severity: error
-message: read_excel no longer takes squeeze and raises TypeError on pandas 3. Call .squeeze("columns") on the result.
+message: $PD.$R no longer takes squeeze and raises TypeError on pandas 3. Write $PD.$R($REST).squeeze("columns").
+rule:
+  pattern: $PD.$R($$$ARGS)
+  regex: '^[^\n]*$'
+  has: { field: arguments, has: { kind: keyword_argument, regex: '^squeeze\s*=\s*True$' } }
+  not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+  R: { regex: '^read_(csv|table|excel)$' }
+rewriters:
+  - id: drop-squeeze
+    rule: { kind: keyword_argument, has: { field: name, regex: ^squeeze$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^squeeze$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-squeeze, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $PD.$R($REST).squeeze("columns")
+metadata: { fix: unsafe }
+---
+# squeeze=False is what the default did, so the fix takes it out with the comma before it.
+# Unsafe: the old call raises TypeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: read_csv and read_excel no longer take squeeze, and False was its default. Drop squeeze=False.
+rule:
+  kind: keyword_argument
+  regex: '^squeeze\s*=\s*False$'
+  follows: { regex: '^,$' }
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.read_(csv|table|excel)$' } } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: unsafe }
+---
+# No fix for squeeze=True in a call over several lines, where the fix would move the report to
+# the line of the call, for squeeze=False with no comma before it, or for a value held in a name.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: read_csv and read_excel no longer take squeeze and raise TypeError on pandas 3. Call .squeeze("columns") on the result.
 rule:
   kind: keyword_argument
   has: { field: name, regex: '^squeeze$' }
-  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.read_excel$' } } }
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.read_(csv|table|excel)$' } } }
+  not:
+    any:
+      - all:
+          - regex: '^squeeze\s*=\s*True$'
+          - inside:
+              kind: argument_list
+              inside:
+                kind: call
+                regex: '^[^\n]*$'
+                not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+      - all:
+          - regex: '^squeeze\s*=\s*False$'
+          - follows: { regex: '^,$' }
 ---
 id: removed-in-pandas-3
 language: python
@@ -403,6 +529,8 @@ rule:
 fix: lineterminator=$V
 metadata: { fix: safe }
 ---
+# The fix takes encoding out with the comma before it. Unsafe: the old call raises TypeError on
+# pandas 3.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -410,6 +538,23 @@ message: to_excel no longer takes encoding and raises TypeError on pandas 3. Dro
 rule:
   kind: keyword_argument
   has: { field: name, regex: '^encoding$' }
+  follows: { regex: '^,$' }
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.to_excel$' } } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: unsafe }
+---
+# No fix with no comma before the argument, because taking it out would leave a comma with
+# nothing before it.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: to_excel no longer takes encoding and raises TypeError on pandas 3. Drop the argument.
+rule:
+  kind: keyword_argument
+  has: { field: name, regex: '^encoding$' }
+  not: { follows: { regex: '^,$' } }
   inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.to_excel$' } } }
 ---
 id: removed-in-pandas-3
@@ -468,15 +613,43 @@ rule:
 fix: $X.is_monotonic_increasing
 metadata: { fix: safe }
 ---
+# Unsafe: the old call raises AttributeError on pandas 3, and the fix reads $X twice.
 id: removed-in-pandas-3
 language: python
 severity: error
-message: mad, as_matrix and ix were removed and raise AttributeError on pandas 3. Write (s - s.mean()).abs().mean(), to_numpy() or .loc.
+message: mad was removed and raises AttributeError on pandas 3. Write ($X - $X.mean()).abs().mean().
+rule: { pattern: $X.mad() }
+fix: ($X - $X.mean()).abs().mean()
+metadata: { fix: unsafe }
+---
+# Unsafe: the old call raises AttributeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: as_matrix was removed and raises AttributeError on pandas 3. Write $X.to_numpy().
+rule: { pattern: $X.as_matrix() }
+fix: $X.to_numpy()
+metadata: { fix: unsafe }
+---
+# No fix, because as_matrix(columns) selects columns that to_numpy does not take.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: as_matrix was removed and raises AttributeError on pandas 3. Select the columns and write to_numpy().
 rule:
-  any:
-    - pattern: $X.mad()
-    - pattern: $X.as_matrix($$$A)
-    - pattern: $X.ix[$$$A]
+  pattern: $X.as_matrix($$$A)
+  not: { pattern: $X.as_matrix() }
+---
+# Unsafe: ix read an integer key as a position when the index held no integers, and .loc reads
+# every key as a label.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: ix was removed and raises AttributeError on pandas 3. Write .loc for labels, or .iloc for positions.
+rule:
+  pattern: $X.ix[$$$A]
+fix: $X.loc[$$$A]
+metadata: { fix: unsafe }
 ---
 id: removed-in-pandas-3
 language: python
@@ -489,6 +662,28 @@ constraints:
 fix: np.$A
 metadata: { fix: safe }
 ---
+# The removed index classes called with their data. Index with the dtype builds the same index.
+# Unsafe: the old call raises AttributeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: $PD.$C was removed and raises AttributeError on pandas 3. Write $PD.Index($DATA, dtype="$LOWER").
+rule:
+  pattern: $PD.$C($DATA)
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+  C: { regex: '^(Int64Index|UInt64Index|Float64Index)$' }
+  DATA: { not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+transform:
+  DTYPE:
+    replace: { source: $C, replace: '^(\w+)64Index$', by: '${1}64' }
+  LOWER:
+    convert: { source: $DTYPE, toCase: lowerCase }
+fix: $PD.Index($DATA, dtype="$LOWER")
+metadata: { fix: unsafe }
+---
+# No fix for the other uses: pandas 3 has no SettingWithCopyWarning, pd.datetime needs an import
+# of datetime, and an index class in isinstance needs pd.Index and a dtype test.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -501,6 +696,16 @@ rule:
     - pattern: $PD.Float64Index
     - pattern: $PD.errors.SettingWithCopyWarning
     - pattern: $PD.core.common.SettingWithCopyWarning
+  # The calls with one argument are the document above.
+  not:
+    all:
+      - regex: 'Index$'
+      - inside:
+          kind: call
+          field: function
+          all:
+            - has: { field: arguments, has: { nthChild: 1, not: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } } }
+            - not: { has: { field: arguments, has: { nthChild: 2 } } }
 constraints:
   PD: { regex: '^(pd|pandas)$' }
 ---
@@ -515,6 +720,20 @@ constraints:
 fix: $PD.json_normalize
 metadata: { fix: safe }
 ---
+# The import of json_normalize alone from pandas.io.json. pandas has exported it at the top level
+# since 1.0. Unsafe: the old import raises ImportError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: pandas.io.json no longer has json_normalize, so this import raises ImportError on pandas 3. Write from pandas import json_normalize.
+rule:
+  kind: import_from_statement
+  regex: '^from\s+pandas\.io\.json\s+import\s+json_normalize$'
+fix: from pandas import json_normalize
+metadata: { fix: unsafe }
+---
+# No fix, because pandas 3 has no SettingWithCopyWarning, pandas.testing lacks most names of
+# pandas.util.testing, and an import of several names would have to be split.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -525,11 +744,13 @@ rule:
       regex: '^from\s+pandas(\.errors|\.core\.common)\s+import\b[^#]*\bSettingWithCopyWarning\b'
     - kind: import_from_statement
       regex: '^from\s+pandas\.io\.json\s+import\b[^#]*\bjson_normalize\b'
+      not: { regex: '^from\s+pandas\.io\.json\s+import\s+json_normalize$' }
     - kind: import_from_statement
       regex: '^from\s+pandas\.util(\.testing)?\s+import\b[^#]*\btesting\b|^from\s+pandas\.util\.testing\s+import'
     - kind: import_statement
       regex: '^import\s+pandas\.util\.testing\b'
 ---
+# No fix, because the rewrite replaces the infinities in the code that reads the data, not in this line.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -543,6 +764,8 @@ constraints:
   PD: { regex: '^(pd|pandas)$' }
   OPT: { regex: 'use_inf_as_na' }
 ---
+# No fix, because the message names two rewrites, errors="coerce" and a try block, and only the
+# author knows which is meant.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -553,24 +776,54 @@ rule:
 constraints:
   PD: { regex: '^(pd|pandas)$' }
 ---
+# Unsafe: the old call raises AttributeError on pandas 3.
 id: removed-in-pandas-3
 language: python
 severity: error
-message: This method was removed and raises AttributeError on pandas 3. Write shift(freq=...) for tshift, ffill() for pad, items() for iteritems, is_monotonic_increasing for is_lexsorted, and a .loc slice for first and last with an offset.
+message: iteritems was removed and raises AttributeError on pandas 3. Write $X.items().
+rule: { pattern: $X.iteritems() }
+fix: $X.items()
+metadata: { fix: unsafe }
+---
+# Unsafe: the old call raises AttributeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: pad was removed and raises AttributeError on pandas 3. Write $X.ffill().
+rule: { pattern: $X.pad() }
+constraints:
+  # np.pad and .str.pad take arguments, and this form takes none, but a name is cheap to check.
+  X: { not: { regex: '(^(np|numpy)$|\.str$)' } }
+fix: $X.ffill()
+metadata: { fix: unsafe }
+---
+# Unsafe: the old call raises AttributeError on pandas 3, and is_monotonic_increasing tests the
+# order of the tuples where is_lexsorted tested the codes of the levels.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: is_lexsorted was removed and raises AttributeError on pandas 3. Write $X.is_monotonic_increasing.
+rule: { pattern: $X.is_lexsorted() }
+fix: $X.is_monotonic_increasing
+metadata: { fix: unsafe }
+---
+# No fix, because tshift needs a freq that the call may not give, lexsort_depth has no
+# replacement, and first and last need a .loc slice computed from the offset.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: This method was removed and raises AttributeError on pandas 3. Write shift(freq=...) for tshift, and a .loc slice for first and last with an offset.
 rule:
   any:
     - pattern: $X.tshift($$$A)
-    - pattern: $X.pad()
-    - pattern: $X.iteritems()
-    - pattern: $X.is_lexsorted()
     - pattern: $X.lexsort_depth
     - pattern: $X.first($OFFSET)
     - pattern: $X.last($OFFSET)
 constraints:
   OFFSET: { kind: string }
-  # np.pad and .str.pad take arguments, and this form takes none, but a name is cheap to check.
-  X: { not: { regex: '(^(np|numpy)$|\.str$)' } }
 ---
+# No fix, because loffset, base and kind each need code around the call, such as a shift of the
+# index after it.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -580,6 +833,49 @@ rule:
   has: { field: name, regex: '^(loffset|base|kind)$' }
   inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.resample$' } } }
 ---
+# infer_datetime_format changed nothing on pandas 2, and freq of a Timestamp changed nothing in
+# its value, so the fix takes the argument out with the comma before it. Unsafe: the old call
+# raises TypeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: This argument was removed and raises on pandas 3. Drop it.
+rule:
+  follows: { regex: '^,$' }
+  matches: dropped-argument
+utils:
+  dropped-argument:
+    any:
+      - kind: keyword_argument
+        has: { field: name, regex: '^infer_datetime_format$' }
+        inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)to_datetime$' } } }
+      - kind: keyword_argument
+        has: { field: name, regex: '^freq$' }
+        inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.Timestamp$' } } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: unsafe }
+---
+# closed= of date_range became inclusive= with the same values "left" and "right". Unsafe: the
+# old call raises TypeError on pandas 3.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: closed was removed from $F and raises TypeError on pandas 3. Write inclusive=$V.
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: '^closed$' }
+    - has: { field: value, pattern: $V, regex: '^["''](left|right)["'']$' }
+  inside: { kind: argument_list, inside: { kind: call, has: { field: function, pattern: $F, regex: '(^|\.)(date_range|bdate_range)$' } } }
+fix: inclusive=$V
+metadata: { fix: unsafe }
+---
+# No fix for the rest: errors="ignore" has two replacements, include_start and include_end
+# together make one inclusive=, date_parser needs a format, fill_method needs a call before
+# pct_change, closed=None means inclusive="both", and an argument with no comma before it would
+# leave a comma with nothing before it.
 id: removed-in-pandas-3
 language: python
 severity: error
@@ -588,10 +884,11 @@ rule:
   any:
     - kind: keyword_argument
       has: { field: name, regex: '^closed$' }
+      not: { has: { field: value, regex: '^["''](left|right)["'']$' } }
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)(date_range|bdate_range)$' } } }
-    - kind: keyword_argument
-      has: { field: name, regex: '^infer_datetime_format$' }
-      inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)to_datetime$' } } }
+    - all:
+        - not: { follows: { regex: '^,$' } }
+        - matches: dropped-argument
     - kind: keyword_argument
       regex: '^errors\s*=\s*["'']ignore["'']$'
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)to_datetime$' } } }
@@ -599,14 +896,20 @@ rule:
       has: { field: name, regex: '^include_(start|end)$' }
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.between_time$' } } }
     - kind: keyword_argument
-      has: { field: name, regex: '^freq$' }
-      inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.Timestamp$' } } }
-    - kind: keyword_argument
       has: { field: name, regex: '^date_parser$' }
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)read_(csv|table|excel)$' } } }
     - kind: keyword_argument
       regex: '^fill_method\s*=\s*["''](pad|ffill|bfill|backfill)["'']$'
       inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '\.pct_change$' } } }
+utils:
+  dropped-argument:
+    any:
+      - kind: keyword_argument
+        has: { field: name, regex: '^infer_datetime_format$' }
+        inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)to_datetime$' } } }
+      - kind: keyword_argument
+        has: { field: name, regex: '^freq$' }
+        inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(pd|pandas)\.Timestamp$' } } }
 ---
 # Timedelta text with a removed unit, in Timedelta, to_timedelta and offset= of resample and
 # Grouper. "T", "L", "U" and "N" raise ValueError on pandas 3.1. "H" and "S" still run and warn,
@@ -671,35 +974,130 @@ metadata: { fix: safe }
 # them stops catching. The try block must hold a pandas call, such as tz_localize, .dt. or pd.,
 # and a block that calls pytz's own localize is left alone, because pytz still raises its errors
 # there.
+#
+# The fix adds ValueError beside the one error the handler names, or after the last one of a
+# tuple. Unsafe: the handler then also catches a ValueError of another cause.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: pandas 3 raises ValueError for an ambiguous or nonexistent time, and no longer the pytz error, so this handler does not catch it. Write ($E, ValueError).
+rule:
+  pattern: $E
+  all: [{ matches: pytz-error }, { matches: pandas-handler }]
+utils:
+  pytz-error:
+    any:
+      - kind: attribute
+        regex: '^pytz\.(exceptions\.)?(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+      - kind: identifier
+        regex: '^(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+        not: { inside: { kind: attribute } }
+  # Inside the handler, with the errors alone or before "as name".
+  pandas-handler:
+    any:
+      - inside: { kind: except_clause, matches: pandas-try }
+      - inside: { kind: as_pattern, inside: { kind: except_clause, matches: pandas-try } }
+  pandas-try:
+    not: { regex: '^except[^:]*\b(ValueError|Exception|BaseException)\b' }
+    inside:
+      kind: try_statement
+      has: { field: body, regex: 'tz_localize|tz_convert|\b(pd|pandas)\.|\.dt\.|\.(floor|ceil|round|shift|resample|normalize)\(' }
+      not: { has: { field: body, regex: '\.localize\(' } }
+fix: ($E, ValueError)
+metadata: { fix: unsafe }
+---
+id: removed-in-pandas-3
+language: python
+severity: error
+message: pandas 3 raises ValueError for an ambiguous or nonexistent time, and no longer the pytz error, so this handler does not catch it. Write $E, ValueError.
+rule:
+  pattern: $E
+  matches: pytz-error
+  nthChild: { position: 1, reverse: true }
+  inside: { kind: tuple, matches: pandas-handler }
+utils:
+  pytz-error:
+    any:
+      - kind: attribute
+        regex: '^pytz\.(exceptions\.)?(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+      - kind: identifier
+        regex: '^(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+        not: { inside: { kind: attribute } }
+  # Inside the handler, with the errors alone or before "as name".
+  pandas-handler:
+    any:
+      - inside: { kind: except_clause, matches: pandas-try }
+      - inside: { kind: as_pattern, inside: { kind: except_clause, matches: pandas-try } }
+  pandas-try:
+    not: { regex: '^except[^:]*\b(ValueError|Exception|BaseException)\b' }
+    inside:
+      kind: try_statement
+      has: { field: body, regex: 'tz_localize|tz_convert|\b(pd|pandas)\.|\.dt\.|\.(floor|ceil|round|shift|resample|normalize)\(' }
+      not: { has: { field: body, regex: '\.localize\(' } }
+fix: $E, ValueError
+metadata: { fix: unsafe }
+---
+# The other names of a tuple, and a name nested deeper, as in parentheses. No fix, because the
+# fix of the last name adds ValueError once, and a nested name has no place to add it.
 id: removed-in-pandas-3
 language: python
 severity: error
 message: pandas 3 raises ValueError for an ambiguous or nonexistent time, and no longer the pytz error, so this handler does not catch it. Catch ValueError as well.
 rule:
-  any:
-    - kind: attribute
-      regex: '^pytz\.(exceptions\.)?(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
-    - kind: identifier
-      regex: '^(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
-      not: { inside: { kind: attribute } }
-  inside:
-    kind: except_clause
-    stopBy: { kind: block }
+  matches: pytz-error
+  inside: { kind: except_clause, stopBy: { kind: block }, matches: pandas-try }
+  not:
+    any:
+      - matches: pandas-handler
+      - all:
+          - nthChild: { position: 1, reverse: true }
+          - inside: { kind: tuple, matches: pandas-handler }
+utils:
+  pytz-error:
+    any:
+      - kind: attribute
+        regex: '^pytz\.(exceptions\.)?(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+      - kind: identifier
+        regex: '^(AmbiguousTimeError|NonExistentTimeError|InvalidTimeError)$'
+        not: { inside: { kind: attribute } }
+  # Inside the handler, with the errors alone or before "as name".
+  pandas-handler:
+    any:
+      - inside: { kind: except_clause, matches: pandas-try }
+      - inside: { kind: as_pattern, inside: { kind: except_clause, matches: pandas-try } }
+  pandas-try:
     not: { regex: '^except[^:]*\b(ValueError|Exception|BaseException)\b' }
     inside:
       kind: try_statement
       has: { field: body, regex: 'tz_localize|tz_convert|\b(pd|pandas)\.|\.dt\.|\.(floor|ceil|round|shift|resample|normalize)\(' }
       not: { has: { field: body, regex: '\.localize\(' } }
 ---
+# Unsafe: the old cast raises ValueError on pandas 3, and dt.days returns whole days as int64.
 id: removed-in-pandas-3
 language: python
 severity: error
-message: A cast to a day unit raises TypeError on pandas 3. Call .dt.days on a timedelta column or .dt.normalize() on a datetime column.
+message: A cast to a day unit raises ValueError on pandas 3. Write $X.dt.days on a timedelta column.
 rule:
   pattern: $X.astype($T)
 constraints:
-  T: { regex: '^["''](timedelta64|datetime64)\[D\]["'']$' }
+  T: { regex: '^["'']timedelta64\[D\]["'']$' }
+fix: $X.dt.days
+metadata: { fix: unsafe }
 ---
+# Unsafe: the old cast raises TypeError on pandas 3, and dt.normalize() keeps the unit of the
+# column.
+id: removed-in-pandas-3
+language: python
+severity: error
+message: A cast to a day unit raises TypeError on pandas 3. Write $X.dt.normalize() on a datetime column.
+rule:
+  pattern: $X.astype($T)
+constraints:
+  T: { regex: '^["'']datetime64\[D\]["'']$' }
+fix: $X.dt.normalize()
+metadata: { fix: unsafe }
+---
+# No fix, because the transpose changes the code after the call too.
 id: removed-in-pandas-3
 language: python
 severity: error

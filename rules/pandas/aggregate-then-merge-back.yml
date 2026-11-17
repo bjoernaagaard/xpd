@@ -1,3 +1,4 @@
+# No fix, because the key and the column of the transform are spread over the merge and the groupby.
 id: aggregate-then-merge-back
 language: python
 severity: warning

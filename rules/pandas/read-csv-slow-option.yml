@@ -1,6 +1,9 @@
 # pandas 3.1 reads a large file on several threads, and these options turn that off. The python
 # engine is left alone when the call needs it, for skipfooter or a separator of several
-# characters other than \s+.
+# characters other than \s+. The fix takes engine= out with the comma before it, so it applies
+# only when a comma comes right before the argument. Unsafe: an option that only the python
+# engine takes raises ValueError without it. On pandas 3.1.1 a callable on_bad_lines raised
+# "on_bad_line can only be a callable function if engine='python' or 'pyarrow'".
 id: read-csv-slow-option
 language: python
 severity: warning
@@ -8,6 +11,36 @@ message: engine="python" reads the file on one thread and in Python. Drop it unl
 rule:
   kind: keyword_argument
   all:
+    - follows: { regex: '^,$' }
+    - has: { field: name, regex: ^engine$ }
+    - has: { field: value, regex: '^["'']python["'']$' }
+  inside:
+    kind: argument_list
+    inside: { kind: call, has: { field: function, regex: '(^|\.)(read_csv|read_table)$' } }
+    not:
+      has:
+        kind: keyword_argument
+        any:
+          - has: { field: name, regex: ^skipfooter$ }
+          - all:
+              - has: { field: name, regex: ^(sep|delimiter)$ }
+              - has: { field: value, regex: '^r?["''](..+)["'']$' }
+              - not: { has: { field: value, regex: '^r?["'']\\s\+["'']$' } }
+fix:
+  template: ''
+  expandStart: { regex: ',' }
+metadata: { fix: unsafe }
+---
+# The same argument as the first one of the call, or after a comment. Taking it out would leave
+# a comma with nothing before it, so this form has no fix.
+id: read-csv-slow-option
+language: python
+severity: warning
+message: engine="python" reads the file on one thread and in Python. Drop it unless an option needs it.
+rule:
+  kind: keyword_argument
+  all:
+    - not: { follows: { regex: '^,$' } }
     - has: { field: name, regex: ^engine$ }
     - has: { field: value, regex: '^["'']python["'']$' }
   inside:
@@ -23,6 +56,7 @@ rule:
               - has: { field: value, regex: '^r?["''](..+)["'']$' }
               - not: { has: { field: value, regex: '^r?["'']\\s\+["'']$' } }
 ---
+# No fix, because the dtypes of the columns are not in the file.
 id: read-csv-slow-option
 language: python
 severity: warning
@@ -36,7 +70,8 @@ rule:
     kind: argument_list
     inside: { kind: call, has: { field: function, regex: '(^|\.)(read_csv|read_table)$' } }
 ---
-# sep=None makes read_csv guess the separator, which only the Python engine can do.
+# sep=None makes read_csv guess the separator, which only the Python engine can do. No fix,
+# because the separator is not in the file.
 id: read-csv-slow-option
 language: python
 severity: warning
@@ -46,3 +81,4 @@ rule:
   has: { field: arguments, has: { kind: keyword_argument, regex: '^(sep|delimiter)\s*=\s*None$' } }
 constraints:
   PD: { regex: '^(pd|pandas)$' }
+

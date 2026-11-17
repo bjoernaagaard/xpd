@@ -32,7 +32,8 @@ utils:
 fix: '"24h"'
 metadata: { fix: unsafe }
 ---
-# Several days, where the hours have to be worked out by hand.
+# Several days, where the hours have to be worked out by hand. No fix, because a transform cannot
+# multiply the days by 24.
 id: day-frequency-with-time-zone
 language: python
 severity: warning
@@ -56,7 +57,44 @@ utils:
             inside: { kind: call, has: { field: function, regex: '\.(shift|pct_change)$', not: { regex: '(?i)period' } } }
   names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
 ---
-# The Day offset added to or taken from datetimes.
+# The Day offset with a count, added to or taken from datetimes. Unsafe: the result changes on
+# purpose, to 24 hours, which is what pandas 2 gave.
+id: day-frequency-with-time-zone
+language: python
+severity: warning
+message: On pandas 3 the Day offset is a calendar day, so on datetimes with a time zone this raises ValueError when a result falls in a daylight saving change. On pandas 2 it was 24 hours. Write $X + pd.Timedelta(days=$N) to keep 24 hours.
+rule:
+  pattern: $X + $DAY
+  matches: names-a-time-zone
+constraints:
+  # Day with one count, such as Day(2) or Day(n).
+  DAY: { kind: call, regex: '^(pd|pandas)\.(tseries\.)?offsets\.Day\(\s*[^=*,()\s]+\s*\)$' }
+transform:
+  N: { replace: { source: $DAY, replace: '^.*\(\s*(.+?)\s*\)$', by: '$1' } }
+utils:
+  names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
+fix: $X + pd.Timedelta(days=$N)
+metadata: { fix: unsafe }
+---
+id: day-frequency-with-time-zone
+language: python
+severity: warning
+message: On pandas 3 the Day offset is a calendar day, so on datetimes with a time zone this raises ValueError when a result falls in a daylight saving change. On pandas 2 it was 24 hours. Write $X - pd.Timedelta(days=$N) to keep 24 hours.
+rule:
+  pattern: $X - $DAY
+  matches: names-a-time-zone
+constraints:
+  # Day with one count, such as Day(2) or Day(n).
+  DAY: { kind: call, regex: '^(pd|pandas)\.(tseries\.)?offsets\.Day\(\s*[^=*,()\s]+\s*\)$' }
+transform:
+  N: { replace: { source: $DAY, replace: '^.*\(\s*(.+?)\s*\)$', by: '$1' } }
+utils:
+  names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
+fix: $X - pd.Timedelta(days=$N)
+metadata: { fix: unsafe }
+---
+# Day with anything but one plain count, such as Day() or Day(n=2). No fix, because there is no
+# one count of days in the call to pass to pd.Timedelta(days=...).
 id: day-frequency-with-time-zone
 language: python
 severity: warning
@@ -67,14 +105,15 @@ rule:
     - pattern: $X - $DAY
   matches: names-a-time-zone
 constraints:
-  DAY: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(tseries\.)?offsets\.Day$' } }
+  DAY: { kind: call, has: { field: function, regex: '^(pd|pandas)\.(tseries\.)?offsets\.Day$' }, not: { regex: '^(pd|pandas)\.(tseries\.)?offsets\.Day\(\s*[^=*,()\s]+\s*\)$' } }
 utils:
   names-a-time-zone: { inside: { kind: module, stopBy: end, regex: 'tz_localize|tz_convert|\btz\s*=|\butc\s*=\s*True' } }
 ---
 # resample and Grouper with a day frequency and offset= or origin=. On pandas 3.1 the bins of an
 # index in Europe/Copenhagen or UTC started at 00:00 with offset="6h", where pandas 2.3 started
 # them at 06:00. "2D" and "7D" and every value of origin did the same. pandas 3.1 raises no
-# error, only a RuntimeWarning.
+# error, only a RuntimeWarning. No fix, because the frequency to rewrite is another argument than
+# the one reported, and "2D" needs its hours worked out.
 id: day-frequency-with-time-zone
 language: python
 severity: warning

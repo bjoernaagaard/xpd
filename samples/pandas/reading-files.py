@@ -110,9 +110,13 @@ def removed_read_and_write_arguments(_):
     part = pd.read_csv(io.StringIO(TEXT))
     writer = pd.ExcelWriter(io.BytesIO())
     writer.save()  # xpd: removed-in-pandas-3
+    from pandas.io.json import json_normalize  # xpd: removed-in-pandas-3
     return (
         pd.read_csv(io.StringIO(TEXT), error_bad_lines=False),  # xpd: removed-in-pandas-3
         pd.read_csv(io.StringIO(TEXT), squeeze=True),  # xpd: removed-in-pandas-3
+        pd.read_csv(io.StringIO(TEXT), squeeze=False),  # xpd: removed-in-pandas-3
+        pd.read_csv(io.StringIO(TEXT), verbose=False),  # xpd: removed-in-pandas-3
+        pd.read_csv(io.StringIO(TEXT), delim_whitespace=False),  # xpd: removed-in-pandas-3
         pd.read_csv(io.StringIO(TEXT), date_parser=pd.to_datetime),  # xpd: removed-in-pandas-3
         pd.read_csv(io.StringIO(TEXT), ","),  # xpd: removed-in-pandas-3
         pd.read_excel(io.BytesIO(), squeeze=True),  # xpd: removed-in-pandas-3

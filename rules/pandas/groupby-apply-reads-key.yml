@@ -1,5 +1,7 @@
 # groupby(...).apply drops the grouping columns from each group in pandas 3, so reading one
 # inside the function raises KeyError.
+# No fix, because $G.name is a tuple with more than one key, and it is one value where the column
+# held one per row.
 id: groupby-apply-reads-key
 language: python
 severity: error

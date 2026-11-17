@@ -1,9 +1,10 @@
 # One column cannot mix rows, so a group of one selected column, df.groupby(k)["a"], and a
-# grouped Series built in place are left alone.
+# grouped Series built in place are left alone. Unsafe: skipna=False changes the result on
+# purpose, to the whole first or last row of each group.
 id: groupby-first-skips-missing
 language: python
 severity: warning
-message: $M() takes the first value that is not missing in each column, so one result row can mix rows. Pass skipna=False for the whole first row.
+message: $M() takes the first value that is not missing in each column, so one result row can mix rows. Write $G.$M(skipna=False) for the whole first row.
 rule:
   pattern: $G.$M()
   has: { field: function, regex: '\.groupby\(' }
@@ -14,3 +15,5 @@ constraints:
       any:
         - { kind: subscript, has: { field: subscript, kind: string } }
         - regex: '(^|\.)Series\('
+fix: $G.$M(skipna=False)
+metadata: { fix: unsafe }

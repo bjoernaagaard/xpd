@@ -1,7 +1,7 @@
 # A format with %z reads a UTC offset per value. Local times from a zone with daylight saving
 # carry two offsets, such as +01:00 and +02:00. pandas 2.3 returned an object Index for them with
-# a FutureWarning, and pandas 3.1 raises ValueError. No fix: utc=True changes the result of a
-# column that holds one offset, from that offset to UTC.
+# a FutureWarning, and pandas 3.1 raises ValueError. No fix, because the zone that dt.tz_convert
+# needs after utc=True is not in the file.
 id: mixed-offsets-without-utc
 language: python
 severity: warning

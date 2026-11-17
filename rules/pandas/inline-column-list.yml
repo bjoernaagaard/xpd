@@ -2,6 +2,7 @@
 # element that is not a text literal is left alone, and so is a list passed to a call that does
 # not take column names, such as isin, agg or subprocess.run. The DataFrame constructor is left
 # alone too, because columns= there defines the frame.
+# No fix, because the list needs a new name, and only the author knows it.
 id: inline-column-list
 language: python
 severity: info

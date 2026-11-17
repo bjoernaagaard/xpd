@@ -73,7 +73,7 @@ Each rule in this group finds code that gives a wrong result, raises, or warns o
 
 #### chained-assignment
 
-**Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`. A write through `.iloc` or `.iat` on a column, and `update` on a column, have no fix.
+**Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`, and `df.loc[df.index[0], "a"] = v` for a write through `.iloc` or `.iat` on a column, which writes every row when the index holds the label twice. Other chains and `update` on a column have no fix.
 
 The rule reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy, so the frame keeps its old values. It also reports `df[col][mask] = v`, where a variable names the column.
 
@@ -174,7 +174,7 @@ The fix applies only to a call that stands alone as a statement, on a name, an a
 
 #### epoch-from-int-cast
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `(col - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s")`, with `"1ms"` for `10**6` and `"1us"` for `10**3`. The result changes on purpose, a column with a time zone raises TypeError, because the epoch has none, a missing value gives NaN, and the fix of `asi8` and `.values` returns an Index or a Series where the old code returned a NumPy array.
 
 The rule reports `df["d"].astype("int64") // 10**9`, `index.asi8 // 10**9` and `df["d"].values.astype("float64") / 1e9`, which are off by a factor of 1,000 now that datetimes default to microseconds. It also reports `.view(np.int64)` divided the same way.
 
@@ -191,8 +191,6 @@ seconds = (df["time"] - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s")
 ```
 
 The replacement assumes dates without a time zone, and for dates with a time zone you subtract `pd.Timestamp("1970-01-01", tz="UTC")` instead. A missing timestamp stays missing.
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### compare-to-missing
 
@@ -234,7 +232,7 @@ The fix is unsafe, because xpd also reports `"x" in frame_data["names"]` when `f
 
 #### mask-precedence
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `(df["a"] > 1) & (df["b"] < 3)`. The fix closes the comparison before each `&` or `|` and opens it again after, so the result changes on purpose.
 
 The rule reports `df["a"] > 1 & df["b"] < 3`, where Python applies `&` before the comparisons, so the code compares `df["a"]` with `1 & df["b"]`.
 
@@ -249,8 +247,6 @@ Use instead:
 ```python
 selected = df[(df["load"] > 1) & (df["wind"] < 3)]
 ```
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### write-through-values
 
@@ -274,7 +270,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### object-dtype-check
 
-**Severity:** error. **Fix:** unsafe: `pd.api.types.is_string_dtype(df["k"])`. `is_object_dtype`, a test with `in`, `dtype.name` and `select_dtypes` have no fix: `"str"` alone leaves out object columns that hold other Python objects, so write `["object", "str"]` to keep both.
+**Severity:** error. **Fix:** unsafe: `pd.api.types.is_string_dtype(df["k"])` for `dtype == object`, `is_object_dtype` and `dtype.name == "object"`, and `["object", "str"]` in `select_dtypes`, which selects the same columns on pandas 3 and raises TypeError on pandas 2. `dtypes == object`, a test with `in`, and any other spelling of object in `select_dtypes`, such as `np.dtype("O")`, have no fix.
 
 The rule reports `df["k"].dtype == object`, `select_dtypes(include="object")`, `is_object_dtype(df["k"])`, `df["k"].dtype in ("object", "category")` and `df["k"].dtype.name == "object"`, which are False for a text column, because pandas 3 stores text in the `str` dtype. It leaves `dtype.kind == "O"` alone, which is still True for a text column.
 
@@ -292,7 +288,7 @@ is_text = pd.api.types.is_string_dtype(df["name"])
 
 #### datetime-unit-check
 
-**Severity:** error. **Fix:** unsafe: `pd.api.types.is_datetime64_dtype(df["d"])` and `select_dtypes("datetime64")`, which are True for every unit. A dtype with a time zone, `str(dtype)`, `dtype.name`, `dtypes` and `is_datetime64_ns_dtype` have no fix.
+**Severity:** error. **Fix:** unsafe: `pd.api.types.is_datetime64_dtype(df["d"])` for `dtype`, `str(dtype)` and `dtype.name`, `pd.api.types.is_datetime64_any_dtype` for `is_datetime64_ns_dtype`, `select_dtypes("datetime64")`, `(isinstance(df["d"].dtype, pd.DatetimeTZDtype) and str(df["d"].dtype.tz) == "UTC")` for a dtype with a time zone, and `select_dtypes("datetimetz")`, which also selects columns of other zones. Each is True for every unit. `dtypes`, and `str(dtype)` or `dtype.name` with a time zone, have no fix.
 
 The rule reports `df["d"].dtype == "datetime64[ns]"`, `df["d"].dtype == "datetime64[ns, UTC]"`, `select_dtypes("datetime64[ns]")` and `is_datetime64_ns_dtype(df["d"])`. Datetimes default to microseconds in pandas 3, so on pandas 3.1 each comparison was False for a column parsed from text, and `select_dtypes` selected no column.
 
@@ -345,7 +341,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### removed-in-pandas-3
 
-**Severity:** error. **Fix:** safe: `map`, `"ME"`, `"h"`, `"min"`, a Timedelta unit such as `"min"` for `"T"`, `sep=r"\s+"`, `lineterminator=`, `sep=` for a separator passed by position, `is_monotonic_increasing`, `np.` for `pd.np.` and `pd.json_normalize`. unsafe: `ffill()` and `bfill()`, which label and order the rows of a group-by differently, `"M"` in `resample`, `dt.isocalendar().week`, `writer.close()`, `pd.Series(x).value_counts()` and the alias in a comparison with `infer_freq` or `freqstr`. The other forms have no fix.
+**Severity:** error. **Fix:** safe: `map`, `"ME"`, `"h"`, `"min"`, a Timedelta unit such as `"min"` for `"T"`, `sep=r"\s+"`, `lineterminator=`, `sep=` for a separator passed by position, `is_monotonic_increasing`, `np.` for `pd.np.` and `pd.json_normalize`. unsafe: `ffill()` and `bfill()`, which label and order the rows of a group-by differently, `"M"` in `resample`, `dt.isocalendar().week`, `writer.close()`, `pd.Series(x).value_counts()`, the alias in a comparison with `infer_freq` or `freqstr`, and these forms, which raise on pandas 3: dropping `delim_whitespace=False`, `verbose`, `infer_datetime_format`, `mangle_dupe_cols`, `squeeze=False`, `encoding` of `to_excel` and `freq` of `pd.Timestamp`, `.squeeze("columns")` for `squeeze=True`, `(s - s.mean()).abs().mean()` for `mad()`, `to_numpy()` for `as_matrix()`, `.loc` for `.ix`, `pd.Index(data, dtype="int64")` for `pd.Int64Index(data)`, `from pandas import json_normalize`, `items()`, `ffill()` for `pad()`, `is_monotonic_increasing` for `is_lexsorted()`, `inclusive=` for `closed="left"` or `"right"`, `ValueError` added to a handler of the pytz errors, `dt.days` and `dt.normalize()` for a cast to a day unit. The other forms have no fix, and the comment above each of them in the rule file says why.
 
 The rule reports `applymap`, `fillna(method=)`, frequencies such as `"M"`, `"H"` and `"T"`, `delim_whitespace=True`, `dt.week`, and the removed arguments and names listed below.
 
@@ -387,7 +383,7 @@ The rule fixes a frequency alias by what the call takes, because `"M"`, `"Q"` an
 
 The rule reports a handler for a pytz error only when its `try` block holds a pandas call, such as `tz_localize`, `.dt.`, `pd.` or `floor`. It leaves the handler alone when the handler also names ValueError or Exception, and when the block calls the `localize` of pytz, which still raises the pytz errors.
 
-The fix for an alias compared with `infer_freq` or `freqstr` is unsafe, because the comparison can then be equal. The rule reports `"M"` only in a comparison with `infer_freq`, because the `freqstr` of a monthly PeriodIndex is still `"M"`. The `writer.close()` fix is unsafe, because xpd knows the writer only by its name. pandas 3 also removed `DataFrame.lookup`. The rule doesn't report it, because other libraries have a method of the same name.
+The fix for an alias compared with `infer_freq` or `freqstr` is unsafe, because the comparison can then be equal. The rule reports `"M"` only in a comparison with `infer_freq`, because the `freqstr` of a monthly PeriodIndex is still `"M"`. The `writer.close()` fix is unsafe, because xpd knows the writer only by its name. `.loc` reads every key as a label where `ix` read an integer as a position, the pytz handler then also catches a ValueError of another cause, and the fix of `squeeze=True` applies only to a call on one line. pandas 3 also removed `DataFrame.lookup`. The rule doesn't report it, because other libraries have a method of the same name.
 
 #### reduction-level-argument
 
@@ -409,9 +405,9 @@ totals = df["load"].groupby(level="region").sum()
 
 #### stack-dropna
 
-**Severity:** error, or warning for `future_stack=False`. **Fix:** none.
+**Severity:** error, or warning for `future_stack=False`. **Fix:** unsafe: `stack()` for `stack(future_stack=False)`, which keeps the rows that are all missing. `dropna=` has no fix, because the replacement depends on its value.
 
-The rule reports `df.stack(dropna=...)` with either value, which raises ValueError, and `df.stack(future_stack=False)`, which is deprecated. The rule has no fix, because the replacement depends on the value of `dropna`.
+The rule reports `df.stack(dropna=...)` with either value, which raises ValueError, and `df.stack(future_stack=False)`, which is deprecated. `dropna=` has no fix, because the replacement depends on its value.
 
 Example:
 
@@ -426,8 +422,6 @@ long = wide.stack().dropna(how="all")
 ```
 
 For `dropna=False`, write `stack()` alone. The new `stack` keeps the rows that are all missing, which the old default dropped.
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### frame-append
 
@@ -508,11 +502,11 @@ top = df["region"].value_counts().iloc[0]
 first = df.iloc[0, 0]
 ```
 
-The fix is unsafe, because the old form still works on labels that are whole numbers. On such labels `value_counts()[0]` is the count of the value 0. The frame reductions have no fix.
+The fix is unsafe, because the old form still works on labels that are whole numbers. On such labels `value_counts()[0]` is the count of the value 0. The same holds for `df.dtypes[0]` and a frame reduction such as `df.sum()[0]`, which get `.iloc[0]` too.
 
 #### day-frequency-with-time-zone
 
-**Severity:** warning. **Fix:** unsafe: `"24h"` for `"D"` and `"1D"` in `shift` and `pct_change`. Several days, the `Day` offset, `resample` and `Grouper` have no fix.
+**Severity:** warning. **Fix:** unsafe: `"24h"` for `"D"` and `"1D"` in `shift` and `pct_change`, and `pd.Timedelta(days=n)` for `pd.offsets.Day(n)`, which keeps 24 hours. Several days, `Day()` with no count, `resample` and `Grouper` have no fix.
 
 The rule reports `ts.shift(freq="D")`, `ts.index + pd.offsets.Day(1)` and `ts.resample("D", offset="6h")` in a file that names a time zone. `"D"` was 24 hours on pandas 2 and is a calendar day on pandas 3. The table shows the result of each version for quarter-hourly data in `Europe/Copenhagen`.
 
@@ -564,7 +558,7 @@ Use instead:
 times = pd.to_datetime(df["time"], format="%Y-%m-%d %H:%M%z", utc=True).dt.tz_convert("Europe/Copenhagen")
 ```
 
-xpd doesn't apply the replacement, because on a column that holds one offset, `utc=True` changes the result from the offset to UTC.
+xpd doesn't apply the replacement, because the zone that `dt.tz_convert` needs is not in the file. On a column that holds one offset, `utc=True` alone changes the result from the offset to UTC.
 
 #### deprecated-in-pandas-3
 
@@ -584,7 +578,7 @@ Use instead:
 now = pd.Timestamp.now("UTC")
 ```
 
-The rule reports `astype(copy=)` only on a column taken by a label or on a value named like a frame, because NumPy's `astype` has the same keyword. Dropping `copy=` from `astype` is unsafe, because on a NumPy array `astype(copy=False)` can return the same array. The rule deletes the copy-on-write option line only at the top level of a file, and inside a function or another block it reports the line without a fix.
+The rule reports `astype(copy=)` only on a column taken by a label or on a value named like a frame, because NumPy's `astype` has the same keyword. Dropping `copy=` from `astype` is unsafe, because on a NumPy array `astype(copy=False)` can return the same array. The rule deletes the copy-on-write option line at the top level of a file and in a block that holds another statement. As the only statement of a block it reports the line without a fix, because the block would be empty.
 
 ### Shorter forms, including the pandas 3.0 and 3.1 API
 
@@ -973,7 +967,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### enumerate-map-encoding
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `pd.factorize(s)[0]`, and `pd.factorize(s, sort=True)[0]` for the sorted values. factorize returns a NumPy array where the lookup returned a Series, and it gives a missing value the code -1.
 
 The rule reports `df["k"].map({v: i for i, v in enumerate(df["k"].unique())})`, a dict of codes built by hand, which was 7 to 17 times slower than `pd.factorize`.
 
@@ -996,8 +990,6 @@ The table compares the result of `factorize` with the result of the dict. Pass `
 | Order of the codes | the order in which the values first appear | the same |
 | Type of the result | Series | NumPy array |
 | Code of a missing value | a code of its own | -1 |
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### copy-in-chain
 
@@ -1143,7 +1135,7 @@ scaled = df["load"] * 2 + 1
 
 #### builtin-on-column
 
-**Severity:** warning. **Fix:** unsafe: `df["a"].sum()`, `df["k"].nunique()`, `df["k"].nunique(dropna=False)` for `len(df["k"].unique())`, `(df["a"] > 50).sum()`, `set(df["k"].unique())`, `df["a"].tolist()`, `df["a"].to_numpy()`. `Counter` has no fix.
+**Severity:** warning. **Fix:** unsafe: `df["a"].sum()`, `df["k"].nunique()`, `df["k"].nunique(dropna=False)` for `len(df["k"].unique())`, `(df["a"] > 50).sum()`, `set(df["k"].unique())`, `df["a"].tolist()`, `df["a"].to_numpy()`, and `df["k"].value_counts()` for `Counter`, which returns a Series sorted by count where `Counter` returned a dict, and leaves out the missing values.
 
 The rule reports `sum(df["a"])`, `len(set(df["k"]))`, `sum(df["a"] > 50)`, `set(df["k"])`, `Counter(df["k"])`, `list(df["a"])`, `np.array(df["a"].tolist())`, `len(df["k"].unique())` and `set(df["k"].values)`. All but `len(df["k"].unique())` were 2.6 to 483 times slower than the column method, and `len(df["k"].unique())` took as long as `nunique(dropna=False)`. For `set` and `list` the rule reports only a value before `[` that is named like a frame, because both are also how code copies a value of a dict. Even so, the rule reports a dict of lists with such a name, as in `list(frame_data["names"])`. The rule doesn't run on test files.
 
@@ -1225,7 +1217,7 @@ count = int((df["load"] > 50).sum())
 
 #### sort-then-head
 
-**Severity:** warning. **Fix:** unsafe: `df.nsmallest(10, "b")`, `df.iloc[df["b"].argmin()]`, `df["b"].min()`, `df["b"].max()`, `df["b"].idxmin()`. The last rows of a frame, `iloc[-1]` on a sorted column and `sorted(df["b"])[0]` have no fix.
+**Severity:** warning. **Fix:** unsafe: `df.nsmallest(10, "b")`, `df.nlargest(10, "b")` for `tail(10)`, `df.iloc[df["b"].argmin()]`, `df.iloc[df["b"].argmax()]` for `iloc[-1]`, `df["b"].min()`, `df["b"].max()`, `df["b"].idxmin()`, and `df["b"].min()` and `.max()` for `sorted(df["b"])[0]` and `[-1]`. A sort by more than one column, a frame that is not held in a name and a negative count of `tail` have no fix.
 
 The rule reports `df.sort_values("b").head(10)`, `df.sort_values("b").iloc[0]`, `df["b"].sort_values().iloc[0]`, `df.sort_values("b").tail(10)` and `sorted(df["b"])[0]`, which sort every row to keep a few. It leaves a negative count alone, because `head(-3)` keeps all but the last 3 rows and `nsmallest(-3)` returns no rows.
 
@@ -1248,12 +1240,13 @@ The fix is unsafe, and the table gives the reason for each form.
 | `nsmallest` and `nlargest` | they raise on a text column, and they order ties differently |
 | `df.iloc[df["b"].argmin()]` | `argmin` raises when every value is missing, where the sort returned the first row |
 | `idxmin` | it can name another row when the lowest value appears twice |
-
-The rule reports `sort_values().iloc[-1]` without a fix, because the sort puts missing values last, so the old form returns NaN where `max()` skips them.
+| `max()` for `sort_values().iloc[-1]` | the sort puts missing values last, so the old form returned NaN where `max()` skips them |
+| `nlargest` for `tail` | it lists the rows largest first, where `tail` listed them largest last |
+| `min()` and `max()` for `sorted` | they return NumPy scalars where `sorted` gave Python numbers, and `sorted` does not order a column with NaN |
 
 #### replace-with-mapping
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `s.map(lambda v: mapping.get(v, v))`. A key of NaN, text mapped to numbers, and a dict of dicts on a frame give another result, and a list in the name has no `get`.
 
 The rule reports `df["k"].replace(mapping)` with a mapping held in a name, and asks for `map` with `mapping.get(v, v)`. The `map` form keeps the values that the mapping lacks, and it keeps the dtype.
 
@@ -1270,8 +1263,6 @@ names = df["name"].map(lambda value: mapping.get(value, value))
 ```
 
 The replacement assumes a plain dict of single values. `replace` can be faster with a short mapping, and `map` doesn't replace by regular expression.
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### concat-in-loop
 
@@ -1428,7 +1419,7 @@ Replace a lambda or `apply` in a `groupby` with a built-in aggregation, which pa
 
 #### groupby-lambda
 
-**Severity:** warning. **Fix:** unsafe: `"max"` for min, max, median, count and nunique, `"sum"`, `"mean"`. The named method can give another dtype, and it raises on a column the lambda could reduce. A reduction with arguments, a count of a condition and `resample` have no fix.
+**Severity:** warning. **Fix:** unsafe: `"max"` for min, max, median, count and nunique, `"sum"`, `"mean"`, `g.quantile(0.9)` for a reduction with arguments, and `"sum"` or `"max"` on a resampler for a lambda and for `np.sum`, `np.mean`, `np.min` and `np.max`. The named method can give another dtype, and it raises on a column the lambda could reduce. A count of a condition, and `np.median`, `np.std` and `np.var` on a resampler, have no fix.
 
 The rule reports `g["b"].agg(lambda v: v.max())`, `g.agg(np.sum)`, `pivot_table(aggfunc=np.mean)`, `g.agg(lambda v: v.quantile(0.9))`, `g.agg(lambda v: (v > 0).sum())` and a lambda or NumPy function on `resample`, which run Python once per group. The rule leaves a lambda inside a list alone, because the result column would get a new name. It leaves `np.median`, `np.std` and `np.var` alone, because they treat missing values and degrees of freedom differently from the named methods.
 
@@ -1444,7 +1435,7 @@ Use instead:
 maximum = df.groupby("region")["load"].agg("max")
 ```
 
-The forms without a fix have a replacement, and the table shows how much faster it was.
+The table shows how much faster the replacements were. The count of a condition has no fix.
 
 | Reported code | Write instead | Faster by |
 | --- | --- | --- |
@@ -1476,9 +1467,9 @@ The fixes for `cumsum` and `cumprod` are unsafe, because the groupby methods add
 
 #### groupby-lambda-arithmetic
 
-**Severity:** warning. **Fix:** unsafe: `df["w"] / df.groupby("k")["w"].transform("sum")`.
+**Severity:** warning. **Fix:** unsafe: `df["w"] / df.groupby("k")["w"].transform("sum")`, and `(df["w"] - g.transform("min")) / (g.transform("max") - g.transform("min"))` for min-max scaling of `g = df.groupby("k")["w"]`.
 
-The rule reports `g["w"].transform(lambda v: v / v.sum())`, `v - v.mean()`, `v / v.max()`, the z-score, min-max scaling and `v.fillna(v.mean())`. With 1,000 groups the lambdas `v - v.mean()` and `v / v.max()` were 6 times slower than `transform` with a method name, and with 100,000 groups they were 390 times slower. Min-max scaling has no fix.
+The rule reports `g["w"].transform(lambda v: v / v.sum())`, `v - v.mean()`, `v / v.max()`, the z-score, min-max scaling and `v.fillna(v.mean())`. With 1,000 groups the lambdas `v - v.mean()` and `v / v.max()` were 6 times slower than `transform` with a method name, and with 100,000 groups they were 390 times slower. Min-max scaling on a group-by that does not select one column of a frame by name has no fix.
 
 Example:
 
@@ -1565,7 +1556,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### groupby-first-skips-missing
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `first(skipna=False)` and `last(skipna=False)`, which change the result on purpose to the whole first or last row.
 
 The rule reports `df.groupby("k").first()` and `last()`, which skip missing values per column, so one result row can mix values from different rows. The rule leaves `df.groupby("k")["b"].last()` alone, because one column can't mix rows.
 
@@ -1582,8 +1573,6 @@ first = df.groupby("region").first(skipna=False)
 ```
 
 `skipna=False` keeps the missing values of the first row.
-
-xpd gives the replacement as advice and doesn't apply it.
 
 ### Tidy data
 
@@ -1716,7 +1705,7 @@ assignment, in `concat(axis=1)` and in a join. The measurements used pandas 3.1.
 
 #### assign-drops-alignment
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `df["b"] = other["b"]`, `df.loc[:, "b"] = other["b"]` and `assign(b=other["b"])`, which pair the rows by index label. A label that the two indexes do not share gives a missing value.
 
 The rule reports `df["m"] = other["m"].values`, `.to_numpy()` and `.tolist()`, also through `df.loc[:, "m"]` and as a keyword of `df.assign`. The array has no index, so pandas pairs the rows by position. With the same 4 rows in another order, all 4 values landed on the wrong row. The rule leaves a column of the same frame alone, because it has the same index.
 
@@ -1732,7 +1721,7 @@ Use instead:
 df["region"] = other["region"]
 ```
 
-xpd gives the replacement as advice and doesn't apply it. When the two indexes share no labels, merge the two frames on a key column instead.
+When the two indexes share no labels, merge the two frames on a key column instead.
 
 #### concat-columns-unchecked
 
@@ -1779,7 +1768,7 @@ both = left.join(right, how="inner")
 
 #### merge-asof-unsorted
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `pd.merge_asof(left.sort_values("t"), right.sort_values("t"), on="t")` when both frames are passed by position and the key by `on=`. The sort reorders the rows of the result. A frame passed by keyword, `left_on` and `right_on`, and the indexes have no fix.
 
 The rule reports `pd.merge_asof(...)` in a function that has no `sort_values` and no `sort_index`, and at module level in a module that has none. An unsorted left frame raised ValueError "left keys must be sorted", and an unsorted right frame raised "right keys must be sorted". The rule also reports a frame that another function sorts, by mistake.
 
@@ -1795,8 +1784,6 @@ Use instead:
 matched = pd.merge_asof(trades.sort_values("time"), quotes.sort_values("time"), on="time")
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
-
 ### MultiIndex
 
 Each rule in this group finds a MultiIndex that the code builds or reads one row at a time, and
@@ -1804,7 +1791,7 @@ names the method that works on whole levels.
 
 #### multiindex-from-tuples
 
-**Severity:** warning. **Fix:** unsafe: `pd.MultiIndex.from_arrays([df["k"], df["a"]])`, `pd.MultiIndex.from_product([keys, numbers])`. The comprehension has no fix.
+**Severity:** warning. **Fix:** unsafe: `pd.MultiIndex.from_arrays([df["k"], df["a"]])`, `pd.MultiIndex.from_product([keys, numbers])`, also for the comprehension with two `for` clauses.
 
 The rule reports `pd.MultiIndex.from_tuples(zip(df["k"], df["a"]))`, `from_tuples(itertools.product(keys, numbers))` and `from_tuples([(k, n) for k in keys for n in numbers])`, which build one Python tuple per row.
 
@@ -1851,9 +1838,9 @@ The fix is unsafe, because a level built from a range comes back as a RangeIndex
 
 #### tuple-slice-on-levels
 
-**Severity:** info. **Fix:** safe: `pd.IndexSlice["a", :, 1]`. None for a slice with bounds.
+**Severity:** info. **Fix:** safe: `pd.IndexSlice["a", :, 1]`, and `pd.IndexSlice["a":"c", :]` for a slice with bounds. None for a slice call with keywords or unpacked arguments.
 
-The rule reports a tuple with `slice(None)` inside `.loc[...]`, on the rows or on the columns. `pd.IndexSlice["a", :, 1]` was equal to `("a", slice(None), 1)`, and `.loc` gave equal frames with the two. The rule reports a tuple with a slice that has bounds, as in `slice("a", "c")`, without a fix.
+The rule reports a tuple with `slice(None)` inside `.loc[...]`, on the rows or on the columns. `pd.IndexSlice["a", :, 1]` was equal to `("a", slice(None), 1)`, and `.loc` gave equal frames with the two. A slice that has bounds, as in `slice("a", "c")`, becomes `"a":"c"`, and `pd.IndexSlice` builds the same tuple.
 
 Example:
 
@@ -1875,7 +1862,7 @@ text, or breaks across a daylight saving change. The time zone rules were run on
 
 #### rolling-apply
 
-**Severity:** warning. **Fix:** safe: `rolling(20).max()` for min, max and median. unsafe: sum, mean, std and var. The `raw=True` case, which reports as info, and a NumPy function have no fix.
+**Severity:** warning. **Fix:** safe: `rolling(20).max()` for min, max and median. unsafe: sum, mean, std and var, and `rolling(20).max()` for a NumPy function such as `np.max` with sum, mean, min, max or median, which can differ in the last bit and skip a missing value. The `raw=True` case, which reports as info, and `np.std` and `np.var`, which divide by n where the window methods divide by n - 1, have no fix.
 
 The rule reports `rolling(20).apply(lambda w: w.max())`, `rolling(20).apply(f)` without `raw=True`, `rolling(20).agg(np.max)` and `rolling(20).apply(np.mean, raw=True)`, which call Python once per window. On 200,000 rows `rolling(60).agg(np.max)` was 1,031 times slower than `rolling(60).max()`.
 
@@ -2001,7 +1988,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### strftime-round-trip
 
-**Severity:** warning. **Fix:** unsafe: `df["d"].dt.normalize()`, `df["d"].dt.floor("h")`. The comparison has no fix.
+**Severity:** warning. **Fix:** unsafe: `df["d"].dt.normalize()`, `df["d"].dt.floor("h")`, and `df["d"].dt.normalize() == pd.Timestamp(day)` for the comparison, which raises TypeError on a column with a time zone.
 
 The rule reports `pd.to_datetime(df["d"].dt.strftime("%Y-%m-%d"))` and `df["d"].dt.strftime("%Y-%m-%d") == "2023-06-01"`, which turn dates into text to drop the time and were 18 to 202 times slower than `normalize`.
 
@@ -2021,7 +2008,7 @@ The fix is unsafe, because on dates with a time zone the round trip through text
 
 #### index-year-mask
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `df.loc["2023"]`. On a PeriodIndex of years the label is one period, so the fix returns the value where the mask returned a Series of one row.
 
 The rule reports `df[df.index.year == 2023]`, which computes the year of every row to build a mask.
 
@@ -2039,11 +2026,9 @@ year = df.loc["2023"]
 
 `df.loc["2023"]` selects by label and needs a sorted DatetimeIndex.
 
-xpd gives the replacement as advice and doesn't apply it.
-
 #### apply-date-method
 
-**Severity:** warning. **Fix:** unsafe: `df["d"].dt.floor("h")`, `df["d"].dt.weekday`, `df["d"].dt.date`, `df["d"].dt.isocalendar().week`, `df["d"].dt.tz_localize(None)` for `replace(tzinfo=None)` and `df["d"].dt.tz_convert(zone)` for `astimezone(zone)`. `timestamp` and `toordinal` have no fix.
+**Severity:** warning. **Fix:** unsafe: `df["d"].dt.floor("h")`, `df["d"].dt.weekday`, `df["d"].dt.date`, `df["d"].dt.isocalendar().week`, `df["d"].dt.tz_localize(None)` for `replace(tzinfo=None)`, `df["d"].dt.tz_convert(zone)` for `astimezone(zone)`, and `(df["d"] - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s")` for `timestamp()`, which raises TypeError on a column with a time zone. `toordinal` has no fix.
 
 The rule reports `df["d"].apply(lambda t: t.floor("h"))`, and the same with `ceil`, `normalize`, `tz_localize`, `tz_convert`, `day_name`, `month_name`, `to_period`, `total_seconds`, `weekday`, `date`, `isocalendar`, `timestamp`, `toordinal`, `replace(tzinfo=None)` and `astimezone`, which call Python once per date. It leaves `round` alone, because `lambda v: v.round(2)` is more often a number. It also leaves `replace(tzinfo=zone)` alone, because `replace` skips the daylight saving check that `tz_localize` makes.
 
@@ -2091,9 +2076,9 @@ The fix is unsafe, because a call per value parses each text on its own, while `
 
 #### timedelta-per-value
 
-**Severity:** warning. **Fix:** unsafe: `pd.to_timedelta(df["n"], unit="D")` for `pd.Timedelta(v, unit="D")`. The other shapes have no fix.
+**Severity:** warning. **Fix:** unsafe: `pd.to_timedelta(df["n"], unit="D")` for `pd.Timedelta(v, unit="D")`, for a keyword such as `days=v`, and for the numbers written as text with a unit such as `" days"`. The Timedelta per value gave microseconds where `to_timedelta` gives nanoseconds, a DateOffset per value gave objects, and a number written with an exponent raised ValueError in the text. Any other text after the numbers has no fix.
 
-The rule reports `df["n"].apply(lambda v: pd.Timedelta(days=v))`, the same with `timedelta` and `pd.DateOffset`, and `pd.to_timedelta(df["n"].astype(str) + " days")`. On 1,000,000 rows `pd.to_timedelta` ran 1,549 times faster. A keyword such as `days=v` has no fix, because the keyword must become a unit. The rule leaves `pd.DateOffset(months=v)` alone, because a month has no fixed length.
+The rule reports `df["n"].apply(lambda v: pd.Timedelta(days=v))`, the same with `timedelta` and `pd.DateOffset`, and `pd.to_timedelta(df["n"].astype(str) + " days")`. On 1,000,000 rows `pd.to_timedelta` ran 1,549 times faster. The rule leaves `pd.DateOffset(months=v)` alone, because a month has no fixed length.
 
 Example:
 
@@ -2522,7 +2507,7 @@ matplotlib installed.
 
 #### plot-without-plotly-backend
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe: the line `pd.options.plotting.backend = "plotly"` after `import pandas as pd`. df.plot then returns a plotly Figure in place of a matplotlib Axes. Any other first import of pandas has no fix.
 
 The rule reports a file that draws with a plot method of the accessor and sets no plotting backend. The report is on the first import of pandas, once per file. xpd reports only a file where the setting changes no other line:
 
@@ -2554,8 +2539,6 @@ pd.options.plotting.backend = "plotly"
 
 df.plot.bar(x="team", y="score")
 ```
-
-xpd gives the replacement as advice and doesn't apply it.
 
 #### plot-kind-argument
 
@@ -2609,7 +2592,7 @@ or that writes a CSV file that reads back wrong.
 
 #### read-csv-slow-option
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: drop `engine="python"` when a comma comes before it. An option that only the python engine takes, such as a callable `on_bad_lines`, then raises ValueError. `low_memory=False` and `sep=None` have no fix, because the dtypes and the separator are not in the file.
 
 The rule reports `read_csv(..., engine="python")`, `sep=None` and `low_memory=False`, which turn off the fast C reader. On 1,000,000 rows `sep=None` was 68 times slower than a named separator, measured with the reader's default threads on a 32-core machine. The rule leaves `engine="python"` alone when the call needs it, which is for `skipfooter` or for a separator of several characters other than `\s+`.
 
@@ -2627,11 +2610,9 @@ df = pd.read_csv(path)
 
 The replacement assumes that the call uses no option that only the Python engine has. In place of `low_memory=False`, pass the dtypes of the columns with `dtype=`.
 
-xpd gives the replacement as advice and doesn't apply it.
-
 #### read-then-head
 
-**Severity:** warning. **Fix:** unsafe: `nrows=1000`.
+**Severity:** warning. **Fix:** unsafe: `nrows=1000`, `nrows=5` for `head()` and `nrows=n` for `iloc[:n]` with a whole number. `iloc[:n]` with any other count has no fix.
 
 The rule reports `pd.read_csv(path).head(1000)` and `.iloc[:1000]`, which parse the whole file to keep the first rows. `nrows` was 45 times faster than `head`, measured with the reader's default threads on a 32-core machine.
 
@@ -2831,7 +2812,7 @@ xpd gives the replacement as advice and doesn't apply it.
 
 #### chunked-csv-concat
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning. **Fix:** unsafe: `pd.read_csv(path)` without `chunksize`, when concat takes nothing but the chunks and `ignore_index=True`. pandas guesses the dtypes per chunk, so a column with mixed values can differ. A concat with other arguments, such as `keys=`, has no fix.
 
 The rule reports `pd.concat(pd.read_csv(path, chunksize=n))`, also with `list(...)` or a comprehension around the reader. The code joins every chunk again, so the whole file is in memory anyway. The two frames were equal, and the table shows how long the chunked read took in two runs against one `read_csv` without `chunksize`.
 
@@ -2853,8 +2834,6 @@ Use instead:
 ```python
 df = pd.read_csv(path)
 ```
-
-xpd gives the replacement as advice and doesn't apply it.
 
 ### Packages
 

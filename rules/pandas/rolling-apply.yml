@@ -44,7 +44,26 @@ rule:
 constraints:
   K: { regex: ^(rolling|expanding)$ }
 ---
-# A NumPy function passed to agg, or to apply with raw=True.
+# A NumPy function passed to agg, or to apply with raw=True. Unsafe: the window methods keep
+# running totals, and they skip a missing value that the NumPy function returns, when
+# min_periods lets a window hold one.
+id: rolling-apply
+language: python
+severity: warning
+message: A NumPy function passed to a rolling window runs once per window. Write $X.rolling($$$W).$M().
+rule:
+  any:
+    - pattern: $X.rolling($$$W).agg($NP.$M)
+    - pattern: $X.rolling($$$W).aggregate($NP.$M)
+    - pattern: $X.rolling($$$W).apply($NP.$M, raw=True)
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  M: { regex: '^(sum|mean|min|max|median)$' }
+fix: $X.rolling($$$W).$M()
+metadata: { fix: unsafe }
+---
+# np.std and np.var. No fix, because they divide by n where the window methods divide by n - 1,
+# and the message does not name ddof=0.
 id: rolling-apply
 language: python
 severity: warning
@@ -56,4 +75,4 @@ rule:
     - pattern: $X.rolling($$$W).apply($NP.$M, raw=True)
 constraints:
   NP: { regex: '^(np|numpy)$' }
-  M: { regex: '^(sum|mean|min|max|median|std|var)$' }
+  M: { regex: '^(std|var)$' }

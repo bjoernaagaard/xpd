@@ -17,6 +17,7 @@ constraints:
 fix: $PD.read_json($$$A, engine="pyarrow")
 metadata: { fix: unsafe }
 ---
+# No fix, because the path of the file is not in the matched code, only the open file.
 id: read-json-lines-engine
 language: python
 severity: warning

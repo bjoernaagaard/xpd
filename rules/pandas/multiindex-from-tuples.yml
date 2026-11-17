@@ -61,15 +61,26 @@ constraints:
 fix: $MI.from_product([$$$ITERS])
 metadata: { fix: unsafe }
 ---
-# Two for clauses that pair every value of one iterable with every value of another.
+# Two for clauses that pair every value of one iterable with every value of another. Unsafe for
+# the same reason as the documents above.
 id: multiindex-from-tuples
 language: python
 severity: warning
 message: from_tuples builds one Python tuple per row. Pass the two iterables to $MI.from_product([$X, $Y]).
 rule:
-  pattern: $MI.from_tuples($$$ARGS)
-  has:
-    field: arguments
-    has: { nthChild: 1, pattern: "[($A, $B) for $A in $X for $B in $Y]" }
+  pattern: "$MI.from_tuples([($A, $B) for $A in $X for $B in $Y], $$$KW)"
 constraints:
   MI: { regex: '(^|\.)MultiIndex$' }
+fix: $MI.from_product([$X, $Y], $$$KW)
+metadata: { fix: unsafe }
+---
+id: multiindex-from-tuples
+language: python
+severity: warning
+message: from_tuples builds one Python tuple per row. Pass the two iterables to $MI.from_product([$X, $Y]).
+rule:
+  pattern: "$MI.from_tuples([($A, $B) for $A in $X for $B in $Y])"
+constraints:
+  MI: { regex: '(^|\.)MultiIndex$' }
+fix: $MI.from_product([$X, $Y])
+metadata: { fix: unsafe }

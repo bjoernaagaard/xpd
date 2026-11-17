@@ -92,13 +92,26 @@ rule:
 fix: $S.dt.isocalendar().week
 metadata: { fix: unsafe }
 ---
+# Unsafe: a column with a time zone raises TypeError, because the epoch has none, and the
+# division can differ from timestamp() in the last bit.
 id: apply-date-method
 language: python
 severity: warning
-message: This calls $M once per value. Subtract a start date from the whole column and divide by a Timedelta, as in ($S - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s").
+message: This calls timestamp once per value. Write ($S - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s") on the whole column.
 rule:
   any:
-    - pattern: "$S.apply(lambda $X: $X.$M())"
-    - pattern: "$S.map(lambda $X: $X.$M())"
-constraints:
-  M: { regex: '^(timestamp|toordinal)$' }
+    - pattern: "$S.apply(lambda $X: $X.timestamp())"
+    - pattern: "$S.map(lambda $X: $X.timestamp())"
+fix: ($S - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s")
+metadata: { fix: unsafe }
+---
+# No fix, because toordinal counts days from the year 1, and the message names no start date for
+# it.
+id: apply-date-method
+language: python
+severity: warning
+message: This calls toordinal once per value. Subtract a start date from the whole column and divide by a Timedelta, as in ($S - pd.Timestamp("1970-01-01")) / pd.Timedelta("1D").
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: $X.toordinal())"
+    - pattern: "$S.map(lambda $X: $X.toordinal())"

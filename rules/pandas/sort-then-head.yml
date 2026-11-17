@@ -79,12 +79,16 @@ rule:
 fix: $S.max()
 metadata: { fix: unsafe }
 ---
+# Unsafe: the sort puts missing values last, so the old code read NaN when a value was missing,
+# and max skips it.
 id: sort-then-head
 language: python
 severity: warning
-message: This sorts the whole column to read its last value, which is NaN when a value is missing. Call $S.max().
+message: This sorts the whole column to read its last value, which is NaN when a value is missing. Write $S.max().
 rule:
   pattern: $S.sort_values().iloc[-1]
+fix: $S.max()
+metadata: { fix: unsafe }
 ---
 id: sort-then-head
 language: python
@@ -95,6 +99,35 @@ rule:
 fix: $S.idxmin()
 metadata: { fix: unsafe }
 ---
+# Unsafe: the sort puts missing values last and orders ties differently, so the old code could
+# read another row, and argmax raises when every value is missing.
+id: sort-then-head
+language: python
+severity: warning
+message: This sorts the whole frame to read its last row. Write $DF.iloc[$DF[$B].argmax()].
+rule:
+  pattern: $DF.sort_values($B).iloc[-1]
+  # A frame held in a name and one column named in text.
+  regex: '^[A-Za-z_][\w.]*\.sort_values\(["''][^"'']*["'']\)\.iloc\[-1\]$'
+fix: $DF.iloc[$DF[$B].argmax()]
+metadata: { fix: unsafe }
+---
+# Unsafe: nlargest returns the rows largest first where tail returned them largest last, and it
+# raises on a text column. A negative count is left to the document below.
+id: sort-then-head
+language: python
+severity: warning
+message: This sorts the whole frame to read its last rows. Write $DF.nlargest($N, $B), which lists them largest first.
+rule:
+  pattern: $DF.sort_values($B).tail($N)
+  regex: '^[A-Za-z_][\w.]*\.sort_values\(["''][^"'']*["'']\)\.tail\('
+constraints:
+  N: { not: { kind: unary_operator } }
+fix: $DF.nlargest($N, $B)
+metadata: { fix: unsafe }
+---
+# No fix for a key that is not one column name, or a frame that is not held in a name, because
+# nlargest and argmax take one column of a frame. A negative count of tail has no nlargest form.
 id: sort-then-head
 language: python
 severity: warning
@@ -103,14 +136,34 @@ rule:
   any:
     - pattern: $DF.sort_values($B).iloc[-1]
     - pattern: $DF.sort_values($B).tail($N)
+  not:
+    any:
+      - regex: '^[A-Za-z_][\w.]*\.sort_values\(["''][^"'']*["'']\)\.iloc\[-1\]$'
+      - all:
+          - regex: '^[A-Za-z_][\w.]*\.sort_values\(["''][^"'']*["'']\)\.tail\('
+          - not: { has: { field: arguments, has: { kind: unary_operator } } }
 ---
+# Unsafe: iterating a column gives Python numbers where min and max return NumPy scalars, and
+# sorted does not order a column with NaN.
 id: sort-then-head
 language: python
 severity: warning
-message: sorted builds a Python list of every value to read one. Call min or max on the column.
+message: sorted builds a Python list of every value to read one. Write $DF[$C].min().
 rule:
-  any:
-    - pattern: sorted($DF[$C])[0]
-    - pattern: sorted($DF[$C])[-1]
+  pattern: sorted($DF[$C])[0]
 constraints:
   C: { kind: string }
+fix: $DF[$C].min()
+metadata: { fix: unsafe }
+---
+# Unsafe for the same reasons as min.
+id: sort-then-head
+language: python
+severity: warning
+message: sorted builds a Python list of every value to read one. Write $DF[$C].max().
+rule:
+  pattern: sorted($DF[$C])[-1]
+constraints:
+  C: { kind: string }
+fix: $DF[$C].max()
+metadata: { fix: unsafe }

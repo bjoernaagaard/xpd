@@ -1,6 +1,7 @@
 # Not run on test files: a test's fixture frame has a handful of rows, and a loop that builds
 # the expected value row by row is the point of the test.
-# A for loop or comprehension over the rows of a frame runs Python once per row.
+# A for loop or comprehension over the rows of a frame runs Python once per row. No document has
+# a fix, because the column expression depends on the body of the loop.
 
 # iterrows builds a Series for every row, so it is the slowest way to loop for any purpose.
 id: row-loop

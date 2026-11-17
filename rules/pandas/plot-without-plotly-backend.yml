@@ -18,12 +18,81 @@
 # A module that the file imports can set the backend for it, so the rule is also silent when one
 # of them does: the __init__.py of a package the file is in, a module of the project that the
 # file imports, or a module that one of those imports.
+#
+# When the first import is `import pandas as pd`, the fix sets the backend on the line after it.
+# Unsafe: df.plot then returns a plotly Figure in place of a matplotlib Axes, and the file shows
+# another chart.
 id: plot-without-plotly-backend
 language: python
 severity: info
 message: This file draws with df.plot and sets no plotting backend, so pandas draws with matplotlib and returns an Axes. Set pd.options.plotting.backend = "plotly" once. With it df.plot.bar(x="team", y="score") returned the same figure as px.bar(df, x="team", y="score"), and xpd checks that figure with its plotly rules. The plot calls of this file pass only x, y and title, which plotly takes too.
 rule:
   any: [{ kind: import_statement }, { kind: import_from_statement }]
+  pattern: $IMPORT
+  regex: '^import\s+pandas\s+as\s+pd$'
+  all:
+    - matches: pandas-import
+    - not: { follows: { stopBy: end, matches: pandas-import } }
+    - inside:
+        kind: module
+        all:
+          - has: { stopBy: end, matches: plot-call }
+          - not: { has: { stopBy: end, matches: sets-backend } }
+          - not: { has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'matplotlib|seaborn' } }
+          - not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^backend$ } } }
+          # A kind that plotly does not draw, as a method or as kind=.
+          - not: { has: { stopBy: end, kind: attribute, all: [{ has: { field: attribute, regex: ^(kde|density|pie|hexbin)$ } }, { has: { field: object, matches: accessor } }] } }
+          # A call of the accessor itself, as in df.plot(...), takes any kind and any keyword.
+          - not: { has: { stopBy: end, kind: call, has: { field: function, matches: accessor } } }
+          - not:
+              has:
+                stopBy: end
+                matches: plot-call
+                any:
+                  - has: { field: arguments, has: { kind: keyword_argument, not: { has: { field: name, regex: ^(x|y|title)$ } } } }
+                  - has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+                  - not: { inside: { any: [{ kind: expression_statement }, { kind: return_statement }] } }
+utils:
+  pandas-import:
+    any:
+      - { kind: import_statement, regex: '^import\s+pandas(\s|\.|,|$)' }
+      - { kind: import_from_statement, has: { field: module_name, regex: '^pandas(\.|$)' } }
+  # df.plot, the accessor.
+  accessor:
+    kind: attribute
+    has: { field: attribute, regex: ^plot$ }
+  # A call of a plot method that plotly draws, as in df.plot.bar(...).
+  plot-call:
+    kind: call
+    has:
+      field: function
+      kind: attribute
+      all:
+        - has: { field: attribute, regex: ^(line|bar|barh|area|scatter|box|hist)$ }
+        - has: { field: object, matches: accessor }
+  # A statement that sets the plotting backend of pandas.
+  sets-backend:
+    any:
+      - kind: assignment
+        has: { field: left, kind: attribute, regex: '(^|\.)options\.plotting\.backend$' }
+      - kind: call
+        all:
+          - has: { field: function, regex: '(^|\.)set_option$' }
+          - has: { field: arguments, regex: '^\(\s*["'']plotting\.backend["'']' }
+fix: |-
+  $IMPORT
+  pd.options.plotting.backend = "plotly"
+metadata: { fix: unsafe, unlessImported: { matches: sets-backend } }
+---
+# Any other first import of pandas. No fix, because the line that sets the backend needs pandas
+# imported as pd.
+id: plot-without-plotly-backend
+language: python
+severity: info
+message: This file draws with df.plot and sets no plotting backend, so pandas draws with matplotlib and returns an Axes. Set pd.options.plotting.backend = "plotly" once. With it df.plot.bar(x="team", y="score") returned the same figure as px.bar(df, x="team", y="score"), and xpd checks that figure with its plotly rules. The plot calls of this file pass only x, y and title, which plotly takes too.
+rule:
+  any: [{ kind: import_statement }, { kind: import_from_statement }]
+  not: { regex: '^import\s+pandas\s+as\s+pd$' }
   all:
     - matches: pandas-import
     - not: { follows: { stopBy: end, matches: pandas-import } }

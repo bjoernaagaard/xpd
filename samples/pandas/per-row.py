@@ -395,6 +395,7 @@ def sorted_column_read_at_one_end(df):
         df.sort_values("w").iloc[-1],  # xpd: sort-then-head
         df.sort_values("w").tail(5),  # xpd: sort-then-head
         sorted(df["a"])[0],  # xpd: sort-then-head
+        sorted(df["a"])[-1],  # xpd: sort-then-head
     )
 
 

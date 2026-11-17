@@ -48,6 +48,7 @@ def from_tuples_of_products(df):
         pd.MultiIndex.from_tuples(list(itertools.product(keys, numbers)), names=["k", "n"]),  # xpd: multiindex-from-tuples
         pd.MultiIndex.from_tuples(itertools.product(keys, numbers)),  # xpd: multiindex-from-tuples
         pd.MultiIndex.from_tuples([(k, n) for k in keys for n in numbers], names=["k", "n"]),  # xpd: multiindex-from-tuples, comprehension-two-fors
+        pd.MultiIndex.from_tuples([(k, n) for k in keys for n in numbers]),  # xpd: multiindex-from-tuples, comprehension-two-fors
     )
 
 

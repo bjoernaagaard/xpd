@@ -1,4 +1,6 @@
 # converters calls a Python function once per value.
+# No fix, because the message names two rewrites, a dtype or a change after reading, and the dtype
+# is not in the file.
 id: read-csv-converters
 language: python
 severity: warning

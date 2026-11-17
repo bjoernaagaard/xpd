@@ -99,7 +99,10 @@ def result_assigned(df):
 
 @case
 def epoch_from_int_cast(df):
-    return df["d"].astype("int64") // 10**9  # xpd: epoch-from-int-cast
+    return (
+        df["d"].astype("int64") // 10**9,  # xpd: epoch-from-int-cast
+        df["d"].astype("int64") / 10**6,  # xpd: epoch-from-int-cast
+    )
 
 
 @case
@@ -176,6 +179,7 @@ def datetime_unit_check(df):
         stamps,
         other,
         utc_col.dtype == "datetime64[ns, UTC]",  # xpd: datetime-unit-check
+        utc_col.dtype != "datetime64[ns, UTC]",  # xpd: datetime-unit-check
         str(df["d"].dtype) == "datetime64[ns]",  # xpd: datetime-unit-check
         df["d"].dtype.name != "datetime64[ns]",  # xpd: datetime-unit-check
         df.dtypes == "datetime64[ns]",  # xpd: datetime-unit-check
@@ -282,6 +286,12 @@ def deprecated_copy_keyword_on_astype(df):
 def copy_on_write_option_in_function(df):
     pd.set_option("mode.copy_on_write", True)  # xpd: deprecated-in-pandas-3
     pd.set_option("mode.copy_on_write", True)  # xpd: deprecated-in-pandas-3
+
+
+@case
+def copy_on_write_option_beside_code(df):
+    pd.set_option("mode.copy_on_write", True)  # xpd: deprecated-in-pandas-3
+    return df["a"].sum()
 
 
 @case
@@ -413,6 +423,10 @@ def object_dtype_check_other_shapes(df):
         [c for c in df if df[c].dtype.name == "object"],  # xpd: object-dtype-check
         df.select_dtypes("object"),  # xpd: object-dtype-check
         df.select_dtypes(["object", "category"]),  # xpd: object-dtype-check
+        df.select_dtypes("object", "number"),  # xpd: object-dtype-check
+        df.select_dtypes(["object", "category"], "number"),  # xpd: object-dtype-check
+        df.select_dtypes(exclude=["object", "category"]),  # xpd: object-dtype-check
+        [c for c in df if df[c].dtype.name != "object"],  # xpd: object-dtype-check
     )
 
 

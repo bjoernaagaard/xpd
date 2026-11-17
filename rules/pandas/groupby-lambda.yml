@@ -166,37 +166,58 @@ fix: '"$R"'
 metadata: { fix: unsafe }
 ---
 # A lambda on a resampler, a reduction with arguments, and a count of a condition.
+# Unsafe: the resampler adds up each bin with compensated summation, and the lambda did not, and
+# a lambda that calls first or last raises AttributeError on pandas 3, where the resampler takes
+# the first or last value of each bin.
 id: groupby-lambda
 language: python
 severity: warning
-message: This lambda runs in Python once per bin. Call the named method on the resampler, such as .sum().
+message: This lambda runs in Python once per bin. Write $CALL("$M"), which runs without Python per bin.
 rule:
-  any:
-    - pattern: "$R.resample($$$F).apply(lambda $X: $X.$M())"
-    - pattern: "$R.resample($$$F).agg(lambda $X: $X.$M())"
-    - pattern: "$R.resample($$$F)[$C].apply(lambda $X: $X.$M())"
-    - pattern: "$R.resample($$$F)[$C].agg(lambda $X: $X.$M())"
+  pattern: "$CALL(lambda $X: $X.$M())"
 constraints:
+  # The agg or apply of a resampler, with or without one column selected.
+  CALL: { regex: '\.resample\((?s:.*)\)(\[[^\]]*\])?\.(agg|apply)$' }
   M: { regex: '^(sum|mean|min|max|median|count|std|var|first|last|nunique)$' }
+fix: $CALL("$M")
+metadata: { fix: unsafe }
 ---
+# Unsafe: the resampler adds up each bin with compensated summation, and the NumPy function did
+# not. np.median, np.std and np.var are the document below.
+id: groupby-lambda
+language: python
+severity: warning
+message: A NumPy function passed to a resampler runs once per bin. Write $CALL("$M").
+rule:
+  pattern: $CALL($NP.$M)
+constraints:
+  # The agg or apply of a resampler, with or without one column selected.
+  CALL: { regex: '\.resample\((?s:.*)\)(\[[^\]]*\])?\.(agg|apply)$' }
+  NP: { regex: '^(np|numpy)$' }
+  M: { regex: '^(sum|mean|min|max)$' }
+fix: $CALL("$M")
+metadata: { fix: unsafe }
+---
+# No fix, because the named methods skip missing values and divide by n - 1, where np.median,
+# np.std and np.var do not, and the message names no keyword to keep their result.
 id: groupby-lambda
 language: python
 severity: warning
 message: A NumPy function passed to a resampler runs once per bin. Pass the name of the method, such as "max".
 rule:
-  any:
-    - pattern: $R.resample($$$F).agg($NP.$M)
-    - pattern: $R.resample($$$F).apply($NP.$M)
-    - pattern: $R.resample($$$F)[$C].agg($NP.$M)
-    - pattern: $R.resample($$$F)[$C].apply($NP.$M)
+  pattern: $CALL($NP.$M)
 constraints:
+  # The agg or apply of a resampler, with or without one column selected.
+  CALL: { regex: '\.resample\((?s:.*)\)(\[[^\]]*\])?\.(agg|apply)$' }
   NP: { regex: '^(np|numpy)$' }
-  M: { regex: '^(sum|mean|min|max|median|std|var)$' }
+  M: { regex: '^(median|std|var)$' }
 ---
+# Unsafe: the groupby methods add up each group with compensated summation, and the lambda did
+# not.
 id: groupby-lambda
 language: python
 severity: warning
-message: This lambda runs in Python once per group. Call $M on the groupby with the same arguments.
+message: This lambda runs in Python once per group. Write $G.$M($$$A).
 rule:
   any:
     - pattern: "$G.agg(lambda $X: $X.$M($$$A))"
@@ -204,7 +225,11 @@ rule:
   has: { stopBy: end, kind: lambda, has: { stopBy: end, kind: argument_list, has: { any: [{ kind: float }, { kind: integer }, { kind: keyword_argument }] } } }
 constraints:
   M: { regex: '^(quantile|std|var)$' }
+fix: $G.$M($$$A)
+metadata: { fix: unsafe }
 ---
+# No fix, because the column and the keys of the groupby are not apart in $G, and the mask has to
+# be built on the column.
 id: groupby-lambda
 language: python
 severity: warning

@@ -1,5 +1,7 @@
 # apply-date-part reports a lambda that only reads a date part, such as t.year. This reports a
 # lambda that compares a part, or computes with parts.
+# No fix, because the message gives an example, and the lambda's name would have to be replaced by
+# $S.dt in its body.
 id: apply-date-expression
 language: python
 severity: warning
@@ -27,6 +29,8 @@ utils:
       - has: { field: object, pattern: $X }
       - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|isoweekday|days_in_month)$' }
 ---
+# No fix, because the message gives an example, and the lambda's name would have to be replaced by
+# $S.dt in its body.
 id: apply-date-expression
 language: python
 severity: warning

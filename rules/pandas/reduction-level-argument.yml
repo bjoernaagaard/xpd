@@ -11,7 +11,7 @@ constraints:
 fix: $X.groupby(level=$L).$R()
 metadata: { fix: unsafe }
 ---
-# With more arguments, such as axis=1, the rewrite depends on them.
+# No fix with more arguments, such as axis=1, because the rewrite depends on them.
 id: reduction-level-argument
 language: python
 severity: error

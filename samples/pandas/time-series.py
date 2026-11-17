@@ -211,6 +211,7 @@ def strftime_round_trip(df):
         pd.to_datetime(df["d"].dt.strftime("%Y-%m-%d")),  # xpd: strftime-round-trip
         pd.to_datetime(df["d"].dt.strftime("%Y-%m-%d %H")),  # xpd: strftime-round-trip
         df[df["d"].dt.strftime("%Y-%m-%d") == "2022-06-01"],  # xpd: strftime-round-trip
+        df[df["d"].dt.strftime("%Y-%m-%d") != "2022-06-01"],  # xpd: strftime-round-trip
     )
 
 
@@ -265,6 +266,7 @@ def removed_time_series_forms(df):
         df["b"].pct_change(fill_method="pad"),  # xpd: removed-in-pandas-3
         pd.Timedelta("5T"),  # xpd: removed-in-pandas-3
         df["d"].diff().astype("timedelta64[D]"),  # xpd: removed-in-pandas-3
+        df["d"].astype("datetime64[D]"),  # xpd: removed-in-pandas-3
     )
 
 
@@ -283,6 +285,7 @@ def day_frequency_with_time_zone(df):
         ts.shift(freq="2D"),  # xpd: day-frequency-with-time-zone
         ts["b"].pct_change(freq="D"),  # xpd: day-frequency-with-time-zone
         ts.index + pd.offsets.Day(1),  # xpd: day-frequency-with-time-zone
+        ts.index - pd.offsets.Day(2),  # xpd: day-frequency-with-time-zone
         ts.index - pd.tseries.offsets.Day(),  # xpd: day-frequency-with-time-zone
         ts.resample("D", offset="6h").sum(),  # xpd: day-frequency-with-time-zone
         ts.resample("1D", origin="start").sum(),  # xpd: day-frequency-with-time-zone
@@ -413,10 +416,14 @@ def pytz_error_handler(df):
     except (pytz.AmbiguousTimeError, KeyError):  # xpd: removed-in-pandas-3
         second = None
     try:
+        fourth = df["d"].dt.tz_localize("Europe/Copenhagen")  # xpd: tz-localize-without-dst
+    except (KeyError, pytz.NonExistentTimeError):  # xpd: removed-in-pandas-3
+        fourth = None
+    try:
         third = df["d"].dt.floor("h")
     except AmbiguousTimeError:  # xpd: removed-in-pandas-3
         third = None
-    return first, second, third
+    return first, second, third, fourth
 
 
 @case

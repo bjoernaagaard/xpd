@@ -1,10 +1,11 @@
-# One Timedelta, timedelta or DateOffset built per value. The keyword, such as days, must become
-# a unit, such as "D", so this document has no fix. DateOffset(months=v) is left alone, because
-# a month has no fixed length.
+# One Timedelta, timedelta or DateOffset built per value. The fix turns the keyword, such as
+# days, into the unit, such as "D". DateOffset(months=v) is left alone, because a month has no
+# fixed length. Unsafe: on pandas 3.1.1 a Timedelta per value gave timedelta64[us] where
+# to_timedelta gave timedelta64[ns], and a DateOffset per value gave a column of objects.
 id: timedelta-per-value
 language: python
 severity: warning
-message: This builds one $T per value. Convert the whole column with pd.to_timedelta and a unit, such as pd.to_timedelta(df["n"], unit="D").
+message: This builds one $T per value. Write pd.to_timedelta($S, unit="$UNIT") on the whole column.
 rule:
   any:
     - pattern: "$S.apply(lambda $X: $T($U=$X))"
@@ -12,6 +13,16 @@ rule:
 constraints:
   T: { regex: '^(pd\.Timedelta|pd\.DateOffset|timedelta|datetime\.timedelta|dt\.timedelta)$' }
   U: { regex: ^(weeks|days|hours|minutes|seconds|milliseconds|microseconds)$ }
+transform:
+  WEEKS: { replace: { source: $U, replace: ^weeks$, by: W } }
+  DAYS: { replace: { source: $WEEKS, replace: ^days$, by: D } }
+  HOURS: { replace: { source: $DAYS, replace: ^hours$, by: h } }
+  MINUTES: { replace: { source: $HOURS, replace: ^minutes$, by: min } }
+  SECONDS: { replace: { source: $MINUTES, replace: ^seconds$, by: s } }
+  MILLIS: { replace: { source: $SECONDS, replace: ^milliseconds$, by: ms } }
+  UNIT: { replace: { source: $MILLIS, replace: ^microseconds$, by: us } }
+fix: pd.to_timedelta($S, unit="$UNIT")
+metadata: { fix: unsafe }
 ---
 # Unsafe: on fractional values the two forms round differently in the last digits.
 id: timedelta-per-value
@@ -29,6 +40,30 @@ constraints:
 fix: pd.to_timedelta($S, unit=$U)
 metadata: { fix: unsafe }
 ---
+# Numbers written as text with a unit that follows them. The fix moves the unit to unit=.
+# Unsafe: a number that str writes with an exponent, such as 1.5e-09, raised ValueError in the
+# text, and to_timedelta reads it as a number.
+id: timedelta-per-value
+language: python
+severity: warning
+message: This writes each number as text and parses it again. Write pd.to_timedelta($S, unit="$UNIT").
+rule:
+  any:
+    - pattern: pd.to_timedelta($S.astype(str) + $TEXT)
+    - pattern: pd.to_timedelta($S.astype("str") + $TEXT)
+    - pattern: pd.to_timedelta($S.astype('str') + $TEXT)
+constraints:
+  TEXT: { kind: string, regex: '^["''] ?(D|days?|h|hours?|min|minutes?|s|seconds?)["'']$' }
+transform:
+  WORD: { replace: { source: $TEXT, replace: '^["''] ?(.+?)s?["'']$', by: '$1' } }
+  DAY: { replace: { source: $WORD, replace: ^day$, by: D } }
+  HOUR: { replace: { source: $DAY, replace: ^hour$, by: h } }
+  MINUTE: { replace: { source: $HOUR, replace: ^minute$, by: min } }
+  UNIT: { replace: { source: $MINUTE, replace: ^second$, by: s } }
+fix: pd.to_timedelta($S, unit="$UNIT")
+metadata: { fix: unsafe }
+---
+# No fix for any other text, because xpd does not know the unit it names.
 id: timedelta-per-value
 language: python
 severity: warning
@@ -39,4 +74,4 @@ rule:
     - pattern: pd.to_timedelta($S.astype("str") + $TEXT)
     - pattern: pd.to_timedelta($S.astype('str') + $TEXT)
 constraints:
-  TEXT: { kind: string }
+  TEXT: { kind: string, not: { regex: '^["''] ?(D|days?|h|hours?|min|minutes?|s|seconds?)["'']$' } }

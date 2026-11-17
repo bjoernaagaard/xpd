@@ -3,6 +3,7 @@
 # x["key"] in a for clause is more often a list inside a dict, such as data["rows"] from JSON,
 # than a column: 14 of 23 hits in the held-back files were. So the receiver must be named like a
 # frame: df, frame, or a name with one of them as a word.
+# No fix, because the column method depends on what the comprehension computes.
 id: list-over-column
 language: python
 severity: warning
@@ -18,6 +19,7 @@ constraints:
   DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }
 ---
 # The statement form: a for loop over a column that appends to a list.
+# No fix, because the column expression depends on the body of the loop.
 id: list-over-column
 language: python
 severity: warning

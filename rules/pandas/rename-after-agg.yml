@@ -1,3 +1,5 @@
+# No fix, because each new name in rename has to be paired with its key in the agg dict, which no
+# ast-grep transform does.
 id: rename-after-agg
 language: python
 severity: warning

@@ -2,6 +2,7 @@
 # earlier row on each pass. A concat inside a loop that builds a frame from other objects, such
 # as `panel = pd.concat(parts_of_this_month)`, copies each row once and is left alone. So is a
 # concat with axis=1: on pandas 3 it shares the columns it already has and copies no row.
+# No fix, because the list and the one concat after the loop change the loop and the code after it.
 id: concat-in-loop
 language: python
 severity: warning

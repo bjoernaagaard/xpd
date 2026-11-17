@@ -145,6 +145,8 @@ transform:
 fix: $A.join($B, $REST)
 metadata: { fix: unsafe }
 ---
+# No fix, because join takes other keywords than merge, such as lsuffix and rsuffix in place of
+# suffixes.
 id: merge-on-both-indexes
 language: python
 severity: info

@@ -4,8 +4,12 @@
 # 2.9 times as long in two runs as one read_csv without chunksize, with the reader's default threads
 # on a 32-core machine, and 1.1 and 1.0 times as long on one thread. The two frames were equal.
 # read_parquet of the same rows was as fast as the one read_csv, and it takes columns= and filters=
-# to read less (research/modern-pandas/probes/storage.txt). The rule has no fix, because pandas
-# guesses the dtypes per chunk, so a column with mixed values can differ.
+# to read less (research/modern-pandas/probes/storage.txt).
+#
+# When concat takes nothing but the chunks and ignore_index=True, the fix reads the file once
+# without chunksize. The chunks are numbered on from one to the next, so the index is the same
+# with ignore_index or without it. Unsafe: pandas guesses the dtypes per chunk, so a column with
+# mixed values can differ.
 id: chunked-csv-concat
 language: python
 severity: warning
@@ -27,6 +31,66 @@ rule:
                 - has: { field: body, kind: identifier, pattern: $I }
                 - has: { kind: for_in_clause, all: [{ has: { field: left, pattern: $I } }, { has: { field: right, matches: chunk-reader } }] }
                 - not: { has: { kind: if_clause } }
+    # Besides the chunks, concat takes only ignore_index=True.
+    - not: { has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { regex: '^ignore_index\s*=\s*True$' } } } }
+    - not: { has: { field: arguments, has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
+    - has: { field: arguments, has: { stopBy: end, matches: chunk-reader, pattern: '$PD.read_csv($$$ARGS)' } }
+utils:
+  # read_csv with chunksize=, which returns the file in parts.
+  chunk-reader:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(pd|pandas)\.read_csv$' }
+      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^chunksize$ } } }
+rewriters:
+  - id: drop-chunks
+    rule: { kind: keyword_argument, has: { field: name, regex: ^(chunksize|iterator)$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^(chunksize|iterator)$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-chunks, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $PD.read_csv($REST)
+metadata: { fix: unsafe }
+---
+# No fix when concat takes other arguments, such as keys= or axis=, which change what it
+# returns.
+id: chunked-csv-concat
+language: python
+severity: warning
+message: This reads the file in chunks and joins every chunk, so the whole file is in memory anyway. With the reader's default threads on a 32-core machine it took 3 times as long as one read_csv without chunksize, which returned an equal frame, and on one thread it took as long. Drop chunksize, or reduce each chunk before the concat. To read only some columns or rows, store the data as Parquet and pass columns= or filters= to read_parquet.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '^(pd|pandas)\.concat$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }
+          any:
+            - matches: chunk-reader
+            - { pattern: list($R), has: { field: arguments, has: { matches: chunk-reader } } }
+            # Every chunk as it is: [part for part in reader], with no condition.
+            - kind: list_comprehension
+              all:
+                - has: { field: body, kind: identifier, pattern: $I }
+                - has: { kind: for_in_clause, all: [{ has: { field: left, pattern: $I } }, { has: { field: right, matches: chunk-reader } }] }
+                - not: { has: { kind: if_clause } }
+    # concat takes more than the chunks and ignore_index=True, which the document above fixes.
+    - any:
+        - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, not: { regex: '^ignore_index\s*=\s*True$' } } }
+        - has: { field: arguments, has: { nthChild: { position: 3, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } }
 utils:
   # read_csv with chunksize=, which returns the file in parts.
   chunk-reader:

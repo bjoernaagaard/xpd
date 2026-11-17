@@ -95,6 +95,8 @@ utils:
 fix: ""
 metadata: { fix: unsafe }
 ---
+# Inside a block that holds another statement, which keeps the block valid once the line is
+# gone. Unsafe for the same reason as at the top level.
 id: deprecated-in-pandas-3
 language: python
 severity: warning
@@ -102,6 +104,29 @@ message: Copy-on-write is always on in pandas 3, and this option is deprecated. 
 rule:
   matches: copy-on-write-option
   not: { inside: { kind: module } }
+  inside: { kind: block, has: { not: { any: [{ kind: comment }, { matches: copy-on-write-option }] } } }
+utils:
+  copy-on-write-option:
+    kind: expression_statement
+    has:
+      any:
+        - pattern: pd.set_option("mode.copy_on_write", $V)
+        - pattern: pd.set_option('mode.copy_on_write', $V)
+        - pattern: pd.options.mode.copy_on_write = $V
+fix: ""
+metadata: { fix: unsafe }
+---
+# The only statement of its block. No fix, because the block would be empty without it.
+id: deprecated-in-pandas-3
+language: python
+severity: warning
+message: Copy-on-write is always on in pandas 3, and this option is deprecated. Delete the line.
+rule:
+  matches: copy-on-write-option
+  not:
+    any:
+      - inside: { kind: module }
+      - inside: { kind: block, has: { not: { any: [{ kind: comment }, { matches: copy-on-write-option }] } } }
 utils:
   copy-on-write-option:
     kind: expression_statement

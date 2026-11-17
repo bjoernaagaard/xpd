@@ -27,13 +27,15 @@ metadata: { fix: unsafe }
 id: positional-key-on-labels
 language: python
 severity: error
-message: This Series is labelled by the column names, and an integer key is a label on pandas 3, so this raises KeyError unless a column is named $N. Take the position with .iloc[$N].
+message: This Series is labelled by the column names, and an integer key is a label on pandas 3, so this raises KeyError unless a column is named $N. Write $S.iloc[$N].
 rule:
-  any:
-    - pattern: $DF.dtypes[$N]
-    - pattern: $DF.$R()[$N]
-    - pattern: $DF.isna().$R()[$N]
-    - pattern: $DF.isnull().$R()[$N]
+  pattern: $S[$N]
 constraints:
   N: { regex: '^-?\d+$' }
-  R: { regex: '^(sum|mean|median|min|max|std|var|count|nunique|idxmax|idxmin|any|all)$' }
+  # df.dtypes, or a reduction of the columns with no argument, such as df.sum() or df.isna().sum().
+  S:
+    any:
+      - { kind: attribute, regex: '\.dtypes$' }
+      - { kind: call, regex: '\.(sum|mean|median|min|max|std|var|count|nunique|idxmax|idxmin|any|all)\(\)$' }
+fix: $S.iloc[$N]
+metadata: { fix: unsafe }

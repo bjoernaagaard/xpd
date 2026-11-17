@@ -1,3 +1,4 @@
+# No fix, because the column expression depends on what the function does with each row.
 id: apply-axis-1
 language: python
 severity: warning
@@ -14,6 +15,7 @@ rule:
 ---
 # agg and transform with axis=1 call a function once per row as apply does. A named method, as
 # in agg("sum", axis=1), runs on whole columns and is left alone.
+# No fix, because the column expression depends on what the function does with each row.
 id: apply-axis-1
 language: python
 severity: warning

@@ -40,7 +40,8 @@ transform:
 fix: $OBJ = $OBJ.$M($REST)
 metadata: { fix: unsafe }
 ---
-# Any other call with inplace=True, such as one passed to another function, has no fix.
+# Any other call with inplace=True, such as one passed to another function, has no fix, because
+# there is no name to assign the result to.
 id: no-inplace
 language: python
 severity: info

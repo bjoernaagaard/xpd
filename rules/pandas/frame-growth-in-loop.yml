@@ -1,3 +1,4 @@
+# No fix, because the list of rows changes the loop and the code after it.
 id: frame-growth-in-loop
 language: python
 severity: warning

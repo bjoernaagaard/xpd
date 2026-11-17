@@ -1,10 +1,14 @@
+# Unsafe: on a PeriodIndex of years the label is one period, so on pandas 3.1.1 .loc["2023"]
+# returned the value where the mask returned a Series of one row.
 id: index-year-mask
 language: python
 severity: warning
-message: On a sorted DatetimeIndex, a label such as $DF.loc["2023"] selects the year without a mask over every row.
+message: On a DatetimeIndex, a label selects the year without a mask over every row. Write $DF.loc["$Y"].
 rule:
   any:
     - pattern: $DF[$DF.index.year == $Y]
     - pattern: $DF.loc[$DF.index.year == $Y]
 constraints:
   Y: { kind: integer }
+fix: $DF.loc["$Y"]
+metadata: { fix: unsafe }

@@ -1,3 +1,5 @@
+# No fix, because the .loc key depends on whether the brackets hold a position, a slice or a mask,
+# and the column is not apart in the code.
 id: write-through-values
 language: python
 severity: error

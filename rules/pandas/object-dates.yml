@@ -1,5 +1,7 @@
 # dt.normalize() keeps datetime64, and datetime64 compared with a Python date raises TypeError,
 # so a dt.date that is one side of a comparison is left alone.
+# No fix, because the message names two rewrites, dt.normalize() and dt.floor("D"), and the code
+# that compares the result has to change too.
 id: object-dates
 language: python
 severity: warning

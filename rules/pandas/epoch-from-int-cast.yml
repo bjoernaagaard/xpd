@@ -1,30 +1,80 @@
 # Dividing by 10**9 or 10**6 turns nanoseconds into seconds or milliseconds. A cast to int on a
 # pandas 3 datetime column returns microseconds for most sources, so the result is off by 1,000.
+# The fix subtracts the epoch and divides by the Timedelta of the unit. Unsafe: the result changes
+# on purpose, a column with a time zone raises TypeError, because the epoch has none, and a
+# missing value gives NaN where the cast gave the smallest int64.
 id: epoch-from-int-cast
 language: python
 severity: error
-message: Datetimes default to microseconds in pandas 3, so this cast no longer gives nanoseconds. Subtract the epoch and divide by a Timedelta, as in (col - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s").
-rule:
-  kind: binary_operator
-  all:
-    - has: { field: operator, regex: ^//?$ }
-    - has: { field: left, any: [{ pattern: $X.astype($T) }, { pattern: $X.view($T) }] }
-    - has: { field: right, regex: '^(10 ?\*\* ?[69]|1e[69]|1_?000_?000(_?000)?)$' }
-constraints:
-  T: { regex: '^(["'']int64["'']|["'']int["'']|int|np\.int64|["'']i8["''])$' }
----
-# The integer values of an index, and a cast of .values to float.
-id: epoch-from-int-cast
-language: python
-severity: error
-message: Datetimes default to microseconds in pandas 3, so this no longer counts nanoseconds. Subtract the epoch and divide by a Timedelta.
+message: Datetimes default to microseconds in pandas 3, so this cast no longer gives nanoseconds. Write ($X - pd.Timestamp("1970-01-01")) // $UNIT.
 rule:
   any:
-    - pattern: $I.asi8 // $D
-    - pattern: $I.asi8 / $D
-    - pattern: $V.values.astype($T) / $D
-    - pattern: $V.values.astype($T) // $D
+    - pattern: $X.astype($T) // $D
+    - pattern: $X.view($T) // $D
+constraints:
+  T: { regex: '^(["'']int64["'']|["'']int["'']|int|np\.int64|["'']i8["''])$' }
+  D: { regex: '^(10 ?\*\* ?[69]|1e[69]|1_?000_?000(_?000)?)$' }
+transform:
+  SECONDS: { replace: { source: $D, replace: '^(10\s*\*\*\s*9|1e9|1_?000_?000_?000)$', by: 'pd.Timedelta("1s")' } }
+  MILLIS: { replace: { source: $SECONDS, replace: '^(10\s*\*\*\s*6|1e6|1_?000_?000)$', by: 'pd.Timedelta("1ms")' } }
+  UNIT: { replace: { source: $MILLIS, replace: '^(10\s*\*\*\s*3|1e3|1_?000)$', by: 'pd.Timedelta("1us")' } }
+fix: ($X - pd.Timestamp("1970-01-01")) // $UNIT
+metadata: { fix: unsafe }
+---
+id: epoch-from-int-cast
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this cast no longer gives nanoseconds. Write ($X - pd.Timestamp("1970-01-01")) / $UNIT.
+rule:
+  any:
+    - pattern: $X.astype($T) / $D
+    - pattern: $X.view($T) / $D
+constraints:
+  T: { regex: '^(["'']int64["'']|["'']int["'']|int|np\.int64|["'']i8["''])$' }
+  D: { regex: '^(10 ?\*\* ?[69]|1e[69]|1_?000_?000(_?000)?)$' }
+transform:
+  SECONDS: { replace: { source: $D, replace: '^(10\s*\*\*\s*9|1e9|1_?000_?000_?000)$', by: 'pd.Timedelta("1s")' } }
+  MILLIS: { replace: { source: $SECONDS, replace: '^(10\s*\*\*\s*6|1e6|1_?000_?000)$', by: 'pd.Timedelta("1ms")' } }
+  UNIT: { replace: { source: $MILLIS, replace: '^(10\s*\*\*\s*3|1e3|1_?000)$', by: 'pd.Timedelta("1us")' } }
+fix: ($X - pd.Timestamp("1970-01-01")) / $UNIT
+metadata: { fix: unsafe }
+---
+# The integer values of an index, and a cast of .values to float. Unsafe for the same reasons,
+# and the fix returns an Index or a Series where the old code returned a NumPy array.
+id: epoch-from-int-cast
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this no longer counts nanoseconds. Write ($X - pd.Timestamp("1970-01-01")) // $UNIT.
+rule:
+  any:
+    - pattern: $X.asi8 // $D
+    - pattern: $X.values.astype($T) // $D
 constraints:
   D: { regex: '^(10\s*\*\*\s*[369]|1e[369]|1_?000(_?000){0,2})$' }
   # A cast to an integer type is the document above.
   T: { regex: '^(float|["'']float(64)?["'']|np\.float64|["'']f8["''])$' }
+transform:
+  SECONDS: { replace: { source: $D, replace: '^(10\s*\*\*\s*9|1e9|1_?000_?000_?000)$', by: 'pd.Timedelta("1s")' } }
+  MILLIS: { replace: { source: $SECONDS, replace: '^(10\s*\*\*\s*6|1e6|1_?000_?000)$', by: 'pd.Timedelta("1ms")' } }
+  UNIT: { replace: { source: $MILLIS, replace: '^(10\s*\*\*\s*3|1e3|1_?000)$', by: 'pd.Timedelta("1us")' } }
+fix: ($X - pd.Timestamp("1970-01-01")) // $UNIT
+metadata: { fix: unsafe }
+---
+id: epoch-from-int-cast
+language: python
+severity: error
+message: Datetimes default to microseconds in pandas 3, so this no longer counts nanoseconds. Write ($X - pd.Timestamp("1970-01-01")) / $UNIT.
+rule:
+  any:
+    - pattern: $X.asi8 / $D
+    - pattern: $X.values.astype($T) / $D
+constraints:
+  D: { regex: '^(10\s*\*\*\s*[369]|1e[369]|1_?000(_?000){0,2})$' }
+  # A cast to an integer type is the document above.
+  T: { regex: '^(float|["'']float(64)?["'']|np\.float64|["'']f8["''])$' }
+transform:
+  SECONDS: { replace: { source: $D, replace: '^(10\s*\*\*\s*9|1e9|1_?000_?000_?000)$', by: 'pd.Timedelta("1s")' } }
+  MILLIS: { replace: { source: $SECONDS, replace: '^(10\s*\*\*\s*6|1e6|1_?000_?000)$', by: 'pd.Timedelta("1ms")' } }
+  UNIT: { replace: { source: $MILLIS, replace: '^(10\s*\*\*\s*3|1e3|1_?000)$', by: 'pd.Timedelta("1us")' } }
+fix: ($X - pd.Timestamp("1970-01-01")) / $UNIT
+metadata: { fix: unsafe }

@@ -8,6 +8,8 @@ rule:
   pattern: $X.stack($$$ARGS)
   has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^dropna$ } } }
 ---
+# The fix builds the argument list again without future_stack. Unsafe: the new stack keeps the
+# rows that are all missing, which the old one dropped.
 id: stack-dropna
 language: python
 severity: warning
@@ -19,3 +21,24 @@ rule:
     has:
       kind: keyword_argument
       all: [{ has: { field: name, regex: ^future_stack$ } }, { has: { field: value, regex: ^False$ } }]
+rewriters:
+  - id: drop-future-stack
+    rule: { kind: keyword_argument, has: { field: name, regex: ^future_stack$ } }
+    fix: ""
+  - id: keep-argument
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^future_stack$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop-future-stack, keep-argument], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $X.stack($REST)
+metadata: { fix: unsafe }

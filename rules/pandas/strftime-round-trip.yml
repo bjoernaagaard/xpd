@@ -24,13 +24,26 @@ constraints:
 fix: $S.dt.floor("h")
 metadata: { fix: unsafe }
 ---
+# Unsafe: on dates with a time zone the comparison with a Timestamp without one raises
+# TypeError, and text that is not a date raises ValueError in pd.Timestamp.
 id: strftime-round-trip
 language: python
 severity: warning
-message: This formats every date as text to compare it with one day. Compare $S.dt.normalize() with a Timestamp.
+message: This formats every date as text to compare it with one day. Write $S.dt.normalize() == pd.Timestamp($D).
 rule:
-  any:
-    - pattern: $S.dt.strftime($F) == $D
-    - pattern: $S.dt.strftime($F) != $D
+  pattern: $S.dt.strftime($F) == $D
 constraints:
   F: { regex: '^["'']%Y-%m-%d["'']$' }
+fix: $S.dt.normalize() == pd.Timestamp($D)
+metadata: { fix: unsafe }
+---
+id: strftime-round-trip
+language: python
+severity: warning
+message: This formats every date as text to compare it with one day. Write $S.dt.normalize() != pd.Timestamp($D).
+rule:
+  pattern: $S.dt.strftime($F) != $D
+constraints:
+  F: { regex: '^["'']%Y-%m-%d["'']$' }
+fix: $S.dt.normalize() != pd.Timestamp($D)
+metadata: { fix: unsafe }

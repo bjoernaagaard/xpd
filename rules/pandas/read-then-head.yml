@@ -13,14 +13,42 @@ constraints:
 fix: $PD.read_csv($$$A, nrows=$N)
 metadata: { fix: unsafe }
 ---
+# head() keeps 5 rows. Unsafe for the same reason as the document above.
+id: read-then-head
+language: python
+severity: warning
+message: This reads and parses the whole file and keeps the first 5 rows. Write $PD.read_csv($$$A, nrows=5).
+rule:
+  pattern: $PD.read_csv($$$A).head()
+  not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^(nrows|chunksize|iterator)$' } } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+fix: $PD.read_csv($$$A, nrows=5)
+metadata: { fix: unsafe }
+---
+# Unsafe for the same reason as the document above.
+id: read-then-head
+language: python
+severity: warning
+message: This reads and parses the whole file and keeps the first $N rows. Write $PD.read_csv($$$A, nrows=$N).
+rule:
+  pattern: $PD.read_csv($$$A).iloc[:$N]
+  not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^(nrows|chunksize|iterator)$' } } }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+  N: { kind: integer }
+fix: $PD.read_csv($$$A, nrows=$N)
+metadata: { fix: unsafe }
+---
+# No fix for iloc[:n] with a count that is not a whole number written out, because a negative
+# count keeps all but the last rows, which nrows cannot say.
 id: read-then-head
 language: python
 severity: warning
 message: This reads and parses the whole file and keeps the first rows. Pass nrows to read_csv.
 rule:
-  any:
-    - pattern: $PD.read_csv($$$A).head()
-    - pattern: $PD.read_csv($$$A).iloc[:$N]
+  pattern: $PD.read_csv($$$A).iloc[:$N]
   not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^(nrows|chunksize|iterator)$' } } }
 constraints:
   PD: { regex: '^(pd|pandas)$' }
+  N: { not: { kind: integer } }

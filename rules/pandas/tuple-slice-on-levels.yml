@@ -22,6 +22,51 @@ transform:
 fix: pd.IndexSlice[$NEW]
 metadata: { fix: safe }
 ---
+# A tuple with a slice that has bounds. The fix writes each slice call with colons, as in "a":"c"
+# for slice("a", "c"), so pd.IndexSlice builds the same tuple, and it is safe for the same
+# reason as the document above.
+id: tuple-slice-on-levels
+language: python
+severity: info
+message: pd.IndexSlice writes a selection over index levels with the colon that a slice has everywhere else. Write pd.IndexSlice[$NEW] in place of the tuple, which is the same object.
+rule:
+  kind: tuple
+  pattern: $T
+  all:
+    - has: { kind: call, has: { field: function, regex: ^slice$ }, not: { pattern: slice(None) } }
+    - inside: { kind: subscript, has: { field: value, kind: attribute, has: { field: attribute, regex: ^loc$ } } }
+    - not: { has: { matches: odd-slice } }
+utils:
+  # A slice call that has no form with colons.
+  odd-slice:
+    kind: call
+    has: { field: function, regex: ^slice$ }
+    any:
+      - not: { any: [{ pattern: slice($A) }, { pattern: 'slice($A, $B)' }, { pattern: 'slice($A, $B, $C)' }] }
+      - has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }
+rewriters:
+  - id: slice-none
+    rule: { pattern: slice(None) }
+    fix: ":"
+  - id: slice-one
+    rule: { pattern: slice($A) }
+    fix: ":$A"
+  - id: slice-two
+    rule: { pattern: 'slice($A, $B)' }
+    fix: "$A:$B"
+  - id: slice-three
+    rule: { pattern: 'slice($A, $B, $C)' }
+    fix: "$A:$B:$C"
+transform:
+  COLONS:
+    rewrite: { source: $T, rewriters: [slice-none, slice-one, slice-two, slice-three] }
+  NEW:
+    substring: { source: $COLONS, startChar: 1, endChar: -1 }
+fix: pd.IndexSlice[$NEW]
+metadata: { fix: safe }
+---
+# No fix for a slice call with keywords, with unpacked arguments or with more than three
+# arguments, because it has no form with colons.
 id: tuple-slice-on-levels
 language: python
 severity: info
@@ -31,3 +76,12 @@ rule:
   all:
     - has: { kind: call, has: { field: function, regex: ^slice$ }, not: { pattern: slice(None) } }
     - inside: { kind: subscript, has: { field: value, kind: attribute, has: { field: attribute, regex: ^loc$ } } }
+    - has: { matches: odd-slice }
+utils:
+  # A slice call that has no form with colons.
+  odd-slice:
+    kind: call
+    has: { field: function, regex: ^slice$ }
+    any:
+      - not: { any: [{ pattern: slice($A) }, { pattern: 'slice($A, $B)' }, { pattern: 'slice($A, $B, $C)' }] }
+      - has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }] } }

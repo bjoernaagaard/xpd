@@ -198,7 +198,8 @@ fix: $DF.loc[$ROW, $COL]
 metadata: { fix: unsafe }
 ---
 # Every other chain of two subscripts with a text label, such as df.iloc[0]["col"] = v, is
-# reported without a fix. Two plain keys, as in rows[0]["name"] or config["db"]["host"], are more
+# reported without a fix, because each shape needs its own .loc key, such as df.index[0] for a
+# position. Two plain keys, as in rows[0]["name"] or config["db"]["host"], are more
 # often a list or dict than a frame, so they are left alone.
 id: chained-assignment
 language: python
@@ -320,10 +321,12 @@ constraints:
 fix: $DF.loc[$ROW, $COL]
 metadata: { fix: unsafe }
 ---
+# The fix writes by label through the index. Unsafe: the write now reaches the frame, which is
+# the point, and a label that the index holds more than once writes every row with it.
 id: chained-assignment
 language: python
 severity: error
-message: $DF[$COL] is a copy under copy-on-write, so this write never reaches the frame. Assign by label with $DF.loc[$DF.index[$ROW], $COL].
+message: $DF[$COL] is a copy under copy-on-write, so this write never reaches the frame. Write $DF.loc[$DF.index[$ROW], $COL].
 rule:
   all:
     - any:
@@ -334,7 +337,11 @@ rule:
         - inside: { kind: augmented_assignment, field: left }
 constraints:
   COL: { kind: string }
+fix: $DF.loc[$DF.index[$ROW], $COL]
+metadata: { fix: unsafe }
 ---
+# No fix, because the message names two rewrites, and $DF.update with the frame would also
+# change columns outside the list.
 id: chained-assignment
 language: python
 severity: error
@@ -346,7 +353,8 @@ constraints:
   COL: { kind: list }
 ---
 # With a text key this is also how a dict of dicts is updated, as in state["seen"].update(extra),
-# so the frame must be named like one: df, frame, or a name with one of them as a word.
+# so the frame must be named like one: df, frame, or a name with one of them as a word. No fix,
+# because the message names two rewrites, update with a frame or an assignment of the column.
 id: chained-assignment
 language: python
 severity: error

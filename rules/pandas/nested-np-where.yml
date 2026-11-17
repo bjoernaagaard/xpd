@@ -1,3 +1,5 @@
+# No fix, because the message names two rewrites, case_when and pd.cut, and each needs the
+# conditions taken apart.
 id: nested-np-where
 language: python
 severity: warning

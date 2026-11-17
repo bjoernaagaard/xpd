@@ -1,6 +1,10 @@
 # In `df["a"] > 1 & df["b"] < 3`, & binds first, so Python compares df["a"] with `1 & df["b"]`.
 # Only a & or | to the right of a comparison operator counts, because `flags & 4 == 0` is
 # ordinary bit arithmetic, and `in` or `is` comparisons often take a set union.
+#
+# The fix closes the comparison before each & or | and opens it again after, so
+# `a > 1 & b < 3` becomes `(a > 1) & (b < 3)`. Unsafe: the result changes on purpose, because the
+# old code compared against a combined value.
 id: mask-precedence
 language: python
 severity: error
@@ -13,3 +17,21 @@ rule:
     not: { nthChild: 1 }
   not:
     has: { field: operators, regex: ^(in|not in|is|is not)$ }
+  pattern: $CMP
+rewriters:
+  # The & or | that sits between two comparisons. Its operands are left as they are.
+  - id: split-and
+    rule:
+      pattern: $L & $R
+      inside: { kind: comparison_operator }
+    fix: $L) & ($R
+  - id: split-or
+    rule:
+      pattern: $L | $R
+      inside: { kind: comparison_operator }
+    fix: $L) | ($R
+transform:
+  SPLIT:
+    rewrite: { source: $CMP, rewriters: [split-and, split-or] }
+fix: ($SPLIT)
+metadata: { fix: unsafe }

@@ -1,5 +1,7 @@
 # A call with no argument is left alone: it returns text, and it is also how a project's own
 # to_csv() method is called. So is a call that forwards **options, which may hold index.
+# No fix, because only the author knows whether the index holds data, so index=False and index=True
+# are both possible.
 id: to-csv-index
 language: python
 severity: warning

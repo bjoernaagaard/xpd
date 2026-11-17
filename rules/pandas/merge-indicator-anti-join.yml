@@ -1,3 +1,4 @@
+# No fix, because the rewrite changes the merge call, which is another statement than the filter.
 id: merge-indicator-anti-join
 language: python
 severity: warning
