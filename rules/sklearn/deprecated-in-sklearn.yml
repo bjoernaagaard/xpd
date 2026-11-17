@@ -713,7 +713,7 @@ rewriters:
   - id: keep
     rule:
       pattern: $ARG
-      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: ^(n_)?alphas$ } }] }
+      not: { any: [{ kind: comment }, { kind: line_continuation }, { kind: keyword_argument, has: { field: name, regex: '^(n_)?alphas$' } }] }
     fix: "$ARG, "
 transform:
   KEPT:

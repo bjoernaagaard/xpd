@@ -179,7 +179,7 @@ installed.
 ```console
 $ xpd rules --format text | grep '(since' | head -3
 info [arch/arch-unseeded-draws] (since 5.0) $C draws its samples from a new seed on every run, so the intervals and variances change from run to run, and np.random.seed does not reach it. Pass seed.
-warning [arch/opt-bandwidth-as-bandwidth] (since 9.0) Since arch 9.0 $K uses opt_bandwidth minus 1 as its bandwidth, so passing opt_bandwidth back gives another estimate. Bartlett gave a long run variance of 0.5245 on its own and 0.5158 with bandwidth=opt_bandwidth. Pass the bandwidth attribute to repeat the estimate.
+warning [arch/opt-bandwidth-as-bandwidth] (unsafe fix) (since 9.0) Since arch 9.0 $K uses opt_bandwidth minus 1 as its bandwidth, so passing opt_bandwidth back gives another estimate. Bartlett gave a long run variance of 0.5245 on its own and 0.5158 with bandwidth=opt_bandwidth. Write bandwidth=$E.bandwidth to repeat the estimate.
 info [arch/reindex-is-default] (safe fix) (since 6.2) reindex=False is the default of forecast since arch 6.2, so this argument does nothing. Drop it.
 ```
 
@@ -336,7 +336,7 @@ and it reports the reads that would fail and the results that nothing reads. It 
 and runs nothing, so it needs no Python.
 
 ```sh
-xpd graph [PATHS]... [--format text|json]
+xpd graph <PATHS>... [--format text|json]
 ```
 
 `graph` reads each file as step code, as Hamilton modules, or both ways, by what the file holds.
@@ -1031,7 +1031,7 @@ xpd new util print-call --lang python --pattern 'print($X)' --yes
 ```
 
 The `project`, `rule` and `util` commands above, run in an empty folder, write the files below.
-Each new folder also gets an empty `.gitkeep`.
+Each folder that `project` makes also gets an empty `.gitkeep`.
 
 ```text
 .

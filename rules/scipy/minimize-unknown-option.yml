@@ -1122,7 +1122,7 @@ constraints:
 # No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
-severity: warning
+severity: error
 message: minimize with method=$METH does not know the option $K and raises TypeError. Use an option this method
   takes, which scipy.optimize.show_options('minimize', $METH) lists.
 rule:

@@ -4,7 +4,7 @@ name = "xpd"
 version = "0.32.0"
 edition = "2024"
 rust-version = "1.99"
-description = "Fast, opinionated linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn, for humans and coding agents"
+description = "Fast, opinionated linter for Python library habits with pandas, NumPy, SciPy, scikit-learn and eight more libraries, for humans and coding agents"
 license = "MIT AND Apache-2.0 AND BSD-3-Clause AND NCSA AND MPL-2.0 AND ISC AND MIT-0 AND PSF-2.0"
 repository = "https://github.com/bjoernaagaard/xpd"
 homepage = "https://bjoernaagaard.github.io/xpd/"
@@ -102,7 +102,7 @@ must_use_candidate = "allow"
 module_inception = "allow"               # a leaf module named after its main item is fine
 enum_glob_use = "allow"                  # use Enum::* inside a function that matches on it
 
-# Whole-program optimisation: 8.3 MB to 5.1 MB, and faster startup on the hook's hot path.
+# Whole-program optimisation, for a smaller binary and faster startup on the hook's hot path.
 [profile.release]
 opt-level = "s"
 lto = true

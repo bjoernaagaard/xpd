@@ -4,7 +4,7 @@
 /mermaid.min.js
 /mermaid-init.js
 
-# Local Python environment. xpd has no Python dependencies to lock.
+# Local Python environment. The wheel pins the MCP server's dependencies in pyproject.toml.
 /.venv
 /uv.lock
 __pycache__/

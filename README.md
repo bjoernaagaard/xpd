@@ -117,9 +117,10 @@ xpd
     └── completions <shell>    print shell completion for bash, elvish, fish, powershell or zsh
 ```
 
-Only `profile`, `equiv` and `refit` run the project's Python, and they need pandas in the
-project's environment. `mcp` starts the MCP server with the Python that the xpd package
-installs. Every other command only reads files.
+`profile`, `equiv` and `refit` run the project's Python, and they need pandas in the project's
+environment. `index` runs it too, with Griffe, and the first `find` runs it once to download the
+search model. `mcp` starts the MCP server with the Python that the xpd package installs. Every
+other command only reads files.
 
 ## Look up a library you don't know
 

@@ -18,7 +18,7 @@ package checks in `xpd rules --format json`, and the files that the pack runs on
 | [pymoo](#pymoo) | 23 | files that import pymoo |
 | [plotly](#plotly) | 25 | files that import plotly, and files that make plotly the plotting backend of pandas |
 | [Hamilton](#hamilton) | 1 | files that import Hamilton |
-| [Python](#python) | 9 | every file |
+| [Python](#python) | 12 | every file |
 
 Each rule section has the same parts:
 
@@ -98,7 +98,8 @@ which forms get a fix.
 | `df[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
 | `df.loc[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
 | any other chain with a text label, such as `df.iloc[0]["a"] = v` | none |
-| `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)` | none |
+| `df["a"].iloc[0] = v` and `df["a"].iat[0] = v` | `df.loc[df.index[0], "a"] = v` |
+| `df.a[mask] = v` and `df["a"].update(other)` | none |
 
 A mask held in a name gets the fix when the enclosing function assigns only masks to the name, such
 as a comparison or a call to `isin`. The rule reports `df.a[mask] = v` only when the mask reads the
@@ -4383,7 +4384,7 @@ result = stats.anderson(sample, method="interpolate")
 
 #### minimize-unknown-option
 
-**Severity:** warning. **Fix:** none.
+**Severity:** warning, and error with `'trust-constr'`, where the key raises TypeError. **Fix:** none.
 
 The rule reports a key in the `options=` dict of `optimize.minimize` that the chosen `method=`
 doesn't take but another method takes. Examples are `disp` and `iprint` for L-BFGS-B, `maxiter`

@@ -134,7 +134,7 @@ A hover anywhere outside an issue shows nothing from xpd.
 ````markdown
 #### chained-assignment
 
-**Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`. A write through `.iloc` or `.iat` on a column, and `update` on a column, have no fix.
+**Severity:** error. **Fix:** unsafe: `df.loc[i, "a"] = v`, and `df.loc[df.index[0], "a"] = v` for a write through `.iloc` or `.iat` on a column, which writes every row when the index holds the label twice. Other chains and `update` on a column have no fix.
 
 The rule reports `df["a"][i] = v`, `df[mask]["a"] = v`, `df.loc[mask]["a"] = v`, `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)`, which write to a copy, so the frame keeps its old values. It also reports `df[col][mask] = v`, where a variable names the column.
 
@@ -159,7 +159,8 @@ which forms get a fix.
 | `df[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
 | `df.loc[mask]["a"] = v` | `df.loc[mask, "a"] = v` |
 | any other chain with a text label, such as `df.iloc[0]["a"] = v` | none |
-| `df.a[mask] = v`, `df["a"].iloc[0] = v` and `df["a"].update(other)` | none |
+| `df["a"].iloc[0] = v` and `df["a"].iat[0] = v` | `df.loc[df.index[0], "a"] = v` |
+| `df.a[mask] = v` and `df["a"].update(other)` | none |
 
 A mask held in a name gets the fix when the enclosing function assigns only masks to the name, such
 as a comparison or a call to `isin`. The rule reports `df.a[mask] = v` only when the mask reads the
@@ -172,6 +173,8 @@ The rule leaves alone code that more often fills a list or a dict, as the table 
 | --- | --- |
 | a dict, list or set assigned to `x["a"][key]` | the code fills a nested dict |
 | two plain keys, as in `rows[0]["name"] = v` | the value is more often a list or a dict |
+
+[pandas/chained-assignment](https://bjoernaagaard.github.io/xpd/rules.html#chained-assignment)
 ````
 
 For a rule of the project, the hover shows the rule's `note`, or its `message` when it has no
