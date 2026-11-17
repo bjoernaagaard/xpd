@@ -5,7 +5,7 @@ version = "0.31.3"
 edition = "2024"
 rust-version = "1.99"
 description = "Fast, opinionated linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn, for humans and coding agents"
-license = "MIT AND Apache-2.0 AND BSD-3-Clause AND NCSA AND MPL-2.0 AND ISC AND MIT-0"
+license = "MIT AND Apache-2.0 AND BSD-3-Clause AND NCSA AND MPL-2.0 AND ISC AND MIT-0 AND PSF-2.0"
 repository = "https://github.com/bjoernaagaard/xpd"
 homepage = "https://bjoernaagaard.github.io/xpd/"
 readme = "README.md"
@@ -32,6 +32,7 @@ globset = "0.4.21"
 ignore = "0.4.34"
 # `xpd new` asks with the prompts that `ast-grep new` uses, so this adds no package to the build.
 inquire = "0.9.5"
+libcst = { version = "1.9.0", default-features = false }
 llama-cpp-2 = { version = "0.1.161", default-features = false }
 # `xpd lsp`. lsp-server is the synchronous scaffold of rust-analyzer: its messages travel over
 # channels and need no async runtime. xpd reads and writes them on its own two threads, in

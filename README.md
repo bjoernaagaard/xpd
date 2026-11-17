@@ -305,6 +305,7 @@ that ship with xpd keep the licenses in the table.
 | xpd's own code | MIT or Apache-2.0, as you choose | `LICENSE-MIT` and `LICENSE-APACHE` |
 | Recipes, which are examples taken from library documentation | The license of the library, which is MIT, BSD-3-Clause, Apache-2.0 or NCSA | `licenses/`, one file per library. `xpd api <recipe>` prints the license name and the source link with the code |
 | `option-ext`, a dependency shipped unmodified | MPL-2.0 | `licenses/option-ext-LICENSE.txt`, with the complete source in `licenses/option-ext-0.2.0-source.tar.gz` and at <https://crates.io/api/v1/crates/option-ext/0.2.0/download> |
+| `libcst`, the parser that checks a fixed file | MIT, with parts of CPython under PSF-2.0 | `licenses/libcst-LICENSE` |
 | EmbeddingGemma, the model that `find` downloads | The Gemma Terms of Use at <https://ai.google.dev/gemma/terms> | Not shipped with xpd |
 
 The `licenses/` folder ships in the crate, the sdist and the wheel, and the package metadata

@@ -1,5 +1,6 @@
 //! Walks paths, fixes and lints each file with the rule packs that apply to it.
 
+use std::cell::OnceCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::ops::Range;
@@ -7,7 +8,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use ast_grep_config::CombinedScan;
-use ast_grep_core::source::Edit;
 use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_core::{AstGrep, Language, NodeMatch};
 use ast_grep_language::SupportLang;
@@ -332,11 +332,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
     }
     let root = parse_as(src, language);
     let imports = imports(&root, language);
-    let parsed = Parsed {
-        src,
-        language,
-        errors: syntax_errors(&root),
-    };
+    let parsed = Parsed::new(src, language, &root);
     let mut found = Vec::new();
     for MatchedRule {
         pack,
@@ -347,7 +343,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
         let unbound = unbound_names(pack, imports.as_deref());
         for m in matches {
             let start = m.start_pos();
-            let edit = usable_edit(rule, &m, &unbound, parsed);
+            let fix = replacement(rule, &m, &unbound, src);
             let issue = Issue {
                 package: pack.module.clone(),
                 rule: rule.id.clone(),
@@ -358,7 +354,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
                 }),
                 severity: rule.config.severity.clone(),
                 message: rule.config.get_message(&m),
-                fix: rule.fix.filter(|_| edit.is_some()),
+                fix: rule.fix.filter(|_| fix.is_some()),
                 help: if pack.is_embedded() {
                     Some(crate::catalog::url(&rule.id))
                 } else {
@@ -379,11 +375,19 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
                     })
                     .collect(),
                 range: m.range(),
-                fix: edit.map(|edit| Replacement {
-                    range: edit.position..edit.position + edit.deleted_length,
-                    text: String::from_utf8(edit.inserted_text).expect("a fix writes UTF-8 text"),
-                }),
+                fix,
             });
+        }
+    }
+    let fixes: Vec<&Replacement> = found
+        .iter()
+        .filter_map(|found| found.fix.as_ref())
+        .collect();
+    let mut accepted = parsed.accepted(&fixes).into_iter();
+    for found in found.iter_mut().filter(|found| found.fix.is_some()) {
+        if !accepted.next().expect("one answer for each fix") {
+            found.fix = None;
+            found.issue.fix = None;
         }
     }
     // A stable sort, so issues at one position keep the order of their packs and rules.
@@ -400,11 +404,7 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
     }
     let root = parse_as(src, language);
     let imports = imports(&root, language);
-    let parsed = Parsed {
-        src,
-        language,
-        errors: syntax_errors(&root),
-    };
+    let parsed = Parsed::new(src, language, &root);
     let mut edits = Vec::new();
     for MatchedRule {
         pack,
@@ -417,25 +417,24 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
             continue;
         }
         for m in matches {
-            edits.extend(usable_edit(rule, &m, &unbound, parsed));
+            edits.extend(replacement(rule, &m, &unbound, src));
         }
     }
-    edits.sort_by_key(|e| e.position);
-    let mut out = Vec::with_capacity(src.len());
-    let mut copied = 0;
-    let mut applied = 0;
+    let accepted = parsed.accepted(&edits.iter().collect::<Vec<_>>());
+    let mut edits: Vec<&Replacement> = (edits.iter().zip(accepted))
+        .filter_map(|(edit, accepted)| accepted.then_some(edit))
+        .collect();
+    edits.sort_by_key(|edit| edit.range.start);
+    let mut applied: Vec<&Replacement> = Vec::new();
     for edit in edits {
-        if edit.position < copied {
-            continue;
+        if applied
+            .last()
+            .is_none_or(|last| last.range.end <= edit.range.start)
+        {
+            applied.push(edit);
         }
-        out.extend_from_slice(&src.as_bytes()[copied..edit.position]);
-        out.extend_from_slice(&edit.inserted_text);
-        copied = edit.position + edit.deleted_length;
-        applied += 1;
     }
-    out.extend_from_slice(&src.as_bytes()[copied..]);
-    let out = String::from_utf8(out).expect("fixes splice UTF-8 text at node boundaries");
-    (out, applied)
+    (splice(src, &applied), applied.len())
 }
 
 /// Every import in the file that binds a name a fix can write anywhere in the file. An import
@@ -518,38 +517,114 @@ fn unbound_names<'p>(pack: &'p Pack, imports: Option<&[Import]>) -> Vec<Unbound<
 }
 
 /// The source of one file as a fix sees it.
-#[derive(Clone, Copy)]
 struct Parsed<'s> {
     src: &'s str,
     language: SupportLang,
-    /// The number of syntax errors in `src`.
+    /// The number of syntax errors that tree-sitter finds in `src`.
     errors: usize,
+    /// Whether libcst parses `src` as Python, found out for the first fix that asks.
+    python: OnceCell<bool>,
 }
 
-/// The edit `rule` makes for `m`, or `None` when the rule has no fix, its fix writes one of the
-/// `unbound` names, its fix leaves the text as it is, or the fixed file has a syntax error that
-/// the file did not have. A fix is a text template, so it cannot know every form of the code
-/// around a match, such as an argument list that ends in a comment.
-fn usable_edit(
+impl<'s> Parsed<'s> {
+    fn new(src: &'s str, language: SupportLang, root: &Root) -> Self {
+        Self {
+            src,
+            language,
+            errors: syntax_errors(root),
+            python: OnceCell::new(),
+        }
+    }
+
+    /// Whether `after`, the file with some fixes applied, is still valid code. Python is parsed
+    /// with libcst, which reads the grammar of Python itself, so a file that libcst cannot
+    /// parse before the fixes gets no fix. tree-sitter recovers from errors that Python does
+    /// not accept, so it is the check only for the other languages, which libcst does not read.
+    fn accepts(&self, after: &str) -> bool {
+        if self.language == SupportLang::Python {
+            let parses = |code: &str| libcst_native::parse_module(code, None).is_ok();
+            *self.python.get_or_init(|| parses(self.src)) && parses(after)
+        } else {
+            syntax_errors(&parse_as(after, self.language)) <= self.errors
+        }
+    }
+
+    /// For each of `fixes`, whether the file is still valid code with that fix applied. Fixes
+    /// that do not overlap are applied together and parsed once, and a group that fails is
+    /// split in two until the fix that breaks the code is alone.
+    fn accepted(&self, fixes: &[&Replacement]) -> Vec<bool> {
+        let mut order: Vec<usize> = (0..fixes.len()).collect();
+        order.sort_by_key(|&i| (fixes[i].range.start, fixes[i].range.end));
+        let mut layers: Vec<Vec<usize>> = Vec::new();
+        for i in order {
+            let fits = |layer: &&mut Vec<usize>| {
+                layer
+                    .last()
+                    .is_none_or(|&last| fixes[last].range.end <= fixes[i].range.start)
+            };
+            match layers.iter_mut().find(fits) {
+                Some(layer) => layer.push(i),
+                None => layers.push(vec![i]),
+            }
+        }
+        let mut accepted = vec![false; fixes.len()];
+        for layer in layers {
+            self.accept_group(fixes, &layer, &mut accepted);
+        }
+        accepted
+    }
+
+    /// Marks the fixes of `group`, which do not overlap and are in the order of their
+    /// positions, that leave valid code.
+    fn accept_group(&self, fixes: &[&Replacement], group: &[usize], accepted: &mut [bool]) {
+        let applied: Vec<&Replacement> = group.iter().map(|&i| fixes[i]).collect();
+        if self.accepts(&splice(self.src, &applied)) {
+            for &i in group {
+                accepted[i] = true;
+            }
+        } else if group.len() > 1 {
+            let (first, second) = group.split_at(group.len() / 2);
+            self.accept_group(fixes, first, accepted);
+            self.accept_group(fixes, second, accepted);
+        }
+    }
+}
+
+/// `src` with `fixes` applied, which do not overlap and are in the order of their positions.
+fn splice(src: &str, fixes: &[&Replacement]) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut copied = 0;
+    for fix in fixes {
+        out.push_str(&src[copied..fix.range.start]);
+        out.push_str(&fix.text);
+        copied = fix.range.end;
+    }
+    out.push_str(&src[copied..]);
+    out
+}
+
+/// The replacement `rule` makes for `m`, or `None` when the rule has no fix, its fix writes one
+/// of the `unbound` names, or its fix leaves the text as it is. A fix is a text template, so it
+/// cannot know every form of the code around a match, such as an argument list that ends in a
+/// comment. [`Parsed::accepted`] therefore checks the fixed file before a fix is offered.
+fn replacement(
     rule: &Rule,
     m: &NodeMatch<'_, StrDoc<SupportLang>>,
     unbound: &[Unbound<'_>],
-    parsed: Parsed<'_>,
-) -> Option<Edit<String>> {
+    src: &str,
+) -> Option<Replacement> {
     let fixer = rule.config.fixer.first()?;
     let edit = m.make_edit(&rule.config.matcher, fixer);
-    let end = edit.position + edit.deleted_length;
-    let src = parsed.src.as_bytes();
-    if edit.inserted_text == src[edit.position..end]
+    let range = edit.position..edit.position + edit.deleted_length;
+    if edit.inserted_text == src.as_bytes()[range.clone()]
         || unbound
             .iter()
             .any(|name| name.written_in(&edit.inserted_text))
     {
         return None;
     }
-    let after = [&src[..edit.position], &edit.inserted_text, &src[end..]].concat();
-    let after = String::from_utf8(after).expect("a fix splices UTF-8 text at node boundaries");
-    (syntax_errors(&parse_as(&after, parsed.language)) <= parsed.errors).then_some(edit)
+    let text = String::from_utf8(edit.inserted_text).expect("a fix writes UTF-8 text");
+    Some(Replacement { range, text })
 }
 
 impl Unbound<'_> {

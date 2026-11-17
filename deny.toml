@@ -7,7 +7,12 @@ all-features = true
 yanked = "deny"
 # ast-grep 0.51.3 uses ansi_term for terminal colors. This advisory reports discontinued
 # maintenance, not a vulnerability; the upstream CLI has no feature to remove the dependency.
-ignore = [{ id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmaintained-only advisory" }]
+# libcst 1.9.0 builds its node types with the paste macro. The advisory reports discontinued
+# maintenance, not a vulnerability, and paste runs only at compile time.
+ignore = [
+    { id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmaintained-only advisory" },
+    { id = "RUSTSEC-2024-0436", reason = "libcst compile-time macro; unmaintained-only advisory" },
+]
 
 [licenses]
 # Permissive licenses only. Read a license's terms before adding it here.
@@ -16,7 +21,10 @@ confidence-threshold = 0.8
 # The unmodified option-ext dependency comes from ast-grep's project-directory support.
 # Its license and complete source
 # archive ship under licenses/ to satisfy MPL's source-availability requirement.
+# libcst, which checks that a fixed file is still valid Python, holds parts of CPython under the
+# PSF license, which is permissive. Its license file ships as licenses/libcst-LICENSE.
 exceptions = [
+    { crate = "libcst@1.9.0", allow = ["PSF-2.0"] },
     { crate = "option-ext@0.2.0", allow = ["MPL-2.0"] },
     { crate = "xpd", allow = ["MPL-2.0"] },
 ]

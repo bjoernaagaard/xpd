@@ -13512,9 +13512,10 @@ on(a rule document)
 Split a document when only some of its forms have one rewrite, so that those forms get the fix
 and the other forms keep the report. A rule document has at most one fix.
 
-xpd checks each fix again where it applies it. It drops the fix at a match, and keeps the report,
-when the fixed file has a syntax error that the file did not have. The parser does not see every
-error that Python sees, so run the fixed sample too.
+xpd checks each fix again where it applies it. It parses the fixed Python file with
+[LibCST](https://github.com/Instagram/LibCST), which reads the grammar of Python itself. It drops
+the fix at a match, and keeps the report, when the fixed file no longer parses. A file that does
+not parse before the fix gets no fix.
 
 A new folder under `rules/` is a new pack, with no Rust change. Build xpd and run it on a sample:
 
