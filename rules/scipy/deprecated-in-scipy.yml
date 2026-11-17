@@ -426,6 +426,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -549,6 +551,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -570,6 +574,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -619,6 +625,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1058,6 +1066,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1181,6 +1191,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1202,6 +1214,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1251,6 +1265,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1690,6 +1706,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1813,6 +1831,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1834,6 +1854,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -1883,6 +1905,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -2322,6 +2346,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -2445,6 +2471,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -2466,6 +2494,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -2515,6 +2545,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -2954,6 +2986,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3077,6 +3111,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3098,6 +3134,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3147,6 +3185,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3696,6 +3736,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3871,6 +3913,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3892,6 +3936,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -3941,6 +3987,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -4490,6 +4538,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -4665,6 +4715,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -4686,6 +4738,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -4735,6 +4789,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5174,6 +5230,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5297,6 +5355,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5318,6 +5378,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5367,6 +5429,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5806,6 +5870,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5929,6 +5995,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5950,6 +6018,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -5999,6 +6069,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -6438,6 +6510,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -6561,6 +6635,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -6582,6 +6658,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -6631,6 +6709,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -7070,6 +7150,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -7193,6 +7275,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -7214,6 +7298,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -7263,6 +7349,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -7812,6 +7900,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -7987,6 +8077,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -8008,6 +8100,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -8057,6 +8151,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -8496,6 +8592,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -8619,6 +8717,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -8640,6 +8740,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -8689,6 +8791,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -9238,6 +9342,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -9413,6 +9519,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -9434,6 +9542,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -9483,6 +9593,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -9922,6 +10034,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10045,6 +10159,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10066,6 +10182,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10115,6 +10233,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10664,6 +10784,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10839,6 +10961,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10860,6 +10984,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -10909,6 +11035,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -11348,6 +11476,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -11471,6 +11601,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -11492,6 +11624,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -11541,6 +11675,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -11980,6 +12116,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12103,6 +12241,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12124,6 +12264,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12173,6 +12315,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12612,6 +12756,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the public module lacks this name or holds another object under it, by the
+# same_object field of runs/probe.jsonl.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12735,6 +12881,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12756,6 +12904,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the code that reads names from the module would have to change too, and the match
+# does not reach it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12805,6 +12955,8 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the import names something that the public module lacks or holds as another
+# object.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12826,6 +12978,7 @@ rule:
 ---
 # R/src/scipy/scipy/odr/__init__.py:8 and :171 deprecate the module, and runs/probe.jsonl holds the
 # warning.
+# No fix, because the replacement is another package.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12849,6 +13002,7 @@ rule:
         field: module_name
 
 ---
+# No fix, because the replacement is another package.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -12883,6 +13037,7 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the replacement is another package.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13372,6 +13527,7 @@ metadata:
   fix: safe
 
 ---
+# No fix, because the call is not of the plain two argument form that the document above fixes.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13508,6 +13664,7 @@ rule:
               - kind: dictionary_splat
 
 ---
+# No fix, because find_simplex is a method of the triangulation, which an import cannot name.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13542,6 +13699,8 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the message names two rewrites, and the code does not show whether the inputs are
+# one pair of vectors or rows.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13653,6 +13812,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the message names two rewrites, and the code does not show whether the inputs are
+# one pair of vectors or rows.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13688,6 +13849,8 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the rewrite raises minkowski to the power p, and the code has no expression for
+# it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13798,6 +13961,8 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the rewrite raises minkowski to the power p, and the code has no expression for
+# it.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13832,6 +13997,7 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because cdist takes the metric and p in other arguments and has no threshold.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13942,6 +14108,7 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because cdist takes the metric and p in other arguments and has no threshold.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -13976,6 +14143,7 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because BarycentricInterpolator returns another object than the poly1d of lagrange.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -14086,6 +14254,7 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because BarycentricInterpolator returns another object than the poly1d of lagrange.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -14120,6 +14289,7 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the replacement is another package.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -14230,6 +14400,7 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the replacement is another package.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -14264,6 +14435,7 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the replacement is an FFT that the code would have to write.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -14374,6 +14546,7 @@ rule:
       matches: compat-code
 
 ---
+# No fix, because the replacement is an FFT that the code would have to write.
 id: deprecated-in-scipy
 language: python
 severity: warning
@@ -14408,11 +14581,14 @@ rule:
         matches: compat-code
 
 ---
+# vq takes the same arguments as py_vq and returns the codes and the distances. Unsafe: vq returns
+# the codes as int32 where py_vq returned int64, and for float32 input it returns float32 distances
+# where py_vq returned float64.
 id: deprecated-in-scipy
 language: python
 severity: warning
-message: $OBJ.py_vq is deprecated since SciPy 1.18.0 and warns with DeprecationWarning when called. SciPy points
-  to scipy.cluster.vq.vq, which takes the same arguments.
+message: $OBJ.py_vq is deprecated since SciPy 1.18.0 and warns with DeprecationWarning when called. Write
+  $OBJ.vq, which takes the same arguments.
 rule:
   all:
   - kind: attribute
@@ -14568,37 +14744,56 @@ rule:
               any: *id008
   - not:
       matches: compat-code
-
+fix: $OBJ.vq
+metadata:
+  fix: unsafe
 ---
+# vq takes the same arguments as py_vq. Unsafe: vq returns the codes as int32 where py_vq returned
+# int64, and for float32 input it returns float32 distances where py_vq returned float64. The fix
+# keeps the old name bound, as `from ... import new as old`.
 id: deprecated-in-scipy
 language: python
 severity: warning
 message: scipy.cluster.vq.py_vq is deprecated since SciPy 1.18.0 and warns with DeprecationWarning when called.
-  SciPy points to scipy.cluster.vq.vq, which takes the same arguments.
+  Import vq, which takes the same arguments.
 rule:
-  any:
-  - all:
-    - kind: dotted_name
-    - pattern: $N
-    - regex: ^(py_vq)$
-    - inside:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(py_vq)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.cluster\.vq$
+  - not:
+      matches: compat-code
+fix: vq as $N
+metadata:
+  fix: unsafe
+---
+# vq takes the same arguments as py_vq. Unsafe: vq returns the codes as int32 where py_vq returned
+# int64, and for float32 input it returns float32 distances where py_vq returned float64.
+id: deprecated-in-scipy
+language: python
+severity: warning
+message: scipy.cluster.vq.py_vq is deprecated since SciPy 1.18.0 and warns with DeprecationWarning when called.
+  Import vq, which takes the same arguments.
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(py_vq)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
         kind: import_from_statement
         has:
           field: module_name
           regex: ^scipy\.cluster\.vq$
-    - not:
-        matches: compat-code
-  - all:
-    - kind: dotted_name
-    - pattern: $N
-    - regex: ^(py_vq)$
-    - inside:
-        kind: aliased_import
-        field: name
-        inside:
-          kind: import_from_statement
-          has:
-            field: module_name
-            regex: ^scipy\.cluster\.vq$
-    - not:
-        matches: compat-code
+  - not:
+      matches: compat-code
+fix: vq
+metadata:
+  fix: unsafe

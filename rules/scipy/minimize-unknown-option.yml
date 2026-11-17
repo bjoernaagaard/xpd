@@ -1,4 +1,5 @@
 # Every key below warns OptimizeWarning and ignores it for method nelder-mead, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -110,6 +111,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|barrier_tol|c1|c2|catol|direc|eps|eta|f_target|factorization_method|feasibility_tol|final_tr_radius|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_tr_radius|iprint|maxCGit|maxcor|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|workers|xrtol|xtol)[''\"]$|^(accuracy|barrier_tol|c1|c2|catol|direc|eps|eta|f_target|factorization_method|feasibility_tol|final_tr_radius|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_tr_radius|iprint|maxCGit|maxcor|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|workers|xrtol|xtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method powell, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -221,6 +223,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|c1|c2|catol|eps|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|finite_diff_rel_step|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|workers|xatol|xrtol)[''\"]$|^(accuracy|adaptive|barrier_tol|c1|c2|catol|eps|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|finite_diff_rel_step|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|workers|xatol|xrtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method cg, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -332,6 +335,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|ftol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol|xtol)[''\"]$|^(accuracy|adaptive|barrier_tol|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|ftol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol|xtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method bfgs, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -443,6 +447,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|ftol|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xtol)[''\"]$|^(accuracy|adaptive|barrier_tol|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|ftol|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method newton-cg, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -554,6 +559,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol)[''\"]$|^(accuracy|adaptive|barrier_tol|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method l-bfgs-b, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -665,6 +671,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|c1|c2|catol|direc|disp|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxfev|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol|xtol)[''\"]$|^(accuracy|adaptive|barrier_tol|c1|c2|catol|direc|disp|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxfev|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol|xtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method tnc, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -776,6 +783,7 @@ constraints:
   K: {regex: '^[''\"](adaptive|barrier_tol|c1|c2|catol|direc|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxcor|maxfev|maxiter|maxls|norm|rhobeg|sparse_jacobian|tol|verbose|xatol|xrtol)[''\"]$|^(adaptive|barrier_tol|c1|c2|catol|direc|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxcor|maxfev|maxiter|maxls|norm|rhobeg|sparse_jacobian|tol|verbose|xatol|xrtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method cobyla, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -887,6 +895,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|c1|c2|direc|eps|eta|factorization_method|fatol|feasibility_tol|final_tr_radius|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|scale|sparse_jacobian|stepmx|verbose|workers|xatol|xrtol|xtol)[''\"]$|^(accuracy|adaptive|barrier_tol|c1|c2|direc|eps|eta|factorization_method|fatol|feasibility_tol|final_tr_radius|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|scale|sparse_jacobian|stepmx|verbose|workers|xatol|xrtol|xtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method cobyqa, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -998,6 +1007,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|c1|c2|catol|direc|eps|eta|factorization_method|fatol|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|iprint|maxCGit|maxcor|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|sparse_jacobian|stepmx|tol|verbose|workers|xatol|xrtol|xtol)[''\"]$|^(accuracy|adaptive|barrier_tol|c1|c2|catol|direc|eps|eta|factorization_method|fatol|finite_diff_rel_step|ftol|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|iprint|maxCGit|maxcor|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|sparse_jacobian|stepmx|tol|verbose|workers|xatol|xrtol|xtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method slsqp, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -1109,6 +1119,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|barrier_tol|c1|c2|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol|xtol)[''\"]$|^(accuracy|adaptive|barrier_tol|c1|c2|catol|direc|eta|f_target|factorization_method|fatol|feasibility_tol|final_tr_radius|gtol|hess_inv0|inexact|initial_barrier_parameter|initial_barrier_tolerance|initial_constr_penalty|initial_simplex|initial_tr_radius|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|rhobeg|scale|sparse_jacobian|stepmx|tol|verbose|xatol|xrtol|xtol)$'}
 ---
 # Every key below raises TypeError for method trust-constr, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning
@@ -1220,6 +1231,7 @@ constraints:
   K: {regex: '^[''\"](accuracy|adaptive|c1|c2|catol|direc|eps|eta|f_target|fatol|feasibility_tol|final_tr_radius|ftol|hess_inv0|inexact|initial_simplex|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|return_all|rhobeg|scale|stepmx|tol|xatol|xrtol)[''\"]$|^(accuracy|adaptive|c1|c2|catol|direc|eps|eta|f_target|fatol|feasibility_tol|final_tr_radius|ftol|hess_inv0|inexact|initial_simplex|iprint|maxCGit|maxcor|maxfev|maxfun|maxls|mesg_num|minfev|norm|offset|rescale|return_all|rhobeg|scale|stepmx|tol|xatol|xrtol)$'}
 ---
 # Every key below warns OptimizeWarning and ignores it for method dogleg, trust-ncg, trust-krylov, trust-exact, in runs/minimize_options.jsonl, which ran each pair under warnings 'error'.
+# No fix, because the option that this method takes in its place is not in the file.
 id: minimize-unknown-option
 language: python
 severity: warning

@@ -552,6 +552,8 @@ constraints:
 metadata: {since: '1.17'}
 ---
 # anderson_ksamp warns UserWarning when variant is not given, scipy/stats/_morestats.py line 2901.
+# No fix, because the message names three variants, and with variant= the result no longer unpacks
+# as a tuple, so the code that reads it must change too.
 id: default-that-warns
 language: python
 severity: warning
@@ -1528,7 +1530,124 @@ constraints:
 fix: $LAST, spmatrix=True
 metadata: {fix: safe, since: '1.18'}
 ---
-# zoom warns UserWarning for grid_mode=True with mode 'constant', the default, or 'wrap', scipy/ndimage/_interpolation.py line 866. The grid modes pad differently, so there is no fix.
+# zoom warns UserWarning for grid_mode=True with mode 'constant', the default, or 'wrap',
+# scipy/ndimage/_interpolation.py line 866. Without mode= the mode is 'constant', so the fix adds
+# mode='grid-constant'. Unsafe: the grid mode pads in another way, so the values near the edges
+# change.
+id: default-that-warns
+language: python
+severity: warning
+message: zoom with grid_mode=True and the default mode 'constant' warns UserWarning, because that mode does not
+  match the grid. Write mode='grid-constant'.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^grid_mode$}
+  - has: {field: value, kind: 'true'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.ndimage\.(zoom)$, pattern: scipy.ndimage.$F}
+          - all:
+            - {regex: \.ndimage\.(zoom)$, pattern: $R.ndimage.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(zoom)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.ndimage$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^ndimage$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^ndimage$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(zoom)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.ndimage$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.ndimage$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(zoom)$}
+                        - has: {field: alias, pattern: $F_AS}
+      - not:
+          has:
+            field: arguments
+            has:
+              any:
+              - kind: keyword_argument
+                has: {field: name, regex: ^mode$}
+              - kind: dictionary_splat
+      - not:
+          all:
+          - has:
+              field: arguments
+              has:
+                nthChild: 5
+                not:
+                  any:
+                  - {kind: keyword_argument}
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+          - not:
+              has:
+                field: arguments
+                has: {kind: list_splat}
+constraints:
+  F: {regex: ^zoom$}
+fix: grid_mode=True, mode='grid-constant'
+metadata: {fix: unsafe}
+---
+# No fix, because the mode= argument that the fix would change is outside the match, or a dict
+# that the call unpacks may hold it.
 id: default-that-warns
 language: python
 severity: warning
@@ -1614,12 +1733,16 @@ rule:
                         - has: {field: name, pattern: $F, regex: ^(zoom)$}
                         - has: {field: alias, pattern: $F_AS}
       - any:
-        - not:
-            has:
-              field: arguments
+        - all:
+          - not:
               has:
-                kind: keyword_argument
-                has: {field: name, regex: ^mode$}
+                field: arguments
+                has:
+                  kind: keyword_argument
+                  has: {field: name, regex: ^mode$}
+          - has:
+              field: arguments
+              has: {kind: dictionary_splat}
         - has:
             field: arguments
             has:

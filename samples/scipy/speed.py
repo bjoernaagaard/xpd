@@ -113,7 +113,8 @@ def query_per_point():
     for i, q in enumerate(Y):
         b[i] = other.query(q, k=1)[0]  # xpd: query-per-point
     c = [tree.query(Y[j], k=2)[1] for j in range(len(Y))]  # xpd: query-per-point
-    return a, b, c
+    d = cKDTree(Y).query(X[:3])[0]  # xpd: ckdtree
+    return a, b, c, d
 
 
 @case

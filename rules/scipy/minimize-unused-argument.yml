@@ -1,4 +1,6 @@
 # minimize warns RuntimeWarning when the method does not use gradient information, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+# No fix, because the message names two rewrites, deleting the argument or choosing another method,
+# and the code does not show which one is meant.
 id: minimize-unused-argument
 language: python
 severity: warning
@@ -97,6 +99,8 @@ constraints:
   METH: {regex: '(?i)^[''\"](nelder\-mead|powell|cobyla|cobyqa)[''\"]$'}
 ---
 # minimize warns RuntimeWarning when the method does not use Hessian information, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+# No fix, because the message names two rewrites, deleting the argument or choosing another method,
+# and the code does not show which one is meant.
 id: minimize-unused-argument
 language: python
 severity: warning
@@ -197,6 +201,8 @@ constraints:
     not: {regex: '(?i)^[''\"](newton\-cg|dogleg|trust\-ncg|trust\-constr|trust\-krylov|trust\-exact)[''\"]$'}
 ---
 # minimize warns RuntimeWarning when the method does not use a Hessian-vector product, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+# No fix, because the message names two rewrites, deleting the argument or choosing another method,
+# and the code does not show which one is meant.
 id: minimize-unused-argument
 language: python
 severity: warning
@@ -297,6 +303,8 @@ constraints:
     not: {regex: '(?i)^[''\"](newton\-cg|trust\-ncg|trust\-constr|trust\-krylov)[''\"]$'}
 ---
 # minimize warns RuntimeWarning when the method cannot handle constraints, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+# No fix, because the message names two rewrites, deleting the argument or choosing another method,
+# and the code does not show which one is meant.
 id: minimize-unused-argument
 language: python
 severity: warning
@@ -397,6 +405,8 @@ constraints:
     not: {regex: '(?i)^[''\"](cobyla|cobyqa|slsqp|trust\-constr)[''\"]$'}
 ---
 # minimize warns RuntimeWarning when the method cannot handle bounds, scipy/optimize/_minimize.py lines 617 to 647, in runs/probe2.jsonl.
+# No fix, because the message names two rewrites, deleting the argument or choosing another method,
+# and the code does not show which one is meant.
 id: minimize-unused-argument
 language: python
 severity: warning

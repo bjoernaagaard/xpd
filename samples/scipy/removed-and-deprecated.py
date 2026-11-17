@@ -140,6 +140,21 @@ def removed_without_one_to_one(x):
     return a, interp2d, b, c, lpmn, d, e, f, g, h, i, itemfreq
 
 
+def removed_with_a_replacement(x):
+    a = signal.impulse2(([1.0], [1.0, 2.0]))  # xpd: removed-in-scipy
+    from scipy.signal import step2  # xpd: removed-in-scipy
+    from scipy.signal import lsim2 as simulate  # xpd: removed-in-scipy
+    b = special.btdtr(2.0, 3.0, 0.4)  # xpd: removed-in-scipy
+    from scipy.special import btdtri  # xpd: removed-in-scipy
+    from scipy.special import btdtr as beta_cdf  # xpd: removed-in-scipy
+    c = stats.chisqprob(3.2, 2)  # xpd: removed-in-scipy
+    d = scipy.stats.betai(2.0, 3.0, 0.4)  # xpd: removed-in-scipy
+    e = linalg.expm2(x)  # xpd: removed-in-scipy
+    from scipy.linalg import expm3  # xpd: removed-in-scipy
+    from scipy.linalg import expm2 as matrix_exp  # xpd: removed-in-scipy
+    return a, step2, simulate, b, btdtri, beta_cdf, c, d, e, expm3, matrix_exp
+
+
 @case
 def current_names_without_one_to_one():
     x = np.array([[1.0, 2.0], [3.0, 4.0]])
@@ -187,8 +202,10 @@ def deprecated_calls(x, tri, pts):
     f = scipy.cluster.vq.py_vq(x, x)  # xpd: deprecated-in-scipy
     g = spatial.tsearch(tri, xi=pts)  # xpd: deprecated-in-scipy
     from scipy.spatial import tsearch  # xpd: deprecated-in-scipy
+    from scipy.cluster.vq import py_vq  # xpd: deprecated-in-scipy
+    from scipy.cluster.vq import py_vq as quantize  # xpd: deprecated-in-scipy
     h = old_odr.Model(np.sin)
-    return a, b, minkowski_distance_p, c, d, e, f, g, tsearch, h
+    return a, b, minkowski_distance_p, c, d, e, f, g, tsearch, py_vq, quantize, h
 
 
 @case

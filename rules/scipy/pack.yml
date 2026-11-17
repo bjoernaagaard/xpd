@@ -4,3 +4,20 @@
 # has no fix.
 aliases:
   np: numpy
+
+# Names a fix may write bare, each with the module it must be imported from. A fix that writes
+# `KDTree(` applies only in a file with `from scipy.spatial import KDTree`.
+members:
+  KDTree: scipy.spatial
+  betaincc: scipy.special
+  betaln: scipy.special
+  comb: scipy.special
+  erf: scipy.special
+  erfc: scipy.special
+  gammainc: scipy.special
+  gammaincc: scipy.special
+  gammaln: scipy.special
+  log_expit: scipy.special
+  log_ndtr: scipy.special
+  log_softmax: scipy.special
+  spsolve: scipy.sparse.linalg

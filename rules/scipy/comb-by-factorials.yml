@@ -35,7 +35,8 @@ utils:
                           - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
                           - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
 ---
-# The same with factorial imported by name. No fix, because comb is not imported.
+# The same with factorial imported by name. The fix writes comb bare, so it applies only in a file
+# that imports comb from scipy.special. Unsafe, for the reasons of the document above.
 id: comb-by-factorials
 language: python
 severity: warning
@@ -43,6 +44,8 @@ message: factorial overflows to inf above 170, so this ratio is inf or nan once 
 rule: { any: [{ pattern: $F($N) / ($F($K) * $F($N - $K)) }, { pattern: $F($N) / ($F($N - $K) * $F($K)) }, { pattern: $F($N) / $F($K) / $F($N - $K) }, { pattern: $F($N) / $F($N - $K) / $F($K) }] }
 constraints:
   F: { all: [{ matches: special-name }, { regex: '^factorial$' }] }
+fix: comb($N, $K)
+metadata: { fix: unsafe }
 utils:
   special-name:
     all:

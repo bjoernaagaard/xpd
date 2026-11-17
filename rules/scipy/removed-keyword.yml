@@ -124,6 +124,7 @@ constraints:
 fix: rtol=$V
 metadata: {fix: unsafe}
 ---
+# No fix, because the call already passes rtol=, or unpacks a dict that may hold it.
 id: removed-keyword
 language: python
 severity: error
@@ -248,6 +249,7 @@ constraints:
   F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
 ---
 # atol='legacy' raises ValueError in _get_atol_rtol, scipy/sparse/linalg/_isolve/iterative.py line 15.
+# No fix, because the number that atol should be is not in the file.
 id: removed-keyword
 language: python
 severity: error
@@ -359,6 +361,7 @@ constraints:
   F: {regex: ^(bicg|bicgstab|cg|cgs|gmres|lgmres|gcrotmk|minres|qmr|tfqmr)$}
 ---
 # Every solver takes its tolerances only by keyword after x0, in runs/probe2.jsonl.
+# No fix, because the names of the old positional arguments are not in the file.
 id: removed-keyword
 language: python
 severity: error
@@ -600,6 +603,7 @@ constraints:
 fix: restart=$V
 metadata: {fix: unsafe}
 ---
+# No fix, because the call already passes restart=, or unpacks a dict that may hold it.
 id: removed-keyword
 language: python
 severity: error
@@ -841,6 +845,7 @@ constraints:
 fix: assume_a='pos'
 metadata: {fix: unsafe}
 ---
+# No fix, because the call already gives assume_a, by keyword, by position or in unpacked arguments.
 id: removed-keyword
 language: python
 severity: error
@@ -959,6 +964,8 @@ rule:
 constraints:
   F: {regex: ^solve$}
 ---
+# No fix, because the message names two rewrites, and a sym_pos that is not True does not show which
+# one is meant.
 id: removed-keyword
 language: python
 severity: error
@@ -1147,6 +1154,7 @@ constraints:
 fix: subset_by_index=$V
 metadata: {fix: unsafe}
 ---
+# No fix, because the call already passes subset_by_index=, or unpacks a dict that may hold it.
 id: removed-keyword
 language: python
 severity: error
@@ -1245,6 +1253,7 @@ rule:
 constraints:
   F: {regex: ^(eigh|eigvalsh)$}
 ---
+# No fix, because the message names two rewrites, deleting turbo or choosing a driver.
 id: removed-keyword
 language: python
 severity: error
@@ -1330,6 +1339,8 @@ rule:
 constraints:
   F: {regex: ^(eigh|eigvalsh)$}
 ---
+# No fix, because the message names two rewrites, atol= or rtol=, and the code does not show which
+# one is meant.
 id: removed-keyword
 language: python
 severity: error
@@ -1415,6 +1426,9 @@ rule:
 constraints:
   F: {regex: ^(pinv|pinvh)$}
 ---
+# The fix deletes even= with the comma before it. Unsafe: the old form raises TypeError, and even=
+# chose how the last interval of an even number of samples was handled, which simpson now does in
+# one way.
 id: removed-keyword
 language: python
 severity: error
@@ -1498,8 +1512,14 @@ rule:
                         - has: {field: alias, pattern: $F_AS}
 constraints:
   F: {regex: ^simpson$}
+fix:
+  template: ''
+  expandStart: {regex: '^,$'}
+metadata: {fix: unsafe}
 ---
 # cumulative_trapezoid raises ValueError for an initial other than 0 or None, scipy/integrate/_quadrature.py line 346.
+# No fix, because the message names two rewrites, and the code does not show whether initial was a
+# first value or an offset.
 id: removed-keyword
 language: python
 severity: error
@@ -1745,6 +1765,7 @@ constraints:
 fix: workers=$V
 metadata: {fix: unsafe}
 ---
+# No fix, because the message names two rewrites, and the code does not show which one is meant.
 id: removed-keyword
 language: python
 severity: error
@@ -1891,6 +1912,8 @@ constraints:
   F: {regex: ^(KDTree|cKDTree)$}
   M: {regex: ^(query|query_ball_point|query_ball_tree|query_pairs|count_neighbors|sparse_distance_matrix)$}
 ---
+# The fix deletes initial_lexsort= with the comma before it. Unsafe: the old form raises TypeError,
+# so there is no value to compare.
 id: removed-keyword
 language: python
 severity: error
@@ -1974,6 +1997,10 @@ rule:
                         - has: {field: alias, pattern: $F_AS}
 constraints:
   F: {regex: ^kendalltau$}
+fix:
+  template: ''
+  expandStart: {regex: '^,$'}
+metadata: {fix: unsafe}
 ---
 # scale='raw' raises ValueError, in runs/probe2.jsonl. The docstring says the default 1.0 divides nothing out, which is what raw meant, but no older source here shows it, so the fix is unsafe.
 id: removed-keyword
@@ -2064,6 +2091,8 @@ constraints:
 fix: scale=1.0
 metadata: {fix: unsafe}
 ---
+# The fix deletes iprint= or disp= with the comma before it. Unsafe: the old form raises TypeError,
+# and the call no longer prints its progress.
 id: removed-keyword
 language: python
 severity: error
@@ -2148,7 +2177,12 @@ rule:
                         - has: {field: alias, pattern: $F_AS}
 constraints:
   F: {regex: ^fmin_l_bfgs_b$}
+fix:
+  template: ''
+  expandStart: {regex: '^,$'}
+metadata: {fix: unsafe}
 ---
+# No fix, because minkowski applies the weights after the power, so w must change too.
 id: removed-keyword
 language: python
 severity: error

@@ -873,6 +873,8 @@ metadata:
   fix: unsafe
 
 ---
+# No fix, because the fix would have to change the module of the import, which is outside the match,
+# and the statement may import other names from scipy.signal.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1021,6 +1023,8 @@ metadata:
   fix: unsafe
 
 ---
+# No fix, because the fix would have to change the module of the import, which is outside the match,
+# and the statement may import other names from scipy.stats.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1055,6 +1059,7 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the message names two replacements.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1180,6 +1185,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because the message names two replacements.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1232,6 +1238,7 @@ transform:
 # interp2d still exists and raises NotImplementedError when called, with `.. versionremoved::
 # 1.14.0` at R/src/scipy/scipy/interpolate/_interpolate.py:147. Its docstring gives the advice in
 # the message.
+# No fix, because the message names several replacements, chosen by the shape of the data.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1353,6 +1360,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because the message names several replacements, chosen by the shape of the data.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1399,6 +1407,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because the other names have no replacement.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1408,7 +1417,7 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(cmplx_sort|quadratic|impulse2|bspline|cascade|morlet2|morlet|ricker|cubic|lsim2|step2|daub|cwt|qmf)$
+      regex: ^(cmplx_sort|quadratic|bspline|cascade|morlet2|morlet|ricker|cubic|daub|cwt|qmf)$
   - pattern: $OBJ.$N
   - not:
       inside:
@@ -1529,6 +1538,148 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# The fix writes impulse, lsim and step, which take the same leading arguments. Unsafe: the old form
+# raises AttributeError, so there is no value to compare. The new functions solve the system in
+# another way, so the last digits differ, and keyword arguments that the old ones passed on to
+# odeint raise TypeError.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(impulse2|lsim2|step2)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.signal$
+      - pattern: $S.signal
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^signal$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^signal$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(impulse2)$
+      by: Write scipy.signal.impulse.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(lsim2)$
+      by: Write scipy.signal.lsim, which simulates a continuous time linear system.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(step2)$
+      by: Write scipy.signal.step.
+  HINT:
+    replace:
+      source: $H3
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: 2$
+      by: ''
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+---
+# No fix, because the other names have no replacement.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1538,7 +1689,7 @@ rule:
   - all:
     - kind: dotted_name
     - pattern: $N
-    - regex: ^(cmplx_sort|quadratic|impulse2|bspline|cascade|morlet2|morlet|ricker|cubic|lsim2|step2|daub|cwt|qmf)$
+    - regex: ^(cmplx_sort|quadratic|bspline|cascade|morlet2|morlet|ricker|cubic|daub|cwt|qmf)$
     - inside:
         kind: import_from_statement
         has:
@@ -1549,7 +1700,7 @@ rule:
   - all:
     - kind: dotted_name
     - pattern: $N
-    - regex: ^(cmplx_sort|quadratic|impulse2|bspline|cascade|morlet2|morlet|ricker|cubic|lsim2|step2|daub|cwt|qmf)$
+    - regex: ^(cmplx_sort|quadratic|bspline|cascade|morlet2|morlet|ricker|cubic|daub|cwt|qmf)$
     - inside:
         kind: aliased_import
         field: name
@@ -1583,6 +1734,108 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# impulse2, lsim2 and step2 become impulse, lsim and step, which take the same leading arguments.
+# Unsafe: the old import raises ImportError, and the new functions solve the system in another way,
+# so the last digits differ. The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.signal.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(impulse2|lsim2|step2)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.signal$
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(impulse2)$
+      by: Write scipy.signal.impulse.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(lsim2)$
+      by: Write scipy.signal.lsim, which simulates a continuous time linear system.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(step2)$
+      by: Write scipy.signal.step.
+  HINT:
+    replace:
+      source: $H3
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: 2$
+      by: ''
+fix: $NEW as $N
+metadata:
+  fix: unsafe
+---
+# impulse2, lsim2 and step2 become impulse, lsim and step, which take the same leading arguments.
+# Unsafe: the old import raises ImportError, and the new functions solve the system in another way,
+# so the last digits differ.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.signal.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(impulse2|lsim2|step2)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.signal$
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(impulse2)$
+      by: Write scipy.signal.impulse.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(lsim2)$
+      by: Write scipy.signal.lsim, which simulates a continuous time linear system.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(step2)$
+      by: Write scipy.signal.step.
+  HINT:
+    replace:
+      source: $H3
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: 2$
+      by: ''
+fix: $NEW
+metadata:
+  fix: unsafe
+---
+# No fix, because the other names have no replacement that takes the same arguments.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1592,7 +1845,7 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|btdtri|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|btdtr|clpmn|lpmn|lpn)$
+      regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|clpmn|lpmn|lpn)$
   - pattern: $OBJ.$N
   - not:
       inside:
@@ -1759,6 +2012,197 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# The fix writes betainc for btdtr and betaincinv for btdtri, which take the same arguments. Unsafe:
+# the old form raises AttributeError, so there is no value to compare.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(btdtr|btdtri)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.special$
+      - pattern: $S.special
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.special$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^special$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^special$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(clpmn|lpmn)$
+      by: Write scipy.special.assoc_legendre_p_all.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(btdtr)$
+      by: Write scipy.special.betainc.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(btdtri)$
+      by: Write scipy.special.betaincinv.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(lpn)$
+      by: Write scipy.special.legendre_p_all.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(errprint)$
+      by: Write scipy.special.seterr.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(sph_harm)$
+      by: Write scipy.special.sph_harm_y(n, m, theta, phi), which takes the degree first and the polar angle before
+        the azimuth.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(sph_inkn)$
+      by: Write scipy.special.spherical_in and spherical_kn.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(sph_in)$
+      by: Write scipy.special.spherical_in.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(sph_jnyn)$
+      by: Write scipy.special.spherical_jn and spherical_yn.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(sph_jn)$
+      by: Write scipy.special.spherical_jn.
+  H11:
+    replace:
+      source: $H10
+      replace: ^(sph_kn)$
+      by: Write scipy.special.spherical_kn.
+  H12:
+    replace:
+      source: $H11
+      replace: ^(sph_yn)$
+      by: Write scipy.special.spherical_yn.
+  HINT:
+    replace:
+      source: $H12
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^btdtr$
+      by: betainc
+  NEW2:
+    replace:
+      source: $NEW
+      replace: ^btdtri$
+      by: betaincinv
+fix: $OBJ.$NEW2
+metadata:
+  fix: unsafe
+---
+# No fix, because the other names have no replacement that takes the same arguments.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1768,7 +2212,7 @@ rule:
   - all:
     - kind: dotted_name
     - pattern: $N
-    - regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|btdtri|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|btdtr|clpmn|lpmn|lpn)$
+    - regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|clpmn|lpmn|lpn)$
     - inside:
         kind: import_from_statement
         has:
@@ -1779,7 +2223,7 @@ rule:
   - all:
     - kind: dotted_name
     - pattern: $N
-    - regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|btdtri|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|btdtr|clpmn|lpmn|lpn)$
+    - regex: ^(bessel_diff_formula|errprint|sph_harm|sph_inkn|sph_jnyn|hyp1f2|hyp2f0|hyp3f0|sph_in|sph_jn|sph_kn|sph_yn|clpmn|lpmn|lpn)$
     - inside:
         kind: aliased_import
         field: name
@@ -1859,6 +2303,211 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# btdtr becomes betainc and btdtri betaincinv, which take the same arguments. Unsafe: the old import
+# raises ImportError. The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.special.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(btdtr|btdtri)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.special$
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(clpmn|lpmn)$
+      by: Write scipy.special.assoc_legendre_p_all.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(btdtr)$
+      by: Write scipy.special.betainc.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(btdtri)$
+      by: Write scipy.special.betaincinv.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(lpn)$
+      by: Write scipy.special.legendre_p_all.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(errprint)$
+      by: Write scipy.special.seterr.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(sph_harm)$
+      by: Write scipy.special.sph_harm_y(n, m, theta, phi), which takes the degree first and the polar angle before
+        the azimuth.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(sph_inkn)$
+      by: Write scipy.special.spherical_in and spherical_kn.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(sph_in)$
+      by: Write scipy.special.spherical_in.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(sph_jnyn)$
+      by: Write scipy.special.spherical_jn and spherical_yn.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(sph_jn)$
+      by: Write scipy.special.spherical_jn.
+  H11:
+    replace:
+      source: $H10
+      replace: ^(sph_kn)$
+      by: Write scipy.special.spherical_kn.
+  H12:
+    replace:
+      source: $H11
+      replace: ^(sph_yn)$
+      by: Write scipy.special.spherical_yn.
+  HINT:
+    replace:
+      source: $H12
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^btdtr$
+      by: betainc
+  NEW2:
+    replace:
+      source: $NEW
+      replace: ^btdtri$
+      by: betaincinv
+fix: $NEW2 as $N
+metadata:
+  fix: unsafe
+---
+# btdtr becomes betainc and btdtri betaincinv, which take the same arguments. Unsafe: the old import
+# raises ImportError.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.special.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(btdtr|btdtri)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.special$
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(clpmn|lpmn)$
+      by: Write scipy.special.assoc_legendre_p_all.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(btdtr)$
+      by: Write scipy.special.betainc.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(btdtri)$
+      by: Write scipy.special.betaincinv.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(lpn)$
+      by: Write scipy.special.legendre_p_all.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(errprint)$
+      by: Write scipy.special.seterr.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(sph_harm)$
+      by: Write scipy.special.sph_harm_y(n, m, theta, phi), which takes the degree first and the polar angle before
+        the azimuth.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(sph_inkn)$
+      by: Write scipy.special.spherical_in and spherical_kn.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(sph_in)$
+      by: Write scipy.special.spherical_in.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(sph_jnyn)$
+      by: Write scipy.special.spherical_jn and spherical_yn.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(sph_jn)$
+      by: Write scipy.special.spherical_jn.
+  H11:
+    replace:
+      source: $H10
+      replace: ^(sph_kn)$
+      by: Write scipy.special.spherical_kn.
+  H12:
+    replace:
+      source: $H11
+      replace: ^(sph_yn)$
+      by: Write scipy.special.spherical_yn.
+  HINT:
+    replace:
+      source: $H12
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^btdtr$
+      by: betainc
+  NEW2:
+    replace:
+      source: $NEW
+      replace: ^btdtri$
+      by: betaincinv
+fix: $NEW2
+metadata:
+  fix: unsafe
+---
+# No fix, because the other names have no replacement that takes the same arguments, np.nanmean and
+# the other NumPy functions reduce over every axis where scipy.stats reduced over the first, and
+# where the code names the module as a bare name, such as stats, the file binds no name for
+# scipy.special.
 id: removed-in-scipy
 language: python
 severity: error
@@ -1868,8 +2517,16 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(NumericalInverseHermite|rvs_ratio_uniforms|square_of_sums|signaltonoise|pdf_moments|binom_test|histogram2|chisqprob|frechet_l|frechet_r|histogram|nanmedian|pdfapprox|threshold|fastsort|itemfreq|nanmean|ksprob|nanstd|pdffit|betai|fprob|zprob|erfc|ss)$
+      regex: ^(NumericalInverseHermite|rvs_ratio_uniforms|square_of_sums|signaltonoise|pdf_moments|binom_test|histogram2|frechet_l|frechet_r|histogram|nanmedian|pdfapprox|threshold|fastsort|itemfreq|nanmean|ksprob|nanstd|pdffit|betai|fprob|zprob|erfc|ss)$
   - pattern: $OBJ.$N
+  - not:
+      all:
+      - has:
+          field: attribute
+          regex: ^(betai|erfc)$
+      - has:
+          field: object
+          kind: attribute
   - not:
       inside:
         kind: assignment
@@ -2024,6 +2681,365 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# The fix writes chi2.sf, which takes the same statistic and degrees of freedom. Unsafe: the old
+# form raises AttributeError, so there is no value to compare.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(chisqprob)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.stats$
+      - pattern: $S.stats
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^stats$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(NumericalInverseHermite)$
+      by: Import NumericalInverseHermite from scipy.stats.sampling, which import scipy.stats does not load.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(rvs_ratio_uniforms)$
+      by: Import RatioUniforms from scipy.stats.sampling.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(histogram)$
+      by: Write np.histogram.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(nanmean)$
+      by: Write np.nanmean.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(nanmedian)$
+      by: Write np.nanmedian.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(nanstd)$
+      by: Write np.nanstd.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(betai)$
+      by: Write scipy.special.betainc.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(erfc)$
+      by: Write scipy.special.erfc.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(binom_test)$
+      by: Write scipy.stats.binomtest(...).pvalue.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(chisqprob)$
+      by: Write scipy.stats.chi2.sf.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^chisqprob$
+      by: chi2.sf
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+---
+# The fix writes the scipy.special function in place of scipy.stats, and applies where the code
+# names the module as an attribute, such as scipy.stats. Unsafe: the old form raises AttributeError,
+# so there is no value to compare.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(betai|erfc)$
+  - pattern: $OBJ.$N
+  - has:
+      field: object
+      kind: attribute
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.stats$
+      - pattern: $S.stats
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^stats$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^stats$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(NumericalInverseHermite)$
+      by: Import NumericalInverseHermite from scipy.stats.sampling, which import scipy.stats does not load.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(rvs_ratio_uniforms)$
+      by: Import RatioUniforms from scipy.stats.sampling.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(histogram)$
+      by: Write np.histogram.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(nanmean)$
+      by: Write np.nanmean.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(nanmedian)$
+      by: Write np.nanmedian.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(nanstd)$
+      by: Write np.nanstd.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(betai)$
+      by: Write scipy.special.betainc.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(erfc)$
+      by: Write scipy.special.erfc.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(binom_test)$
+      by: Write scipy.stats.binomtest(...).pvalue.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(chisqprob)$
+      by: Write scipy.stats.chi2.sf.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^betai$
+      by: betainc
+  PRE:
+    replace:
+      source: $OBJ
+      replace: stats$
+      by: special
+fix: $PRE.$NEW
+metadata:
+  fix: unsafe
+---
+# No fix, because the other names have no replacement that takes the same arguments, or live in
+# another module, which an import from scipy.stats cannot name.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2113,6 +3129,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because calc_lwork and flinalg have no replacement.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2122,7 +3139,7 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(calc_lwork|flinalg|slogdet|expm2|expm3|kron|tril|triu|tri)$
+      regex: ^(calc_lwork|flinalg)$
   - pattern: $OBJ.$N
   - not:
       inside:
@@ -2258,6 +3275,316 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# The fix writes expm. Unsafe: the old form raises AttributeError, and expm3 took a second argument
+# q that expm does not.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(expm2|expm3)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.linalg$
+      - pattern: $S.linalg
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^linalg$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(kron)$
+      by: Write np.kron.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(slogdet)$
+      by: Write np.linalg.slogdet.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(tri)$
+      by: Write np.tri.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(tril)$
+      by: Write np.tril.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(triu)$
+      by: Write np.triu.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(expm2|expm3)$
+      by: Write scipy.linalg.expm.
+  HINT:
+    replace:
+      source: $H6
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^(expm2|expm3)$
+      by: expm
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
+---
+# The fix writes the NumPy function, so it applies only in a file with `import numpy as np`. Unsafe:
+# the old form raises AttributeError, so there is no value to compare.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from SciPy and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(kron|slogdet|tri|tril|triu)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.linalg$
+      - pattern: $S.linalg
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^linalg$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^linalg$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(kron)$
+      by: Write np.kron.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(slogdet)$
+      by: Write np.linalg.slogdet.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(tri)$
+      by: Write np.tri.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(tril)$
+      by: Write np.tril.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(triu)$
+      by: Write np.triu.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(expm2|expm3)$
+      by: Write scipy.linalg.expm.
+  HINT:
+    replace:
+      source: $H6
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^slogdet$
+      by: linalg.slogdet
+fix: np.$NEW
+metadata:
+  fix: unsafe
+---
+# No fix, because the other names moved to NumPy or have no replacement, and an import from
+# scipy.linalg cannot name them.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2267,7 +3594,7 @@ rule:
   - all:
     - kind: dotted_name
     - pattern: $N
-    - regex: ^(calc_lwork|flinalg|slogdet|expm2|expm3|kron|tril|triu|tri)$
+    - regex: ^(calc_lwork|flinalg|slogdet|kron|tril|triu|tri)$
     - inside:
         kind: import_from_statement
         has:
@@ -2278,7 +3605,7 @@ rule:
   - all:
     - kind: dotted_name
     - pattern: $N
-    - regex: ^(calc_lwork|flinalg|slogdet|expm2|expm3|kron|tril|triu|tri)$
+    - regex: ^(calc_lwork|flinalg|slogdet|kron|tril|triu|tri)$
     - inside:
         kind: aliased_import
         field: name
@@ -2327,6 +3654,137 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# expm2 and expm3 become expm. Unsafe: the old import raises ImportError, and expm3 took a second
+# argument q that expm does not. The fix keeps the old name bound, as `from ... import new as old`.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.linalg.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(expm2|expm3)$
+  - inside:
+      kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^scipy\.linalg$
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(kron)$
+      by: Write np.kron.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(slogdet)$
+      by: Write np.linalg.slogdet.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(tri)$
+      by: Write np.tri.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(tril)$
+      by: Write np.tril.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(triu)$
+      by: Write np.triu.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(expm2|expm3)$
+      by: Write scipy.linalg.expm.
+  HINT:
+    replace:
+      source: $H6
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^(expm2|expm3)$
+      by: expm
+fix: $NEW as $N
+metadata:
+  fix: unsafe
+---
+# expm2 and expm3 become expm. Unsafe: the old import raises ImportError, and expm3 took a second
+# argument q that expm does not.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.linalg.$N was removed from SciPy, so this import raises ImportError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: dotted_name
+  - pattern: $N
+  - regex: ^(expm2|expm3)$
+  - inside:
+      kind: aliased_import
+      field: name
+      inside:
+        kind: import_from_statement
+        has:
+          field: module_name
+          regex: ^scipy\.linalg$
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(kron)$
+      by: Write np.kron.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(slogdet)$
+      by: Write np.linalg.slogdet.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(tri)$
+      by: Write np.tri.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(tril)$
+      by: Write np.tril.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(triu)$
+      by: Write np.triu.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(expm2|expm3)$
+      by: Write scipy.linalg.expm.
+  HINT:
+    replace:
+      source: $H6
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  NEW:
+    replace:
+      source: $N
+      replace: ^(expm2|expm3)$
+      by: expm
+fix: $NEW
+metadata:
+  fix: unsafe
+---
+# The fix writes csgraph.connected_components through the scipy.sparse that the file already names.
+# Unsafe: the old form raises AttributeError, so there is no value to compare.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2445,8 +3903,17 @@ transform:
       source: $H1
       replace: ^\w+$
       by: SciPy 1.18.1 has no public function of that name.
-
+  NEW:
+    replace:
+      source: $N
+      replace: ^cs_graph_components$
+      by: csgraph.connected_components
+fix: $OBJ.$NEW
+metadata:
+  fix: unsafe
 ---
+# No fix, because connected_components lives in scipy.sparse.csgraph, which an import from
+# scipy.sparse cannot name.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2491,6 +3958,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because minkowski applies the weights after the power, so w must change too.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2663,6 +4131,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because minkowski applies the weights after the power, so w must change too.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2707,6 +4176,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because dual_annealing takes bounds where anneal took a start point.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2827,6 +4297,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because dual_annealing takes bounds where anneal took a start point.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2871,6 +4342,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because SciPy 1.18.1 has no replacement.
 id: removed-in-scipy
 language: python
 severity: error
@@ -2986,6 +4458,7 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# No fix, because SciPy 1.18.1 has no replacement.
 id: removed-in-scipy
 language: python
 severity: error
@@ -3027,6 +4500,8 @@ transform:
 ---
 # scipy.misc holds no names on SciPy 1.18.1 and warns when imported, by runs/probe.jsonl and
 # R/src/scipy/scipy/misc/__init__.py.
+# No fix, because the code that reads names from scipy.misc would have to change too, and the match
+# does not reach it.
 id: removed-in-scipy
 language: python
 severity: error
@@ -3050,6 +4525,8 @@ rule:
         field: module_name
 
 ---
+# No fix, because the code that reads names from scipy.misc would have to change too, and the match
+# does not reach it.
 id: removed-in-scipy
 language: python
 severity: error
@@ -3084,6 +4561,9 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because the other names have no replacement that takes the same arguments, and where the
+# code names the module as a bare name, such as misc, the file binds no name for scipy.special or
+# scipy.datasets.
 id: removed-in-scipy
 language: python
 severity: error
@@ -3095,6 +4575,14 @@ rule:
       field: attribute
       regex: ^(\w+)$
   - pattern: $OBJ.$N
+  - not:
+      all:
+      - has:
+          field: attribute
+          regex: ^(comb|factorial|factorial2|factorialk|logsumexp|ascent|electrocardiogram|face)$
+      - has:
+          field: object
+          kind: attribute
   - not:
       inside:
         kind: assignment
@@ -3249,6 +4737,194 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# The fix writes scipy.special or scipy.datasets in place of scipy.misc, and applies where the code
+# names the module as an attribute, such as scipy.misc. Unsafe: the old form raises AttributeError,
+# so there is no value to compare. The datasets also need the pooch package.
+id: removed-in-scipy
+language: python
+severity: error
+message: scipy.misc is empty on SciPy 1.18.1, so $OBJ.$N raises AttributeError. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(comb|factorial|factorial2|factorialk|logsumexp|ascent|electrocardiogram|face)$
+  - pattern: $OBJ.$N
+  - has:
+      field: object
+      kind: attribute
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy\.misc$
+      - pattern: $S.misc
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id004
+                  stopBy: end
+                  any: &id005
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy\.misc$
+                    - has:
+                        field: alias
+                        pattern: $S
+                  - kind: dotted_name
+                    pattern: $S
+                    regex: ^misc$
+                    inside:
+                      kind: import_from_statement
+                      has: &id003
+                        field: module_name
+                        regex: ^scipy$
+                  - kind: aliased_import
+                    inside:
+                      kind: import_from_statement
+                      has: *id003
+                    all:
+                    - has:
+                        field: name
+                        regex: ^misc$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id004
+              - kind: try_statement
+                has: *id004
+              - kind: if_statement
+                has: *id004
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id005
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(pade)$
+      by: Write mpmath.pade, since scipy.interpolate.pade is deprecated too.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(ascent)$
+      by: Write scipy.datasets.ascent, which needs the pooch package.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(electrocardiogram)$
+      by: Write scipy.datasets.electrocardiogram, which needs the pooch package.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(face)$
+      by: Write scipy.datasets.face, which needs the pooch package.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(derivative)$
+      by: Write scipy.differentiate.derivative, which takes different arguments.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(comb)$
+      by: Write scipy.special.comb.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(factorial)$
+      by: Write scipy.special.factorial.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(factorial2)$
+      by: Write scipy.special.factorial2.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(factorialk)$
+      by: Write scipy.special.factorialk.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(logsumexp)$
+      by: Write scipy.special.logsumexp.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  MOD1:
+    replace:
+      source: $N
+      replace: ^(comb|factorial|factorial2|factorialk|logsumexp)$
+      by: special
+  MOD:
+    replace:
+      source: $MOD1
+      replace: ^(ascent|electrocardiogram|face)$
+      by: datasets
+  PRE:
+    replace:
+      source: $OBJ
+      replace: misc$
+      by: ''
+fix: $PRE$MOD.$N
+metadata:
+  fix: unsafe
+---
 # Each name is public in NumPy 2.5.4 and raises on the scipy namespace, by runs/probe.jsonl. Humans
 # made this change in scikit-learn 823ed5a8d0 (runs/pairs.txt). The old scipy/__init__.py is not in
 # the research material, so which NumPy function each name was cannot be shown, and the fix is
@@ -3313,6 +4989,8 @@ metadata:
   fix: unsafe
 
 ---
+# No fix, because the fix would have to change the module of the import, which is outside the match,
+# and the statement may import other names from scipy.
 id: removed-in-scipy
 language: python
 severity: error
@@ -3347,6 +5025,8 @@ rule:
         matches: compat-code
 
 ---
+# No fix, because derivative takes other arguments in scipy.differentiate, pade moved to mpmath, and
+# lena has no replacement.
 id: removed-in-scipy
 language: python
 severity: error
@@ -3356,7 +5036,7 @@ rule:
   - kind: attribute
   - has:
       field: attribute
-      regex: ^(derivative|factorial2|factorial|comb|face|lena|pade)$
+      regex: ^(derivative|lena|pade)$
   - pattern: $OBJ.$N
   - not:
       inside:
@@ -3460,6 +5140,135 @@ transform:
       by: SciPy 1.18.1 has no public function of that name.
 
 ---
+# The fix writes the name in scipy.special or scipy.datasets, through the scipy that the file
+# already names. Unsafe: the old form raises AttributeError, so there is no value to compare.
+# scipy.datasets.face also needs the pooch package.
+id: removed-in-scipy
+language: python
+severity: error
+message: $OBJ.$N was removed from the scipy namespace and raises AttributeError on SciPy 1.18.1. $HINT
+rule:
+  all:
+  - kind: attribute
+  - has:
+      field: attribute
+      regex: ^(comb|factorial|factorial2|face)$
+  - pattern: $OBJ.$N
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - has:
+      field: object
+      any:
+      - regex: ^scipy$
+      - kind: identifier
+        pattern: $S
+        any:
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              any:
+              - kind: import_statement
+                has: &id001
+                  stopBy: end
+                  any: &id002
+                  - kind: aliased_import
+                    inside:
+                      kind: import_statement
+                    all:
+                    - has:
+                        field: name
+                        regex: ^scipy$
+                    - has:
+                        field: alias
+                        pattern: $S
+              - kind: import_from_statement
+                has: *id001
+              - kind: try_statement
+                has: *id001
+              - kind: if_statement
+                has: *id001
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has:
+              stopBy: end
+              any: *id002
+  - not:
+      matches: compat-code
+transform:
+  H1:
+    replace:
+      source: $N
+      replace: ^(pade)$
+      by: Write mpmath.pade, since scipy.interpolate.pade is deprecated too.
+  H2:
+    replace:
+      source: $H1
+      replace: ^(ascent)$
+      by: Write scipy.datasets.ascent, which needs the pooch package.
+  H3:
+    replace:
+      source: $H2
+      replace: ^(electrocardiogram)$
+      by: Write scipy.datasets.electrocardiogram, which needs the pooch package.
+  H4:
+    replace:
+      source: $H3
+      replace: ^(face)$
+      by: Write scipy.datasets.face, which needs the pooch package.
+  H5:
+    replace:
+      source: $H4
+      replace: ^(derivative)$
+      by: Write scipy.differentiate.derivative, which takes different arguments.
+  H6:
+    replace:
+      source: $H5
+      replace: ^(comb)$
+      by: Write scipy.special.comb.
+  H7:
+    replace:
+      source: $H6
+      replace: ^(factorial)$
+      by: Write scipy.special.factorial.
+  H8:
+    replace:
+      source: $H7
+      replace: ^(factorial2)$
+      by: Write scipy.special.factorial2.
+  H9:
+    replace:
+      source: $H8
+      replace: ^(factorialk)$
+      by: Write scipy.special.factorialk.
+  H10:
+    replace:
+      source: $H9
+      replace: ^(logsumexp)$
+      by: Write scipy.special.logsumexp.
+  HINT:
+    replace:
+      source: $H10
+      replace: ^\w+$
+      by: SciPy 1.18.1 has no public function of that name.
+  MOD1:
+    replace:
+      source: $N
+      replace: ^(comb|factorial|factorial2)$
+      by: special
+  MOD:
+    replace:
+      source: $MOD1
+      replace: ^face$
+      by: datasets
+fix: $OBJ.$MOD.$N
+metadata:
+  fix: unsafe
+---
+# No fix, because the names live in other modules, which an import from scipy cannot name.
 id: removed-in-scipy
 language: python
 severity: error

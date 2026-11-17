@@ -224,8 +224,9 @@ utils:
                           - has: { kind: dotted_name, pattern: $MOD_, regex: '^special$' }
                           - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^special$' } }, { has: { field: alias, pattern: $MOD_ } }] }
 ---
-# The same forms with the function imported by name. No fix, because the log form is not imported.
-# The measurements are those of the documents above.
+# The same forms with the function imported by name. The fix writes the log form bare, so it
+# applies only in a file that imports it from scipy.special. The measurements are those of the
+# documents above. Unsafe. The last bits change.
 id: log-of-special
 language: python
 severity: warning
@@ -237,6 +238,8 @@ constraints:
 transform:
   T1: { replace: { source: $F, replace: '^(ndtr|expit|softmax)$', by: 'log_$1' } }
   NEW: { replace: { source: $T1, replace: '^(gamma|beta)$', by: '${1}ln' } }
+fix: $NEW($$$A)
+metadata: { fix: unsafe }
 utils:
   special-name:
     all:

@@ -152,8 +152,8 @@ utils:
       - { kind: identifier, pattern: $NAME_ }
       - inside: { stopBy: end, kind: module, has: { kind: import_from_statement, all: [{ has: { field: module_name, regex: '^scipy\.special$' } }, { has: { kind: dotted_name, pattern: $NAME_ } }] } }
 ---
-# The renamed forms with the function imported by name. No fix, because the new name is not
-# imported.
+# The renamed forms with the function imported by name. The fix writes the new name bare, so it
+# applies only in a file that imports it from scipy.special. Unsafe. The last bits change.
 id: special-complement
 language: python
 severity: warning
@@ -167,6 +167,8 @@ transform:
   T3: { replace: { source: $T2, replace: '^gammaincc$', by: gammainc_ } }
   T4: { replace: { source: $T3, replace: '^(gammainc|betainc)$', by: '${1}c' } }
   NEW: { replace: { source: $T4, replace: '_$', by: '' } }
+fix: $NEW($$$A)
+metadata: { fix: unsafe }
 utils:
   special-name:
     all:

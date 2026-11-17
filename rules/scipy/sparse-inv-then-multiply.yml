@@ -61,7 +61,8 @@ utils:
         kind: import_from_statement
         all: [{ has: { field: module_name, regex: '^scipy\.sparse\.linalg$' } }, { has: { kind: dotted_name, pattern: $F } }]
 ---
-# The same product with inv imported by name. No fix, because spsolve may not be imported.
+# The same product with inv imported by name. The fix writes spsolve bare, so it applies only in a
+# file that imports spsolve from scipy.sparse.linalg. Unsafe, for the reasons of the document above.
 id: sparse-inv-then-multiply
 language: python
 severity: warning
@@ -73,6 +74,8 @@ rule:
   has: { stopBy: end, kind: identifier, pattern: $F, matches: from-sparse-linalg }
 constraints:
   F: { regex: '^inv$' }
+fix: spsolve($A, $B)
+metadata: { fix: unsafe }
 utils:
   sparse-linalg:
     any:

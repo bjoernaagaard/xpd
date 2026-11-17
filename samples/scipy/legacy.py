@@ -17,7 +17,8 @@ from scipy.integrate import odeint
 from scipy.io import hb_read, mmread, mmwrite
 from scipy.optimize import minimize
 from scipy.spatial import cKDTree
-from scipy.spatial.distance import cdist
+from scipy.spatial.distance import cdist, directed_hausdorff
+from scipy.spatial.transform import Rotation
 from scipy.sparse import random as sparse_random
 from scipy.sparse.linalg import gmres
 from scipy.stats import qmc
@@ -84,6 +85,7 @@ def current_keywords():
 
 def deprecated_arguments(t, y, freqs, a, samples):
     signal.lombscargle(t, y, freqs, precenter=True)  # xpd: deprecated-argument
+    signal.lombscargle(t, y, freqs, precenter=False)  # xpd: deprecated-argument
     signal.lombscargle(t, y, freqs, False, True)  # xpd: deprecated-argument
     linalg.qr(a, lwork=None)  # xpd: deprecated-argument
     linalg.qr(a, False, -1)  # xpd: deprecated-argument
@@ -231,6 +233,11 @@ def rng_keywords(x, f, bounds, sp_version=(1, 14)):
     optimize.differential_evolution(f, bounds, seed=2)  # xpd: rng-keyword
     qmc.Sobol(2, seed=3)  # xpd: rng-keyword
     stats.bootstrap((x,), np.mean, random_state=4)  # xpd: rng-keyword
+    spla.svds(x, k=1, random_state=5)  # xpd: rng-keyword
+    interpolate.BarycentricInterpolator(x, x, random_state=6)  # xpd: rng-keyword
+    linalg.clarkson_woodruff_transform(x, 2, seed=7)  # xpd: rng-keyword
+    directed_hausdorff(x, x, seed=8)  # xpd: rng-keyword
+    Rotation.random(2, random_state=9)  # xpd: rng-keyword
     if sp_version < (1, 15):
         stats.bootstrap((x,), np.mean, random_state=4)
 

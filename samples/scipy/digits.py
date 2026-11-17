@@ -11,7 +11,7 @@ import scipy as sp
 import scipy.special as sc
 from scipy import linalg, special, stats
 from scipy.linalg import det
-from scipy.special import erf, expit, factorial, ndtri
+from scipy.special import comb, erf, erfc, expit, factorial, log_expit, ndtri
 from scipy.stats import binom, chi2, norm
 
 CASES = {}

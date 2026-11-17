@@ -275,7 +275,9 @@ transform:
 fix: $G
 metadata: {fix: safe}
 ---
-# scipy/stats/_stats_py.py line 8473 marks ranksums as legacy and says to prefer mannwhitneyu. mannwhitneyu reports U where ranksums reports z, so there is no fix.
+# scipy/stats/_stats_py.py line 8473 marks ranksums as legacy and says to prefer mannwhitneyu. No
+# fix, because mannwhitneyu reports U where ranksums reports z, so the code that reads the
+# statistic must change too.
 id: legacy-api
 language: python
 severity: info
@@ -356,7 +358,9 @@ rule:
 constraints:
   F: {regex: ^ranksums$}
 ---
-# scipy/sparse/_construct.py line 1207 says block_array is preferred over bmat. bmat returns a sparse matrix when no input is a sparse array, so there is no fix.
+# scipy/sparse/_construct.py line 1207 says block_array is preferred over bmat. bmat returns a
+# sparse matrix when no input is a sparse array. No fix, because on the sparse array that
+# block_array returns * and ** work elementwise, so the code that uses the result must change too.
 id: legacy-api
 language: python
 severity: info

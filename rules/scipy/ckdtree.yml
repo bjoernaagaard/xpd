@@ -1,14 +1,17 @@
 # The cKDTree docstring says the class is functionally identical to KDTree, kept only for
 # backward compatibility, and to prefer KDTree when SciPy older than 1.6 is not a concern, in
 # research/scipy-rules/src/scipy/scipy/spatial/_ckdtree.pyx:430 to 435. Building and querying
-# ran at the same speed in speed/runs/bench.jsonl. No fix, because the default leafsize differs,
-# 16 for cKDTree against 10 for KDTree, and the tree's node classes differ.
+# ran at the same speed in speed/runs/bench.jsonl. The fix writes KDTree with the same arguments,
+# which both classes take in the same order. Unsafe: the default leafsize is 16 for cKDTree and 10
+# for KDTree, so a query can return another one of two equally near points, and the tree's node
+# classes differ.
 id: ckdtree
 language: python
 severity: info
 message: cKDTree is functionally identical to KDTree and SciPy keeps the name only for backward compatibility, as its docstring says. Write KDTree, unless the code must run on SciPy older than 1.6.
 rule:
   kind: call
+  pattern: $CALL
   has:
     field: function
     any:
@@ -16,7 +19,10 @@ rule:
       - { kind: identifier, pattern: $K, matches: from-spatial }
 constraints:
   K: { regex: '^cKDTree$' }
-metadata: { since: "1.6" }
+transform:
+  NEW: { replace: { source: $CALL, replace: '^([\w.]*?)cKDTree', by: '${1}KDTree' } }
+fix: $NEW
+metadata: { fix: unsafe, since: "1.6" }
 utils:
   spatial-module:
     any:

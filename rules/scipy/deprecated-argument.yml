@@ -1,4 +1,97 @@
 # lombscargle warns DeprecationWarning for any precenter=, scipy/signal/_spectral_py.py line 260.
+# precenter=False is what the default does, so the fix deletes it with the comma before it.
+id: deprecated-argument
+language: python
+severity: warning
+message: lombscargle deprecated precenter= in SciPy 1.17 and warns DeprecationWarning for any value. Delete
+  precenter=False, which is what the default does.
+rule:
+  kind: keyword_argument
+  all:
+  - has: {field: name, regex: ^precenter$}
+  - has: {field: value, kind: 'false'}
+  inside:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+      - has:
+          field: function
+          any:
+          - {regex: ^scipy\.signal\.(lombscargle)$, pattern: scipy.signal.$F}
+          - all:
+            - {regex: \.signal\.(lombscargle)$, pattern: $R.signal.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy$}
+                      - has: {field: alias, pattern: $R}
+          - all:
+            - {regex: \.(lombscargle)$, pattern: $R.$F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_statement
+                    has:
+                      kind: aliased_import
+                      all:
+                      - has: {field: name, regex: ^scipy\.signal$}
+                      - has: {field: alias, pattern: $R}
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy$}
+                    - any:
+                      - has: {kind: dotted_name, pattern: $R, regex: ^signal$}
+                      - has:
+                          kind: aliased_import
+                          all:
+                          - has: {field: name, regex: ^signal$}
+                          - has: {field: alias, pattern: $R}
+          - all:
+            - {kind: identifier, regex: ^(lombscargle)$, pattern: $F}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  stopBy: end
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.signal$}
+                    - has: {kind: dotted_name, pattern: $F}
+          - all:
+            - {kind: identifier, pattern: $F_AS}
+            - inside:
+                stopBy: end
+                kind: module
+                has:
+                  any:
+                  - kind: import_from_statement
+                    all:
+                    - has: {field: module_name, regex: ^scipy\.signal$}
+                    - has:
+                        kind: aliased_import
+                        all:
+                        - has: {field: name, pattern: $F, regex: ^(lombscargle)$}
+                        - has: {field: alias, pattern: $F_AS}
+constraints:
+  F: {regex: ^lombscargle$}
+fix:
+  template: ''
+  expandStart: {regex: '^,$'}
+metadata: {fix: safe}
+---
+# No fix, because where precenter is True or a variable, y must be centred too.
 id: deprecated-argument
 language: python
 severity: warning
@@ -6,7 +99,10 @@ message: lombscargle deprecated precenter= in SciPy 1.17 and warns DeprecationWa
   and pass y - y.mean() as y where it was True.
 rule:
   kind: keyword_argument
-  has: {field: name, regex: ^precenter$}
+  all:
+  - has: {field: name, regex: ^precenter$}
+  - not:
+      has: {field: value, kind: 'false'}
   inside:
     kind: argument_list
     inside:
@@ -85,6 +181,8 @@ constraints:
   F: {regex: ^lombscargle$}
 ---
 # @_deprecate_positional_args(version='1.19.0') on lombscargle, scipy/signal/_spectral_py.py line 19.
+# No fix, because the fourth positional argument is precenter, whose value decides whether y must
+# change too.
 id: deprecated-argument
 language: python
 severity: warning
@@ -179,7 +277,9 @@ rule:
 constraints:
   F: {regex: ^lombscargle$}
 ---
-# qr warns DeprecationWarning for lwork=None, -1 or above M and raises ValueError below, scipy/linalg/_decomp_qr.py line 175.
+# qr warns DeprecationWarning for lwork=None, -1 or above M and raises ValueError below,
+# scipy/linalg/_decomp_qr.py line 175. The fix deletes lwork= with the comma before it. Unsafe: an
+# lwork below M raised ValueError, and the call without it returns the factors.
 id: deprecated-argument
 language: python
 severity: warning
@@ -263,7 +363,13 @@ rule:
                         - has: {field: alias, pattern: $F_AS}
 constraints:
   F: {regex: ^qr$}
+fix:
+  template: ''
+  expandStart: {regex: '^,$'}
+metadata: {fix: unsafe}
 ---
+# No fix, because the arguments after lwork must become keywords too, and their names are not in the
+# file.
 id: deprecated-argument
 language: python
 severity: warning
@@ -445,6 +551,8 @@ constraints:
   F: {regex: ^anderson_ksamp$}
 metadata: {since: '1.17'}
 ---
+# No fix, because with variant= the result no longer unpacks as a tuple, so the code that reads it
+# must change too.
 id: deprecated-argument
 language: python
 severity: warning
