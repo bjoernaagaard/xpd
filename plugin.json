@@ -9,7 +9,7 @@
   },
   "homepage": "https://bjoernaagaard.github.io/xpd/",
   "repository": "https://github.com/bjoernaagaard/xpd",
-  "license": "MIT OR Apache-2.0",
+  "license": "MIT AND Apache-2.0 AND BSD-3-Clause AND NCSA AND MPL-2.0 AND ISC AND MIT-0 AND PSF-2.0",
   "keywords": [
     "python",
     "linter",

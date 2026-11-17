@@ -510,7 +510,7 @@ fn sort_ranking(ranked: &mut [(usize, f64)]) {
 
 /// The records that share a keyword with the query, best first.
 fn keyword_ranking(query: &str, passes: impl Fn(&Stored) -> bool) -> Vec<(usize, f64)> {
-    let words: BTreeSet<_> = search_terms(query).into_iter().collect();
+    let words: BTreeSet<_> = tokens(query).into_iter().collect();
     let mut scores = vec![0.0; RECORDS.len()];
     for word in &words {
         if let Ok(i) = TABLE.binary_search_by_key(&word.as_str(), |(w, _, _)| *w) {
@@ -681,7 +681,7 @@ fn find_dynamic<'a>(
         })
         .collect::<Vec<_>>();
     let table = crate::search::weights(&documents);
-    let words: BTreeSet<_> = search_terms(query).into_iter().collect();
+    let words: BTreeSet<_> = tokens(query).into_iter().collect();
     let mut scores = vec![0.0; entries.len()];
     for word in &words {
         if let Some(postings) = table.get(word) {
@@ -707,10 +707,6 @@ fn find_dynamic<'a>(
         .collect::<Vec<_>>();
     ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(&b.name)));
     ranked.into_iter().map(|(e, _)| e).collect()
-}
-
-fn search_terms(query: &str) -> Vec<String> {
-    tokens(query)
 }
 
 fn rank_score(

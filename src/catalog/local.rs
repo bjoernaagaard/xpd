@@ -28,6 +28,7 @@ use serde::Deserialize;
 use crate::pack::{self, AlsoOnSource, Manifest, Pack};
 use crate::package_check::PackageCheck;
 use crate::rule::{Origin, Rule};
+use crate::scan::cannot_read;
 
 /// The names ast-grep finds its project file by, in the order it tries them.
 const CONFIG_NAMES: [&str; 2] = ["sgconfig.yml", "sgconfig.yaml"];
@@ -171,10 +172,6 @@ impl std::fmt::Debug for LocalProject {
             .field("packs", &self.packs)
             .finish_non_exhaustive()
     }
-}
-
-fn cannot_read(path: &Path) -> String {
-    format!("cannot read {}", path.display())
 }
 
 /// `path` without symbolic links, or as an absolute path when no file is there yet.

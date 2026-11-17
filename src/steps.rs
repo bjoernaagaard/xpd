@@ -14,15 +14,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use ast_grep_core::Node;
-use ast_grep_core::tree_sitter::StrDoc;
-use ast_grep_language::SupportLang;
 
 use crate::nodes::{Finding, Level, literal};
 use crate::outline::{self, Function};
 use crate::scan;
 
 /// A node of the syntax tree of a Python file.
-type Syntax<'r> = Node<'r, StrDoc<SupportLang>>;
+type Syntax<'r> = scan::Node<'r>;
 
 /// Methods that keep the columns of the frame they are called on.
 const KEEPS_COLUMNS: &[&str] = &["astype", "clip", "fillna", "mask", "round", "where"];

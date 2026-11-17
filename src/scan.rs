@@ -107,7 +107,7 @@ pub(crate) fn names_language(path: &Path) -> bool {
     SupportLang::from_path(path).is_some()
 }
 
-fn cannot_read(path: &Path) -> String {
+pub(crate) fn cannot_read(path: &Path) -> String {
     format!("cannot read {}", path.display())
 }
 

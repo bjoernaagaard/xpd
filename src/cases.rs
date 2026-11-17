@@ -12,19 +12,13 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{catalog::Catalog, pack, scan, venv::Venv};
+use crate::{catalog::Catalog, cli::Format, pack, scan, venv::Venv};
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub(crate) enum Engine {
     #[default]
     Xpd,
     Structural,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum Format {
-    Text,
-    Json,
 }
 
 #[derive(Debug, Args)]

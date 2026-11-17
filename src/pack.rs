@@ -13,6 +13,7 @@ use ast_grep_config::{
     SerializableRule, Severity,
 };
 use ast_grep_language::SupportLang;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use crate::package_check::PackageCheck;
@@ -237,15 +238,19 @@ impl TryFrom<&PackSource> for Pack {
     fn try_from(source: &PackSource) -> Result<Self> {
         let utils = source.utils.iter();
         let globals = global_utils(utils.map(|file| (Path::new(file.path), file.yaml)))?;
-        let mut rules = Vec::new();
-        for file in source.rules {
-            let path = Path::new(file.path);
-            let pack = Some(source.module);
-            rules.extend(
+        // Compiling the rules is most of the time xpd takes to start, so the files compile on
+        // all cores. The rules stay in file order, which is the order a scan reports them in.
+        let per_file: Vec<Vec<Rule>> = source
+            .rules
+            .par_iter()
+            .map(|file| {
+                let path = Path::new(file.path);
+                let pack = Some(source.module);
                 compile_rules(path, file.yaml, &globals, Origin::Embedded, pack)
-                    .with_context(|| format!("{}.yml", file.id()))?,
-            );
-        }
+                    .with_context(|| format!("{}.yml", file.id()))
+            })
+            .collect::<Result<_>>()?;
+        let rules = per_file.into_iter().flatten().collect();
         let manifest: Manifest = match source.manifest {
             Some(yaml) => ast_grep_config::from_str(yaml).context("pack.yml")?,
             None => Manifest::default(),
@@ -466,7 +471,7 @@ impl fmt::Debug for Pack {
 /// Every pack that ships with xpd, each with all of its rules.
 pub(crate) fn embedded() -> Result<Vec<Pack>> {
     SOURCES
-        .iter()
+        .par_iter()
         .map(|source| Pack::try_from(source).with_context(|| format!("rules/{}", source.module)))
         .collect()
 }

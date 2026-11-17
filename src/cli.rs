@@ -49,7 +49,7 @@ struct Cli {
     cmd: Cmd,
 }
 
-/// How `graph`, `rules`, `find` and `api` print what they found.
+/// How `graph`, `rules`, `find`, `api`, `new` and `test` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(crate) enum Format {
     Text,
@@ -387,12 +387,7 @@ fn print_matches(mut found: index::Matches, kind: Option<Kind>, format: Format) 
             entry.keywords.clear();
             entry.members.clear();
             entry.parameters_written.clear();
-            entry.summary = entry
-                .summary
-                .split("\n\n")
-                .next()
-                .unwrap_or_default()
-                .to_owned();
+            entry.summary = first_paragraph(&entry.summary);
         }
     }
     match format {
@@ -803,6 +798,11 @@ enum Detail {
     Full,
 }
 
+/// The first paragraph of a summary, which is what `find` and a short `api` listing show.
+fn first_paragraph(summary: &str) -> String {
+    summary.split("\n\n").next().unwrap_or_default().to_owned()
+}
+
 fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> Result<()> {
     let entries: Vec<_> = entries
         .iter()
@@ -811,12 +811,7 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
             entry.keywords.clear();
             if matches!(detail, Detail::Summary) {
                 entry.members.clear();
-                entry.summary = entry
-                    .summary
-                    .split("\n\n")
-                    .next()
-                    .unwrap_or_default()
-                    .to_owned();
+                entry.summary = first_paragraph(&entry.summary);
             }
             entry
         })

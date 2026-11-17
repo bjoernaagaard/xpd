@@ -8,14 +8,12 @@
 use std::collections::BTreeSet;
 
 use ast_grep_core::Node;
-use ast_grep_core::tree_sitter::StrDoc;
-use ast_grep_language::SupportLang;
 
 use crate::outline::{self, Function, Parameter};
 use crate::scan;
 
 /// A node of the syntax tree of a Python file.
-type Syntax<'r> = Node<'r, StrDoc<SupportLang>>;
+type Syntax<'r> = scan::Node<'r>;
 
 /// Decorators that build nodes in a way this module does not read.
 const UNREAD: &[&str] = &[

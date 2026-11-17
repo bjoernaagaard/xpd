@@ -17,6 +17,7 @@ use clap::{Subcommand, ValueEnum};
 use inquire::validator::Validation;
 use serde::Serialize;
 
+use crate::cli::Format;
 use document::{Name, RuleDoc, RuleId};
 use project::{Changes, Gate, Pack, Project};
 
@@ -53,12 +54,6 @@ struct Options {
     /// Print the result as text, or as JSON with `createdFiles` and `modifiedFiles`.
     #[arg(long, value_enum, global = true, default_value = "text")]
     format: Format,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum Format {
-    Text,
-    Json,
 }
 
 #[derive(Debug, Subcommand)]
