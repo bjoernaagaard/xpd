@@ -55,9 +55,9 @@ skills with no settings to write. The plugin starts xpd with `uvx`, so the machi
 
 ```text
 xpd, loaded as a plugin
-├── plugin.json                         the name and version of the plugin, 0.30.0
+├── plugin.json                         the name and version of the plugin, 0.31.0
 ├── skills/                             xpd, python-best-practices and python-review
-├── mcp.json                            starts the MCP server with uvx xpd@0.30.0 mcp
+├── mcp.json                            starts the MCP server with uvx xpd@0.31.0 mcp
 └── .agents/plugins/marketplace.json    lists the plugin for Codex
 ```
 
