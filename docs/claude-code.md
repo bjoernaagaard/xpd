@@ -1,8 +1,7 @@
 # Claude Code
 
-Add `xpd hook` as a `PostToolUse` hook, so Claude Code lints each Python file the agent edits
-and shows the issues to the agent in the same turn. Add the hook below to
-`.claude/settings.json` in your project.
+Add the `PostToolUse` hook below to `.claude/settings.json` in your project, so xpd lints each
+Python file the agent edits. Claude Code then shows the issues to the agent in the same turn.
 
 ```json
 {
@@ -20,8 +19,19 @@ and shows the issues to the agent in the same turn. Add the hook below to
 ## What the hook does
 
 Claude Code sends the event of each edit to `xpd hook` on stdin, and xpd lints the file named in
-`tool_input.file_path`. When xpd finds issues, it prints them on stderr and exits 2, and Claude
-Code shows them to the agent.
+`tool_input.file_path`. When xpd finds issues, it prints them on stderr and exits with 2. Claude
+Code then shows the issues to the agent.
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant CC as Claude Code
+    participant Hook as xpd hook
+    Agent->>CC: Edit samples/bad.py
+    CC->>Hook: the event JSON on stdin
+    Hook-->>CC: 5 issues on stderr, exit code 2
+    CC-->>Agent: the 5 issues
+```
 
 ```console
 $ echo '{"tool_name":"Edit","tool_input":{"file_path":"samples/bad.py"},"tool_response":{}}' | xpd hook
@@ -34,11 +44,11 @@ $ echo $?
 2
 ```
 
-The hook writes no fix. For a file with a pipeline of steps, the issues also include the errors
-and warnings of [`xpd graph`](commands.md#step-code), such as a formula that another step
-computes already. In a project with its own rules, which has an `sgconfig.yml`, the hook also
-lints an edited file in another language that xpd can parse, so the project's rules for that
-language run on it.
+The hook only reports issues, and it writes no fix. For a file with a pipeline of steps, the
+issues also include the errors and warnings of [`xpd graph`](commands.md#step-code), such as a
+formula that another step computes already. A project with its own rules has an `sgconfig.yml`,
+and there the hook also runs the project's rules on an edited file in any other language that xpd
+can parse.
 
 | Exit code | When | What Claude Code does |
 | --- | --- | --- |
@@ -61,7 +71,7 @@ xpd, loaded as a plugin
 └── .agents/plugins/marketplace.json    lists the plugin for Codex
 ```
 
-Codex installs the plugin with the two commands below.
+Run the commands below to install the plugin in Codex.
 
 ```sh
 codex plugin marketplace add bjoernaagaard/xpd
@@ -69,7 +79,7 @@ codex plugin add xpd@xpd
 ```
 
 Version 1.0.0 of the format has no hooks, so the plugin ships none. The 1.1.0 draft of the
-format adds hooks, and `xpd hook` already answers a client of that draft. xpd tells the two
+format adds hooks, and `xpd hook` already answers a client of the 1.1.0 draft. xpd tells the two
 kinds of client apart by the field that holds the result of the tool call.
 
 | Client | Field in the event | Files that xpd lints | How the agent gets the issues |
@@ -78,14 +88,14 @@ kinds of client apart by the field that holds the result of the tool call.
 | Claude Code settings | `tool_response` | `tool_input.file_path` | stderr, with exit code 2 |
 
 A hook of the draft format runs after every tool call, and xpd prints nothing for a call that
-changed no Python file. Such a hook starts in the plugin's folder, so xpd moves to the `cwd` of
-the event before it lints, and it finds the project's venv there.
+changed no Python file. The client starts the hook in the plugin's folder, so xpd first moves to
+the `cwd` that the event names. xpd then finds the project's virtual environment from the `cwd`.
 
 ## Agent skill
 
-The xpd skill tells the agent which xpd command to run and when, such as `xpd profile` before
-it chooses methods for a data file and `xpd equiv` after it refactors data logic. Run the
-command below to save the skill of your xpd version in the project.
+Run the command below to save the xpd skill of your installed version in the project. The skill
+tells the agent which xpd command to run and when, e.g., `xpd profile` before it chooses methods
+for a data file and `xpd equiv` after it refactors data logic.
 
 ```sh
 mkdir -p .claude/skills/xpd && xpd skill > .claude/skills/xpd/SKILL.md

@@ -46,8 +46,8 @@ Fix every `error`, and fix a `warning` unless you can say why the code is right 
 | safe fix | The rewrite keeps what the code does, and `--fix` writes it. |
 | unsafe fix | The rewrite may change what the code does. `--fix --unsafe-fixes` writes it, so read the diff afterwards. |
 
-`xpd check` exits with 0 when it finds no `error`, with 1 when it finds one, and with 2 when it
-can't run.
+`xpd check` exits with 0 when it finds no `error`, and with 1 when it finds one. It exits with 2
+when it can't run.
 
 ## Install
 
@@ -61,7 +61,7 @@ uv tool install xpd
 ## Rules
 
 Each library has one pack of rules, and the pack runs only on a file that imports the library.
-The Python pack runs on every file. The plotly pack also runs on a file that makes plotly the
+The Python pack runs on every file, and the plotly pack also runs on a file that makes plotly the
 plotting backend of pandas.
 
 | Pack | One of its rules | What the rule reports |
@@ -117,16 +117,17 @@ xpd
     └── completions <shell>    print shell completion for bash, elvish, fish, powershell or zsh
 ```
 
-Only `profile`, `equiv` and `refit` start Python, and they need pandas in the project's
-environment. Every other command reads files.
+Only `profile`, `equiv` and `refit` run the project's Python, and they need pandas in the
+project's environment. `mcp` starts the MCP server with the Python that the xpd package
+installs. Every other command only reads files.
 
 ## Look up a library you don't know
 
-`xpd find "<task>"` names the classes, the rules and the worked examples for a task in your own
-words, also for a library you haven't installed. `xpd api <name>` then prints one of them in
-full, with each parameter as the source writes it, so you see the type annotation and the
-default. A stub file writes `...` for a default. The name can also be a method of a class, such
-as `Class.method`.
+`xpd find "<task>"` lists the classes, rules and recipes for a task in your own words, even for
+a library you haven't installed. A recipe is a worked example from the library's documentation.
+`xpd api <name>` then prints one entry in full, with each parameter's type annotation and default
+as the source writes them, so a default in a stub file shows as `...`. You can also name a method
+of a class, as the last call below does with `mapie.subsample.BlockBootstrap.split`.
 
 ```console
 $ xpd find "time series bootstrap for cross validation" --limit 1
@@ -159,12 +160,19 @@ Generate indices to split data into training and test sets.
 | Results without `--limit` | Up to 5 symbols, 3 rules and 3 recipes |
 | Flags | `--kind symbol`, `--kind rule` or `--kind recipe` selects one kind, and `--package` selects one library |
 | Ranking | By keywords and by meaning, so a task finds an entry whose documentation uses other words |
-| Model for the meaning | EmbeddingGemma, which the first `find` downloads once, 333 MB, to `~/.cache/xpd/models` |
+| Model for the meaning | EmbeddingGemma, a 333 MB file that the first `find` downloads once |
 | Without the model | `find` says so on stderr and ranks by keywords only |
 | Where recipes come from | Library documentation and galleries. xpd keeps an example only when its own rules report nothing in it, and it never runs the example |
 
-On macOS the model folder is `~/Library/Caches/xpd/models`, and on Windows it is
-`%LOCALAPPDATA%\xpd\models`. With `XDG_CACHE_HOME` set it is `$XDG_CACHE_HOME/xpd/models`.
+The first `find` saves the model in the folder that the table below names for your system, and
+`XDG_CACHE_HOME` takes precedence on every system.
+
+| System | Model folder |
+| --- | --- |
+| Any, with `XDG_CACHE_HOME` set | `$XDG_CACHE_HOME/xpd/models` |
+| Linux | `~/.cache/xpd/models` |
+| macOS | `~/Library/Caches/xpd/models` |
+| Windows | `%LOCALAPPDATA%\xpd\models` |
 
 ## Use in an editor
 
@@ -180,15 +188,15 @@ together. Otherwise set up the parts you want one at a time.
 
 | Way | What the agent gets | Setup |
 | --- | --- | --- |
-| Plugin | The MCP server and the skills together | Load this repository in a client that supports Agent Plugins, such as Codex |
+| Plugin | The MCP server and the skills together | Load the xpd repository in a client that supports Agent Plugins, such as Codex |
 | Hook | The issues of each file, right after the edit | `xpd hook` in the Claude Code settings |
 | MCP server | Typed tools, the rules, the skills and prompts | `xpd mcp` |
 | Skills | When to run each command, and Python style that a linter cannot check | `npx skills add bjoernaagaard/xpd` |
 
 ### Plugin
 
-Codex installs the plugin with two commands. The plugin starts xpd with `uvx`, so the machine
-needs [uv](https://docs.astral.sh/uv/).
+Run the commands below to install the plugin in Codex. The plugin starts xpd with `uvx`, so the
+machine needs [uv](https://docs.astral.sh/uv/).
 
 ```sh
 codex plugin marketplace add bjoernaagaard/xpd
@@ -203,7 +211,7 @@ The repository is a plugin in the
 xpd, loaded as a plugin
 ├── plugin.json                         the name and version of the plugin
 ├── skills/                             xpd, python-best-practices and python-review
-├── mcp.json                            starts the MCP server of this version with uvx
+├── mcp.json                            starts the MCP server of the same xpd version with uvx
 └── .agents/plugins/marketplace.json    lists the plugin for Codex
 ```
 
@@ -263,8 +271,9 @@ xpd mcp
 
 The server takes every rule and every result from the xpd binary, so it matches the installed
 version. The [MCP page](https://bjoernaagaard.github.io/xpd/mcp.html) covers other clients, the
-settings and HTTP. The [code mode page](https://bjoernaagaard.github.io/xpd/code-mode.html) shows a
-run from a data file to a saved scikit-learn model, with checks that xpd runs itself.
+settings and how to serve xpd over HTTP. The
+[code mode page](https://bjoernaagaard.github.io/xpd/code-mode.html) shows a run from a data file
+to a saved scikit-learn model, with checks that xpd runs itself.
 
 ### Skills
 
@@ -288,8 +297,8 @@ how to write a rule.
 
 ## License
 
-You may use xpd's own code under the MIT license or the Apache-2.0 license. The table lists
-what else ships with xpd.
+You may use xpd's own code under the MIT license or the Apache-2.0 license, and the other parts
+that ship with xpd keep the licenses in the table.
 
 | Part | License | Where the text is |
 | --- | --- | --- |
