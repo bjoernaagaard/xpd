@@ -8089,6 +8089,9 @@ interpreter proofs ignored the pandas warning about the option.
 A document is `info` when no proof passed for it, or when its advice depends on something the code
 doesn't show, such as the dtype of a column. `sklearn-ships-encoder` passed its speed proof and is
 still `info`, because the two libraries return different things and the swap is a choice.
+`nan-into-pipeline` and `ordinal-mapping-unknown` are `warning`, because their proofs show a raise
+and a wrong code for a category that the training rows lacked, and the code doesn't show whether
+new data brings one.
 
 The rules were run over two sets of code:
 
@@ -8112,11 +8115,11 @@ After the runs, the rules below were narrowed, and the table gives the reports t
 | [`transform-with-test-target`](#transform-with-test-target) | error, info | score: 0.691 against 0.517 AUC | 4 | 0 | unsafe |
 | [`encode-before-split`](#encode-before-split) | error | score: 0.655 against 0.495 AUC | 0 | 0 | none |
 | [`ordinal-mapping-pairs`](#ordinal-mapping-pairs) | error | result: every code is -1.0 | 0 | 0 | unsafe |
-| [`ordinal-mapping-unknown`](#ordinal-mapping-unknown) | info | result: -1.0 for a category the mapping lacks | 3 | 1 | none |
+| [`ordinal-mapping-unknown`](#ordinal-mapping-unknown) | warning | result: -1.0 for a category the mapping lacks | 3 | 1 | none |
 | [`zero-regularization`](#zero-regularization) | error | result: inf. Interpreter: ValueError | 0 | 0 | none |
 | [`hashing-default-components`](#hashing-default-components) | warning | result: 100 values give 8 distinct rows | 10 | 1 | none |
 | [`cols-left-to-dtype`](#cols-left-to-dtype) | info | result: 1 column where 5 were meant | 1 | 0 | none |
-| [`nan-into-pipeline`](#nan-into-pipeline) | info | interpreter: ValueError at predict | 0 | 0 | none |
+| [`nan-into-pipeline`](#nan-into-pipeline) | warning | interpreter: ValueError at predict | 0 | 0 | none |
 | [`supervised-encoder-without-target`](#supervised-encoder-without-target) | error | interpreter: TypeError, ValueError | 0 | 0 | none |
 | [`invalid-handle-option`](#invalid-handle-option) | error | interpreter: ValueError, TypeError | 0 | 0 | none |
 | [`named-cols-after-array-step`](#named-cols-after-array-step) | error | interpreter: ValueError | 0 | 0 | none |
@@ -8275,7 +8278,7 @@ The rule reports the `"mapping"` entry of a dict that also has a `"col"` entry.
 
 #### ordinal-mapping-unknown
 
-**Severity:** info. **Fix:** none.
+**Severity:** warning. **Fix:** none.
 
 The rule reports `OrdinalEncoder(mapping=...)` without `handle_unknown`. A category that the
 mapping doesn't name is then coded -1, with no error and no warning.
@@ -8419,7 +8422,7 @@ scikit-learn class, which encodes every column it is given.
 
 #### nan-into-pipeline
 
-**Severity:** info. **Fix:** unsafe: `handle_unknown="value"` for `CountEncoder(handle_unknown=None)`, which codes an unseen category as 0 in place of NaN. `"return_nan"` has no fix, because the message names two rewrites, `"value"` or an imputer after the encoder.
+**Severity:** warning. **Fix:** unsafe: `handle_unknown="value"` for `CountEncoder(handle_unknown=None)`, which codes an unseen category as 0 in place of NaN. `"return_nan"` has no fix, because the message names two rewrites, `"value"` or an imputer after the encoder.
 
 The rule reports an encoder with `handle_unknown="return_nan"` or `handle_missing="return_nan"`
 inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.

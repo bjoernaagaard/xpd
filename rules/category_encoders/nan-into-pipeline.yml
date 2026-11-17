@@ -6,11 +6,12 @@
 # a missing city. The fit passed, because the training rows had no unseen category, so the
 # error first shows on new data. The rule reports the encoder only inside a Pipeline or
 # make_pipeline call, and stays silent when the same call holds an imputer or a model that
-# takes NaN. A choice can be right, so the rule is info.
+# takes NaN. The code raises only when new data brings such a category, which the code does not
+# show, so the rule is a warning and not an error.
 # No fix, because the message names two rewrites, and the code does not show which is meant.
 id: nan-into-pipeline
 language: python
-severity: info
+severity: warning
 message: $KW makes $C code an unseen or missing category as NaN, and the next step of the pipeline gets it. LogisticRegression raised "ValueError, Input X contains NaN" at predict. Use "value", or put an imputer after the encoder.
 rule:
   kind: call
@@ -29,7 +30,7 @@ rule:
 # count of an unseen category as NaN. Unsafe: the fix codes an unseen category as 0 in place of NaN.
 id: nan-into-pipeline
 language: python
-severity: info
+severity: warning
 message: handle_unknown=None makes CountEncoder code an unseen category as NaN, and the next step of the pipeline gets it. LogisticRegression raised "ValueError, Input X contains NaN" at predict. Use "value", the default, which codes it as 0.
 rule:
   kind: call
