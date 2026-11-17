@@ -177,11 +177,25 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 
 ## 9. Proof that it works
 
-- Run the real command or app with real data and show the output. For a bug, run the
-  same case before and after the fix.
-- Don't write unit tests, integration tests or tests that use mocks unless the project
-  or the user asks for them. Write an end to end test when asked, and end it with an
-  artifact someone can check and rerun.
+- **Run the change.** Run the real command or app with real data and show the output.
+  For a bug, run the same case before and after the fix. Run it again after the last
+  edit, because proof counts only for the version it ran on.
+- **Write a test file only when the project or the user asks for one,** and never one
+  that replaces the code under test with a mock. These three kinds are hard to pass with
+  broken code:
+
+| Kind | What it proves | Write it for |
+|---|---|---|
+| End to end | A whole flow works in the running program | A flow a user would notice was broken. End it with an artifact someone can check and rerun |
+| Property, with Hypothesis | A statement holds for thousands of generated inputs | A round trip (`decode(encode(x)) == x`), a value that must stay in range, an action that is safe to repeat, fast code that must match slow code |
+| Differential | New code gives the same result as old code | A rewrite or a migration. `xpd equiv old.py new.py` compares two scripts that assign `result` |
+
+- Watch a new test fail once on broken code. A test that can't fail proves nothing.
+- **A test that fails some of the time has a cause.** Find it. Don't skip the test,
+  rerun it or add a sleep. When the cause can't be found, delete the test and write
+  down why.
+- Don't change a test, a snapshot or a tool setting so that your own change passes.
+- When a check still fails after three rounds of fixes, stop and show the user.
 - Never add an interface, a parameter or a module level hook only so that a test can
   replace it.
 
@@ -207,6 +221,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
 | Mock imports | `xpd check`: `python/mock-import` |
+| A skipped test, a test that is rerun, a sleep in a test | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep` |
 | Slow or wrong pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Hamilton code | `xpd check`, in files that import them |
 
 The rest of this file needs a reader. The `python-review` skill is that reader.

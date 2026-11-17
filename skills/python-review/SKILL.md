@@ -117,8 +117,16 @@ The first two groups are where real bugs live.
 **Proof**
 
 - A change with no command a reader can run to see that it works.
-- Tests that mock the thing under test, or assert on private details, so they pass while
-  the program fails.
+- Tests that mock the thing under test (`python/mock-import`), or assert on private
+  details, so they pass while the program fails.
+- A test that is skipped (`python/test-skip`), rerun until it passes
+  (`python/test-rerun`) or waits with a sleep (`python/test-sleep`), so a failure stays
+  unseen.
+- A diff that changes a test, a snapshot or a tool setting together with the code it
+  judges, where the change to the check is what makes the code pass.
+- A round trip, an invariant or a rewrite with only hand-picked cases, where a property
+  test with Hypothesis or `xpd equiv` would try the inputs nobody thought of. Report it
+  only when the project has tests.
 
 The `python-best-practices` skill holds the full rules. Read the section a finding cites
 before you write the finding.

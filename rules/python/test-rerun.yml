@@ -1,0 +1,16 @@
+# A test that is run again until it passes hides the run where the code was wrong. The marker
+# comes from pytest-rerunfailures and from flaky, and both accept a test that fails some of the
+# time.
+id: test-rerun
+language: python
+severity: warning
+message: This runs the test again until it passes. Find why it fails some of the time, or delete the test and write down why.
+files: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+rule:
+  any:
+    - pattern: pytest.mark.flaky
+    - pattern: mark.flaky
+    - kind: import_statement
+      has: { stopBy: end, kind: dotted_name, regex: ^flaky(\.|$) }
+    - kind: import_from_statement
+      has: { field: module_name, regex: ^flaky(\.|$) }

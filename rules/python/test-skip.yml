@@ -1,0 +1,14 @@
+# A skipped test stays in the suite and reports nothing, so the failure it was written to catch
+# comes back unseen. `skipif` is left alone, because it states the platform or version where the
+# test cannot run. `xfail` is left alone too, because `xfail_strict` in the project's settings
+# decides whether it can hide a failure, and a rule reads one file.
+id: test-skip
+language: python
+severity: warning
+message: This test never runs. Fix what makes it fail, or delete the test and write down why.
+files: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+rule:
+  any:
+    - pattern: pytest.mark.skip
+    - pattern: mark.skip
+    - pattern: unittest.skip

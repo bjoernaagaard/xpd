@@ -10,6 +10,8 @@ Use `xpd` whenever you write or change Python code.
 
 - `xpd check <paths…> --format json`: lint. Fix every `error`. Fix `warning`s
   unless you can state why the pattern is right here. Don't silence rules.
+  In a test file, `python/test-skip`, `python/test-rerun` and `python/test-sleep` report
+  a test that hides a failure. Find why the test fails, or delete it and write down why.
   A `missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
@@ -31,7 +33,8 @@ Use `xpd` whenever you write or change Python code.
   suit `category`. Needs pandas.
 - `xpd equiv old.py new.py`: both scripts must assign `result`. Run it after
   any refactor of data logic; a refactor isn't done until it prints
-  `"equivalent": true`. Needs pandas.
+  `"equivalent": true`. Needs pandas. The old script is the judge, so don't edit it to
+  make the two agree, and run both on real rows instead of a frame you typed in.
 - `xpd graph <files…> --format json`: the dataflow of a file, read without
   running it. Run it after you add, move or rename a step or a node. Fix every
   `error`. Fix `warning`s unless you can state why the code is right.

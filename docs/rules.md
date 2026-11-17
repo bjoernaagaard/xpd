@@ -13002,7 +13002,7 @@ and the `python-review` skill reviews code against it.
 | Names | `module-private-name`, `vague-module-name` |
 | Modules | `import-side-effect` |
 | Types | `typing-cast`, `dict-str-any` |
-| Tests | `mock-import` |
+| Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors` |
 
 ### Names
@@ -13241,7 +13241,7 @@ ruff's `ANN401` reports a parameter or a return value annotated with `Any` alone
 
 ### Tests
 
-Test with real objects, because a test with a mock checks the mock and not the code.
+Test with real objects and let every test run once, because a mock, a skip, a rerun or a sleep lets a test pass while the code is wrong.
 
 #### mock-import
 
@@ -13273,6 +13273,99 @@ xpd gives the replacement as advice and doesn't apply it.
 
 A test that replaces a function with a mock passes when the mock is called the way the test
 expects, whatever the real function does. Run the real code on real input.
+
+#### test-skip
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `pytest.mark.skip` and `unittest.skip` in a test file.
+
+Example:
+
+```python
+@pytest.mark.skip(reason="fails on CI")
+def test_total():
+    assert total(ORDERS) == 3.0
+```
+
+Use instead:
+
+```python
+def test_total():
+    assert total(ORDERS) == pytest.approx(3.0)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A skipped test stays in the suite and reports nothing, so the failure it was written to catch
+comes back unseen. Fix what makes the test fail. When the cause can't be found, delete the test
+and write down why. The rule leaves `skipif` alone, because it names the platform or version
+where the test can't run, and it leaves `xfail` alone, because `xfail_strict` in the project's
+settings decides whether it can hide a failure.
+
+#### test-rerun
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `pytest.mark.flaky` and an import of `flaky` in a test file.
+
+Example:
+
+```python
+@pytest.mark.flaky(reruns=3)
+def test_worker():
+    done = threading.Event()
+    start(done)
+    assert done.is_set()
+```
+
+Use instead:
+
+```python
+def test_worker():
+    done = threading.Event()
+    start(done)
+    assert done.wait(timeout=5)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A test that is run again until it passes hides the run where the code was wrong, and it teaches
+whoever reads the result to run the suite once more instead of fixing the code. Find why the
+test fails some of the time, which is often an order or a wait that the test doesn't control.
+When the cause can't be found, delete the test and write down why.
+
+#### test-sleep
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `time.sleep` and `asyncio.sleep` in a test file, but not `asyncio.sleep(0)`.
+
+Example:
+
+```python
+def test_worker():
+    done = threading.Event()
+    start(done)
+    time.sleep(0.5)
+    assert done.is_set()
+```
+
+Use instead:
+
+```python
+def test_worker():
+    done = threading.Event()
+    start(done)
+    assert done.wait(timeout=5)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A sleep waits a fixed time and hopes the work is done by then, so the test fails on a slow
+machine and wastes the time on a fast one. Wait for the result itself, with a join, an event or
+a poll that has a deadline. `asyncio.sleep(0)` hands control to the event loop and waits for
+nothing, so the rule leaves it alone.
 
 ### Comprehensions
 
