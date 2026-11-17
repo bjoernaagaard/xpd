@@ -438,15 +438,21 @@ fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -
     (out, applied)
 }
 
-/// Every import in the file that binds a name a fix can write, at any depth. `None` for a file
-/// that is not Python, where no name of a pack needs an import.
+/// Every import in the file that binds a name a fix can write anywhere in the file. An import
+/// inside a function or a class binds the name only there, so it does not count. `None` for a
+/// file that is not Python, where no name of a pack needs an import.
 fn imports(root: &Root, language: SupportLang) -> Option<Vec<Import>> {
     if language != SupportLang::Python {
         return None;
     }
     let mut imports = Vec::new();
     for node in root.root().dfs() {
+        let local = |node: &Node<'_>| {
+            node.ancestors()
+                .any(|outer| matches!(&*outer.kind(), "function_definition" | "class_definition"))
+        };
         match &*node.kind() {
+            "aliased_import" | "import_from_statement" if local(&node) => {}
             "aliased_import" => {
                 let (Some(module), Some(alias)) = (node.field("name"), node.field("alias")) else {
                     continue;

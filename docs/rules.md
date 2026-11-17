@@ -13484,8 +13484,8 @@ with `xpd test`, which [the commands page](commands.md#new) describes.
 | Setting | What it does |
 | --- | --- |
 | `fix:` | One ast-grep fix for the rule. The rule must then say whether the fix keeps what the code does, with `metadata: { fix: safe }` or `metadata: { fix: unsafe }`. |
-| `aliases` in `pack.yml` | A fix may write an alias that the pack lists, such as `pd.`, and xpd applies the fix only in a file that imports the module under that alias. |
-| `members` in `pack.yml` | A fix may write a bare name that the pack lists with its module, such as `assert_allclose: numpy.testing`, and xpd applies the fix only in a file that imports the name from that module. |
+| `aliases` in `pack.yml` | A fix may write an alias that the pack lists, such as `pd.`, and xpd applies the fix only in a file that imports the module under that alias. An import inside a function or a class does not count. |
+| `members` in `pack.yml` | A fix may write a bare name that the pack lists with its module, such as `assert_allclose: numpy.testing`, and xpd applies the fix only in a file that imports the name from that module. An import inside a function or a class does not count. |
 | `metadata: { since: "3.1" }` | xpd skips the rule when the project's venv holds an older version of the pack's library. |
 | `metadata: { since: "0.6", until: "0.6.1.6" }` | The rule's advice holds only up to a release, and a second document with `since: "0.6.1.6"` gives the newest advice. |
 | [`files` and `ignores`](https://ast-grep.github.io/reference/yaml.html#files) | Globs that limit the files a rule runs on. xpd matches a glob against the path as it was given, so start it with `**/` to match at any depth, as in `ignores: ["**/__main__.py"]`. |
