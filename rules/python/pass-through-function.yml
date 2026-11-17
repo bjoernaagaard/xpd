@@ -1,0 +1,66 @@
+# A function that only hands its own parameters to one call gives that call a second name, and a
+# reader has to open the function to learn that it does nothing else. Call the other function
+# directly. A function that computes something, such as a formula, is left alone, and so is a
+# method and a decorated function. The rule has no fix, because the calls of the function are
+# in other places and other files.
+id: pass-through-function
+language: python
+severity: warning
+message: This function only passes its parameters to one call. Call that function where this one is called, and delete this one.
+rule:
+  kind: function_definition
+  inside: { kind: module }
+  has:
+    field: body
+    all:
+      - has:
+          kind: return_statement
+          has: { matches: passes-names }
+      - not:
+          has:
+            any:
+              - kind: return_statement
+                follows: { stopBy: end, kind: return_statement }
+              - not:
+                  any:
+                    - kind: return_statement
+                    - kind: comment
+                    - kind: expression_statement
+                      has: { kind: string }
+utils:
+  # A call whose arguments are all plain names, with at least one of them.
+  only-names:
+    kind: call
+    has:
+      field: arguments
+      kind: argument_list
+      has: { kind: identifier }
+    not:
+      has:
+        field: arguments
+        kind: argument_list
+        has:
+          not:
+            any:
+              - kind: identifier
+              - regex: ^[(),]$
+  # The same, where an argument may also be one more call of plain names.
+  passes-names:
+    kind: call
+    has:
+      field: arguments
+      kind: argument_list
+      has:
+        any:
+          - kind: identifier
+          - matches: only-names
+    not:
+      has:
+        field: arguments
+        kind: argument_list
+        has:
+          not:
+            any:
+              - kind: identifier
+              - regex: ^[(),]$
+              - matches: only-names

@@ -1,0 +1,22 @@
+# A comprehension next to other arguments puts a loop inside a call, so a reader has to find
+# where the loop ends before the other arguments make sense. A name on the line above says what
+# the loop builds. A comprehension that is the only argument, as in `sum(x for x in xs)`, is
+# left alone. The rule has no fix, because the name for the value is not in the file.
+id: comprehension-among-arguments
+language: python
+severity: warning
+message: This comprehension is one of several arguments of a call. Give it a name on the line above, and pass the name.
+rule:
+  any:
+    - kind: dictionary_comprehension
+    - kind: list_comprehension
+    - kind: set_comprehension
+    - kind: generator_expression
+  inside:
+    any:
+      - kind: argument_list
+        has: { nthChild: 2 }
+      - kind: keyword_argument
+        inside:
+          kind: argument_list
+          has: { nthChild: 2 }

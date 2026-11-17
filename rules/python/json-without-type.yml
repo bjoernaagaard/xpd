@@ -1,0 +1,12 @@
+# json.loads and json.load return Any, so the type checker accepts every use of the result, and
+# a wrong key or a wrong type shows up far from the place where the data came in. On msgspec
+# 0.22.0, msgspec.json.decode(b'{"price": "x"}', type=Item) raised "Expected `float`, got `str`
+# - at `$.price`". The rule has no fix, because the type to decode into is not in the file.
+id: json-without-type
+language: python
+severity: warning
+message: This returns Any, so nothing checks the shape of the data. Decode it with msgspec.json.decode(data, type=...) into a msgspec Struct.
+rule:
+  any:
+    - pattern: json.loads($$$ARGS)
+    - pattern: json.load($$$ARGS)

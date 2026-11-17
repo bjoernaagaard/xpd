@@ -92,7 +92,10 @@ def total(rows: list[Row]) -> float:
 - **Booleans and options are keyword-only.** `def load(path, *, strict=False)`.
 - **No mutable default.** Use `None` and build the value inside, or a tuple.
 - **A comprehension maps or filters one value per item.** One `for`, at most one `if`,
-  and an expression that fits on a line. Anything more is a loop.
+  and the whole comprehension on one line. Anything more is a loop.
+- **A comprehension gets a name before it is passed with other arguments.** Write
+  `frames = [read(path) for path in paths]` and then `pd.concat(frames, ignore_index=True)`.
+  As the only argument it stays in the call, as in `sum(x.cost for x in items)`.
 - **Build a row or a record in a loop.** Don't merge dicts with `**` inside a
   comprehension, and don't unpack a comprehension inside a dict literal:
 
@@ -111,6 +114,10 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   `any` or `"".join`. When the caller may stop early or the data is large, write a
   generator function.
 - No `lambda` bound to a name. Write `def`.
+- **No function that only passes its parameters to one call,** such as
+  `def reference(curve, at_price): return float(curve(at_price))`. Call the other
+  function. A function earns its name when it computes something, or when three places
+  would otherwise repeat the same lines.
 - A function does one thing at one level. When it needs a comment to separate its parts,
   split it into functions named after the parts.
 
@@ -119,9 +126,15 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 - **Annotate every parameter and return value.** Inside a function, annotate only what
   the checker cannot infer, such as an empty list.
 - **Data that crosses a boundary gets a named model.** A file, a request, a response, a
-  database row or a config file is decoded once into a dataclass, a `TypedDict` or the
-  project's model library, and the rest of the code takes the model. No `dict[str, Any]`
-  passed between functions.
+  database row or a config file is decoded once into a msgspec Struct, with
+  `msgspec.json.decode(data, type=Order)` or `msgspec.convert(row, type=Order)`, and the
+  rest of the code takes the Struct. No `json.loads`, and no `dict[str, Any]` passed
+  between functions.
+- **Trust a typed value.** After the decode, don't check or convert it again: no
+  `isinstance` on a value whose type is declared, no `float()` around a float, no `str()`
+  around a str, and no `if` for a case the types rule out. `mean`, `median`, `std` and
+  `var` of an array or a Series already return a float, and the mean of an empty Series
+  is `nan`.
 - **No `typing.cast`.** Fix the type where the value is made, or narrow it with
   `isinstance`, `match` or a `TypeIs` function.
 - **No `Any`** except at the edge of an untyped library, and then in one function that
@@ -131,8 +144,15 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   `Protocol` or `ABC` for one implementation, and none added only for a test.
 - Parameters take the widest type that works (`Iterable[str]`, `Mapping[str, int]` from
   `collections.abc`). Return values are concrete (`list[str]`).
-- A value object is `@dataclass(frozen=True, slots=True, kw_only=True)`. A closed set of
-  names is a `StrEnum` or `Literal`, never bare strings compared in several places.
+- **A record is `class Order(msgspec.Struct, frozen=True, kw_only=True)`,** in place of a
+  dataclass, a `NamedTuple`, a `TypedDict` and an attrs class. Ask before you add msgspec
+  to a project that lacks it. A closed set of names is a `StrEnum` or `Literal`, never
+  bare strings compared in several places.
+- **Add a record only for a value that several functions take.** Two or three results of
+  one function are a tuple that the caller unpacks into names. One summary per group is
+  a table: `df.groupby(key).agg(rows=("price", "size"), median=("price", "median"))`, not
+  a loop that appends a record for each group. A record that holds one field is that
+  field.
 - A class that only has `__init__` and one method is a function.
 
 ## 6. Errors
@@ -191,6 +211,11 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | Differential | New code gives the same result as old code | A rewrite or a migration. `xpd equiv old.py new.py` compares two scripts that assign `result` |
 
 - Watch a new test fail once on broken code. A test that can't fail proves nothing.
+- **A project with tests runs them with pytest** from `tests/` beside `src/`, with
+  `--import-mode=importlib` and, on pytest 9, `strict = true` in the pytest settings.
+  Add `pytest-randomly`, so a test that depends on the order of the run fails, and
+  `pytest-timeout`, so a test that hangs fails. Never add `pytest-rerunfailures`,
+  `flaky` or `pytest-mock`.
 - **A test that fails some of the time has a cause.** Find it. Don't skip the test,
   rerun it or add a sleep. When the cause can't be found, delete the test and write
   down why.
@@ -219,7 +244,12 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | Module level names with an underscore, a `utils` module | `xpd check`: `python/module-private-name`, `python/vague-module-name` |
 | Calls and environment reads at import | `xpd check`: `python/import-side-effect` |
 | `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
+| A comprehension over several lines, or among other arguments | `xpd check`: `python/comprehension-multi-line`, `python/comprehension-among-arguments` |
+| A function that only passes its parameters on | `xpd check`: `python/pass-through-function` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
+| A dataclass, `NamedTuple`, `TypedDict` or attrs class, `json.loads` | `xpd check`: `python/record-without-msgspec`, `python/json-without-type` |
+| `float()` around a mean, median, std or var | `xpd check`: `python/float-of-float` |
+| A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
 | Mock imports | `xpd check`: `python/mock-import` |
 | A skipped test, a test that is rerun, a sleep in a test | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep` |
 | Slow or wrong pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Hamilton code | `xpd check`, in files that import them |

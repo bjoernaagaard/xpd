@@ -161,3 +161,24 @@ def lambda_reduction_with_arguments(df):
 @case
 def reduction_called_on_the_groupby(df):
     return df.groupby("k")["w"].quantile(0.9), (df["b"] > 0).groupby(df["k"]).sum(), df.groupby("k")["w"].agg(lambda v: v.max() - v.min())
+
+
+def summary_with_loop(df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for region, part in df.groupby("region"):  # xpd: groupby-loop-collects
+        rows.append((region, len(part), part["load"].median()))
+    return pd.DataFrame(rows, columns=["region", "rows", "median_load"])
+
+
+def summary(df: pd.DataFrame) -> pd.DataFrame:
+    return df.groupby("region", as_index=False).agg(
+        rows=("load", "size"),
+        median_load=("load", "median"),
+    )
+
+
+def models(df: pd.DataFrame) -> list[np.ndarray]:
+    fitted = []
+    for _, part in df.groupby("region"):
+        fitted.append(np.polyfit(part["hour"], part["load"], 1))
+    return fitted

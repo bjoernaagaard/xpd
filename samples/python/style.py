@@ -5,10 +5,14 @@ A line that xpd reports ends with a comment that names the rule.
 
 import logging
 import os
+import json
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, TypeVar, cast
 from unittest.mock import patch  # xpd: mock-import
+
+import msgspec
+import numpy as np
 
 __all__ = ["rows", "rows_with_loop"]
 
@@ -105,14 +109,52 @@ def price(payload: dict[str, Any]) -> float:  # xpd: dict-str-any
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class Item:
+class Record:  # xpd: record-without-msgspec
     price: float
 
 
-def decode(payload: object) -> Item:
-    if not isinstance(payload, dict) or not isinstance(payload.get("price"), float):
-        raise ValueError(f"not an item: {payload!r}")
-    return Item(price=payload["price"])
+class Item(msgspec.Struct, frozen=True, kw_only=True):
+    price: float
+
+
+def load(body: bytes) -> float:
+    return json.loads(body)["price"]  # xpd: json-without-type
+
+
+def decode(body: bytes) -> Item:
+    return msgspec.json.decode(body, type=Item)
+
+
+def spread(values: np.ndarray) -> float:
+    return float(values.std())  # xpd: float-of-float
+
+
+def spread_without_float(values: np.ndarray) -> float:
+    return values.std()
+
+
+def by_column(values: np.ndarray) -> list[float]:
+    return [float(value) for value in values.mean(axis=0)]
+
+
+def decoded(body: bytes) -> Item:  # xpd: pass-through-function
+    return decode(body)
+
+
+def total(items: list[Item]) -> float:
+    return sum(item.price for item in items)
+
+
+def long_names(items: list[dict]) -> list[str]:
+    return [  # xpd: comprehension-multi-line
+        item["name"].strip().lower()
+        for item in items
+        if item["name"] and len(item["name"]) > LIMIT
+    ]
+
+
+def joined(items: list[dict], sep: str) -> str:
+    return print([item["name"] for item in items], sep=sep)  # xpd: comprehension-among-arguments
 
 
 def first(values: list[_T]) -> _T:

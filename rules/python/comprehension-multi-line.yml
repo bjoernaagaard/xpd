@@ -1,0 +1,15 @@
+# A comprehension that runs over several lines holds more than one step, and its result stands
+# before the loop that makes it, so a reader has to go through it twice. A loop gives each step
+# its own line in the order it runs. The rule has no fix, because the names of the steps are
+# not in the file.
+id: comprehension-multi-line
+language: python
+severity: warning
+message: This comprehension runs over more than one line. Write a loop, or give the expression for one item a name and a function.
+rule:
+  any:
+    - kind: dictionary_comprehension
+    - kind: list_comprehension
+    - kind: set_comprehension
+    - kind: generator_expression
+  regex: "\n"

@@ -1555,6 +1555,40 @@ result = df.assign(total=lambda frame: frame.groupby("region")["load"].transform
 
 xpd gives the replacement as advice and doesn't apply it.
 
+#### groupby-loop-collects
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a `for` loop over `df.groupby(...)` that appends a value which calls `mean`,
+`median`, `sum`, `min`, `max`, `std`, `var`, `count`, `nunique`, `size` or `quantile`. It leaves
+a loop alone that appends something else, such as a fitted model for each group.
+
+Example:
+
+```python
+rows = []
+for region, part in df.groupby("region"):
+    rows.append((region, len(part), float(part["price"].median())))
+summary = pd.DataFrame(rows, columns=["region", "offers", "median_price"])
+```
+
+Use instead:
+
+```python
+summary = df.groupby("region", as_index=False).agg(
+    offers=("price", "size"),
+    median_price=("price", "median"),
+)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The loop builds a frame for each group in Python, and every number is then pulled out and
+converted by hand. Named aggregation runs each reduction on all groups at once and returns one
+row per group in a table whose columns have names, so no record class and no `float()` is needed
+to carry the result. For a share of rows that meet a condition, add the condition as a boolean
+column first and take its `"mean"`.
+
 #### groupby-first-skips-missing
 
 **Severity:** warning. **Fix:** unsafe: `first(skipna=False)` and `last(skipna=False)`, which change the result on purpose to the whole first or last row.
@@ -12987,9 +13021,10 @@ and the `python-review` skill reviews code against it.
 | --- | --- |
 | Names | `module-private-name`, `vague-module-name` |
 | Modules | `import-side-effect` |
-| Types | `typing-cast`, `dict-str-any` |
+| Types | `typing-cast`, `dict-str-any`, `record-without-msgspec`, `json-without-type`, `float-of-float` |
+| Functions | `pass-through-function` |
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
-| Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors` |
+| Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
 
 ### Names
 
@@ -13202,11 +13237,10 @@ def total(order: dict[str, Any]) -> float:
 Use instead:
 
 ```python
-from dataclasses import dataclass
+import msgspec
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Order:
+class Order(msgspec.Struct, frozen=True, kw_only=True):
     price: float
     quantity: int
 
@@ -13220,10 +13254,173 @@ xpd gives the replacement as advice and doesn't apply it.
 The type says nothing about the keys or the values, so the type checker cannot find a
 misspelled key. Every function that takes the dict has to know its keys and the types of its
 values. Decode the data
-once, where it enters the program, into a dataclass or a `TypedDict`.
+once, where it enters the program, into a msgspec Struct, with `msgspec.json.decode(data, type=Order)`
+for JSON or `msgspec.convert(row, type=Order)` for a dict.
 
 ruff's `ANN401` reports a parameter or a return value annotated with `Any` alone, and leaves
 `dict[str, Any]` alone.
+
+#### record-without-msgspec
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a class with `@dataclass`, a class with an attrs decorator, and a class that
+inherits `NamedTuple` or `TypedDict`. It leaves a pydantic `BaseModel` alone, because a web
+framework can require it.
+
+Example:
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Order:
+    price: float
+    tags: list[str] = field(default_factory=list)
+```
+
+Use instead:
+
+```python
+import msgspec
+
+
+class Order(msgspec.Struct, frozen=True, kw_only=True):
+    price: float
+    tags: list[str] = msgspec.field(default_factory=list)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A Struct holds the same fields as the other four kinds of record, and it also checks the types
+when it decodes JSON, TOML, YAML, MessagePack or a dict, and encodes a value back. With one kind
+of record in a project, a value is copied, compared and decoded in one way. The table gives the
+msgspec name for each part of a dataclass.
+
+| dataclass | msgspec |
+| --- | --- |
+| `@dataclass(frozen=True, kw_only=True)` | `class Order(msgspec.Struct, frozen=True, kw_only=True)` |
+| `slots=True` | nothing, because a Struct always has slots |
+| `field(default_factory=list)` | `msgspec.field(default_factory=list)` |
+| `dataclasses.replace(order, price=3.0)` | `msgspec.structs.replace(order, price=3.0)` |
+| `dataclasses.asdict(order)` | `msgspec.structs.asdict(order)` |
+
+A Struct checks types only when it decodes. On msgspec 0.22.0 a Struct with a field of type
+`np.ndarray` was built from an array without a check, so a Struct also holds arrays and frames
+that never leave the program. A JP Hutchins
+[measurement](https://www.crumpledpaper.tech/2026-06-21-python-struct-profiling/) on one machine
+found that Python defined a Struct in 10.5 microseconds and a frozen dataclass in 373.4, and
+built an instance in 63 nanoseconds and 224.
+
+Keep a `TypedDict` for the `**kwargs` of a function and for a dict that a library you call asks
+for, because those have to stay dicts.
+
+#### json-without-type
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `json.loads` and `json.load`.
+
+Example:
+
+```python
+import json
+
+
+def price(body: bytes) -> float:
+    return json.loads(body)["price"]
+```
+
+Use instead:
+
+```python
+import msgspec
+
+
+class Quote(msgspec.Struct, frozen=True):
+    price: float
+
+
+def price(body: bytes) -> float:
+    return msgspec.json.decode(body, type=Quote).price
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+`json.loads` returns `Any`, so the type checker accepts every use of the result. A wrong key or
+a wrong type then raises far from the place where the data came in, or doesn't raise at all. On
+msgspec 0.22.0, decoding `{"price": "x"}` into `Quote` raised
+``Expected `float`, got `str` - at `$.price` ``. The code after the decode needs no `isinstance`
+check and no conversion, because the value already has the type.
+
+#### float-of-float
+
+**Severity:** warning. **Fix:** safe: the call without `float()`.
+
+The rule reports `float()` around `mean`, `median`, `std` or `var` of an array or a Series, when
+the call has no `axis` and the file imports numpy or pandas. It leaves a file alone that imports
+torch, jax, tensorflow, xarray, cupy, dask, mlx, polars or sympy, where `mean` can return an
+array of that library.
+
+Example:
+
+```python
+def spread(prices: pd.Series) -> float:
+    return float(prices.std())
+```
+
+Use instead:
+
+```python
+def spread(prices: pd.Series) -> float:
+    return prices.std()
+```
+
+xpd applies the replacement with `--fix`.
+
+The four methods return `np.float64`, and `np.float64` is a subclass of `float`. On NumPy 2.5
+and pandas 3.1, `isinstance(np.arange(4.0).mean(), float)` was `True`, and ty 0.0.105 accepted
+`return x.mean()` in a function that returns `float`. The same holds for the mean of a boolean
+Series, as in `(prices < 1).mean()`. The mean of an empty Series is `nan` and raises nothing,
+so it needs no `if len(prices) else float("nan")` either.
+
+`int()` is another matter and the rule leaves it alone. `np.int64` is not a subclass of `int`,
+and ty rejects `return x.argmax()` in a function that returns `int`.
+
+### Functions
+
+Call a function directly when a second function would only pass its parameters on.
+
+#### pass-through-function
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a module level function whose body is one `return` of a call that takes only
+the function's own names as arguments, also when one more call wraps it, as in
+`float(curve(at_price))`. It leaves alone a method, a decorated function and a function that
+computes something, such as a formula.
+
+Example:
+
+```python
+def reference(curve: Curve, at_price: float) -> float:
+    return float(curve(at_price))
+
+
+quantity = reference(curve, price)
+```
+
+Use instead:
+
+```python
+quantity = curve(price)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The function gives the call a second name, and a reader has to open it to learn that it does
+nothing else. When the function is passed as a value, pass the function it calls.
 
 ### Tests
 
@@ -13355,7 +13552,7 @@ nothing, so the rule leaves it alone.
 
 ### Comprehensions
 
-Write a loop when a comprehension merges dicts, unpacks or holds two `for` clauses, because the loop is easier to read.
+Write a loop when a comprehension merges dicts, unpacks, holds two `for` clauses or runs over several lines, and give a comprehension a name before you pass it with other arguments, because both are easier to read.
 
 #### comprehension-merges-dicts
 
@@ -13448,6 +13645,68 @@ xpd gives the replacement as advice and doesn't apply it.
 The clauses run in the order of a nested loop, but the result stands before both of them. A
 reader has to reorder the expression to follow it. On Python 3.15,
 `[*case.checks for case in cases]` flattens the lists with one `for`.
+
+#### comprehension-multi-line
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a comprehension or generator expression that runs over more than one line.
+
+Example:
+
+```python
+def stacks(trades):
+    return {
+        str(lot): Stack(group["spread"].to_numpy(), group["mw"].cumsum().to_numpy())
+        for lot, group in trades.groupby("lot", sort=False)
+    }
+```
+
+Use instead:
+
+```python
+def stacks(trades):
+    found = {}
+    for lot, group in trades.groupby("lot", sort=False):
+        spread = group["spread"].to_numpy()
+        depth = group["mw"].cumsum().to_numpy()
+        found[str(lot)] = Stack(spread, depth)
+    return found
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+A comprehension that needs several lines holds more than one step, and its result stands before
+the loop that makes it, so a reader goes through it twice. The loop gives each step its own line
+and its own name, in the order it runs.
+
+#### comprehension-among-arguments
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a comprehension or generator expression that is one of several arguments of a
+call. It leaves a comprehension alone that is the only argument, as in `sum(x.cost for x in items)`.
+
+Example:
+
+```python
+def points(cache, days):
+    return pd.concat([pd.read_parquet(cache / f"{day}.parquet") for day in days], ignore_index=True)
+```
+
+Use instead:
+
+```python
+def points(cache, days):
+    frames = [pd.read_parquet(cache / f"{day}.parquet") for day in days]
+    return pd.concat(frames, ignore_index=True)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The call holds a loop, and a reader has to find where the loop ends before the other arguments
+make sense. The name on the line above says what the loop builds, and the call then fits on one
+short line.
 
 ## Write a rule
 

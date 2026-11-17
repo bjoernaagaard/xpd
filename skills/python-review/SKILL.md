@@ -75,9 +75,15 @@ The first two groups are where real bugs live.
 
 - A public function without annotations, or one that takes or returns `Any`.
 - `typing.cast` or `# type: ignore` in place of fixing the type where the value is made.
-- A `dict[str, Any]` passed between functions where a dataclass or `TypedDict` would name
-  the fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), or data from
-  a file or request used before it is decoded into a model.
+- A `dict[str, Any]` passed between functions where a msgspec Struct would name the
+  fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), or data from a
+  file or request used before it is decoded into a Struct (`python/json-without-type`).
+- A record that is not a msgspec Struct (`python/record-without-msgspec`), a record that
+  no function takes and that only carries two or three results to one caller, or a
+  record with one field.
+- A typed value that is checked or converted again: `float()` around a float
+  (`python/float-of-float`), `str()` around a str, `isinstance` on a declared type, or an
+  `if` for a case the types rule out. Count them, and show the line without the guard.
 - A `Protocol` or `ABC` with one implementation, or an interface added only for a test.
 - Bare strings compared in several places where a `StrEnum` or `Literal` would do.
 
@@ -97,7 +103,13 @@ The first two groups are where real bugs live.
 
 - A comprehension with two `for` clauses (`python/comprehension-two-fors`), with several
   conditions, or that merges dicts with `**` for every item
-  (`python/comprehension-merges-dicts`, `python/unpacked-comprehension`). Show the loop.
+  (`python/comprehension-merges-dicts`, `python/unpacked-comprehension`), that runs over
+  several lines (`python/comprehension-multi-line`) or that sits among other arguments of
+  a call (`python/comprehension-among-arguments`). Show the loop or the named value.
+- A function that only passes its parameters to one call
+  (`python/pass-through-function`), or that is one line and called from one place.
+- A loop over `groupby` that appends a summary per group
+  (`pandas/groupby-loop-collects`). Show the `agg` call.
 - A function that works at several levels at once, or needs comments to separate its
   parts.
 - A Boolean positional parameter, deep nesting where an early return would do, or a

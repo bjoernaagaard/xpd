@@ -1,11 +1,11 @@
 # A dict[str, Any] in a signature tells the caller and the type checker nothing about the keys
 # or the values, so every function that takes it has to know the shape by heart. Decode the
-# data once, where it enters the program, into a dataclass or a TypedDict. The rule has no fix,
-# because the dataclass or the TypedDict and its fields are not in the file.
+# data once, where it enters the program, into a msgspec Struct. The rule has no fix, because the
+# Struct and its fields are not in the file.
 id: dict-str-any
 language: python
 severity: warning
-message: $TYPE in a signature hides which keys and values the function works with. Decode the data once into a dataclass or a TypedDict, and pass that.
+message: $TYPE in a signature hides which keys and values the function works with. Decode the data once into a msgspec Struct, and pass that.
 rule:
   kind: generic_type
   pattern: $TYPE

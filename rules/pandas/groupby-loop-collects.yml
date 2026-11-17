@@ -1,0 +1,28 @@
+# A loop over groupby that appends one summary per group does in Python what agg does in one
+# call: each pass builds a frame for the group, and every number is then pulled out and
+# converted by hand. Named aggregation gives one row per group in a table whose columns have
+# names. The rule reports the loop only when the appended value calls a reduction, and it has
+# no fix, because the names of the result columns are not in the file.
+id: groupby-loop-collects
+language: python
+severity: warning
+message: This loop appends one summary per group. Use named aggregation, as in $FRAME.groupby(key).agg(mean_price=("price", "mean"), rows=("price", "size")), which returns one row per group.
+rule:
+  kind: for_statement
+  all:
+    - has:
+        field: right
+        any:
+          - pattern: $FRAME.groupby($$$ARGS)
+          - pattern: $FRAME.groupby($$$ARGS)[$COLS]
+    - has:
+        field: body
+        has:
+          stopBy: end
+          kind: call
+          all:
+            - has: { field: function, kind: attribute, has: { field: attribute, regex: ^append$ } }
+            - has:
+                stopBy: end
+                kind: call
+                has: { field: function, kind: attribute, has: { field: attribute, regex: ^(mean|median|sum|min|max|std|var|count|nunique|size|quantile)$ } }
