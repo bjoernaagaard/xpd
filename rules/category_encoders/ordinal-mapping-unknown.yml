@@ -4,6 +4,7 @@
 # as -1, below every real code. With handle_unknown="error" the same fit raised "ValueError:
 # Unexpected categories found in column c". Whether the mapping names every category cannot be
 # read from the code, so the rule is info. No scikit-learn class has a mapping keyword.
+# No fix, because the message names two rewrites, and the code does not show which handle_unknown is meant.
 id: ordinal-mapping-unknown
 language: python
 severity: info

@@ -25,6 +25,7 @@ metadata: { since: "2.10" }
 ---
 # OneHotEncoder, OrdinalEncoder and TargetEncoder exist in scikit-learn too, where every column
 # is encoded, so the document needs proof that the class comes from category_encoders.
+# No fix, because the message names two rewrites, and the code does not show the dtype of the columns.
 id: cols-left-to-dtype
 language: python
 severity: info

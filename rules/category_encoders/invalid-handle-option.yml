@@ -10,6 +10,9 @@
 # function, is allowed since 2.11 and is left alone too. Code inside assertRaises, pytest.raises
 # or a try block with an except clause expects the error and stays silent.
 #
+# The fix writes "value", the default, for each string that the class does not take. Unsafe:
+# since 2.10 the call raised at fit, and before 2.10 the string did not act as the default.
+#
 # The classes in this document take "error", "return_nan" and "value" for both keywords, and
 # their names belong to category_encoders alone.
 id: invalid-handle-option
@@ -30,6 +33,24 @@ rule:
           all:
             - has: { field: name, regex: '^handle_(unknown|missing)$' }
             - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } }
+rewriters:
+  - id: bad-unknown
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_unknown$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } } }] }
+    fix: 'handle_unknown="value", '
+  - id: bad-missing
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_missing$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } } }] }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [bad-unknown, bad-missing, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
+
 ---
 # OrdinalEncoder and TargetEncoder take the same three strings. scikit-learn has classes of both
 # names with other options, so the document needs proof that the class comes from
@@ -53,6 +74,23 @@ rule:
             - has: { field: name, regex: '^handle_(unknown|missing)$' }
             - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } }
     - matches: from-category-encoders
+rewriters:
+  - id: bad-unknown
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_unknown$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } } }] }
+    fix: 'handle_unknown="value", '
+  - id: bad-missing
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_missing$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } } }] }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [bad-unknown, bad-missing, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
 utils:
   from-category-encoders:
     any:
@@ -94,6 +132,24 @@ rule:
           all:
             - has: { field: name, regex: '^handle_(unknown|missing)$' }
             - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } }
+rewriters:
+  - id: bad-unknown
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_unknown$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } } }] }
+    fix: 'handle_unknown="value", '
+  - id: bad-missing
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_missing$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } } }] }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [bad-unknown, bad-missing, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
+
 ---
 # The scikit-learn OneHotEncoder takes handle_unknown="ignore", and that string is what this
 # document most often finds. "value" does the same here: an unseen category becomes a row of
@@ -119,6 +175,23 @@ rule:
     - any:
         - has: { field: function, regex: '(^|\.)MultiHotEncoder$' }
         - matches: from-category-encoders
+rewriters:
+  - id: bad-unknown
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_unknown$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } } }] }
+    fix: 'handle_unknown="value", '
+  - id: bad-missing
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_missing$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator|ignore)["'']+$|\{' } } }] }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [bad-unknown, bad-missing, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
 utils:
   from-category-encoders:
     any:
@@ -163,6 +236,23 @@ rule:
     - any:
         - has: { field: function, regex: '(^|\.)MultiHotEncoder$' }
         - matches: from-category-encoders
+rewriters:
+  - id: bad-unknown
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_unknown$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator)["'']+$|\{' } } }] }
+    fix: 'handle_unknown="value", '
+  - id: bad-missing
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_missing$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|indicator|ignore)["'']+$|\{' } } }] }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [bad-unknown, bad-missing, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
 utils:
   from-category-encoders:
     any:
@@ -208,9 +298,28 @@ rule:
             - all:
                 - has: { field: name, regex: '^handle_missing$' }
                 - has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|ignore)["'']+$|\{' } }
+rewriters:
+  - id: bad-unknown
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_unknown$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value)["'']+$|\{' } } }] }
+    fix: 'handle_unknown="value", '
+  - id: bad-missing
+    rule: { kind: keyword_argument, all: [{ has: { field: name, regex: ^handle_missing$ } }, { has: { field: value, kind: string, not: { regex: '^[a-zA-Z]*["'']+(error|return_nan|value|ignore)["'']+$|\{' } } }] }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [bad-unknown, bad-missing, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }
+
 ---
 # HashingEncoder keeps no list of categories, so it has neither keyword and raises "TypeError:
 # HashingEncoder.__init__() got an unexpected keyword argument 'handle_unknown'".
+# Unsafe: the call raised before the fix, which drops both keywords.
 id: invalid-handle-option
 language: python
 severity: error
@@ -222,3 +331,24 @@ rule:
     - has: { field: function, regex: '(^|\.)HashingEncoder$' }
     - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, pattern: $K, regex: '^handle_(unknown|missing)$' } } }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^handle_(unknown|missing)$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^handle_(unknown|missing)$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }

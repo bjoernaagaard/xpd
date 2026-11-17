@@ -8,6 +8,8 @@
 # impute_missing was a keyword of every encoder until 2.0, which replaced it with
 # handle_missing. On 2.11.2: "TypeError: OneHotEncoder.__init__() got an unexpected keyword
 # argument 'impute_missing'". No other library has the keyword.
+# Unsafe: the call raised before the fix, which writes handle_missing="value" for
+# impute_missing=True in a call that has no handle_missing.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -19,10 +21,44 @@ rule:
     - has: { field: function, regex: 'Encoder$' }
     - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^impute_missing$' } } }
+    - { has: { field: arguments, has: { kind: keyword_argument, regex: '^impute_missing\s*=\s*True$' } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^handle_missing$' } } } }
+metadata: { fix: unsafe, since: "2.0" }
+rewriters:
+  - id: value
+    rule: { kind: keyword_argument, regex: '^impute_missing\s*=\s*True$' }
+    fix: 'handle_missing="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [value, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+
+---
+# Any other value, or a call that also has handle_missing, has no fix, because the code does not
+# show which handle_missing is meant.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: impute_missing was removed in category_encoders 2.0, and $C raises TypeError on it. Use handle_missing="value", the default, in place of impute_missing=True, or handle_missing="return_nan" to keep the missing value.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: 'Encoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^impute_missing$' } } }
+    - not: { all: [{ has: { field: arguments, has: { kind: keyword_argument, regex: '^impute_missing\s*=\s*True$' } } }, { not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^handle_missing$' } } } } }] }
 metadata: { since: "2.0" }
 ---
 # LeaveOneOutEncoder(randomized=True, sigma=0.05) was the 1.x way to add noise. Since 2.0 sigma
 # alone turns the noise on. The other encoders with noise still take randomized.
+# Unsafe: the call raised before the fix, which drops randomized when the call has sigma or says
+# randomized=False.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -34,6 +70,43 @@ rule:
     - has: { field: function, regex: '(^|\.)LeaveOneOutEncoder$' }
     - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^randomized$' } } }
+    - { has: { field: arguments, any: [{ has: { kind: keyword_argument, has: { field: name, regex: '^sigma$' } } }, { has: { kind: keyword_argument, regex: '^randomized\s*=\s*False$' } }] } }
+metadata: { fix: unsafe, since: "2.0" }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^randomized$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^randomized$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+
+---
+# randomized=True without sigma has no fix, because the size of the noise is not in the file.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: LeaveOneOutEncoder(randomized=) was removed in category_encoders 2.0 and raises TypeError. Pass sigma alone, such as sigma=0.05, to add the noise.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)LeaveOneOutEncoder$' }
+    - not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^randomized$' } } }
+    - not: { has: { field: arguments, any: [{ has: { kind: keyword_argument, has: { field: name, regex: '^sigma$' } } }, { has: { kind: keyword_argument, regex: '^randomized\s*=\s*False$' } }] } }
 metadata: { since: "2.0" }
 ---
 # utils.get_obj_cols was replaced by get_categorical_cols in 2.6.3. The wheels of 2.6.0, 2.6.1
@@ -75,6 +148,8 @@ metadata: { fix: unsafe, since: "2.8" }
 # frame.insert, holds its own column, and a drop on that frame is left alone. assign returns a
 # new frame under a name the rule cannot follow, so a file with assign(intercept=...) is left
 # alone as a whole.
+# No fix, because the drop may name other columns, and taking out the call changes the statement
+# around it.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -107,6 +182,7 @@ metadata: { since: "2.7" }
 # feature_names_out_ was a list until 2.6 and is a NumPy array since 2.7, which has no list
 # methods: "AttributeError: 'numpy.ndarray' object has no attribute 'index'".
 # feature_names_in_ is still a list. No scikit-learn estimator has feature_names_out_.
+# Unsafe: index and count raised before the fix, which reads them on a list of the names.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -115,11 +191,27 @@ rule:
   pattern: $E.feature_names_out_.$M($$$A)
   not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
 constraints:
-  M: { regex: '^(index|remove|append|extend|insert|count|pop)$' }
+  M: { regex: '^(index|count)$' }
+fix: list($E.feature_names_out_).$M($$$A)
+metadata: { fix: unsafe, since: "2.7" }
+
+---
+# remove, append, extend, insert and pop have no fix, because on a copy of the names they would
+# change nothing that the code reads afterwards.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: feature_names_out_ is a NumPy array since category_encoders 2.7 and has no $M method, so this raises AttributeError. Call list($E.feature_names_out_) first.
+rule:
+  pattern: $E.feature_names_out_.$M($$$A)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  M: { regex: '^(remove|append|extend|insert|pop)$' }
 metadata: { since: "2.7" }
 ---
 # get_feature_names_out returned the list on 2.6.0 and wraps it in np.array since 2.6.1, one
 # release series before the attribute changed.
+# Unsafe: index and count raised before the fix, which reads them on a list of the names.
 id: removed-in-category-encoders
 language: python
 severity: error
@@ -128,5 +220,19 @@ rule:
   pattern: $E.get_feature_names_out().$M($$$A)
   not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
 constraints:
-  M: { regex: '^(index|remove|append|extend|insert|count|pop)$' }
+  M: { regex: '^(index|count)$' }
+fix: list($E.get_feature_names_out()).$M($$$A)
+metadata: { fix: unsafe, since: "2.6.1" }
+
+---
+# remove, append, extend, insert and pop have no fix, for the same reason as above.
+id: removed-in-category-encoders
+language: python
+severity: error
+message: get_feature_names_out returns a NumPy array since category_encoders 2.6.1, which has no $M method, so this raises AttributeError. Call list($E.get_feature_names_out()) first.
+rule:
+  pattern: $E.get_feature_names_out().$M($$$A)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  M: { regex: '^(remove|append|extend|insert|pop)$' }
 metadata: { since: "2.6.1" }

@@ -5,6 +5,7 @@
 # TargetEncoder from category_encoders, whose fit_transform does not cross-fit. On data with no
 # signal, over 30 seeds, it scored 0.655 AUC before a split against 0.495 after it, and 0.650
 # before cross_val_score against 0.502 in a Pipeline.
+# No fix, because the advice is another order of the statements.
 id: encode-before-split
 language: python
 severity: error
@@ -37,6 +38,7 @@ utils:
       # A second import of TargetEncoder from another library leaves open which class a call builds.
       not: { has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, regex: '^TargetEncoder$' } }] } }
 ---
+# No fix, because the advice is another order of the statements.
 id: encode-before-split
 language: python
 severity: error
@@ -72,6 +74,7 @@ utils:
       # A second import of TargetEncoder from another library leaves open which class a call builds.
       not: { has: { stopBy: end, kind: import_from_statement, all: [{ not: { has: { field: module_name, regex: '^category_encoders(\.|$)' } } }, { has: { kind: dotted_name, regex: '^TargetEncoder$' } }] } }
 ---
+# No fix, because the advice is another order of the statements.
 id: encode-before-split
 language: python
 severity: error

@@ -5,6 +5,7 @@
 # CatBoostEncoder(sigma=0.05). With random_state=0 the two calls were equal. A seed does not move
 # the expected score, so the rule is info, as missing-random-state of the scikit-learn pack is. A
 # file that calls np.random.seed is left alone, because the encoders then draw from that seed.
+# No document has a fix, because the seed is not in the file.
 id: encoder-noise-without-seed
 language: python
 severity: info

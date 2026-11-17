@@ -2,6 +2,7 @@
 # the logarithm of their ratio. With regularization=0 a category that holds one class alone
 # divides by zero: on 2.11.2 a category of five rows of class 1 was coded inf, with no error and
 # no warning, where the default gave 1.204. An inf in a feature makes most models raise at fit.
+# No fix, because the new regularization is not in the file.
 id: zero-regularization
 language: python
 severity: error
@@ -16,6 +17,7 @@ rule:
 ---
 # CountTargetEncoder, added in 2.11, checks its smoothing at fit: "ValueError: smoothing must be
 # strictly bigger than 0."
+# No fix, because the new smoothing is not in the file.
 id: zero-regularization
 language: python
 severity: error

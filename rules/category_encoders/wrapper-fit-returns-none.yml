@@ -4,6 +4,7 @@
 # object has no attribute 'transform'", and so did the same chain on NestedCVWrapper. A name
 # assigned from the fit call holds None in the same way. Code inside assertRaises, pytest.raises
 # or a try block with an except clause expects the error and stays silent.
+# No fix, because the advice splits the statement in two.
 id: wrapper-fit-returns-none
 language: python
 severity: error
@@ -14,6 +15,7 @@ rule:
 constraints:
   W: { regex: '(^|\.)(PolynomialWrapper|NestedCVWrapper)$' }
 ---
+# No fix, because the advice splits the statement in two.
 id: wrapper-fit-returns-none
 language: python
 severity: error
@@ -26,6 +28,7 @@ constraints:
 ---
 # The wrapper is built on one line and fitted on another, in the same function or both outside
 # any function.
+# No fix, because the advice splits the statement in two.
 id: wrapper-fit-returns-none
 language: python
 severity: error

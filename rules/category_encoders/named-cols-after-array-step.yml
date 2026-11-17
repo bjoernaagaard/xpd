@@ -8,6 +8,7 @@
 # step it knows to give an array, and stays silent in a file that calls set_output or sets
 # transform_output. Code inside assertRaises, pytest.raises or a try block with an except clause
 # expects the error and stays silent too.
+# No fix, because the message names two rewrites, and set_output goes on another step.
 id: named-cols-after-array-step
 language: python
 severity: error

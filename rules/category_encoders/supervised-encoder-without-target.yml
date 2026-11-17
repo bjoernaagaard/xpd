@@ -5,6 +5,7 @@
 # to carry over. The names in this document belong to category_encoders alone.
 # Code inside assertRaises, pytest.raises or a try block with an except clause expects the error
 # and stays silent.
+# No fix, because the target is not in the call.
 id: supervised-encoder-without-target
 language: python
 severity: error
@@ -20,6 +21,7 @@ constraints:
 # scikit-learn has a TargetEncoder too, and it raises on a missing target as well, but the
 # message below names category_encoders, so the document needs proof of where the class comes
 # from.
+# No fix, because the target is not in the call.
 id: supervised-encoder-without-target
 language: python
 severity: error
@@ -62,6 +64,7 @@ utils:
 # The encoder is built on one line and fitted on another. The rule needs the name assigned
 # from a supervised class of category_encoders in the same function, or in the module for code
 # outside a function, and never from another call there.
+# No fix, because the target is not in the call.
 id: supervised-encoder-without-target
 language: python
 severity: error

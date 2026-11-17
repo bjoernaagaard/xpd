@@ -7,6 +7,7 @@
 # error first shows on new data. The rule reports the encoder only inside a Pipeline or
 # make_pipeline call, and stays silent when the same call holds an imputer or a model that
 # takes NaN. A choice can be right, so the rule is info.
+# No fix, because the message names two rewrites, and the code does not show which is meant.
 id: nan-into-pipeline
 language: python
 severity: info
@@ -25,7 +26,7 @@ rule:
           - not: { regex: 'Imputer|HistGradientBoosting|XGB|LGBM|CatBoost(Classifier|Regressor)|fillna' }
 ---
 # CountEncoder also takes handle_unknown=None, which was its default until 2.5 and leaves the
-# count of an unseen category as NaN.
+# count of an unseen category as NaN. Unsafe: the fix codes an unseen category as 0 in place of NaN.
 id: nan-into-pipeline
 language: python
 severity: info
@@ -42,3 +43,17 @@ rule:
         all:
           - has: { field: function, regex: '(^|\.)(Pipeline|make_pipeline)$' }
           - not: { regex: 'Imputer|HistGradientBoosting|XGB|LGBM|CatBoost(Classifier|Regressor)|fillna' }
+rewriters:
+  - id: value
+    rule: { kind: keyword_argument, regex: '^handle_unknown\s*=\s*None$' }
+    fix: 'handle_unknown="value", '
+  - id: keep
+    rule: { pattern: $ARG, not: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [value, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $C($REST)
+metadata: { fix: unsafe }

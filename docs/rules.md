@@ -8436,7 +8436,7 @@ scikit-learn class, which encodes every column it is given.
 
 #### nan-into-pipeline
 
-**Severity:** info. **Fix:** none.
+**Severity:** info. **Fix:** unsafe: `handle_unknown="value"` for `CountEncoder(handle_unknown=None)`, which codes an unseen category as 0 in place of NaN. `"return_nan"` has no fix, because the message names two rewrites, `"value"` or an imputer after the encoder.
 
 The rule reports an encoder with `handle_unknown="return_nan"` or `handle_missing="return_nan"`
 inside a `Pipeline` or `make_pipeline` call, and a `CountEncoder(handle_unknown=None)` there.
@@ -8453,7 +8453,7 @@ Use instead:
 model = make_pipeline(ce.OneHotEncoder(cols=["city"], handle_unknown="value"), LogisticRegression())
 ```
 
-xpd gives the replacement as advice and doesn't apply it.
+xpd gives the replacement for `"return_nan"` as advice and doesn't apply it.
 
 `return_nan` codes a category that fit did not see as NaN, in every output column of the row, and
 in a Pipeline the NaN goes to the next step. With a `OneHotEncoder` or a `TargetEncoder` in front
@@ -8518,7 +8518,7 @@ nothing else there.
 
 #### invalid-handle-option
 
-**Severity:** error. **Fix:** none.
+**Severity:** error. **Fix:** unsafe: `"value"`, the default, for each string the class doesn't take, and on `HashingEncoder` the keyword is dropped. Since 2.10 the call raised at fit, and before 2.10 the string did not act as the default, so the codes can change.
 
 The rule reports a `handle_unknown` or `handle_missing` string that the encoder doesn't take, such
 as `handle_unknown="ignore"`, which belongs to the scikit-learn `OneHotEncoder`.
@@ -8534,8 +8534,6 @@ Use instead:
 ```python
 encoder = ce.OneHotEncoder(cols=["city"], handle_unknown="value")
 ```
-
-xpd gives the replacement as advice and doesn't apply it.
 
 | Encoders | `handle_unknown` | `handle_missing` |
 | --- | --- | --- |
@@ -8632,7 +8630,7 @@ clause expects the error or handles both releases, and is left alone.
 
 #### removed-in-category-encoders
 
-**Severity:** error. **Fix:** unsafe for the two renamed names in `category_encoders.utils`. The other forms have no fix.
+**Severity:** error. **Fix:** unsafe for the two renamed names in `category_encoders.utils`, `handle_missing="value"` for `impute_missing=True` in a call without `handle_missing`, dropping `randomized=` from a `LeaveOneOutEncoder` that has `sigma` or says `randomized=False`, and `list(...)` around `feature_names_out_` and `get_feature_names_out()` before `index` and `count`. The calls raised before the fix. The other forms have no fix, and `remove`, `append`, `extend`, `insert` and `pop` have none because on a copy of the names they would change nothing that the code reads afterwards.
 
 The rule reports forms that a release of category_encoders removed and that raise on 2.11.2.
 
@@ -8679,8 +8677,8 @@ list.
 `get_obj_cols` is still in the wheels of 2.6.0, 2.6.1 and 2.6.2 and went away in 2.6.3, so its
 document carries `since: "2.6.3"`.
 
-The two fixes are unsafe. `get_obj_cols` named the columns of the object dtype, and
-`get_categorical_cols` also names the columns of the category and string dtypes. A file that
+The fixes are unsafe, because each turns code that raises into code that runs. `get_obj_cols`
+named the columns of the object dtype, and `get_categorical_cols` also names the columns of the category and string dtypes. A file that
 defines its own `get_obj_cols` is left alone.
 
 #### deprecated-in-category-encoders
