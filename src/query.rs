@@ -167,7 +167,7 @@ pub(crate) struct RunArgs {
     )]
     json: Option<JsonStyle>,
     /// Output format. Default: text on a terminal, json otherwise. JSON is one line.
-    #[arg(long, value_enum, conflicts_with_all = ["interactive", "update_all"])]
+    #[arg(long, value_enum)]
     format: Option<Format>,
     /// When to color the text output.
     #[arg(long, value_enum, default_value = "auto", value_name = "WHEN")]
@@ -205,6 +205,23 @@ pub(crate) struct RunArgs {
 impl RunArgs {
     /// Runs the search through ast-grep, which prints the matches.
     pub(crate) fn run(self) -> Result<ExitCode> {
+        anyhow::ensure!(
+            !(matches!(self.format, Some(Format::Json)) && (self.interactive || self.update_all)),
+            "--format json never writes files, so it cannot be combined with --interactive or \
+             --update-all"
+        );
+        // ast-grep takes its arguments as text and exits with 1 for a path it cannot open,
+        // which is the code of a search that matched nothing.
+        if !self.stdin {
+            for path in &self.paths {
+                anyhow::ensure!(
+                    path.to_str().is_some(),
+                    "{} is not a UTF-8 path, which xpd run cannot search",
+                    path.display()
+                );
+                anyhow::ensure!(path.exists(), "{} does not exist", path.display());
+            }
+        }
         ast_grep::main_with_args(self.into_args().into_iter())
     }
 

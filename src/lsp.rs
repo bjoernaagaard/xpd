@@ -429,21 +429,27 @@ fn severity(severity: &Severity) -> DiagnosticSeverity {
     }
 }
 
-/// The diagnostic for `issue` at `range`: its rule as the code, with the rule's section of the
-/// rules page as the code's link.
-fn diagnostic(issue: &Issue, range: lsp_types::Range) -> Diagnostic {
+/// The diagnostic for `issue` at `range`: its rule as the code, with `url`, the page about the
+/// rule, as the code's link.
+fn diagnostic(issue: &Issue, range: lsp_types::Range, url: Option<&str>) -> Diagnostic {
     Diagnostic {
         range,
         severity: Some(severity(&issue.severity)),
         code: Some(NumberOrString::String(issue.rule.clone())),
-        code_description: catalog::url(&issue.rule)
-            .parse()
-            .ok()
+        code_description: url
+            .and_then(|href| href.parse().ok())
             .map(|href| CodeDescription { href }),
         source: Some(SOURCE.to_owned()),
         message: issue.message.clone(),
         ..Diagnostic::default()
     }
+}
+
+/// The diagnostic for `found`. A rule of xpd links to its section of the rules page, and a
+/// project's own rule links to the page it names, or to its file.
+fn found_diagnostic(catalog: &Catalog, found: &Found, range: lsp_types::Range) -> Diagnostic {
+    let url = rule_help(catalog, found).and_then(|(_, url)| url);
+    diagnostic(&found.issue, range, url.as_deref())
 }
 
 fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<Diagnostic> {
@@ -452,13 +458,11 @@ fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<
         .found
         .iter()
         .map(|found| {
-            let mut diagnostic =
-                diagnostic(&found.issue, lsp_range(&lines, &marked(found, &lines)));
-            diagnostic.code_description = rule_help(&linted.catalog, found)
-                .and_then(|(_, url)| url)
-                .and_then(|href| href.parse().ok())
-                .map(|href| CodeDescription { href });
-            diagnostic
+            found_diagnostic(
+                &linted.catalog,
+                found,
+                lsp_range(&lines, &marked(found, &lines)),
+            )
         })
         .collect()
 }
@@ -941,7 +945,11 @@ impl<'c> Server<'c> {
         let top = lsp_types::Range::default();
         let diagnostics: Vec<Diagnostic> = file
             .iter()
-            .flat_map(|_| issues.iter().map(|issue| diagnostic(issue, top)))
+            .flat_map(|_| {
+                issues
+                    .iter()
+                    .map(|issue| diagnostic(issue, top, issue.help.as_deref()))
+            })
             .collect();
         let before = match &file {
             Some(file) => self.package_files.insert(root.to_path_buf(), file.clone()),
@@ -1086,7 +1094,11 @@ impl<'c> Server<'c> {
                         }
                     },
                     kind: Some(CodeActionKind::QUICKFIX),
-                    diagnostics: Some(vec![diagnostic(issue, lsp_range(&lines, &marked))]),
+                    diagnostics: Some(vec![found_diagnostic(
+                        &linted.catalog,
+                        found,
+                        lsp_range(&lines, &marked),
+                    )]),
                     edit: Some(edit(form, document, &lines, fix)),
                     // The editor applies a preferred fix on its "auto fix" key, so only a fix
                     // that keeps what the code does is preferred.

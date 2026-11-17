@@ -5,11 +5,19 @@ import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import NoReturn
+
+
+def fail(reason: str) -> NoReturn:
+    """Exits with 2, the code of an xpd command that cannot run."""
+    print(reason, file=sys.stderr)
+    sys.exit(2)
+
 
 try:
     import pandas as pd
 except ImportError as e:
-    sys.exit(f"xpd profile needs pandas in the project's Python. {e}")
+    fail(f"xpd profile needs pandas in the project's Python. {e}")
 
 
 def unique_count(s: pd.Series) -> int | None:
@@ -100,13 +108,13 @@ def main() -> None:
     }
     reader = readers.get(path.suffix.lower())
     if reader is None:
-        sys.exit(f"xpd profile: unsupported file type {path.suffix!r}")
+        fail(f"xpd profile: unsupported file type {path.suffix!r}")
     try:
         df = reader(path)
     except ImportError as e:  # pandas names the optional package it needs, such as openpyxl
-        sys.exit(f"xpd profile: reading {path.suffix} files needs an extra package. {e}")
+        fail(f"xpd profile: reading {path.suffix} files needs an extra package. {e}")
     except (OSError, ValueError) as e:  # pandas raises ValueError subclasses on a malformed file
-        sys.exit(f"xpd profile: cannot read {path}. {e}")
+        fail(f"xpd profile: cannot read {path}. {e}")
 
     mem = df.memory_usage(deep=True)
     cols = []

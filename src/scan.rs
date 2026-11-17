@@ -111,6 +111,15 @@ fn cannot_read(path: &Path) -> String {
     format!("cannot read {}", path.display())
 }
 
+/// The text of the file at `path`. A file that cannot be read, such as one that is not UTF-8,
+/// is named on stderr and gives `None`, so that one such file does not stop a run over the
+/// others. The run then counts it as skipped and exits with 2.
+pub(crate) fn read_source(path: &Path) -> Option<String> {
+    fs::read_to_string(path)
+        .map_err(|e| eprintln!("xpd: {}: {e}", cannot_read(path)))
+        .ok()
+}
+
 /// The files under `paths` that `packs` have rules for, each once: the Python files, and the
 /// files of each other language that a rule names. A path that is a file is always taken.
 /// Folders respect `.gitignore`.
@@ -163,6 +172,8 @@ pub(crate) struct Scanned {
     pub(crate) issues: Vec<Issue>,
     /// Number of fixes written to disk.
     pub(crate) fixed: usize,
+    /// Number of files that could not be read.
+    pub(crate) skipped: usize,
 }
 
 /// A fix can create a match for another fix, so fixing repeats until nothing changes, at
@@ -177,10 +188,12 @@ pub(crate) fn scan(
 ) -> Result<Scanned> {
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-    let per_file: Vec<(Vec<Issue>, usize)> = files
+    let per_file: Vec<Option<(Vec<Issue>, usize)>> = files
         .par_iter()
         .map(|path| {
-            let mut src = fs::read_to_string(path).with_context(|| cannot_read(path))?;
+            let Some(mut src) = read_source(path) else {
+                return Ok(None);
+            };
             let mut fixed = 0;
             let file = File::on_disk(path);
             if let Some(allowed) = fix {
@@ -194,13 +207,19 @@ pub(crate) fn scan(
                 .into_iter()
                 .map(|found| found.issue)
                 .collect();
-            Ok((issues, fixed))
+            Ok(Some((issues, fixed)))
         })
         .collect::<Result<_>>()?;
+    let skipped = per_file.iter().filter(|file| file.is_none()).count();
+    let per_file: Vec<(Vec<Issue>, usize)> = per_file.into_iter().flatten().collect();
     let fixed = per_file.iter().map(|(_, n)| n).sum();
     let mut issues: Vec<Issue> = per_file.into_iter().flat_map(|(i, _)| i).collect();
     issues.sort_by(|a, b| (&a.file, a.position).cmp(&(&b.file, b.position)));
-    Ok(Scanned { issues, fixed })
+    Ok(Scanned {
+        issues,
+        fixed,
+        skipped,
+    })
 }
 
 struct MatchedRule<'p, 'r> {

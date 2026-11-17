@@ -114,7 +114,7 @@ about the project and not about a place in a file, so its `line` and `column` ar
 | --- | --- |
 | 0 | No issue of severity error is left, after fixes |
 | 1 | At least one issue of severity error is left |
-| 2 | xpd could not run, for example because a path cannot be read |
+| 2 | xpd could not run, or it could not read a file. It names that file on stderr and still reports the others |
 
 The format never changes the exit code or the rules that run.
 
@@ -250,6 +250,7 @@ write it.
 | `--update-all`, `-U` | Writes every rewrite |
 | `--stdin` | Reads the code from stdin, in the language of `--lang` |
 | `--format json` or `--json` | Prints the matches as JSON. JSON never writes files, so it cannot be combined with `-U` or `-i` |
+| `--format text` | Prints the matches as text, which is the default on a terminal and with `-U` or `-i` |
 
 `xpd run --help` lists the other flags, such as `--strictness`, `--globs` and `--context`.
 
@@ -561,7 +562,7 @@ $ xpd graph samples/graph/steps.py --format json | jq -c 'keys, (.pipelines[0] |
 | --- | --- |
 | 0 | No error |
 | 1 | At least one error |
-| 2 | xpd could not run, for example because a path cannot be read |
+| 2 | xpd could not run, or it could not read a file. It names that file on stderr and still reports the others |
 
 ## profile
 
@@ -575,7 +576,8 @@ $ xpd profile samples/data.csv
 
 It reads `.csv`, `.parquet`, `.feather`, `.json` and `.xlsx` files. It runs with the project's
 Python, which needs pandas. Each finding has `finding`, `columns` and a `message` with what was
-measured on the file.
+measured on the file. `xpd profile` exits with 0 when it printed a profile, and with 2 when it
+can't run, as when the project's Python has no pandas or the file can't be read.
 
 | Finding | When | What the message names |
 | --- | --- | --- |

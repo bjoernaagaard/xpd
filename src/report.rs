@@ -95,6 +95,8 @@ pub(crate) struct Report {
     pub(crate) issues: Vec<Issue>,
     /// Number of fixes `--fix` wrote.
     pub(crate) fixed: usize,
+    /// Number of files that could not be read, which the run named on stderr.
+    pub(crate) skipped: usize,
 }
 
 impl Report {

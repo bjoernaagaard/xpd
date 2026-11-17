@@ -22,8 +22,10 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
         if quit {
             break;
         }
-        let source =
-            fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+        // The scan after the review names and counts a file that cannot be read.
+        let Ok(source) = fs::read_to_string(path) else {
+            continue;
+        };
         let mut proposals = scan::lint_source(File::on_disk(path), &source, packs);
         proposals.sort_by_key(|found| found.fix.as_ref().map(|edit| edit.range.start));
         let mut accepted: Vec<Replacement> = Vec::new();

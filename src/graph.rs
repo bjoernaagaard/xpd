@@ -5,10 +5,8 @@
 //! Nothing is imported or run, so this needs no Python and no Hamilton.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
 use serde_json::{Value, json};
 
 use crate::nodes::{self, Level, NodeDef};
@@ -61,6 +59,8 @@ pub(crate) struct Graph {
     problems: Vec<Problem>,
     files: usize,
     functions: usize,
+    /// Number of files that could not be read.
+    skipped: usize,
 }
 
 /// The lines of one pipeline: its name, one line per step, the columns it reads from its
@@ -121,18 +121,18 @@ fn pipeline_lines(placed: &PlacedPipeline) -> Vec<String> {
 
 impl Graph {
     /// Reads `files` as the modules of one dataflow.
-    ///
-    /// # Errors
-    ///
-    /// When a file cannot be read.
-    pub(crate) fn read(files: &[PathBuf]) -> Result<Self> {
+    /// A file that cannot be read is named on stderr and counted as skipped.
+    pub(crate) fn read(files: &[PathBuf]) -> Self {
         let mut pipelines = Vec::new();
         let mut nodes = Vec::new();
         let mut problems = Vec::new();
         let mut functions = 0;
+        let mut skipped = 0;
         for file in files {
-            let src = fs::read_to_string(file)
-                .with_context(|| format!("cannot read {}", file.display()))?;
+            let Some(src) = crate::scan::read_source(file) else {
+                skipped += 1;
+                continue;
+            };
             let found = steps::read(&src);
             let is_step_code = found.iter().any(Pipeline::runs_functions);
             for mut pipeline in found {
@@ -179,15 +179,21 @@ impl Graph {
             .filter(|name| !read.contains(name))
             .map(str::to_owned)
             .collect();
-        Ok(Self {
+        Self {
             pipelines,
             unread: unread.into_iter().collect(),
             nodes,
             inputs,
             problems,
-            files: files.len(),
+            files: files.len() - skipped,
             functions,
-        })
+            skipped,
+        }
+    }
+
+    /// Number of files that could not be read, which `read` named on stderr.
+    pub(crate) fn skipped(&self) -> usize {
+        self.skipped
     }
 
     /// Whether the code would raise, or Python drops a function.

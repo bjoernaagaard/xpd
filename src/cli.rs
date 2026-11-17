@@ -554,6 +554,7 @@ fn lint(
     Ok(Report {
         issues,
         fixed: scanned.fixed,
+        skipped: scanned.skipped,
     })
 }
 
@@ -597,7 +598,9 @@ fn check(
             eprintln!("xpd: {}", report.summary(allowed));
         }
     }
-    if report.has_errors() {
+    if report.skipped > 0 {
+        ExitCode::from(CHECK_FAILED)
+    } else if report.has_errors() {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
@@ -606,7 +609,7 @@ fn check(
 
 /// Prints the dataflow of the files under `paths`.
 fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
-    let graph = match scan::python_files(paths).and_then(|files| Graph::read(&files)) {
+    let graph = match scan::python_files(paths).map(|files| Graph::read(&files)) {
         Ok(graph) => graph,
         Err(e) => {
             eprintln!("xpd: {e:#}");
@@ -620,7 +623,9 @@ fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
             eprintln!("xpd: {}", graph.summary());
         }
     }
-    if graph.has_errors() {
+    if graph.skipped() > 0 {
+        ExitCode::from(CHECK_FAILED)
+    } else if graph.has_errors() {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
