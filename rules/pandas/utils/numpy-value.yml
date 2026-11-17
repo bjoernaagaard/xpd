@@ -1,0 +1,26 @@
+id: numpy-value
+language: python
+# A value the file shows comes from NumPy: a call of a np. function, or a name that each
+# assignment in the nearest function or module gives the result of one.
+rule:
+  any:
+    - { kind: call, has: { field: function, regex: '^(np|numpy)\.' } }
+    - all:
+        - kind: identifier
+        - pattern: $NUMPY_NAME
+        - inside:
+            stopBy: { any: [{ kind: function_definition }, { kind: module }] }
+            any: [{ kind: function_definition }, { kind: module }]
+            has:
+              stopBy: end
+              kind: assignment
+              all:
+                - has: { field: left, pattern: $NUMPY_NAME }
+                - has: { field: right, kind: call, has: { field: function, regex: '^(np|numpy)\.' } }
+            not:
+              has:
+                stopBy: end
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $NUMPY_NAME }
+                  - not: { has: { field: right, kind: call, has: { field: function, regex: '^(np|numpy)\.' } } }

@@ -197,7 +197,7 @@ The replacement assumes dates without a time zone, and for dates with a time zon
 
 **Severity:** error. **Fix:** unsafe: `df["b"].isna()`.
 
-The rule reports `df["b"] == np.nan`, `df["k"].astype(str) == "nan"` and `df[df["b"] == None]`, which are never true. It reports `None` only inside a subscript, because `config["mode"] == None` on a dict is valid Python.
+The rule reports `df["b"] == np.nan`, `df["k"].astype(str) == "nan"` and `df[df["b"] == None]`, which are never true. It reports `None` only inside a subscript, because `config["mode"] == None` on a dict is valid Python. When the file shows that the value comes from NumPy, as in `x = np.arange(3.0)` and then `x == np.nan`, the fix writes `pd.isna(x)`, because a NumPy array has no `.isna()`.
 
 Example:
 

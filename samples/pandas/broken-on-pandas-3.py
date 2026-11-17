@@ -120,6 +120,12 @@ def compare_to_missing(df):
 
 
 @case
+def compare_array_to_missing(df):
+    values = np.arange(3.0)
+    return values == np.nan, values != np.nan  # xpd: compare-to-missing, compare-to-missing
+
+
+@case
 def isna_and_text_compare(df):
     return df[df["b"].isna()], df["k"] == "nan"
 
