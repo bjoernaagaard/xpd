@@ -13402,7 +13402,7 @@ and the `python-review` skill reviews code against it.
 | Functions | `pass-through-function`, `multi-line-call-argument` |
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
-| Standard library | `setdefault-without-defaultdict` |
+| Standard library | `setdefault-without-defaultdict`, `counting-loop-without-counter`, `strptime-without-fromisoformat`, `elapsed-without-perf-counter`, `toml-without-tomllib` |
 
 ### Names
 
@@ -14229,6 +14229,170 @@ the `defaultdict` form of each call.
 A `defaultdict` also adds a key when code reads one that is missing, so `found[key]` never
 raises a `KeyError`. Read with `found.get(key)` or test with `key in found` where a missing
 key matters, or return `dict(found)` to hand the caller a plain dict.
+
+#### counting-loop-without-counter
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a loop whose only statement is `counts[item] = counts.get(item, 0) + 1`, where
+`item` is the loop variable and the same function starts `counts` as `{}` or `dict()`. It
+leaves alone a loop that holds another statement, a loop that counts a part of each item, and
+a dict that the function takes as a parameter.
+
+Example:
+
+```python
+def word_counts(words: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for word in words:
+        counts[word] = counts.get(word, 0) + 1
+    return counts
+```
+
+Use instead:
+
+```python
+from collections import Counter
+
+
+def word_counts(words: list[str]) -> Counter[str]:
+    return Counter(words)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The Python documentation describes a
+[`Counter`](https://docs.python.org/3/library/collections.html#collections.Counter) as "a dict
+subclass for counting hashable objects". On Python 3.15.2 on one machine, counting 100,000
+items under 50 keys took 2.59 milliseconds with the loop and 1.79 with `Counter(words)`. The
+rule stops at that one shape because the other two were not faster. A `Counter` filled with
+`counts[word] += 1` in a loop took 4.43 milliseconds, and `Counter(item.kind for item in
+items)` took 4.12 against 4.23 for the loop.
+
+A `Counter` returns 0 for a key that is missing and doesn't raise a `KeyError`. It also has
+`most_common(3)` for the largest counts, and two of them add with `+`.
+
+#### strptime-without-fromisoformat
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `datetime.strptime` with a format that is ISO 8601: `"%Y-%m-%d"`, a date and
+a time with `T` or a space between them, and either with `.%f` or `%z` at the end. It leaves
+every other format alone, and a format that is held in a name.
+
+Example:
+
+```python
+from datetime import date, datetime
+
+
+def trading_day(text: str) -> date:
+    return datetime.strptime(text, "%Y-%m-%d").date()
+```
+
+Use instead:
+
+```python
+from datetime import date
+
+
+def trading_day(text: str) -> date:
+    return date.fromisoformat(text)
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+`strptime` turns the format into a regular expression and matches the text against it.
+[`date.fromisoformat`](https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)
+and `datetime.fromisoformat` read the text without a format. On Python 3.15.2 on one machine,
+`datetime.strptime(text, "%Y-%m-%d").date()` took 1.53 microseconds and
+`date.fromisoformat(text)` took 0.035. For `"%Y-%m-%dT%H:%M:%S"` the two took 1.86 and 0.044.
+
+The two accept different text at the edges. `strptime` reads `2026-1-5`, and `fromisoformat`
+raises a `ValueError` for a month or a day without its leading zero. `fromisoformat` also reads
+other ISO 8601 spellings, such as `20261118`. Keep `strptime` for data that leaves out the
+leading zeros.
+
+ruff's `DTZ007` reports a `strptime` format without `%z`, and has no rule that asks for
+`fromisoformat`.
+
+#### elapsed-without-perf-counter
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `time.time()` minus a name that the same function, or the module, sets from
+`time.time()`. It leaves alone a difference with any other value, such as the modified time
+of a file, because that value is a time of day.
+
+Example:
+
+```python
+import time
+
+
+def timed_fit(model: Model, rows: Rows) -> float:
+    start = time.time()
+    model.fit(rows)
+    return time.time() - start
+```
+
+Use instead:
+
+```python
+import time
+
+
+def timed_fit(model: Model, rows: Rows) -> float:
+    start = time.perf_counter()
+    model.fit(rows)
+    return time.perf_counter() - start
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+`time.time()` reads the clock of the system, which a person or a time server can set. The
+Python documentation says it can return "a lower value than a previous call if the system clock
+has been set back", so a duration measured with it can be wrong and can be negative.
+[`time.perf_counter()`](https://docs.python.org/3/library/time.html#time.perf_counter) is
+"a clock with the highest available resolution to measure a short duration", and it only moves
+forward. Its value means nothing on its own, so keep `time.time()` for a time of day that the
+code stores or prints.
+
+#### toml-without-tomllib
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports an import of `tomli`, and `toml.load` and `toml.loads`. It leaves alone
+`toml.dump` and `toml.dumps`, because `tomllib` cannot write, and an import of `tomli` inside
+`try` or `if`, which is how code that still runs on Python 3.10 falls back.
+
+Example:
+
+```python
+import toml
+
+
+def settings(path: Path) -> dict[str, object]:
+    return toml.load(path)
+```
+
+Use instead:
+
+```python
+import tomllib
+
+
+def settings(path: Path) -> dict[str, object]:
+    return tomllib.loads(path.read_text())
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+[`tomllib`](https://docs.python.org/3/library/tomllib.html) has been in the standard library
+since Python 3.11, and every Python that still gets fixes has it. `tomli` is the package that
+`tomllib` was copied from, with the same `load` and `loads`, so only the import changes.
+`toml.load` takes a path or a file opened as text, and `tomllib.load` takes a file opened with
+`"rb"`, so pass the text of the file to `tomllib.loads` or open the file in binary mode.
 
 ## Write a rule
 

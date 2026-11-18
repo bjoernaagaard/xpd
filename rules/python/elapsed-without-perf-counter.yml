@@ -1,0 +1,28 @@
+# time.time() reads the clock of the system, which a person or a time server can set, so the
+# difference between two readings can be wrong and can be negative. The Python documentation
+# says time.time() can return "a lower value than a previous call if the system clock has been
+# set back", and that time.perf_counter() is "a clock with the highest available resolution to
+# measure a short duration". The rule reports time.time() minus a name that the same function,
+# or the module, sets from time.time(). It leaves alone a difference with any other value, such
+# as the modified time of a file, because that value is a time of day.
+id: elapsed-without-perf-counter
+language: python
+severity: warning
+message: This measures a duration with the clock of the system, which can be set back. Read time.perf_counter() in both places, which only moves forward.
+rule:
+  all:
+    - pattern: time.time() - $START
+    - any:
+        - inside:
+            stopBy: { kind: function_definition }
+            kind: function_definition
+            has: { stopBy: end, kind: assignment, pattern: $START = time.time() }
+        - all:
+            - not:
+                inside: { stopBy: end, kind: function_definition }
+            - inside:
+                stopBy: end
+                kind: module
+                has: { stopBy: end, kind: assignment, pattern: $START = time.time() }
+constraints:
+  START: { kind: identifier }

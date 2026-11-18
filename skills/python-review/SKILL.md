@@ -90,6 +90,13 @@ The first two groups are where real bugs live.
 - Bare strings compared in several places where a `StrEnum` or `Literal` would do.
 - `setdefault(key, [])` on a dict that the function starts empty, where a
   `collections.defaultdict(list)` would do (`python/setdefault-without-defaultdict`).
+- A loop that only counts its items where `collections.Counter(items)` would do
+  (`python/counting-loop-without-counter`).
+- `strptime` with an ISO 8601 format in place of `date.fromisoformat`
+  (`python/strptime-without-fromisoformat`).
+- A duration measured with `time.time()` in place of `time.perf_counter()`
+  (`python/elapsed-without-perf-counter`).
+- `tomli` or `toml.load` in place of `tomllib` (`python/toml-without-tomllib`).
 
 **Module design**
 

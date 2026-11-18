@@ -158,7 +158,9 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   `__post_init__`, and a `TypedDict` for a value that has to stay a dict. Reach for the
   standard library before a package: `tomllib` for a config file, `functools.cache` for a result
   to keep, `itertools.pairwise` and `batched` for windows, `collections.defaultdict(list)`
-  for a dict of lists in place of `setdefault(key, [])`. A closed set of names is a
+  for a dict of lists in place of `setdefault(key, [])`. `collections.Counter(items)` counts,
+  `date.fromisoformat` reads an ISO date in place of `strptime`, and `time.perf_counter()`
+  measures a duration in place of `time.time()`. A closed set of names is a
   `StrEnum` or `Literal`, never bare strings compared in several places.
 - **Add a record only for a value that several functions take.** Two or three results of
   one function are a tuple that the caller unpacks into names. One summary per group is
@@ -264,6 +266,10 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | A frozen dataclass or attrs class, a function that returns `json.loads` | `xpd check`: `python/record-without-namedtuple`, `python/json-without-type` |
 | `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |
 | `setdefault(key, [])` on a dict the function starts as `{}` | `xpd check`: `python/setdefault-without-defaultdict` |
+| A loop that only counts its items | `xpd check`: `python/counting-loop-without-counter` |
+| `strptime` with an ISO 8601 format | `xpd check`: `python/strptime-without-fromisoformat` |
+| `time.time()` minus an earlier `time.time()` | `xpd check`: `python/elapsed-without-perf-counter` |
+| `import tomli`, `toml.load` | `xpd check`: `python/toml-without-tomllib` |
 | A test for an empty frame around a mean, `astype(...).to_numpy()` | `xpd check`: `pandas/empty-guard`, `pandas/astype-then-to-numpy` |
 | A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
 | A loop where one call on whole arrays or columns does the work: a recurrence, a mask per label, a draw per pass, a column per pass, a lambda in named `agg`, a filter before the frame | `xpd check`: `numpy/recurrence-loop`, `numpy/slice-fill-loop`, `numpy/mask-per-label`, `numpy/random-draw-loop`, `pandas/column-loop`, `pandas/named-agg-lambda`, `pandas/filter-before-frame` |

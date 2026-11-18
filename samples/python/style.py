@@ -6,11 +6,17 @@ A line that xpd reports ends with a comment that names the rule.
 import logging
 import os
 import json
-from collections import defaultdict
+import time
+import tomllib
+from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import date, datetime
 from functools import cache
 from typing import Any, NamedTuple, TypeVar, cast
 from unittest.mock import patch  # xpd: mock-import
+
+import toml
+import tomli  # xpd: toml-without-tomllib
 
 import numpy as np
 
@@ -141,6 +147,64 @@ def by_length_with_defaultdict(words: list[str]) -> dict[int, list[str]]:
 
 def add_word(found: dict[int, list[str]], word: str) -> None:
     found.setdefault(len(word), []).append(word)
+
+
+def word_counts(words: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for word in words:  # xpd: counting-loop-without-counter
+        counts[word] = counts.get(word, 0) + 1
+    return counts
+
+
+def most_common_word(words: list[str]) -> str:
+    return Counter(words).most_common(1)[0][0]
+
+
+def length_counts(words: list[str]) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for word in words:
+        counts[len(word)] = counts.get(len(word), 0) + 1
+    return counts
+
+
+def trading_day(text: str) -> date:
+    return datetime.strptime(text, "%Y-%m-%d").date()  # xpd: strptime-without-fromisoformat
+
+
+def trading_day_from_iso(text: str) -> date:
+    return date.fromisoformat(text.strip())
+
+
+def danish_day(text: str) -> date:
+    return datetime.strptime(text, "%d-%m-%Y").date()
+
+
+def timed(words: list[str]) -> float:
+    start = time.time()
+    word_counts(words)
+    return time.time() - start  # xpd: elapsed-without-perf-counter
+
+
+def timed_with_perf_counter(words: list[str]) -> float:
+    start = time.perf_counter()
+    word_counts(words)
+    return time.perf_counter() - start
+
+
+def age(modified: float) -> float:
+    return time.time() - modified
+
+
+def region(path: str) -> str:
+    return toml.load(path)["region"]  # xpd: toml-without-tomllib
+
+
+def region_with_tomllib(text: str) -> str:
+    return tomllib.loads(text)["region"]
+
+
+def region_as_toml(name: str) -> str:
+    return toml.dumps({"region": name}) + tomli.__name__
 
 
 def spread(values: np.ndarray) -> float:

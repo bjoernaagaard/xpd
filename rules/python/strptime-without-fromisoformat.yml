@@ -1,0 +1,18 @@
+# datetime.strptime compiles its format into a regular expression and matches the text against
+# it, and date.fromisoformat and datetime.fromisoformat read ISO 8601 text in C. On Python
+# 3.15.2 on one machine, strptime(text, "%Y-%m-%d").date() took 1.53 microseconds and
+# date.fromisoformat(text) took 0.035, and for a date with a time the two took 1.86 and 0.044.
+# The rule reports only a format that fromisoformat reads: a date, a date and a time with T or
+# a space between them, and either with %f or %z at the end. It leaves every other format
+# alone. It has no fix, because strptime also reads a month or a day without its leading zero,
+# and fromisoformat also reads other ISO 8601 spellings, such as 20261118.
+id: strptime-without-fromisoformat
+language: python
+severity: warning
+message: This format is ISO 8601, which fromisoformat reads without a format. Write date.fromisoformat($TEXT) for a date and datetime.fromisoformat($TEXT) for a date with a time.
+rule:
+  any:
+    - pattern: datetime.strptime($TEXT, $FORMAT)
+    - pattern: $MODULE.datetime.strptime($TEXT, $FORMAT)
+constraints:
+  FORMAT: { regex: "^[\"']%Y-%m-%d([T ]%H:%M:%S(\\.%f)?(%z)?)?[\"']$" }
