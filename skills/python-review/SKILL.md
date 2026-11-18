@@ -97,6 +97,12 @@ The first two groups are where real bugs live.
 - A duration measured with `time.time()` in place of `time.perf_counter()`
   (`python/elapsed-without-perf-counter`).
 - `tomli` or `toml.load` in place of `tomllib` (`python/toml-without-tomllib`).
+- `insert(0, item)` in a loop, where `append` and one `reverse()` or a `deque` would do
+  (`python/front-insert-in-loop`).
+- `orjson.loads(raw.decode())`, where `orjson.loads(raw)` reads the bytes
+  (`python/orjson-loads-decoded`).
+- A subclass of a class with `__slots__` that leaves out `__slots__`, so its instances get a
+  `__dict__` again (`python/slotted-base-without-slots`).
 
 **Module design**
 

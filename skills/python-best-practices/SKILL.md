@@ -110,6 +110,9 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
     return rows
 ```
 
+- **Build a list in a loop with `append`.** For the reverse order, call `reverse()` once
+  after the loop, or start a `collections.deque()` and call `appendleft`. Each
+  `insert(0, item)` moves every item already in the list.
 - A generator expression goes straight into the call that consumes it, such as `sum`,
   `any` or `"".join`. When the caller may stop early or the data is large, write a
   generator function.
@@ -160,7 +163,8 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   to keep, `itertools.pairwise` and `batched` for windows, `collections.defaultdict(list)`
   for a dict of lists in place of `setdefault(key, [])`. `collections.Counter(items)` counts,
   `date.fromisoformat` reads an ISO date in place of `strptime`, and `time.perf_counter()`
-  measures a duration in place of `time.time()`. A closed set of names is a
+  measures a duration in place of `time.time()`. A subclass of a class with `__slots__`
+  assigns its own `__slots__`, `()` when it adds no field. A closed set of names is a
   `StrEnum` or `Literal`, never bare strings compared in several places.
 - **Add a record only for a value that several functions take.** Two or three results of
   one function are a tuple that the caller unpacks into names. One summary per group is
@@ -192,6 +196,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   never `shell=True` with a value from outside.
 - Instants are timezone-aware `datetime` values (`datetime.now(UTC)`), and spans are
   `timedelta`. A bare number carries its unit in the name (`timeout_s`).
+- Pass bytes straight to `orjson.loads`, which reads UTF-8 itself, and not `raw.decode()`.
 - Read configuration and the environment once, in `main()`, and pass values down.
 - `secrets` for tokens, `random` for the rest. Never `pickle`, `eval` or `yaml.load` on
   data from outside.
@@ -270,6 +275,9 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | `strptime` with an ISO 8601 format | `xpd check`: `python/strptime-without-fromisoformat` |
 | `time.time()` minus an earlier `time.time()` | `xpd check`: `python/elapsed-without-perf-counter` |
 | `import tomli`, `toml.load` | `xpd check`: `python/toml-without-tomllib` |
+| `insert(0, item)` in a loop on a list the function starts as `[]` | `xpd check`: `python/front-insert-in-loop` |
+| `orjson.loads(raw.decode())` | `xpd check`: `python/orjson-loads-decoded` |
+| A subclass without `__slots__` of a class with `__slots__` | `xpd check`: `python/slotted-base-without-slots` |
 | A test for an empty frame around a mean, `astype(...).to_numpy()` | `xpd check`: `pandas/empty-guard`, `pandas/astype-then-to-numpy` |
 | A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
 | A loop where one call on whole arrays or columns does the work: a recurrence, a mask per label, a draw per pass, a column per pass, a lambda in named `agg`, a filter before the frame | `xpd check`: `numpy/recurrence-loop`, `numpy/slice-fill-loop`, `numpy/mask-per-label`, `numpy/random-draw-loop`, `pandas/column-loop`, `pandas/named-agg-lambda`, `pandas/filter-before-frame` |

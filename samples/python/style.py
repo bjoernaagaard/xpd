@@ -8,7 +8,7 @@ import os
 import json
 import time
 import tomllib
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import cache
@@ -19,6 +19,7 @@ import toml
 import tomli  # xpd: toml-without-tomllib
 
 import numpy as np
+import orjson
 
 __all__ = ["rows", "rows_with_loop"]
 
@@ -205,6 +206,101 @@ def region_with_tomllib(text: str) -> str:
 
 def region_as_toml(name: str) -> str:
     return toml.dumps({"region": name}) + tomli.__name__
+
+
+def newest_first(events: list[str]) -> list[str]:
+    found: list[str] = []
+    for event in events:
+        found.insert(0, event)  # xpd: front-insert-in-loop
+    return found
+
+
+def newest_first_with_reverse(events: list[str]) -> list[str]:
+    found: list[str] = []
+    for event in events:
+        found.append(event)
+    found.reverse()
+    return found
+
+
+def newest_first_with_deque(events: list[str]) -> deque[str]:
+    found: deque[str] = deque()
+    for event in events:
+        found.appendleft(event)
+    return found
+
+
+def with_header(events: list[str], found: list[str]) -> list[str]:
+    for event in events:
+        found.insert(0, event)
+    found.insert(0, "header")
+    return found
+
+
+def after_header(events: list[str]) -> list[str]:
+    found = ["header"]
+    for event in events:
+        found.insert(0, event)
+        found.insert(1, event)
+    return found
+
+
+def read_item(body: bytes) -> Item:
+    return Item(**orjson.loads(body.decode("utf-8")))  # xpd: orjson-loads-decoded
+
+
+def read_item_from_bytes(body: bytes) -> Item:
+    return Item(**orjson.loads(body))
+
+
+def read_latin_item(body: bytes) -> Item:
+    return Item(**orjson.loads(body.decode("latin-1")))
+
+
+def read_lenient_item(body: bytes) -> Item:
+    return Item(**orjson.loads(body.decode("utf-8", errors="replace")))
+
+
+def read_item_with_json(body: bytes) -> Item:
+    return Item(**json.loads(body.decode()))
+
+
+class Quote:
+    __slots__ = ("symbol", "price")
+
+    def __init__(self, symbol: str, price: float) -> None:
+        self.symbol = symbol
+        self.price = price
+
+
+class SizedQuote(Quote):  # xpd: slotted-base-without-slots
+    def __init__(self, symbol: str, price: float, size: int) -> None:
+        super().__init__(symbol, price)
+        self.size = size
+
+
+class SizedQuoteWithSlots(Quote):
+    __slots__ = ("size",)
+
+    def __init__(self, symbol: str, price: float, size: int) -> None:
+        super().__init__(symbol, price)
+        self.size = size
+
+
+class LabeledQuote(Quote):
+    __slots__ = ()
+
+    def label(self) -> str:
+        return f"{self.symbol} {self.price}"
+
+
+@dataclass(slots=True)
+class TradedQuote(Quote):
+    volume: int
+
+
+class QuoteError(ValueError):
+    pass
 
 
 def spread(values: np.ndarray) -> float:

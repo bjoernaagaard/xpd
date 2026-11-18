@@ -1,0 +1,22 @@
+# orjson.loads reads UTF-8 bytes directly, and its documentation says to pass bytes "rather than
+# creating an unnecessary str object". Given a str, it first has to turn the text back into
+# UTF-8, so decoding the bytes before the call does the same work twice. On Python 3.15.2 on one
+# machine, orjson read a document of 161 KB with Chinese text in 83.1 microseconds from the
+# bytes and in 182.9 from raw.decode(), 2.20 times as long, and an ASCII document of 62 KB in 37.1
+# and 38.8. The results were equal. The rule reports orjson.loads around a decode with no
+# argument or with UTF-8 as the encoding. It leaves alone a decode with another encoding and a
+# decode with an errors argument, because those change the text, and json.loads, which decodes
+# bytes itself at the same cost. The fix is unsafe, because invalid UTF-8 then raises
+# orjson.JSONDecodeError in place of UnicodeDecodeError.
+id: orjson-loads-decoded
+language: python
+severity: warning
+message: orjson reads UTF-8 bytes directly, and a str has to be turned back into UTF-8 before it is read. Pass the bytes, as orjson.loads($X).
+rule:
+  any:
+    - pattern: orjson.loads($X.decode())
+    - pattern: orjson.loads($X.decode($ENCODING))
+constraints:
+  ENCODING: { regex: "^(encoding\\s*=\\s*)?[\"'](?i:utf[-_]?8)[\"']$" }
+fix: orjson.loads($X)
+metadata: { fix: unsafe }

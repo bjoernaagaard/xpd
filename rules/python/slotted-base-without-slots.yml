@@ -1,0 +1,91 @@
+# A class with __slots__ keeps its fields in fixed places and has no __dict__. A subclass that
+# does not assign __slots__ gets a __dict__ again, so the saving of the base is lost. On Python
+# 3.15.2 on one machine, tracemalloc counted 135.7 bytes for each of 100,000 instances with three
+# fields when the subclass left out __slots__, and 95.7 when it had __slots__ = ("c",). A
+# subclass that adds no field took 127.7 bytes without __slots__ and 87.6 with __slots__ = (), so
+# it pays too. The rule reports a class with one base, a plain name of a class in the same file
+# that assigns __slots__ in its body, when the subclass body does not. The base must itself be
+# free of a __dict__: it has no base, or object, ABC, Generic or another slotted class of the
+# file, and its __slots__ does not name __dict__. The rule leaves alone a dataclass or attrs
+# subclass, which gets slots from its decorator, a subclass that uses __dict__, vars or
+# cached_property, which need a __dict__, a subclass with more than one base, and a base that is
+# defined in another file. It has no fix, because the names of the new fields are in the methods.
+id: slotted-base-without-slots
+language: python
+severity: warning
+message: $BASE has __slots__, but this subclass does not, so its instances get a __dict__ again and the saving of $BASE is lost. Add __slots__ with the names of the fields this class adds, or __slots__ = () when it adds none.
+utils:
+  slots-in-body:
+    kind: block
+    has:
+      kind: expression_statement
+      has:
+        kind: assignment
+        has: { field: left, kind: identifier, regex: ^__slots__$ }
+  slots-without-dict:
+    kind: block
+    has:
+      kind: expression_statement
+      has:
+        kind: assignment
+        has: { field: left, kind: identifier, regex: ^__slots__$ }
+        not:
+          has: { field: right, stopBy: end, kind: string, regex: __dict__ }
+  bases-without-dict:
+    kind: class_definition
+    not:
+      has:
+        field: superclasses
+        has:
+          any:
+            - kind: identifier
+            - kind: attribute
+            - kind: subscript
+            - kind: call
+            - kind: keyword_argument
+          not: { regex: "^(object|(abc\\.)?ABC|(typing\\.)?Generic\\[[\\s\\S]*\\])$" }
+rule:
+  all:
+    - kind: class_definition
+    - has:
+        field: superclasses
+        kind: argument_list
+        all:
+          - has: { kind: identifier, pattern: $BASE }
+          - not: { has: { nthChild: 2 } }
+    - not: { has: { field: body, matches: slots-in-body } }
+    - not:
+        has:
+          field: body
+          has: { stopBy: end, kind: identifier, regex: ^(__dict__|vars|cached_property)$ }
+    - not:
+        inside:
+          kind: decorated_definition
+          has: { kind: decorator, regex: ^@(dataclasses\.|attrs?\.)?(dataclass|define|frozen|mutable|s|attrs)\b }
+    - inside:
+        stopBy: end
+        kind: module
+        has:
+          stopBy: end
+          kind: class_definition
+          all:
+            - has: { field: name, pattern: $BASE }
+            - has: { field: body, matches: slots-without-dict }
+            - any:
+                - matches: bases-without-dict
+                - all:
+                    - has:
+                        field: superclasses
+                        all:
+                          - has: { kind: identifier, pattern: $MIDDLE }
+                          - not: { has: { nthChild: 2 } }
+                    - inside:
+                        stopBy: end
+                        kind: module
+                        has:
+                          stopBy: end
+                          kind: class_definition
+                          all:
+                            - has: { field: name, pattern: $MIDDLE }
+                            - has: { field: body, matches: slots-without-dict }
+                            - matches: bases-without-dict

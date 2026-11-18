@@ -13403,6 +13403,7 @@ and the `python-review` skill reviews code against it.
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
 | Standard library | `setdefault-without-defaultdict`, `counting-loop-without-counter`, `strptime-without-fromisoformat`, `elapsed-without-perf-counter`, `toml-without-tomllib` |
+| Speed and memory | `front-insert-in-loop`, `orjson-loads-decoded`, `slotted-base-without-slots` |
 
 ### Names
 
@@ -14393,6 +14394,150 @@ since Python 3.11, and every Python that still gets fixes has it. `tomli` is the
 `tomllib` was copied from, with the same `load` and `loads`, so only the import changes.
 `toml.load` takes a path or a file opened as text, and `tomllib.load` takes a file opened with
 `"rb"`, so pass the text of the file to `tomllib.loads` or open the file in binary mode.
+
+### Speed and memory
+
+Leave out work that the measured alternative skips, when the code can always take the
+alternative.
+
+#### front-insert-in-loop
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `items.insert(0, item)` in the body of a `for` or `while` loop, when the same
+function, or the module, starts `items` as `[]` or `list()` under a plain name. It leaves alone
+an insert outside a loop, an insert at another index, a list that the function takes as a
+parameter, an attribute, and a list that starts with items.
+
+Example:
+
+```python
+def newest_first(events: list[Event]) -> list[Event]:
+    found: list[Event] = []
+    for event in events:
+        found.insert(0, event)
+    return found
+```
+
+Use instead:
+
+```python
+def newest_first(events: list[Event]) -> list[Event]:
+    found: list[Event] = []
+    for event in events:
+        found.append(event)
+    found.reverse()
+    return found
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+An insert at index 0 moves every item already in the list one place to the right, so the loop
+does work that grows with the square of the length of the list. On Python 3.15.2 on one
+machine, building a list of 10,000 items took 4.87 milliseconds with `insert(0, item)`, 0.074
+with `append` and one `reverse()` after the loop, and 0.103 with
+[`collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque) and
+`appendleft`. The loop with `insert` took 1.39 times as long at 10 items, 2.06 times at 100 and
+6.87 times at 1,000, and it was never faster. The three forms give equal contents.
+
+Keep the `deque` when the loop also reads the front of the collection while it builds it,
+because the list is in the opposite order until `reverse()` runs. A `deque` is not a list, so
+call `list(found)` where the caller needs one, or slices it.
+
+#### orjson-loads-decoded
+
+**Severity:** warning. **Fix:** unsafe: `orjson.loads(raw)`.
+
+The rule reports `orjson.loads(raw.decode())`, and the same call with UTF-8 as the encoding,
+written as `"utf-8"`, `"utf8"` or `"UTF-8"`, given by position or as `encoding=`. It leaves alone
+a decode with another encoding, a decode with an `errors` argument, and `json.loads`.
+
+Example:
+
+```python
+import orjson
+
+
+def read_quote(body: bytes) -> dict[str, object]:
+    return orjson.loads(body.decode("utf-8"))
+```
+
+Use instead:
+
+```python
+import orjson
+
+
+def read_quote(body: bytes) -> dict[str, object]:
+    return orjson.loads(body)
+```
+
+xpd applies the replacement with `--fix --unsafe-fixes`.
+
+[orjson](https://github.com/ijl/orjson#deserialize) reads UTF-8 bytes directly, and its
+documentation says to pass bytes "rather than creating an unnecessary `str` object". Given a
+`str`, it first turns the text back into UTF-8, so the decode before the call does the same work
+twice. On Python 3.15.2 on one machine, reading a document of 161 KB with Chinese text took 83.1
+microseconds from the bytes and 182.9 from `raw.decode()`, 2.20 times as long. An ASCII
+document of 62 KB took 37.1 and 38.8 microseconds. Both gave equal results. `json.loads` from
+the standard library decodes bytes itself at the same cost, so the rule leaves it alone.
+
+The fix is unsafe, because bytes that are not valid UTF-8 then raise `orjson.JSONDecodeError`
+in place of `UnicodeDecodeError`. Catch `ValueError`, which both of them are, where the code
+handles bad input.
+
+#### slotted-base-without-slots
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a class whose one base is a plain name of a class in the same file that
+assigns `__slots__` in its body, when the class body does not assign `__slots__`. The base
+counts only when its own instances have no `__dict__`: it has no base, or `object`, `ABC`,
+`Generic`, or another slotted class of the file, and its `__slots__` does not name `__dict__`.
+The rule leaves alone a dataclass or attrs subclass, which gets its slots from the decorator, a
+subclass that uses `__dict__`, `vars` or `cached_property`, a subclass with more than one base,
+and a subclass whose base is defined in another file.
+
+Example:
+
+```python
+class Quote:
+    __slots__ = ("symbol", "price")
+
+    def __init__(self, symbol: str, price: float) -> None:
+        self.symbol = symbol
+        self.price = price
+
+
+class SizedQuote(Quote):
+    def __init__(self, symbol: str, price: float, size: int) -> None:
+        super().__init__(symbol, price)
+        self.size = size
+```
+
+Use instead:
+
+```python
+class SizedQuote(Quote):
+    __slots__ = ("size",)
+
+    def __init__(self, symbol: str, price: float, size: int) -> None:
+        super().__init__(symbol, price)
+        self.size = size
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+[`__slots__`](https://docs.python.org/3/reference/datamodel.html#slots) gives each instance fixed
+places for its fields and no `__dict__`. A subclass without `__slots__` gets a `__dict__` again,
+so the saving of the base is lost. On Python 3.15.2 on one machine, tracemalloc counted 135.7
+bytes for each of 100,000 instances with three fields when the subclass left out `__slots__`,
+and 95.7 when it had `__slots__ = ("size",)`. A subclass that adds no field also pays. It took
+127.7 bytes without `__slots__` and 87.6 with `__slots__ = ()`. Write `__slots__ = ()` for a
+subclass that only adds methods.
+
+Name `__weakref__` in the new `__slots__` when code takes a weak reference to the instances,
+because a slotted class has no room for one unless a class in its chain names it.
 
 ## Write a rule
 
