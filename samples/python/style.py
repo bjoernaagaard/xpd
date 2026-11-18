@@ -6,6 +6,7 @@ A line that xpd reports ends with a comment that names the rule.
 import logging
 import os
 import json
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, NamedTuple, TypeVar, cast
@@ -122,6 +123,24 @@ def load(body: bytes) -> float:
 
 def decode(body: bytes) -> Item:
     return Item(**json.loads(body))
+
+
+def by_length(words: list[str]) -> dict[int, list[str]]:
+    found: dict[int, list[str]] = {}
+    for word in words:
+        found.setdefault(len(word), []).append(word)  # xpd: setdefault-without-defaultdict
+    return found
+
+
+def by_length_with_defaultdict(words: list[str]) -> dict[int, list[str]]:
+    found: defaultdict[int, list[str]] = defaultdict(list)
+    for word in words:
+        found[len(word)].append(word)
+    return found
+
+
+def add_word(found: dict[int, list[str]], word: str) -> None:
+    found.setdefault(len(word), []).append(word)
 
 
 def spread(values: np.ndarray) -> float:

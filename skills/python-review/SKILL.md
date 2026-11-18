@@ -88,6 +88,8 @@ The first two groups are where real bugs live.
   rule out. Count them, and show the line without the conversion or the guard.
 - A `Protocol` or `ABC` with one implementation, or an interface added only for a test.
 - Bare strings compared in several places where a `StrEnum` or `Literal` would do.
+- `setdefault(key, [])` on a dict that the function starts empty, where a
+  `collections.defaultdict(list)` would do (`python/setdefault-without-defaultdict`).
 
 **Module design**
 
