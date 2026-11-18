@@ -1,0 +1,44 @@
+{
+ "python": "3.13.18",
+ "executable": "/home/bsa/.cache/uv/builds-v0/.tmpxEJluf/bin/python",
+ "cpu": [
+  8
+ ],
+ "rows": [
+  {
+   "size": 1,
+   "kind": "int",
+   "input_bytes": {},
+   "calibration_load": "56.46 69.04 65.13",
+   "loops": {
+    "MDP": 1
+   },
+   "memory": {},
+   "attempts": [
+    {
+     "loadavg": [
+      "56.46 69.04 65.13",
+      "56.46 69.04 65.13",
+      "52.26 67.96 64.80"
+     ],
+     "samples": {
+      "MDP": [
+       1.233374315997935,
+       1.2231489650002914,
+       1.2256954420008697
+      ]
+     },
+     "stats": {
+      "MDP": {
+       "mean_s": 1.2274062409996986,
+       "sd_s": 0.00532302316987707
+      }
+     },
+     "ratios": {},
+     "max_cv": 0.004336806341754928
+    }
+   ],
+   "best": 0
+  }
+ ]
+}

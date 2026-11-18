@@ -1,0 +1,53 @@
+{
+ "python": "3.15.2",
+ "rows": [
+  {
+   "size": 10,
+   "kind": "int",
+   "first_calls": 10,
+   "repeat_calls": 0,
+   "bytes": 128,
+   "peak_construction_bytes": 0
+  },
+  {
+   "size": 10,
+   "kind": "str",
+   "first_calls": 10,
+   "repeat_calls": 0,
+   "bytes": 128,
+   "peak_construction_bytes": 0
+  },
+  {
+   "size": 1000,
+   "kind": "int",
+   "first_calls": 1000,
+   "repeat_calls": 0,
+   "bytes": 8048,
+   "peak_construction_bytes": 8048
+  },
+  {
+   "size": 1000,
+   "kind": "str",
+   "first_calls": 1000,
+   "repeat_calls": 0,
+   "bytes": 8048,
+   "peak_construction_bytes": 8048
+  },
+  {
+   "size": 100000,
+   "kind": "int",
+   "first_calls": 100000,
+   "repeat_calls": 0,
+   "bytes": 800048,
+   "peak_construction_bytes": 800048
+  },
+  {
+   "size": 100000,
+   "kind": "str",
+   "first_calls": 100000,
+   "repeat_calls": 0,
+   "bytes": 800048,
+   "peak_construction_bytes": 800048
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "python": "3.14.10",
+ "executable": "/home/bsa/.cache/uv/builds-v0/.tmpbkp3FW/bin/python",
+ "cpu": [
+  8
+ ],
+ "rows": [
+  {
+   "size": 1,
+   "kind": "int",
+   "input_bytes": {},
+   "calibration_load": "52.26 67.96 64.80",
+   "loops": {
+    "MDP": 1
+   },
+   "memory": {},
+   "attempts": [
+    {
+     "loadavg": [
+      "52.26 67.96 64.80",
+      "52.26 67.96 64.80",
+      "48.63 66.94 64.49"
+     ],
+     "samples": {
+      "MDP": [
+       0.5671819440030959,
+       0.5657719139999244,
+       0.5686257180059329
+      ]
+     },
+     "stats": {
+      "MDP": {
+       "mean_s": 0.5671931920029843,
+       "sd_s": 0.001426935252316503
+      }
+     },
+     "ratios": {},
+     "max_cv": 0.0025157834622052287
+    }
+   ],
+   "best": 0
+  }
+ ]
+}
