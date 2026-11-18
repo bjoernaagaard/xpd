@@ -1,0 +1,499 @@
+{
+  "version": "3.13.18",
+  "core": 4,
+  "commands": [
+    [
+      "/home/bsa/.cache/uv/builds-v0/.tmppj9Y4l/bin/python",
+      "bench/import_time.py",
+      "typing",
+      "warm",
+      "/home/bsa/worktrees/pdx/perf-posts-startup-af20001073160f3c/research/perf-posts/startup/.bench.JHNZHo/warm"
+    ],
+    [
+      "/home/bsa/.cache/uv/builds-v0/.tmppj9Y4l/bin/python",
+      "bench/import_time.py",
+      "typing",
+      "cold",
+      "/home/bsa/worktrees/pdx/perf-posts-startup-af20001073160f3c/research/perf-posts/startup/.bench.JHNZHo/cold"
+    ]
+  ],
+  "packages": {
+    "charset-normalizer": "3.5.2",
+    "requests": "2.34.2",
+    "langchain-protocol": "0.0.21",
+    "chardet": "6.0.0.post1",
+    "urllib3": "2.8.0",
+    "PyYAML": "6.0.3",
+    "truststore": "0.10.5",
+    "idna": "3.20",
+    "pandas": "3.1.1",
+    "cffi": "2.1.1",
+    "typing_extensions": "4.16.0",
+    "mbstrdecoder": "1.1.5",
+    "google-auth": "2.62.2",
+    "annotated-types": "0.8.0",
+    "pytablewriter": "1.2.1",
+    "dominate": "2.9.1",
+    "google-cloud-access-context-manager": "0.6.2",
+    "pydantic": "2.14.3",
+    "langgraph-checkpoint": "4.3.2",
+    "google-cloud-os-config": "1.26.0",
+    "mdurl": "0.1.2",
+    "tenacity": "9.2.1",
+    "cryptography": "50.0.2",
+    "google-cloud-asset": "4.5.0",
+    "text-unidecode": "1.3",
+    "websockets": "17.4",
+    "packaging": "26.3",
+    "python-slugify": "9.2.0",
+    "langsmith": "0.15.0",
+    "pytz": "2026.6",
+    "tabledata": "1.3.5",
+    "s3transfer": "0.19.3",
+    "grpcio": "1.85.3",
+    "termcolor": "3.3.0",
+    "six": "1.17.0",
+    "pydantic_core": "2.50.4",
+    "google-api-core": "2.44.0",
+    "prettytable": "3.19.0",
+    "grpcio-status": "1.85.3",
+    "langgraph": "1.2.12",
+    "ormsgpack": "1.13.1",
+    "DataProperty": "1.1.1",
+    "anyio": "4.16.0",
+    "wcwidth": "0.9.4",
+    "setuptools": "84.2.1",
+    "xxhash": "4.1.0",
+    "httpx2": "2.16.2",
+    "httpcore2": "2.16.2",
+    "orjson": "3.13.0",
+    "distro": "1.9.0",
+    "openapi-pydantic": "0.6.0",
+    "httpx": "0.28.1",
+    "pyasn1_modules": "0.4.2",
+    "python-dateutil": "2.9.0.post0",
+    "httpcore": "1.0.9",
+    "tcolorpy": "0.1.7",
+    "rich": "15.0.0",
+    "sniffio": "1.3.1",
+    "langchain-core": "1.8.2",
+    "botocore": "1.44.5",
+    "h11": "0.16.0",
+    "opentelemetry-api": "1.45.2",
+    "proto-plus": "1.29.0",
+    "zstandard": "0.25.0",
+    "protobuf": "7.36.2",
+    "googleapis-common-protos": "1.76.0",
+    "numpy": "2.5.5",
+    "langgraph-prebuilt": "1.1.2",
+    "jsonpointer": "3.12",
+    "boto3": "1.44.5",
+    "typing-inspection": "0.4.5",
+    "requests-toolbelt": "1.0.0",
+    "pathvalidate": "3.3.1",
+    "pycparser": "3.12",
+    "google-cloud-org-policy": "1.19.0",
+    "Pygments": "2.21.0",
+    "jmespath": "1.1.0",
+    "certifi": "2026.10.23",
+    "platformdirs": "4.14.7",
+    "jsonpatch": "1.47",
+    "typepy": "1.3.5",
+    "langgraph-sdk": "0.4.14",
+    "pypistats": "1.11.0",
+    "uuid_utils": "0.19.0",
+    "grpc-google-iam-v1": "0.14.6",
+    "pyasn1": "0.6.5",
+    "markdown-it-py": "4.3.0",
+    "pip": "26.2.2"
+  },
+  "attempts": [
+    {
+      "load": "28.04 56.55 61.06",
+      "cv": 0.01840103739456973,
+      "sample_loads": [
+        "warm 28.04 56.55 61.06",
+        "warm 28.04 56.55 61.06",
+        "warm 28.04 56.55 61.06",
+        "warm 28.04 56.55 61.06",
+        "warm 28.04 56.55 61.06",
+        "warm 28.04 56.55 61.06",
+        "warm 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06",
+        "cold 28.04 56.55 61.06"
+      ],
+      "summary": {
+        "warm": {
+          "mean_ms": 2.54,
+          "sd_ms": 0.046738634982207115,
+          "median_ms": 2.526,
+          "samples_ms": [
+            2.526,
+            2.609,
+            2.564,
+            2.507,
+            2.494
+          ]
+        },
+        "cold": {
+          "mean_ms": 22.0734,
+          "sd_ms": 0.16857431595590067,
+          "median_ms": 22.135,
+          "samples_ms": [
+            21.873,
+            21.917,
+            22.25,
+            22.192,
+            22.135
+          ]
+        }
+      },
+      "hyperfine": [
+        {
+          "command": "/home/bsa/.cache/uv/builds-v0/.tmppj9Y4l/bin/python bench/import_time.py typing warm /home/bsa/worktrees/pdx/perf-posts-startup-af20001073160f3c/research/perf-posts/startup/.bench.JHNZHo/warm",
+          "name": "warm",
+          "measurements": [
+            {
+              "time_wall_clock": {
+                "value": 0.026642480000000003,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.026570999999999997,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.023509,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.003062,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 15429632.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.027560204,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.02745,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.020701999999999998,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.006748,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 15495168.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.027277853,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.027197999999999996,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.020149999999999998,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.007048,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 15433728.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.026457079,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.026381999999999996,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.019545999999999997,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.006836,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 15441920.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.025982533000000002,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.025925,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.022986,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.0029389999999999998,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 15478784.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            }
+          ],
+          "summary": {
+            "memory_peak_resident": {
+              "unit": "byte",
+              "count": 5,
+              "mean": 15455846.4,
+              "stddev": 29337.19790300362,
+              "median": 15441920.0,
+              "min": 15429632.0,
+              "max": 15495168.0
+            },
+            "time_cpu": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.026705200000000002,
+              "stddev": 0.0006182149302629301,
+              "median": 0.026570999999999997,
+              "min": 0.025925,
+              "max": 0.02745
+            },
+            "time_system": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.0053266,
+              "stddev": 0.0021266717659291006,
+              "median": 0.006748,
+              "min": 0.0029389999999999998,
+              "max": 0.007048
+            },
+            "time_user": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.021378599999999998,
+              "stddev": 0.0017640866758750835,
+              "median": 0.020701999999999998,
+              "min": 0.019545999999999997,
+              "max": 0.023509
+            },
+            "time_wall_clock": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.026784029800000005,
+              "stddev": 0.0006355387544270605,
+              "median": 0.026642480000000003,
+              "min": 0.025982533000000002,
+              "max": 0.027560204
+            }
+          }
+        },
+        {
+          "command": "/home/bsa/.cache/uv/builds-v0/.tmppj9Y4l/bin/python bench/import_time.py typing cold /home/bsa/worktrees/pdx/perf-posts-startup-af20001073160f3c/research/perf-posts/startup/.bench.JHNZHo/cold",
+          "name": "cold",
+          "measurements": [
+            {
+              "time_wall_clock": {
+                "value": 0.050530854,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.050435999999999995,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.043539999999999995,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.006895999999999999,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 20365312.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.050898171000000006,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.050803999999999995,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.037859,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.012945,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 20389888.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.051280153,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.051171,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.043983,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.007188,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 20406272.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.051511813000000004,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.051434,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.045479,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.005954999999999999,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 20389888.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            },
+            {
+              "time_wall_clock": {
+                "value": 0.051010001000000006,
+                "unit": "second"
+              },
+              "time_cpu": {
+                "value": 0.050899,
+                "unit": "second"
+              },
+              "time_user": {
+                "value": 0.042127,
+                "unit": "second"
+              },
+              "time_system": {
+                "value": 0.008772,
+                "unit": "second"
+              },
+              "memory_peak_resident": {
+                "value": 20389888.0,
+                "unit": "byte"
+              },
+              "exit_code": 0
+            }
+          ],
+          "summary": {
+            "memory_peak_resident": {
+              "unit": "byte",
+              "count": 5,
+              "mean": 20388249.6,
+              "stddev": 14654.295097342621,
+              "median": 20389888.0,
+              "min": 20365312.0,
+              "max": 20406272.0
+            },
+            "time_cpu": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.050948799999999995,
+              "stddev": 0.0003778897987509083,
+              "median": 0.050899,
+              "min": 0.050435999999999995,
+              "max": 0.051434
+            },
+            "time_system": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.0083512,
+              "stddev": 0.0027610001267656618,
+              "median": 0.007188,
+              "min": 0.005954999999999999,
+              "max": 0.012945
+            },
+            "time_user": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.0425976,
+              "stddev": 0.002906273868719189,
+              "median": 0.043539999999999995,
+              "min": 0.037859,
+              "max": 0.045479
+            },
+            "time_wall_clock": {
+              "unit": "second",
+              "count": 5,
+              "mean": 0.051046198400000006,
+              "stddev": 0.0003742772782721394,
+              "median": 0.051010001000000006,
+              "min": 0.050530854,
+              "max": 0.051511813000000004
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "stdout": "typing\n",
+  "hyperfine_version": "2.0.0",
+  "best": 0
+}

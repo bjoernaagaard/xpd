@@ -1,0 +1,1042 @@
+# Linux on x86_64. Each attempt pins one paired hyperfine invocation to one core
+# using taskset on core 4. Hyperfine 2 runs two warmups and five fresh processes
+# per form. A coefficient of variation above 5 percent triggers another attempt,
+# up to three attempts. The reported attempt minimizes the largest coefficient
+# of variation across its forms. All attempts stay in the raw file.
+#
+# Values are milliseconds. SD is the sample standard deviation. Module probes
+# report cumulative importtime from the child. Other rows measure elapsed process
+# time. The load averages span one, five and fifteen minutes respectively.
+# On 3.13 and 3.14 the explicit lazy keyword fails the syntax check before timing.
+# Single eager rows on those versions are controls. They are not lazy timings.
+# The 3.15 typing matrix times all three interpreters together. Commands and
+# filenames in the raw output describe the original run. Use run.sh to resolve
+# the paths on another machine. An import can defer exceptions and side effects.
+#
+# For comparable ratios, direction-only means the gap exceeded the observed
+# scatter but its size differed by more than 25 percent from the published ratio,
+# or the code or method only allowed a partial comparison. This descriptive
+# tolerance is not a confidence interval.
+- url: https://stevenpg.com/posts/python-3-15-lazy-imports-free-threading/
+  title: 'Python 3.15 Lazy Imports and Free-Threading: A Benchmark for People Who Write CLIs and Services'
+  author: StevenPG
+  published: '2026-09-21'
+  python_measured: 3.14.8 and 3.15.0
+  claim: Deferring the imports in fleetctl shortens the version command on 3.15. The module list has no effect
+    on 3.14.
+  author_numbers: Linux medians in ms from the October 18 update. On 3.15 eager took 248.9, explicit lazy took
+    38.0 and the module list took 35.8. On 3.14 eager took 246.4 and the list took 255.0. The author launched
+    each command 30 times after one warmup.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: The version path reconstructs the imports and subparser dispatch from StevenPG/DemosAndArticleContent
+    at 8303038175b07791aa5826708cb933a6675089cc. Network and archive commands are omitted.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh fleet
+    interpreter_versions: &id001
+    - 3.13.18
+    - 3.14.10
+    - 3.15.2
+    raw: runs/fleet-3.15.2.json
+    numbers:
+    - raw: runs/fleet-3.13.18.json
+      attempt: 1
+      load_average: 37.95 60.72 62.49
+      numbers:
+        eager:
+          mean_ms: 119.7106
+          sd_ms: 1.88
+          median_ms: 118.9377
+        module_list:
+          mean_ms: 112.4793
+          sd_ms: 0.8475
+          median_ms: 112.8095
+      noisy: false
+    - raw: runs/fleet-3.14.10.json
+      attempt: 1
+      load_average: 37.95 60.72 62.49
+      numbers:
+        eager:
+          mean_ms: 118.032
+          sd_ms: 0.7788
+          median_ms: 118.0521
+        module_list:
+          mean_ms: 117.4585
+          sd_ms: 0.7879
+          median_ms: 117.4036
+      noisy: false
+    - raw: runs/fleet-3.15.2.json
+      attempt: 1
+      load_average: 35.39 59.81 62.19
+      numbers:
+        eager:
+          mean_ms: 112.7798
+          sd_ms: 1.45
+          median_ms: 112.2994
+        lazy:
+          mean_ms: 13.6055
+          sd_ms: 0.1303
+          median_ms: 13.5829
+        module_list:
+          mean_ms: 13.842
+          sd_ms: 0.1852
+          median_ms: 13.8307
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to lazy was 8.29. The published ratio was 6.55.
+  noisy: false
+- url: https://hugovk.dev/blog/2025/lazy-imports/
+  title: Three times faster with lazy imports
+  author: Hugo van Kemenade
+  published: '2025-10-19'
+  python_measured: 3.15.0a0 reference implementation identifying as 3.14.0a0
+  claim: Global lazy imports shorten pypistats help most when its imports sit at the top.
+  author_numbers: Hyperfine means over 20 runs after ten warmups. With inline imports, 46.2 ± 1.1 ms eager
+    and 35.3 ± 0.5 ms lazy. With top level imports, 104.1 ± 1.6 ms eager and 35.7 ± 0.5 ms lazy.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: The local parser reconstructs the help path and the heavy imports moved in hugovk/pypistats at
+    646bc6f70656df26d55a0bf4977a878a2b4379e5 and its parent. Neither the full package nor its network and configuration
+    functions run.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh stats
+    interpreter_versions: *id001
+    raw: runs/stats-3.15.2.json
+    numbers:
+    - raw: runs/stats-3.13.18.json
+      attempt: 1
+      load_average: 29.87 57.39 61.36
+      numbers:
+        inline:
+          mean_ms: 22.7417
+          sd_ms: 0.4776
+          median_ms: 22.6722
+        top:
+          mean_ms: 97.176
+          sd_ms: 0.992
+          median_ms: 96.8705
+      noisy: false
+    - raw: runs/stats-3.14.10.json
+      attempt: 1
+      load_average: 29.87 57.39 61.36
+      numbers:
+        inline:
+          mean_ms: 32.1025
+          sd_ms: 0.3672
+          median_ms: 31.9442
+        top:
+          mean_ms: 101.3811
+          sd_ms: 0.7018
+          median_ms: 101.4507
+      noisy: false
+    - raw: runs/stats-3.15.2.json
+      attempt: 1
+      load_average: 28.04 56.55 61.06
+      numbers:
+        inline:
+          mean_ms: 31.5959
+          sd_ms: 0.4365
+          median_ms: 31.4711
+        top:
+          mean_ms: 105.0751
+          sd_ms: 1.1793
+          median_ms: 105.6386
+        inline_global:
+          mean_ms: 20.8928
+          sd_ms: 0.3248
+          median_ms: 20.7708
+        top_global:
+          mean_ms: 21.2422
+          sd_ms: 0.4559
+          median_ms: 21.2229
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for top to top_global was 4.95. The published ratio was 2.92.
+  noisy: false
+  limits: The post used an experimental interpreter, different binary wheels and the draft switch value on.
+    Only 3.15.2 supports global mode in the rerun.
+- url: https://www.crumpledpaper.tech/2026-06-21-python-struct-profiling/
+  title: The Fastest Python Struct?
+  author: JP Hutchins
+  published: '2026-06-21'
+  python_measured: 3.14.0
+  claim: Compiling the import tree from source costs more than loading cached bytecode for typing and dataclasses.
+  author_numbers: Table 2 reports cumulative importtime medians in ms. Warm then cold were 4.0 and 33.9 for
+    typing and 11.5 and 81.9 for dataclasses.
+  mechanism: SourceLoader.get_code loads a valid bytecode cache or compiles the source. https://raw.githubusercontent.com/python/cpython/v3.14.0/Lib/importlib/_bootstrap_external.py#L829
+  xpd: none
+  provenance: The local importtime driver reconstructs the dependency measurement from JPHutchins/python-struct-profiling
+    at d8acfd5f63824b87b24e820e6f6859e0194da4c6. Cold samples each use a new cache directory.
+  script: bench/import_time.py
+  rerun:
+    command: ./run.sh struct
+    interpreter_versions: *id001
+    raw: runs/struct-dataclasses-3.14.10.json
+    numbers:
+    - raw: runs/struct-dataclasses-3.13.18.json
+      attempt: 1
+      load_average: 28.04 56.55 61.06
+      numbers:
+        warm:
+          mean_ms: 8.6388
+          sd_ms: 0.1144
+          median_ms: 8.656
+        cold:
+          mean_ms: 68.9804
+          sd_ms: 0.3983
+          median_ms: 69.013
+      noisy: false
+    - raw: runs/struct-dataclasses-3.14.10.json
+      attempt: 1
+      load_average: 28.04 56.55 61.06
+      numbers:
+        warm:
+          mean_ms: 7.2318
+          sd_ms: 0.0137
+          median_ms: 7.228
+        cold:
+          mean_ms: 60.2084
+          sd_ms: 0.1912
+          median_ms: 60.299
+      noisy: false
+    - raw: runs/struct-dataclasses-3.15.2.json
+      attempt: 1
+      load_average: 26.43 55.74 60.78
+      numbers:
+        warm:
+          mean_ms: 2.2726
+          sd_ms: 0.0849
+          median_ms: 2.289
+        cold:
+          mean_ms: 19.7692
+          sd_ms: 0.0813
+          median_ms: 19.815
+      noisy: false
+    - raw: runs/struct-typing-3.13.18.json
+      attempt: 1
+      load_average: 28.04 56.55 61.06
+      numbers:
+        warm:
+          mean_ms: 2.54
+          sd_ms: 0.0467
+          median_ms: 2.526
+        cold:
+          mean_ms: 22.0734
+          sd_ms: 0.1686
+          median_ms: 22.135
+      noisy: false
+    - raw: runs/struct-typing-3.14.10.json
+      attempt: 1
+      load_average: 28.04 56.55 61.06
+      numbers:
+        warm:
+          mean_ms: 2.6092
+          sd_ms: 0.0218
+          median_ms: 2.604
+        cold:
+          mean_ms: 24.4024
+          sd_ms: 0.1838
+          median_ms: 24.386
+      noisy: false
+    - raw: runs/struct-typing-3.15.2.json
+      attempt: 1
+      load_average: 26.43 55.74 60.78
+      numbers:
+        warm:
+          mean_ms: 2.4926
+          sd_ms: 0.0382
+          median_ms: 2.483
+        cold:
+          mean_ms: 24.4822
+          sd_ms: 0.1856
+          median_ms: 24.458
+      noisy: false
+  verdict: reproduced
+  reason: The mean ratio for cold to warm was 8.33. Compare the 3.14.10 typing and dataclasses rows to Table
+    2. The ratio above uses dataclasses on 3.14.10.
+  noisy: false
+  limits: Cold refers to bytecode. The filesystem cache stays warm. The scope here is the two standard library
+    dependencies in Table 2.
+- url: https://huseyinbabal.dev/posts/python-3-15-measured/
+  title: 'Python 3.15, measured: lazy imports, the Tachyon profiler and the JIT on four workloads'
+  author: Huseyin Babal
+  published: '2026-10-12'
+  python_measured: 3.15.0
+  claim: Deferring nine unused standard library imports reduces the time to print ready.
+  author_numbers: Median over 20 process launches. Eager took 45.0 ms and lazy took 11.3 ms.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: none
+  provenance: The local programs import the nine published modules in order and print the same readiness message.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh nine
+    interpreter_versions: *id001
+    raw: runs/nine-3.15.2.json
+    numbers:
+    - raw: runs/nine-3.13.18.json
+      attempt: 2
+      load_average: 40.11 62.62 63.12
+      numbers:
+        eager:
+          mean_ms: 60.3638
+          sd_ms: 1.9458
+          median_ms: 59.8907
+      noisy: false
+    - raw: runs/nine-3.14.10.json
+      attempt: 2
+      load_average: 40.11 62.62 63.12
+      numbers:
+        eager:
+          mean_ms: 63.1858
+          sd_ms: 0.521
+          median_ms: 63.0252
+      noisy: false
+    - raw: runs/nine-3.15.2.json
+      attempt: 1
+      load_average: 40.42 63.44 63.39
+      numbers:
+        eager:
+          mean_ms: 60.5004
+          sd_ms: 1.1156
+          median_ms: 60.9826
+        lazy:
+          mean_ms: 8.3841
+          sd_ms: 0.095
+          median_ms: 8.4278
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to lazy was 7.22. The published ratio was 3.98.
+  noisy: false
+- url: https://lemire.me/blog/2026/10/09/faster-python-startup-with-lazy-imports/
+  title: Faster Python startup with lazy imports
+  author: Daniel Lemire
+  published: '2026-10-09'
+  python_measured: 3.15.0b4
+  claim: Deferring sixteen imports helps the version and mean commands more than the stats command that uses
+    pandas.
+  author_numbers: The author's raw output gives eager and lazy medians in ms over 41 runs. Version took 295.1
+    and 20.0, mean took 295.6 and 23.9, and stats took 299.3 and 224.4.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: The local program reconstructs the sixteen imports and the three measured paths from lemire/Code-used-on-Daniel-Lemire-s-blog
+    at ff545779896e53ab5a618cd705718bf656fb9bbf. It reads only the generated CSV in its temporary directory.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh lemire
+    interpreter_versions: *id001
+    raw: runs/lemire-3.15.2.json
+    numbers:
+    - raw: runs/lemire-3.13.18.json
+      attempt: 1
+      load_average: 35.39 59.81 62.19
+      numbers:
+        eager:
+          mean_ms: 229.4799
+          sd_ms: 6.8143
+          median_ms: 232.0526
+      noisy: false
+    - raw: runs/lemire-3.14.10.json
+      attempt: 1
+      load_average: 33.27 58.97 61.90
+      numbers:
+        eager:
+          mean_ms: 238.5227
+          sd_ms: 2.6234
+          median_ms: 238.185
+      noisy: false
+    - raw: runs/lemire-3.15.2.json
+      attempt: 1
+      load_average: 33.27 58.97 61.90
+      numbers:
+        eager:
+          mean_ms: 231.7512
+          sd_ms: 6.1584
+          median_ms: 228.6545
+        lazy:
+          mean_ms: 21.0924
+          sd_ms: 0.1716
+          median_ms: 21.1187
+      noisy: false
+    - raw: runs/lemire-mean-3.15.2.json
+      attempt: 1
+      load_average: 31.25 58.12 61.61
+      numbers:
+        eager:
+          mean_ms: 227.9197
+          sd_ms: 2.2159
+          median_ms: 227.9415
+        lazy:
+          mean_ms: 15.2864
+          sd_ms: 0.1346
+          median_ms: 15.2974
+      noisy: false
+    - raw: runs/lemire-stats-3.15.2.json
+      attempt: 2
+      load_average: 29.87 57.39 61.36
+      numbers:
+        eager:
+          mean_ms: 225.1443
+          sd_ms: 3.7664
+          median_ms: 223.4023
+        lazy:
+          mean_ms: 145.1072
+          sd_ms: 1.8704
+          median_ms: 145.344
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to lazy was 10.99. The published ratio was 14.76. The mean and stats commands
+    also check what happens when the CLI reads the deferred imports.
+  noisy: false
+- url: https://jacar.es/en/python-3-15-whats-new/
+  title: 'Python 3.15: lazy imports, frozendict and what changes, tested in Docker'
+  author: Javier Cañete
+  published: '2026-10-15'
+  python_measured: 3.14.7 and 3.15.0rc2
+  claim: The version flag avoids loading requests, yaml, rich and three other imports that serve the report
+    command.
+  author_numbers: In the 3.15 release candidate container, eager took 73.5 ms and lazy took 9.8 ms median.
+    Eager took 66.4 ms on 3.14.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: The local version action uses the six published optional imports. The article omits the complete
+    parser.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh docker
+    interpreter_versions: *id001
+    raw: runs/docker-3.15.2.json
+    numbers:
+    - raw: runs/docker-3.13.18.json
+      attempt: 1
+      load_average: 40.64 61.63 62.79
+      numbers:
+        eager:
+          mean_ms: 146.1672
+          sd_ms: 4.3868
+          median_ms: 144.7735
+      noisy: false
+    - raw: runs/docker-3.14.10.json
+      attempt: 1
+      load_average: 40.64 61.63 62.79
+      numbers:
+        eager:
+          mean_ms: 150.6358
+          sd_ms: 1.5139
+          median_ms: 150.4303
+      noisy: false
+    - raw: runs/docker-3.15.2.json
+      attempt: 3
+      load_average: 37.95 60.72 62.49
+      numbers:
+        eager:
+          mean_ms: 125.0574
+          sd_ms: 1.7225
+          median_ms: 124.4267
+        lazy:
+          mean_ms: 23.583
+          sd_ms: 0.3542
+          median_ms: 23.5471
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to lazy was 5.30. The published ratio was 7.50.
+  noisy: false
+  limits: Only the six imports and the early exit are known. The exact program and container differ.
+- url: https://sxz.io/python-315-lazy-imports-startup-time-tutorial/
+  title: How to Cut a Python Command Line Tool’s Startup Time With Python 3.15 Lazy Imports
+  author: Amir
+  published: '2026-10-04'
+  python_measured: 3.15.0rc3
+  claim: Deferring seven imports reduces invtool startup for its version command.
+  author_numbers: Windows process launch medians were 128.7 ms eager and 62.2 ms lazy in the final comparison.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: The local parser registers the five subcommands and reconstructs the seven optional imports.
+    It omits their handlers, including the network client.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh sxz
+    interpreter_versions: *id001
+    raw: runs/sxz-3.15.2.json
+    numbers:
+    - raw: runs/sxz-3.13.18.json
+      attempt: 1
+      load_average: 40.11 62.62 63.12
+      numbers:
+        eager:
+          mean_ms: 56.3367
+          sd_ms: 0.5868
+          median_ms: 56.3563
+      noisy: false
+    - raw: runs/sxz-3.14.10.json
+      attempt: 3
+      load_average: 40.02 62.23 62.99
+      numbers:
+        eager:
+          mean_ms: 62.42
+          sd_ms: 0.5496
+          median_ms: 62.3359
+      noisy: false
+    - raw: runs/sxz-3.15.2.json
+      attempt: 3
+      load_average: 40.02 62.23 62.99
+      numbers:
+        eager:
+          mean_ms: 69.362
+          sd_ms: 2.2409
+          median_ms: 68.7808
+        lazy:
+          mean_ms: 30.6061
+          sd_ms: 0.9791
+          median_ms: 30.2714
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to lazy was 2.27. The published ratio was 2.07.
+  noisy: false
+- url: https://www.danilchenko.dev/posts/python-lazy-imports/
+  title: 'Python Lazy Imports (PEP 810): The Startup Speedup, Benchmarked'
+  author: Maksim Danilchenko
+  published: '2026-07-24'
+  python_measured: 3.12.3 in the post. The July 2026 programs run unchanged on all three pins.
+  claim: Putting the boto3 import inside the upload branch shortens the version path.
+  author_numbers: Best of fifteen fresh process launches on Linux. The version command took 394 ms eager and
+    48 ms with the function import.
+  mechanism: CPython executes IMPORT_NAME when control reaches the statement. https://raw.githubusercontent.com/python/cpython/v3.14.0/Python/bytecodes.c#L2871
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: The local version path imports boto3 eagerly or puts that import inside an uncalled function.
+    Neither program creates an AWS client.
+  script: bench/workloads.py
+  rerun:
+    command: ./run.sh boto
+    interpreter_versions: *id001
+    raw: runs/boto-3.15.2.json
+    numbers:
+    - raw: runs/boto-3.13.18.json
+      attempt: 2
+      load_average: 40.02 62.23 62.99
+      numbers:
+        eager:
+          mean_ms: 111.3804
+          sd_ms: 0.8783
+          median_ms: 111.572
+        lazy:
+          mean_ms: 8.3213
+          sd_ms: 0.0912
+          median_ms: 8.3073
+      noisy: false
+    - raw: runs/boto-3.14.10.json
+      attempt: 1
+      load_average: 40.26 61.91 62.89
+      numbers:
+        eager:
+          mean_ms: 118.6553
+          sd_ms: 1.5852
+          median_ms: 118.5376
+        lazy:
+          mean_ms: 8.8026
+          sd_ms: 0.2056
+          median_ms: 8.7101
+      noisy: false
+    - raw: runs/boto-3.15.2.json
+      attempt: 2
+      load_average: 40.26 61.91 62.89
+      numbers:
+        eager:
+          mean_ms: 116.8899
+          sd_ms: 4.4698
+          median_ms: 117.7723
+        lazy:
+          mean_ms: 8.423
+          sd_ms: 0.0489
+          median_ms: 8.4155
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to lazy was 13.88. The published ratio was 8.21.
+  noisy: false
+- url: https://darren.codes/posts/python-startup-time/
+  title: Improving Posting's startup time by over 40%
+  author: Darren Burns
+  published: '2025-03-13'
+  python_measured: The author does not give the patch or minor version. The March 2025 import runs unchanged
+    on 3.13.
+  claim: The OpenAPI parser alone accounts for most of the import time attributed to posting.importing.open_api.
+  author_numbers: The M4 importtime trace reports 62.952 ms cumulative for openapi_pydantic under a 63.048
+    ms parent.
+  mechanism: CPython executes IMPORT_NAME when control reaches the statement. https://raw.githubusercontent.com/python/cpython/v3.14.0/Python/bytecodes.c#L2871
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: bench/import_time.py reconstructs the openapi_pydantic import from the published trace. The fresh
+    process measures the package without Posting's other imports.
+  script: bench/import_time.py
+  rerun:
+    command: ./run.sh posting
+    interpreter_versions: *id001
+    raw: runs/posting-openapi_pydantic-3.15.2.json
+    numbers:
+    - raw: runs/posting-openapi_pydantic-3.13.18.json
+      attempt: 1
+      load_average: 26.43 55.74 60.78
+      numbers:
+        warm:
+          mean_ms: 82.6454
+          sd_ms: 0.9362
+          median_ms: 82.899
+        cold:
+          mean_ms: 297.603
+          sd_ms: 1.4445
+          median_ms: 297.081
+      noisy: false
+    - raw: runs/posting-openapi_pydantic-3.14.10.json
+      attempt: 1
+      load_average: 24.80 54.92 60.48
+      numbers:
+        warm:
+          mean_ms: 85.7532
+          sd_ms: 0.5455
+          median_ms: 85.65
+        cold:
+          mean_ms: 323.9176
+          sd_ms: 5.1193
+          median_ms: 322.642
+      noisy: false
+    - raw: runs/posting-openapi_pydantic-3.15.2.json
+      attempt: 2
+      load_average: 23.29 54.10 60.19
+      numbers:
+        warm:
+          mean_ms: 81.6572
+          sd_ms: 0.5177
+          median_ms: 81.632
+        cold:
+          mean_ms: 321.4008
+          sd_ms: 3.8697
+          median_ms: 320.364
+      noisy: false
+  verdict: not-rerunnable
+  reason: The standalone import proves the dependency has a startup cost. The contribution to Posting requires
+    the original parent import graph.
+  noisy: false
+  limits: This isolates the parser dependency. Neither cache state reproduces the full Posting import graph
+    or time to first paint.
+- url: https://enjii.pages.dev/blog/Optimizations/vex_startup_time_optimization/
+  title: 'Architecture Deep Dive: Startup Time & Import Optimization'
+  author: Enji
+  published: '2026-10-01'
+  python_measured: The article gives no minor version. The October 2026 example runs on all three pins.
+  claim: Reading the END constant through LangGraph loads dependencies that a literal can avoid.
+  author_numbers: The author attributes 1.36 s to the import from langgraph.graph.state in the Tuna profile.
+  mechanism: CPython executes IMPORT_NAME when control reaches the statement. https://raw.githubusercontent.com/python/cpython/v3.14.0/Python/bytecodes.c#L2871
+  xpd: none
+  provenance: bench/measure.py reconstructs the two END assignments. It verifies the string printed by each.
+    LangGraph 1.2.12 comes from the VEX lockfile at f934f55.
+  script: bench/measure.py
+  rerun:
+    command: ./run.sh vex
+    interpreter_versions: *id001
+    raw: runs/vex-3.15.2.json
+    numbers:
+    - raw: runs/vex-3.13.18.json
+      attempt: 1
+      load_average: 21.91 53.31 59.90
+      numbers:
+        imported:
+          mean_ms: 368.9274
+          sd_ms: 8.3348
+          median_ms: 369.2951
+        literal:
+          mean_ms: 6.5438
+          sd_ms: 0.0555
+          median_ms: 6.5302
+      noisy: false
+    - raw: runs/vex-3.14.10.json
+      attempt: 1
+      load_average: 20.95 52.59 59.63
+      numbers:
+        imported:
+          mean_ms: 436.3562
+          sd_ms: 9.6973
+          median_ms: 431.0753
+        literal:
+          mean_ms: 7.2986
+          sd_ms: 0.2949
+          median_ms: 7.2161
+      noisy: false
+    - raw: runs/vex-3.15.2.json
+      attempt: 2
+      load_average: 19.75 51.81 59.34
+      numbers:
+        imported:
+          mean_ms: 370.5752
+          sd_ms: 8.2189
+          median_ms: 367.0694
+        literal:
+          mean_ms: 6.2547
+          sd_ms: 0.1255
+          median_ms: 6.225
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for imported to literal was 59.25. The comparison uses the same string on both paths.
+  noisy: false
+  limits: The isolated process delta includes startup and misses imports already resident in VEX. The source
+    diff used langgraph.graph for the old import while the post names langgraph.graph.state.
+- url: https://blog.pecar.me/speeding-up-django-startup-times-with-lazy-imports/
+  title: Speeding Up Django Startup Times with Lazy Imports
+  author: Anže Pečar
+  published: '2026-03-22'
+  python_measured: The author does not name the application's interpreter. The March 2026 SDK import runs unchanged
+    on 3.13.
+  claim: Deferring the unused Google Cloud asset client removes an expensive dependency from an early exit.
+  author_numbers: The Fancer importtime trace assigns 2277.1 ms cumulative to google.cloud.asset_v1. The complete
+    Django check fell from 9.45 s to 2.17 s after several changes.
+  mechanism: CPython executes IMPORT_NAME when control reaches the statement. https://raw.githubusercontent.com/python/cpython/v3.14.0/Python/bytecodes.c#L2871
+  xpd: Consider flagging an expensive top level import used by only one CLI subcommand when the other commands
+    can run without it.
+  provenance: bench/measure.py uses the article's exact client import before or inside an uncalled function.
+    Both print ready.
+  script: bench/measure.py
+  rerun:
+    command: ./run.sh django
+    interpreter_versions: *id001
+    raw: runs/django-3.15.2.json
+    numbers:
+    - raw: runs/django-3.13.18.json
+      attempt: 2
+      load_average: 18.65 51.05 59.06
+      numbers:
+        eager:
+          mean_ms: 214.4998
+          sd_ms: 7.847
+          median_ms: 215.0782
+        deferred:
+          mean_ms: 6.932
+          sd_ms: 0.149
+          median_ms: 6.8974
+      noisy: false
+    - raw: runs/django-3.14.10.json
+      attempt: 2
+      load_average: 18.04 50.39 58.80
+      numbers:
+        eager:
+          mean_ms: 218.5644
+          sd_ms: 5.1656
+          median_ms: 219.0611
+        deferred:
+          mean_ms: 7.3676
+          sd_ms: 0.1551
+          median_ms: 7.2747
+      noisy: false
+    - raw: runs/django-3.15.2.json
+      attempt: 2
+      load_average: 17.40 49.72 58.54
+      numbers:
+        eager:
+          mean_ms: 309.9865
+          sd_ms: 10.4127
+          median_ms: 307.9693
+        deferred:
+          mean_ms: 10.2263
+          sd_ms: 0.1497
+          median_ms: 10.164
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for eager to deferred was 30.31. The paired delta is for the client import only.
+  noisy: false
+  limits: The application and dependency pins are unpublished. The paired times measure the SDK in isolation.
+    They cannot establish the Django speedup.
+- url: https://discuss.python.org/t/static-analysis-at-odds-with-runtime-goals/76319/8
+  title: Static analysis at odds with runtime goals, reply 8
+  author: Shantanu Jain
+  published: '2025-01-07'
+  python_measured: 3.13.1
+  claim: A fresh interpreter takes longer to import typing than to run pass.
+  author_numbers: Hyperfine means were 22.3 ± 3.4 ms with typing and 18.6 ± 4.1 ms with pass.
+  mechanism: CPython executes IMPORT_NAME when control reaches the statement. https://raw.githubusercontent.com/python/cpython/v3.14.0/Python/bytecodes.c#L2871
+  xpd: none
+  provenance: bench/measure.py rebuilds the two inline hyperfine commands.
+  script: bench/measure.py
+  rerun:
+    command: ./run.sh typing
+    interpreter_versions: *id001
+    raw: runs/typing-3.15.2.json
+    numbers:
+    - raw: runs/typing-3.15.2.json
+      attempt: 1
+      load_average: 16.80 49.06 58.28
+      numbers:
+        3.13.18_empty:
+          mean_ms: 5.9677
+          sd_ms: 0.1008
+          median_ms: 6.0077
+        3.13.18_typing:
+          mean_ms: 9.1252
+          sd_ms: 0.0683
+          median_ms: 9.1403
+        3.14.10_empty:
+          mean_ms: 6.1065
+          sd_ms: 0.0686
+          median_ms: 6.1084
+        3.14.10_typing:
+          mean_ms: 9.2675
+          sd_ms: 0.0763
+          median_ms: 9.2417
+        3.15.2_empty:
+          mean_ms: 6.0639
+          sd_ms: 0.149
+          median_ms: 6.0076
+        3.15.2_typing:
+          mean_ms: 9.1342
+          sd_ms: 0.2243
+          median_ms: 9.197
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for 3.13.18_typing to 3.13.18_empty was 1.53. The author measured 1.20.
+  noisy: false
+- url: https://discuss.python.org/t/pep-749-implementing-pep-649/54974/57
+  title: 'PEP 749: Implementing PEP 649, reply 57'
+  author: David Ellis
+  published: '2025-04-02'
+  python_measured: 3.13.2 and 3.14.0a6
+  claim: The added cost of importing typing increased from 3.13 to the 3.14 alpha.
+  author_numbers: Over 50 runs the 3.13 means were 18.1 ms empty and 25.3 ms with typing. On the alpha they
+    were 17.7 and 35.4 ms.
+  mechanism: The release version of typing loads annotationlib through a proxy. https://raw.githubusercontent.com/python/cpython/v3.14.0/Lib/typing.py#L165
+  xpd: none
+  provenance: bench/measure.py runs the two inline commands from each released interpreter in one hyperfine
+    invocation. Pass supplies the empty baseline.
+  script: bench/measure.py
+  rerun:
+    command: ./run.sh typing
+    interpreter_versions: *id001
+    raw: runs/typing-3.15.2.json
+    numbers:
+    - raw: runs/typing-3.15.2.json
+      attempt: 1
+      load_average: 16.80 49.06 58.28
+      numbers:
+        3.13.18_empty:
+          mean_ms: 5.9677
+          sd_ms: 0.1008
+          median_ms: 6.0077
+        3.13.18_typing:
+          mean_ms: 9.1252
+          sd_ms: 0.0683
+          median_ms: 9.1403
+        3.14.10_empty:
+          mean_ms: 6.1065
+          sd_ms: 0.0686
+          median_ms: 6.1084
+        3.14.10_typing:
+          mean_ms: 9.2675
+          sd_ms: 0.0763
+          median_ms: 9.2417
+        3.15.2_empty:
+          mean_ms: 6.0639
+          sd_ms: 0.149
+          median_ms: 6.0076
+        3.15.2_typing:
+          mean_ms: 9.1342
+          sd_ms: 0.2243
+          median_ms: 9.197
+      noisy: false
+  verdict: not-reproduced
+  reason: The import to empty process ratio was 1.53 on 3.13.18 and 1.52 on 3.14.10. The published ratios were
+    1.40 and 2.00.
+  noisy: false
+- url: https://pydepth.com/blog/what-import-actually-does/
+  title: What import Actually Does
+  author: Elliot Sayer
+  published: '2026-07-23'
+  python_measured: 3.13.2
+  claim: Importing asyncio loads more modules and costs more than importing the email package alone.
+  author_numbers: The author's fresh interpreter reported 21.9 ms and 100 additional modules for asyncio and
+    0.1 ms and one additional module for email.
+  mechanism: CPython executes IMPORT_NAME when control reaches the statement. https://raw.githubusercontent.com/python/cpython/v3.14.0/Python/bytecodes.c#L2871
+  xpd: none
+  provenance: The local probe reconstructs the fresh interpreter command from CognatePress/erperiments.pydepth.com
+    at fd39ff031d6790240aae1f7f0eed4e7c196017e6. Each observation stores cumulative microseconds and the resident
+    module count.
+  script: bench/graph.py
+  rerun:
+    command: ./run.sh module
+    interpreter_versions: *id001
+    raw: runs/module-3.13.18.json
+    numbers:
+    - raw: runs/module-3.13.18.json
+      attempt: 1
+      load_average: 18.05 48.28 57.92
+      numbers:
+        asyncio:
+          mean_ms: 34.1558
+          sd_ms: 0.7754
+          median_ms: 33.747
+        email:
+          mean_ms: 0.1008
+          sd_ms: 0.0026
+          median_ms: 0.1
+      noisy: false
+    - raw: runs/module-3.14.10.json
+      attempt: 1
+      load_average: 18.05 48.28 57.92
+      numbers:
+        asyncio:
+          mean_ms: 42.641
+          sd_ms: 1.2984
+          median_ms: 42.627
+        email:
+          mean_ms: 0.1
+          sd_ms: 0.0037
+          median_ms: 0.101
+      noisy: false
+    - raw: runs/module-3.15.2.json
+      attempt: 3
+      load_average: 18.05 48.28 57.92
+      numbers:
+        asyncio:
+          mean_ms: 20.7232
+          sd_ms: 0.1562
+          median_ms: 20.721
+        email:
+          mean_ms: 0.0748
+          sd_ms: 0.0037
+          median_ms: 0.074
+      noisy: false
+  verdict: direction-only
+  reason: The mean ratio for asyncio to email was 338.85. The published ratio was 219.00.
+  noisy: false
+- url: https://pydepth.com/blog/import-time-is-not-import-cost/
+  title: Swapping Two Imports Moved 5.5 ms to a Different Module
+  author: Elliot Sayer
+  published: '2026-09-27'
+  python_measured: 3.13.2
+  claim: Changing the order of logging and asyncio changes the cumulative time charged to asyncio.
+  author_numbers: macOS medians over nine processes were 23.5 ms for asyncio first and 18.0 ms after logging.
+    The top level totals were 23.5 and 23.6 ms.
+  mechanism: CPython checks sys.modules before loading a module. https://docs.python.org/3.13/reference/import.html#the-module-cache
+  xpd: none
+  provenance: The linked attribution.py is absent at fd39ff03. bench/graph.py rebuilds the two import orders
+    from the post and saves the top level asyncio and logging rows in microseconds.
+  script: bench/graph.py
+  rerun:
+    command: ./run.sh order
+    interpreter_versions: *id001
+    raw: runs/order-3.13.18.json
+    numbers:
+    - raw: runs/order-3.13.18.json
+      attempt: 1
+      load_average: 16.80 49.06 58.28
+      numbers:
+        asyncio_first:
+          mean_ms: 22.455
+          sd_ms: 0.4297
+          median_ms: 22.577
+        logging_first:
+          mean_ms: 15.4252
+          sd_ms: 0.1352
+          median_ms: 15.434
+      noisy: false
+    - raw: runs/order-3.14.10.json
+      attempt: 3
+      load_average: 18.58 48.89 58.17
+      numbers:
+        asyncio_first:
+          mean_ms: 51.7204
+          sd_ms: 2.4576
+          median_ms: 51.466
+        logging_first:
+          mean_ms: 22.162
+          sd_ms: 0.21
+          median_ms: 22.098
+      noisy: false
+    - raw: runs/order-3.15.2.json
+      attempt: 2
+      load_average: 18.58 48.89 58.17
+      numbers:
+        asyncio_first:
+          mean_ms: 36.9482
+          sd_ms: 1.6716
+          median_ms: 36.265
+        logging_first:
+          mean_ms: 23.3162
+          sd_ms: 0.8777
+          median_ms: 23.136
+      noisy: false
+  verdict: reproduced
+  reason: The mean ratio for asyncio_first to logging_first was 1.46. The published ratio was 1.31.
+  noisy: false
+- url: https://pydepth.com/blog/what-lazy-import-defers/
+  title: lazy import Moved 26.8 ms and Removed None of It
+  author: Elliot Sayer
+  published: '2026-09-20'
+  python_measured: 3.15.0rc1
+  claim: The startup saving from deferring asyncio disappears when the program reads asyncio.run.
+  author_numbers: After subtraction of a 9.1 ms baseline, best of 15 times were 26.8 ms eager, minus 0.4 ms
+    lazy and unread, and 26.4 ms lazy and read.
+  mechanism: PEP 810 binds a proxy at the import statement. Reading the name resolves it. https://peps.python.org/pep-0810/
+  xpd: none
+  provenance: The linked lazy.py is absent at fd39ff03. bench/measure.py rebuilds the empty, eager, deferred
+    and first read programs described in the post.
+  script: bench/measure.py
+  rerun:
+    command: ./run.sh touch
+    interpreter_versions: *id001
+    raw: runs/touch-3.15.2.json
+    numbers:
+    - raw: runs/touch-3.13.18.json
+      attempt: 1
+      load_average: 16.93 47.54 57.63
+      numbers:
+        empty:
+          mean_ms: 6.3761
+          sd_ms: 0.1187
+          median_ms: 6.3837
+        eager:
+          mean_ms: 30.2251
+          sd_ms: 0.1603
+          median_ms: 30.244
+      noisy: false
+    - raw: runs/touch-3.14.10.json
+      attempt: 2
+      load_average: 16.93 47.54 57.63
+      numbers:
+        empty:
+          mean_ms: 15.5528
+          sd_ms: 0.1541
+          median_ms: 15.5247
+        eager:
+          mean_ms: 83.8224
+          sd_ms: 5.15
+          median_ms: 83.5848
+      noisy: true
+    - raw: runs/touch-3.15.2.json
+      attempt: 3
+      load_average: 18.54 47.37 57.52
+      numbers:
+        empty:
+          mean_ms: 14.6089
+          sd_ms: 0.3388
+          median_ms: 14.4707
+        eager:
+          mean_ms: 82.6139
+          sd_ms: 6.889
+          median_ms: 81.6508
+        unread:
+          mean_ms: 13.2386
+          sd_ms: 0.4456
+          median_ms: 13.1635
+        read:
+          mean_ms: 63.0842
+          sd_ms: 3.128
+          median_ms: 63.2173
+      noisy: true
+  verdict: direction-only
+  reason: The mean ratio for eager to unread was 6.24. After the first read the eager to read ratio was 1.31.
+    Reading the name restored much of the import cost, but the read and eager means still differed by more
+    than their combined standard deviations.
+  noisy: true

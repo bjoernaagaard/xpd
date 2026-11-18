@@ -1,0 +1,86 @@
+{
+  "checked_at": "2026-11-18T12:35:07.442454+00:00",
+  "method": "GET",
+  "results": [
+    {
+      "url": "https://stevenpg.com/posts/python-3-15-lazy-imports-free-threading/",
+      "http_status": 200,
+      "final_url": "https://stevenpg.com/posts/python-3-15-lazy-imports-free-threading/"
+    },
+    {
+      "url": "https://hugovk.dev/blog/2025/lazy-imports/",
+      "http_status": 200,
+      "final_url": "https://hugovk.dev/blog/2025/lazy-imports/"
+    },
+    {
+      "url": "https://www.crumpledpaper.tech/2026-06-21-python-struct-profiling/",
+      "http_status": 200,
+      "final_url": "https://www.crumpledpaper.tech/2026-06-21-python-struct-profiling/"
+    },
+    {
+      "url": "https://huseyinbabal.dev/posts/python-3-15-measured/",
+      "http_status": 200,
+      "final_url": "https://huseyinbabal.dev/posts/python-3-15-measured/"
+    },
+    {
+      "url": "https://lemire.me/blog/2026/10/09/faster-python-startup-with-lazy-imports/",
+      "http_status": 200,
+      "final_url": "https://lemire.me/blog/2026/10/09/faster-python-startup-with-lazy-imports/"
+    },
+    {
+      "url": "https://jacar.es/en/python-3-15-whats-new/",
+      "http_status": 200,
+      "final_url": "https://jacar.es/en/python-3-15-whats-new/"
+    },
+    {
+      "url": "https://sxz.io/python-315-lazy-imports-startup-time-tutorial/",
+      "http_status": 200,
+      "final_url": "https://sxz.io/python-315-lazy-imports-startup-time-tutorial/"
+    },
+    {
+      "url": "https://www.danilchenko.dev/posts/python-lazy-imports/",
+      "http_status": 200,
+      "final_url": "https://www.danilchenko.dev/posts/python-lazy-imports/"
+    },
+    {
+      "url": "https://darren.codes/posts/python-startup-time/",
+      "http_status": 200,
+      "final_url": "https://darren.codes/posts/python-startup-time/"
+    },
+    {
+      "url": "https://enjii.pages.dev/blog/Optimizations/vex_startup_time_optimization/",
+      "http_status": 200,
+      "final_url": "https://enjii.pages.dev/blog/Optimizations/vex_startup_time_optimization/"
+    },
+    {
+      "url": "https://blog.pecar.me/speeding-up-django-startup-times-with-lazy-imports/",
+      "http_status": 200,
+      "final_url": "https://blog.pecar.me/speeding-up-django-startup-times-with-lazy-imports/"
+    },
+    {
+      "url": "https://discuss.python.org/t/static-analysis-at-odds-with-runtime-goals/76319/8",
+      "http_status": 200,
+      "final_url": "https://discuss.python.org/t/static-analysis-at-odds-with-runtime-goals/76319/8"
+    },
+    {
+      "url": "https://discuss.python.org/t/pep-749-implementing-pep-649/54974/57",
+      "http_status": 200,
+      "final_url": "https://discuss.python.org/t/pep-749-implementing-pep-649/54974/57"
+    },
+    {
+      "url": "https://pydepth.com/blog/what-import-actually-does/",
+      "http_status": 200,
+      "final_url": "https://pydepth.com/blog/what-import-actually-does/"
+    },
+    {
+      "url": "https://pydepth.com/blog/import-time-is-not-import-cost/",
+      "http_status": 200,
+      "final_url": "https://pydepth.com/blog/import-time-is-not-import-cost/"
+    },
+    {
+      "url": "https://pydepth.com/blog/what-lazy-import-defers/",
+      "http_status": 200,
+      "final_url": "https://pydepth.com/blog/what-lazy-import-defers/"
+    }
+  ]
+}
