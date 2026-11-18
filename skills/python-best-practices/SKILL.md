@@ -129,11 +129,11 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 - **Annotate every parameter and return value.** Inside a function, annotate only what
   the checker cannot infer, such as an empty list.
 - **Data that crosses a boundary gets a named model.** A file, a request, a response, a
-  database row or a config file is decoded once into a msgspec Struct, with
-  `msgspec.json.decode(data, type=Order)` or `msgspec.convert(row, type=Order)`, and the
-  rest of the code takes the Struct. No `json.loads`, and no `dict[str, Any]` passed
+  database row or a config file is read once into a `NamedTuple`, with
+  `Order(**json.loads(body))` or `Order._make(row)`, and the rest of the code takes the
+  `NamedTuple`. No function returns `json.loads`, and no `dict[str, Any]` is passed
   between functions.
-- **Trust a typed value.** After the decode, don't check or convert it again: no
+- **Trust a typed value.** After that read, don't check or convert it again: no
   `isinstance` on a value whose type is declared, no `float()`, `int()`, `str()` or
   `bool()` around a value of that type, and no `if` for a case the types rule out.
 - **A NumPy number is a number.** `np.float64` is a subclass of `float`, so an element of
@@ -152,10 +152,13 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   `Protocol` or `ABC` for one implementation, and none added only for a test.
 - Parameters take the widest type that works (`Iterable[str]`, `Mapping[str, int]` from
   `collections.abc`). Return values are concrete (`list[str]`).
-- **A record is `class Order(msgspec.Struct, frozen=True, kw_only=True)`,** in place of a
-  dataclass, a `NamedTuple`, a `TypedDict` and an attrs class. Ask before you add msgspec
-  to a project that lacks it. A closed set of names is a `StrEnum` or `Literal`, never
-  bare strings compared in several places.
+- **A record is `class Order(NamedTuple)`,** from the standard library, in place of a
+  frozen dataclass and a frozen attrs class. Copy it with `order._replace(price=3.0)`. Keep
+  a dataclass for a record that changes, that inherits, or that needs `field()` or
+  `__post_init__`, and a `TypedDict` for a value that has to stay a dict. Reach for the
+  standard library before a package: `tomllib` for a config file, `functools.cache` for a result
+  to keep, `itertools.pairwise` and `batched` for windows. A closed set of names is a
+  `StrEnum` or `Literal`, never bare strings compared in several places.
 - **Add a record only for a value that several functions take.** Two or three results of
   one function are a tuple that the caller unpacks into names. One summary per group is
   a table: `df.groupby(key).agg(rows=("price", "size"), median=("price", "median"))`, not
@@ -257,7 +260,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | A frame rebuilt from the columns of another frame | `xpd check`: `pandas/frame-rebuilt-from-columns` |
 | Three or more `reset_index` or `to_numpy` calls in one function, rows repeated through the index | `xpd check`: `pandas/repeated-reset-index`, `pandas/numpy-round-trip`, `pandas/repeat-rows-by-index` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
-| A dataclass, `NamedTuple`, `TypedDict` or attrs class, `json.loads` | `xpd check`: `python/record-without-msgspec`, `python/json-without-type` |
+| A frozen dataclass or attrs class, a function that returns `json.loads` | `xpd check`: `python/record-without-namedtuple`, `python/json-without-type` |
 | `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |
 | A test for an empty frame around a mean, `astype(...).to_numpy()` | `xpd check`: `pandas/empty-guard`, `pandas/astype-then-to-numpy` |
 | A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |

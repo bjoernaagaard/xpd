@@ -1,0 +1,32 @@
+# A frozen dataclass and a frozen attrs class hold named fields that never change, and so does
+# a NamedTuple from the standard library. A JP Hutchins measurement on one machine found that
+# Python defined a NamedTuple in 76 microseconds and a frozen dataclass in 373, and built an
+# instance in 138 nanoseconds and 224. A NamedTuple also unpacks, and copies with _replace. The
+# rule leaves alone a class that a NamedTuple cannot replace: one that inherits, one that calls
+# field(), and one with __post_init__. It has no fix, because a NamedTuple is also a tuple, so it
+# iterates, has a length and is equal to a plain tuple with the same values.
+id: record-without-namedtuple
+language: python
+severity: warning
+message: This frozen record can be a NamedTuple. Write class Name(NamedTuple), which holds the same fields, is cheaper to define and to build, and needs no decorator.
+rule:
+  kind: class_definition
+  inside:
+    kind: decorated_definition
+    has:
+      kind: decorator
+      any:
+        - regex: ^@((dataclasses|pydantic\.dataclasses)\.)?dataclass\(.*\bfrozen\s*=\s*True
+        - regex: ^@(attrs?\.)?frozen\b
+        - regex: ^@(attrs?\.)?(define|s|attrs)\(.*\bfrozen\s*=\s*True
+  not:
+    any:
+      - has: { field: superclasses, kind: argument_list }
+      - has:
+          stopBy: end
+          any:
+            - pattern: field($$$ARGS)
+            - pattern: dataclasses.field($$$ARGS)
+            - pattern: attrs.field($$$ARGS)
+            - pattern: attr.ib($$$ARGS)
+            - { kind: identifier, regex: ^(__post_init__|__attrs_post_init__|InitVar)$ }

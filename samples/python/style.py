@@ -8,10 +8,9 @@ import os
 import json
 from dataclasses import dataclass
 from functools import cache
-from typing import Any, TypeVar, cast
+from typing import Any, NamedTuple, TypeVar, cast
 from unittest.mock import patch  # xpd: mock-import
 
-import msgspec
 import numpy as np
 
 __all__ = ["rows", "rows_with_loop"]
@@ -109,11 +108,11 @@ def price(payload: dict[str, Any]) -> float:  # xpd: dict-str-any
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class Record:  # xpd: record-without-msgspec
+class Record:  # xpd: record-without-namedtuple
     price: float
 
 
-class Item(msgspec.Struct, frozen=True, kw_only=True):
+class Item(NamedTuple):
     price: float
 
 
@@ -122,7 +121,7 @@ def load(body: bytes) -> float:
 
 
 def decode(body: bytes) -> Item:
-    return msgspec.json.decode(body, type=Item)
+    return Item(**json.loads(body))
 
 
 def spread(values: np.ndarray) -> float:

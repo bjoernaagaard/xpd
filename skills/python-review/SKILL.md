@@ -75,10 +75,10 @@ The first two groups are where real bugs live.
 
 - A public function without annotations, or one that takes or returns `Any`.
 - `typing.cast` or `# type: ignore` in place of fixing the type where the value is made.
-- A `dict[str, Any]` passed between functions where a msgspec Struct would name the
-  fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), or data from a
-  file or request used before it is decoded into a Struct (`python/json-without-type`).
-- A record that is not a msgspec Struct (`python/record-without-msgspec`), a record that
+- A `dict[str, Any]` passed between functions where a `NamedTuple` would name the
+  fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), or a function
+  that returns `json.loads` in place of a typed value (`python/json-without-type`).
+- A frozen dataclass that can be a `NamedTuple` (`python/record-without-namedtuple`), a record that
   no function takes and that only carries two or three results to one caller, or a
   record with one field.
 - A typed value that is checked or converted again: `float()`, `int()`, `str()` or

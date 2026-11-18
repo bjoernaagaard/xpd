@@ -1,12 +1,24 @@
-# json.loads and json.load return Any, so the type checker accepts every use of the result, and
-# a wrong key or a wrong type shows up far from the place where the data came in. On msgspec
-# 0.22.0, msgspec.json.decode(b'{"price": "x"}', type=Item) raised "Expected `float`, got `str`
-# - at `$.price`". The rule has no fix, because the type to decode into is not in the file.
+# json.loads and json.load return Any, so a function that returns the result hands Any to every
+# caller, and a wrong key or a wrong type shows up far from the place where the data came in.
+# The standard library has no decoder that checks types, so the function that reads the JSON
+# picks the fields it needs and returns a NamedTuple. Quote(**json.loads(body)) raises a
+# TypeError on a missing or an unknown key. The rule has no fix, because the fields are not in
+# the file.
 id: json-without-type
 language: python
 severity: warning
-message: This returns Any, so nothing checks the shape of the data. Decode it with msgspec.json.decode(data, type=...) into a msgspec Struct.
+message: This returns Any to the caller, so nothing names the shape of the data. Read the fields here, and return a NamedTuple, such as Quote(**json.loads(body)).
 rule:
+  kind: call
   any:
     - pattern: json.loads($$$ARGS)
     - pattern: json.load($$$ARGS)
+  inside:
+    any:
+      - kind: return_statement
+      - kind: subscript
+        inside:
+          any:
+            - kind: return_statement
+            - kind: subscript
+              inside: { kind: return_statement }

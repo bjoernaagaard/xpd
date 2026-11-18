@@ -13398,7 +13398,7 @@ and the `python-review` skill reviews code against it.
 | --- | --- |
 | Names | `module-private-name`, `vague-module-name` |
 | Modules | `import-side-effect` |
-| Types | `typing-cast`, `dict-str-any`, `record-without-msgspec`, `json-without-type`, `same-type-conversion`, `float-around-number` |
+| Types | `typing-cast`, `dict-str-any`, `record-without-namedtuple`, `json-without-type`, `same-type-conversion`, `float-around-number` |
 | Functions | `pass-through-function`, `multi-line-call-argument` |
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
@@ -13614,10 +13614,10 @@ def total(order: dict[str, Any]) -> float:
 Use instead:
 
 ```python
-import msgspec
+from typing import NamedTuple
 
 
-class Order(msgspec.Struct, frozen=True, kw_only=True):
+class Order(NamedTuple):
     price: float
     quantity: int
 
@@ -13630,74 +13630,74 @@ xpd gives the replacement as advice and doesn't apply it.
 
 The type says nothing about the keys or the values, so the type checker cannot find a
 misspelled key. Every function that takes the dict has to know its keys and the types of its
-values. Decode the data
-once, where it enters the program, into a msgspec Struct, with `msgspec.json.decode(data, type=Order)`
-for JSON or `msgspec.convert(row, type=Order)` for a dict.
+values. Name the fields once, where the data enters the program, in a `NamedTuple` from the
+standard library, with `Order(**row)` for a dict. Use a `TypedDict` when the value has to stay
+a dict, as the `**kwargs` of a function and a dict that a library asks for do.
 
 ruff's `ANN401` reports a parameter or a return value annotated with `Any` alone, and leaves
 `dict[str, Any]` alone.
 
-#### record-without-msgspec
+#### record-without-namedtuple
 
 **Severity:** warning. **Fix:** none.
 
-The rule reports a class with `@dataclass`, a class with an attrs decorator, and a class that
-inherits `NamedTuple` or `TypedDict`. It leaves a pydantic `BaseModel` alone, because a web
-framework can require it.
+The rule reports a class with `@dataclass(frozen=True)` and a frozen attrs class. It leaves
+alone a class that a `NamedTuple` cannot replace: a dataclass that is not frozen, a class that
+inherits from another class, a class that calls `field()`, and a class with `__post_init__`.
 
 Example:
 
 ```python
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(frozen=True, slots=True)
 class Order:
     price: float
-    tags: list[str] = field(default_factory=list)
+    quantity: int = 1
 ```
 
 Use instead:
 
 ```python
-import msgspec
+from typing import NamedTuple
 
 
-class Order(msgspec.Struct, frozen=True, kw_only=True):
+class Order(NamedTuple):
     price: float
-    tags: list[str] = msgspec.field(default_factory=list)
+    quantity: int = 1
 ```
 
 xpd gives the replacement as advice and doesn't apply it.
 
-A Struct holds the same fields as the other four kinds of record, and it also checks the types
-when it decodes JSON, TOML, YAML, MessagePack or a dict, and encodes a value back. With one kind
-of record in a project, a value is copied, compared and decoded in one way. The table gives the
-msgspec name for each part of a dataclass.
-
-| dataclass | msgspec |
-| --- | --- |
-| `@dataclass(frozen=True, kw_only=True)` | `class Order(msgspec.Struct, frozen=True, kw_only=True)` |
-| `slots=True` | nothing, because a Struct always has slots |
-| `field(default_factory=list)` | `msgspec.field(default_factory=list)` |
-| `dataclasses.replace(order, price=3.0)` | `msgspec.structs.replace(order, price=3.0)` |
-| `dataclasses.asdict(order)` | `msgspec.structs.asdict(order)` |
-
-A Struct checks types only when it decodes. On msgspec 0.22.0 a Struct with a field of type
-`np.ndarray` was built from an array without a check, so a Struct also holds arrays and frames
-that never leave the program. A JP Hutchins
+A `NamedTuple` comes from the standard library, holds the same fields, cannot be changed, and
+keeps methods, class methods and properties. A JP Hutchins
 [measurement](https://www.crumpledpaper.tech/2026-06-21-python-struct-profiling/) on one machine
-found that Python defined a Struct in 10.5 microseconds and a frozen dataclass in 373.4, and
-built an instance in 63 nanoseconds and 224.
+found that Python defined a `NamedTuple` in 76.2 microseconds and a frozen dataclass in 373.4,
+and built an instance in 138 nanoseconds and 224. An instance takes 88 bytes, and an instance
+of a dataclass with slots takes 64. The table gives the `NamedTuple` name for each part of a
+dataclass.
 
-Keep a `TypedDict` for the `**kwargs` of a function and for a dict that a library you call asks
-for, because those have to stay dicts.
+| dataclass | `NamedTuple` |
+| --- | --- |
+| `@dataclass(frozen=True, slots=True)` | `class Order(NamedTuple)` |
+| `dataclasses.replace(order, price=3.0)` | `order._replace(price=3.0)` |
+| `dataclasses.asdict(order)` | `order._asdict()` |
+| `dataclasses.fields(Order)` | `Order._fields` |
+| `Order(*row)` for a row from a file | `Order._make(row)` |
+
+A `NamedTuple` is also a tuple. It iterates over its fields, has a length, unpacks, and is
+equal to a plain tuple with the same values. Check each place that tests a record with
+`isinstance(value, tuple)`, formats it with `%`, or passes a list of records to
+`np.asarray`, which turns the fields into columns. A field name cannot start with an
+underscore.
 
 #### json-without-type
 
 **Severity:** warning. **Fix:** none.
 
-The rule reports `json.loads` and `json.load`.
+The rule reports a function that returns the result of `json.loads` or `json.load`, or a key
+of that result. It leaves alone a result that the function reads into a typed value first.
 
 Example:
 
@@ -13705,31 +13705,33 @@ Example:
 import json
 
 
-def price(body: bytes) -> float:
-    return json.loads(body)["price"]
+def quote(body: bytes) -> dict:
+    return json.loads(body)
 ```
 
 Use instead:
 
 ```python
-import msgspec
+import json
+from typing import NamedTuple
 
 
-class Quote(msgspec.Struct, frozen=True):
+class Quote(NamedTuple):
     price: float
 
 
-def price(body: bytes) -> float:
-    return msgspec.json.decode(body, type=Quote).price
+def quote(body: bytes) -> Quote:
+    return Quote(**json.loads(body))
 ```
 
 xpd gives the replacement as advice and doesn't apply it.
 
-`json.loads` returns `Any`, so the type checker accepts every use of the result. A wrong key or
-a wrong type then raises far from the place where the data came in, or doesn't raise at all. On
-msgspec 0.22.0, decoding `{"price": "x"}` into `Quote` raised
-``Expected `float`, got `str` - at `$.price` ``. The code after the decode needs no `isinstance`
-check and no conversion, because the value already has the type.
+`json.loads` returns `Any`, so the type checker accepts every use of the result. When a
+function returns it, a wrong key raises far from the place where the data came in, or doesn't
+raise at all. The standard library has no decoder that checks the type of each value.
+`Quote(**json.loads(body))` raises a `TypeError` on a missing key and on a key that `Quote`
+does not have, and the callers get named fields. When the JSON has more keys than the function
+needs, read those keys by name and pass them to the `NamedTuple`.
 
 #### same-type-conversion
 
