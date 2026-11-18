@@ -1,6 +1,7 @@
 """Refresh the numeric fields from the saved runs without changing the verdicts."""
 
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
@@ -38,7 +39,7 @@ for study, section in zip(studies, sections, strict=True):
                         "type": row["kind"],
                         "max_cv": attempt["max_cv"],
                         "initial_load_average": attempt["loadavg"][0],
-                        "seconds": attempt["stats"],
+                        "seconds": deepcopy(attempt["stats"]),
                     }
                 )
     rerun["our_numbers"] = numbers

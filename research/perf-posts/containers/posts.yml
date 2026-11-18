@@ -95,7 +95,7 @@
       3.13.18:
         size: 1000000
         type: int
-        seconds: &id001
+        seconds:
           sort:
             mean_s: 0.09253960766606421
             sd_s: 0.0008021110604746904
@@ -115,11 +115,20 @@
           type: int
           max_cv: 0.05241091518090754
           initial_load_average: 44.98 65.88 64.16
-          seconds: *id001
+          seconds:
+            sort:
+              mean_s: 0.09253960766606421
+              sd_s: 0.0008021110604746904
+            mine:
+              mean_s: 0.1732044646681364
+              sd_s: 0.009077804506676194
+            heap:
+              mean_s: 0.17895806400095657
+              sd_s: 0.004768717356512427
       3.14.10:
         size: 1000000
         type: int
-        seconds: &id002
+        seconds:
           sort:
             mean_s: 0.12209241699990041
             sd_s: 0.0071128452680856175
@@ -139,7 +148,16 @@
           type: int
           max_cv: 0.06818567765180245
           initial_load_average: 41.49 64.43 63.70
-          seconds: *id002
+          seconds:
+            sort:
+              mean_s: 0.12209241699990041
+              sd_s: 0.0071128452680856175
+            mine:
+              mean_s: 0.20222639600251568
+              sd_s: 0.005622754875561239
+            heap:
+              mean_s: 0.3207181496666938
+              sd_s: 0.021868384370255716
         - size: 100000
           type: int
           max_cv: 0.1292758670818348
@@ -310,7 +328,7 @@
       3.14.10:
         size: 200000
         type: str
-        seconds: &id001
+        seconds:
           get:
             mean_s: 0.008934304332797183
             sd_s: 0.0010943889865242442
@@ -326,7 +344,13 @@
           type: str
           max_cv: 0.12249291559353107
           initial_load_average: 40.11 62.62 63.12
-          seconds: *id001
+          seconds:
+            get:
+              mean_s: 0.008934304332797183
+              sd_s: 0.0010943889865242442
+            Counter:
+              mean_s: 0.00561706000007689
+              sd_s: 4.6383670422096525e-06
       3.15.2:
         size: 200000
         type: str
@@ -520,7 +544,7 @@
       3.13.18:
         size: 1
         type: int
-        seconds: &id001
+        seconds:
           python:
             mean_s: 3.431728223208787e-06
             sd_s: 1.483694914388656e-06
@@ -536,7 +560,13 @@
           type: int
           max_cv: 0.43234627507925116
           initial_load_average: 40.02 62.23 62.99
-          seconds: *id001
+          seconds:
+            python:
+              mean_s: 3.431728223208787e-06
+              sd_s: 1.483694914388656e-06
+            C:
+              mean_s: 3.7155450942807966e-07
+              sd_s: 6.115652890917976e-09
       3.14.10:
         size: 1
         type: int
