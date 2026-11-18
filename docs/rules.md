@@ -2470,6 +2470,95 @@ xpd gives the replacement as advice and doesn't apply it. A time window starts w
 Each rule in this group asks for an argument that states what the code expects, so that pandas
 raises when the data doesn't match instead of giving a wrong result.
 
+#### repeated-reset-index
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a function that calls `reset_index` three times or more.
+
+Example:
+
+```python
+def summary(rows):
+    group = rows.groupby(KEY, sort=False)
+    keys = group.size().reset_index()[KEY]
+    labels = group[LABELS].first().reset_index(drop=True)
+    return keys.join(labels).reset_index(drop=True)
+```
+
+Use instead:
+
+```python
+def summary(rows):
+    return rows.groupby(KEY, sort=False, as_index=False)[LABELS].first()
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+Each call moves the same keys between the index and the columns and copies the frame. A reader
+has to track after every line whether a key is an index level or a column. With
+`as_index=False` the keys stay columns, and `merge` and `sort_values(ignore_index=True)` leave no
+index to reset.
+
+#### repeat-rows-by-index
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports `frame.loc[frame.index.repeat(n)]`, and `frame.iloc[np.repeat(...)]`.
+
+Example:
+
+```python
+long = keys.loc[keys.index.repeat(POSITIONS)].reset_index(drop=True)
+long["position"] = np.tile(np.arange(POSITIONS), len(keys))
+```
+
+Use instead:
+
+```python
+positions = pd.DataFrame({"position": np.arange(POSITIONS)})
+long = keys.merge(positions, how="cross")
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The repeat copies every row through the index, and the lines after it reset the index and tile
+a column for the position inside each copy. A cross merge pairs every row with every position
+in one call. On pandas 3.1.1 the two forms gave equal frames.
+
+#### numpy-round-trip
+
+**Severity:** warning. **Fix:** none.
+
+The rule reports a function that calls `to_numpy` three times or more and also assigns to a
+column of a frame.
+
+Example:
+
+```python
+def with_share(rows):
+    load = rows["load"].to_numpy()
+    total = rows.groupby("region")["load"].transform("sum").to_numpy()
+    unit = rows["unit_mw"].to_numpy()
+    rows["share"] = load / total * unit
+    return rows
+```
+
+Use instead:
+
+```python
+def with_share(rows):
+    total = rows.groupby("region")["load"].transform("sum")
+    return rows.assign(share=rows["load"] / total * rows["unit_mw"])
+```
+
+xpd gives the replacement as advice and doesn't apply it.
+
+The function computes in NumPy what the frame came for, and the arrays stay lined up with the
+rows only as long as nothing sorts or filters the frame in between. Columns of one frame are
+already lined up, so arithmetic on them needs no array. When the work really is array work, take
+the arrays out once and return arrays.
+
 #### frame-rebuilt-from-columns
 
 **Severity:** warning. **Fix:** none.

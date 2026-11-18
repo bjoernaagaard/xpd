@@ -1,0 +1,18 @@
+# A function that calls reset_index three times or more keeps moving the same keys between the
+# index and the columns. Each call copies the frame, and a reader has to track after every line
+# whether a key is an index level or a column. Keep the keys as columns from the start:
+# groupby(keys, as_index=False) returns them as columns, and merge and sort_values with
+# ignore_index=True leave no index to reset. The rule has no fix, because each call has its own
+# replacement.
+id: repeated-reset-index
+language: python
+severity: warning
+message: This function calls reset_index three times or more. Keep the keys as columns from the start, with groupby(keys, as_index=False), merge, and ignore_index=True, so that no index has to be reset.
+rule:
+  kind: function_definition
+  regex: '(?s)\.reset_index\(.*\.reset_index\(.*\.reset_index\('
+  not:
+    has:
+      stopBy: end
+      kind: function_definition
+      regex: '(?s)\.reset_index\(.*\.reset_index\(.*\.reset_index\('

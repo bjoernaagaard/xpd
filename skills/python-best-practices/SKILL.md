@@ -255,6 +255,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | A comprehension over several lines, or among other arguments | `xpd check`: `python/comprehension-multi-line`, `python/comprehension-among-arguments` |
 | A function that only passes its parameters on, a call over several lines inside another call | `xpd check`: `python/pass-through-function`, `python/multi-line-call-argument` |
 | A frame rebuilt from the columns of another frame | `xpd check`: `pandas/frame-rebuilt-from-columns` |
+| Three or more `reset_index` or `to_numpy` calls in one function, rows repeated through the index | `xpd check`: `pandas/repeated-reset-index`, `pandas/numpy-round-trip`, `pandas/repeat-rows-by-index` |
 | `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
 | A dataclass, `NamedTuple`, `TypedDict` or attrs class, `json.loads` | `xpd check`: `python/record-without-msgspec`, `python/json-without-type` |
 | `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |

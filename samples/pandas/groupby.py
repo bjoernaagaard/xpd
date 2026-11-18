@@ -247,3 +247,35 @@ def share(df: pd.DataFrame) -> pd.DataFrame:
 
 def records(rows: list[list[str]]) -> pd.DataFrame:
     return pd.DataFrame([row[1:] for row in rows if row[0] == "D"])  # xpd: filter-before-frame
+
+
+def keys_and_labels(df: pd.DataFrame) -> pd.DataFrame:  # xpd: repeated-reset-index
+    group = df.groupby("region", sort=False)
+    keys = group.size().reset_index()[["region"]]
+    labels = group[["hour"]].first().reset_index(drop=True)
+    return keys.join(labels).reset_index(drop=True)
+
+
+def keys_and_labels_as_columns(df: pd.DataFrame) -> pd.DataFrame:
+    return df.groupby("region", sort=False, as_index=False)[["hour"]].first()
+
+
+def repeated(keys: pd.DataFrame, count: int) -> pd.DataFrame:
+    return keys.loc[keys.index.repeat(count)]  # xpd: repeat-rows-by-index
+
+
+def crossed(keys: pd.DataFrame, count: int) -> pd.DataFrame:
+    return keys.merge(pd.DataFrame({"position": np.arange(count)}), how="cross")
+
+
+def share_through_numpy(df: pd.DataFrame) -> pd.DataFrame:  # xpd: numpy-round-trip
+    load = df["load"].to_numpy()
+    total = df.groupby("region")["load"].transform("sum").to_numpy()
+    hour = df["hour"].to_numpy()
+    df["share"] = load / total * hour
+    return df
+
+
+def share_in_pandas(df: pd.DataFrame) -> pd.DataFrame:
+    total = df.groupby("region")["load"].transform("sum")
+    return df.assign(share=df["load"] / total * df["hour"])

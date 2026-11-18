@@ -1,0 +1,17 @@
+# A function that takes three or more columns out of a frame with to_numpy and then writes
+# arrays back into a frame computes in NumPy what the frame came for, and it has to keep the
+# rows of both in the same order by hand. Compute on the columns with pandas, with groupby,
+# merge, pivot or merge_asof, or take the arrays out once and return arrays. The rule has no
+# fix, because the pandas form depends on what the function computes.
+id: numpy-round-trip
+language: python
+severity: warning
+message: This function takes columns out with to_numpy three times or more and writes arrays back into a frame. Compute on the columns in pandas, or take the arrays out once and return arrays, so that the row order is not kept by hand.
+rule:
+  kind: function_definition
+  all:
+    - regex: '(?s)\.to_numpy\(.*\.to_numpy\(.*\.to_numpy\('
+    - has:
+        stopBy: end
+        kind: assignment
+        has: { field: left, kind: subscript, has: { field: subscript, kind: string } }

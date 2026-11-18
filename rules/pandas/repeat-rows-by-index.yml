@@ -1,0 +1,15 @@
+# keys.loc[keys.index.repeat(n)] copies every row n times through the index, and the code after
+# it resets the index and adds a tiled column for the position inside each copy. A cross merge
+# says the same thing in one call: on pandas 3.1.1,
+# keys.merge(pd.DataFrame({"position": np.arange(3)}), how="cross") was equal to the repeat,
+# the reset and the tiled column together. The rule has no fix, because the tiled column is on
+# another line.
+id: repeat-rows-by-index
+language: python
+severity: warning
+message: 'This repeats every row of $FRAME through its index. Use a cross merge, as in $FRAME.merge(positions, how="cross") with positions = pd.DataFrame({"position": range(n)}), which also adds the position and leaves no index to reset.'
+rule:
+  any:
+    - pattern: $FRAME.loc[$FRAME.index.repeat($N)]
+    - pattern: $FRAME.iloc[np.repeat($$$ARGS)]
+    - pattern: $FRAME.loc[np.repeat($$$ARGS)]

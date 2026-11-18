@@ -114,6 +114,10 @@ The first two groups are where real bugs live.
   (`python/multi-line-call-argument`), or a frame rebuilt from the columns of another
   frame in a dict (`pandas/frame-rebuilt-from-columns`). Show the named value or the
   `rename`.
+- A function that moves between pandas and NumPy and back: three or more `reset_index`
+  calls (`pandas/repeated-reset-index`), three or more `to_numpy` calls with a write back
+  into a frame (`pandas/numpy-round-trip`), or rows repeated through the index
+  (`pandas/repeat-rows-by-index`). Show the function written in pandas alone.
 - A loop over `groupby` that appends a summary per group
   (`pandas/groupby-loop-collects`). Show the `agg` call.
 - A loop that one call on whole arrays or columns replaces: `x[t]` from `x[t - 1]`
