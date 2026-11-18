@@ -374,7 +374,7 @@ asyncio.run(main())
 ```
 
 The run took 11.5 seconds and returned `passed: true` with the `gates` list below. The outputs
-on the page came from xpd 0.35.0, built from the repository, and FastMCP 4.2.0. The project's
+on the page came from xpd 0.36.0, built from the repository, and FastMCP 4.2.0. The project's
 Python was Python 3.15.2 with scikit-learn 1.9.1, pandas 3.1.1, NumPy 2.5.5 and joblib 1.6.0.
 
 | Gate | Passed | Detail |
