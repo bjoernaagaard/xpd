@@ -26,7 +26,7 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
         let Ok(source) = fs::read_to_string(path) else {
             continue;
         };
-        let mut proposals = scan::lint_source(File::on_disk(path), &source, packs);
+        let mut proposals = scan::lint_source(File::on_disk(path), &source, packs).found;
         proposals.sort_by_key(|found| found.fix.as_ref().map(|edit| edit.range.start));
         let mut accepted: Vec<Replacement> = Vec::new();
         let mut end = 0;

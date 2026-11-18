@@ -57,7 +57,7 @@ installed.
 | The rules of a library, such as `pandas/row-loop` | Files that import the library |
 | The Python rules | Every file |
 | A rule for a newer library version than the project's Python has | No file, because xpd skips the rule |
-| A package check, such as `pandas/missing-pyarrow` | The project, once per run, when the project's Python has the library and lacks the package |
+| A package check, such as `pandas/missing-pyarrow` | The project, once per run, when the project's Python has the library and lacks the package. Some checks also need a call in the checked files, as `pandas/missing-bottleneck` needs `std` or `min` |
 
 See [Rules](rules.md) for every rule.
 

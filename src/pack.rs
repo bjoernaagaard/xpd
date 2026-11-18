@@ -16,7 +16,7 @@ use ast_grep_language::SupportLang;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
-use crate::package_check::PackageCheck;
+use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
 use crate::scan::{File, Root};
 use crate::venv::Distributions;
@@ -76,7 +76,7 @@ pub(crate) struct Manifest {
     #[serde(default)]
     pub(crate) members: BTreeMap<String, String>,
     #[serde(default)]
-    pub(crate) packages: Vec<PackageCheck>,
+    pub(crate) packages: Vec<PackageCheckSource>,
     /// The pack is not about one library, so its rules run on every file.
     #[serde(default)]
     pub(crate) every_file: bool,
@@ -96,30 +96,43 @@ pub(crate) struct AlsoOnSource {
 /// plotly in a file that makes plotly its plotting backend.
 pub(crate) struct AlsoOn {
     /// What the file must hold for the pack's rules to run on it without an import.
-    setting: Shape,
+    setting: ManifestRule,
     /// The expression that stands for the library's module in such a file, such as `df.plot`.
-    stand_in: Shape,
-    /// What the two shapes were read in. A shape that names a utility rule with `matches`
-    /// finds it through this, so it must live as long as they do.
-    _env: DeserializeEnv<SupportLang>,
+    stand_in: ManifestRule,
 }
 
 impl AlsoOn {
     /// Both shapes can name the pack's utility rules, which are in `globals`.
     fn new(source: AlsoOnSource, globals: &GlobalRules) -> Result<Self> {
-        let env = DeserializeEnv::new(SupportLang::Python).with_globals(globals);
-        let shape = |rule: SerializableRule| -> Result<Shape> {
-            let shape = env.deserialize_rule(rule)?;
-            shape.verify_util()?;
-            Ok(shape)
-        };
-        let setting = shape(source.setting).context("setting")?;
-        let stand_in = shape(source.stand_in).context("standIn")?;
         Ok(Self {
-            setting,
-            stand_in,
-            _env: env,
+            setting: ManifestRule::read(source.setting, globals).context("setting")?,
+            stand_in: ManifestRule::read(source.stand_in, globals).context("standIn")?,
         })
+    }
+}
+
+/// An ast-grep rule that a manifest writes, which can name the pack's utility rules with
+/// `matches`.
+pub(crate) struct ManifestRule {
+    pub(crate) shape: Shape,
+    /// What the shape was read in. A shape that names a utility rule finds it through this, so
+    /// it must live as long as the shape does.
+    _env: DeserializeEnv<SupportLang>,
+}
+
+impl ManifestRule {
+    /// Reads `rule` against the pack's utility rules in `globals`.
+    pub(crate) fn read(rule: SerializableRule, globals: &GlobalRules) -> Result<Self> {
+        let env = DeserializeEnv::new(SupportLang::Python).with_globals(globals);
+        let shape = env.deserialize_rule(rule)?;
+        shape.verify_util()?;
+        Ok(Self { shape, _env: env })
+    }
+}
+
+impl fmt::Debug for ManifestRule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ManifestRule").finish_non_exhaustive()
     }
 }
 
@@ -134,7 +147,7 @@ pub(crate) struct Library<'p> {
 }
 
 /// A shape of code that a pack's manifest names, as an ast-grep rule.
-type Shape = ast_grep_config::Rule;
+pub(crate) type Shape = ast_grep_config::Rule;
 
 /// Which files a pack's rules run on. A rule runs only on a file of the rule's own language.
 pub(crate) enum Gate {
@@ -142,7 +155,7 @@ pub(crate) enum Gate {
     /// setting. The rule matches such an import.
     Import {
         import: Box<RuleConfig<SupportLang>>,
-        also: Option<AlsoOn>,
+        also: Option<Box<AlsoOn>>,
     },
     /// Every file.
     EveryFile,
@@ -290,7 +303,7 @@ impl Pack {
                 .pop()
                 .context("the import rule did not parse")?;
             let also = (manifest.also_on)
-                .map(|source| AlsoOn::new(source, globals))
+                .map(|source| AlsoOn::new(source, globals).map(Box::new))
                 .transpose()
                 .context("alsoOn")?;
             Gate::Import {
@@ -298,6 +311,10 @@ impl Pack {
                 also,
             }
         };
+        let package_checks = (manifest.packages.into_iter())
+            .map(|source| PackageCheck::new(source, globals))
+            .collect::<Result<_>>()
+            .context("packages")?;
         Ok(Self {
             module: module.to_owned(),
             gate,
@@ -305,7 +322,7 @@ impl Pack {
             inactive_rules: Vec::new(),
             aliases: manifest.aliases,
             members: manifest.members,
-            package_checks: manifest.packages,
+            package_checks,
             docs: &[],
             root,
         })
@@ -408,7 +425,7 @@ impl Pack {
         match &self.gate {
             Gate::Import {
                 also: Some(also), ..
-            } => (root.root().find(&also.setting).is_some()).then_some(&also.stand_in),
+            } => (root.root().find(&also.setting.shape).is_some()).then_some(&also.stand_in.shape),
             _ => None,
         }
     }

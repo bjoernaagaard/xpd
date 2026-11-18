@@ -1,36 +1,194 @@
 //! Package checks: packages a library works better with, reported once per project when the
 //! project's venv has the library but not the package.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ast_grep_config::Severity;
+use anyhow::{Context, Result, bail};
+use ast_grep_config::{GlobalRules, SerializableRule, Severity};
+use ast_grep_language::SupportLang;
 use serde::Deserialize;
 
-use crate::pack::Pack;
+use crate::pack::{ManifestRule, Pack};
 use crate::report::Issue;
+use crate::scan::Root;
 use crate::venv::{Distributions, Venv};
 
-/// One entry under `packages` in a pack's `pack.yml`.
-#[derive(Debug, Deserialize)]
+/// One entry under `packages` in a pack's `pack.yml`, as it is written.
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PackageCheckSource {
+    id: String,
+    package: String,
+    #[serde(default)]
+    only_with: Vec<String>,
+    only_where: Option<SerializableRule>,
+    message: String,
+}
+
+/// One package check of a pack.
+#[derive(Debug)]
 pub(crate) struct PackageCheck {
     /// Rule name in the report, such as `missing-pyarrow`.
     pub(crate) id: String,
     /// Distribution name, such as `pandas-stubs`.
     package: String,
-    /// When not empty, the check runs only in a project that uses one of these tools.
-    #[serde(default)]
-    only_with: Vec<String>,
+    when: Condition,
+    /// May name `{count}` and `{first}` when the check has `onlyWhere`.
     pub(crate) message: String,
 }
 
+/// What a project that lacks the package must also show for the check to report.
+#[derive(Debug)]
+struct Condition {
+    /// When not empty, the project uses one of these tools.
+    only_with: Vec<String>,
+    /// When set, a file that the run checked with the pack holds code of this shape.
+    only_where: Option<ManifestRule>,
+}
+
+/// The placeholders a message may name when its check has `onlyWhere`.
+const PLACEHOLDERS: [&str; 2] = ["{count}", "{first}"];
+
 impl PackageCheck {
-    /// `configured` holds the tools with a table in the project's `pyproject.toml`.
-    fn is_missing(&self, installed: &Distributions, configured: &[&str]) -> bool {
-        let uses = |tool: &str| configured.contains(&tool) || installed.version(tool).is_some();
-        installed.version(&self.package).is_none()
-            && (self.only_with.is_empty() || self.only_with.iter().any(|tool| uses(tool)))
+    /// Reads `onlyWhere` against the pack's utility rules in `globals`.
+    pub(crate) fn new(source: PackageCheckSource, globals: &GlobalRules) -> Result<Self> {
+        let PackageCheckSource {
+            id,
+            package,
+            only_with,
+            only_where,
+            message,
+        } = source;
+        let only_where = only_where
+            .map(|rule| ManifestRule::read(rule, globals))
+            .transpose()
+            .with_context(|| format!("onlyWhere of {id}"))?;
+        if only_where.is_none()
+            && let Some(placeholder) = PLACEHOLDERS.iter().find(|p| message.contains(*p))
+        {
+            bail!("the package check {id} names {placeholder} in its message without onlyWhere");
+        }
+        Ok(Self {
+            id,
+            package,
+            when: Condition {
+                only_with,
+                only_where,
+            },
+            message,
+        })
+    }
+
+    /// The warning's message when the venv lacks the package and the project meets the
+    /// check's condition. `configured` holds the tools with a table in the project's
+    /// `pyproject.toml`, and `seen` holds what the run found of the check's `onlyWhere`.
+    fn report(
+        &self,
+        installed: &Distributions,
+        configured: &[&str],
+        seen: Option<&Seen>,
+    ) -> Option<String> {
+        if installed.version(&self.package).is_some() {
+            return None;
+        }
+        let uses = |tool: &String| {
+            configured.contains(&tool.as_str()) || installed.version(tool).is_some()
+        };
+        let Condition {
+            only_with,
+            only_where,
+        } = &self.when;
+        if !only_with.is_empty() && !only_with.iter().any(uses) {
+            return None;
+        }
+        match (only_where, seen) {
+            (None, _) => Some(self.message.clone()),
+            (Some(_), None) => None,
+            (Some(_), Some(seen)) => Some(
+                self.message
+                    .replace("{count}", &seen.count.to_string())
+                    .replace("{first}", &seen.first()),
+            ),
+        }
+    }
+}
+
+/// What the `onlyWhere` shapes of the package checks matched in the files of one run.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct Calls(BTreeMap<(String, String), Seen>);
+
+/// The matches of one check's `onlyWhere`.
+#[derive(Debug, Clone)]
+struct Seen {
+    count: usize,
+    /// The file and line of the first match, by path and then by line.
+    first: (PathBuf, usize),
+}
+
+impl Seen {
+    fn first(&self) -> String {
+        let (path, line) = &self.first;
+        format!("{}:{line}", path.display())
+    }
+}
+
+impl Calls {
+    /// The matches in the parsed file `root` at `path`, of `src` and `language`. A check's
+    /// shape runs only on a file that its pack's rules run on.
+    pub(crate) fn find(
+        path: &Path,
+        root: &Root,
+        src: &str,
+        language: SupportLang,
+        packs: &[Pack],
+    ) -> Self {
+        let mut calls = Self::default();
+        for pack in packs {
+            let checks = pack.package_checks.iter();
+            let mut shaped = checks
+                .filter_map(|check| Some((check, check.when.only_where.as_ref()?)))
+                .peekable();
+            if shaped.peek().is_none() || !pack.applies(root, src, language) {
+                continue;
+            }
+            for (check, only_where) in shaped {
+                let lines: Vec<usize> = (root.root().find_all(&only_where.shape))
+                    .map(|found| found.start_pos().line() + 1)
+                    .collect();
+                if let Some(&line) = lines.iter().min() {
+                    let seen = Seen {
+                        count: lines.len(),
+                        first: (path.to_path_buf(), line),
+                    };
+                    calls.add((pack.module.clone(), check.id.clone()), seen);
+                }
+            }
+        }
+        calls
+    }
+
+    /// Adds the matches of `other`, from other files of the same run.
+    pub(crate) fn merge(&mut self, other: Self) {
+        for (key, seen) in other.0 {
+            self.add(key, seen);
+        }
+    }
+
+    fn add(&mut self, key: (String, String), seen: Seen) {
+        let Some(known) = self.0.get_mut(&key) else {
+            self.0.insert(key, seen);
+            return;
+        };
+        known.count += seen.count;
+        if seen.first < known.first {
+            known.first = seen.first;
+        }
+    }
+
+    fn get(&self, pack: &Pack, check: &PackageCheck) -> Option<&Seen> {
+        self.0.get(&(pack.module.clone(), check.id.clone()))
     }
 }
 
@@ -38,13 +196,15 @@ impl PackageCheck {
 pub(crate) const SEVERITY: Severity = Severity::Warning;
 
 /// One warning for each package that a pack asks for and the venv lacks. A pack is checked only
-/// when the venv has its library. `installed` is what `venv` holds, and `project` is the folder
-/// the run starts in, which is the working directory for the command line.
+/// when the venv has its library. `installed` is what `venv` holds, `project` is the folder the
+/// run starts in, which is the working directory for the command line, and `calls` is what the
+/// run found of the checks' `onlyWhere` shapes.
 pub(crate) fn missing(
     packs: &[Pack],
     venv: &Venv,
     installed: &Distributions,
     project: &Path,
+    calls: &Calls,
 ) -> Vec<Issue> {
     let pyproject = nearest_pyproject(project)
         .and_then(|path| fs::read_to_string(&path).ok().map(|text| (path, text)));
@@ -57,16 +217,18 @@ pub(crate) fn missing(
         .iter()
         .filter(|pack| installed.version(&pack.module).is_some())
         .flat_map(|pack| pack.package_checks.iter().map(move |check| (pack, check)))
-        .filter(|(_, check)| check.is_missing(installed, configured))
-        .map(|(pack, check)| Issue {
-            package: pack.module.clone(),
-            rule: check.id.clone(),
-            file: file.clone(),
-            position: None,
-            severity: SEVERITY,
-            message: check.message.clone(),
-            fix: None,
-            help: pack.is_embedded().then(|| crate::catalog::url(&check.id)),
+        .filter_map(|(pack, check)| {
+            let message = check.report(installed, configured, calls.get(pack, check))?;
+            Some(Issue {
+                package: pack.module.clone(),
+                rule: check.id.clone(),
+                file: file.clone(),
+                position: None,
+                severity: SEVERITY,
+                message,
+                fix: None,
+                help: pack.is_embedded().then(|| crate::catalog::url(&check.id)),
+            })
         })
         .collect()
 }

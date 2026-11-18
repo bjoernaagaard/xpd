@@ -3144,18 +3144,18 @@ one.
 | Check | Package | Extra condition |
 | --- | --- | --- |
 | [`missing-pyarrow`](#missing-pyarrow) | pyarrow | none |
-| [`missing-bottleneck`](#missing-bottleneck) | bottleneck | none |
+| [`missing-bottleneck`](#missing-bottleneck) | bottleneck | the checked code calls `std`, `var`, `min`, `max` or `median` |
 | [`missing-plotly`](#missing-plotly) | plotly | the project uses matplotlib or seaborn |
 | [`missing-pandas-stubs`](#missing-pandas-stubs) | pandas-stubs | the project uses mypy, pyright, basedpyright, ty or pyrefly |
 
 A project uses a tool when the venv has it or `pyproject.toml` has a `[tool.<name>]` table for it.
 The output shows the four warnings for a venv that holds pandas and matplotlib, next to a
-`pyproject.toml` with a `[tool.mypy]` table.
+`pyproject.toml` with a `[tool.mypy]` table, and a `report.py` that calls `std` on line 4.
 
 ```text
 $ xpd check --format text report.py
 pyproject.toml: warning [pandas/missing-pyarrow] pyarrow is not installed, so text columns are stored as Python strings. With pyarrow the .str methods ran 3 to 11 times faster on 1,000,000 rows. Add pyarrow to the project.
-pyproject.toml: warning [pandas/missing-bottleneck] bottleneck is not installed. With it std ran 4 times faster and median 1.7 times faster on 10,000,000 rows. Add bottleneck to the project.
+pyproject.toml: warning [pandas/missing-bottleneck] bottleneck is not installed. pandas uses it for std, var, min, max and median. This code calls them first at report.py:4, and the number of such calls is 1. On 10,000,000 rows std ran 5.7 times faster and min 4.7 times. Add bottleneck to the project.
 pyproject.toml: warning [pandas/missing-plotly] The project has matplotlib and no plotly, so df.plot returns a static matplotlib Axes. With plotly installed and pd.options.plotting.backend = "plotly", df.plot.bar(x="team", y="score") returned the same figure as px.bar(df, x="team", y="score"), which xpd checks with its plotly rules. Add plotly to the project.
 pyproject.toml: warning [pandas/missing-pandas-stubs] The project has a type checker but not pandas-stubs, so calls to pandas are not type checked. Add pandas-stubs as a development dependency.
 xpd: 4 issues
@@ -3184,9 +3184,36 @@ Add the package to the project environment, not to xpd itself.
 
 **Severity:** warning. **Fix:** none.
 
-With bottleneck, `std` ran 4 times faster and `median` 1.7 times faster on 10,000,000 rows.
+pandas 3.1.1 uses bottleneck only for `std`, `var`, `min`, `max` and `median` with
+`skipna=True` on a numeric column. The table shows each call on 10,000,000 float rows with
+CPython 3.15.2, without bottleneck and with bottleneck 1.6.1.
 
-The warning appears when bottleneck is not installed.
+| Call | Without | With | Times faster |
+| --- | --- | --- | --- |
+| `series.std()` | 49.20 ms | 8.61 ms | 5.71 |
+| `series.var()` | 39.13 ms | 8.51 ms | 4.60 |
+| `series.min()` | 16.37 ms | 3.52 ms | 4.65 |
+| `series.max()` | 16.29 ms | 3.50 ms | 4.65 |
+| `series.median()` | 98.74 ms | 77.56 ms | 1.27 |
+| `series.agg("std")`, `frame.std()` | about 49 ms | about 8.7 ms | 5.7 |
+
+The calls below gained nothing, because pandas does not hand them to bottleneck.
+
+| Call | Without | With | Times faster |
+| --- | --- | --- | --- |
+| `series.mean()` | 16.37 ms | 16.70 ms | 0.98 |
+| `series.sum()` | 14.59 ms | 14.69 ms | 0.99 |
+| `series.std(skipna=False)` | 21.59 ms | 21.71 ms | 0.99 |
+| `groupby.std()` | 25.07 ms | 24.54 ms | 1.02 |
+| `groupby.median()` | 137.59 ms | 137.01 ms | 1.00 |
+| `rolling.std()` | 141.04 ms | 141.62 ms | 1.00 |
+
+The warning appears when bottleneck is not installed and a file that imports pandas calls a
+method named `std`, `var`, `min`, `max` or `median`, or calls `agg` or `aggregate` with one of
+those names as a string. A call with `skipna=False` does not count. A call whose receiver holds
+`.groupby(`, `.rolling(`, `.resample(`, `.expanding(` or `.ewm(` does not count, and neither
+does a call on `np`, `numpy`, `math`, `statistics` or `builtins`. The message gives the number
+of such calls and the file and line of the first one.
 
 In a project managed with uv, add the package with the command below.
 
@@ -14657,6 +14684,7 @@ library and lacks the package.
 | `package` | the package to look for |
 | `message` | what the warning says |
 | `onlyWith` | optional. A list of tools, and xpd warns only when the project also uses one of them. |
+| `onlyWhere` | optional. An ast-grep rule, written as under `rule` in a rule file, and xpd warns only when it matches code in a file that the run checked with the pack. The message may then name `{count}`, the number of matches, and `{first}`, the path and line of the first one. |
 
 ### Index a new pack
 

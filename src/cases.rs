@@ -223,6 +223,7 @@ fn run_case(
             source,
             packs,
         )
+        .found
         .into_iter()
         .find(|found| {
             found

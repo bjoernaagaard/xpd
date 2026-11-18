@@ -26,7 +26,7 @@ use ast_grep_language::config_file_type;
 use serde::Deserialize;
 
 use crate::pack::{self, AlsoOnSource, Manifest, Pack};
-use crate::package_check::PackageCheck;
+use crate::package_check::PackageCheckSource;
 use crate::rule::{Origin, Rule};
 use crate::scan::cannot_read;
 
@@ -123,7 +123,7 @@ struct PackEntry {
     #[serde(default)]
     members: BTreeMap<String, String>,
     #[serde(default)]
-    packages: Vec<PackageCheck>,
+    packages: Vec<PackageCheckSource>,
     #[serde(default)]
     every_file: bool,
     also_on: Option<AlsoOnSource>,

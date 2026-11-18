@@ -477,9 +477,9 @@ fn validate(code: String, package: &str, packs: &[pack::Pack]) -> Option<Verifie
         path: Path::new("recipe.py"),
         disk: None,
     };
-    let clean = scan::lint_source(file, &code, packs).is_empty();
+    let clean = scan::lint_source(file, &code, packs).found.is_empty();
     let (code, fixes) = scan::fix_source(file, code, packs, Applicability::Unsafe);
-    if !complete(&code) || !scan::lint_source(file, &code, packs).is_empty() {
+    if !complete(&code) || !scan::lint_source(file, &code, packs).found.is_empty() {
         return None;
     }
     let symbols = symbols(&code, package);

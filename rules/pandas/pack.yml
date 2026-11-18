@@ -8,14 +8,60 @@ aliases:
 
 # Packages pandas works better with. `xpd check` warns once per run when the project's venv has
 # pandas and lacks the package. With onlyWith, it warns only in a project that uses one of the
-# tools.
+# tools. With onlyWhere, an ast-grep rule, it warns only when the rule matches code in a file
+# that the run checked with this pack. Its message may then name {count}, the number of matches,
+# and {first}, the path and line of the first one.
 packages:
   - id: missing-pyarrow
     package: pyarrow
     message: pyarrow is not installed, so text columns are stored as Python strings. With pyarrow the .str methods ran 3 to 11 times faster on 1,000,000 rows. Add pyarrow to the project.
+  # pandas 3.1.1 calls bottleneck only from nanops for std, var, median, min and max with
+  # skipna=True. sum, mean, groupby, rolling and the NumPy functions gained nothing
+  # (research/bottleneck-check/runs.txt).
   - id: missing-bottleneck
     package: bottleneck
-    message: bottleneck is not installed. With it std ran 4 times faster and median 1.7 times faster on 10,000,000 rows. Add bottleneck to the project.
+    onlyWhere:
+      kind: call
+      all:
+        - has:
+            field: function
+            kind: attribute
+            all:
+              - has:
+                  field: attribute
+                  regex: ^(std|var|median|min|max|agg|aggregate)$
+              - not:
+                  has:
+                    field: object
+                    any:
+                      - kind: identifier
+                        regex: ^(np|numpy|math|statistics|builtins)$
+                      - regex: \.\s*(groupby|rolling|resample|expanding|ewm)\s*\(
+        - any:
+            - has:
+                field: function
+                has:
+                  field: attribute
+                  regex: ^(std|var|median|min|max)$
+            - has:
+                field: arguments
+                has:
+                  stopBy: end
+                  kind: string
+                  regex: ^["'](std|var|median|min|max)["']$
+        - not:
+            has:
+              field: arguments
+              has:
+                kind: keyword_argument
+                all:
+                  - has:
+                      field: name
+                      regex: ^skipna$
+                  - has:
+                      field: value
+                      kind: "false"
+    message: bottleneck is not installed. pandas uses it for std, var, min, max and median. This code calls them first at {first}, and the number of such calls is {count}. On 10,000,000 rows std ran 5.7 times faster and min 4.7 times. Add bottleneck to the project.
   # On pandas 3.1.1 with plotly 7.1.0, df.plot.bar(x="team", y="score") with the plotly backend
   # was equal as JSON to px.bar(df, x="team", y="score") (research/modern-pandas/probes/backend.txt).
   - id: missing-plotly

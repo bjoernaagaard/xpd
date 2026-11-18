@@ -541,6 +541,7 @@ fn lint(
             venv,
             installed,
             &project,
+            &scanned.calls,
         ));
     }
     if matches!(scope, Scope::Project) {

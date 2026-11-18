@@ -13,6 +13,7 @@ use ast_grep_core::{AstGrep, Language, NodeMatch};
 use ast_grep_language::SupportLang;
 
 use crate::pack::Pack;
+use crate::package_check::Calls;
 use crate::report::{Issue, Position};
 use crate::rule::{Applicability, Rule};
 
@@ -174,6 +175,8 @@ pub(crate) struct Scanned {
     pub(crate) fixed: usize,
     /// Number of files that could not be read.
     pub(crate) skipped: usize,
+    /// What the `onlyWhere` shapes of the package checks matched.
+    pub(crate) calls: Calls,
 }
 
 /// A fix can create a match for another fix, so fixing repeats until nothing changes, at
@@ -188,7 +191,7 @@ pub(crate) fn scan(
 ) -> Result<Scanned> {
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-    let per_file: Vec<Option<(Vec<Issue>, usize)>> = files
+    let per_file: Vec<Option<(Linted, usize)>> = files
         .par_iter()
         .map(|path| {
             let Some(mut src) = read_source(path) else {
@@ -203,23 +206,25 @@ pub(crate) fn scan(
                         .with_context(|| format!("cannot write {}", path.display()))?;
                 }
             }
-            let issues = lint_source(file, &src, packs)
-                .into_iter()
-                .map(|found| found.issue)
-                .collect();
-            Ok(Some((issues, fixed)))
+            Ok(Some((lint_source(file, &src, packs), fixed)))
         })
         .collect::<Result<_>>()?;
     let skipped = per_file.iter().filter(|file| file.is_none()).count();
-    let per_file: Vec<(Vec<Issue>, usize)> = per_file.into_iter().flatten().collect();
-    let fixed = per_file.iter().map(|(_, n)| n).sum();
-    let mut issues: Vec<Issue> = per_file.into_iter().flat_map(|(i, _)| i).collect();
-    issues.sort_by(|a, b| (&a.file, a.position).cmp(&(&b.file, b.position)));
-    Ok(Scanned {
-        issues,
-        fixed,
+    let mut scanned = Scanned {
+        issues: Vec::new(),
+        fixed: 0,
         skipped,
-    })
+        calls: Calls::default(),
+    };
+    for (linted, fixed) in per_file.into_iter().flatten() {
+        scanned.fixed += fixed;
+        scanned
+            .issues
+            .extend(linted.found.into_iter().map(|found| found.issue));
+        scanned.calls.merge(linted.calls);
+    }
+    (scanned.issues).sort_by(|a, b| (&a.file, a.position).cmp(&(&b.file, b.position)));
+    Ok(scanned)
 }
 
 struct MatchedRule<'p, 'r> {
@@ -342,14 +347,24 @@ pub(crate) fn fix_source(
     (src, fixed)
 }
 
-/// The issues in one file's source, in the order of their positions. `file` is the file the
-/// source belongs to.
-pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Found> {
+/// What one file's source holds for a run.
+#[derive(Debug, Default)]
+pub(crate) struct Linted {
+    /// The issues, in the order of their positions.
+    pub(crate) found: Vec<Found>,
+    /// What the `onlyWhere` shapes of the package checks matched.
+    pub(crate) calls: Calls,
+}
+
+/// The issues in one file's source, and the code that package checks ask about. `file` is the
+/// file the source belongs to.
+pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
     let language = language_of(file.path);
     if !packs.iter().any(|pack| pack.may_apply(src, language)) {
-        return Vec::new();
+        return Linted::default();
     }
     let root = parse_as(src, language);
+    let calls = Calls::find(file.path, &root, src, language, packs);
     let imports = imports(&root, language);
     let parsed = Parsed::new(src, language, &root);
     let mut found = Vec::new();
@@ -411,7 +426,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Vec<Foun
     }
     // A stable sort, so issues at one position keep the order of their packs and rules.
     found.sort_by_key(|found| found.issue.position);
-    found
+    Linted { found, calls }
 }
 
 /// Applies every fix up to `allowed` that does not overlap an earlier one, and returns the new

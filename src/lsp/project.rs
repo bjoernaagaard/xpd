@@ -11,9 +11,9 @@ use lsp_types::Uri;
 use super::uri;
 use crate::catalog::{Catalog, LocalProject};
 use crate::pack;
-use crate::package_check;
+use crate::package_check::{self, Calls};
 use crate::report::Issue;
-use crate::venv::Venv;
+use crate::venv::{Distributions, Venv};
 use crate::version::Version;
 
 /// Where a document is, as `xpd check` would see it when run in the project's folder.
@@ -39,8 +39,22 @@ pub(crate) struct Project {
     /// The rules for the library versions in the project's venv.
     pub(crate) catalog: Rc<Catalog>,
     pub(crate) load_error: Option<String>,
-    /// One warning for each package the venv lacks, as `xpd check` adds them to a run.
-    pub(crate) package_issues: Vec<Issue>,
+    /// The project's venv, with what it holds.
+    venv: Option<(Venv, Distributions)>,
+}
+
+impl Project {
+    /// One warning for each package the venv lacks, as `xpd check` adds them to a run. The
+    /// project is in `root`, and `calls` is what the checks' `onlyWhere` shapes matched in the
+    /// project's open documents.
+    pub(crate) fn package_issues(&self, root: &Path, calls: &Calls) -> Vec<Issue> {
+        match &self.venv {
+            Some((venv, installed)) => {
+                package_check::missing(&self.catalog.packs, venv, installed, root, calls)
+            }
+            None => Vec::new(),
+        }
+    }
 }
 
 /// The client's workspace folders and the projects of the open documents.
@@ -124,16 +138,10 @@ impl Workspace {
                 (catalog, Some(format!("{error:#}")))
             }
         };
-        let package_issues = match (&venv, &installed) {
-            (Some(venv), Some(installed)) => {
-                package_check::missing(&catalog.packs, venv, installed, root)
-            }
-            _ => Vec::new(),
-        };
         let project = Project {
             catalog,
             load_error,
-            package_issues,
+            venv: venv.zip(installed),
         };
         let before = self.projects.insert(root.to_path_buf(), project);
         let now = &self.projects[root];

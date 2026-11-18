@@ -98,7 +98,9 @@ published versions [11]
 
 `xpd check` also warns about a package that the project's virtual environment (venv) lacks, such
 as pyarrow. The warning is about the project and not about one file, so the server places it as
-the tree shows.
+the tree shows. A check that asks for calls in the code, such as `pandas/missing-bottleneck`,
+looks at the project's open documents, and its warning changes when a document opens, closes or
+is saved.
 
 ```text
 package warning

@@ -49,6 +49,7 @@ use self::project::{Place, Workspace};
 use self::text::{Encoding, Lines};
 use crate::catalog;
 use crate::catalog::Catalog;
+use crate::package_check::Calls;
 use crate::report::Issue;
 use crate::rule::Applicability;
 use crate::scan::{self, Found, Replacement};
@@ -349,6 +350,8 @@ struct Document {
 struct Linted {
     catalog: Rc<Catalog>,
     found: Vec<Found>,
+    /// What the `onlyWhere` shapes of the package checks matched in the document.
+    calls: Calls,
 }
 
 /// The issues of `document`, linted now unless the document still holds them. Diagnostics, a
@@ -365,7 +368,8 @@ fn lint<'d>(
             path: &document.place.path,
             disk: Some(&disk),
         };
-        let mut found = scan::lint_source(file, &document.text, &catalog.packs);
+        let scan::Linted { mut found, calls } =
+            scan::lint_source(file, &document.text, &catalog.packs);
         if disk
             .extension()
             .is_some_and(|ext| ext == "yml" || ext == "yaml")
@@ -394,7 +398,11 @@ fn lint<'d>(
                 });
             }
         }
-        document.linted = Some(Linted { catalog, found });
+        document.linted = Some(Linted {
+            catalog,
+            found,
+            calls,
+        });
     }
     let document: &'d Document = document;
     let linted = document
@@ -778,15 +786,10 @@ impl<'c> Server<'c> {
         };
         let root = document.place.root.clone();
         self.workspace.refresh(&root)?;
-        self.publish_package_issues(&root)?;
         self.lint_again(&root);
-        Ok(())
+        self.publish_package_issues(&root)
     }
 
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "every notification handler has the same signature"
-    )]
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<()> {
         let uri = params.text_document.uri;
         let Some(closed) = self.documents.remove(uri.as_str()) else {
@@ -798,10 +801,12 @@ impl<'c> Server<'c> {
             self.notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(uri, Vec::new(), None));
         }
         let root = closed.place.root;
-        if !self.roots().contains(&root) {
+        if self.roots().contains(&root) {
+            self.publish_package_issues(&root)
+        } else {
             self.close_project(&root);
+            Ok(())
         }
-        Ok(())
     }
 
     fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> Result<()> {
@@ -870,12 +875,10 @@ impl<'c> Server<'c> {
     /// Reads the venv of the project in `root` again, and brings what the client shows for the
     /// project up to date.
     fn refresh_project(&mut self, root: &Path) -> Result<()> {
-        let rules_changed = self.workspace.refresh(root)?;
-        self.publish_package_issues(root)?;
-        if rules_changed {
+        if self.workspace.refresh(root)? {
             self.lint_again(root);
         }
-        Ok(())
+        self.publish_package_issues(root)
     }
 
     /// Drops the issues of every open document of the project in `root`, and has the client
@@ -932,9 +935,16 @@ impl<'c> Server<'c> {
     /// Sends the warnings about packages that the venv of the project in `root` lacks. They
     /// are about the project and not about a document, so they go on the first line of the
     /// project's `pyproject.toml`, which is the file `xpd check` names for them. The client
-    /// never asks for that file, so they are pushed to every client.
+    /// never asks for that file, so they are pushed to every client. A check with `onlyWhere`
+    /// looks at the project's open documents, which the server holds, and not at other files.
     fn publish_package_issues(&mut self, root: &Path) -> Result<()> {
-        let issues = &self.workspace.project(root)?.package_issues;
+        let mut calls = Calls::default();
+        let documents = self.documents.values_mut();
+        for document in documents.filter(|document| document.place.root == root) {
+            let (_, linted) = lint(&mut self.workspace, document)?;
+            calls.merge(linted.calls.clone());
+        }
+        let issues = self.workspace.project(root)?.package_issues(root, &calls);
         // Without a `pyproject.toml`, `xpd check` names the venv's folder, and an editor
         // cannot show an issue on a folder.
         let file = issues
