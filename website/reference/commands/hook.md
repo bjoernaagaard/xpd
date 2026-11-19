@@ -99,7 +99,9 @@ pipeline of steps, it also reports the errors and warnings of [`xpd graph`](../g
 ## When the agent wants to stop
 
 On `Stop`, xpd lints every Python file that differs from the commit that `SessionStart` recorded,
-and every untracked Python file. This also covers a file that the agent changed through the shell
+and every untracked Python file, when the file was written after the session began. A file that
+was already changed or untracked before the session is not the session's own, so xpd leaves it
+out. This also covers a file that the agent changed through the shell
 and a file that it committed. In a project without git, xpd lints the Python files that the
 `PostToolUse` events of the session named.
 

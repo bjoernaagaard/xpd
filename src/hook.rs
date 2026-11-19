@@ -11,7 +11,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use ast_grep_config::Severity;
@@ -258,6 +258,7 @@ fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> 
     if source == Source::Opened || !began {
         let commit = repository(cwd).and_then(|top| checked_out(&top));
         session.append(&Record::Start(commit))?;
+        session.append(&Record::Began(now()))?;
     }
     std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
     let files = project_files(MOST_FILES);
@@ -603,7 +604,7 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
     let last = (records.iter().rev())
         .find_map(|record| match record {
             Record::Held(lines) => Some(lines.as_slice()),
-            Record::Start(_) | Record::Edited(_) => None,
+            Record::Start(_) | Record::Began(_) | Record::Edited(_) => None,
         })
         .unwrap_or_default();
     // The agent saw this list when the hook held the turn, and it stopped again with the same
@@ -648,14 +649,14 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
 }
 
 /// The Python files that the session changed. With git, they are the files that differ from
-/// the commit the session began on and the untracked files, so an edit through the shell and
-/// a committed edit both count. Without git, they are the files that `PostToolUse` recorded.
+/// the commit the session began on and the untracked files, when they were written after the
+/// session began, so an edit through the shell and a committed edit both count. Without git, they are the files that `PostToolUse` recorded.
 fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
     let here = fs::canonicalize(".")?;
     let mut files: Vec<PathBuf> = if let Some(top) = repository(&here) {
         let began = records.iter().rev().find_map(|record| match record {
             Record::Start(commit) => commit.as_deref(),
-            Record::Edited(_) | Record::Held(_) => None,
+            Record::Began(_) | Record::Edited(_) | Record::Held(_) => None,
         });
         // The recorded commit is not in this repository when the agent moved to another one,
         // and no commit is recorded when the hook was added to a running session. Then the
@@ -674,15 +675,22 @@ fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
         .context("git diff failed")?;
         let untracked = git(&top, &["ls-files", "--others", "--exclude-standard", "-z"])
             .context("git ls-files failed")?;
+        // A file that was already changed or untracked when the session began is not the
+        // session's own, so only a file that was written since then counts.
+        let since = records.iter().rev().find_map(|record| match record {
+            Record::Began(seconds) => Some(*seconds),
+            Record::Start(_) | Record::Edited(_) | Record::Held(_) => None,
+        });
         (differing.split('\0').chain(untracked.split('\0')))
             .filter(|name| !name.is_empty())
             .map(|name| top.join(name))
+            .filter(|file| since.is_none_or(|since| written(file) >= since))
             .collect()
     } else {
         (records.iter())
             .filter_map(|record| match record {
                 Record::Edited(file) => Some(file.clone()),
-                Record::Start(_) | Record::Held(_) => None,
+                Record::Start(_) | Record::Began(_) | Record::Held(_) => None,
             })
             .collect()
     };
@@ -728,12 +736,31 @@ fn git(folder: &Path, args: &[&str]) -> Option<String> {
     (output.status.success()).then(|| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+/// The time now, in seconds since 1970.
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs())
+}
+
+/// When `file` was last written, in seconds since 1970. A file whose time cannot be read
+/// counts as written now, so the Stop check still lints it.
+fn written(file: &Path) -> u64 {
+    fs::metadata(file)
+        .and_then(|data| data.modified())
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map_or_else(now, |since| since.as_secs())
+}
+
 /// One line of a session file.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Record {
     /// The commit that was checked out when the session began. `None` without git.
     Start(Option<String>),
+    /// When the session began, in seconds since 1970.
+    Began(u64),
     /// A Python file that a tool call changed.
     Edited(PathBuf),
     /// The errors and warnings that the last Stop check held the turn on. Empty when it let
