@@ -197,6 +197,139 @@ impl Runner {
         self.policies()?;
         self.configurations()?;
         self.versions()?;
+        self.pytest_settings()?;
+        self.pytest_plugins()?;
+        Ok(())
+    }
+
+    fn pytest_settings(&mut self) -> Result<()> {
+        for (name, config, expected) in [
+            (
+                "pytest-fresh",
+                "[project]\nname = 'example'\nversion = '0.1.0'\n",
+                &[
+                    "pytest:--import-mode=importlib",
+                    "pytest:-ra",
+                    "pytest:strict",
+                ][..],
+            ),
+            (
+                "pytest-configured",
+                "[tool.pytest]\nstrict = true\naddopts = ['-rA']\n",
+                &["pytest:--import-mode=importlib"],
+            ),
+            (
+                "pytest-ini-options",
+                "[tool.pytest.ini_options]\naddopts = '-q --strict-markers'\n",
+                &[
+                    "pytest:--import-mode=importlib",
+                    "pytest:-ra",
+                    "pytest:strict",
+                ],
+            ),
+        ] {
+            let project = self.project(name, &[("pyproject.toml", config)])?;
+            let report = self.doctor(&project, &[])?;
+            let found: Vec<_> = suggested(&report)
+                .into_iter()
+                .filter(|id| id.starts_with("pytest:"))
+                .collect();
+            self.check((found != expected).then(|| format!("{name}: pytest advice is {found:?}")));
+            let text = self.doctor_text(&project, &[])?;
+            let expected_edit = match name {
+                "pytest-fresh" => r#"addopts = ["-ra", "--import-mode=importlib"]"#,
+                "pytest-configured" => {
+                    r#"add "--import-mode=importlib" to the existing addopts array at line 3"#
+                }
+                _ => "append -ra --import-mode=importlib inside the addopts string at line 2",
+            };
+            self.check(
+                (!text.contains(expected_edit)).then(|| format!("{name}: missing {expected_edit}")),
+            );
+            self.check(
+                (!text.contains("unverified locally (decisions for pytest 9.2.0)"))
+                    .then(|| format!("{name}: pytest advice should say unverified locally")),
+            );
+        }
+        Ok(())
+    }
+
+    fn pytest_plugins(&mut self) -> Result<()> {
+        let remove = self.project(
+            "pytest-remove",
+            &[
+                (
+                    "pyproject.toml",
+                    concat!(
+                        "[dependency-groups]\n",
+                        "dev = [\n",
+                        "    'pytest>=9.2',\n",
+                        "    'Pytest_RerunFailures>=16',\n",
+                        "]\n",
+                        "[project.optional-dependencies]\n",
+                        "test = ['pytest-mock', 'flaky']\n",
+                        "[tool.pytest.ini_options]\n",
+                        "addopts = [\n",
+                        "    '-q', '--reruns', '2',\n",
+                        "    '--reruns-delay=0.5',\n",
+                        "]\n",
+                        "reruns = 2\n",
+                        "reruns_delay = 0.5\n",
+                        "strict_xfail = false\n",
+                        "xfail_strict = 'false'\n",
+                    ),
+                ),
+                ("uv.lock", ""),
+            ],
+        )?;
+        let text = self.doctor_text(&remove, &[])?;
+        self.expect_output(
+            "pytest-remove",
+            "doctor text",
+            &text,
+            &[
+                "remove --reruns 2 from addopts at line 10",
+                "remove --reruns-delay=0.5 from addopts at line 11",
+                "remove reruns = 2 at line 13",
+                "remove reruns_delay = 0.5 at line 14",
+                "remove strict_xfail = false at line 15",
+                "remove xfail_strict = 'false' at line 16",
+                r#"remove "Pytest_RerunFailures>=16" from dev at line 4"#,
+                r#"remove "pytest-mock" from test at line 7"#,
+                r#"remove "flaky" from test at line 7"#,
+                r#"add "pytest-timeout", "pytest-randomly" to the existing dev array at line 2"#,
+                "uv add --dev pytest-timeout",
+            ],
+            &[],
+        );
+        let report = self.doctor(&remove, &[])?;
+        let removals = report["suggestions"]
+            .as_array()
+            .context("doctor suggestions")?
+            .iter()
+            .filter(|suggestion| suggestion["decision"] == "remove")
+            .count();
+        self.check((removals != 9).then(|| format!("pytest-remove: {removals} JSON removals")));
+
+        let timeout = self.project(
+            "pytest-timeout",
+            &[(
+                "pyproject.toml",
+                "[dependency-groups]\nqa = ['pytest', 'pytest-timeout']\n",
+            )],
+        )?;
+        let text = self.doctor_text(&timeout, &[])?;
+        self.expect_output(
+            "pytest-timeout",
+            "doctor text",
+            &text,
+            &[
+                r#"timeout = "<seconds>""#,
+                r#"add "pytest-randomly" to the existing qa array at line 2"#,
+                "Evidence: pyproject.toml:2 pytest-timeout",
+            ],
+            &["uv add --dev", r#"add "pytest-timeout""#],
+        );
         Ok(())
     }
 
@@ -345,11 +478,14 @@ impl Runner {
         }
     }
 
-    /// The recommended and the conditional records, each as `tool:id` with its record key.
+    /// The Ruff and ty recommendations, each as `tool:id` with its record key.
     fn actionable(&self, decision: Wanted) -> Vec<(String, String, bool)> {
         self.catalog
             .suggestions()
-            .filter(|(_, suggestion)| {
+            .filter(|(record, suggestion)| {
+                if record.key.tool == catalog::Tool::Pytest {
+                    return false;
+                }
                 let conditional = matches!(suggestion.when, When::If { .. });
                 conditional == (decision == Wanted::Conditional)
             })

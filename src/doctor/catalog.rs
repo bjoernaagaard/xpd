@@ -18,12 +18,14 @@ pub(crate) const DECISIONS: &str = include_str!("decisions.jsonl");
 /// The releases the decisions were reviewed for.
 pub(crate) const RUFF_RELEASE: &str = "0.17.4";
 pub(crate) const TY_RELEASE: &str = "0.0.106";
+pub(crate) const PYTEST_RELEASE: &str = "9.2.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Tool {
     Ruff,
     Ty,
+    Pytest,
 }
 
 impl Tool {
@@ -31,6 +33,7 @@ impl Tool {
         match self {
             Self::Ruff => "ruff",
             Self::Ty => "ty",
+            Self::Pytest => "pytest",
         }
     }
 
@@ -38,6 +41,7 @@ impl Tool {
         match self {
             Self::Ruff => RUFF_RELEASE,
             Self::Ty => TY_RELEASE,
+            Self::Pytest => PYTEST_RELEASE,
         }
     }
 }
@@ -104,6 +108,8 @@ pub(crate) enum Kind {
     Setting,
     /// An environment variable.
     Variable,
+    /// A Python distribution declared as a dependency.
+    Dependency,
 }
 
 impl Kind {
@@ -201,10 +207,12 @@ pub(crate) enum Trigger {
     RuffAvailable,
     /// Ruff leaves out a Python file that xpd checks.
     RuffSkipsPythonFile,
+    /// The project declares the pytest-timeout plugin.
+    TimeoutPlugin,
 }
 
 impl Trigger {
-    pub(crate) const ALL: [Self; 29] = [
+    pub(crate) const ALL: [Self; 30] = [
         Self::ExplicitAny,
         Self::LazyImport,
         Self::NumpyImport,
@@ -234,6 +242,7 @@ impl Trigger {
         Self::DeclaredDependencies,
         Self::RuffAvailable,
         Self::RuffSkipsPythonFile,
+        Self::TimeoutPlugin,
     ];
 
     /// The trigger's name in the catalog, which is also its evidence rule's id.
@@ -250,6 +259,7 @@ impl Trigger {
                 | Self::DeclaredDependencies
                 | Self::RuffAvailable
                 | Self::RuffSkipsPythonFile
+                | Self::TimeoutPlugin
         )
     }
 }
@@ -309,6 +319,8 @@ pub(crate) enum Target {
     },
     /// Run a command.
     Command(String),
+    /// Remove a key, an item of an array, or a dependency.
+    Remove { key: String, item: Option<String> },
 }
 
 /// When a suggestion applies.
@@ -345,6 +357,10 @@ impl Decision {
         match self {
             Self::Leave => "leave",
             Self::Inherit(_) => "inherit",
+            Self::Suggest(Suggestion {
+                target: Target::Remove { .. },
+                ..
+            }) => "remove",
             Self::Destination
             | Self::Suggest(Suggestion {
                 when: When::Always, ..
@@ -480,7 +496,7 @@ impl Line {
                     .with_context(|| format!("{key} inherits from no record"))?,
             ),
             ("recommend", Some("destination")) if proposal.is_empty() => Decision::Destination,
-            (word @ ("recommend" | "conditional"), None) => {
+            (word @ ("recommend" | "conditional" | "remove"), None) => {
                 Decision::Suggest(proposal.suggestion(&key, word)?)
             }
             (word, role) => {
@@ -545,8 +561,8 @@ impl Proposal {
     /// `conditional` on a trigger with a stated condition.
     fn suggestion(self, key: &Key, word: &str) -> Result<Suggestion> {
         let when = match (word, self.trigger, self.condition) {
-            ("recommend", None, None) => When::Always,
-            ("recommend", _, _) => bail!("{key} is recommended but names a condition"),
+            ("recommend" | "remove", None, None) => When::Always,
+            ("recommend" | "remove", _, _) => bail!("{key} is {word} but names a condition"),
             (_, Some(trigger), Some(condition)) if !condition.trim().is_empty() => {
                 When::If { trigger, condition }
             }
@@ -560,6 +576,20 @@ impl Proposal {
         let destination = self
             .destination
             .with_context(|| format!("{key} has no destination"))?;
+        if word == "remove" {
+            ensure!(
+                self.requires.is_empty(),
+                "{key} removes a setting but requires a rule"
+            );
+            return Ok(Suggestion {
+                target: Target::Remove {
+                    key: destination,
+                    item: self.value,
+                },
+                when,
+                requires: self.requires,
+            });
+        }
         let value = self.value.with_context(|| format!("{key} has no value"))?;
         let target = match (key.tool, key.surface) {
             (_, Surface::Cli) => Target::Command(value),

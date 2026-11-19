@@ -146,7 +146,7 @@ xpd
     ├── mcp                    start the MCP server for agents
     ├── lsp                    start the language server for editors
     ├── skill                  print the agent skill for the installed version
-    ├── doctor                 suggest Ruff and ty settings for the project
+    ├── doctor                 suggest Ruff, ty and pytest settings for the project
     └── completions <shell>    print shell completion
 ```
 

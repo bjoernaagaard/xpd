@@ -272,14 +272,13 @@ enum Cmd {
   xpd rules
   xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]
     Rules(RulesOptions),
-    /// Suggest Ruff and ty settings for this project, each with its file, reason and evidence.
+    /// Suggest Ruff, ty and pytest settings and pytest plugin changes for this project, each with its file, reason and evidence.
     ///
     /// The suggestions come from a review of every rule and setting of Ruff 0.17.4 and ty
-    /// 0.0.106. A setting the project already has, or deliberately turned off, gets no
-    /// suggestion. A conditional one shows the code that makes it relevant and the condition the
-    /// developer decides. Ruff and ty are optional: an installed one gives the settings it
-    /// resolves, and the advice for a missing one is unverified locally. Nothing is installed or
-    /// edited. Exit 0, or 2 if xpd can't run.
+    /// 0.0.106 and cover the pytest settings in the testing policy. A conditional suggestion
+    /// shows why it applies. Doctor consults an installed Ruff or ty for its settings and reads
+    /// the installed pytest version from the project's virtual environment. Advice for a missing
+    /// tool is unverified locally. Doctor prints advice and exits 0, or exits 2 if it can't run.
     #[command(after_long_help = "Examples:
   xpd doctor
   xpd doctor --format json | jq '.suggestions[] | {tool, key, value}'")]

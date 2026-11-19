@@ -159,9 +159,27 @@ pub(crate) struct Placement {
 }
 
 impl Destination {
+    /// The TOML spelling of a setting's value, without comments or surrounding whitespace.
+    pub(crate) fn literal(&self, key: &str) -> Option<String> {
+        let path: Vec<&str> = self.prefix.iter().copied().chain(key.split('.')).collect();
+        let doc = self.doc.as_ref()?;
+        let span = get(doc, &path)?.span()?;
+        doc.raw().get(span).map(str::to_owned)
+    }
+
     /// Where the setting at `key`, dotted relative to the tool's table, goes.
     pub(crate) fn place(&self, key: &str) -> Placement {
-        let path: Vec<&str> = self.prefix.iter().copied().chain(key.split('.')).collect();
+        self.place_path(&key.split('.').collect::<Vec<_>>())
+    }
+
+    /// Like `place`, but each segment can itself contain a dot.
+    pub(crate) fn place_path(&self, key: &[&str]) -> Placement {
+        let path: Vec<&str> = self
+            .prefix
+            .iter()
+            .copied()
+            .chain(key.iter().copied())
+            .collect();
         let Some(doc) = &self.doc else {
             return new_table(&path);
         };

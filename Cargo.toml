@@ -49,6 +49,7 @@ similar = "3.2.1"
 # `xpd doctor` reads Ruff and ty settings and the line of each key. proc-macro-crate already
 # builds toml_edit, so this adds no package to the build.
 toml_edit = { version = "0.25.19", default-features = false, features = ["parse"] }
+shlex = "1.3"
 
 [build-dependencies]
 anyhow = "1.0.104"

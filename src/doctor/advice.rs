@@ -8,9 +8,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::catalog::{Catalog, Record, Satisfied, Suggestion, Target, Tool, Trigger, When};
+use super::catalog::{Catalog, Kind, Record, Satisfied, Suggestion, Target, Tool, Trigger, When};
 use super::evidence::{Evidence, Location};
 use super::probe::Checker;
+use super::pytest::{self, Project, Pytest};
 use super::ruff::{self, Ruff};
 use super::toml::{Destination, Observed, Placement};
 use super::ty::{self, Ty};
@@ -60,6 +61,10 @@ pub(crate) struct Advice {
     condition: Option<String>,
     evidence: Vec<Location>,
     status: String,
+    #[serde(skip)]
+    arguments: Option<(Placement, pytest::ArgumentStyle)>,
+    #[serde(skip)]
+    assign: Assign,
 }
 
 /// A deliberate choice of the project that doctor keeps.
@@ -188,6 +193,7 @@ impl Verdict {
 }
 
 /// The facts of the scope that a suggestion is written for.
+#[derive(Clone)]
 struct Scope<'a> {
     destination: &'a Destination,
     name: String,
@@ -195,6 +201,7 @@ struct Scope<'a> {
     status: String,
     /// The file `ruff check --show-settings` ran for.
     representative: Option<&'a Path>,
+    placement: Option<&'a Placement>,
 }
 
 pub(crate) fn evaluate(
@@ -242,6 +249,7 @@ pub(crate) fn evaluate(
                 None => ruff.checker.unverified(),
             },
             representative: state.verified_with.as_deref(),
+            placement: None,
         };
         let verdict = |record: &Record, suggestion: &Suggestion| {
             ruff_verdict(record, suggestion, state, ruff)
@@ -275,6 +283,7 @@ pub(crate) fn evaluate(
                     None => ty.checker.unverified(),
                 },
                 representative: None,
+                placement: None,
             };
             let verdict = |record: &Record, suggestion: &Suggestion| {
                 ty_verdict(catalog, record, suggestion, state, ty)
@@ -349,7 +358,7 @@ fn ruff_verdict(
             satisfied,
         } => setting_verdict(&state.settings, key, value, *satisfied),
         Target::Command(_) => Verdict::of(Outcome::Suggest(None)),
-        Target::Level { .. } => Verdict::nothing(),
+        Target::Level { .. } | Target::Remove { .. } => Verdict::nothing(),
     }
 }
 
@@ -367,7 +376,9 @@ fn ty_verdict(
             value,
             satisfied,
         } => return setting_verdict(&state.settings, key, value, *satisfied),
-        Target::Select { .. } | Target::Command(_) => return Verdict::nothing(),
+        Target::Select { .. } | Target::Command(_) | Target::Remove { .. } => {
+            return Verdict::nothing();
+        }
     };
     let rule = &record.key.id;
     if project
@@ -455,6 +466,189 @@ fn shown(root: &Path, path: &Path) -> PathBuf {
 }
 
 impl Report {
+    pub(crate) fn pytest(&mut self, root: &Path, files: usize, catalog: &Catalog, pytest: &Pytest) {
+        let tool = Tool::Pytest;
+        let (installed, path) = pytest.installed.clone().unzip();
+        let pinned = tool.pinned();
+        let status = installed.as_ref().map_or_else(
+            || format!("unverified locally (decisions for pytest {pinned})"),
+            |version| format!("pytest {version} installed (decisions reviewed for {pinned})"),
+        );
+        self.tools.push(ToolStatus {
+            tool: tool.name(),
+            pinned,
+            installed,
+            path,
+        });
+        for note in &pytest.notes {
+            self.note(tool, note.clone());
+        }
+        let timeout = pytest.project.as_ref().and_then(|project| {
+            self.pytest_plugins(
+                root,
+                files,
+                catalog,
+                project,
+                pytest.installed.as_ref(),
+                &status,
+            )
+        });
+        let settings = match &pytest.settings {
+            Ok(Some(settings)) => settings,
+            Ok(None) => return,
+            Err(error) => {
+                self.note(tool, format!("cannot read pytest's settings: {error}"));
+                return;
+            }
+        };
+        let facts = Scope {
+            destination: &settings.destination,
+            name: scope_name(root, settings.config.as_deref(), "pytest's defaults"),
+            files,
+            status,
+            representative: None,
+            placement: None,
+        };
+        for (record, suggestion) in catalog
+            .suggestions()
+            .filter(|(record, _)| record.key.tool == tool && record.key.kind != Kind::Dependency)
+        {
+            match (&suggestion.target, &suggestion.when) {
+                (Target::Remove { key, .. }, _) => {
+                    for (item, placement) in settings.removals(record, key) {
+                        self.suggest(
+                            root,
+                            record,
+                            &Suggestion {
+                                target: Target::Remove {
+                                    key: key.clone(),
+                                    item,
+                                },
+                                ..suggestion.clone()
+                            },
+                            placement.current.clone(),
+                            Vec::new(),
+                            &Scope {
+                                placement: Some(&placement),
+                                ..facts.clone()
+                            },
+                        );
+                    }
+                }
+                (
+                    _,
+                    When::If {
+                        trigger: Trigger::TimeoutPlugin,
+                        ..
+                    },
+                ) if settings.needs_timeout() => {
+                    if let Some(location) = &timeout {
+                        self.suggest(
+                            root,
+                            record,
+                            suggestion,
+                            None,
+                            vec![location.clone()],
+                            &facts,
+                        );
+                    }
+                }
+                (_, When::Always) if settings.missing(&record.key.id) => {
+                    self.suggest(root, record, suggestion, None, Vec::new(), &facts);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn pytest_plugins(
+        &mut self,
+        root: &Path,
+        files: usize,
+        catalog: &Catalog,
+        project: &Project,
+        installed: Option<&(String, PathBuf)>,
+        status: &str,
+    ) -> Option<Location> {
+        let groups = project.groups();
+        let runtime = project.runtime_dependencies();
+        let has = |name| {
+            groups
+                .iter()
+                .chain(runtime.iter())
+                .any(|group| group.has(name))
+        };
+        let has_pytest = installed.is_some() || has("pytest");
+        let path = Project::plugin_group(&groups);
+        let destination = &project.destination;
+        let facts = Scope {
+            destination,
+            name: scope_name(root, Some(&destination.file), "pytest's dependencies"),
+            files,
+            status: status.to_owned(),
+            representative: None,
+            placement: None,
+        };
+        let add = project.place_group(path);
+        for (record, suggestion) in catalog.suggestions().filter(|(record, _)| {
+            record.key.tool == Tool::Pytest && record.key.kind == Kind::Dependency
+        }) {
+            let name = &record.key.id;
+            match &suggestion.target {
+                Target::Remove { key, .. } => {
+                    for group in &groups {
+                        for entry in group.entries(name) {
+                            let placement = group.place(project, entry);
+                            let suggestion = Suggestion {
+                                target: Target::Remove {
+                                    key: key.clone(),
+                                    item: entry.as_str().map(str::to_owned),
+                                },
+                                ..suggestion.clone()
+                            };
+                            self.suggest(
+                                root,
+                                record,
+                                &suggestion,
+                                None,
+                                Vec::new(),
+                                &Scope {
+                                    placement: Some(&placement),
+                                    ..facts.clone()
+                                },
+                            );
+                        }
+                    }
+                }
+                Target::Setting { .. } if has_pytest && !has(name) => {
+                    self.suggest(
+                        root,
+                        record,
+                        suggestion,
+                        None,
+                        Vec::new(),
+                        &Scope {
+                            placement: Some(&add),
+                            ..facts.clone()
+                        },
+                    );
+                    if project.uv_lock && path == ["dependency-groups", "dev"] {
+                        let command = Suggestion {
+                            target: Target::Command(format!("uv add --dev {name}")),
+                            ..suggestion.clone()
+                        };
+                        self.suggest(root, record, &command, None, Vec::new(), &facts);
+                    }
+                }
+                _ => {}
+            }
+        }
+        groups.iter().chain(runtime.iter()).find_map(|group| {
+            let entry = group.entries("pytest-timeout").next()?;
+            group.location(project, entry)
+        })
+    }
+
     fn note(&mut self, tool: Tool, message: String) {
         self.notes.push(Note {
             tool: tool.name(),
@@ -479,6 +673,7 @@ impl Report {
             let checker = match tool {
                 Tool::Ruff => &ruff.checker,
                 Tool::Ty => &ty.checker,
+                Tool::Pytest => continue,
             };
             let version = checker
                 .installed
@@ -571,13 +766,43 @@ impl Report {
         let (key, value, assign) = match &suggestion.target {
             Target::Select { key, code } => (key, format!("\"{code}\""), Assign::Item),
             Target::Level { key, level } => (key, format!("\"{}\"", level.name()), Assign::Value),
-            Target::Setting { key, value, .. } => (key, value.clone(), Assign::Value),
+            Target::Setting { key, value, .. } => (
+                key,
+                value.clone(),
+                if record.key.kind == Kind::Dependency {
+                    Assign::Item
+                } else {
+                    Assign::Value
+                },
+            ),
             Target::Command(command) => (command, String::new(), Assign::Command),
+            Target::Remove {
+                key,
+                item: Some(item),
+            } => (key, item.clone(), Assign::RemoveItem),
+            Target::Remove { key, item: None } => (
+                key,
+                facts.destination.literal(key).unwrap_or_default(),
+                Assign::RemoveKey,
+            ),
         };
-        let placement = (assign != Assign::Command).then(|| facts.destination.place(key));
+        let placement = (assign != Assign::Command).then(|| {
+            facts
+                .placement
+                .cloned()
+                .unwrap_or_else(|| facts.destination.place(key))
+        });
+        let arguments = placement
+            .as_ref()
+            .filter(|_| pytest::is_addopts(record.key.tool, &suggestion.target))
+            .map(|placement| (placement.clone(), pytest::argument_style(facts.destination)));
         let (value, edit) = if let Some(placement) = &placement {
             let file = shown(root, &facts.destination.file);
-            let edit = edit(placement, &value, assign, &file);
+            let edit = if let Some((placement, style)) = &arguments {
+                pytest::add_arguments(placement, &[&value], *style)
+            } else {
+                edit(placement, &value, assign, &file)
+            };
             (value, edit)
         } else {
             let command = match facts.representative {
@@ -619,6 +844,8 @@ impl Report {
             condition,
             evidence: relative(root, evidence),
             status: facts.status.clone(),
+            arguments,
+            assign,
         });
     }
 
@@ -718,15 +945,36 @@ impl Report {
             );
             let mut keys: Vec<&str> = Vec::new();
             for advice in &group {
+                if advice.decision == "remove" {
+                    let _ = writeln!(out, "  {}", advice.edit);
+                    advice.explain(out);
+                    continue;
+                }
                 if !keys.contains(&advice.key.as_str()) {
                     keys.push(&advice.key);
                 }
             }
             for key in keys {
-                let same: Vec<&Advice> = group.iter().filter(|m| m.key == key).copied().collect();
+                let same: Vec<&Advice> = group
+                    .iter()
+                    .filter(|m| m.key == key && m.decision != "remove")
+                    .copied()
+                    .collect();
                 let values: Vec<&str> = same.iter().map(|m| m.value.as_str()).collect();
                 let _ = match (same.as_slice(), same[0].key_line) {
+                    _ if let Some((placement, style)) = &same[0].arguments => {
+                        writeln!(
+                            out,
+                            "  {}",
+                            pytest::add_arguments(placement, &values, *style)
+                        )
+                    }
                     ([single], Some(_)) => writeln!(out, "  {}", single.edit),
+                    ([single], None)
+                        if single.tool == "pytest" && single.assign == Assign::Item =>
+                    {
+                        writeln!(out, "  {key} = [{}]", single.value)
+                    }
                     ([single], None) => writeln!(out, "  {key} = {}", single.value),
                     (_, Some(line)) => writeln!(
                         out,
@@ -789,12 +1037,26 @@ enum Assign {
     Value,
     /// No key: run a command.
     Command,
+    /// Remove a key and its value.
+    RemoveKey,
+    /// Remove part of a key's value.
+    RemoveItem,
 }
 
 /// The edit that sets `key` to `value` at `placement`, or adds `value` to its array.
 fn edit(placement: &Placement, value: &str, assign: Assign, file: &Path) -> String {
     let key = &placement.key;
     let assignment = match assign {
+        Assign::RemoveKey | Assign::RemoveItem => {
+            let line = placement
+                .key_line
+                .map_or_else(String::new, |line| format!(" at line {line}"));
+            return match assign {
+                Assign::RemoveKey => format!("remove {key} = {value}{line}"),
+                _ if key == "addopts" => format!("remove {value} from {key}{line}"),
+                _ => format!("remove {value:?} from {key}{line}"),
+            };
+        }
         Assign::Item => format!("{key} = [{value}]"),
         Assign::Value | Assign::Command => format!("{key} = {value}"),
     };
