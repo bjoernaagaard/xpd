@@ -1,0 +1,26 @@
+{
+  "description": "Runs xpd hook when a session starts, on each prompt, after each edit and when the agent wants to stop.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [{ "type": "command", "command": "xpd hook" }]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{ "type": "command", "command": "xpd hook" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "xpd hook" }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "xpd hook" }]
+      }
+    ]
+  }
+}

@@ -31,8 +31,8 @@ const OWN_PACK: &str = "xpd";
 const OWN_RULES: &[&str] = &["unused-suppression"];
 /// The folder in a pack folder that holds the pack's shared utility rules.
 const UTILS: &str = "utils";
-/// The manifest of the agent plugin that this repository is.
-const PLUGIN: &str = "plugin.json";
+/// The manifest of the plugin that this repository is. Claude Code and Codex both read it.
+const PLUGIN: &str = ".claude-plugin/plugin.json";
 /// The plugin's file that starts xpd with `uvx xpd@VERSION`.
 const PLUGIN_MCP: &str = "mcp.json";
 /// The vector of each index record, by the record's name. `xpd find --write-vectors` writes it.
@@ -41,7 +41,7 @@ const VECTORS: &str = "indexes/vectors.bin";
 /// hash of its text (u64 LE, as `text_hash` gives it), and `DIMENSIONS` signed bytes.
 const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
 const DIMENSIONS: usize = 256;
-/// Fails the build when the agent plugin names another version than the crate, so a release
+/// Fails the build when the plugin names another version than the crate, so a release
 /// cannot ship skills under an old version or start an old xpd.
 fn plugin_version() -> Result<()> {
     let version = env::var("CARGO_PKG_VERSION").context("cargo sets CARGO_PKG_VERSION")?;

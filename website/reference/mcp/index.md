@@ -28,9 +28,9 @@ sequenceDiagram
     Server-->>Agent: the same JSON, as a typed result
 ```
 
-The project root is `--root` or `XPD_MCP_ROOT` when one is set. A client that loads xpd as an
-agent plugin sets `PLUGIN_ROOT`, and then the root is the first root of the client that is a
-folder on the machine. Otherwise it is the server's working folder.
+The project root is `--root` or `XPD_MCP_ROOT` when one is set. A client that starts the server
+in a plugin's folder sets `PLUGIN_ROOT`, and then the root is the first root of the client that is
+a folder on the machine. Otherwise it is the server's working folder.
 
 ## Errors
 

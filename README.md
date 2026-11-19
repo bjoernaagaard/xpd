@@ -149,7 +149,7 @@ once. Every other command only reads files.
 | --- | --- | --- |
 | Claude Code to see the issues of each file it edits | Add `xpd hook` as a `PostToolUse` hook | [Claude Code and other agents](https://bjoernaagaard.github.io/xpd/guides/claude-code/) |
 | An agent to call xpd's tools | `claude mcp add xpd -- uvx xpd mcp` | [Connect an agent with MCP](https://bjoernaagaard.github.io/xpd/guides/mcp/) |
-| The MCP server and the skills in one step | Load this repository as an agent plugin | [Agent plugin](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-plugin) |
+| The hook, the MCP server and the skills in one step | Install this repository as a plugin in Claude Code or Codex | [Agent plugin](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-plugin) |
 | An agent to know when to run each command | `npx skills add bjoernaagaard/xpd` | [Agent skill](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-skill) |
 | An agent to train a scikit-learn model with checks | `xpd mcp --code-mode` | [Train a model in code mode](https://bjoernaagaard.github.io/xpd/guides/code-mode/) |
 | Issues, fixes and rule help in your editor | Start `xpd lsp` from the editor | [Use xpd in an editor](https://bjoernaagaard.github.io/xpd/guides/editors/) |

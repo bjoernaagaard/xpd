@@ -55,8 +55,9 @@ project root of a call
 └── otherwise                        the folder the server started in
 ```
 
-A client that loads xpd as an [agent plugin](../claude-code/#agent-plugin) sets `PLUGIN_ROOT`,
-and the server then asks the client on each call for its
+Claude Code and Codex start the server of the [plugin](../claude-code/#agent-plugin) in the
+project's folder. A client that starts it in the plugin's folder sets `PLUGIN_ROOT`, and the
+server then asks the client on each call for its
 [roots](https://modelcontextprotocol.io/specification/2025-06-18/client/roots), the folders that
 the client shares with servers. When none of them is a folder on the machine, a tool fails with a
 message that names `--root` and `XPD_MCP_ROOT`.

@@ -1,0 +1,15 @@
+{
+  "name": "xpd",
+  "description": "xpd, a linter for Python that uses pandas, NumPy and other data libraries.",
+  "owner": {
+    "name": "Bjørn Aagaard",
+    "url": "https://github.com/bjoernaagaard"
+  },
+  "plugins": [
+    {
+      "name": "xpd",
+      "source": "./",
+      "category": "development"
+    }
+  ]
+}

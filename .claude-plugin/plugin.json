@@ -1,5 +1,4 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "xpd",
   "version": "0.38.0",
   "description": "Lints Python that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly or Apache Hamilton for slow operations and wrong results, after each edit and through MCP tools.",
@@ -10,6 +9,7 @@
   "homepage": "https://bjoernaagaard.github.io/xpd/",
   "repository": "https://github.com/bjoernaagaard/xpd",
   "license": "MIT AND Apache-2.0 AND BSD-3-Clause AND NCSA AND MPL-2.0 AND ISC AND MIT-0 AND PSF-2.0",
+  "mcpServers": "./mcp.json",
   "keywords": [
     "python",
     "linter",

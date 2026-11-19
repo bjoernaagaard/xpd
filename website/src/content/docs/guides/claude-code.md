@@ -3,21 +3,22 @@ title: Claude Code and other agents
 description: Show a coding agent the issues of each Python file it edits, and give it xpd's tools and skills.
 ---
 
-Add `xpd hook` to your Claude Code settings, and the agent sees xpd's issues for each Python file
-in the same turn as its edit. You can also give the agent xpd's MCP tools and skills, or load the
-whole repository as an agent plugin in a client that supports plugins.
+Install the xpd plugin in Claude Code or Codex, and the agent sees xpd's issues for each Python
+file it changes, calls xpd's MCP tools and loads its skills. You can also set up each of the three
+parts by hand.
 
 | You want the agent to | Set up | What it needs |
 | --- | --- | --- |
+| Get the hook, the MCP server and the skills in one step | [The plugin](#agent-plugin) | Claude Code or Codex, `xpd` on `PATH`, and [uv](https://docs.astral.sh/uv/) |
 | See the issues of each file it edits | [The hook](#lint-each-edit-with-the-hook) | `xpd` on `PATH` |
-| Call xpd itself, to fix, search or check a refactor | [The MCP server](../mcp/) | [uv](https://docs.astral.sh/uv/) |
+| Call xpd itself, to fix, search or check a refactor | [The MCP server](../mcp/) | uv |
 | Know when to run each xpd command | [The skills](#agent-skill) | Nothing |
-| Get the MCP server and the skills in one step | [The plugin](#agent-plugin) | A client that loads Agent Plugins, and uv |
 
 ## Lint each edit with the hook
 
-Install xpd as [Get started](../../#install) shows, and add the following to
-`.claude/settings.json` in your project.
+The [plugin](#agent-plugin) adds this hook for you. To add it by hand, install xpd as
+[Get started](../../#install) shows, and add the following to `.claude/settings.json` in your
+project.
 
 ```json title=".claude/settings.json"
 {
@@ -104,34 +105,68 @@ The MCP server also offers each skill as a resource, such as `skill://xpd/SKILL.
 
 ## Agent plugin
 
-A client that loads plugins in the [Agent Plugins](https://github.com/agentplugins/agent-plugins-spec)
-format, version 1.0.0, can load the xpd repository and get the MCP server and the three skills
-with no settings to write. The plugin starts the server with `uvx`, so the machine needs
-[uv](https://docs.astral.sh/uv/). Install it in Codex with the following commands.
+The xpd repository is a plugin for Claude Code and for Codex. One install gives the agent the
+hook, the MCP server and the three skills, with no settings to write. The hook runs the `xpd` on
+your `PATH`, so install xpd as [Get started](../../#install) shows. The plugin starts the MCP
+server with `uvx`, so the machine also needs [uv](https://docs.astral.sh/uv/).
+
+Install the plugin in Claude Code with the following commands.
+
+```sh
+claude plugin marketplace add bjoernaagaard/xpd
+claude plugin install xpd@xpd
+```
+
+Install the plugin in Codex with the following commands.
 
 ```sh
 codex plugin marketplace add bjoernaagaard/xpd
 codex plugin add xpd@xpd
 ```
 
-The plugin is made of the files below, at the root of the repository.
+Codex skips the hooks of a plugin until you trust them. Start Codex, type `/hooks`, and trust the
+four `xpd hook` entries. Codex asks you again when a later version of the plugin changes a hook.
+Claude Code runs the hooks of an installed plugin without this step.
+
+The plugin is made of the files below.
 
 ```text
 xpd repository, loaded as a plugin
-├── plugin.json                         the name and version of the plugin
+├── .claude-plugin/
+│   ├── plugin.json                     the name and version of the plugin, which both clients read
+│   └── marketplace.json                lists the plugin for Claude Code
+├── .agents/plugins/marketplace.json    lists the plugin for Codex
+├── hooks/hooks.json                    runs xpd hook on four events, in both clients
 ├── mcp.json                            starts the server of the same version, with uvx xpd@<version> mcp
-├── skills/                             xpd, python-best-practices and python-review
-└── .agents/plugins/marketplace.json    lists the plugin for Codex
+└── skills/                             xpd, python-best-practices and python-review
 ```
 
-Version 1.0.0 of the format has no hooks, so the plugin ships none, and you add the
-[hook](#lint-each-edit-with-the-hook) yourself in Claude Code. The 1.1.0 draft of the format adds
-hooks, and `xpd hook` already answers such a client. xpd tells the two kinds of client apart by
-the field that holds the result of the tool call.
+Codex 0.170.0 loads the hooks of a plugin only when the plugin has no `plugin.json` at its root,
+so the manifest is in `.claude-plugin/`, where both clients read it.
+
+The client runs `xpd hook` on the four events below, and [`xpd hook`](../../commands/hook/)
+describes each answer.
+
+| Event | What xpd does |
+| --- | --- |
+| `SessionStart` | Records the commit that is checked out, and prints nothing |
+| `UserPromptSubmit` | Nothing in this version |
+| `PostToolUse`, after an `Edit` or a `Write` | Lints the edited file, so the agent sees its issues |
+| `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning |
+
+In Claude Code, the agent sees the issues of a file right after its edit. In Codex, an edit is an
+`apply_patch` call whose event names no file, so xpd prints nothing after the edit. The `Stop`
+check lints every changed Python file in both clients, so the agent in Codex sees the errors and
+warnings when it wants to end the turn.
+
+`xpd hook` also answers a client of the 1.1.0 draft of the
+[Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, which sends another
+event after an edit. xpd tells the two kinds of client apart by the field that holds the result of
+the tool call.
 
 | Client | Field in the event | Files that xpd lints | How the agent gets the issues |
 | --- | --- | --- | --- |
-| A hook in the Claude Code settings | `tool_response` | `tool_input.file_path` | On stderr, with exit code 2 |
+| Claude Code | `tool_response` | `tool_input.file_path` | On stderr, with exit code 2 |
 | A client of the Agent Plugins 1.1.0 draft | `tool_result` | The `path` of each `edit` and `write`, and the `to` of each `move` | As `additional_context` in JSON on stdout, with exit code 0 |
 
 A client of the draft runs the hook in the plugin's folder, so xpd first moves to the `cwd` that
