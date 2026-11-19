@@ -16,7 +16,7 @@ A new reader should be able to copy a small Python file, run xpd and see exactly
 - [x] ✅ 2. Give every rule a page and share its explanation with installed tools.
 - [x] ✅ 3. Generate command and MCP references from the running tools.
 - [x] ✅ 4. Rewrite the public guides and package README.
-- [ ] 5. Verify existing links and switch GitHub Pages to Starlight.
+- [x] ✅ 5. Verify existing links and switch GitHub Pages to Starlight.
 
 Develop and verify the phases together before the production switch. The deployed book continues serving its existing URLs until the complete replacement passes the final checks.
 
@@ -123,7 +123,7 @@ The agent also ran the manual steps in headless Chrome for Testing 158 against t
 
 **Manual verification.** Start at the README and follow installation through the first fix without a checkout. In the site, navigate to rule authoring, connect an editor and locate an MCP tool. Check keyboard focus, search results, code readability, diagram labels and horizontal scrolling on desktop and at phone width in each supported theme.
 
-**Progress on 19 November 2026.** Five guides live in `website/src/content/docs/guides/`, at `guides/claude-code/`, `guides/mcp/`, `guides/code-mode/`, `guides/editors/` and `guides/write-a-rule/`, and the sidebar lists them after Get started. They cover the hook, the skills and the agent plugin, MCP setup and settings, code mode, the language server, and rule authoring for a project and for xpd's packs. They link to the generated command, MCP and rule pages for options, counts and tool fields. The README leads with installation and the copyable `bad.py`, and it links each guide and rule by its new address. Get started links to the guides. The old book chapters stay in `docs/` until phase 5 removes them.
+**Progress on 19 November 2026.** Five guides live in `website/src/content/docs/guides/`, at `guides/claude-code/`, `guides/mcp/`, `guides/code-mode/`, `guides/editors/` and `guides/write-a-rule/`, and the sidebar lists them after Get started. They cover the hook, the skills and the agent plugin, MCP setup and settings, code mode, the language server, and rule authoring for a project and for xpd's packs. They link to the generated command, MCP and rule pages for options, counts and tool fields. The README leads with installation and the copyable `bad.py`, and it links each guide and rule by its new address. Get started links to the guides. Phase 5 removed the old book chapters in `docs/`.
 
 `samples/pipeline/discovery.json` named `sklearn.conftest.fetch_species_distributions`, which the index now gives as `sklearn.datasets.fetch_species_distributions`, so the gate `discovery-is-recorded` failed. The record was written again from `find` and `api`, as the code mode guide tells readers to do.
 
@@ -139,7 +139,7 @@ The agent also ran the manual steps in headless Chrome for Testing 158 against t
 - [x] In the site, navigate to rule authoring, connect an editor and locate an MCP tool.
 - [x] Check keyboard focus, search results, code readability, diagram labels and horizontal scrolling on desktop and at phone width in each theme.
 
-## 5. Verify existing links and switch GitHub Pages to Starlight
+## ✅ 5. Verify existing links and switch GitHub Pages to Starlight
 
 **Change outline.** Make the existing `mise run docs` build the complete Starlight site into `site/`. Update [Pages publishing](../../../.github/workflows/docs.yml) to build on pull requests and deploy verified main builds. Include the site sources, dependency locks, rule text, CLI and MCP definitions, and other build inputs in its triggers. Update compatible workflow dependencies. Retire mdBook configuration and assets once their consumers have moved. Publish the new site before releasing binaries that emit the new URLs.
 
@@ -148,6 +148,22 @@ Keep the legacy chapter routes, including the old rules page. Its fragment handl
 **Automated verification.** From a clean checkout run `mise run docs`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo run --quiet -- check samples/good.py --format text` and `jactionlint .github/workflows/docs.yml`. Run the existing CI hooks. Against the built site under `/xpd/`, follow the baseline's six chapter aliases, 20 named cross-chapter targets and all 426 published rule targets, including fragment handling in a browser. Check new catalog links as well. Confirm that a pull request builds without deploying and that the production workflow serves the verified output.
 
 **Manual verification.** On the published site, open an old editor link, read the rule, browse its pack and search for a command. Compare the result with the candidate build and verify the quick start remains reachable from the package README.
+
+**Progress on 19 November 2026.** `mise run docs` builds the Starlight site into `site/`, and the `docs:starlight` task, mdBook, mdbook-mermaid, `book.toml`, `docs/` and the generated Mermaid scripts are gone. The `docs-preview` daemon serves the same build. xpd links each rule and package check to `https://bjoernaagaard.github.io/xpd/rules/<pack>/<id>/`, in SARIF and GitHub output, LSP diagnostics and hover, and the catalog, and `xpd/unused-suppression` now has its address too.
+
+`website/src/legacy.mjs` maps each old address to its new page. `rules.html`, `commands.html`, `claude-code.html`, `mcp.html`, `code-mode.html`, `lsp.html`, `claude-code/index.html`, `code-mode/index.html` and `lsp/index.html` are small pages whose script reads the fragment and opens its new page. An unknown fragment opens the chapter's new page, and without JavaScript the page refreshes to it. The old `commands/`, `mcp/` and `rules/` folder addresses are pages of the new site. Each old heading of a chapter has an entry, and the rule entries come from the generated rule pages, so a new rule gets one with no edit.
+
+`.github/workflows/docs.yml` builds on pull requests and on pushes to main that touch the site, the rules, the Rust and Python sources, the indexes, the skills, the lockfiles, `mise.toml` or the workflow, and only main deploys. mise-action moved from 5.2.6 to 5.2.10, and the other actions were already on their newest tags. The Release workflow now ignores `website/**` in place of `docs/**` and `book.toml`. The changes went out as [pull request 14](https://github.com/bjoernaagaard/xpd/pull/14), with commits 11f81cc and 6b96864 on main.
+
+- [x] From a clean clone of the branch, `mise run docs` built 497 pages and 506 HTML files, and `cargo fmt --check`, clippy with `-D warnings`, `cargo run --quiet -- check samples/good.py --format text` and `jactionlint .github/workflows/docs.yml` exited 0. The lefthook pre-commit hooks passed on the commit, and `xpd find --check` passed 53 of 53 after `--write-vectors` embedded the one rule whose text changed. 48,206 internal links of the clean build resolve.
+- [x] `xpd rules --builtin --format json` gives 427 records, each with the address of its rule page.
+- [x] In headless Chrome for Testing 158 against the site under `/xpd/`, locally and then live, all 426 baseline rule links of `rules.html#<id>` opened the page whose heading is the rule's pack and id. The 427 new catalog links, the 20 named cross-chapter targets with their headings, the 6 chapter aliases and the 7 chapter pages opened their new pages. On the live site, the first pass timed out once while one rule page loaded, and the same link passed 3 of 3 runs again.
+- [x] On pull request 14, the Documentation build passed in 3 minutes 49 seconds, its deploy job was skipped, and the CI lefthook job passed. On main, run 44544972720 built and deployed at 14:38 UTC, and the Pages API reports the `workflow` build type. Five live pages, including `rules.html` and `guides/mcp/`, are byte for byte equal to the clean build.
+
+The agent also ran the manual steps in headless Chrome against the live site. `rules.html#chained-assignment` opened `rules/pandas/chained-assignment/`, with the lead, the diff and the unsafe fix, and its pack link opened the pandas pack, which has 134 rules and fixes for 81. Ctrl+K, `xpd outline`, two Tabs and Enter opened `commands/outline/`. Every site link in the README on main answers 200, with its heading where it names one, and its Get started link is the quick start. The live guides matched the local build at both widths in both themes.
+
+- [x] On the published site, open an old editor link, read the rule, browse its pack and search for a command.
+- [x] Compare the result with the candidate build, and verify the quick start remains reachable from the package README.
 
 ## Open questions
 
