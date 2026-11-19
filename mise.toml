@@ -8,12 +8,24 @@ ruff = "0.17.4"
 "github:rust-lang/mdBook" = "0.5.0"
 "github:badboy/mdbook-mermaid" = "0.17.1"
 "aqua:Kitware/CMake" = "4.5.0"
+node = "26.13.1"
 
 [tasks.docs]
 description = "Build the documentation site into site/"
 run = """
 mdbook-mermaid install .
 mdbook build
+"""
+
+# The Starlight site that replaces the mdBook site. It builds on its own into website/dist/ until
+# GitHub Pages publishes it. The docs-preview daemon in pitchfork.toml serves it under /xpd/, the
+# path it has on Pages.
+[tasks."docs:starlight"]
+description = "Build the Starlight site into website/dist/"
+dir = "website"
+run = """
+npm ci
+npm run build
 """
 
 # Builds the wheels this machine can build, to try a build before pushing a tag. zig cross-compiles

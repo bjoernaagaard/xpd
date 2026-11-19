@@ -1,0 +1,21 @@
+{
+  "name": "xpd-docs",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.13.1"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/markdown-satteri": "0.4.10",
+    "@astrojs/starlight": "0.43.1",
+    "@expressive-code/plugin-line-numbers": "0.44.4",
+    "astro": "7.4.13",
+    "astro-mermaid": "2.2.0",
+    "mermaid": "12.3.0"
+  }
+}

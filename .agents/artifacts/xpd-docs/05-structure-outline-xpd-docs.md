@@ -30,6 +30,29 @@ Rewrite the quick start around a copyable example drawn from [samples/bad.py](..
 
 **Manual verification.** Follow the quick start from an empty directory. Find the page again using keyboard search, then read the sample and diff at phone width.
 
+**Progress on 19 November 2026.** The site lives in `website/`, and `mise run docs:starlight` builds it into `website/dist/`. The `docs-preview` daemon in `pitchfork.toml` builds the site the same way and serves it at `http://localhost:4321/xpd/`. The existing `mise run docs` still builds the mdBook site, and the Pages workflow is unchanged.
+
+| Tool | Resolved version | Where it is pinned |
+| --- | --- | --- |
+| Node | 26.13.1, the current LTS release | `mise.toml` |
+| Astro | 7.4.13 | `website/package.json` and `package-lock.json` |
+| Starlight | 0.43.1 | the same |
+| Astro Markdown processor, Sätteri | 0.4.10 | the same, with smart punctuation off as in mdBook |
+| astro-mermaid, the integration that Starlight's plugin list names | 2.2.0 | the same |
+| Mermaid | 12.3.0 | the same |
+| Expressive Code line numbers | 0.44.4 | the same, matching Starlight's Expressive Code |
+| Pagefind | 1.6.0 | the lockfile, through Starlight |
+
+- [x] `npm ci` installs from the lockfile and `npm run build` finishes. Astro reports that the `i18n` collection and a `404` entry are missing. Starlight's own 0.43.1 starter reports the same two warnings.
+- [x] Served under `/xpd/`, the start page, its 10 linked assets and `pagefind/pagefind-entry.json` return 200.
+- [x] On a temporary copy of the sample taken from the page's copy button, the three output blocks match xpd 0.38.0 line for line with `--format text`. The exit statuses are 1, 1 and 0, and the safe fix leaves the file unchanged. The unsafe fixes write the two lines that the page's diff shows.
+
+The agent also ran the manual steps in headless Chrome for Testing 158. Ctrl+K opened search, and "unsafe fixes" returned the page and three of its sections. Starlight binds Ctrl+K, while mdBook used the slash key. At 390 pixels wide, no code block or page scrolled sideways, and the diagram rendered in light and dark themes. The steps below stay open until the user confirms them.
+
+- [ ] Follow the quick start from an empty directory.
+- [ ] Find the page again using keyboard search.
+- [ ] Read the sample and diff at phone width.
+
 ## 2. Give every rule a page and share its explanation with installed tools
 
 **Change outline.** First capture the old catalog's IDs, URLs and fragment targets from the baseline commit. Move authored explanations into Markdown keyed by pack and rule ID. Rewrite each entry in plain language. Lead with the consequence and action, then show a small example and its fix. Where xpd offers no automatic fix, describe what the reader can change. Include the special diagnostic `xpd/unused-suppression`, whose baseline record lacks a page.

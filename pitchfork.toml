@@ -1,0 +1,11 @@
+#:schema https://pitchfork.jdx.dev/schema.json
+
+# Builds the Starlight site the way `mise run docs:starlight` does and serves it at
+# http://localhost:4321/xpd/. From another machine, forward the port first, such as
+# `ssh -N -L 4321:localhost:4321 homelab`.
+[daemons.docs-preview]
+dir = "website"
+run = "npm ci && npm run build && exec npm run preview -- --port 4321"
+mise = true
+ready_http = { url = "http://127.0.0.1:4321/xpd/", timeout = "5m" }
+retry = 3
