@@ -24,6 +24,36 @@ pub(crate) struct Recipe {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub(crate) attribution: String,
     pub(crate) modified: bool,
+    /// What a user asks for when this playbook is the answer. Empty for an example taken from
+    /// a library.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) asks: Vec<String>,
+    /// The commands to run for a playbook, in order. Empty for an example taken from a library.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) commands: Vec<String>,
+}
+
+impl Recipe {
+    /// Whether this is one of xpd's own recipes, which state the house style for a kind of
+    /// task. build.rs reads them from `rules/xpd/playbooks`.
+    pub(crate) fn is_playbook(&self) -> bool {
+        !self.commands.is_empty()
+    }
+}
+
+/// The issues of the code of a playbook under the strict style, one line each. A playbook
+/// states the house style, so its code has none.
+pub(crate) fn playbook_issues(recipe: &Recipe) -> Result<Vec<String>> {
+    let packs = Catalog::embedded(None, Style::Strict)?.packs;
+    // A recipe is in no file, so no import of it is followed.
+    let file = scan::File {
+        path: Path::new("playbook.py"),
+        disk: None,
+    };
+    let code = recipe.code.as_deref().unwrap_or_default();
+    Ok((scan::lint_source(file, code, &packs).found.iter())
+        .map(|found| found.issue.line(Applicability::Safe))
+        .collect())
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -560,6 +590,8 @@ pub(crate) fn harvest(
                 license: license.to_owned(),
                 attribution,
                 modified: verified.fixes > 0,
+                asks: Vec::new(),
+                commands: Vec::new(),
             };
             entries.push(Entry {
                 kind: Kind::Recipe,

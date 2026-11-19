@@ -59,6 +59,13 @@ impl Model {
             .ok()
     }
 
+    /// The model from the cache folder. `None` when it is not there or cannot be loaded, and
+    /// nothing is downloaded.
+    pub(crate) fn cached() -> Option<Self> {
+        let path = path().ok().filter(|path| path.is_file())?;
+        Self::load(&path).ok()
+    }
+
     fn load(path: &Path) -> Result<Self> {
         let mut backend = LlamaBackend::init()?;
         backend.void_logs();

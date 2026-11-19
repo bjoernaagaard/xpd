@@ -7,7 +7,8 @@
 //! `<rule id>.md` explains a rule or a package check of the manifest. `pack.md` introduces the
 //! pack and lists each of its rules once under a heading, and the folder `utils/` holds
 //! `<utility id>.yml`, one utility rule that every rule of the pack can name with `matches`.
-//! The folder `rules/xpd/` holds only the Markdown of xpd's own rule, `xpd/unused-suppression`. This script writes `OUT_DIR/packs.rs`, which src/pack.rs includes, so a new rule or
+//! The folder `rules/xpd/` holds the Markdown of xpd's own rule, `xpd/unused-suppression`, and
+//! in `playbooks/` xpd's own recipes, which join the search index. This script writes `OUT_DIR/packs.rs`, which src/pack.rs includes, so a new rule or
 //! a new pack needs no Rust change. It also writes `OUT_DIR/skills.rs`, which src/skills.rs
 //! includes.
 
@@ -29,6 +30,10 @@ const PACK_PAGE: &str = "pack.md";
 /// defines, and their ids.
 const OWN_PACK: &str = "xpd";
 const OWN_RULES: &[&str] = &["unused-suppression"];
+/// The folder in `rules/xpd/` that holds the playbooks, which are xpd's own recipes.
+const PLAYBOOKS: &str = "playbooks";
+/// Where the source of a playbook can be read.
+const REPOSITORY: &str = "https://github.com/bjoernaagaard/xpd";
 /// The folder in a pack folder that holds the pack's shared utility rules.
 const UTILS: &str = "utils";
 /// The manifest of the plugin that this repository is. Claude Code and Codex both read it.
@@ -369,6 +374,7 @@ fn discovery_source(out: &Path, docs: &BTreeMap<String, BTreeMap<String, String>
                 .cloned(),
         );
     }
+    entries.extend(playbooks(docs)?);
     for (package, sections) in docs {
         for (id, doc) in sections {
             entries.push(serde_json::json!({"kind":"rule","package":package,"name":format!("{package}/{id}"),"callable":null,"parameters":[],"summary":doc.trim(),"members":[],"rules":[]}));
@@ -416,6 +422,92 @@ fn discovery_source(out: &Path, docs: &BTreeMap<String, BTreeMap<String, String>
     write(&out.join("records.rs"), &records)?;
     vectors_source(out, &entries)?;
     search_source(out, &entries)
+}
+
+/// The playbooks under `rules/xpd/playbooks`, each as a recipe of the `xpd` package named
+/// `xpd/recipe/<file name>`. A playbook is a Markdown file with a title, a first paragraph and
+/// the sections `Asks`, `Code`, `Commands` and `Rules`. Its asks are in the summary, which the
+/// keyword search and the embedding model both read, so a loose ask finds its playbook. `docs`
+/// holds the rule ids of each pack, and a playbook that names another rule fails the build.
+fn playbooks(docs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<Vec<serde_json::Value>> {
+    let version = env::var("CARGO_PKG_VERSION").context("cargo sets CARGO_PKG_VERSION")?;
+    let mut entries = Vec::new();
+    for file in sorted_entries(&Path::new("rules").join(OWN_PACK).join(PLAYBOOKS))? {
+        let name = utf8_name(&file)?;
+        let Some(stem) = name.strip_suffix(".md") else {
+            continue;
+        };
+        let text =
+            fs::read_to_string(&file).with_context(|| format!("cannot read {}", file.display()))?;
+        let mut sections = BTreeMap::<&str, Vec<&str>>::new();
+        let mut section = "";
+        let mut in_code = false;
+        for line in text.lines() {
+            if line.starts_with("```") {
+                in_code = !in_code;
+            } else if let Some(heading) = line.strip_prefix("## ").filter(|_| !in_code) {
+                section = heading.trim();
+            } else {
+                sections.entry(section).or_default().push(line);
+            }
+        }
+        let lines = |section: &str| sections.get(section).cloned().unwrap_or_default();
+        // A list item without its `- ` or `1. ` mark.
+        let items = |section: &str| -> Vec<String> {
+            (lines(section).iter())
+                .filter_map(|line| line.split_once(' '))
+                .filter(|(mark, _)| *mark == "-" || mark.ends_with('.'))
+                .map(|(_, item)| item.trim().to_owned())
+                .collect()
+        };
+        let intro = lines("");
+        let title = (intro.iter())
+            .find_map(|line| line.strip_prefix("# "))
+            .with_context(|| format!("{}: a playbook starts with a `# ` title", file.display()))?;
+        let about: Vec<&str> = (intro.iter().copied())
+            .filter(|line| !line.starts_with("# ") && !line.trim().is_empty())
+            .collect();
+        let (asks, commands, rules) = (items("Asks"), items("Commands"), items("Rules"));
+        let code = format!("{}\n", lines("Code").join("\n").trim());
+        ensure!(
+            !about.is_empty() && !asks.is_empty() && !commands.is_empty() && code.trim() != "",
+            "{}: a playbook has a first paragraph and the sections Asks, Code and Commands",
+            file.display()
+        );
+        for rule in &rules {
+            let known = rule
+                .split_once('/')
+                .is_some_and(|(pack, id)| docs.get(pack).is_some_and(|ids| ids.contains_key(id)));
+            ensure!(known, "{}: {rule} is no rule of a pack", file.display());
+        }
+        let summary = format!(
+            "{title}. {}\n\nIt answers asks such as: {}.",
+            about.join(" "),
+            asks.join(", ")
+        );
+        entries.push(serde_json::json!({
+            "kind": "recipe",
+            "package": OWN_PACK,
+            "name": format!("{OWN_PACK}/recipe/{stem}"),
+            "callable": null,
+            "parameters": [],
+            "summary": summary,
+            "keywords": asks,
+            "members": [],
+            "rules": rules,
+            "recipe": {
+                "title": title,
+                "symbols": [],
+                "source": format!("{REPOSITORY}/blob/v{version}/rules/{OWN_PACK}/{PLAYBOOKS}/{name}"),
+                "code": code,
+                "license": "MIT OR Apache-2.0",
+                "modified": false,
+                "asks": asks,
+                "commands": commands,
+            },
+        }));
+    }
+    Ok(entries)
 }
 
 /// The FNV-1a hash of the text that a record's vector is made from, which is its name and its

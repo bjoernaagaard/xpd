@@ -191,6 +191,11 @@ impl Graph {
         }
     }
 
+    /// The number of pipelines of steps and the number of nodes that the files hold.
+    pub(crate) fn counts(&self) -> (usize, usize) {
+        (self.pipelines.len(), self.nodes.len())
+    }
+
     /// Number of files that could not be read, which `read` named on stderr.
     pub(crate) fn skipped(&self) -> usize {
         self.skipped

@@ -177,8 +177,11 @@ claude plugin install xpd@xpd
 The plugin runs `xpd hook` at four points of a session.
 
 ```text
-session starts        xpd records the commit that the session began at
-user sends a prompt   xpd prints nothing in this version
+session starts        xpd prints which rule packs apply, the style setting,
+                      and the pipelines and Hamilton nodes of the project
+user sends a prompt   xpd prints the playbook that answers the prompt, such as
+                      xpd/recipe/plotly-chart for "improve my charts",
+                      or the open issues when the prompt asks what to improve
 agent edits a file    xpd reports the issues of that file
 agent wants to stop   xpd lints every Python file the session changed,
                       and holds the turn while one has an error or a warning
@@ -187,6 +190,17 @@ agent wants to stop   xpd lints every Python file the session changed,
 With `style = "strict"`, a rule of the house style counts as a warning, so the agent also keeps
 working until the code is in the style.
 
+A playbook is one of xpd's own recipes. It holds the house style for a kind of task as a complete
+module, with the commands to run in order and the rules that the code satisfies.
+`xpd find "<task>"` returns a playbook when the task fits it, and `xpd api <name>` prints it.
+
+| Playbook | What its code is |
+| --- | --- |
+| `xpd/recipe/pandas-pipeline` | Step functions that each return `frame.assign(...)`, joined with `pipe` |
+| `xpd/recipe/feature-module` | One typed function for each feature, named for the column it returns |
+| `xpd/recipe/linear-script` | A script that changed a frame line by line, as one chain that `xpd equiv` proves equal |
+| `xpd/recipe/plotly-chart` | A line chart that reports no issue of the plotly pack |
+
 ## License
 
 You may use xpd's own code under the MIT license or the Apache-2.0 license, and the other parts
@@ -194,7 +208,7 @@ that ship with xpd keep the licenses in the table.
 
 | Part | License | Where the text is |
 | --- | --- | --- |
-| xpd's own code | MIT or Apache-2.0, as you choose | `LICENSE-MIT` and `LICENSE-APACHE` |
+| xpd's own code and its playbooks | MIT or Apache-2.0, as you choose | `LICENSE-MIT` and `LICENSE-APACHE` |
 | Recipes, which are examples taken from library documentation | The license of the library, which is MIT, BSD-3-Clause, Apache-2.0 or NCSA | `licenses/`, one file per library. `xpd api <recipe>` prints the license name and the source link with the code |
 | `option-ext`, a dependency shipped unmodified | MPL-2.0 | `licenses/option-ext-LICENSE.txt`, with the complete source in `licenses/option-ext-0.2.0-source.tar.gz` and at <https://crates.io/api/v1/crates/option-ext/0.2.0/download> |
 | `libcst`, the parser that checks a fixed file | MIT, with parts of CPython under PSF-2.0 | `licenses/libcst-LICENSE` |

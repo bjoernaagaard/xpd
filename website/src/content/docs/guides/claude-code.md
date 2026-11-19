@@ -149,8 +149,8 @@ describes each answer.
 
 | Event | What xpd does |
 | --- | --- |
-| `SessionStart` | Records the commit that is checked out, and prints nothing |
-| `UserPromptSubmit` | Nothing in this version |
+| `SessionStart` | Records the commit that is checked out, and prints a brief of the project for the agent |
+| `UserPromptSubmit` | Prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
 | `PostToolUse`, after an `Edit` or a `Write` | Lints the edited file, so the agent sees its issues |
 | `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning |
 
@@ -158,6 +158,40 @@ In both clients, the agent sees the issues of a file right after its edit. In Co
 `apply_patch` call, and xpd reads the names of the files from the text of the patch. An edit that
 a shell command makes sends no such event, and the `Stop` check covers it, because that check
 lints every Python file the session changed.
+
+### What the agent reads without asking
+
+In a project with a Python file, the agent gets two texts from xpd that nobody asked for. Both
+state what xpd found, and a prompt about other work gets no text.
+
+| Event | What xpd prints | Example |
+| --- | --- | --- |
+| `SessionStart` | A brief with the rule packs that apply, the style setting, the pipelines and Hamilton nodes that `xpd graph` reads, and three commands | `Rule packs that apply: python (13 files), numpy (9 files), scipy (6 files), pandas (4 files).` |
+| `UserPromptSubmit`, for a prompt that a playbook answers | The playbook with its name, its commands in order and its rules | `xpd has a playbook for this prompt: xpd/recipe/plotly-chart` |
+| `UserPromptSubmit`, for a prompt that asks what to make or improve | The open issues of the project, counted by pack and severity | `plotly: 11 warnings` |
+
+A playbook is one of xpd's own recipes, which holds the house style for a kind of task.
+[`xpd find`](../../commands/find/#playbooks) lists the four of them. You type "improve my charts"
+and name no rule and no command, and the turn goes as follows.
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant Client as Claude Code or Codex
+    participant Hook as xpd hook
+    participant Agent
+    You->>Client: improve my charts
+    Client->>Hook: UserPromptSubmit with the prompt
+    Hook-->>Agent: the playbook xpd/recipe/plotly-chart and the open plotly issues
+    Agent->>Client: edits report.py
+    Client->>Hook: PostToolUse
+    Hook-->>Agent: the issues of report.py
+    Agent->>Client: done
+    Client->>Hook: Stop
+    Hook-->>Agent: 2 warnings remain in report.py, so the turn goes on
+```
+
+[`xpd hook`](../../commands/hook/#on-each-prompt) describes when a prompt gets a playbook.
 
 ### Hold a turn on the house style
 

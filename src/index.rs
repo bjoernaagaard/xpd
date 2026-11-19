@@ -274,6 +274,15 @@ pub(crate) struct Library {
 }
 
 impl Library {
+    /// The same library, which searches by meaning only when the embedding model is already
+    /// on this machine. The hook searches on every prompt, and it must not wait for a download.
+    pub(crate) fn without_download(self) -> Self {
+        Self {
+            model: OnceCell::from(Model::cached()),
+            ..self
+        }
+    }
+
     /// The same library, searched by keywords only.
     pub(crate) fn keywords_only(self) -> Self {
         Self {
@@ -321,6 +330,12 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
 }
 
 impl Entry {
+    /// Whether this is one of xpd's own recipes, which state the house style for a kind of
+    /// task.
+    pub(crate) fn is_playbook(&self) -> bool {
+        (self.recipe.as_ref()).is_some_and(crate::recipe::Recipe::is_playbook)
+    }
+
     /// The method or property `name` of this class, as an entry of its own.
     fn member(self, name: &str) -> Option<Self> {
         let member = self.members.into_iter().find(|m| m.name == name)?;
@@ -383,6 +398,12 @@ const DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/entries.bin"));
 const STRINGS: &[&str] = include!(concat!(env!("OUT_DIR"), "/strings.rs"));
 
 impl Stored {
+    /// Whether the record is one of xpd's own recipes. build.rs gives no other record the
+    /// kind and the package of a playbook.
+    fn is_playbook(&self) -> bool {
+        self.kind == Kind::Recipe && self.package == "xpd"
+    }
+
     fn entry(&self) -> Result<Entry, serde_json::Error> {
         let start = usize::try_from(self.start).expect("entry offset fits usize");
         let end = start + usize::from(self.len);
@@ -500,12 +521,41 @@ pub(crate) fn find(
     )
 }
 
-/// Sorts `(record, score)` pairs by score, best first, and by name between equal scores.
+/// Sorts `(record, score)` pairs by score, best first. Between equal scores a playbook comes
+/// before a recipe taken from a library, and then the name decides.
 fn sort_ranking(ranked: &mut [(usize, f64)]) {
     ranked.sort_by(|(a, sa), (b, sb)| {
+        let (a, b) = (&RECORDS[*a], &RECORDS[*b]);
         sb.total_cmp(sa)
-            .then_with(|| RECORDS[*a].name.cmp(RECORDS[*b].name))
+            .then_with(|| b.is_playbook().cmp(&a.is_playbook()))
+            .then_with(|| a.name.cmp(b.name))
     });
+}
+
+/// The playbooks, which are the recipes of xpd's own package.
+pub(crate) fn playbooks() -> Result<Vec<Entry>> {
+    (RECORDS.iter())
+        .filter(|record| record.is_playbook())
+        .map(|record| record.entry().context("embedded playbook"))
+        .collect()
+}
+
+/// The lowest keyword score at which a playbook is taken as the answer to a prompt. The score
+/// is the one that the keyword search ranks by, so the bar is the same with and without the
+/// embedding model. Of the prompts tried on 2026-11-19, the ten loose asks scored 28.2 and
+/// above for their playbook. Of thirty prompts about other work, none had a playbook as its
+/// first recipe, and the best playbook of each scored 18.0 and below.
+const PLAYBOOK_BAR: f64 = 24.0;
+
+/// The playbook that answers `prompt`: the first recipe that `find` gives for it, when that is
+/// a playbook whose keyword score clears [`PLAYBOOK_BAR`]. A prompt about other work shares
+/// few words with the asks of a playbook, so it gets `None`.
+pub(crate) fn playbook_for(library: &Library, prompt: &str) -> Option<Entry> {
+    let first = (find(library, prompt, None, Some(Kind::Recipe), Some(1)).recipes)
+        .pop()
+        .filter(Entry::is_playbook)?;
+    let (_, score) = *keyword_ranking(prompt, |record| record.name == first.name).first()?;
+    (score >= PLAYBOOK_BAR).then_some(first)
 }
 
 /// The records that share a keyword with the query, best first.
@@ -705,7 +755,11 @@ fn find_dynamic<'a>(
             )
         })
         .collect::<Vec<_>>();
-    ranked.sort_by(|(a, sa), (b, sb)| sb.total_cmp(sa).then_with(|| a.name.cmp(&b.name)));
+    ranked.sort_by(|(a, sa), (b, sb)| {
+        sb.total_cmp(sa)
+            .then_with(|| b.is_playbook().cmp(&a.is_playbook()))
+            .then_with(|| a.name.cmp(&b.name))
+    });
     ranked.into_iter().map(|(e, _)| e).collect()
 }
 

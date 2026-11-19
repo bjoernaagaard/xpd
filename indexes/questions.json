@@ -226,9 +226,29 @@
     ]
   },
   {
-    "open": true,
     "query": "Help me implement a plotly chart from scratch based on our ruleset derived from the book",
+    "expected": "xpd/recipe/plotly-chart",
     "answer": "Maybe not as strict, but yeah, basically a way to steer the agent in the right direction."
+  },
+  {
+    "query": "build a robust pandas pipeline for feature engineering",
+    "expected": "xpd/recipe/pandas-pipeline"
+  },
+  {
+    "query": "write a module of features for my model",
+    "expected": "xpd/recipe/feature-module"
+  },
+  {
+    "query": "turn this non-linear code into a linear pipeline",
+    "expected": "xpd/recipe/linear-script"
+  },
+  {
+    "query": "improve the charts I am generating",
+    "expected": "xpd/recipe/plotly-chart"
+  },
+  {
+    "query": "make my plotly figure better",
+    "expected": "xpd/recipe/plotly-chart"
   },
   {
     "open": true,

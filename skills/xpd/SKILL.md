@@ -21,9 +21,16 @@ Use `xpd` whenever you write or change Python code.
   `~/.config/xpd/config.toml`. The rules of the house style are then warnings: write a frame's
   steps as one method chain or as functions joined with `.pipe`, return `frame.assign(...)`
   instead of writing `frame["x"] = ...`, and follow the plotly pack in a chart.
+  The hook also prints a brief of the project when a session starts, and the playbook that
+  answers a prompt. Read that playbook with `xpd api` before you write the code.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
   Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per
   kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.
+  A recipe named `xpd/recipe/<name>` is a playbook, which is a complete module in the house
+  style with the commands to run in order and the rules it satisfies. Start from `pandas-pipeline` for a
+  frame pipeline, `feature-module` for model features, `linear-script` for a script that
+  changes a frame line by line, and `plotly-chart` for a figure. `xpd api xpd/recipe/<name>`
+  prints one.
   In code mode, read these lists directly. Record inspected candidates in the same grouped
   shape. A symbol read directly through `api` counts as a candidate when recorded there.
   `xpd api <dotted.name>` reads a result with its guarding rules and with each parameter as

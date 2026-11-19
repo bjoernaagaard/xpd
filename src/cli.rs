@@ -214,8 +214,15 @@ enum Cmd {
     /// 1.1.0 draft, it prints the issues as `additional_context` and exits 0. As a hook in the
     /// Claude Code settings, it prints them on stderr and exits 2.
     ///
-    /// On `SessionStart` it records the commit that is checked out. On `Stop` it lints the
-    /// Python files that differ from that commit and the untracked ones. While one has an error
+    /// On `SessionStart` it records the commit that is checked out, and in a project with a
+    /// Python file it prints a brief for the agent with the rule packs that apply, the style
+    /// setting, and the pipelines and Hamilton nodes that `xpd graph` reads. On
+    /// `UserPromptSubmit` it prints the playbook that answers the prompt, and the open issues
+    /// of the project when the prompt asks what to make or improve. A prompt about other work
+    /// gets no text.
+    ///
+    /// On `Stop` it lints the Python files that differ from the recorded commit and the
+    /// untracked ones. While one has an error
     /// or a warning, it prints `{"decision": "block", "reason": ...}` with the issues and exits
     /// 0, which keeps the agent working in Claude Code and in Codex. It holds a turn once for
     /// the same list of issues.
@@ -784,18 +791,28 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
                 if matches!(detail, Detail::Full)
                     && let Some(recipe) = &entry.recipe
                 {
-                    println!(
-                        "Source: {}\nSymbols: {}\nLicense: {}\nModified by xpd fixes: {}",
-                        recipe.source,
-                        recipe.symbols.join(", "),
-                        recipe.license,
-                        recipe.modified
-                    );
+                    if recipe.is_playbook() {
+                        println!("Source: {}\nLicense: {}", recipe.source, recipe.license);
+                    } else {
+                        println!(
+                            "Source: {}\nSymbols: {}\nLicense: {}\nModified by xpd fixes: {}",
+                            recipe.source,
+                            recipe.symbols.join(", "),
+                            recipe.license,
+                            recipe.modified
+                        );
+                    }
                     if !recipe.attribution.is_empty() {
                         println!("{}", recipe.attribution);
                     }
                     if let Some(code) = &recipe.code {
                         println!("\n```python\n{code}```");
+                    }
+                    if recipe.is_playbook() {
+                        println!("\nCommands, in order:");
+                        for (nth, command) in recipe.commands.iter().enumerate() {
+                            println!("{}. {command}", nth + 1);
+                        }
                     }
                 }
                 for member in &entry.members {
@@ -820,7 +837,38 @@ fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> R
     Ok(())
 }
 
-/// Asks each question of `path` and fails when its expected entry misses the top five. A
+/// Prints the issues that the code of each playbook has under the strict style, and gives the
+/// number of playbooks with an issue. A playbook states the house style, so its own code must
+/// have none.
+fn unclean_playbooks() -> Result<usize> {
+    let mut unclean = 0;
+    let playbooks = index::playbooks()?;
+    for playbook in &playbooks {
+        let issues = match &playbook.recipe {
+            Some(recipe) => crate::recipe::playbook_issues(recipe)?,
+            None => Vec::new(),
+        };
+        if !issues.is_empty() {
+            unclean += 1;
+            println!(
+                "FAIL: the code of {} has issues under the strict style",
+                playbook.name
+            );
+        }
+        for issue in issues {
+            println!("  {issue}");
+        }
+    }
+    println!(
+        "{} of {} playbooks have no issue under the strict style",
+        playbooks.len() - unclean,
+        playbooks.len()
+    );
+    Ok(unclean)
+}
+
+/// Asks each question of `path` and fails when its expected entry misses the top five. It also
+/// fails when the code of a playbook has an issue under the strict style. A
 /// question is asked with keyword search, which is what runs without the embedding model, and
 /// again with the model when it is there. A question with `"needs_model": true` is asked only
 /// with the model.
@@ -895,6 +943,7 @@ fn check_ranking(index: Option<&std::path::Path>, path: &std::path::Path) -> Res
             );
         }
     }
+    let unclean = unclean_playbooks()?;
     println!("{} open questions are recorded and not checked", open.len());
     let missing = index::records_without_vector();
     if let Some(first) = missing.first() {
@@ -905,6 +954,7 @@ fn check_ranking(index: Option<&std::path::Path>, path: &std::path::Path) -> Res
     }
     let failed = failed[0] + failed[1];
     anyhow::ensure!(failed == 0, "{failed} discovery questions failed");
+    anyhow::ensure!(unclean == 0, "{unclean} playbooks have issues");
     anyhow::ensure!(
         missing.is_empty(),
         "{} records have no vector",

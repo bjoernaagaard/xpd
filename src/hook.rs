@@ -1,8 +1,12 @@
 //! `xpd hook`: what xpd answers when the client of a coding agent reports an event of a session.
 //!
-//! Claude Code and Codex send the same fields for `SessionStart` and `Stop`, and both read the
-//! same answer on `Stop`, so those two events have one code path for both clients.
+//! Claude Code and Codex send the same fields for `SessionStart`, `UserPromptSubmit` and `Stop`,
+//! and both read the same answers, so those three events have one code path for both clients.
+//! Both add what the hook prints on stdout for `SessionStart` and `UserPromptSubmit` to what the
+//! agent reads, when the hook exits 0. That text states what xpd found and gives no order,
+//! because Claude Code may show text that reads as a system command to the user instead.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,15 +15,19 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use ast_grep_config::Severity;
+use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::catalog::{self, Filters};
+use crate::catalog::{self, Catalog, Filters};
 use crate::cli::{self, FixMode, Scope};
 use crate::embed;
 use crate::graph::Graph;
+use crate::index;
+use crate::report::{self, Issue};
 use crate::rule::Applicability;
 use crate::scan;
+use crate::settings::{Settings, Style};
 
 /// Claude Code shows stderr to the agent only when a hook exits 2.
 const BLOCK: u8 = 2;
@@ -27,6 +35,33 @@ const BLOCK: u8 = 2;
 const FAILED: u8 = 1;
 /// A session file that nothing wrote to for this long belongs to a session that is over.
 const SESSION_KEPT: Duration = Duration::from_hours(7 * 24);
+/// The most Python files of a project that the session brief and the prompt answer read, so
+/// that both stay fast in a large project.
+const MOST_FILES: usize = 1000;
+/// The most files and folders of a project that are looked at to find its Python files.
+const MOST_ENTRIES: usize = 20_000;
+/// The most characters of a session brief or a prompt answer. Claude Code passes on 10,000
+/// characters of a hook's output and Codex about 2,500 tokens.
+const MOST_CHARACTERS: usize = 2000;
+/// The most files that one line of a brief names.
+const MOST_NAMED: usize = 3;
+/// The rules with the most issues that a prompt answer names.
+const TOP_RULES: usize = 5;
+/// A prompt with one of these phrases asks what to make or what to improve.
+const OPEN_ASKS: [&str; 12] = [
+    "what should i",
+    "what should we",
+    "what can i",
+    "what could i",
+    "what to make",
+    "what to build",
+    "what to improve",
+    "what to do next",
+    "what next",
+    "improve",
+    "optimi",
+    "better",
+];
 
 /// An event of an agent session, as the client names it in `hook_event_name`.
 enum HookEvent {
@@ -34,6 +69,10 @@ enum HookEvent {
         session: String,
         cwd: PathBuf,
         source: Source,
+    },
+    UserPromptSubmit {
+        cwd: PathBuf,
+        prompt: String,
     },
     PostToolUse {
         client: Client,
@@ -95,6 +134,10 @@ impl HookEvent {
                     Some("compact") => Source::Compacted,
                     _ => Source::Opened,
                 },
+            },
+            "UserPromptSubmit" => Self::UserPromptSubmit {
+                cwd: required("cwd")?.into(),
+                prompt: required("prompt")?.to_owned(),
             },
             "Stop" => Self::Stop {
                 session: required("session_id")?.to_owned(),
@@ -188,6 +231,7 @@ pub(crate) fn run() -> ExitCode {
             cwd,
             source,
         } => session_start(&session, &cwd, source),
+        HookEvent::UserPromptSubmit { cwd, prompt } => user_prompt(&cwd, &prompt),
         HookEvent::PostToolUse {
             client,
             session,
@@ -202,7 +246,8 @@ pub(crate) fn run() -> ExitCode {
 }
 
 /// Records where the session began, so that the Stop check also sees a file that the agent
-/// changed and committed.
+/// changed and committed. In a project with a Python file it then prints the session brief,
+/// also after a compaction, which drops the brief the session began with.
 fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> {
     let session = Session::open(session)?;
     session.forget_old_sessions();
@@ -214,7 +259,275 @@ fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> 
         let commit = repository(cwd).and_then(|top| checked_out(&top));
         session.append(&Record::Start(commit))?;
     }
+    std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
+    let files = project_files(MOST_FILES);
+    if !files.is_empty() {
+        print_context(&brief(&files)?);
+    }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Prints `text` for the agent, cut to the most characters that an answer has.
+fn print_context(text: &str) {
+    let cut: String = text.chars().take(MOST_CHARACTERS).collect();
+    println!("{cut}");
+}
+
+/// The Python files of the project in the working directory, in the order of their names and
+/// at most `most` of them. Folders respect `.gitignore`, as in `xpd check`. Each file is named
+/// from the working directory, as the agent names it.
+fn project_files(most: usize) -> Vec<PathBuf> {
+    ignore::WalkBuilder::new(".")
+        .sort_by_file_name(Ord::cmp)
+        .build()
+        .take(MOST_ENTRIES)
+        .flatten()
+        .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
+        .map(ignore::DirEntry::into_path)
+        .filter(|path| scan::is_python(path))
+        .map(|path| {
+            path.strip_prefix(".")
+                .map(Path::to_path_buf)
+                .unwrap_or(path)
+        })
+        .take(most)
+        .collect()
+}
+
+/// `count` with `noun`, which gets an s when the count is not one.
+fn counted(count: usize, noun: &str) -> String {
+    let plural = if count == 1 { "" } else { "s" };
+    format!("{count} {noun}{plural}")
+}
+
+/// How many files `files` are of the project. The scan stops at [`MOST_FILES`], and the text
+/// says so when it did.
+fn files_read(files: &[PathBuf]) -> String {
+    if files.len() == MOST_FILES {
+        format!("the first {MOST_FILES} Python files")
+    } else {
+        counted(files.len(), "Python file")
+    }
+}
+
+/// What one Python file adds to the session brief.
+struct Census {
+    /// The modules of the packs whose rules run on the file.
+    packs: Vec<String>,
+    pipelines: usize,
+    /// The nodes of a file that imports Hamilton. `xpd graph` reads every other module as
+    /// nodes too, and those functions are no nodes of the project.
+    nodes: usize,
+}
+
+/// What xpd knows about the project before the agent writes anything: the packs whose rules
+/// run on `files`, the style setting, the pipelines and the Hamilton nodes that `xpd graph`
+/// reads, and the three commands that fit between the edits.
+fn brief(files: &[PathBuf]) -> Result<String> {
+    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
+    let project = std::env::current_dir()?;
+    let style = Settings::find(&project)?.style;
+    // The packs apply by the imports of a file, whatever versions the project's venv holds.
+    let catalog = Catalog::load(&project, None, style)?;
+    let read: Vec<(&PathBuf, Census)> = files
+        .par_iter()
+        .filter_map(|file| {
+            let src = fs::read_to_string(file).ok()?;
+            let root = scan::parse(&src);
+            let packs: Vec<String> = (catalog.packs.iter())
+                .filter(|pack| pack.applies(&root, &src, SupportLang::Python))
+                .map(|pack| pack.module.clone())
+                .collect();
+            let (pipelines, nodes) = Graph::read(std::slice::from_ref(file)).counts();
+            let nodes = if packs.iter().any(|pack| pack == "hamilton") {
+                nodes
+            } else {
+                0
+            };
+            let census = Census {
+                packs,
+                pipelines,
+                nodes,
+            };
+            Some((file, census))
+        })
+        .collect();
+    let mut packs = BTreeMap::<&str, usize>::new();
+    for pack in read.iter().flat_map(|(_, census)| &census.packs) {
+        *packs.entry(pack).or_default() += 1;
+    }
+    let mut packs: Vec<_> = packs.into_iter().collect();
+    packs.sort_by_key(|(name, count)| (std::cmp::Reverse(*count), *name));
+    let packs: Vec<String> = (packs.iter())
+        .map(|(name, count)| format!("{name} ({})", counted(*count, "file")))
+        .collect();
+    let style_line = match style {
+        Style::Strict => {
+            "The style setting is strict, so a rule of the house style is a warning, and the \
+             Stop check holds a turn that leaves a warning."
+        }
+        Style::Default => {
+            "The style setting is default, so a rule of the house style is info, which holds no \
+             turn."
+        }
+    };
+    let pipelines = placed(&read, |census| census.pipelines);
+    let nodes = placed(&read, |census| census.nodes);
+    Ok(format!(
+        "xpd read {} of this project.\n\
+         Rule packs that apply: {}.\n\
+         {style_line}\n\
+         Pipelines of steps that `xpd graph` reads: {pipelines}.\n\
+         Hamilton nodes that `xpd graph` reads: {nodes}.\n\
+         Three xpd commands fit between the edits of a session.\n\
+         - `xpd find \"<task>\"` ranks library symbols, rules and playbooks for a task, and it \
+         comes before the choice of a library or a method.\n\
+         - `xpd graph <file>` prints the dataflow of a file, and it comes after a step or a node \
+         is added, moved or renamed.\n\
+         - `xpd equiv old.py new.py` compares the result of two scripts, and a refactor of data \
+         logic is done when it prints {{\"equivalent\": true}}.",
+        files_read(files),
+        packs.join(", "),
+    ))
+}
+
+/// The total of `count` over the files, with the files that have the most, as in
+/// `3 in 2 files: a.py (2), b.py (1)`.
+fn placed(read: &[(&PathBuf, Census)], count: impl Fn(&Census) -> usize) -> String {
+    let mut found: Vec<(&Path, usize)> = (read.iter())
+        .map(|(file, census)| (file.as_path(), count(census)))
+        .filter(|(_, count)| *count > 0)
+        .collect();
+    if found.is_empty() {
+        return "none".to_owned();
+    }
+    found.sort_by_key(|(file, count)| (std::cmp::Reverse(*count), *file));
+    let total: usize = found.iter().map(|(_, count)| count).sum();
+    let mut named: Vec<String> = (found.iter().take(MOST_NAMED))
+        .map(|(file, count)| format!("{} ({count})", file.display()))
+        .collect();
+    if found.len() > MOST_NAMED {
+        named.push(format!("and {} more", found.len() - MOST_NAMED));
+    }
+    format!(
+        "{total} in {}: {}",
+        counted(found.len(), "file"),
+        named.join(", ")
+    )
+}
+
+/// Answers a prompt in a project with a Python file. A prompt that a playbook answers gets
+/// the playbook, a prompt that asks what to make or improve gets the open issues of the
+/// project, and any other prompt gets nothing.
+fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
+    std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
+    if project_files(1).is_empty() {
+        return Ok(ExitCode::SUCCESS);
+    }
+    let library = index::load(None)?.without_download();
+    let mut text = Vec::new();
+    if let Some(playbook) = index::playbook_for(&library, prompt) {
+        text.push(playbook_lines(&playbook));
+    }
+    let lowered = prompt.to_lowercase();
+    if OPEN_ASKS.iter().any(|ask| lowered.contains(ask)) {
+        text.push(open_issues(&project_files(MOST_FILES))?);
+    }
+    if !text.is_empty() {
+        print_context(&text.join("\n"));
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// What the agent needs to follow `playbook`: its name, where to read its code, its commands
+/// in order and the rules it satisfies.
+fn playbook_lines(playbook: &index::Entry) -> String {
+    let recipe = playbook.recipe.as_ref();
+    let title = recipe
+        .map(|recipe| recipe.title.as_str())
+        .unwrap_or_default();
+    let commands: Vec<String> = (recipe.iter())
+        .flat_map(|recipe| &recipe.commands)
+        .enumerate()
+        .map(|(nth, command)| format!("{}. {command}", nth + 1))
+        .collect();
+    format!(
+        "xpd has a playbook for this prompt: {name}, \"{title}\".\n\
+         `xpd api {name}` prints its code in the house style.\n\
+         Its commands, in order:\n\
+         {}\n\
+         The rules that its code satisfies: {}.",
+        commands.join("\n"),
+        playbook.rules.join(", "),
+        name = playbook.name,
+    )
+}
+
+/// The open issues of `files` under the style in force, counted by pack and severity, with
+/// the rules that have the most.
+fn open_issues(files: &[PathBuf]) -> Result<String> {
+    let style = Settings::find(&std::env::current_dir()?)?.style;
+    let checked = format!(
+        "xpd checked {} of this project under the {} style",
+        files_read(files),
+        style.as_str()
+    );
+    let report = cli::lint(
+        files,
+        FixMode::Apply(None),
+        Scope::Files,
+        &Filters::default(),
+        None,
+    )?;
+    if report.issues.is_empty() {
+        return Ok(format!("{checked} and found no open issue."));
+    }
+    let mut packs = BTreeMap::<&str, Vec<&Issue>>::new();
+    let mut rules = BTreeMap::<String, usize>::new();
+    for issue in &report.issues {
+        packs.entry(&issue.package).or_default().push(issue);
+        *rules
+            .entry(format!("{}/{}", issue.package, issue.rule))
+            .or_default() += 1;
+    }
+    let mut lines = vec![format!(
+        "{checked} and found {}.",
+        counted(report.issues.len(), "open issue")
+    )];
+    let mut packs: Vec<_> = packs.into_iter().collect();
+    packs.sort_by_key(|(name, issues)| (std::cmp::Reverse(issues.len()), *name));
+    for (pack, issues) in packs {
+        let severities: Vec<String> = [Severity::Error, Severity::Warning, Severity::Info]
+            .iter()
+            .filter_map(|severity| {
+                let count = (issues.iter())
+                    .filter(|issue| catalog::rank(&issue.severity) == catalog::rank(severity))
+                    .count();
+                let name = report::severity_name(severity);
+                (count > 0).then(|| match severity {
+                    Severity::Info => format!("{count} {name}"),
+                    _ => counted(count, name),
+                })
+            })
+            .collect();
+        lines.push(format!("{pack}: {}", severities.join(", ")));
+    }
+    let mut rules: Vec<_> = rules.into_iter().collect();
+    rules.sort_by_key(|(name, count)| (std::cmp::Reverse(*count), name.clone()));
+    let top: Vec<String> = (rules.iter().take(TOP_RULES))
+        .map(|(name, count)| format!("{name} ({count})"))
+        .collect();
+    lines.push(format!(
+        "The rules with the most issues: {}.",
+        top.join(", ")
+    ));
+    lines.push(
+        "`xpd check . --format json` lists each issue with its file and line, and \
+         `xpd rules --rule <pack>/<rule>` explains a rule."
+            .to_owned(),
+    );
+    Ok(lines.join("\n"))
 }
 
 /// Lints the files that a tool call changed, and hands the issues to the client the way that
