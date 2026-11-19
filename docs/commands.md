@@ -208,6 +208,64 @@ them as one rule, with the highest severity of the documents, the message of the
 least safe fix. `since` is the lowest version, or `null` when one document applies to every
 version.
 
+## doctor
+
+`xpd doctor` suggests the Ruff and ty settings worth changing in the project in the working
+folder. Each suggestion names the file and table it goes in, the key and value, the reason, and
+whether an installed checker confirmed it. Nothing is installed or edited.
+
+```console
+$ xpd doctor --format text
+ruff 0.17.4 at /usr/local/bin/ruff; decisions reviewed for ruff 0.17.4
+ty 0.0.106 at /usr/local/bin/ty; decisions reviewed for ty 0.0.106
+
+pyproject.toml, table [tool.ruff.lint] at line 5
+  For 1 Python file under pyproject.toml, verified with ruff 0.17.4 (decisions reviewed for 0.17.4).
+  add "PTH118", "PGH003", "PGH004" to the existing extend-select array at line 6
+    PTH118 os-path-join. Recommend. Use Path objects for readable joins. Keep string or bytes contracts intact and measure hot paths.
+    ...
+
+pyproject.toml, new table [tool.ty.rules]
+  For 1 Python file under ty's defaults, with no configuration, verified with ty 0.0.106 (decisions reviewed for 0.0.106).
+  disjoint-cast = "error"
+    disjoint-cast. Recommend error. An assertion between provably disjoint types cannot validate a value.
+  unsound-return = "error"
+    unsound-return. Conditional error in annotated boundary modules. A return annotation can otherwise promise more than the body establishes.
+    Condition: If this module is a typed boundary. ty then reports an Any value returned under a narrower annotation. Validate the value where it enters, because a cast or an Any annotation only removes the evidence.
+    Evidence: app.py:7 return json.loads(payload)
+```
+
+The suggestions come from a review of every rule and setting of Ruff 0.17.4 and ty 0.0.106,
+which ships inside xpd. Most entries are left to the project. A recommended one is suggested
+wherever it is not already in effect. A conditional one is suggested only when the project's code
+or configuration shows that it applies, and it states the condition that the developer decides,
+with the lines that made it relevant.
+
+Doctor reads the configuration that applies to each file. For Ruff that is the closest
+`.ruff.toml`, `ruff.toml` or `pyproject.toml` with a `[tool.ruff]` table, with the files it
+extends, so a nested configuration gets suggestions of its own. For ty it is the project's
+`ty.toml`, or else the `[tool.ty]` table, with its overrides. A setting already in effect gets
+no suggestion. A rule the project turns off on purpose, with an `ignore` selector, a per-file
+ignore, a lower level or an override, is listed under "Project choices doctor keeps". A key that
+the file already has is changed in place, and a table that exists is named with its line, so an
+edit never repeats a table.
+
+Ruff and ty are optional. Doctor runs one that is in the project's venv or on `PATH`: Ruff's
+`check --show-settings` gives the rules and settings it resolves for a file of each
+configuration, and `ty explain rule` gives the installed rules and their default levels. Without
+one, its suggestions rest on the reviewed release and say "unverified locally". When another
+release is installed, the notes list the rules it adds, lacks or renamed, and the defaults that
+changed. Configuration that cannot be read is named in the notes with its error.
+
+| Flag | Effect |
+| --- | --- |
+| `--format text` or `json` | Picks the output format. The default is text on a terminal and JSON otherwise |
+
+The JSON has `tools`, `suggestions`, `policies` and `notes`. Each suggestion has `record`, `tool`,
+`id`, `decision` (`recommend` or `conditional`), `file`, `table`, `key`, `value`, `current`,
+`edit`, `scope`, `reason`, `source`, `condition`, `evidence` and `status`. A suggestion to run a
+command has no `file`. Doctor exits 0, or 2 if xpd can't run.
+
 ## run
 
 `xpd run` finds code that matches a syntax pattern or a syntax kind, without running the code, and

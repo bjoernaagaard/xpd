@@ -5,6 +5,7 @@ mod author;
 mod cases;
 mod catalog;
 mod cli;
+mod doctor;
 mod embed;
 mod graph;
 mod imports;

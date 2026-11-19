@@ -1,0 +1,44 @@
+# Utility rules that the evidence rules in evidence.yml name with `matches`.
+id: any-type
+language: python
+rule:
+  kind: type
+  regex: ^(typing\.|t\.)?Any$
+---
+id: any-parameter
+language: python
+rule:
+  any:
+    - kind: typed_parameter
+    - kind: typed_default_parameter
+  all:
+    - has: { kind: identifier, pattern: $V }
+    - has: { field: type, matches: any-type }
+---
+id: decoder-call
+language: python
+rule:
+  kind: call
+  has:
+    field: function
+    regex: ^((json|simplejson|ujson|orjson|pickle|marshal)\.)?loads$|^(json|simplejson|ujson|pickle|marshal)\.load$|^yaml\.(safe_|unsafe_|full_)?load$
+---
+id: dynamic-value
+language: python
+rule:
+  any:
+    - matches: decoder-call
+    - all:
+        - kind: identifier
+          pattern: $V
+        - inside:
+            stopBy: end
+            kind: function_definition
+            has: { field: parameters, has: { matches: any-parameter } }
+---
+id: narrow-annotation
+language: python
+rule:
+  kind: type
+  not:
+    regex: ^((typing\.)?(Any|object)|None)$

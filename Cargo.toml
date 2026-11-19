@@ -1,7 +1,7 @@
 [package]
 # The package and the command share one name, so that `uvx xpd` runs it.
 name = "xpd"
-version = "0.37.0"
+version = "0.38.0"
 edition = "2024"
 rust-version = "1.99"
 description = "Fast, opinionated linter for Python library habits with pandas, NumPy, SciPy, scikit-learn and eight more libraries, for humans and coding agents"
@@ -46,6 +46,9 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = "2.1.1"
 serde_json = "1.0.154"
 similar = "3.2.1"
+# `xpd doctor` reads Ruff and ty settings and the line of each key. proc-macro-crate already
+# builds toml_edit, so this adds no package to the build.
+toml_edit = { version = "0.25.19", default-features = false, features = ["parse"] }
 
 [build-dependencies]
 anyhow = "1.0.104"
