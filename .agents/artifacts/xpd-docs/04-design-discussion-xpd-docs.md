@@ -1,7 +1,7 @@
 ---
 type: design-discussion
 flow: design-discussion
-status: open
+status: resolved
 repos:
   - identifier: bjoernaagaard/xpd
     sha: 2f7d56539a80952d2bae4d8048fe559247006867
@@ -34,7 +34,7 @@ Proposed build inputs and consumers:
 Rule definitions and authored Markdown keyed by pack and rule ID
     Cargo embeds the definitions and Markdown
         CLI catalog, editor hover and MCP resources read the same entry
-        Starlight reads the built-in catalog and renders the rule reference
+        Starlight renders one page per rule and a browse page for each pack
 CLI command definitions and MCP registrations
     The documentation build derives options, defaults, tool signatures and counts
 Authored guides and sample files
@@ -44,15 +44,9 @@ Authored guides and sample files
 
 Keep the input to Cargo independent of generated site files. A contributor using xpd's rule authoring command should create the explanation where Cargo expects to find it. A missing or duplicate explanation should still fail the build. The current patterns are the heading checks in [build.rs](../../../build.rs), the rule writer in [project.rs](../../../src/author/project.rs) and the public entries in [catalog.rs](../../../src/catalog.rs). Handle the catalog's special unused-suppression diagnostic explicitly.
 
-Use Astro and Node to build the Starlight site for GitHub Pages through the existing local command, `mise run docs`. Build the site on pull requests and include changes to its inputs in deployment triggers. Resolve stable tool versions together, pin the compatible set and record the resulting versions. Verify the six old chapter redirects, 426 published rule targets and 20 named cross-chapter links against the built site. URL fragments stay in the browser, so preserving an old rule link requires keeping its anchor or resolving the fragment on the old page.
+Use Astro and Node to build the Starlight site for GitHub Pages through the existing local command, `mise run docs`. Build the site on pull requests and include changes to its inputs in deployment triggers. Resolve stable tool versions together, pin the compatible set and record the resulting versions. Verify the six old chapter redirects, 426 published rule targets and 20 named cross-chapter links against the built site. Keep rules.html available so the browser can resolve each old fragment to its corresponding rule page. Check that each link reaches the correct rule ID.
 
 Use the current sample-based checks as a starting point. Run the guide commands on a temporary copy, compare the edits, inspect output from the CLI, editor and MCP for the same rule, and follow an old rule link. Check keyboard search, navigation at phone width and diagram readability in each supported theme. [Existing checks](../../../lefthook.yml)
-
-## Design questions
-
-### How should readers browse and link to the rule catalog?
-
-I recommend one address per rule, grouped by pack, with the same Markdown available to the installed tools. A reader can share or search for one rule directly. Existing links need a route from each old fragment to its rule. One page per pack would reduce the number of pages while retaining longer lists. A single catalog page would keep today's anchor scheme and its long scroll. This choice concerns the public addresses and navigation. The build can derive counts under any of the three designs.
 
 ## Resolved design questions
 
@@ -60,4 +54,10 @@ The user chose research followed by a design discussion and requested a complete
 
 ### Starlight will publish the site and Pagefind will provide search
 
-The user chose Starlight for searchable guides and reference pages and accepted the Astro and Node build. Updating mdBook would have kept the existing Rust publishing tools. Sphinx offered Python example checks, but its Python reference generator would still need an exporter for xpd's Rust commands and YAML rules. The remaining catalog choice determines where a reader lands after selecting a rule. [Platform comparison](03-research-xpd-docs.md)
+The user chose Starlight for searchable guides and reference pages and accepted the Astro and Node build. Updating mdBook would have kept the existing Rust publishing tools. Sphinx offered Python example checks, but its Python reference generator would still need an exporter for xpd's Rust commands and YAML rules. [Platform comparison](03-research-xpd-docs.md)
+
+### Each rule has its own page and links back to its pack
+
+A reader who opens `pandas/chained-assignment` from an editor, search result or shared link lands on the rule's explanation, example and fix. The page links to the pandas pack so the reader can browse related rules. New catalog links point directly to each rule page. Links from earlier xpd releases, such as `rules.html#chained-assignment`, must reach that same page.
+
+A page per pack or a single catalog page would put readers inside a longer list. A dedicated page keeps one finding in view and gives it an address readers can share.
