@@ -29,6 +29,10 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Restores the build cache but never saves it. The CI job saves it for each push to main
+    # under the same key, so a save from here races CI's and is refused or keeps a target/ without
+    # clippy's output.
+    cache-mode: read
     # A new push to the same pull request cancels its older build.
     concurrency:
       group: docs-build-${{ github.event.pull_request.number || github.ref }}
