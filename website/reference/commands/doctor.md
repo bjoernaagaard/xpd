@@ -1,10 +1,10 @@
 Run `xpd doctor` at the root of a Python project to see which Ruff, ty and pytest settings to change and which pytest plugins to add or remove. Doctor reads the project's configuration and Python files. It prints edits for you to review and apply. Ruff and ty run their own checks.
 
-Doctor ships a catalog reviewed against Ruff 0.17.4, ty 0.0.106 and pytest 9.2.0. Doctor consults Ruff and ty in the project's environment or on `PATH`. It gets the installed pytest version from the project's virtual environment. Advice for a missing tool is marked “unverified locally”.
+Doctor ships a catalog reviewed against Ruff 0.17.4, ty 0.0.106 and pytest 9.2.0. Doctor consults Ruff and ty in the project's environment or on `PATH`. It gets the installed pytest version from the project's virtual environment. Advice for a missing tool is marked "unverified locally".
 
 ## Recommended Ruff rules
 
-Doctor recommends seven rule codes. It suggests adding missing codes to `lint.extend-select`, which preserves your existing selection. An active code needs no edit. Deliberate exclusions can appear under “Project choices doctor keeps”.
+Doctor recommends seven rule codes. It suggests adding missing codes to `lint.extend-select`, which preserves your existing selection. An active code needs no edit. Deliberate exclusions can appear under "Project choices doctor keeps".
 
 | Code | What Ruff checks | What to do about a finding |
 | --- | --- | --- |
@@ -28,9 +28,94 @@ Doctor recommends three diagnostic levels under `[tool.ty.rules]` in `pyproject.
 
 ## Recommended pytest settings
 
-Doctor recommends strict mode, `-ra` for the test summary, and `--import-mode=importlib`. It names the TOML file and table where the settings belong. If it finds an INI or CFG file that pytest may use, it names the file in a note.
+Doctor reads the pytest settings from `pytest.toml`, `.pytest.toml` or `pyproject.toml`, and it names the table and the line of each edit. Doctor does not read `pytest.ini`, `tox.ini` or `setup.cfg`. When pytest would use one of them, doctor names the file in a note and suggests no edit to a table that the file overrides.
 
-Doctor recommends declaring `pytest-randomly` and `pytest-timeout` in your test dependencies and setting a timeout in seconds. It flags rerun settings, settings that let an unexpectedly passing xfail pass the run, and dependencies on `pytest-rerunfailures`, `flaky` and `pytest-mock`.
+| Setting | Where | What it changes |
+| --- | --- | --- |
+| `strict = true` | The pytest table | An unknown marker, an invalid setting, a repeated parameter id and an `xfail` test that passes each fail the run. |
+| `-ra` | `addopts` | The summary lists each skipped test and each expected failure. |
+| `--import-mode=importlib` | `addopts` | pytest imports a test file without adding its folder to `sys.path`. |
+
+`strict` needs pytest 9.0. On pytest 8, doctor suggests `--strict-markers` and `--strict-config` in `addopts` and `xfail_strict = true` in the table.
+
+## Recommended pytest plugins
+
+Doctor reads the dependency groups and the optional dependencies in `pyproject.toml`. It suggests the command `uv add --dev` as well when the project has a `uv.lock` file.
+
+| Plugin | Advice | Reason |
+| --- | --- | --- |
+| `pytest-timeout` | Add | A test that hangs fails and prints where it stopped. |
+| `pytest-randomly` | Add | The tests run in a new order each time, so a test that depends on another test fails. |
+| `pytest-rerunfailures`, `flaky` | Remove | A rerun hides the run where the code was wrong. |
+| `pytest-mock` | Remove | A test with a mock checks the mock and not the code. |
+
+`pytest-timeout` stops no test until `timeout` is set. When the project declares the plugin and sets no `timeout`, doctor suggests the setting and leaves the number of seconds to you.
+
+## What doctor asks you to remove
+
+| In the project | Reason |
+| --- | --- |
+| `--reruns` and `--reruns-delay` in `addopts` | A rerun hides the run where the code was wrong. |
+| `reruns` and `reruns_delay` in the pytest table | The same. |
+| `strict_xfail = false` and `xfail_strict = false` | An `xfail` test that passes no longer fails the run. |
+
+### Example with pytest settings to remove
+
+The example project declares two plugins and reruns each failed test twice.
+
+```toml title="pyproject.toml"
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-rerunfailures",
+    "pytest-timeout",
+]
+
+[tool.pytest.ini_options]
+addopts = "--reruns 2 --strict-markers"
+```
+
+Doctor prints one block for each table, and each `remove` line names the line to edit. The output below leaves out the `Source:` line under each reason.
+
+```console
+$ xpd doctor --format text
+pyproject.toml, table [dependency-groups] at line 5
+  remove "pytest-rerunfailures" from dev at line 8
+    pytest-rerunfailures. A retry can hide the first failure.
+  add "pytest-randomly" to the existing dev array at line 6
+    pytest-randomly. Shuffle test order to find tests that depend on shared state.
+
+pyproject.toml, table [tool.pytest.ini_options] at line 12
+  remove --reruns 2 from addopts at line 13
+    --reruns. Keep the first failure visible so you can find and fix its cause.
+  strict = true
+    strict. Fail on unknown markers, invalid settings, duplicate parameter IDs and unexpectedly passing xfails.
+  append -ra --import-mode=importlib inside the addopts string at line 13
+    -ra. Show skipped tests and expected failures in the short test summary.
+    --import-mode=importlib. Import test files without putting their directories on sys.path.
+  timeout = "<seconds>"
+    timeout. pytest-timeout sets no time limit by default. Choose a limit so a hanging test fails.
+    Condition: Choose a number of seconds above the longest expected test run.
+    Evidence: pyproject.toml:9 pytest-timeout
+```
+
+The file reads as follows after the edits, with a limit of 60 seconds as an example. `strict` covers `--strict-markers`, so that flag goes too.
+
+```diff
+ [dependency-groups]
+ dev = [
+     "pytest>=9.2.0",
+-    "pytest-rerunfailures",
++    "pytest-randomly",
+     "pytest-timeout",
+ ]
+
+ [tool.pytest.ini_options]
+-addopts = "--reruns 2 --strict-markers"
++addopts = "-ra --import-mode=importlib"
++strict = true
++timeout = "60"
+```
 
 ## When the advice depends on your project
 
