@@ -9,6 +9,7 @@ mod commands;
 mod doctor;
 mod embed;
 mod graph;
+mod hook;
 mod imports;
 mod index;
 mod lsp;

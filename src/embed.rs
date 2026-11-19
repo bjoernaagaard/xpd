@@ -125,9 +125,14 @@ fn normalised(vector: &[f32]) -> Vec<f32> {
     vector.iter().map(|v| v / norm).collect()
 }
 
-/// Where the model file is kept: `$XDG_CACHE_HOME/xpd/models`, or else the platform's cache
-/// folder.
+/// Where the model file is kept, in the `models` folder of [`cache_folder`].
 fn path() -> Result<PathBuf> {
+    Ok(cache_folder()?.join("models").join(FILE))
+}
+
+/// The folder for files that xpd can make again: `$XDG_CACHE_HOME/xpd`, or else `xpd` in the
+/// platform's cache folder.
+pub(crate) fn cache_folder() -> Result<PathBuf> {
     let var = |name| env::var_os(name).filter(|value| !value.is_empty());
     let cache = if let Some(cache) = var("XDG_CACHE_HOME") {
         PathBuf::from(cache)
@@ -141,7 +146,7 @@ fn path() -> Result<PathBuf> {
             home.join(".cache")
         }
     };
-    Ok(cache.join("xpd").join("models").join(FILE))
+    Ok(cache.join("xpd"))
 }
 
 /// Downloads the model to a file of this process and renames it into place, so a stopped run
