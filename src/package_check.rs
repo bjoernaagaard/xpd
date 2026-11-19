@@ -227,7 +227,7 @@ pub(crate) fn missing(
                 severity: SEVERITY,
                 message,
                 fix: None,
-                help: pack.is_embedded().then(|| crate::catalog::url(&check.id)),
+                help: pack.page(&check.id),
             })
         })
         .collect()

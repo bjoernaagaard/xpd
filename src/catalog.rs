@@ -19,12 +19,12 @@ use crate::rule::{Applicability, Rule};
 use crate::venv::Distributions;
 use crate::version::Version;
 
-/// The page whose `#<rule id>` anchors document each embedded rule.
-const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules.html");
+/// The folder of the published rule pages, one page for each pack and each rule in it.
+const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules/");
 
-/// The address of the section about the embedded rule or package check `id` on the rules page.
-pub(crate) fn url(id: &str) -> String {
-    format!("{RULES_URL}#{id}")
+/// The address of the published page about the rule or package check `id` of the pack `module`.
+pub(crate) fn url(module: &str, id: &str) -> String {
+    format!("{RULES_URL}{module}/{id}/")
 }
 
 /// The rules of one project for one set of installed libraries.
@@ -189,7 +189,7 @@ pub(crate) struct Entry<'a> {
     since: Option<&'a Version>,
     /// The page about the rule. `None` for a local rule without `url`.
     url: Option<String>,
-    /// The rule's section of the rules page, or the `note` of a local rule.
+    /// The rule's Markdown, which its published page shows, or the `note` of a local rule.
     doc: Option<&'a str>,
 }
 
@@ -250,7 +250,7 @@ fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
     let mut entries: Vec<Entry<'_>> = Vec::new();
     for pack in packs {
         let first = entries.len();
-        let page = |id: &str| pack.is_embedded().then(|| url(id));
+        let page = |id: &str| pack.page(id);
         for rule in &pack.rules {
             let id = rule.id.as_str();
             let since = rule.since.as_ref();

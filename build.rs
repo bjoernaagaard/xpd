@@ -72,8 +72,8 @@ fn main() -> Result<()> {
     let mut packs = Vec::new();
     let mut docs = BTreeMap::new();
     let mut own = None;
-    // The published rules page and `xpd check --rule` find a rule by its id alone, so an id
-    // belongs to one pack.
+    // `xpd check --rule` and the old links of the form rules.html#<id>, which the site sends on
+    // to the rule's page, find a rule by its id alone, so an id belongs to one pack.
     let mut owners = BTreeMap::new();
     for pack in sorted_entries(root)?.iter().filter(|path| path.is_dir()) {
         let module = utf8_name(pack)?;

@@ -14,7 +14,7 @@ The rule reports three functions called one inside the other on a frame, as in `
 - a variable whose nearest earlier assignment is such a call
 - a parameter annotated `pd.DataFrame`
 
-The fix is unsafe, because the chain raises AttributeError when the first or the second function returns something without `pipe`, such as a dict. [`xpd graph`](https://bjoernaagaard.github.io/xpd/commands.html#graph) reads the pipe form as a pipeline of steps.
+The fix is unsafe, because the chain raises AttributeError when the first or the second function returns something without `pipe`, such as a dict. [`xpd graph`](https://bjoernaagaard.github.io/xpd/commands/graph/) reads the pipe form as a pipeline of steps.
 
 ## How to fix it
 

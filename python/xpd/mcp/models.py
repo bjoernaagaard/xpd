@@ -230,7 +230,7 @@ class RuleSummary(Output):
 
 
 class Rule(RuleSummary):
-    """One rule with its section of the rules page, which has examples and notes."""
+    """One rule with its documentation, which has examples and notes."""
 
     doc: str | None = Field(description="The rule's documentation as Markdown.")
 

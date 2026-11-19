@@ -389,11 +389,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
                 severity: rule.config.severity.clone(),
                 message: rule.config.get_message(&m),
                 fix: rule.fix.filter(|_| fix.is_some()),
-                help: if pack.is_embedded() {
-                    Some(crate::catalog::url(&rule.id))
-                } else {
-                    rule.config.url.clone()
-                },
+                help: pack.page(&rule.id).or_else(|| rule.config.url.clone()),
             };
             found.push(Found {
                 variant: Some(rule.variant.clone()),

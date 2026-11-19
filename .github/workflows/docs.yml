@@ -1,38 +1,70 @@
+# Builds the documentation site with `mise run docs` and publishes site/ to GitHub Pages. A pull
+# request only builds the site, so a broken page or reference fails the check before it merges.
+# A push to main builds and deploys. The site reads the rule catalog, the command tree and the MCP
+# server of the xpd that this checkout builds, so their sources are inputs too.
 name: Documentation
 on:
+  pull_request:
+    paths: &inputs
+      - website/**
+      - rules/**
+      - src/**
+      - build.rs
+      - Cargo.toml
+      - Cargo.lock
+      - indexes/**
+      - python/**
+      - skills/**
+      - pyproject.toml
+      - mise.toml
+      - .github/workflows/docs.yml
   push:
     branches: [main]
-    paths: [docs/**, book.toml, mise.toml, .github/workflows/docs.yml]
+    paths: *inputs
   workflow_dispatch:
 permissions: {}
-# A new push waits for a running deploy instead of cancelling it halfway.
-concurrency:
-  group: pages
-  cancel-in-progress: false
 jobs:
-  deploy:
+  build:
     permissions:
       contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A new push to the same pull request cancels its older build.
+    concurrency:
+      group: docs-build-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          install_args: rust mr-boxington aqua:Kitware/CMake node uv
+      # mise.toml routes cargo through mbx. Its action restores target/ and the cargo registry
+      # from the cache that pushes to main save.
+      - uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
+      - run: mise run docs
+        env:
+          MISE_TASK_RUN_AUTO_INSTALL: "false"
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    permissions:
       pages: write
       id-token: write
+    # A new push waits for a running deploy instead of cancelling it halfway.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-        with:
-          install_args: github:rust-lang/mdBook github:badboy/mdbook-mermaid
-          # A cache restored here could slip into the published site.
-          cache: false
-      - run: mise run docs
-        env:
-          MISE_TASK_RUN_AUTO_INSTALL: "false"
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: site
       - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment

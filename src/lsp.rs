@@ -47,7 +47,6 @@ use serde_json::Value;
 
 use self::project::{Place, Workspace};
 use self::text::{Encoding, Lines};
-use crate::catalog;
 use crate::catalog::Catalog;
 use crate::package_check::Calls;
 use crate::report::Issue;
@@ -453,7 +452,7 @@ fn diagnostic(issue: &Issue, range: lsp_types::Range, url: Option<&str>) -> Diag
     }
 }
 
-/// The diagnostic for `found`. A rule of xpd links to its section of the rules page, and a
+/// The diagnostic for `found`. A rule of xpd links to its published page, and a
 /// project's own rule links to the page it names, or to its file.
 fn found_diagnostic(catalog: &Catalog, found: &Found, range: lsp_types::Range) -> Diagnostic {
     let url = rule_help(catalog, found).and_then(|(_, url)| url);
@@ -492,19 +491,14 @@ fn rule_help<'a>(catalog: &'a Catalog, found: &Found) -> Option<(&'a str, Option
     let doc = pack
         .doc(&issue.rule)
         .or_else(|| rule.map(|rule| rule.config.note.as_deref().unwrap_or(&rule.config.message)))?;
-    let url = if pack.is_embedded() {
-        Some(catalog::url(&issue.rule))
-    } else if pack.unused_suppression().is_some() {
-        // xpd's own rule has no file, and the published rules page has no section for it yet.
-        None
-    } else {
+    let url = pack.page(&issue.rule).or_else(|| {
         rule.and_then(|rule| {
             rule.config
                 .url
                 .clone()
                 .or_else(|| uri::from_path(&rule.source).map(|uri| uri.as_str().to_owned()))
         })
-    };
+    });
     Some((doc, url))
 }
 

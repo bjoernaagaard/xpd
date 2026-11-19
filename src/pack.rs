@@ -454,11 +454,10 @@ impl Pack {
             .map(|doc| doc.text)
     }
 
-    /// Whether the pack ships with xpd and the published rules page documents its rules, so
-    /// that an issue links there. xpd's own pack has its Markdown in the catalog, and the
-    /// published page has no section for it yet.
-    pub(crate) fn is_embedded(&self) -> bool {
-        !self.docs.is_empty() && !matches!(self.gate, Gate::Suppressions)
+    /// The published page of the rule or package check `id`, for a pack that ships with xpd and
+    /// so has its Markdown in the binary. A project's own pack has no page.
+    pub(crate) fn page(&self, id: &str) -> Option<String> {
+        (!self.docs.is_empty()).then(|| crate::catalog::url(&self.module, id))
     }
 
     /// Keeps the rules for the `installed` version of the pack's library. A pack whose library

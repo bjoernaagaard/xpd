@@ -1,8 +1,7 @@
 /target
 /dist
+# The documentation site that `mise run docs` builds
 /site
-/mermaid.min.js
-/mermaid-init.js
 
 # Local Python environment. The wheel pins the MCP server's dependencies in pyproject.toml.
 /.venv
@@ -15,9 +14,8 @@ __pycache__/
 # The model and contract that samples/pipeline/train.py writes
 /samples/pipeline/model/
 
-# The Starlight site's dependencies, build output and generated types
+# The documentation site's dependencies and generated types
 /website/node_modules/
-/website/dist/
 /website/.astro/
 
 # The rule and pack pages that website/scripts/rules.mjs writes from xpd rules
