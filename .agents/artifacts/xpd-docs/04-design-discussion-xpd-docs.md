@@ -34,30 +34,21 @@ Proposed build inputs and consumers:
 Rule definitions and authored Markdown keyed by pack and rule ID
     Cargo embeds the definitions and Markdown
         CLI catalog, editor hover and MCP resources read the same entry
-        Site build reads the built-in catalog and renders the rule reference
+        Starlight reads the built-in catalog and renders the rule reference
 CLI command definitions and MCP registrations
-    Site build derives options, defaults, tool signatures and counts
+    The documentation build derives options, defaults, tool signatures and counts
 Authored guides and sample files
-    Site build combines instructions with verified examples
+    Starlight renders the guides with verified examples
+    Pagefind indexes the built pages for search
 ```
 
 Keep the input to Cargo independent of generated site files. A contributor using xpd's rule authoring command should create the explanation where Cargo expects to find it. A missing or duplicate explanation should still fail the build. The current patterns are the heading checks in [build.rs](../../../build.rs), the rule writer in [project.rs](../../../src/author/project.rs) and the public entries in [catalog.rs](../../../src/catalog.rs). Handle the catalog's special unused-suppression diagnostic explicitly.
 
-Keep GitHub Pages and the existing local build command. Build the site on pull requests and include changes to its inputs in deployment triggers. Resolve stable tool versions together, pin the compatible set and record the resulting versions. Verify the six old chapter redirects, 426 published rule targets and 20 named cross-chapter links against the built site. URL fragments stay in the browser, so preserving an old rule link requires keeping its anchor or resolving the fragment on the old page.
+Use Astro and Node to build the Starlight site for GitHub Pages through the existing local command, `mise run docs`. Build the site on pull requests and include changes to its inputs in deployment triggers. Resolve stable tool versions together, pin the compatible set and record the resulting versions. Verify the six old chapter redirects, 426 published rule targets and 20 named cross-chapter links against the built site. URL fragments stay in the browser, so preserving an old rule link requires keeping its anchor or resolving the fragment on the old page.
 
 Use the current sample-based checks as a starting point. Run the guide commands on a temporary copy, compare the edits, inspect output from the CLI, editor and MCP for the same rule, and follow an old rule link. Check keyboard search, navigation at phone width and diagram readability in each supported theme. [Existing checks](../../../lefthook.yml)
 
 ## Design questions
-
-### Which publishing platform should maintainers work with?
-
-| Option | What it offers this project | Cost |
-| --- | --- | --- |
-| Starlight, recommended | Pagefind search, navigation for a larger reference, highlighted examples and integrations for diagrams and link checks | Adds an Astro and Node build. Existing URLs and embedded rule text need explicit handling. |
-| Updated mdBook | Keeps the working Rust-based build, keyboard search and Mermaid pages | Building a more detailed catalog and checking xpd examples remain project work. |
-| Sphinx | Python example checking, cross-references and Python API documentation | The command definitions are Rust and the rules are YAML. They still need an exporter. |
-
-Starlight is my recommendation for a full platform replacement with individually searchable reference pages. Updating mdBook is the smaller choice if keeping one Rust-based publishing stack matters more. The [release and feature comparison](03-research-xpd-docs.md) covers available versions. No migration has been tested.
 
 ### How should readers browse and link to the rule catalog?
 
@@ -65,4 +56,8 @@ I recommend one address per rule, grouped by pack, with the same Markdown availa
 
 ## Resolved design questions
 
-The user chose research followed by a design discussion and requested a complete rewrite alongside the platform upgrade. Platform and catalog choices await discussion.
+The user chose research followed by a design discussion and requested a complete rewrite alongside the platform upgrade.
+
+### Starlight will publish the site and Pagefind will provide search
+
+The user chose Starlight for searchable guides and reference pages and accepted the Astro and Node build. Updating mdBook would have kept the existing Rust publishing tools. Sphinx offered Python example checks, but its Python reference generator would still need an exporter for xpd's Rust commands and YAML rules. The remaining catalog choice determines where a reader lands after selecting a rule. [Platform comparison](03-research-xpd-docs.md)
