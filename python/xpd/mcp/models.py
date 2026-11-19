@@ -332,12 +332,16 @@ class DiscoveryMatches(Output):
 
 
 class DiscoveryQuestion(Written):
-    task: str = Field(min_length=1)
+    """The question that the agent asked find."""
+
+    task: str = Field(min_length=1, description="The task, as it was given to find.")
 
 
 class DiscoveryChoice(Written):
+    """The candidate that the agent chose, and why."""
+
     name: str = Field(description="The selected candidate's exact name.", min_length=1)
-    reason: str = Field(min_length=1)
+    reason: str = Field(min_length=1, description="Why this candidate fits the task.")
     symbols: list[str] = Field(
         min_length=1,
         description="Indexed callable symbols the code must call, including a recipe's symbols.",

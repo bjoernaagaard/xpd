@@ -66,11 +66,16 @@ enum CheckFormat {
 
 #[derive(Debug, clap::Args)]
 struct IndexArgs {
+    /// The library's source folder or installed package folder, such as a site-packages folder.
     source: PathBuf,
+    /// The Python import name of the library, such as `sklego`.
     #[arg(long)]
     package: String,
+    /// The library version. Default: the version in the wheel metadata, so give it for a
+    /// source checkout.
     #[arg(long)]
     version: Option<String>,
+    /// The file to write. Default: indexes/<package>.json, in a folder that exists.
     #[arg(long)]
     output: Option<PathBuf>,
     /// Documentation and gallery root to harvest with the symbol index.
@@ -79,18 +84,24 @@ struct IndexArgs {
     /// Repository URL ending in /blob/<pinned revision> for example attribution.
     #[arg(long, requires = "examples")]
     source_url: Option<String>,
+    /// The source's license file, which names the license of each recipe.
     #[arg(long, requires = "examples")]
     license: Option<PathBuf>,
 }
 
 #[derive(Debug, clap::Args)]
 struct RulesOptions {
+    /// List only the rules that ship with xpd, without the project's own rules.
     #[arg(long, conflicts_with = "config")]
     builtin: bool,
+    /// The project file to read instead of the nearest sgconfig.yml.
     #[arg(short, long)]
     config: Option<PathBuf>,
-    #[arg(long = "rule")]
+    /// List only this package or rule, as `pandas`, `chained-assignment` or
+    /// `pandas/chained-assignment`. Repeat it to name several.
+    #[arg(long = "rule", value_name = "NAME")]
     rules: Vec<String>,
+    /// List only the rules of this severity and above: error, warning, info or hint.
     #[arg(long, value_parser = report::parse_severity)]
     severity: Option<Severity>,
     /// Output format. Default: text on a terminal, json otherwise.
@@ -104,14 +115,18 @@ enum Cmd {
     Test(crate::cases::Options),
     /// Find libraries and rules for a task, without importing Python.
     Find {
+        /// The task, in your own words, such as "grouped regression".
         query: Option<String>,
+        /// Search only this library, by its Python import name, such as `sklearn`.
         #[arg(long)]
         package: Option<String>,
+        /// Search only symbols, rules or recipes.
         #[arg(long, value_enum)]
         kind: Option<Kind>,
         /// Maximum results per kind (defaults to 5 symbols, 3 rules and 3 recipes).
         #[arg(long)]
         limit: Option<usize>,
+        /// Print text, or JSON with `symbols`, `rules` and `recipes`.
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
         /// Additional index generated from local source.
@@ -139,8 +154,10 @@ enum Cmd {
     Api {
         /// A dotted name, such as `pandas.DataFrame` or `pandas.DataFrame.merge`.
         name: String,
+        /// Print text, or JSON with the entry's parameters, members and rules.
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
+        /// Additional index generated from local source.
         #[arg(long)]
         index: Option<PathBuf>,
     },
@@ -187,6 +204,7 @@ enum Cmd {
         /// Exit 1 when an issue of this severity or above is left: error, warning, info or hint.
         #[arg(long, value_parser = report::parse_severity, default_value = "error")]
         fail_on: Severity,
+        /// The project file to read instead of the nearest sgconfig.yml.
         #[arg(short, long)]
         config: Option<PathBuf>,
     },
@@ -202,11 +220,22 @@ enum Cmd {
     /// if xpd can't run.
     Hook,
     /// Profile a data file (csv, parquet, feather, json, xlsx). Needs pandas.
-    Profile { file: PathBuf },
+    Profile {
+        /// The data file.
+        file: PathBuf,
+    },
     /// Check that two scripts produce an equal `result` (`DataFrame` or Series). Needs pandas.
-    Equiv { old: PathBuf, new: PathBuf },
+    Equiv {
+        /// The script before the change. It must assign its output to `result`.
+        old: PathBuf,
+        /// The script after the change. It must assign its output to `result`.
+        new: PathBuf,
+    },
     /// Refit a saved Pipeline on raw training rows and compare its outputs and scores.
-    Refit { contract: PathBuf },
+    Refit {
+        /// The contract JSON that the training script saved beside its model.
+        contract: PathBuf,
+    },
     /// Print the dataflow of step code or Hamilton modules: what reads what, and what does not
     /// connect.
     ///
@@ -278,11 +307,16 @@ enum Cmd {
     Lsp,
     /// Generate completion for the installed xpd command tree.
     Completions {
+        /// The shell to print completion for.
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
     /// Create a rule project, or a rule, test case or utility in one.
     New(author::NewArgs),
+    /// Print every command with its arguments, defaults and help as JSON, for the documentation
+    /// site's command reference.
+    #[command(hide = true)]
+    Commands,
 }
 
 /// Runs the command the arguments name.
@@ -371,14 +405,8 @@ pub(crate) fn run() -> ExitCode {
         Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
         Cmd::Rules(options) => rules(options, default_format),
         Cmd::Doctor { format } => discovery(crate::doctor::run(format.unwrap_or(default_format))),
-        Cmd::Skill { json: false } => {
-            print!("{SKILL}");
-            ExitCode::SUCCESS
-        }
-        Cmd::Skill { json: true } => {
-            println!("{}", skills::to_json());
-            ExitCode::SUCCESS
-        }
+        Cmd::Skill { json: false } => print_out(SKILL),
+        Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
         Cmd::Test(options) => command_result(crate::cases::run(&options)),
@@ -387,7 +415,14 @@ pub(crate) fn run() -> ExitCode {
             ExitCode::SUCCESS
         }
         Cmd::New(args) => command_result(author::run(args)),
+        Cmd::Commands => print_out(&format!("{}\n", crate::commands::to_json(Cli::command()))),
     }
+}
+
+/// Prints `text` as it is, for a command that cannot fail.
+fn print_out(text: &str) -> ExitCode {
+    print!("{text}");
+    ExitCode::SUCCESS
 }
 
 fn discovery(result: Result<()>) -> ExitCode {

@@ -16,8 +16,13 @@ from xpd.mcp.tools import READS, REWRITES, WRITES, confirmed, run
 class Query(BaseModel):
     pattern: str | None = Field(default=None, description="AST pattern with $VARIABLE captures.")
     kind: str | None = Field(default=None, description="Syntax kind instead of a pattern.")
-    language: str | None = None
-    selector: str | None = None
+    language: str | None = Field(
+        default=None,
+        description="The language of the pattern, such as python. Default: each file's extension.",
+    )
+    selector: str | None = Field(
+        default=None, description="The kind of the part of the pattern that is the match."
+    )
     rewrite: str | None = Field(default=None, description="Replacement template to preview.")
 
     def flags(self) -> list[str]:
@@ -38,31 +43,79 @@ class Query(BaseModel):
 
 
 class OutlineOptions(BaseModel):
-    language: str | None = None
-    items: Literal["auto", "all", "structure", "imports", "exports"] = "auto"
+    language: str | None = Field(
+        default=None, description="Read only the files of this language, such as python."
+    )
+    items: Literal["auto", "all", "structure", "imports", "exports"] = Field(
+        default="auto",
+        description="Which top-level items to list. `auto` is `structure` for files and "
+        "`exports` for folders.",
+    )
     rules: str | None = Field(default=None, description="Project-relative outline rule file.")
 
 
 class NewItem(BaseModel):
-    entity: Literal["project", "rule", "test", "util"]
-    name: str | None = None
-    directory: str = "."
-    language: str | None = None
-    pack: str | None = None
-    pattern: str | None = None
-    message: str | None = None
-    severity: Severity | None = None
-    note: str | None = None
-    rewrite: str | None = None
-    fix_safety: FixSafety | None = None
-    since: str | None = None
-    until: str | None = None
+    entity: Literal["project", "rule", "test", "util"] = Field(description="What to create.")
+    name: str | None = Field(
+        default=None,
+        description="The rule's name or <pack>/<name>, the test's rule id, or the utility's name.",
+    )
+    directory: str = Field(
+        default=".",
+        description="The project folder, which holds sgconfig.yml, relative to the project root.",
+    )
+    language: str | None = Field(
+        default=None, description="The language of a structural rule or a utility."
+    )
+    pack: str | None = Field(
+        default=None,
+        description="The pack the rule belongs to, or the pack a new project declares.",
+    )
+    pattern: str | None = Field(
+        default=None,
+        description="The code to find, with $X for any one node and $$$X for any number of them.",
+    )
+    message: str | None = Field(
+        default=None, description="What the issue says. It may name the pattern's variables."
+    )
+    severity: Severity | None = Field(default=None, description="Default: warning.")
+    note: str | None = Field(
+        default=None, description="A longer explanation, for the rule's note and its Markdown."
+    )
+    rewrite: str | None = Field(
+        default=None, description="The code that replaces a match, with the pattern's variables."
+    )
+    fix_safety: FixSafety | None = Field(
+        default=None,
+        description="Whether the fix keeps the code's behavior. Required with rewrite.",
+    )
+    since: str | None = Field(
+        default=None, description="The first version of the pack's library the rule applies to."
+    )
+    until: str | None = Field(
+        default=None,
+        description="The first version of the pack's library the rule no longer applies to.",
+    )
     holds: list[str] = Field(default_factory=list, description="Proofs as VAR={kind: call}.")
-    unless_holds: list[str] = Field(default_factory=list)
-    unless_imported: str | None = None
-    public_id: str | None = None
-    with_test: bool = False
-    every_file: bool = False
+    unless_holds: list[str] = Field(
+        default_factory=list,
+        description="Drop a match when the variable holds a value of this shape, as "
+        "VAR={kind: call}.",
+    )
+    unless_imported: str | None = Field(
+        default=None,
+        description="Silence the rule in a file that imports a module with a module-level "
+        "statement of this shape.",
+    )
+    public_id: str | None = Field(
+        default=None, description="The id that issues show, for one of several rule variants."
+    )
+    with_test: bool = Field(default=False, description="Also create an empty test case.")
+    every_file: bool = Field(
+        default=False,
+        description="Run a pack this call adds on every Python file, not only on files that "
+        "import its module.",
+    )
 
     def flags(self, root: Root) -> list[str]:
         flags = [self.entity]
@@ -93,11 +146,25 @@ class NewItem(BaseModel):
 
 
 class CaseOptions(BaseModel):
-    config: str | None = None
-    test_dir: str | None = None
-    filter: str | None = None
-    skip_snapshots: bool = False
-    update_snapshots: bool = False
+    config: str | None = Field(
+        default=None,
+        description="A project file to read instead of the nearest sgconfig.yml, relative to the "
+        "project root.",
+    )
+    test_dir: str | None = Field(
+        default=None,
+        description="Read the test cases in this folder instead of the testConfigs of "
+        "sgconfig.yml.",
+    )
+    filter: str | None = Field(
+        default=None, description="Test only the rules whose id matches this regular expression."
+    )
+    skip_snapshots: bool = Field(
+        default=False, description="Check only the valid and invalid examples, and no snapshot."
+    )
+    update_snapshots: bool = Field(
+        default=False, description="Accept every changed snapshot and write it."
+    )
 
     def flags(self, root: Root) -> list[str]:
         if self.skip_snapshots and self.update_snapshots:
@@ -127,7 +194,12 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     async def query(
         ctx: Context, query: Query, paths: list[str] | None = None
     ) -> list[CodeMatch] | InputRequiredResult:
-        """Find AST patterns or syntax kinds and preview replacements without changing files."""
+        """Find AST patterns or syntax kinds and preview replacements without changing files.
+
+        Args:
+            query: The pattern or kind to find, and the replacement to preview.
+            paths: Files or folders inside the project root. Default: the whole root.
+        """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):
             return root
@@ -137,7 +209,12 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     async def rewrite(
         ctx: Context, query: Query, paths: list[str] | None = None
     ) -> list[CodeMatch] | InputRequiredResult:
-        """Preview a structural rewrite, ask for confirmation, then apply it to project files."""
+        """Preview a structural rewrite, ask for confirmation, then apply it to project files.
+
+        Args:
+            query: The pattern or kind to find, and the `rewrite` template that replaces it.
+            paths: Files or folders inside the project root. Default: the whole root.
+        """
         if query.rewrite is None:
             msg = "Provide a rewrite template."
             raise ToolError(msg)
@@ -167,7 +244,12 @@ def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     async def outline(
         ctx: Context, paths: list[str] | None = None, options: OutlineOptions | None = None
     ) -> list[OutlineFile] | InputRequiredResult:
-        """Read symbols, signatures, imports, members and source ranges without execution."""
+        """Read symbols, signatures, imports, members and source ranges without execution.
+
+        Args:
+            paths: Files or folders inside the project root. Default: the whole root.
+            options: The language and items to read, and an extra outline rule file.
+        """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):
             return root
@@ -183,7 +265,11 @@ def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"rules", "authoring"}, annotations=WRITES, task=True)
     async def new(ctx: Context, item: NewItem) -> CreatedFiles | InputRequiredResult:
-        """Create a project, rule, empty case template or shared utility without prompts."""
+        """Create a project, rule, empty case template or shared utility without prompts.
+
+        Args:
+            item: What to create, and the answers that `xpd new` would otherwise ask for.
+        """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):
             return root
@@ -198,6 +284,9 @@ def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
         Changes snapshots only when update_snapshots is true. Import, version and proof
         checks use the same rules as linting, including project rules.
+
+        Args:
+            options: The project file, the test folder and filter, and what to do with snapshots.
         """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):

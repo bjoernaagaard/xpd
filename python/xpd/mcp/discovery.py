@@ -124,6 +124,10 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         required arguments, or dependency availability. The index may omit valid APIs and
         inherited or variadic parameters. It runs no project code and imports no library.
         Pass its result as proof.discovery, and save discovery in the training contract.
+
+        Args:
+            paths: The Python files or folders to check, inside the project root.
+            discovery: The search, the entries read and the choice, as the agent recorded them.
         """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):

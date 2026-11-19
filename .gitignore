@@ -22,3 +22,8 @@ __pycache__/
 
 # The rule and pack pages that website/scripts/rules.mjs writes from xpd rules
 /website/src/content/docs/rules/
+# The command and MCP pages that website/scripts/reference.mjs writes, and the Python
+# environment it starts the MCP server with
+/website/src/content/docs/commands/
+/website/src/content/docs/mcp/
+/website/.mcp-venv/

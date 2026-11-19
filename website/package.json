@@ -7,8 +7,9 @@
   },
   "scripts": {
     "rules": "node scripts/rules.mjs",
-    "dev": "node scripts/rules.mjs && astro dev",
-    "build": "node scripts/rules.mjs && astro build",
+    "reference": "node scripts/reference.mjs",
+    "dev": "node scripts/rules.mjs && node scripts/reference.mjs && astro dev",
+    "build": "node scripts/rules.mjs && node scripts/reference.mjs && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

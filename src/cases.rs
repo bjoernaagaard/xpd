@@ -26,20 +26,28 @@ pub(crate) struct Options {
     /// Run domain checks with xpd, or raw structural checks with ast-grep.
     #[arg(long, value_enum, default_value = "xpd")]
     engine: Engine,
+    /// The project file to read instead of the nearest sgconfig.yml.
     #[arg(short, long)]
     config: Option<PathBuf>,
+    /// Read the test cases in this folder instead of the `testConfigs` of sgconfig.yml.
     #[arg(short, long)]
     test_dir: Option<PathBuf>,
+    /// The snapshot folder inside the test folder.
     #[arg(long, default_value = "__snapshots__")]
     snapshot_dir: PathBuf,
+    /// Test only the rules whose id matches this regular expression.
     #[arg(short, long)]
     filter: Option<Regex>,
+    /// Check only the valid and invalid examples, and no snapshot.
     #[arg(long, conflicts_with_all = ["update_all", "interactive"])]
     skip_snapshot_tests: bool,
+    /// Accept every changed snapshot and write it.
     #[arg(short = 'U', long)]
     update_all: bool,
+    /// Ask about each changed snapshot before writing it.
     #[arg(short, long, conflicts_with = "format")]
     interactive: bool,
+    /// Print text, or JSON with each case's `id`, `source` and `status` and the `failed` count.
     #[arg(long, value_enum, default_value = "text")]
     format: Format,
 }

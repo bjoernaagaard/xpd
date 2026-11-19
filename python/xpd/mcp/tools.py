@@ -121,8 +121,14 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 class CheckOptions(BaseModel):
     rules: list[str] = Field(default_factory=list, description="Packages or public rule names.")
-    severity: Severity | None = None
-    config: str | None = None
+    severity: Severity | None = Field(
+        default=None, description="Run only the rules of this severity and above."
+    )
+    config: str | None = Field(
+        default=None,
+        description="A project file to read instead of the nearest sgconfig.yml, relative to the "
+        "project root.",
+    )
 
     def flags(self, root: Root) -> list[str]:
         flags = [f"--rule={name}" for name in self.rules]
@@ -156,6 +162,7 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             paths: Files or folders inside the project root. Folders respect .gitignore.
                 Default: the whole root.
             unsafe_fixes: Count unsafe fixes, which may change behavior, in `fixable` too.
+            options: Which rules run, and the project file that adds the project's own rules.
         """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):
@@ -182,6 +189,7 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         Args:
             paths: Files or folders inside the project root. Default: the whole root.
             unsafe: Also apply unsafe fixes, after the user confirms.
+            options: Which rules run, and the project file that adds the project's own rules.
         """
         root = await project.root(ctx)
         if isinstance(root, InputRequiredResult):
@@ -273,6 +281,12 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
         Search before choosing a library, even when it is not installed. Describe the task in
         your own words, because search ranks by meaning as well as by keywords.
         Read the chosen symbol with api before writing code.
+
+        Args:
+            task: The task in your own words, such as "grouped regression".
+            package: Search only this library, by its Python import name, such as sklearn.
+            kind: Search only `symbol`, `rule` or `recipe` entries.
+            limit: The most entries of each kind. Default: 5 symbols, 3 rules and 3 recipes.
         """
         flags = []
         if limit is not None:
@@ -291,6 +305,9 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
         such as pandas.DataFrame.merge. parameters_written holds each parameter as the source
         writes it, with its type annotation and default. A stub file writes ... for a default,
         which says only that the parameter is optional.
+
+        Args:
+            name: A dotted name, such as pandas.DataFrame or pandas.DataFrame.merge.
         """
         entries = await xpd.run(API, Path.cwd(), [name])
         return entries[0]

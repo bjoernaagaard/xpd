@@ -94,6 +94,27 @@ The agent also ran the manual steps in headless Chrome for Testing 158 against t
 
 **Manual verification.** Search for a flag and a tool name. From each result, check that a reader can identify the owning command or tool and see how to supply the argument.
 
+**Progress on 19 November 2026.** A hidden command, `xpd commands`, prints the clap command tree as JSON through clap's public getters, with each visible command, argument, default, possible value, conflict and required group. clap-markdown 0.1.5 writes one Markdown file and clap_mangen 0.3.4 writes man pages, so neither gives fields that the site can combine with authored text. `website/scripts/mcp_listing.py` starts `python -m xpd.mcp` over stdio, as `xpd mcp` does, once as is and once with `--code-mode`, and lists its tools, resources, resource templates, prompts, instructions and `--help`. `website/scripts/reference.mjs` runs both after `rules.mjs` and writes 23 command pages under `commands/` and the MCP overview, 21 tool pages, resources and prompts under `mcp/`, which git ignores. Each option and argument is a heading with its syntax, default, values and conflicts. Each tool shows its call, its arguments with every nested field by dotted path, and its result fields.
+
+When to use each command and tool, worked examples, exit status and tool errors are written by hand in `website/reference/`, one file for each command and tool. The build fails when a command or tool has no file, when a file names none, when a command page has no "Exit status" section or a tool page no "Errors" section, and when a page names a flag that its command does not take. The 31 arguments without help text got it in the clap definitions, and 47 MCP inputs got descriptions, so `--help` and the server show the same text as the site. The build installs the server's dependencies from `pyproject.toml` with uv into `website/.mcp-venv`. `xpd index` has its page at `commands/xpd-index/`, because Astro reads a page named `index` as its folder's page. The mdBook site and the Pages workflow are unchanged.
+
+| Tool | Resolved version | Where it is pinned |
+| --- | --- | --- |
+| uv | 0.13.9, the newest release | `mise.toml` |
+| Python for the listing | 3.14.10. uv offers 3.15 here only as a free-threaded build | `website/scripts/reference.mjs` |
+| FastMCP | 4.2.2 | `pyproject.toml`, `~=4.2.0` |
+
+- [x] `mise run docs:starlight` builds 492 pages with the two warnings of phase 1. `cargo fmt --check`, clippy with `-D warnings`, the rule load check on `samples/good.py`, `xpd find --check` with 53 of 53 questions, `ruff format --check` and `ruff check` pass. `mise run docs` still writes the mdBook site.
+- [x] `xpd --help` lists 19 commands, and `xpd new` has 4 of its own. For all 23, a script parsed `--help` and found every one of 125 options and arguments as a heading of its page, with every default and possible value.
+- [x] `cargo run --quiet -- outline --help` and `cargo run --quiet -- run --help` list `--follow` and `--globs`, and `run` lists `--debug-query`. The outline page has headings for `--follow` and `--globs`, and the run page for all three.
+- [x] `fastmcp list` on the live server gave 21 tools, 10 resources and 5 prompts, and a client listed 2 resource templates and 3 code-mode tools. Every tool page has each of 363 arguments and nested fields, and the resources and prompts pages have every URI, template, prompt and argument.
+- [x] The 27 `$ xpd` lines in the authored pages give their shown output when run from the repository root, with pandas 3.1.1 and scikit-learn 1.9.1 for `profile`, `equiv` and `refit`. The tool examples are results of live calls to all 21 tools. 42,720 internal links on 492 pages resolve, fragments included.
+- [x] A wrong flag in a page and a page that names no command each stop the build with a message.
+
+The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. Ctrl+K searches for `--follow`, `debug-query`, `globs`, `discovery_gate`, `update_snapshots` and `unsafe_fixes` showed results titled by their command or tool, such as "xpd outline" with a "--follow" section and "check tool" with an "unsafe_fixes" section. Two Tabs and Enter opened `xpd run`, the `discovery_gate` tool and the `test` tool, and a click on the "--follow" section opened `commands/outline/#--follow`. A search for `--follow` lists the plotly pack page first, because Pagefind drops the dashes and the pack text uses "follow". At 390 pixels wide, 8 reference pages did not scroll sideways in light and dark themes, and the MCP sequence diagram rendered in both. Manual acceptance by the user is pending.
+
+- [ ] Search for a flag and a tool name, and from each result identify the owning command or tool and how to supply the argument.
+
 ## 4. Rewrite the public guides and package README
 
 **Change outline.** Use the seven chapters in [the existing book](../../../docs/SUMMARY.md) as the coverage inventory. Rewrite the README used on GitHub and PyPI, installation, commands, rules and rule authoring, Claude Code, MCP setup, code mode and language server guides. Link guides to generated facts rather than copying counts or option tables. In each workflow, lead with what the reader can do, explain prerequisites and show the result. Use a diagram for interactions and a diff for changes to code. Keep examples readable wherever the package README is rendered.

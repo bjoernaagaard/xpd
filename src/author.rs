@@ -161,6 +161,7 @@ struct TestArgs {
 struct UtilArgs {
     /// The utility's name, which rules use as `matches: <name>`.
     name: Option<String>,
+    /// The language of the code the utility matches.
     #[arg(long, short, visible_alias = "lang")]
     language: Option<Lang>,
     /// The code the utility matches.

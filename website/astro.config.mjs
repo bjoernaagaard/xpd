@@ -37,6 +37,9 @@ export default defineConfig({
             ...PACKS.map((pack) => ({ label: packTitle(pack), link: `/rules/${pack}/` })),
           ],
         },
+        // scripts/reference.mjs writes these pages from the CLI and the MCP server.
+        { label: 'Commands', collapsed: true, items: [{ autogenerate: { directory: 'commands' } }] },
+        { label: 'MCP server', collapsed: true, items: [{ autogenerate: { directory: 'mcp' } }] },
       ],
       pagefind: true,
     }),
