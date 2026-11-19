@@ -269,7 +269,7 @@ enum Cmd {
   xpd rules
   xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]
     Rules(RulesOptions),
-    /// Suggest Ruff, ty and pytest settings for this project, each with its file, reason and evidence.
+    /// Suggest Ruff, ty and pytest settings and pytest plugin changes for this project, each with its file, reason and evidence.
     ///
     /// The suggestions come from a review of every rule and setting of Ruff 0.17.4 and ty
     /// 0.0.106 and cover the pytest settings in the testing policy. A conditional suggestion

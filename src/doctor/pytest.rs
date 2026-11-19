@@ -2,8 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use super::catalog::{Catalog, Record, Suggestion, Target, Tool};
-use super::toml::{self, Destination};
+use super::catalog::{Record, Target, Tool};
+use super::evidence::Location;
+use super::toml::{self, Destination, Toml};
 use crate::venv::Venv;
 
 const STANDALONE: &[&str] = &["pytest"];
@@ -25,14 +26,20 @@ pub(crate) enum ArgumentStyle {
 pub(crate) struct Pytest {
     pub(crate) installed: Option<(String, PathBuf)>,
     pub(crate) settings: Result<Option<Settings>, String>,
+    pub(crate) project: Option<Project>,
     pub(crate) notes: Vec<String>,
 }
 
 pub(crate) struct Settings {
     pub(crate) destination: Destination,
     pub(crate) config: Option<PathBuf>,
-    args: Vec<String>,
+    args: Vec<Argument>,
     release: Release,
+}
+
+struct Argument {
+    text: String,
+    line: Option<usize>,
 }
 
 pub(crate) fn analyze(root: &Path) -> Pytest {
@@ -52,10 +59,26 @@ pub(crate) fn analyze(root: &Path) -> Pytest {
         .filter(|name| root.join(name).is_file())
         .map(|name| format!("{name} exists. Doctor did not read it because it reads TOML only."))
         .collect::<Vec<_>>();
-    let settings = settings(root, release, &mut notes);
+    let file = root.join("pyproject.toml");
+    let pyproject = toml::read(&file);
+    let settings = settings(root, release, &file, &pyproject, &mut notes);
+    if settings.is_ok()
+        && let Err(error) = &pyproject
+    {
+        notes.push(format!("cannot read pytest dependencies: {error}"));
+    }
+    let project = pyproject.ok().map(|doc| Project {
+        destination: Destination {
+            file,
+            prefix: &[],
+            doc,
+        },
+        uv_lock: root.join("uv.lock").is_file(),
+    });
     Pytest {
         installed: version.map(|(version, path)| (version.to_string(), path)),
         settings,
+        project,
         notes,
     }
 }
@@ -63,6 +86,8 @@ pub(crate) fn analyze(root: &Path) -> Pytest {
 fn settings(
     root: &Path,
     release: Release,
+    pyproject: &Path,
+    doc: &Result<Option<Toml>, String>,
     notes: &mut Vec<String>,
 ) -> Result<Option<Settings>, String> {
     if release == Release::NineOrLater {
@@ -89,8 +114,8 @@ fn settings(
     {
         return Ok(None);
     }
-    let file = root.join("pyproject.toml");
-    let doc = toml::read(&file)?;
+    let file = pyproject.to_path_buf();
+    let doc = doc.as_ref().map_err(Clone::clone)?;
     if release == Release::NineOrLater
         && let Some(table) = doc
             .as_ref()
@@ -120,7 +145,16 @@ fn settings(
         }
         if setting.is_some_and(toml_edit::Item::is_table_like) {
             let config = Some(file.clone());
-            return Settings::new(Destination { file, prefix, doc }, config, release).map(Some);
+            return Settings::new(
+                Destination {
+                    file,
+                    prefix,
+                    doc: doc.clone(),
+                },
+                config,
+                release,
+            )
+            .map(Some);
         }
     }
     if ["tox.ini", "setup.cfg"]
@@ -135,7 +169,16 @@ fn settings(
     } else {
         NATIVE
     };
-    Settings::new(Destination { file, prefix, doc }, None, release).map(Some)
+    Settings::new(
+        Destination {
+            file,
+            prefix,
+            doc: doc.clone(),
+        },
+        None,
+        release,
+    )
+    .map(Some)
 }
 
 impl Settings {
@@ -145,19 +188,33 @@ impl Settings {
         release: Release,
     ) -> Result<Self, String> {
         let Destination { file, prefix, doc } = &destination;
-        let args = match doc.as_ref().and_then(|doc| {
+        let args = if let Some(doc) = doc {
             let path: Vec<&str> = prefix.iter().copied().chain(["addopts"]).collect();
-            toml::get(doc, &path)
-        }) {
-            None => Some(Vec::new()),
-            Some(item) if item.is_array() => item
-                .as_array()
-                .into_iter()
-                .flatten()
-                .map(|arg| arg.as_str().map(str::to_owned))
-                .collect(),
-            Some(item) if *prefix == LEGACY => item.as_str().and_then(shlex::split),
-            Some(_) => None,
+            match toml::get(doc, &path) {
+                None => Some(Vec::new()),
+                Some(item) if item.is_array() => item
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|arg| {
+                        Some(Argument {
+                            text: arg.as_str()?.to_owned(),
+                            line: arg.span().map(|span| toml::line_of(doc, span.start)),
+                        })
+                    })
+                    .collect(),
+                Some(item) if *prefix == LEGACY => {
+                    item.as_str().and_then(shlex::split).map(|args| {
+                        let line = toml::line(doc, &path);
+                        args.into_iter()
+                            .map(|text| Argument { text, line })
+                            .collect()
+                    })
+                }
+                Some(_) => None,
+            }
+        } else {
+            Some(Vec::new())
         }
         .ok_or_else(|| {
             format!(
@@ -174,17 +231,7 @@ impl Settings {
         })
     }
 
-    pub(crate) fn suggestions<'a>(
-        &'a self,
-        catalog: &'a Catalog,
-    ) -> impl Iterator<Item = (&'a Record, &'a Suggestion)> {
-        catalog
-            .suggestions()
-            .filter(|(record, _)| record.key.tool == Tool::Pytest)
-            .filter(|(record, _)| self.missing(&record.key.id))
-    }
-
-    fn missing(&self, id: &str) -> bool {
+    pub(crate) fn missing(&self, id: &str) -> bool {
         match id {
             "strict" => self.release == Release::NineOrLater && !self.strict(),
             "--strict-config" | "--strict-markers" => {
@@ -223,18 +270,18 @@ impl Settings {
             .all(|enabled| enabled)
     }
 
-    pub(crate) fn has_arg(&self, flag: &str) -> bool {
+    fn has_arg(&self, flag: &str) -> bool {
         self.args
             .iter()
-            .take_while(|arg| *arg != "--")
-            .any(|arg| arg == flag)
+            .take_while(|arg| arg.text != "--")
+            .any(|arg| arg.text == flag)
     }
 
-    pub(crate) fn arg_value(&self, long: &str, short: Option<&str>) -> Option<&str> {
+    fn arg_value(&self, long: &str, short: Option<&str>) -> Option<&str> {
         let mut args = self
             .args
             .iter()
-            .map(String::as_str)
+            .map(|arg| arg.text.as_str())
             .take_while(|arg| *arg != "--");
         let mut value = None;
         while let Some(arg) = args.next() {
@@ -252,7 +299,60 @@ impl Settings {
         value
     }
 
-    pub(crate) fn flag(&self, key: &str) -> Option<bool> {
+    pub(crate) fn removals(
+        &self,
+        record: &Record,
+        key: &str,
+    ) -> Vec<(Option<String>, toml::Placement)> {
+        let placement = self.destination.place(key);
+        if key == "addopts" {
+            let mut removals = Vec::new();
+            let flag = record.key.id.as_str();
+            let mut arguments = self
+                .args
+                .iter()
+                .take_while(|arg| arg.text != "--")
+                .peekable();
+            while let Some(arg) = arguments.next() {
+                let item = if arg.text == flag {
+                    match arguments.next_if(|next| {
+                        !next.text.starts_with('-') || next.text.parse::<f64>().is_ok()
+                    }) {
+                        Some(value) => format!("{flag} {}", value.text),
+                        None => flag.to_owned(),
+                    }
+                } else if arg
+                    .text
+                    .strip_prefix(flag)
+                    .is_some_and(|rest| rest.starts_with('='))
+                {
+                    arg.text.clone()
+                } else {
+                    continue;
+                };
+                removals.push((
+                    Some(item),
+                    toml::Placement {
+                        key_line: arg.line.or(placement.key_line),
+                        ..placement.clone()
+                    },
+                ));
+            }
+            return removals;
+        }
+        let remove = match key {
+            "strict_xfail" => self.flag(key) == Some(false),
+            "xfail_strict" => self.release == Release::NineOrLater && self.flag(key) == Some(false),
+            _ => self.get(key).is_some(),
+        };
+        if remove {
+            vec![(None, placement)]
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn flag(&self, key: &str) -> Option<bool> {
         let item = self.get(key)?;
         item.as_bool().or_else(|| {
             if self.destination.prefix != LEGACY {
@@ -266,7 +366,11 @@ impl Settings {
         })
     }
 
-    pub(crate) fn get(&self, key: &str) -> Option<&toml_edit::Item> {
+    pub(crate) fn needs_timeout(&self) -> bool {
+        self.get("timeout").is_none() && self.arg_value("--timeout", None).is_none()
+    }
+
+    fn get(&self, key: &str) -> Option<&toml_edit::Item> {
         let doc = self.destination.doc.as_ref()?;
         let path: Vec<&str> = self
             .destination
@@ -321,4 +425,129 @@ fn command_line(values: &[&str]) -> String {
         .map(|value| value.trim_matches('"'))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Dependency arrays from pyproject.toml. Each entry stays in the array that declares it.
+pub(crate) struct Project {
+    pub(crate) destination: Destination,
+    pub(crate) uv_lock: bool,
+}
+
+pub(crate) struct Group<'a> {
+    path: Vec<&'a str>,
+    array: &'a toml_edit::Array,
+}
+
+impl Project {
+    pub(crate) fn groups(&self) -> Vec<Group<'_>> {
+        let Some(doc) = &self.destination.doc else {
+            return Vec::new();
+        };
+        let mut groups = Vec::new();
+        for path in [
+            &["dependency-groups"][..],
+            &["project", "optional-dependencies"],
+        ] {
+            let Some(table) = toml::get(doc, path).and_then(toml_edit::Item::as_table_like) else {
+                continue;
+            };
+            for (key, item) in table.iter() {
+                if let Some(array) = item.as_array() {
+                    groups.push(Group {
+                        path: [path, &[key]].concat(),
+                        array,
+                    });
+                }
+            }
+        }
+        groups
+    }
+
+    pub(crate) fn runtime_dependencies(&self) -> Option<Group<'_>> {
+        let doc = self.destination.doc.as_ref()?;
+        let path = vec!["project", "dependencies"];
+        let array = toml::get(doc, &path)?.as_array()?;
+        Some(Group { path, array })
+    }
+
+    pub(crate) fn place_group(&self, path: &[&str]) -> toml::Placement {
+        let mut placement = self.destination.place_path(path);
+        if placement.table.is_empty() {
+            placement.table = path[..path.len() - 1].join(".");
+            path.last()
+                .copied()
+                .unwrap_or_default()
+                .clone_into(&mut placement.key);
+        }
+        placement
+    }
+
+    pub(crate) fn plugin_group<'a>(groups: &'a [Group<'a>]) -> &'a [&'a str] {
+        groups
+            .iter()
+            .find(|group| group.has("pytest"))
+            .or_else(|| {
+                groups
+                    .iter()
+                    .find(|group| group.path == ["dependency-groups", "dev"])
+            })
+            .or_else(|| {
+                groups.iter().find(|group| {
+                    group
+                        .path
+                        .last()
+                        .is_some_and(|name| matches!(*name, "test" | "tests" | "testing"))
+                })
+            })
+            .or_else(|| groups.first())
+            .map_or(&["dependency-groups", "dev"], |group| group.path.as_slice())
+    }
+}
+
+impl Group<'_> {
+    pub(crate) fn has(&self, name: &str) -> bool {
+        self.entries(name).next().is_some()
+    }
+
+    pub(crate) fn entries<'a>(
+        &'a self,
+        name: &'a str,
+    ) -> impl Iterator<Item = &'a toml_edit::Value> {
+        self.array
+            .iter()
+            .filter(move |value| dependency(value).is_some_and(|dep| dep == name))
+    }
+
+    pub(crate) fn location(&self, project: &Project, entry: &toml_edit::Value) -> Option<Location> {
+        Some(Location {
+            file: project.destination.file.clone(),
+            line: self.place(project, entry).key_line?,
+            text: entry.as_str()?.to_owned(),
+        })
+    }
+
+    pub(crate) fn place(&self, project: &Project, entry: &toml_edit::Value) -> toml::Placement {
+        let mut placement = project.place_group(&self.path);
+        if let Some(doc) = &project.destination.doc
+            && let Some(span) = entry.span()
+        {
+            placement.key_line = Some(toml::line_of(doc, span.start));
+        }
+        placement
+    }
+}
+
+fn dependency(value: &toml_edit::Value) -> Option<String> {
+    let name = value
+        .as_str()?
+        .trim_start()
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')))
+        .next()?;
+    Some(
+        name.split(['-', '_', '.'])
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("-")
+            .to_ascii_lowercase(),
+    )
 }

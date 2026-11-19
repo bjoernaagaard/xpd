@@ -1,4 +1,4 @@
-Run `xpd doctor` at the root of a Python project to see which Ruff, ty and pytest settings to change and why. Doctor reads the project's configuration and Python files. It prints edits for you to review and apply. Ruff and ty run their own checks.
+Run `xpd doctor` at the root of a Python project to see which Ruff, ty and pytest settings to change and which pytest plugins to add or remove. Doctor reads the project's configuration and Python files. It prints edits for you to review and apply. Ruff and ty run their own checks.
 
 Doctor ships a catalog reviewed against Ruff 0.17.4, ty 0.0.106 and pytest 9.2.0. Doctor consults Ruff and ty in the project's environment or on `PATH`. It gets the installed pytest version from the project's virtual environment. Advice for a missing tool is marked “unverified locally”.
 
@@ -29,6 +29,8 @@ Doctor recommends three diagnostic levels under `[tool.ty.rules]` in `pyproject.
 ## Recommended pytest settings
 
 Doctor recommends strict mode, `-ra` for the test summary, and `--import-mode=importlib`. It names the TOML file and table where the settings belong. If it finds an INI or CFG file that pytest may use, it names the file in a note.
+
+Doctor recommends declaring `pytest-randomly` and `pytest-timeout` in your test dependencies and setting a timeout in seconds. It flags rerun settings, settings that let an unexpectedly passing xfail pass the run, and dependencies on `pytest-rerunfailures`, `flaky` and `pytest-mock`.
 
 ## When the advice depends on your project
 
