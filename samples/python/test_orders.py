@@ -3,6 +3,7 @@
 A line that xpd reports ends with a comment that names the rule.
 """
 
+import os
 import sys
 import threading
 import time
@@ -35,6 +36,16 @@ def test_worker_with_flaky() -> None:
     done = threading.Event()
     start(done).join()
     assert done.is_set()
+
+
+def test_platform_replaced(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")  # xpd: test-setattr
+    assert sys.platform == "win32"
+
+
+def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ORDERS_DIR", "/var/tmp/orders")
+    assert os.environ["ORDERS_DIR"] == "/var/tmp/orders"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="needs fork")

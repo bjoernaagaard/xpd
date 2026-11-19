@@ -1,0 +1,12 @@
+# `monkeypatch.setattr` replaces a function or an object for one test, so the test passes when
+# the replacement is called as the test expects, whatever the real code does. It needs no import,
+# so `mock-import` does not see it. `setenv`, `chdir`, `syspath_prepend` and `setitem` are left
+# alone, because they give the real code another input and replace none of it.
+# No fix, because a test without the replacement is another design.
+id: test-setattr
+language: python
+severity: warning
+message: This replaces real code with a stand-in for the test. Run the real code on real input, such as a file in tmp_path or a server on localhost.
+files: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+rule:
+  pattern: monkeypatch.setattr($$$ARGS)
