@@ -123,10 +123,17 @@ impl HookEvent {
 fn edit(event: &Value) -> (Client, Vec<PathBuf>) {
     let path = |value: &Value, key: &str| value.get(key).and_then(Value::as_str).map(PathBuf::from);
     if event.get("tool_result").is_none() {
-        let files = event
-            .get("tool_input")
-            .and_then(|input| path(input, "file_path"));
-        return (Client::ClaudeCode, files.into_iter().collect());
+        let input = event.get("tool_input");
+        let named = input.and_then(|input| path(input, "file_path"));
+        // Codex edits files with `apply_patch`, which names them inside the text of the patch.
+        let diff = input
+            .and_then(|input| input.get("command"))
+            .and_then(Value::as_str)
+            .filter(|_| event.get("tool_name").and_then(Value::as_str) == Some("apply_patch"))
+            .unwrap_or_default();
+        let cwd = path(event, "cwd").unwrap_or_default();
+        let files = named.into_iter().chain(patched(diff, &cwd)).collect();
+        return (Client::ClaudeCode, files);
     }
     // Only the file.modify profile names files. A call that reports an error may still have
     // changed some of them.
@@ -149,6 +156,16 @@ fn edit(event: &Value) -> (Client, Vec<PathBuf>) {
         .collect();
     let cwd = path(event, "cwd");
     (Client::AgentPlugin { cwd }, files)
+}
+
+/// The files that the `apply_patch` text `patch` adds, updates or moves to. Their paths are
+/// relative to `cwd`, the folder Codex ran the patch in. A deleted file has nothing to lint.
+fn patched<'a>(patch: &'a str, cwd: &'a Path) -> impl Iterator<Item = PathBuf> + 'a {
+    const HEADERS: [&str; 3] = ["*** Add File: ", "*** Update File: ", "*** Move to: "];
+    patch
+        .lines()
+        .filter_map(|line| HEADERS.iter().find_map(|header| line.strip_prefix(header)))
+        .map(move |file| cwd.join(file.trim()))
 }
 
 /// Answers the hook event on stdin the way the client that sent it reads the answer.

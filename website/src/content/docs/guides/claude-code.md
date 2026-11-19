@@ -154,10 +154,10 @@ describes each answer.
 | `PostToolUse`, after an `Edit` or a `Write` | Lints the edited file, so the agent sees its issues |
 | `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning |
 
-In Claude Code, the agent sees the issues of a file right after its edit. In Codex, an edit is an
-`apply_patch` call whose event names no file, so xpd prints nothing after the edit. The `Stop`
-check lints every changed Python file in both clients, so the agent in Codex sees the errors and
-warnings when it wants to end the turn.
+In both clients, the agent sees the issues of a file right after its edit. In Codex, an edit is an
+`apply_patch` call, and xpd reads the names of the files from the text of the patch. An edit that
+a shell command makes sends no such event, and the `Stop` check covers it, because that check
+lints every Python file the session changed.
 
 `xpd hook` also answers a client of the 1.1.0 draft of the
 [Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, which sends another
