@@ -163,9 +163,10 @@ The first two groups are where real bugs live.
 - A change with no command a reader can run to see that it works.
 - Tests that mock the thing under test (`python/mock-import`), or assert on private
   details, so they pass while the program fails.
-- A test that is skipped (`python/test-skip`), rerun until it passes
-  (`python/test-rerun`) or waits with a sleep (`python/test-sleep`), so a failure stays
-  unseen.
+- A test that is skipped or marked `xfail(strict=False)` (`python/test-skip`), rerun
+  until it passes (`python/test-rerun`), waits with a sleep (`python/test-sleep`) or
+  turns off a Hypothesis correctness check (`python/test-suppressed-health-check`), so
+  a failure stays unseen.
 - A diff that changes a test, a snapshot or a tool setting together with the code it
   judges, where the change to the check is what makes the code pass.
 - A round trip, an invariant or a rewrite with only hand-picked cases, where a property

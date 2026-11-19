@@ -1,0 +1,24 @@
+# Hypothesis raises two health checks about correctness and not about speed.
+# `function_scoped_fixture` says a fixture such as `tmp_path` is set up once for the whole test
+# and not once for each generated input, so one input can see what another left behind.
+# `differing_executors` says the same test ran under more than one executor. The Hypothesis
+# reference says that suppressing them "may result in an unsound test". `list(HealthCheck)`
+# suppresses both with the rest. `too_slow`, `filter_too_much` and `data_too_large` are about
+# speed, and they are left alone.
+# No fix, because the test has to make its own state for each input, and the file does not show how.
+id: test-suppressed-health-check
+language: python
+severity: warning
+message: This turns off a Hypothesis check of correctness, so the test can pass while it checks the wrong thing. Make the state inside the test for each input, such as with tempfile.TemporaryDirectory(), and drop the suppression.
+files: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+rule:
+  kind: keyword_argument
+  all:
+    - has: { field: name, regex: ^suppress_health_check$ }
+    - has:
+        stopBy: end
+        any:
+          - kind: attribute
+            regex: (^|\.)HealthCheck\.(function_scoped_fixture|differing_executors)$
+          - pattern: list(HealthCheck)
+          - pattern: HealthCheck.all()

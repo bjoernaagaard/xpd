@@ -11,7 +11,7 @@ and the `python-review` skill reviews code against it.
 | Modules | `import-side-effect` |
 | Types | `typing-cast`, `dict-str-any`, `record-without-namedtuple`, `json-without-type`, `same-type-conversion`, `float-around-number` |
 | Functions | `pass-through-function`, `multi-line-call-argument` |
-| Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep` |
+| Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep`, `test-suppressed-health-check` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
 | Standard library | `setdefault-without-defaultdict`, `counting-loop-without-counter`, `strptime-without-fromisoformat`, `elapsed-without-perf-counter`, `toml-without-tomllib` |
 | Speed and memory | `front-insert-in-loop`, `orjson-loads-decoded`, `slotted-base-without-slots` |
@@ -55,6 +55,7 @@ Test with real objects and let every test run once, because a mock, a skip, a re
 - test-skip
 - test-rerun
 - test-sleep
+- test-suppressed-health-check
 
 ## Comprehensions
 

@@ -10,8 +10,8 @@ Use `xpd` whenever you write or change Python code.
 
 - `xpd check <paths…> --format json`: lint. Fix every `error`. Fix `warning`s
   unless you can state why the pattern is right here. Don't silence rules.
-  In a test file, `python/test-skip`, `python/test-rerun` and `python/test-sleep` report
-  a test that hides a failure. Find why the test fails, or delete it and write down why.
+  In a test file, `python/test-skip`, `python/test-rerun`, `python/test-sleep` and
+  `python/test-suppressed-health-check` report a test that hides a failure. Find why the test fails, or delete it and write down why.
   A `pandas/missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.

@@ -294,7 +294,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
 | A loop where one call on whole arrays or columns does the work: a recurrence, a mask per label, a draw per pass, a column per pass, a lambda in named `agg`, a filter before the frame | `xpd check`: `numpy/recurrence-loop`, `numpy/slice-fill-loop`, `numpy/mask-per-label`, `numpy/random-draw-loop`, `pandas/column-loop`, `pandas/named-agg-lambda`, `pandas/filter-before-frame` |
 | Mock imports | `xpd check`: `python/mock-import` |
-| A skipped test, a test that is rerun, a sleep in a test | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep` |
+| A skipped test, `xfail(strict=False)`, a test that is rerun, a sleep in a test, a suppressed Hypothesis correctness check | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep`, `python/test-suppressed-health-check` |
 | Slow or wrong pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Hamilton code | `xpd check`, in files that import them |
 
 The rest of this file needs a reader. The `python-review` skill is that reader.
