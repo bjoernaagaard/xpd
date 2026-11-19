@@ -1,0 +1,25 @@
+# A module that builds its frames in ten or more statements at its top, with no function that
+# takes a frame, is a script that only runs from its first line to its last. No step of it can
+# be called alone, and xpd graph finds no pipeline in it. Step functions that take a frame and
+# return one, joined with pipe, compute the same: on pandas 3.1.1 the script and its rewrite
+# gave an equal frame, by xpd equiv on samples/pandas/script.py and samples/pandas/steps.py.
+#
+# A rule of ast-grep cannot count statements, so the rule matches every assignment at the top
+# of a module, and `frameScript` in the metadata keeps the first statement of a script
+# (src/frames.rs). A statement counts when it gives a name a frame or writes into a frame, and
+# xpd proves the frame as it does for filter-ladder. A function takes a frame when a parameter
+# is annotated pd.DataFrame, when a call passes it a frame, or when a .pipe(...) call names it.
+# The rule has no fix, because xpd cannot choose the steps.
+#
+# xpd check ~/src/bidcurves/src gave no finding of this rule, and samples/ gave the one that
+# samples/pandas/script.py marks.
+id: script-steps
+language: python
+severity: info
+message: This module builds its frames in ten or more statements at its top, and no function of it takes a frame, so no step can be called or checked alone. Move the statements into functions that take a frame and return one, and join them with pipe, as in pd.read_parquet(path).pipe(clean).pipe(add_columns). xpd graph reads that form as a pipeline of steps.
+rule:
+  kind: expression_statement
+  # At the top of the module, which is in no block.
+  not: { inside: { kind: block } }
+  has: { any: [{ kind: assignment }, { kind: augmented_assignment }] }
+metadata: { style: house, frameScript: 10 }

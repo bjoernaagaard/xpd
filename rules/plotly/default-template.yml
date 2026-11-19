@@ -63,7 +63,7 @@ utils:
       any:
         - all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }]
         - all: [{ has: { field: attribute, regex: '^template$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] } }]
-metadata: { unlessImported: { matches: sets-template } }
+metadata: { style: house, unlessImported: { matches: sets-template } }
 ---
 # The same report for a file that builds its figures with go.Figure and does not import
 # plotly.express. It is reported on the import of plotly.graph_objects. A module that the file
@@ -118,7 +118,7 @@ utils:
       kind: attribute
       any:
         - all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }]
-metadata: { unlessImported: { matches: sets-template } }
+metadata: { style: house, unlessImported: { matches: sets-template } }
 ---
 # The same report for a file that draws through pandas and imports no plotly module. It is
 # reported on the statement that makes plotly the plotting backend, in a file that calls a plot
@@ -175,7 +175,7 @@ utils:
       any:
         - all: [{ has: { field: attribute, regex: '^default$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^templates$' } }, { has: { field: object, matches: pio } }] } }]
         - all: [{ has: { field: attribute, regex: '^template$' } }, { has: { field: object, kind: attribute, all: [{ has: { field: attribute, regex: '^defaults$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] } }]
-metadata: { unlessImported: { matches: sets-template } }
+metadata: { style: house, unlessImported: { matches: sets-template } }
 ---
 # Three named templates draw the same tinted panel. On plotly 7.1.0 "plotly" resolved to the
 # plot_bgcolor #E5ECF6, "ggplot2" to rgb(237,237,237) and "seaborn" to rgb(234,234,242), each with
@@ -251,4 +251,4 @@ utils:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
 fix: '"simple_white"'
-metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

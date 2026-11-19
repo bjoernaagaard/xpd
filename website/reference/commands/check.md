@@ -75,6 +75,56 @@ library versions that its `since` and `until` name. A project rule gets an unsaf
 `metadata.fix` says `safe`. xpd warns when `sgconfig.yml` sets `languageGlobs` or
 `languageInjections`, and it skips the rules of `customLanguages`.
 
+## House style
+
+Some rules state a preference about code that works, such as one method chain where the code
+builds a frame in separate steps. They are `info`, and their pages call them rules of the house
+style. Set `style` to `"strict"` to make xpd report them as warnings, so that
+[`xpd hook`](../hook/) holds a turn that leaves one.
+
+```toml
+# pyproject.toml
+[tool.xpd]
+style = "strict"
+```
+
+xpd reads the setting from two files, and the first one that sets it wins.
+
+| File | Where the key goes |
+| --- | --- |
+| The closest `pyproject.toml` at or above the current folder that has a `[tool.xpd]` table | `style` in `[tool.xpd]` |
+| `xpd/config.toml` in `$XDG_CONFIG_HOME`, which is `~/.config` when the variable is not set, and `%APPDATA%` on Windows | `style` at the top of the file |
+
+The values are `"strict"` and `"default"`. A project sets `"default"` to turn off a `"strict"`
+that the user's file sets. xpd exits with 2 and names the file when the value is another one, or
+when the file sets a key that xpd does not read.
+
+The example runs xpd on a `script.py` that filters one frame in three statements, first without
+the setting and then with it.
+
+```python
+import pandas as pd
+
+df = pd.read_csv("orders.csv")
+df = df[df["price"] > 0]
+df = df[df["qty"] >= 2]
+df = df[df["city"] != "Oslo"]
+```
+
+```console
+$ xpd check script.py --format text
+script.py:4:1: info [pandas/filter-ladder] df is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in df = df.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...], or one df.query(...) with the conditions joined by "and".
+xpd: 1 issue
+$ printf '[tool.xpd]\nstyle = "strict"\n' > pyproject.toml
+$ xpd check script.py --format text
+script.py:4:1: warning [pandas/filter-ladder] df is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in df = df.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...], or one df.query(...) with the conditions joined by "and".
+xpd: 1 issue
+```
+
+The setting changes the severity in each format of `xpd check`, in the hook, in the language
+server and in the MCP server. `xpd rules --format json` lists the rules of the house
+style with `"style": "house"`.
+
 ## Suppress an issue
 
 A comment `# ast-grep-ignore: pandas/row-loop` turns the named rule off for the next line, or for

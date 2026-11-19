@@ -105,6 +105,17 @@ instead and whether xpd can fix it, such as
 `xpd rules` lists every rule, and the
 [rules overview](https://bjoernaagaard.github.io/xpd/rules/) lists the packs with their counts.
 
+Some `info` rules state a preference of the house style, such as one method chain where the code
+builds a frame in separate steps. Set `style` to make xpd report them as warnings, in
+`[tool.xpd]` of the project's `pyproject.toml` or at the top of `~/.config/xpd/config.toml`.
+[`xpd check`](https://bjoernaagaard.github.io/xpd/commands/check/#house-style) describes the
+setting.
+
+```toml
+[tool.xpd]
+style = "strict"
+```
+
 ## Commands
 
 `xpd <command> -h` lists the options of a command, and the

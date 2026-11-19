@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{catalog::Catalog, cli::Format, pack, scan, venv::Venv};
+use crate::{catalog::Catalog, cli::Format, pack, scan, settings::Style, venv::Venv};
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub(crate) enum Engine {
@@ -95,9 +95,10 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
             .unwrap_or(&root),
     );
     let installed = venv.as_ref().map(Venv::distributions);
+    // A case passes or fails the same way under every style setting, so none is read.
     let catalog = match &options.config {
-        Some(config) => Catalog::load_config(config, installed.as_ref())?,
-        None => Catalog::load(&root, installed.as_ref())?,
+        Some(config) => Catalog::load_config(config, installed.as_ref(), Style::Default)?,
+        None => Catalog::load(&root, installed.as_ref(), Style::Default)?,
     };
     let directories = directories(options, &catalog)?;
     let source_root = catalog

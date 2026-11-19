@@ -1,0 +1,39 @@
+id: pandas/frame-column-write
+valid:
+  # A dict, a list and a NumPy array are written the same way.
+  - "import pandas as pd\ndef fill(options: dict) -> dict:\n    options[\"a\"] = 1\n    return options"
+  - "import pandas as pd\ndef fill(rows: list) -> list:\n    rows[0] = 1\n    return rows"
+  - "import numpy as np\nimport pandas as pd\ndef fill(values: np.ndarray) -> np.ndarray:\n    values[\"a\"] = 1\n    return values"
+  # A parameter that nothing says is a frame.
+  - "import pandas as pd\ndef add(frame):\n    frame[\"a\"] = 1\n    return frame"
+  # A frame of another library.
+  - "import pandas as pd\nimport polars as pl\ndef add(frame: pl.DataFrame):\n    frame[\"a\"] = 1\n    return frame"
+  # An attribute, and a frame that the function made itself.
+  - "import pandas as pd\nclass Store:\n    def add(self) -> None:\n        self.frame[\"a\"] = 1"
+  - "import pandas as pd\ndef add(frame: pd.DataFrame) -> pd.DataFrame:\n    frame = frame.copy()\n    frame[\"a\"] = 1\n    return frame"
+  - "import pandas as pd\ndef load(path: str) -> pd.DataFrame:\n    frame = pd.read_csv(path)\n    frame[\"a\"] = 1\n    frame[\"b\"] = 2\n    frame[\"c\"] = 3\n    return frame"
+  # A parameter that a loop binds again before the write.
+  - "import pandas as pd\ndef add(frame: pd.DataFrame, frames: list):\n    for frame in frames:\n        frame[\"a\"] = 1"
+  # A key with a computed part.
+  - "import pandas as pd\ndef add(frame: pd.DataFrame, zone: str):\n    frame[f\"{zone}_mw\"] = 1\n    return frame"
+  # A key that is no string, and a write through loc.
+  - "import pandas as pd\ndef add(frame: pd.DataFrame, name: str):\n    frame[name] = 1\n    frame.loc[frame[\"a\"] > 0, \"b\"] = 2\n    return frame"
+  # At the top of a module: two writes, three writes to a dict, and three writes to a name
+  # whose value xpd cannot prove.
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2"
+  - "import pandas as pd\noptions = {}\noptions[\"a\"] = 1\noptions[\"b\"] = 2\noptions[\"c\"] = 3"
+  - "import pandas as pd\ndf = load()\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\", chunksize=10)\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")[\"price\"]\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+  # A name that a branch binds, and writes with another statement between them.
+  - "import pandas as pd\nif fast:\n    df = pd.read_csv(\"a.csv\")\nelse:\n    df = load()\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2\nrows = len(df)\ndf[\"c\"] = 3"
+  # pd that is not pandas.
+  - "import polars as pd\nimport pandas\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+invalid:
+  - "import pandas as pd\ndef add(frame: pd.DataFrame) -> pd.DataFrame:\n    frame[\"a\"] = 1\n    return frame"
+  - "from pandas import DataFrame\ndef add(frame: DataFrame, rate: float = 1.25) -> DataFrame:\n    if rate:\n        frame[\"a\"] = frame[\"b\"] * rate\n    return frame"
+  - "import pandas as pd\nclass Store:\n    def add(self, frame: pd.DataFrame) -> None:\n        frame[\"a\"] = 1"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+  - "import pandas as pd\ndf = pd.read_parquet(\"a.parquet\")\ndf = df[df[\"price\"] > 0]\ndf = df.dropna()\n# the new columns\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3\ndf[\"d\"] = 4"
+  - "import pandas as pd\nleft = pd.DataFrame({\"k\": [1]})\nboth = pd.concat([left, load()])\nboth[\"a\"] = 1\nboth[\"b\"] = 2\nboth[\"c\"] = 3"

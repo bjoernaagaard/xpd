@@ -1,0 +1,114 @@
+id: pandas/filter-ladder
+snapshots:
+  "import pandas as pd\ndef keep(frame: pd.DataFrame) -> pd.DataFrame:\n    frame = frame[frame[\"a\"] > 0]\n    frame = frame[frame[\"b\"] > 0]\n    frame = frame[frame[\"c\"] > 0]\n    return frame":
+    labels:
+    - end: 100
+      source: frame = frame[frame["a"] > 0]
+      start: 71
+      style: primary
+    - end: 100
+      source: frame = frame[frame["a"] > 0]
+      start: 71
+      style: secondary
+    - end: 134
+      source: frame = frame[frame["b"] > 0]
+      start: 105
+      style: secondary
+    - end: 134
+      source: frame = frame[frame["b"] > 0]
+      start: 105
+      style: secondary
+    - end: 168
+      source: frame = frame[frame["c"] > 0]
+      start: 139
+      style: secondary
+    - end: 168
+      source: frame = frame[frame["c"] > 0]
+      start: 139
+      style: secondary
+  "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df.loc[df[\"a\"] > 0]\n# the second filter\ndf = df[df[\"b\"].notna()]\ndf = df.loc[~df[\"c\"].isin(skipped)]\ndf = df[mask]":
+    labels:
+    - end: 70
+      source: df = df.loc[df["a"] > 0]
+      start: 46
+      style: primary
+    - end: 70
+      source: df = df.loc[df["a"] > 0]
+      start: 46
+      style: secondary
+    - end: 115
+      source: df = df[df["b"].notna()]
+      start: 91
+      style: secondary
+    - end: 115
+      source: df = df[df["b"].notna()]
+      start: 91
+      style: secondary
+    - end: 112
+      source: df["b"].notna
+      start: 99
+      style: secondary
+    - end: 112
+      source: notna
+      start: 107
+      style: secondary
+    - end: 151
+      source: df = df.loc[~df["c"].isin(skipped)]
+      start: 116
+      style: secondary
+    - end: 151
+      source: df = df.loc[~df["c"].isin(skipped)]
+      start: 116
+      style: secondary
+  "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]":
+    labels:
+    - end: 66
+      source: df = df[df["a"] > 0]
+      start: 46
+      style: primary
+    - end: 66
+      source: df = df[df["a"] > 0]
+      start: 46
+      style: secondary
+    - end: 87
+      source: df = df[df["b"] > 0]
+      start: 67
+      style: secondary
+    - end: 87
+      source: df = df[df["b"] > 0]
+      start: 67
+      style: secondary
+    - end: 108
+      source: df = df[df["c"] > 0]
+      start: 88
+      style: secondary
+    - end: 108
+      source: df = df[df["c"] > 0]
+      start: 88
+      style: secondary
+  "import pandas as pd\norders = pd.read_csv(\"a.csv\").dropna().rename(columns={\"q\": \"qty\"})\nlate = orders[\"days\"] > 30\nsold = orders[late]\nsold = sold[sold[\"a\"] > 0]\nsold = sold[sold[\"b\"] > 0]\nsold = sold[sold[\"c\"] > 0]":
+    labels:
+    - end: 161
+      source: sold = sold[sold["a"] > 0]
+      start: 135
+      style: primary
+    - end: 161
+      source: sold = sold[sold["a"] > 0]
+      start: 135
+      style: secondary
+    - end: 188
+      source: sold = sold[sold["b"] > 0]
+      start: 162
+      style: secondary
+    - end: 188
+      source: sold = sold[sold["b"] > 0]
+      start: 162
+      style: secondary
+    - end: 215
+      source: sold = sold[sold["c"] > 0]
+      start: 189
+      style: secondary
+    - end: 215
+      source: sold = sold[sold["c"] > 0]
+      start: 189
+      style: secondary

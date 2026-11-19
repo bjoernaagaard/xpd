@@ -26,7 +26,7 @@ rule:
         - regex: '^["'']best["'']$'
         - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^zsmooth$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Histogram2d)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }] }
 fix: 'False'
-metadata: { fix: unsafe }
+metadata: { style: house, fix: unsafe }
 ---
 # go.Image takes zsmooth "fast" or False, and "best" raised ValueError on plotly 7.1.0. The
 # attribute's docstring says it "only applies for image traces that use the source attribute". A 2
@@ -48,7 +48,7 @@ rule:
       - has: { field: name, regex: '^zsmooth$' }
       - inside: { kind: argument_list, inside: { kind: call, all: [{ has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Image)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } }, { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(source)$' } } } }] } }
 fix: 'False'
-metadata: { fix: unsafe }
+metadata: { style: house, fix: unsafe }
 ---
 # The same smoothing set afterwards with update_traces(zsmooth="best") on a plotly figure.
 # px.density_heatmap made a histogram2d trace, and "best" drew 1,156 colors where False drew 1,011
@@ -92,4 +92,4 @@ utils:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
 fix: 'False'
-metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

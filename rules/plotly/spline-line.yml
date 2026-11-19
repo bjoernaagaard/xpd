@@ -57,7 +57,7 @@ utils:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
 fix: '"linear"'
-metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
 ---
 # The same shape inside the line argument of a go trace: line=dict(shape="spline") or
 # line={"shape": "spline"}.
@@ -79,4 +79,4 @@ rule:
           - has: { field: name, regex: '^line$' }
           - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scattercarpet|Scatterpolar|Scattersmith|Scatterternary)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } }
 fix: '"linear"'
-metadata: { fix: unsafe }
+metadata: { style: house, fix: unsafe }

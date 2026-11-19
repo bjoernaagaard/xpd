@@ -34,3 +34,4 @@ rule:
     - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(points|boxpoints|notched|notchwidth|notchspan|boxmean|mean|sd|sizemode|quartilemethod|q1|median|q3|lowerfence|upperfence|fillcolor|line|line_.*|marker|marker_.*|whiskerwidth|width|jitter|pointpos|boxmode|orientation)$' } } } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - not: { has: { field: arguments, has: { kind: list_splat } } }
+metadata: { style: house }

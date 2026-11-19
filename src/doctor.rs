@@ -10,7 +10,7 @@ pub(crate) mod catalog;
 mod evidence;
 mod probe;
 mod ruff;
-mod toml;
+pub(crate) mod toml;
 mod ty;
 
 use std::path::PathBuf;

@@ -13,6 +13,7 @@ use crate::catalog::{Catalog, LocalProject};
 use crate::pack;
 use crate::package_check::{self, Calls};
 use crate::report::Issue;
+use crate::settings::{Settings, Style};
 use crate::venv::{Distributions, Venv};
 use crate::version::Version;
 
@@ -61,9 +62,10 @@ impl Project {
 #[derive(Debug, Default)]
 pub(crate) struct Workspace {
     folders: Vec<PathBuf>,
-    /// The packs for each set of installed library versions. Parsing the rules takes about
-    /// half a second, so projects with the same versions share one set.
-    loaded: HashMap<Vec<Option<Version>>, Rc<Catalog>>,
+    /// The packs for each set of installed library versions and each style setting. Parsing
+    /// the rules takes about half a second, so projects with the same versions and the same
+    /// setting share one set.
+    loaded: HashMap<(Vec<Option<Version>>, Style), Rc<Catalog>>,
     projects: HashMap<PathBuf, Project>,
 }
 
@@ -119,21 +121,29 @@ impl Workspace {
         let versions = pack::installed_versions(installed.as_ref());
         // A project with its own rules reads them again each time, and the others share the
         // embedded rules for their versions.
-        let loaded = if let Some(config) = LocalProject::find(root)? {
-            Catalog::load_config(&config, installed.as_ref()).map(Rc::new)
-        } else if let Some(catalog) = self.loaded.get(&versions) {
-            Ok(Rc::clone(catalog))
-        } else {
-            let catalog = Rc::new(Catalog::embedded(installed.as_ref())?);
-            self.loaded.insert(versions, Rc::clone(&catalog));
-            Ok(catalog)
+        // A settings file that cannot be read is a load error, as a broken rule file is.
+        let loaded = match (Settings::find(root), LocalProject::find(root)?) {
+            (Err(error), _) => Err(error),
+            (Ok(settings), Some(config)) => {
+                Catalog::load_config(&config, installed.as_ref(), settings.style).map(Rc::new)
+            }
+            (Ok(settings), None) => {
+                let key = (versions, settings.style);
+                if let Some(catalog) = self.loaded.get(&key) {
+                    Ok(Rc::clone(catalog))
+                } else {
+                    let catalog = Rc::new(Catalog::embedded(installed.as_ref(), settings.style)?);
+                    self.loaded.insert(key, Rc::clone(&catalog));
+                    Ok(catalog)
+                }
+            }
         };
         let (catalog, load_error) = match loaded {
             Ok(catalog) => (catalog, None),
             Err(error) => {
                 let catalog = match self.projects.get(root) {
                     Some(previous) => Rc::clone(&previous.catalog),
-                    None => Rc::new(Catalog::embedded(installed.as_ref())?),
+                    None => Rc::new(Catalog::embedded(installed.as_ref(), Style::Default)?),
                 };
                 (catalog, Some(format!("{error:#}")))
             }

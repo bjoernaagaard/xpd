@@ -1,0 +1,131 @@
+id: pandas/frame-column-write
+snapshots:
+  "from pandas import DataFrame\ndef add(frame: DataFrame, rate: float = 1.25) -> DataFrame:\n    if rate:\n        frame[\"a\"] = frame[\"b\"] * rate\n    return frame":
+    labels:
+    - end: 157
+      source: |-
+        def add(frame: DataFrame, rate: float = 1.25) -> DataFrame:
+            if rate:
+                frame["a"] = frame["b"] * rate
+            return frame
+      start: 29
+      style: secondary
+    - end: 140
+      source: frame["a"] = frame["b"] * rate
+      start: 110
+      style: primary
+    - end: 140
+      source: frame["a"] = frame["b"] * rate
+      start: 110
+      style: secondary
+  "import pandas as pd\nclass Store:\n    def add(self, frame: pd.DataFrame) -> None:\n        frame[\"a\"] = 1":
+    labels:
+    - end: 103
+      source: |-
+        def add(self, frame: pd.DataFrame) -> None:
+                frame["a"] = 1
+      start: 37
+      style: secondary
+    - end: 103
+      source: frame["a"] = 1
+      start: 89
+      style: primary
+    - end: 103
+      source: frame["a"] = 1
+      start: 89
+      style: secondary
+  "import pandas as pd\ndef add(frame: pd.DataFrame) -> pd.DataFrame:\n    frame[\"a\"] = 1\n    return frame":
+    labels:
+    - end: 101
+      source: |-
+        def add(frame: pd.DataFrame) -> pd.DataFrame:
+            frame["a"] = 1
+            return frame
+      start: 20
+      style: secondary
+    - end: 84
+      source: frame["a"] = 1
+      start: 70
+      style: primary
+    - end: 84
+      source: frame["a"] = 1
+      start: 70
+      style: secondary
+  "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3":
+    labels:
+    - end: 57
+      source: df["a"] = 1
+      start: 46
+      style: primary
+    - end: 57
+      source: df["a"] = 1
+      start: 46
+      style: secondary
+    - end: 69
+      source: df["b"] = 2
+      start: 58
+      style: secondary
+    - end: 69
+      source: df["b"] = 2
+      start: 58
+      style: secondary
+    - end: 81
+      source: df["c"] = 3
+      start: 70
+      style: secondary
+    - end: 81
+      source: df["c"] = 3
+      start: 70
+      style: secondary
+  "import pandas as pd\ndf = pd.read_parquet(\"a.parquet\")\ndf = df[df[\"price\"] > 0]\ndf = df.dropna()\n# the new columns\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3\ndf[\"d\"] = 4":
+    labels:
+    - end: 125
+      source: df["a"] = 1
+      start: 114
+      style: primary
+    - end: 125
+      source: df["a"] = 1
+      start: 114
+      style: secondary
+    - end: 137
+      source: df["b"] = 2
+      start: 126
+      style: secondary
+    - end: 137
+      source: df["b"] = 2
+      start: 126
+      style: secondary
+    - end: 149
+      source: df["c"] = 3
+      start: 138
+      style: secondary
+    - end: 149
+      source: df["c"] = 3
+      start: 138
+      style: secondary
+  "import pandas as pd\nleft = pd.DataFrame({\"k\": [1]})\nboth = pd.concat([left, load()])\nboth[\"a\"] = 1\nboth[\"b\"] = 2\nboth[\"c\"] = 3":
+    labels:
+    - end: 98
+      source: both["a"] = 1
+      start: 85
+      style: primary
+    - end: 98
+      source: both["a"] = 1
+      start: 85
+      style: secondary
+    - end: 112
+      source: both["b"] = 2
+      start: 99
+      style: secondary
+    - end: 112
+      source: both["b"] = 2
+      start: 99
+      style: secondary
+    - end: 126
+      source: both["c"] = 3
+      start: 113
+      style: secondary
+    - end: 126
+      source: both["c"] = 3
+      start: 113
+      style: secondary

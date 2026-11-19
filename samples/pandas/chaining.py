@@ -131,3 +131,79 @@ def nested_calls_that_stay():
     df = pd.DataFrame(orders())
     unknown = orders()
     return len(list(set(df.columns))), add_totals(clean(df)), add_shares(add_totals(clean(unknown)))
+
+
+@case
+def filter_ladder():
+    df = pd.DataFrame(orders())
+    df = df[df["price"] > 90]  # xpd: filter-ladder
+    df = df[df["qty"] >= 2]
+    df = df.loc[df["city"] != "Oslo"]
+    chained = (
+        orders()
+        .loc[lambda d: d.price > 90]
+        .loc[lambda d: d.qty >= 2]
+        .loc[lambda d: d.city != "Oslo"]
+    )
+    conditions = 'price > 90 and qty >= 2 and city != "Oslo"'
+    queried = orders().query(conditions)
+    return df, df.equals(chained), df.equals(queried)
+
+
+@case
+def filters_that_stay():
+    """Two filters, a NumPy array, a frame that xpd cannot prove, and selections of columns."""
+    df = pd.DataFrame(orders())
+    df = df[df["price"] > 90]
+    df = df[df["qty"] >= 2]
+    values = np.arange(9)
+    values = values[values > 1]
+    values = values[values > 2]
+    values = values[values > 3]
+    unknown = orders()
+    unknown = unknown[unknown["price"] > 90]
+    unknown = unknown[unknown["qty"] >= 2]
+    unknown = unknown[unknown["city"] != "Oslo"]
+    names = ["price", "qty"]
+    narrow = pd.DataFrame(orders())
+    narrow = narrow[names]
+    narrow = narrow[names]
+    narrow = narrow[names]
+    return df, values, unknown, narrow
+
+
+def add_total_in_place(frame: pd.DataFrame) -> pd.DataFrame:
+    frame["total"] = frame["price"] * frame["qty"]  # xpd: frame-column-write
+    return frame
+
+
+def add_total(frame: pd.DataFrame) -> pd.DataFrame:
+    return frame.assign(total=frame["price"] * frame["qty"])
+
+
+@case
+def frame_column_write():
+    """The write changes the caller's frame, and assign leaves it as it was."""
+    written = orders()
+    changed = add_total_in_place(written)
+    kept = orders()
+    added = add_total(kept)
+    return "total" in written.columns, "total" in kept.columns, changed.equals(added)
+
+
+def count_rows(frame: pd.DataFrame, counts: dict) -> pd.DataFrame:
+    counts["rows"] = len(frame)
+    frame = frame.copy()
+    frame["rows"] = counts["rows"]
+    return frame
+
+
+@case
+def column_writes_that_stay():
+    """A dict, a frame that the function made, and a frame that is no parameter."""
+    counts = {}
+    df = pd.DataFrame(orders())
+    df["total"] = df["price"] * df["qty"]
+    df["large"] = df["qty"] > 4
+    df["cheap"] = df["price"] < 90
+    return count_rows(df, counts), counts

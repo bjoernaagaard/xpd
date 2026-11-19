@@ -272,7 +272,7 @@ def share_through_numpy(df: pd.DataFrame) -> pd.DataFrame:  # xpd: numpy-round-t
     load = df["load"].to_numpy()
     total = df.groupby("region")["load"].transform("sum").to_numpy()
     hour = df["hour"].to_numpy()
-    df["share"] = load / total * hour
+    df["share"] = load / total * hour  # xpd: frame-column-write
     return df
 
 

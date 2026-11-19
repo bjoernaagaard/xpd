@@ -34,3 +34,4 @@ rule:
     - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(labels)$' } } } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - not: { inside: { stopBy: end, kind: module, regex: '[xy]axis[0-9]*(_title|_title_text|\s*=\s*(dict\(|\{))|["''][xy]axis[0-9]*["'']\s*:|update_[xy]axes\(|for_each_[xy]axis|[.]title[.]text' } }
+metadata: { style: house }

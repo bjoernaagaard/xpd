@@ -22,7 +22,7 @@ def clipped(raw: pd.DataFrame) -> pd.DataFrame:
 
 
 def with_spread(raw: pd.DataFrame, offset: float = 0.0) -> pd.DataFrame:
-    raw["spread"] = raw["uk"] - raw["dk"]  # xpd: node-mutates-input
+    raw["spread"] = raw["uk"] - raw["dk"]  # xpd: node-mutates-input, frame-column-write
     raw["spread"] += offset  # xpd: node-mutates-input
     del raw["dk"]  # xpd: node-mutates-input
     raw.columns = [name.upper() for name in raw.columns]  # xpd: node-mutates-input
@@ -31,7 +31,7 @@ def with_spread(raw: pd.DataFrame, offset: float = 0.0) -> pd.DataFrame:
 
 @extract_columns("uk")
 def doubled(raw: pd.DataFrame) -> pd.DataFrame:
-    raw["uk"] = raw["uk"] * 2  # xpd: node-mutates-input
+    raw["uk"] = raw["uk"] * 2  # xpd: node-mutates-input, frame-column-write
     return raw
 
 
@@ -97,18 +97,18 @@ def next_state(state: dict, row: dict) -> dict:
 
 @load_from.csv(path=value("spend.csv"))
 def spend(data: pd.DataFrame) -> pd.DataFrame:
-    data["date"] = pd.date_range("2020-01-01", periods=len(data))
+    data["date"] = pd.date_range("2020-01-01", periods=len(data))  # xpd: frame-column-write
     return data
 
 
 @hamilton_exclude
 def excluded(raw: pd.DataFrame) -> pd.DataFrame:
-    raw["checked"] = True
+    raw["checked"] = True  # xpd: frame-column-write
     return raw
 
 
 def _helper(raw: pd.DataFrame) -> pd.DataFrame:
-    raw["checked"] = True
+    raw["checked"] = True  # xpd: frame-column-write
     return raw
 
 
@@ -119,5 +119,5 @@ def run(raw):
 
 class Writer:
     def write(self, raw: pd.DataFrame) -> pd.DataFrame:
-        raw["checked"] = True
+        raw["checked"] = True  # xpd: frame-column-write
         return raw

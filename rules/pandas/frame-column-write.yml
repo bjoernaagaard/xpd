@@ -1,0 +1,71 @@
+# frame["x"] = value changes the frame it is called on. In a function that was given the frame,
+# the caller's frame changes too: on pandas 3.1.1, with copy-on-write, a function that ran
+# frame["total"] = ... left the new column in the frame of its caller, and one that returned
+# frame.assign(total=...) left the caller's frame as it was and returned an equal frame
+# (frame_column_write in samples/pandas/chaining.py). xpd graph also reads a step that returns
+# assign and warns about a step that writes in place.
+#
+# x["key"] = value is also how a dict is filled, so `frame` in the metadata asks xpd to prove
+# that the name holds a frame (src/frames.rs). `parameter` keeps a match only when the name is a
+# parameter annotated pd.DataFrame that nothing assigns again before the write. So a write to a
+# dict, a list, a NumPy array or self.frame, and a write to a frame that the function made
+# itself, as after frame = frame.copy(), are left alone. The key is a string with no computed
+# part, because assign takes the column's name as a keyword. The rule reports the first write of a run of writes. It
+# has no fix, because a later statement may read the changed frame.
+#
+# xpd check ~/src/bidcurves/src gave no finding of this rule, where every such write is to a
+# NumPy array or a dict. samples/ gave ten: nine writes to a parameter annotated pd.DataFrame,
+# and the run in samples/pandas/script.py.
+id: frame-column-write
+language: python
+severity: info
+message: $F[$K] = ... changes the frame that the caller passed in, so the caller's frame gets the column too. Return a new frame instead, as in return $F.assign(name=value) with one keyword for each column, which leaves the caller's frame as it was.
+rule:
+  kind: expression_statement
+  all:
+    - has: { pattern: '$F[$K] = $V' }
+    - inside: { stopBy: end, kind: function_definition }
+    - not:
+        follows:
+          stopBy: { not: { kind: comment } }
+          kind: expression_statement
+          has: { pattern: '$F[$K0] = $V0' }
+constraints:
+  F: { kind: identifier }
+  K: { kind: string, not: { has: { kind: interpolation } } }
+  K0: { kind: string, not: { has: { kind: interpolation } } }
+metadata: { style: house, frame: { F: parameter } }
+---
+# Three or more column writes in a row at the top of a module build one frame in steps. One
+# assign adds the same columns: on pandas 3.1.1 it gave a frame equal to the one from the writes,
+# by xpd equiv on samples/pandas/script.py and samples/pandas/steps.py. Here `frame: any` asks only that the name holds a frame, which its
+# nearest earlier assignment or its annotation proves.
+id: frame-column-write
+language: python
+severity: info
+message: $F gets three or more columns in a row, each in its own statement, so every line leaves a half-built frame under the final name. Add them in one call, as in $F = $F.assign(name=value, ...) with one keyword for each column.
+rule:
+  kind: expression_statement
+  # At the top of the module, which is in no block.
+  not: { inside: { kind: block } }
+  all:
+    - has: { pattern: '$F[$K1] = $V1' }
+    # The next statement, with any comments between the two passed over.
+    - precedes:
+        stopBy: { not: { kind: comment } }
+        kind: expression_statement
+        all:
+          - has: { pattern: '$F[$K2] = $V2' }
+          - precedes: { stopBy: { not: { kind: comment } }, kind: expression_statement, has: { pattern: '$F[$K3] = $V3' } }
+    - not:
+        follows:
+          stopBy: { not: { kind: comment } }
+          kind: expression_statement
+          has: { pattern: '$F[$K0] = $V0' }
+constraints:
+  F: { kind: identifier }
+  K1: { kind: string, not: { has: { kind: interpolation } } }
+  K2: { kind: string, not: { has: { kind: interpolation } } }
+  K3: { kind: string, not: { has: { kind: interpolation } } }
+  K0: { kind: string, not: { has: { kind: interpolation } } }
+metadata: { style: house, frame: { F: any } }

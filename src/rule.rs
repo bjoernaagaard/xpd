@@ -5,17 +5,19 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
-use ast_grep_config::{RuleConfig, SerializableRule};
+use ast_grep_config::{RuleConfig, SerializableRule, Severity};
 use ast_grep_core::NodeMatch;
 use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_language::SupportLang;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
+use crate::frames;
 use crate::imports;
 use crate::names;
 use crate::pack::Library;
 use crate::scan::Root;
+use crate::settings::Style;
 use crate::version::Version;
 
 /// A shape of code that a rule's metadata names, as an ast-grep rule that can use the `utils`
@@ -37,6 +39,23 @@ impl Applicability {
         match self {
             Self::Safe => "safe",
             Self::Unsafe => "unsafe",
+        }
+    }
+}
+
+/// What `metadata.style` says about a rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Mark {
+    /// The rule states a preference of the house style about code that works. With
+    /// `style = "strict"` in the settings, such a rule that is `info` is a `warning`.
+    House,
+}
+
+impl Mark {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::House => "house",
         }
     }
 }
@@ -93,10 +112,29 @@ struct Metadata {
     /// `unlessImported: <rule>` drops the matches in a file that imports a module of its
     /// project with a direct module statement or expression of the rule's shape.
     unless_imported: Option<SerializableRule>,
+    /// `style: house` marks a rule of the house style.
+    style: Option<Mark>,
+    /// `frame: { DF: any }` keeps a match only when the name that `$DF` matched holds a pandas
+    /// frame where the matched statement starts. `parameter` asks for a frame that the function
+    /// around the match was given.
+    #[serde(default)]
+    frame: BTreeMap<String, frames::Role>,
+    /// `frameScript: 10` keeps a match only when it is the first of at least ten statements
+    /// at the top of its module that assign or write a frame, and no function of the module
+    /// takes a frame.
+    frame_script: Option<usize>,
 }
 
 /// The settings that need a pack, with how each is written in `metadata`.
-const PACK_SETTINGS: [&str; 5] = ["since", "until", "holds", "unlessHolds", "unlessImported"];
+const PACK_SETTINGS: [&str; 7] = [
+    "since",
+    "until",
+    "holds",
+    "unlessHolds",
+    "unlessImported",
+    "frame",
+    "frameScript",
+];
 
 impl Metadata {
     /// Reads the `metadata` of a rule document from `origin`. A structural rule may hold any
@@ -116,7 +154,7 @@ impl Metadata {
             fields.retain(|key, _| matches!(key.as_str(), "fix" | "publicId"));
         }
         serde_json::from_value(value).context(
-            "metadata may hold fix: safe or unsafe, publicId: <name>, since: \"<version>\", until: \"<version>\", holds: { <VARIABLE>: <rule> }, unlessHolds: { <VARIABLE>: <rule> } and unlessImported: <rule>",
+            "metadata may hold fix: safe or unsafe, publicId: <name>, since: \"<version>\", until: \"<version>\", holds: { <VARIABLE>: <rule> }, unlessHolds: { <VARIABLE>: <rule> }, unlessImported: <rule>, style: house, frame: { <VARIABLE>: any or parameter } and frameScript: <count>",
         )
     }
 }
@@ -159,6 +197,17 @@ pub(crate) struct Rule {
     /// From `metadata.unlessImported`: a shape that silences the rule on a file when a module
     /// the file loads has it at module level, outside any branch or definition body.
     unless_imported: Option<Shape>,
+    /// From `metadata.style`. `None` for a rule that is not about style.
+    pub(crate) style: Option<Mark>,
+    /// The severity that the rule's file gives it. `config.severity` is the one a run reports,
+    /// which [`Rule::report_under`] sets.
+    declared_severity: Severity,
+    /// From `metadata.frame`: each variable of the rule that must name a pandas frame, which
+    /// `frames::holds` proves from the file.
+    frames: Vec<(String, frames::Role)>,
+    /// From `metadata.frameScript`: the fewest frame statements at the top of a module that
+    /// make it a script, which `frames::script_start` counts.
+    frame_script: Option<usize>,
 }
 
 /// One entry of a rule's `files:` or `ignores:`, as ast-grep writes it.
@@ -191,6 +240,20 @@ fn glob_set(globs: &impl serde::Serialize) -> Result<GlobSet> {
         });
     }
     Ok(builder.build()?)
+}
+
+/// The variables of `metadata.frame` with their roles. Each must be a variable of the rule.
+fn frame_roles(
+    roles: BTreeMap<String, frames::Role>,
+    config: &RuleConfig<SupportLang>,
+) -> Result<Vec<(String, frames::Role)>> {
+    for variable in roles.keys() {
+        ensure!(
+            config.matcher.defined_vars().contains(variable.as_str()),
+            "metadata.frame names ${variable}, which the rule does not match"
+        );
+    }
+    Ok(roles.into_iter().collect())
 }
 
 impl Rule {
@@ -228,10 +291,13 @@ impl Rule {
             python_checks
                 || (metadata.holds.is_empty()
                     && metadata.unless_holds.is_empty()
-                    && metadata.unless_imported.is_none()),
-            "metadata.holds, unlessHolds and unlessImported read Python code, and the rule's language is {}",
+                    && metadata.unless_imported.is_none()
+                    && metadata.frame.is_empty()
+                    && metadata.frame_script.is_none()),
+            "metadata.holds, unlessHolds, unlessImported, frame and frameScript read Python code, and the rule's language is {}",
             config.language
         );
+        let frames = frame_roles(metadata.frame, &config)?;
         let files = config.files.as_ref().map(glob_set).transpose()?;
         let ignores = config.ignores.as_ref().map(glob_set).transpose()?;
         // The document's own environment, so that a shape can say `matches: <one of its utils>`.
@@ -283,6 +349,7 @@ impl Rule {
         );
         let id = id.to_owned();
         config.id = format!("{package}/{id}");
+        let declared_severity = config.severity.clone();
         Ok(Self {
             id,
             declared_id,
@@ -298,6 +365,10 @@ impl Rule {
             holds,
             unless_holds,
             unless_imported,
+            style: metadata.style,
+            declared_severity,
+            frames,
+            frame_script: metadata.frame_script,
         })
     }
 
@@ -305,6 +376,21 @@ impl Rule {
     pub(crate) fn package(&self) -> &str {
         let package = self.config.id.len() - self.id.len() - 1;
         &self.config.id[..package]
+    }
+}
+
+impl Rule {
+    /// The severity that a run with the setting `style` reports the rule with.
+    pub(crate) fn severity_under(&self, style: Style) -> Severity {
+        match (style, self.style, &self.declared_severity) {
+            (Style::Strict, Some(Mark::House), Severity::Info) => Severity::Warning,
+            (_, _, declared) => declared.clone(),
+        }
+    }
+
+    /// Makes the rule report with its severity under `style`.
+    pub(crate) fn report_under(&mut self, style: Style) {
+        self.config.severity = self.severity_under(style);
     }
 }
 
@@ -330,8 +416,9 @@ impl Rule {
     }
 
     /// What the rule reports in the parsed file `root`: the shared scanner's matches that
-    /// `metadata.holds` keeps, or nothing when `metadata.unlessImported` silences the file. A
-    /// rule without the Python checks reports every match.
+    /// `metadata.holds`, `metadata.frame` and `metadata.frameScript` keep, or nothing when
+    /// `metadata.unlessImported` silences the file. A rule without the Python checks reports
+    /// every match.
     /// `disk` is where the file is, from which its imports are followed. Without it no import
     /// is read. A value proof starts from the pack's `library` as the file uses it.
     pub(crate) fn retain_matches<'r>(
@@ -356,11 +443,26 @@ impl Rule {
                         .is_none_or(|usage| names::holds(usage, shape, library))
                 })
         };
+        let frames = frames::Frames::new();
+        let is_frame = |found: &NodeMatch<'r, StrDoc<SupportLang>>| {
+            self.frames.iter().all(|(variable, role)| {
+                (found.get_env().get_match(variable)).is_none_or(|usage| frames.holds(usage, *role))
+            })
+        };
+        // The first statement of the script that the module is, found for the first match.
+        let script = std::cell::OnceCell::new();
+        let starts_script = |found: &NodeMatch<'r, StrDoc<SupportLang>>| {
+            self.frame_script.is_none_or(|least| {
+                *script.get_or_init(|| frames.script_start(root, least)) == Some(found.node_id())
+            })
+        };
         let found: Vec<_> = matches
             .into_iter()
             .filter(|found| {
                 proven(found, &self.holds)
                     && (self.unless_holds.is_empty() || !proven(found, &self.unless_holds))
+                    && is_frame(found)
+                    && starts_script(found)
             })
             .collect();
         let silenced = !found.is_empty()

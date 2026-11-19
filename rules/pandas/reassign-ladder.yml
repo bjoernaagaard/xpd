@@ -26,3 +26,4 @@ constraints:
   M2: { regex: *frame-method }
   M0: { regex: *frame-method }
   M3: { regex: *frame-method }
+metadata: { style: house }

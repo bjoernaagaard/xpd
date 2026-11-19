@@ -83,6 +83,13 @@ function fixText(rule) {
   }
 }
 
+/** The severity of a rule, and for a rule of the house style the one under the strict setting. */
+function severityText(rule) {
+  if (rule.style !== 'house') return rule.severity;
+  const strict = rule.severities.strict === rule.severities.default ? '' : `, and ${rule.severities.strict} with \`style = "strict"\``;
+  return `${rule.severities.default}${strict}. A rule of the [house style](../../../commands/check/#house-style)`;
+}
+
 function page(frontmatter, body) {
   const lines = Object.entries(frontmatter).map(([key, value]) => `${key}: ${value}`);
   return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
@@ -111,7 +118,7 @@ for (const [pack, rules] of byPack) {
       `| Rule | ${rule.rule} |`,
       '| --- | --- |',
       `| Pack | [${title}](../) |`,
-      `| Severity | ${rule.severity} |`,
+      `| Severity | ${severityText(rule)} |`,
       `| Fix | ${fixText(rule)} |`,
       `| Library versions | ${versions} |`,
       '',

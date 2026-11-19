@@ -11,6 +11,7 @@ use crate::{
     pack,
     rule::Applicability,
     scan,
+    settings::Style,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -504,7 +505,7 @@ pub(crate) fn harvest(
     entries: &mut Vec<Entry>,
 ) -> Result<Stats> {
     let license = license_name(source)?;
-    let packs = Catalog::embedded(None)?.packs;
+    let packs = Catalog::embedded(None, Style::Default)?.packs;
     let mut files = Vec::new();
     paths(source.root, &mut files)?;
     files.sort();

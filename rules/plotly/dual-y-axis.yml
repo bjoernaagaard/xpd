@@ -39,6 +39,7 @@ rule:
             all:
               - has: { field: function, regex: '(^|\.)make_subplots$' }
               - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
+metadata: { style: house }
 ---
 # The same two scales written by hand: an axis with overlaying="y" or overlaying="x". With
 # yaxis2=dict(overlaying="y", side="right") the two axes resolved to the ranges (0.93, 2.07) and
@@ -90,4 +91,4 @@ utils:
     any:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

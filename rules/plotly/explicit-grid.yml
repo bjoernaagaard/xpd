@@ -84,7 +84,7 @@ utils:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
 fix: 'False'
-metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
 ---
 # A grid in black is the dark grid the book names. plotly 7.1.0 kept gridcolor="black" as written
 # (runs/behavior.txt). The rule reads black in its four spellings, on an x or y axis of a plotly
@@ -160,4 +160,4 @@ utils:
     any:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

@@ -21,6 +21,7 @@ rule:
   all:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|choropleth|density_contour|density_heatmap|ecdf|funnel|histogram|imshow|line|line_geo|scatter|scatter_geo|strip|timeline|violin)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, pattern: $F, all: [{ has: { field: name, regex: '^animation_frame$' } }, { has: { field: value, kind: string } }] } }
+metadata: { style: house }
 ---
 # The 11 px functions with animation_frame and without facet_col.
 id: animation-frame
@@ -32,6 +33,7 @@ rule:
   all:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar_polar|choropleth_map|density_map|line_3d|line_map|line_polar|line_ternary|scatter_3d|scatter_map|scatter_polar|scatter_ternary)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, pattern: $F, all: [{ has: { field: name, regex: '^animation_frame$' } }, { has: { field: value, kind: string } }] } }
+metadata: { style: house }
 ---
 # The same animation built from go.Frame objects: frames= in go.Figure or in update on a plotly
 # figure, or fig.frames = ... after it is made. On plotly 7.1.0 a go.Figure with three frames of
@@ -92,4 +94,4 @@ utils:
         - kind: none
         - { kind: list, not: { has: { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } } } } }
         - { kind: attribute, has: { field: attribute, regex: '^frames$' } }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

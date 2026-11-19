@@ -1,0 +1,22 @@
+id: pandas/script-steps
+snapshots:
+  "import pandas as pd\ndef load(path: str) -> None:\n    print(path)\ndf = pd.read_parquet(\"orders.parquet\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]\ndf[\"u\"] = df[\"a\"] * 0\ndf[\"v\"] = df[\"a\"] * 1\ndf[\"w\"] = df[\"a\"] * 2\ndf[\"x\"] = df[\"a\"] * 3\ndf[\"y\"] = df[\"a\"] * 4\ndf[\"z\"] = df[\"a\"] * 5\ndf.loc[df[\"a\"] > 1, \"u\"] = 0\nother = pd.DataFrame({\"a\": [1]})\ndf = df.merge(other, on=\"a\", validate=\"many_to_one\")":
+    labels:
+    - end: 103
+      source: df = pd.read_parquet("orders.parquet")
+      start: 65
+      style: primary
+    - end: 103
+      source: df = pd.read_parquet("orders.parquet")
+      start: 65
+      style: secondary
+  "import pandas as pd\ndf = pd.read_parquet(\"orders.parquet\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]\ndf[\"u\"] = df[\"a\"] * 0\ndf[\"v\"] = df[\"a\"] * 1\ndf[\"w\"] = df[\"a\"] * 2\ndf[\"x\"] = df[\"a\"] * 3\ndf[\"y\"] = df[\"a\"] * 4\ndf[\"z\"] = df[\"a\"] * 5":
+    labels:
+    - end: 58
+      source: df = pd.read_parquet("orders.parquet")
+      start: 20
+      style: primary
+    - end: 58
+      source: df = pd.read_parquet("orders.parquet")
+      start: 20
+      style: secondary

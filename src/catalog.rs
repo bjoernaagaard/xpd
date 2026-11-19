@@ -15,7 +15,8 @@ pub(crate) use self::local::{LocalProject, is_module_name};
 use crate::pack::{self, Pack};
 use crate::package_check;
 use crate::report::severity_name;
-use crate::rule::{Applicability, Rule};
+use crate::rule::{Applicability, Mark, Rule};
+use crate::settings::Style;
 use crate::venv::Distributions;
 use crate::version::Version;
 
@@ -63,29 +64,39 @@ impl Filters {
 impl Catalog {
     /// The catalog for the project that `from` is in, which is the nearest folder at or above
     /// it with an `sgconfig.yml`. Without such a folder the catalog holds the embedded rules.
-    /// `installed` selects the rules for the library versions of the project's venv.
-    pub(crate) fn load(from: &Path, installed: Option<&Distributions>) -> Result<Self> {
+    /// `installed` selects the rules for the library versions of the project's venv, and
+    /// `style` the severity of the rules of the house style.
+    pub(crate) fn load(
+        from: &Path,
+        installed: Option<&Distributions>,
+        style: Style,
+    ) -> Result<Self> {
         match LocalProject::find(from)? {
-            Some(config) => Self::load_config(&config, installed),
-            None => Self::embedded(installed),
+            Some(config) => Self::load_config(&config, installed, style),
+            None => Self::embedded(installed, style),
         }
     }
 
     /// The catalog for the project of the project file `config`.
-    pub(crate) fn load_config(config: &Path, installed: Option<&Distributions>) -> Result<Self> {
+    pub(crate) fn load_config(
+        config: &Path,
+        installed: Option<&Distributions>,
+        style: Style,
+    ) -> Result<Self> {
         let (project, packs) = LocalProject::read(config)?;
-        Self::assemble(packs, Some(project), installed)
+        Self::assemble(packs, Some(project), installed, style)
     }
 
     /// The catalog of the rules that ship with xpd, whatever project the run is in.
-    pub(crate) fn embedded(installed: Option<&Distributions>) -> Result<Self> {
-        Self::assemble(Vec::new(), None, installed)
+    pub(crate) fn embedded(installed: Option<&Distributions>, style: Style) -> Result<Self> {
+        Self::assemble(Vec::new(), None, installed, style)
     }
 
     fn assemble(
         local: Vec<Pack>,
         project: Option<LocalProject>,
         installed: Option<&Distributions>,
+        style: Style,
     ) -> Result<Self> {
         let mut packs = pack::embedded().context("invalid embedded rules")?;
         packs.extend(local);
@@ -104,6 +115,11 @@ impl Catalog {
         }
         for pack in &mut packs {
             pack.keep_rules_for(installed);
+            // Every later reader of a rule's severity, such as a report, `--severity` and the
+            // Stop check of the hook, then sees the severity of this run.
+            for rule in &mut pack.rules {
+                rule.report_under(style);
+            }
         }
         Ok(Self { packs, project })
     }
@@ -182,7 +198,12 @@ pub(crate) struct Entry<'a> {
     /// Module name of the pack the rule belongs to.
     package: &'a str,
     rule: &'a str,
+    /// The severity that the catalog's run reports the rule with.
     severity: &'a Severity,
+    /// What `metadata.style` marks the rule as. `None` for a rule that is not about style.
+    style: Option<Mark>,
+    /// The severity without a style setting, and the one with `style = "strict"`.
+    by_style: [Severity; 2],
     message: &'a str,
     /// `None` when no document of the rule has a fix.
     fix: Option<Applicability>,
@@ -219,6 +240,11 @@ impl Entry<'_> {
             "package": self.package,
             "rule": self.rule,
             "severity": severity_name(self.severity),
+            "style": self.style.map(Mark::as_str),
+            "severities": {
+                Style::Default.as_str(): severity_name(&self.by_style[0]),
+                Style::Strict.as_str(): severity_name(&self.by_style[1]),
+            },
             "message": self.message,
             "fix": self.fix.map(Applicability::as_str),
             "since": self.since.map(ToString::to_string),
@@ -254,10 +280,17 @@ fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
         for rule in &pack.rules {
             let id = rule.id.as_str();
             let since = rule.since.as_ref();
+            let by_style = [Style::Default, Style::Strict].map(|style| rule.severity_under(style));
             match entries[first..].iter_mut().find(|entry| entry.rule == id) {
                 Some(entry) => {
                     if rank(&rule.config.severity) > rank(entry.severity) {
                         entry.severity = &rule.config.severity;
+                    }
+                    entry.style = entry.style.or(rule.style);
+                    for (highest, severity) in entry.by_style.iter_mut().zip(by_style) {
+                        if rank(&severity) > rank(highest) {
+                            *highest = severity;
+                        }
                     }
                     entry.fix = entry.fix.max(rule.fix);
                     entry.since = entry.since.zip(since).map(|(a, b)| a.min(b));
@@ -266,6 +299,8 @@ fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
                     package: &pack.module,
                     rule: id,
                     severity: &rule.config.severity,
+                    style: rule.style,
+                    by_style,
                     message: &rule.config.message,
                     fix: rule.fix,
                     since,
@@ -278,6 +313,8 @@ fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
             package: &pack.module,
             rule: &check.id,
             severity: &package_check::SEVERITY,
+            style: None,
+            by_style: [package_check::SEVERITY, package_check::SEVERITY],
             message: &check.message,
             fix: None,
             since: None,

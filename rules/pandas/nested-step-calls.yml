@@ -31,4 +31,4 @@ utils:
     kind: type
     regex: '^(pd|pandas)\.DataFrame$'
 fix: $X.pipe($A).pipe($B).pipe($C)
-metadata: { fix: unsafe, holds: { X: { any: [{ matches: frame-maker }, { matches: frame-type }] } } }
+metadata: { style: house, fix: unsafe, holds: { X: { any: [{ matches: frame-maker }, { matches: frame-type }] } } }

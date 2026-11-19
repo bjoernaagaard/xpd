@@ -15,14 +15,20 @@ Each text line gives the severity, the rule, its fix, the first library version 
 when there is one, and the message. A name that starts with `$` stands for code from the checked
 file, which `xpd check` fills in.
 
-The JSON is a list with one object per rule, with `package`, `rule`, `severity`, `message`,
-`fix`, `since`, `url` and `doc`. `fix` is `safe`, `unsafe` or `null`. `since` is the first
-library version the rule applies to, or `null`. `doc` is the Markdown that explains the rule.
+The JSON is a list with one object per rule, with `package`, `rule`, `severity`, `style`,
+`severities`, `message`, `fix`, `since`, `url` and `doc`. `fix` is `safe`, `unsafe` or `null`.
+`since` is the first library version the rule applies to, or `null`. `doc` is the Markdown that
+explains the rule.
 
 ```console
-$ xpd rules --builtin --format json | jq -c '.[] | select(.rule == "no-inplace") | {package, rule, severity, fix, since}'
-{"package":"pandas","rule":"no-inplace","severity":"info","fix":"unsafe","since":null}
+$ xpd rules --builtin --format json | jq -c '.[] | select(.rule == "no-inplace") | {package, rule, severity, style, severities, fix, since}'
+{"package":"pandas","rule":"no-inplace","severity":"info","style":"house","severities":{"default":"info","strict":"warning"},"fix":"unsafe","since":null}
 ```
+
+`style` is `house` for a rule of the [house style](../check/#house-style), and `null` for every
+other rule. `severities` holds the severity without a style setting and the one with
+`style = "strict"`. `severity` is the one that the project in the current folder gets, and
+`--builtin` lists the rules without reading a settings file.
 
 A rule file may hold several YAML documents, one for each form that the rule matches. `rules`
 lists them as one rule, with the highest severity of the documents, the message of the first and

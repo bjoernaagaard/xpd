@@ -5,7 +5,9 @@
 //! follows the name back to the nearest earlier assignment, and from a parameter out to the
 //! calls of its function.
 
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use ast_grep_core::matcher::MatcherExt;
 use ast_grep_core::meta_var::MetaVariable;
@@ -17,14 +19,14 @@ use crate::pack::Library;
 use crate::scan::Node;
 
 /// What gives a name its value at the place of one use.
-struct Origin<'t> {
+pub(crate) struct Origin<'t> {
     /// The annotation that the binding gives the name, as in `fig: go.Figure`.
-    annotation: Option<Node<'t>>,
-    binding: Binding<'t>,
+    pub(crate) annotation: Option<Node<'t>>,
+    pub(crate) binding: Binding<'t>,
 }
 
 /// The statement or the parameter that binds a name.
-enum Binding<'t> {
+pub(crate) enum Binding<'t> {
     /// The nearest earlier statement that binds the name is `name = value`. The value is `None`
     /// for `name: T`, which declares the name and assigns nothing.
     Assigned(Option<Node<'t>>),
@@ -34,7 +36,7 @@ enum Binding<'t> {
 }
 
 /// One parameter of a `def`.
-struct Parameter<'t> {
+pub(crate) struct Parameter<'t> {
     function: Node<'t>,
     name: String,
     /// The place of the parameter among those a call fills by position, from 0. `None` for a
@@ -125,6 +127,102 @@ fn library_value(value: &Node<'_>, library: Library<'_>) -> bool {
                         && imported_at(value, &bound)
                 })
         }),
+        _ => false,
+    }
+}
+
+/// The names of one file that imports of one library bind, found once for the many uses that a
+/// proof asks about. [`library_value`] walks the whole file for each use.
+pub(crate) struct LibraryNames<'t> {
+    /// The name the library is imported by.
+    module: &'static str,
+    known: RefCell<HashMap<String, Rc<Bound<'t>>>>,
+}
+
+/// How a file binds one name.
+enum Bound<'t> {
+    /// One import of the library at the top of the module binds the name, and nothing else in
+    /// the file does. The import statement ends at this byte.
+    OnlyImport(usize),
+    /// The identifiers that imports of the library bind to the name, in a file that binds the
+    /// name in other places too. Whether one of them reaches a use depends on the place.
+    Imports(Vec<Node<'t>>),
+}
+
+impl<'t> LibraryNames<'t> {
+    pub(crate) fn new(module: &'static str) -> Self {
+        Self {
+            module,
+            known: RefCell::new(HashMap::new()),
+        }
+    }
+
+    /// Whether the name at `usage`, an identifier, is bound there to the library's module or
+    /// to something imported from it. The answer is the one [`library_value`] gives for the
+    /// identifier.
+    pub(crate) fn binds(&self, usage: &Node<'t>) -> bool {
+        let name = usage.text();
+        let known = self.known.borrow().get(&*name).cloned();
+        let bound = known.unwrap_or_else(|| {
+            let bound = Rc::new(self.bound(usage, &name));
+            let mut known = self.known.borrow_mut();
+            Rc::clone(known.entry(name.into_owned()).or_insert(bound))
+        });
+        match &*bound {
+            Bound::OnlyImport(end) => *end <= usage.range().start,
+            Bound::Imports(imports) => imports.iter().any(|import| imported_at(usage, import)),
+        }
+    }
+
+    /// How the file of `usage` binds `name`.
+    fn bound(&self, usage: &Node<'t>, name: &str) -> Bound<'t> {
+        let from_library = |bound: &Node<'t>| {
+            import_binding(bound).is_some_and(|module| {
+                module == self.module
+                    || module
+                        .strip_prefix(self.module)
+                        .is_some_and(|tail| tail.starts_with('.'))
+            })
+        };
+        let binders: Vec<Node<'t>> = (usage.root().root().dfs())
+            .filter(|node| node.kind() == "identifier" && node.text() == name)
+            .filter(|node| is_bound(node) || is_parameter_name(node))
+            .collect();
+        // With one import at the top of the module and no other binding, every use after the
+        // import reads it, also a use in a function or a class.
+        if let [only] = binders.as_slice()
+            && from_library(only)
+            && let Some(statement) = statement_around(only.clone())
+            && statement.parent().is_some_and(|top| top.kind() == "module")
+        {
+            return Bound::OnlyImport(statement.range().end);
+        }
+        Bound::Imports(binders.into_iter().filter(from_library).collect())
+    }
+}
+
+/// Whether the identifier is the name of a parameter of a `def`, as `frame` is in
+/// `def f(frame: pd.DataFrame, *rest, **options)`, and `rest` and `options` are.
+fn is_parameter_name(identifier: &Node<'_>) -> bool {
+    let Some(parent) = identifier.parent() else {
+        return false;
+    };
+    let in_parameters = |node: &Node<'_>| {
+        node.parent()
+            .is_some_and(|around| around.kind() == "parameters")
+    };
+    match &*parent.kind() {
+        "parameters" => true,
+        "default_parameter" | "typed_default_parameter" => field_is(&parent, "name", identifier),
+        "typed_parameter" => {
+            (parent.child(0)).is_some_and(|first| first.node_id() == identifier.node_id())
+        }
+        "list_splat_pattern" | "dictionary_splat_pattern" => {
+            in_parameters(&parent)
+                || parent
+                    .parent()
+                    .is_some_and(|typed| typed.kind() == "typed_parameter" && in_parameters(&typed))
+        }
         _ => false,
     }
 }
@@ -284,24 +382,100 @@ fn scope_binds(node: &Node<'_>, name: &str) -> bool {
 /// before the use.
 fn origin<'t>(usage: &Node<'t>) -> Option<Origin<'t>> {
     let name = usage.text();
-    let mut statement = statement_around(usage.clone())?;
+    let statement = statement_around(usage.clone())?;
+    if binds(&statement, &name) {
+        return None;
+    }
+    origin_before(&statement, &name)
+}
+
+/// What gives `name` its value when `statement` starts to run. The statement itself may bind
+/// the name, as `df = df.dropna()` does, because it reads the name first. `None` in the cases
+/// where [`origin`] gives `None`.
+fn origin_before<'t>(statement: &Node<'t>, name: &str) -> Option<Origin<'t>> {
+    origin_from(statement, name, |statement| {
+        statement.prev_all().find(|earlier| binds(earlier, name))
+    })
+}
+
+/// [`origin_before`], with `nearest` giving the nearest statement before a statement, in the
+/// same block, that binds the name.
+fn origin_from<'t>(
+    statement: &Node<'t>,
+    name: &str,
+    nearest: impl Fn(&Node<'t>) -> Option<Node<'t>>,
+) -> Option<Origin<'t>> {
+    let mut statement = statement.clone();
     loop {
-        if binds(&statement, &name) {
-            return None;
-        }
-        if let Some(binder) = statement.prev_all().find(|earlier| binds(earlier, &name)) {
-            return assigned(&binder, &name);
+        if let Some(binder) = nearest(&statement) {
+            return assigned(&binder, name);
         }
         let owner = statement.parent()?.parent()?;
         if owner.kind() == "function_definition" {
-            return parameter(&owner, &name);
+            return parameter(&owner, name);
         }
         statement = statement_around(owner)?;
+        if binds(&statement, name) {
+            return None;
+        }
     }
 }
 
+/// The statements of each block of one file that bind each name, found once for the many
+/// statements that a proof asks about. [`origin_before`] walks back through a block for each.
+#[derive(Default)]
+pub(crate) struct Binders<'t> {
+    /// What the statements of a block bind, by the block's node.
+    known: RefCell<HashMap<usize, Rc<BlockBinders<'t>>>>,
+}
+
+/// The statements of one block that bind each name, in their order.
+type BlockBinders<'t> = HashMap<String, Vec<Node<'t>>>;
+
+impl<'t> Binders<'t> {
+    /// What gives `name` its value when `statement` starts to run, as [`origin_before`] finds
+    /// it.
+    pub(crate) fn origin_before(&self, statement: &Node<'t>, name: &str) -> Option<Origin<'t>> {
+        origin_from(statement, name, |statement| self.nearest(statement, name))
+    }
+
+    /// The nearest statement before `statement`, in the same block, that binds `name`.
+    fn nearest(&self, statement: &Node<'t>, name: &str) -> Option<Node<'t>> {
+        let block = statement.parent()?;
+        let known = self.known.borrow().get(&block.node_id()).cloned();
+        let binders = known.unwrap_or_else(|| {
+            let binders = Rc::new(block_binders(&block));
+            Rc::clone(
+                (self.known.borrow_mut())
+                    .entry(block.node_id())
+                    .or_insert(binders),
+            )
+        });
+        let start = statement.range().start;
+        (binders.get(name)?.iter().rev())
+            .find(|binder| binder.range().start < start)
+            .cloned()
+    }
+}
+
+/// Each name that a statement of `block` binds, with the statements that bind it. A statement
+/// is listed for a name when [`binds`] holds for the two.
+fn block_binders<'t>(block: &Node<'t>) -> BlockBinders<'t> {
+    let mut binders = BlockBinders::new();
+    for statement in block.children() {
+        let bound: HashSet<String> = (statement.dfs())
+            .filter(|node| node.kind() == "identifier" && is_bound(node))
+            .map(|node| node.text().into_owned())
+            .collect();
+        for name in bound {
+            binders.entry(name).or_default().push(statement.clone());
+        }
+    }
+    binders
+}
+
 /// `node` itself or the node around it that is a statement of a block or of the module.
-fn statement_around(mut node: Node<'_>) -> Option<Node<'_>> {
+pub(crate) fn statement_around(mut node: Node<'_>) -> Option<Node<'_>> {
     loop {
         let parent = node.parent()?;
         if matches!(&*parent.kind(), "block" | "module") {

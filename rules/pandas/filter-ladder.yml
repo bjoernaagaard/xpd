@@ -1,0 +1,63 @@
+# Three or more statements in a row that each assign a frame a selection of its own rows filter
+# one frame in steps, and every step leaves a half-filtered frame under the final name. One chain
+# of .loc[lambda d: ...] links keeps the same rows: on pandas 3.1.1 it gave a
+# frame equal to the three statements (filter_ladder in samples/pandas/chaining.py).
+#
+# x = x[...] is also how a list, a str and a NumPy array are cut, so `frame` in the metadata asks
+# xpd to prove that the name holds a frame where the ladder starts (src/frames.rs): its nearest
+# earlier assignment gives it a frame, or it is a parameter annotated pd.DataFrame. Each step
+# selects by a condition, so a selection of columns or of rows by position is no step of a
+# ladder. The rule reports the first statement of the ladder. It has no fix, because the conditions of the
+# later statements read the frame by its name and must become lambdas.
+#
+# xpd check ~/src/bidcurves/src gave no finding of this rule, and samples/ gave the two that
+# samples/pandas/chaining.py and samples/pandas/script.py mark.
+id: filter-ladder
+language: python
+severity: info
+message: '$DF is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in $DF = $DF.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...].'
+rule:
+  kind: expression_statement
+  all:
+    - has: { any: [{ pattern: '$DF = $DF[$I1]' }, { pattern: '$DF = $DF.loc[$I1]' }] }
+    # The next statement, with any comments between the two passed over.
+    - precedes:
+        stopBy: { not: { kind: comment } }
+        kind: expression_statement
+        all:
+          - has: { any: [{ pattern: '$DF = $DF[$I2]' }, { pattern: '$DF = $DF.loc[$I2]' }] }
+          - precedes:
+              stopBy: { not: { kind: comment } }
+              kind: expression_statement
+              has: { any: [{ pattern: '$DF = $DF[$I3]' }, { pattern: '$DF = $DF.loc[$I3]' }] }
+    - not:
+        follows:
+          stopBy: { not: { kind: comment } }
+          kind: expression_statement
+          has: { any: [{ pattern: '$DF = $DF[$I0]' }, { pattern: '$DF = $DF.loc[$I0]' }] }
+constraints:
+  DF: { kind: identifier }
+  I1: { matches: condition }
+  I2: { matches: condition }
+  I3: { matches: condition }
+  I0: { matches: condition }
+utils:
+  # A selection of rows by a condition: a comparison, conditions joined with & or |, a negation
+  # with ~, a lambda, or a method that gives True or False for each row. A string, a list, a
+  # slice and a plain name can select columns or rows by position, so they are no condition.
+  condition:
+    any:
+      - matches: bare-condition
+      - { kind: parenthesized_expression, has: { matches: bare-condition } }
+  bare-condition:
+    any:
+      - kind: comparison_operator
+      - { kind: binary_operator, has: { field: operator, regex: '^[&|^]$' } }
+      - { kind: unary_operator, regex: '^~' }
+      - kind: lambda
+      - kind: call
+        has:
+          field: function
+          kind: attribute
+          has: { field: attribute, regex: ^(between|contains|duplicated|endswith|eq|fullmatch|ge|gt|isin|isna|isnull|le|lt|match|ne|notna|notnull|startswith)$ }
+metadata: { style: house, frame: { DF: any } }

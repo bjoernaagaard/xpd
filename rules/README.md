@@ -22,5 +22,10 @@ A rule's fix tells you how much xpd changes on its own.
 | unsafe | can change what the code does, so read the edit | `xpd check --fix --unsafe-fixes` |
 | none | xpd shows the change as advice | edit the code by hand |
 
+Some rules state a preference of the house style about code that works, and their pages say so
+in the severity. Such a rule is `info`, and it is a warning in a project with `style = "strict"`
+in its settings, which [`xpd check`](https://bjoernaagaard.github.io/xpd/commands/check/#house-style)
+describes.
+
 A pack holds the rules for one library. xpd runs a pack on the files that import its library,
 and the Python and xpd packs on every file.

@@ -22,6 +22,7 @@ use crate::query::RunArgs;
 use crate::report::{self, Report};
 use crate::rule::Applicability;
 use crate::scan;
+use crate::settings::{Settings, Style};
 use crate::skills;
 use crate::venv::{self, Venv};
 
@@ -263,8 +264,10 @@ enum Cmd {
     Outline(OutlineArgs),
     /// List every rule and package check, with its severity, fix and documentation.
     ///
-    /// The JSON has one object per rule, with `package`, `rule`, `severity`, `message`, `fix`,
-    /// `since`, `url` and `doc`, the Markdown that explains the rule.
+    /// The JSON has one object per rule, with `package`, `rule`, `severity`, `style`,
+    /// `severities`, `message`, `fix`, `since`, `url` and `doc`, the Markdown that explains the
+    /// rule. `style` is `house` for a rule of the house style, and `severities` holds the
+    /// severity without a style setting and the one with `style = "strict"`.
     #[command(after_long_help = "Examples:
   xpd rules
   xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]
@@ -530,12 +533,14 @@ fn rules(options: RulesOptions, default: Format) -> ExitCode {
     let filters = Filters { rules, severity };
     // Without a working directory there is no project folder, so only the embedded rules.
     let project = std::env::current_dir().unwrap_or_default();
+    // The rules that ship with xpd are listed as they are without a settings file.
     let load = if builtin {
-        Catalog::embedded(None)
-    } else if let Some(config) = config {
-        Catalog::load_config(&config, None)
+        Catalog::embedded(None, Style::Default)
     } else {
-        Catalog::load(&project, None)
+        Settings::find(&project).and_then(|settings| match config {
+            Some(config) => Catalog::load_config(&config, None, settings.style),
+            None => Catalog::load(&project, None, settings.style),
+        })
     };
     let catalog = match load.and_then(|mut catalog| {
         catalog.select(&filters)?;
@@ -569,7 +574,8 @@ pub(crate) enum FixMode {
     Review(Applicability),
 }
 
-/// The issues of the files under `paths`, with the rules of the project in the working directory.
+/// The issues of the files under `paths`, with the rules and the settings of the project in the
+/// working directory.
 pub(crate) fn lint(
     paths: &[PathBuf],
     mode: FixMode,
@@ -580,9 +586,10 @@ pub(crate) fn lint(
     let venv = Venv::find();
     let installed = venv.as_ref().map(Venv::distributions);
     let project = std::env::current_dir()?;
+    let style = Settings::find(&project)?.style;
     let mut catalog = match config {
-        Some(config) => Catalog::load_config(config, installed.as_ref())?,
-        None => Catalog::load(&project, installed.as_ref())?,
+        Some(config) => Catalog::load_config(config, installed.as_ref(), style)?,
+        None => Catalog::load(&project, installed.as_ref(), style)?,
     };
     catalog.select(filters)?;
     let files = scan::collect_files(paths, &catalog.packs)?;

@@ -99,4 +99,4 @@ utils:
       any: [{ kind: keyword_argument, has: { field: name, regex: '^([a-z0-9]+_)*title$' } }, { kind: pair, has: { field: key, regex: '^["'']title["'']$' } }]
       field: value
       inside: { stopBy: end, matches: plotly-call }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

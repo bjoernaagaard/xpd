@@ -80,4 +80,4 @@ utils:
       - any: [{ kind: integer }, { kind: float }]
       - { kind: unary_operator, has: { field: argument, any: [{ kind: integer }, { kind: float }] } }
     not: { regex: '^[-+]?(0+|180|360)(\.0*)?$' }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

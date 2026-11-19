@@ -29,7 +29,8 @@ and a file that it committed. In a project without git, xpd lints the Python fil
 While a file has an error or a warning, xpd prints `{"decision": "block", "reason": ...}` on
 stdout, with one line for each issue. Claude Code and Codex both read this answer and keep the
 agent working. Issues of the severity `info` are listed after the others, and they do not hold the
-turn.
+turn. With [`style = "strict"`](../check/#house-style) in the settings, the rules of the house
+style are warnings, so they hold the turn too.
 
 The agent ends the turn in one of two ways. It fixes the code, or it writes
 `# ast-grep-ignore: pandas/row-loop` on the line above with the reason after the rule name.

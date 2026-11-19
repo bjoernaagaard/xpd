@@ -57,6 +57,7 @@ utils:
     any:
       - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }
       - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }] }
+metadata: { style: house }
 ---
 # Tufte, vdqi.md line 1521, printed page 56: "Tables usually outperform graphics in reporting on
 # small data sets of 20 numbers or less." Line 7166, printed page 178: "Tables are clearly the
@@ -116,3 +117,4 @@ utils:
     any:
       - { nthChild: { position: 1, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }
       - inside: { kind: keyword_argument, field: value, all: [{ has: { field: name, regex: '^data$' } }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] } } } }] }
+metadata: { style: house }

@@ -18,3 +18,4 @@ rule:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Indicator)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, kind: string, regex: 'gauge'  } }] } }
     - not: { has: { stopBy: end, kind: string, regex: 'bullet' } }
+metadata: { style: house }

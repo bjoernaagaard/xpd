@@ -44,6 +44,7 @@ utils:
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(name)$' } } }
       - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } } }
       - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+metadata: { style: house }
 ---
 # The same few lines added one by one: fig = go.Figure() with nothing in it, then two to four
 # statements in a row of fig.add_trace(go.Scatter(name=...)). On plotly 7.1.0 two lines added that
@@ -138,7 +139,7 @@ utils:
       - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
       - { kind: named_expression, has: { field: name, pattern: $FIG } }
   holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+metadata: { style: house, holds: { FIG: { matches: figure-expr } } }
 ---
 # The same legend on px.line: color= with a column name draws one line for each value of the
 # column, and y= with a written list of two to four column names draws one line for each column.
@@ -176,3 +177,4 @@ rule:
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - not: { inside: { stopBy: end, kind: module, regex: 'showlegend|annotation|textposition|[+]text|text[+]' } }
     - not: { inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, all: [{ has: { field: function, kind: attribute, has: { field: attribute, regex: '^update_traces$' } } }, has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(mode)$' } }, { has: { field: value, regex: '^["'']markers["'']$'  } }] } }] } } }
+metadata: { style: house }

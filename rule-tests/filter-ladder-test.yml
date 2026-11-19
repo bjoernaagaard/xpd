@@ -1,0 +1,25 @@
+id: pandas/filter-ladder
+valid:
+  # Two filters, and three with another statement between them.
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\nrows = len(df)\ndf = df[df[\"c\"] > 0]"
+  # A list, a str and a NumPy array are cut the same way.
+  - "import pandas as pd\nitems = [3, 1, 2]\nitems = items[1:]\nitems = items[keep]\nitems = items[other]"
+  - "import numpy as np\nimport pandas as pd\nvalues = np.arange(9)\nvalues = values[values > 1]\nvalues = values[values > 2]\nvalues = values[values > 3]"
+  - "import pandas as pd\ndef trim(values):\n    values = values[values > 1]\n    values = values[values > 2]\n    values = values[values > 3]\n    return values"
+  # A name whose value xpd cannot prove, and a column of a frame.
+  - "import pandas as pd\ndf = load()\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]"
+  - "import pandas as pd\nprice = pd.read_csv(\"a.csv\")[\"price\"]\nprice = price[price > 0]\nprice = price[price < 9]\nprice = price[price != 5]"
+  # Selections of columns and of rows by position are no filters.
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[[\"a\", \"b\", \"c\"]]\ndf = df[[\"a\", \"b\"]]\ndf = df[[\"a\"]]"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[1:]\ndf = df[:-1]\ndf = df[::2]"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[names]\ndf = df[names]\ndf = df[names]"
+  # A frame that a loop binds.
+  - "import pandas as pd\nfor df in frames:\n    df = df[df[\"a\"] > 0]\n    df = df[df[\"b\"] > 0]\n    df = df[df[\"c\"] > 0]"
+  # The chain.
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df.loc[lambda d: d[\"a\"] > 0].loc[lambda d: d[\"b\"] > 0].loc[lambda d: d[\"c\"] > 0]"
+invalid:
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]"
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df.loc[df[\"a\"] > 0]\n# the second filter\ndf = df[df[\"b\"].notna()]\ndf = df.loc[~df[\"c\"].isin(skipped)]\ndf = df[mask]"
+  - "import pandas as pd\ndef keep(frame: pd.DataFrame) -> pd.DataFrame:\n    frame = frame[frame[\"a\"] > 0]\n    frame = frame[frame[\"b\"] > 0]\n    frame = frame[frame[\"c\"] > 0]\n    return frame"
+  - "import pandas as pd\norders = pd.read_csv(\"a.csv\").dropna().rename(columns={\"q\": \"qty\"})\nlate = orders[\"days\"] > 30\nsold = orders[late]\nsold = sold[sold[\"a\"] > 0]\nsold = sold[sold[\"b\"] > 0]\nsold = sold[sold[\"c\"] > 0]"

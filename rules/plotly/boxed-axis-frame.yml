@@ -71,4 +71,4 @@ fix:
   template: ''
   expandStart: { regex: '^,$' }
   expandEnd: { regex: '^,$', follows: { follows: { regex: '^[({]$' } } }
-metadata: { fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+metadata: { style: house, fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

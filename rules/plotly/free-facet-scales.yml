@@ -65,7 +65,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $FN($REST)
-metadata: { fix: unsafe, holds: { FIG: { matches: figure-expr } } }
+metadata: { style: house, fix: unsafe, holds: { FIG: { matches: figure-expr } } }
 ---
 # The same free scales from make_subplots, which gives every cell its own y axis unless it is told
 # to share them. On plotly 7.1.0 make_subplots(rows=1, cols=2) with a bar of 5 in one cell and a
@@ -151,4 +151,4 @@ utils:
       any:
         - has: { field: left, any: [{ pattern: $V }, { has: { stopBy: end, pattern: $V } }] }
         - has: { field: body, has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $V }, { has: { stopBy: end, pattern: $V } }] } } }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+metadata: { style: house, holds: { FIG: { matches: figure-expr } } }

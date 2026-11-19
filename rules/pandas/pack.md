@@ -206,11 +206,16 @@ raises when the data doesn't match instead of giving a wrong result.
 
 Each rule in this group asks for one chain of methods where the code builds a frame in separate
 steps. A chain names the frame once and lists the steps in the order they run. No variable
-holds a frame that is half done.
+holds a frame that is half done. The rules of this group are info, and xpd reports them as
+warnings in a project with `style = "strict"` in its settings, which
+[`xpd check`](https://bjoernaagaard.github.io/xpd/commands/check/#house-style) describes.
 
 - lambda-in-assign
 - reassign-ladder
+- filter-ladder
+- frame-column-write
 - nested-step-calls
+- script-steps
 
 ## Charts
 

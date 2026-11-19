@@ -67,4 +67,4 @@ transform:
   NEW:
     rewrite: { source: $BODY, rewriters: [column] }
 fix: $NEW
-metadata: { fix: safe, since: "3.0" }
+metadata: { style: house, fix: safe, since: "3.0" }
