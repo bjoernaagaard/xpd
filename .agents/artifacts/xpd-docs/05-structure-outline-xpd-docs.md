@@ -13,7 +13,7 @@ A new reader should be able to copy a small Python file, run xpd and see exactly
 ## Implementation overview
 
 - [x] ✅ 1. Build a working Starlight quick start.
-- [ ] 2. Give every rule a page and share its explanation with installed tools.
+- [x] ✅ 2. Give every rule a page and share its explanation with installed tools.
 - [ ] 3. Generate command and MCP references from the running tools.
 - [ ] 4. Rewrite the public guides and package README.
 - [ ] 5. Verify existing links and switch GitHub Pages to Starlight.
@@ -53,7 +53,7 @@ The agent also ran the manual steps in headless Chrome for Testing 158. Ctrl+K o
 - [x] Find the page again using keyboard search.
 - [x] Read the sample and diff at phone width.
 
-## 2. Give every rule a page and share its explanation with installed tools
+## ✅ 2. Give every rule a page and share its explanation with installed tools
 
 **Change outline.** First capture the old catalog's IDs, URLs and fragment targets from the baseline commit. Move authored explanations into Markdown keyed by pack and rule ID. Rewrite each entry in plain language. Lead with the consequence and action, then show a small example and its fix. Where xpd offers no automatic fix, describe what the reader can change. Include the special diagnostic `xpd/unused-suppression`, whose baseline record lacks a page.
 
@@ -81,10 +81,10 @@ Every rule entry starts with a new lead that states the consequence and the acti
 - [x] A FastMCP 4.2 client reading `xpd://rules/pandas/chained-assignment`, `pandas/merge-without-validate` and `xpd/unused-suppression` from `python -m xpd.mcp` gets text equal to the CLI `doc`. An LSP hover on line 6 of `samples/bad.py` returns the CLI `doc` followed by the `rules.html#chained-assignment` link.
 - [x] `xpd find --write-vectors` embedded the 426 changed records, and `xpd find --check` passes 53 of 53 questions. `cargo fmt --check`, clippy with `-D warnings`, the rule load check on `samples/good.py`, `mise run docs` and `mise run docs:starlight` pass. The mdBook `rules.html` still has all 426 baseline anchors.
 
-The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. From the rules overview, the pandas link and then the chained-assignment link opened the rule, which showed its lead, the diff and the unsafe fix command, and its pack link returned to the pandas pack. `pandas/merge-without-validate` showed "none, edit by hand" and the sentence on making the change by hand. Ctrl+K searches for `chained-assignment`, `pandas/chained-assignment`, `chained assignment` and `merge validate` each listed the rule page first. At 390 pixels wide the rule and pack pages did not scroll sideways in light and dark themes. These results await the user's confirmation.
+The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. From the rules overview, the pandas link and then the chained-assignment link opened the rule, which showed its lead, the diff and the unsafe fix command, and its pack link returned to the pandas pack. `pandas/merge-without-validate` showed "none, edit by hand" and the sentence on making the change by hand. Ctrl+K searches for `chained-assignment`, `pandas/chained-assignment`, `chained assignment` and `merge validate` each listed the rule page first. At 390 pixels wide the rule and pack pages did not scroll sideways in light and dark themes. The user accepted these results on 19 November 2026.
 
-- [ ] Open pandas/chained-assignment from the candidate catalog and follow the link to the pandas pack.
-- [ ] Check a rule with no automatic fix.
+- [x] Open pandas/chained-assignment from the candidate catalog and follow the link to the pandas pack.
+- [x] Check a rule with no automatic fix.
 
 ## 3. Generate command and MCP references from the running tools
 
