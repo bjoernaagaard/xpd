@@ -231,10 +231,22 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 
 - Watch a new test fail once on broken code. A test that can't fail proves nothing.
 - **A project with tests runs them with pytest** from `tests/` beside `src/`, with
-  `--import-mode=importlib` and, on pytest 9, `strict = true` in the pytest settings.
+  `--import-mode=importlib`, `-ra` and, on pytest 9, `strict = true` in the pytest
+  settings. `-ra` lists each skipped test in the summary, and `strict` turns a mistyped
+  marker and an `xfail` test that passes into errors.
   Add `pytest-randomly`, so a test that depends on the order of the run fails, and
-  `pytest-timeout`, so a test that hangs fails. Never add `pytest-rerunfailures`,
-  `flaky` or `pytest-mock`.
+  `pytest-timeout` with a `timeout` setting, so a test that hangs fails. The plugin
+  stops no test until `timeout` is set.
+- **Never add `pytest-rerunfailures`, `flaky`, `pytest-mock` or `pytest-socket`,** and
+  never write `--reruns` or `xfail(strict=False)`. They rerun a failure, replace the
+  code under test, block the real network or let a failing test stay.
+- **A slow property or differential test gets a Hypothesis profile with
+  `deadline=None`,** because the default deadline of 200 ms fails it on timing. Don't
+  suppress `HealthCheck.function_scoped_fixture` or `HealthCheck.differing_executors`,
+  because the test can then pass while it checks the wrong thing.
+- `pytest-cov` and `pytest-benchmark` prove nothing that an end to end test needs.
+  Coverage counts no lines of a command the test starts as a process, and a benchmark
+  reports a slowdown only against a saved run.
 - **A test that fails some of the time has a cause.** Find it. Don't skip the test,
   rerun it or add a sleep. When the cause can't be found, delete the test and write
   down why.
