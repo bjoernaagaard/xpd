@@ -494,6 +494,9 @@ fn rule_help<'a>(catalog: &'a Catalog, found: &Found) -> Option<(&'a str, Option
         .or_else(|| rule.map(|rule| rule.config.note.as_deref().unwrap_or(&rule.config.message)))?;
     let url = if pack.is_embedded() {
         Some(catalog::url(&issue.rule))
+    } else if pack.unused_suppression().is_some() {
+        // xpd's own rule has no file, and the published rules page has no section for it yet.
+        None
     } else {
         rule.and_then(|rule| {
             rule.config

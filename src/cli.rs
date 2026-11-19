@@ -233,7 +233,7 @@ enum Cmd {
     /// List every rule and package check, with its severity, fix and documentation.
     ///
     /// The JSON has one object per rule, with `package`, `rule`, `severity`, `message`, `fix`,
-    /// `since`, `url` and `doc`, the rule's section of the rules page as Markdown.
+    /// `since`, `url` and `doc`, the Markdown that explains the rule.
     #[command(after_long_help = "Examples:
   xpd rules
   xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]

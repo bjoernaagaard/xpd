@@ -64,7 +64,7 @@ enum Item {
     /// rules run on the Python files that import the module, or on every file with
     /// --every-file. The paths are relative, so the project can be moved and shared.
     Project(ProjectArgs),
-    /// Create a rule from a pattern, with its docs/rules.md section.
+    /// Create a rule from a pattern, with the Markdown that explains it beside the rule file.
     ///
     /// A rule in a pack is a Python rule with the id <pack>/<name>, in the pack's folder. A rule
     /// without a pack is a structural rule for any language, in the first rules folder. The
@@ -115,7 +115,7 @@ struct RuleArgs {
     /// Default: warning.
     #[arg(long, value_enum)]
     severity: Option<Severity>,
-    /// A longer explanation, for the rule's note and its docs section.
+    /// A longer explanation, for the rule's note and its Markdown.
     #[arg(long)]
     note: Option<String>,
     /// The code that replaces a match, with the pattern's variables.
@@ -494,7 +494,7 @@ fn new_rule(args: RuleArgs, project: &Project, mode: Mode) -> Result<Outcome> {
         None => (args.since, args.until),
     };
     let note = mode.or_maybe_ask(args.note, || {
-        ask_optional("Note for the docs (empty for none):", |_| Ok(()))
+        ask_optional("Note for the rule page (empty for none):", |_| Ok(()))
     })?;
     let with_test = args.with_test
         || (mode == Mode::Ask

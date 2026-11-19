@@ -30,7 +30,8 @@ Example: and Use instead:      the reported code and the code to write instead
 notes                          measurements, and what an unsafe fix can change
 ```
 
-`xpd rules --format json` prints each section as the `doc` field of its rule.
+`xpd rules --format json` prints the newest text of each rule as its `doc` field, from the
+Markdown file beside the rule in the repository.
 
 ## pandas
 
@@ -14568,21 +14569,23 @@ because a slotted class has no room for one unless a class in its chain names it
 
 ## Write a rule
 
-Add a rule to xpd by writing an ast-grep rule file in the folder of its pack and a section on
-the rules page, then building xpd and running it on a sample. Rules are
+Add a rule to xpd by writing an ast-grep rule file and a Markdown file in the folder of its pack,
+then building xpd and running it on a sample. Rules are
 [ast-grep rules](https://ast-grep.github.io/guide/rule-config.html) in `.yml` files, compiled
 into the binary. A pack lives at `rules/<module>/`, where `<module>` is the name you import.
 
 ```text
 rules/pandas/
 ├── pack.yml        # the pack's manifest: import aliases and package checks. A pack may leave it out
+├── pack.md         # the pack's introduction, with each rule id listed once under a heading
 ├── row-loop.yml    # one file per rule, named after the rule id
+├── row-loop.md     # what the rule finds and how to fix it, for each rule and package check
 └── ...
-docs/rules.md       # one #### <rule id> section per rule, under the heading of its pack
 ```
 
-The build fails when a rule has no `#### <rule id>` section on the rules page, because `xpd rules`,
-`xpd find` and the editor hover print the section. A rule file holds the documents of one rule,
+The build fails when a rule has no Markdown file, when a Markdown file names no rule, and when
+`pack.md` does not list each rule once, because `xpd rules`, `xpd find`, the editor hover and the
+MCP server print the Markdown. A rule file holds the documents of one rule,
 one for each shape, and each document has the name of the file as its `id`. The build fails on
 any other id. Rules for your own project, outside xpd, are made with `xpd new rule` and checked
 with `xpd test`, which [the commands page](commands.md#new) describes.
@@ -14705,8 +14708,8 @@ metadata and writes `indexes/sklego.json`. A run on the pymoo 0.6.2 source with
 run the last command again. Commit the file that the command writes, and never edit it by hand.
 
 `build.rs` builds the records that `xpd find` searches, and their word weights, from
-`indexes/` and from the rule sections of the rules page. The Python pack has no library, so it needs
-only its rule sections. Add real questions for the new pack to `indexes/questions.json`, and
+`indexes/` and from the Markdown of each rule. The Python pack has no library, so it needs only
+the Markdown of its rules. Add real questions for the new pack to `indexes/questions.json`, and
 check that each question finds its expected entry in the top five:
 
 ```sh

@@ -70,6 +70,22 @@ Update [build.rs](../../../build.rs), [the catalog](../../../src/catalog.rs), [t
 
 **Manual verification.** Open pandas/chained-assignment from the candidate catalog. Read its consequence, example and unsafe fix together, then follow the link to the pandas pack. Check a rule with no automatic fix as well.
 
+**Progress on 19 November 2026.** Each rule's text now lives in `rules/<pack>/<id>.md` beside its YAML, and `rules/<pack>/pack.md` introduces the pack and lists each id once under a group heading. xpd's own rule has its text in `rules/xpd/`. `rules/README.md` introduces the rules overview. `build.rs` embeds the Markdown and no longer reads `docs/rules.md`. `website/scripts/rules.mjs` runs `cargo run -- rules --builtin --format json` before `astro build` and writes the overview, 14 pack pages and 427 rule pages into `website/src/content/docs/rules/`, which git ignores. The catalog URLs still point to `rules.html#<id>`, the mdBook site still builds them, and the Pages workflow is unchanged. `xpd/unused-suppression` has a page and text but no catalog URL until phase 5. The baseline IDs, URLs and fragments from commit 7538988 are in [legacy-rule-targets.json](legacy-rule-targets.json).
+
+Every rule entry starts with a new lead that states the consequence and the action, followed by a diff of the example and its fix, then "What the rule reports" and "How to fix it". The longer notes kept their measured wording, with the irregular fix sentences rewritten and the four package-check pages rewritten.
+
+- [x] `cargo build` and `cargo run --quiet -- rules --builtin --format json` give 427 records, all with `doc`, and 426 with the old URL. Every field but `doc` equals the baseline.
+- [x] The ID sets of the catalog, the built rule pages and the pack index tables are equal, at 427 each. Each pack page's count equals its records, for example pandas 134, NumPy 63 and Python 28. Each rule page has the rule ID as its title and links back to its pack, and 11,304 internal links resolve.
+- [x] The build fails with a message when a rule has no Markdown, when a Markdown file names no rule, when `pack.md` leaves an id out or lists it twice, and when two packs share an id.
+- [x] `xpd new rule team/no-print ... --with-test --yes` in an empty project writes `rules/team/no-print.md` beside `rules/team/no-print.yml` and no `docs/rules.md`. `xpd check` then reports the rule.
+- [x] A FastMCP 4.2 client reading `xpd://rules/pandas/chained-assignment`, `pandas/merge-without-validate` and `xpd/unused-suppression` from `python -m xpd.mcp` gets text equal to the CLI `doc`. An LSP hover on line 6 of `samples/bad.py` returns the CLI `doc` followed by the `rules.html#chained-assignment` link.
+- [x] `xpd find --write-vectors` embedded the 426 changed records, and `xpd find --check` passes 53 of 53 questions. `cargo fmt --check`, clippy with `-D warnings`, the rule load check on `samples/good.py`, `mise run docs` and `mise run docs:starlight` pass. The mdBook `rules.html` still has all 426 baseline anchors.
+
+The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. From the rules overview, the pandas link and then the chained-assignment link opened the rule, which showed its lead, the diff and the unsafe fix command, and its pack link returned to the pandas pack. `pandas/merge-without-validate` showed "none, edit by hand" and the sentence on making the change by hand. Ctrl+K searches for `chained-assignment`, `pandas/chained-assignment`, `chained assignment` and `merge validate` each listed the rule page first. At 390 pixels wide the rule and pack pages did not scroll sideways in light and dark themes. These results await the user's confirmation.
+
+- [ ] Open pandas/chained-assignment from the candidate catalog and follow the link to the pandas pack.
+- [ ] Check a rule with no automatic fix.
+
 ## 3. Generate command and MCP references from the running tools
 
 **Change outline.** Use the CLI command definitions behind [src/cli.rs](../../../src/cli.rs) and the registrations in [the MCP server](../../../python/xpd/mcp/server.py) for names, nested commands, flags, arguments, defaults and tool signatures. Keep explanations of when to use a command, worked examples and exit behavior in authored prose. Cover MCP prompts and resources alongside its tools. Make generated fields part of the docs build so an option change appears on the next build.

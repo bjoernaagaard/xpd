@@ -1,0 +1,2569 @@
+{
+ "commit": "75389889584b828586c9893535223806941fbb8f",
+ "source": "xpd rules --builtin --format json, built at the commit above (xpd 0.38.0)",
+ "records": 427,
+ "rules": [
+  {
+   "package": "arch",
+   "rule": "analytic-forecast-horizon",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#analytic-forecast-horizon",
+   "fragment": "analytic-forecast-horizon"
+  },
+  {
+   "package": "arch",
+   "rule": "arch-ignored-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#arch-ignored-argument",
+   "fragment": "arch-ignored-argument"
+  },
+  {
+   "package": "arch",
+   "rule": "arch-rejected-number",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#arch-rejected-number",
+   "fragment": "arch-rejected-number"
+  },
+  {
+   "package": "arch",
+   "rule": "arch-unknown-option",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#arch-unknown-option",
+   "fragment": "arch-unknown-option"
+  },
+  {
+   "package": "arch",
+   "rule": "arch-unseeded-draws",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#arch-unseeded-draws",
+   "fragment": "arch-unseeded-draws"
+  },
+  {
+   "package": "arch",
+   "rule": "fit-output-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#fit-output-in-loop",
+   "fragment": "fit-output-in-loop"
+  },
+  {
+   "package": "arch",
+   "rule": "forecast-per-origin",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#forecast-per-origin",
+   "fragment": "forecast-per-origin"
+  },
+  {
+   "package": "arch",
+   "rule": "opt-bandwidth-as-bandwidth",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#opt-bandwidth-as-bandwidth",
+   "fragment": "opt-bandwidth-as-bandwidth"
+  },
+  {
+   "package": "arch",
+   "rule": "reindex-is-default",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#reindex-is-default",
+   "fragment": "reindex-is-default"
+  },
+  {
+   "package": "arch",
+   "rule": "removed-in-arch",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-arch",
+   "fragment": "removed-in-arch"
+  },
+  {
+   "package": "arch",
+   "rule": "rescaled-units",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rescaled-units",
+   "fragment": "rescaled-units"
+  },
+  {
+   "package": "arch",
+   "rule": "results-before-compute",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#results-before-compute",
+   "fragment": "results-before-compute"
+  },
+  {
+   "package": "arch",
+   "rule": "unscaled-returns",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unscaled-returns",
+   "fragment": "unscaled-returns"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "cols-left-to-dtype",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#cols-left-to-dtype",
+   "fragment": "cols-left-to-dtype"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "deprecated-in-category-encoders",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-category-encoders",
+   "fragment": "deprecated-in-category-encoders"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "encode-before-split",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#encode-before-split",
+   "fragment": "encode-before-split"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "encoder-noise-without-seed",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#encoder-noise-without-seed",
+   "fragment": "encoder-noise-without-seed"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "hashing-default-components",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#hashing-default-components",
+   "fragment": "hashing-default-components"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "invalid-handle-option",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#invalid-handle-option",
+   "fragment": "invalid-handle-option"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "named-cols-after-array-step",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#named-cols-after-array-step",
+   "fragment": "named-cols-after-array-step"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "nan-into-pipeline",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#nan-into-pipeline",
+   "fragment": "nan-into-pipeline"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "ordinal-mapping-pairs",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#ordinal-mapping-pairs",
+   "fragment": "ordinal-mapping-pairs"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "ordinal-mapping-unknown",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#ordinal-mapping-unknown",
+   "fragment": "ordinal-mapping-unknown"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "removed-in-category-encoders",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-category-encoders",
+   "fragment": "removed-in-category-encoders"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "sklearn-ships-encoder",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sklearn-ships-encoder",
+   "fragment": "sklearn-ships-encoder"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "supervised-encoder-without-target",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#supervised-encoder-without-target",
+   "fragment": "supervised-encoder-without-target"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "transform-with-test-target",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#transform-with-test-target",
+   "fragment": "transform-with-test-target"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "wrapper-fit-returns-none",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#wrapper-fit-returns-none",
+   "fragment": "wrapper-fit-returns-none"
+  },
+  {
+   "package": "category_encoders",
+   "rule": "zero-regularization",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#zero-regularization",
+   "fragment": "zero-regularization"
+  },
+  {
+   "package": "hamilton",
+   "rule": "node-mutates-input",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#node-mutates-input",
+   "fragment": "node-mutates-input"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "absorb-not-categorical",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#absorb-not-categorical",
+   "fragment": "absorb-not-categorical"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "clustered-without-clusters",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#clustered-without-clusters",
+   "fragment": "clustered-without-clusters"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "cov-option-without-cov-type",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#cov-option-without-cov-type",
+   "fragment": "cov-option-without-cov-type"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "deprecated-in-linearmodels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-linearmodels",
+   "fragment": "deprecated-in-linearmodels"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "effects-keyword-with-formula",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#effects-keyword-with-formula",
+   "fragment": "effects-keyword-with-formula"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "effects-outside-panel-ols",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#effects-outside-panel-ols",
+   "fragment": "effects-outside-panel-ols"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "first-difference-constant",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#first-difference-constant",
+   "fragment": "first-difference-constant"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "formula-power-term",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#formula-power-term",
+   "fragment": "formula-power-term"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "formula-without-constant",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#formula-without-constant",
+   "fragment": "formula-without-constant"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "hand-written-hausman",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#hand-written-hausman",
+   "fragment": "hand-written-hausman"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "invalid-compare-precision",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#invalid-compare-precision",
+   "fragment": "invalid-compare-precision"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "iv-arguments-swapped",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#iv-arguments-swapped",
+   "fragment": "iv-arguments-swapped"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "iv-missing-arguments",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#iv-missing-arguments",
+   "fragment": "iv-missing-arguments"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "iv-without-exog",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#iv-without-exog",
+   "fragment": "iv-without-exog"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "kernel-default-bandwidth",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#kernel-default-bandwidth",
+   "fragment": "kernel-default-bandwidth"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "manual-two-stage",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#manual-two-stage",
+   "fragment": "manual-two-stage"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "panel-default-covariance",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#panel-default-covariance",
+   "fragment": "panel-default-covariance"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "panel-ols-without-effects",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#panel-ols-without-effects",
+   "fragment": "panel-ols-without-effects"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "removed-in-linearmodels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-linearmodels",
+   "fragment": "removed-in-linearmodels"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "statsmodels-result-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#statsmodels-result-name",
+   "fragment": "statsmodels-result-name"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "time-before-entity-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#time-before-entity-index",
+   "fragment": "time-before-entity-index"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "too-many-effects",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#too-many-effects",
+   "fragment": "too-many-effects"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "unknown-cov-type",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unknown-cov-type",
+   "fragment": "unknown-cov-type"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "use-lsdv",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#use-lsdv",
+   "fragment": "use-lsdv"
+  },
+  {
+   "package": "linearmodels",
+   "rule": "weights-column-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#weights-column-name",
+   "fragment": "weights-column-name"
+  },
+  {
+   "package": "mapie",
+   "rule": "alpha-as-confidence-level",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#alpha-as-confidence-level",
+   "fragment": "alpha-as-confidence-level"
+  },
+  {
+   "package": "mapie",
+   "rule": "calibrate-on-training-rows",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#calibrate-on-training-rows",
+   "fragment": "calibrate-on-training-rows"
+  },
+  {
+   "package": "mapie",
+   "rule": "coverage-on-seen-rows",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#coverage-on-seen-rows",
+   "fragment": "coverage-on-seen-rows"
+  },
+  {
+   "package": "mapie",
+   "rule": "deprecated-in-mapie",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-mapie",
+   "fragment": "deprecated-in-mapie"
+  },
+  {
+   "package": "mapie",
+   "rule": "predict-and-predict-interval",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#predict-and-predict-interval",
+   "fragment": "predict-and-predict-interval"
+  },
+  {
+   "package": "mapie",
+   "rule": "predict-function-returns-labels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#predict-function-returns-labels",
+   "fragment": "predict-function-returns-labels"
+  },
+  {
+   "package": "mapie",
+   "rule": "prefit-estimator-not-fitted",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#prefit-estimator-not-fitted",
+   "fragment": "prefit-estimator-not-fitted"
+  },
+  {
+   "package": "mapie",
+   "rule": "quantile-estimator-loss",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#quantile-estimator-loss",
+   "fragment": "quantile-estimator-loss"
+  },
+  {
+   "package": "mapie",
+   "rule": "refit-per-confidence-level",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#refit-per-confidence-level",
+   "fragment": "refit-per-confidence-level"
+  },
+  {
+   "package": "mapie",
+   "rule": "removed-in-mapie",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-mapie",
+   "fragment": "removed-in-mapie"
+  },
+  {
+   "package": "mapie",
+   "rule": "risk-control-method",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#risk-control-method",
+   "fragment": "risk-control-method"
+  },
+  {
+   "package": "mapie",
+   "rule": "shuffled-time-series-split",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#shuffled-time-series-split",
+   "fragment": "shuffled-time-series-split"
+  },
+  {
+   "package": "mapie",
+   "rule": "unseeded-resampling",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unseeded-resampling",
+   "fragment": "unseeded-resampling"
+  },
+  {
+   "package": "numpy",
+   "rule": "almost-equal-assert",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#almost-equal-assert",
+   "fragment": "almost-equal-assert"
+  },
+  {
+   "package": "numpy",
+   "rule": "append-flattens",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#append-flattens",
+   "fragment": "append-flattens"
+  },
+  {
+   "package": "numpy",
+   "rule": "arange-float-step",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#arange-float-step",
+   "fragment": "arange-float-step"
+  },
+  {
+   "package": "numpy",
+   "rule": "argument-in-wrong-slot",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#argument-in-wrong-slot",
+   "fragment": "argument-in-wrong-slot"
+  },
+  {
+   "package": "numpy",
+   "rule": "array-construction",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#array-construction",
+   "fragment": "array-construction"
+  },
+  {
+   "package": "numpy",
+   "rule": "array-default-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#array-default-argument",
+   "fragment": "array-default-argument"
+  },
+  {
+   "package": "numpy",
+   "rule": "array-truth-value",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#array-truth-value",
+   "fragment": "array-truth-value"
+  },
+  {
+   "package": "numpy",
+   "rule": "as-strided",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#as-strided",
+   "fragment": "as-strided"
+  },
+  {
+   "package": "numpy",
+   "rule": "assert-on-arrays",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#assert-on-arrays",
+   "fragment": "assert-on-arrays"
+  },
+  {
+   "package": "numpy",
+   "rule": "builtin-on-array",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#builtin-on-array",
+   "fragment": "builtin-on-array"
+  },
+  {
+   "package": "numpy",
+   "rule": "char-module",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#char-module",
+   "fragment": "char-module"
+  },
+  {
+   "package": "numpy",
+   "rule": "clock-seed",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#clock-seed",
+   "fragment": "clock-seed"
+  },
+  {
+   "package": "numpy",
+   "rule": "compare-reductions",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#compare-reductions",
+   "fragment": "compare-reductions"
+  },
+  {
+   "package": "numpy",
+   "rule": "compare-to-nan",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#compare-to-nan",
+   "fragment": "compare-to-nan"
+  },
+  {
+   "package": "numpy",
+   "rule": "count-nonzero",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#count-nonzero",
+   "fragment": "count-nonzero"
+  },
+  {
+   "package": "numpy",
+   "rule": "deprecated-in-numpy-2",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-numpy-2",
+   "fragment": "deprecated-in-numpy-2"
+  },
+  {
+   "package": "numpy",
+   "rule": "dot-on-matrices",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#dot-on-matrices",
+   "fragment": "dot-on-matrices"
+  },
+  {
+   "package": "numpy",
+   "rule": "eig-on-symmetric",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#eig-on-symmetric",
+   "fragment": "eig-on-symmetric"
+  },
+  {
+   "package": "numpy",
+   "rule": "einsum-optimize",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#einsum-optimize",
+   "fragment": "einsum-optimize"
+  },
+  {
+   "package": "numpy",
+   "rule": "element-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#element-loop",
+   "fragment": "element-loop"
+  },
+  {
+   "package": "numpy",
+   "rule": "expm1-log1p",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#expm1-log1p",
+   "fragment": "expm1-log1p"
+  },
+  {
+   "package": "numpy",
+   "rule": "file-roundtrip",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#file-roundtrip",
+   "fragment": "file-roundtrip"
+  },
+  {
+   "package": "numpy",
+   "rule": "growth-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#growth-in-loop",
+   "fragment": "growth-in-loop"
+  },
+  {
+   "package": "numpy",
+   "rule": "int-mask-as-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#int-mask-as-index",
+   "fragment": "int-mask-as-index"
+  },
+  {
+   "package": "numpy",
+   "rule": "inv-then-multiply",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#inv-then-multiply",
+   "fragment": "inv-then-multiply"
+  },
+  {
+   "package": "numpy",
+   "rule": "iterator-to-array",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#iterator-to-array",
+   "fragment": "iterator-to-array"
+  },
+  {
+   "package": "numpy",
+   "rule": "legacy-polynomial",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-polynomial",
+   "fragment": "legacy-polynomial"
+  },
+  {
+   "package": "numpy",
+   "rule": "legacy-random",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-random",
+   "fragment": "legacy-random"
+  },
+  {
+   "package": "numpy",
+   "rule": "legacy-testing-helper",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-testing-helper",
+   "fragment": "legacy-testing-helper"
+  },
+  {
+   "package": "numpy",
+   "rule": "log-of-det",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#log-of-det",
+   "fragment": "log-of-det"
+  },
+  {
+   "package": "numpy",
+   "rule": "log-of-product",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#log-of-product",
+   "fragment": "log-of-product"
+  },
+  {
+   "package": "numpy",
+   "rule": "logaddexp",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#logaddexp",
+   "fragment": "logaddexp"
+  },
+  {
+   "package": "numpy",
+   "rule": "mask-operator-precedence",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mask-operator-precedence",
+   "fragment": "mask-operator-precedence"
+  },
+  {
+   "package": "numpy",
+   "rule": "mask-per-label",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mask-per-label",
+   "fragment": "mask-per-label"
+  },
+  {
+   "package": "numpy",
+   "rule": "matmul-diagonal",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#matmul-diagonal",
+   "fragment": "matmul-diagonal"
+  },
+  {
+   "package": "numpy",
+   "rule": "mergesort-kind",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mergesort-kind",
+   "fragment": "mergesort-kind"
+  },
+  {
+   "package": "numpy",
+   "rule": "nan-to-int",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#nan-to-int",
+   "fragment": "nan-to-int"
+  },
+  {
+   "package": "numpy",
+   "rule": "needless-copy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#needless-copy",
+   "fragment": "needless-copy"
+  },
+  {
+   "package": "numpy",
+   "rule": "norm-by-hand",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#norm-by-hand",
+   "fragment": "norm-by-hand"
+  },
+  {
+   "package": "numpy",
+   "rule": "np-vectorize",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#np-vectorize",
+   "fragment": "np-vectorize"
+  },
+  {
+   "package": "numpy",
+   "rule": "numpy-import-alias",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#numpy-import-alias",
+   "fragment": "numpy-import-alias"
+  },
+  {
+   "package": "numpy",
+   "rule": "per-value-comprehension",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#per-value-comprehension",
+   "fragment": "per-value-comprehension"
+  },
+  {
+   "package": "numpy",
+   "rule": "percentile-of-fraction",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#percentile-of-fraction",
+   "fragment": "percentile-of-fraction"
+  },
+  {
+   "package": "numpy",
+   "rule": "positional-tolerance",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#positional-tolerance",
+   "fragment": "positional-tolerance"
+  },
+  {
+   "package": "numpy",
+   "rule": "power-half",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#power-half",
+   "fragment": "power-half"
+  },
+  {
+   "package": "numpy",
+   "rule": "printoptions-restore",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#printoptions-restore",
+   "fragment": "printoptions-restore"
+  },
+  {
+   "package": "numpy",
+   "rule": "randint-single-value",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#randint-single-value",
+   "fragment": "randint-single-value"
+  },
+  {
+   "package": "numpy",
+   "rule": "random-draw-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#random-draw-loop",
+   "fragment": "random-draw-loop"
+  },
+  {
+   "package": "numpy",
+   "rule": "read-uninitialized",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-uninitialized",
+   "fragment": "read-uninitialized"
+  },
+  {
+   "package": "numpy",
+   "rule": "recurrence-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#recurrence-loop",
+   "fragment": "recurrence-loop"
+  },
+  {
+   "package": "numpy",
+   "rule": "reduce-last",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#reduce-last",
+   "fragment": "reduce-last"
+  },
+  {
+   "package": "numpy",
+   "rule": "removed-in-numpy-2",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-numpy-2",
+   "fragment": "removed-in-numpy-2"
+  },
+  {
+   "package": "numpy",
+   "rule": "result-discarded",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#result-discarded",
+   "fragment": "result-discarded"
+  },
+  {
+   "package": "numpy",
+   "rule": "result-is-none",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#result-is-none",
+   "fragment": "result-is-none"
+  },
+  {
+   "package": "numpy",
+   "rule": "rng-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rng-in-loop",
+   "fragment": "rng-in-loop"
+  },
+  {
+   "package": "numpy",
+   "rule": "slice-fill-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#slice-fill-loop",
+   "fragment": "slice-fill-loop"
+  },
+  {
+   "package": "numpy",
+   "rule": "sort-then-select",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sort-then-select",
+   "fragment": "sort-then-select"
+  },
+  {
+   "package": "numpy",
+   "rule": "sum-of-products",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sum-of-products",
+   "fragment": "sum-of-products"
+  },
+  {
+   "package": "numpy",
+   "rule": "unpackbits-popcount",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unpackbits-popcount",
+   "fragment": "unpackbits-popcount"
+  },
+  {
+   "package": "numpy",
+   "rule": "vecdot",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#vecdot",
+   "fragment": "vecdot"
+  },
+  {
+   "package": "numpy",
+   "rule": "where-shortcut",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#where-shortcut",
+   "fragment": "where-shortcut"
+  },
+  {
+   "package": "numpy",
+   "rule": "where-tuple-length",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#where-tuple-length",
+   "fragment": "where-tuple-length"
+  },
+  {
+   "package": "numpy",
+   "rule": "write-to-copy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#write-to-copy",
+   "fragment": "write-to-copy"
+  },
+  {
+   "package": "pandas",
+   "rule": "aggregate-then-merge-back",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#aggregate-then-merge-back",
+   "fragment": "aggregate-then-merge-back"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-arithmetic",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-arithmetic",
+   "fragment": "apply-arithmetic"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-axis-1",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-axis-1",
+   "fragment": "apply-axis-1"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-cast",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-cast",
+   "fragment": "apply-cast"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-comparison",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-comparison",
+   "fragment": "apply-comparison"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-condition",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-condition",
+   "fragment": "apply-condition"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-date-expression",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-date-expression",
+   "fragment": "apply-date-expression"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-date-method",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-date-method",
+   "fragment": "apply-date-method"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-date-part",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-date-part",
+   "fragment": "apply-date-part"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-known-function",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-known-function",
+   "fragment": "apply-known-function"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-math-function",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-math-function",
+   "fragment": "apply-math-function"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-on-dates",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-on-dates",
+   "fragment": "apply-on-dates"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-parse-date",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-parse-date",
+   "fragment": "apply-parse-date"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-pd-series",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-pd-series",
+   "fragment": "apply-pd-series"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-recomputes-aggregate",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-recomputes-aggregate",
+   "fragment": "apply-recomputes-aggregate"
+  },
+  {
+   "package": "pandas",
+   "rule": "apply-text-method",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#apply-text-method",
+   "fragment": "apply-text-method"
+  },
+  {
+   "package": "pandas",
+   "rule": "assign-drops-alignment",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#assign-drops-alignment",
+   "fragment": "assign-drops-alignment"
+  },
+  {
+   "package": "pandas",
+   "rule": "astype-then-to-numpy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#astype-then-to-numpy",
+   "fragment": "astype-then-to-numpy"
+  },
+  {
+   "package": "pandas",
+   "rule": "builtin-on-column",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#builtin-on-column",
+   "fragment": "builtin-on-column"
+  },
+  {
+   "package": "pandas",
+   "rule": "chained-assignment",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#chained-assignment",
+   "fragment": "chained-assignment"
+  },
+  {
+   "package": "pandas",
+   "rule": "chunked-csv-concat",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#chunked-csv-concat",
+   "fragment": "chunked-csv-concat"
+  },
+  {
+   "package": "pandas",
+   "rule": "column-loop-to-long",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#column-loop-to-long",
+   "fragment": "column-loop-to-long"
+  },
+  {
+   "package": "pandas",
+   "rule": "column-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#column-loop",
+   "fragment": "column-loop"
+  },
+  {
+   "package": "pandas",
+   "rule": "compare-to-missing",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#compare-to-missing",
+   "fragment": "compare-to-missing"
+  },
+  {
+   "package": "pandas",
+   "rule": "concat-columns-unchecked",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#concat-columns-unchecked",
+   "fragment": "concat-columns-unchecked"
+  },
+  {
+   "package": "pandas",
+   "rule": "concat-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#concat-in-loop",
+   "fragment": "concat-in-loop"
+  },
+  {
+   "package": "pandas",
+   "rule": "concat-then-category",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#concat-then-category",
+   "fragment": "concat-then-category"
+  },
+  {
+   "package": "pandas",
+   "rule": "convert-then-drop-zone",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#convert-then-drop-zone",
+   "fragment": "convert-then-drop-zone"
+  },
+  {
+   "package": "pandas",
+   "rule": "copy-after-indexing",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#copy-after-indexing",
+   "fragment": "copy-after-indexing"
+  },
+  {
+   "package": "pandas",
+   "rule": "copy-in-chain",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#copy-in-chain",
+   "fragment": "copy-in-chain"
+  },
+  {
+   "package": "pandas",
+   "rule": "csv-round-trip",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#csv-round-trip",
+   "fragment": "csv-round-trip"
+  },
+  {
+   "package": "pandas",
+   "rule": "date-part-key",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#date-part-key",
+   "fragment": "date-part-key"
+  },
+  {
+   "package": "pandas",
+   "rule": "date-range-slice",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#date-range-slice",
+   "fragment": "date-range-slice"
+  },
+  {
+   "package": "pandas",
+   "rule": "date-range-then-localize",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#date-range-then-localize",
+   "fragment": "date-range-then-localize"
+  },
+  {
+   "package": "pandas",
+   "rule": "datetime-unit-check",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#datetime-unit-check",
+   "fragment": "datetime-unit-check"
+  },
+  {
+   "package": "pandas",
+   "rule": "day-frequency-with-time-zone",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#day-frequency-with-time-zone",
+   "fragment": "day-frequency-with-time-zone"
+  },
+  {
+   "package": "pandas",
+   "rule": "deprecated-in-pandas-3",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-pandas-3",
+   "fragment": "deprecated-in-pandas-3"
+  },
+  {
+   "package": "pandas",
+   "rule": "divide-by-shift",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#divide-by-shift",
+   "fragment": "divide-by-shift"
+  },
+  {
+   "package": "pandas",
+   "rule": "empty-guard",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#empty-guard",
+   "fragment": "empty-guard"
+  },
+  {
+   "package": "pandas",
+   "rule": "enumerate-map-encoding",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#enumerate-map-encoding",
+   "fragment": "enumerate-map-encoding"
+  },
+  {
+   "package": "pandas",
+   "rule": "epoch-from-int-cast",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#epoch-from-int-cast",
+   "fragment": "epoch-from-int-cast"
+  },
+  {
+   "package": "pandas",
+   "rule": "filter-before-frame",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#filter-before-frame",
+   "fragment": "filter-before-frame"
+  },
+  {
+   "package": "pandas",
+   "rule": "filter-items",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#filter-items",
+   "fragment": "filter-items"
+  },
+  {
+   "package": "pandas",
+   "rule": "frame-append",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#frame-append",
+   "fragment": "frame-append"
+  },
+  {
+   "package": "pandas",
+   "rule": "frame-growth-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#frame-growth-in-loop",
+   "fragment": "frame-growth-in-loop"
+  },
+  {
+   "package": "pandas",
+   "rule": "frame-rebuilt-from-columns",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#frame-rebuilt-from-columns",
+   "fragment": "frame-rebuilt-from-columns"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-apply-reads-key",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-apply-reads-key",
+   "fragment": "groupby-apply-reads-key"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-apply",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-apply",
+   "fragment": "groupby-apply"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-filter-lambda",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-filter-lambda",
+   "fragment": "groupby-filter-lambda"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-first-skips-missing",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-first-skips-missing",
+   "fragment": "groupby-first-skips-missing"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-lambda-arithmetic",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-lambda-arithmetic",
+   "fragment": "groupby-lambda-arithmetic"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-lambda-window",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-lambda-window",
+   "fragment": "groupby-lambda-window"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-lambda",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-lambda",
+   "fragment": "groupby-lambda"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-loop-collects",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-loop-collects",
+   "fragment": "groupby-loop-collects"
+  },
+  {
+   "package": "pandas",
+   "rule": "groupby-then-reset-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groupby-then-reset-index",
+   "fragment": "groupby-then-reset-index"
+  },
+  {
+   "package": "pandas",
+   "rule": "in-column",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#in-column",
+   "fragment": "in-column"
+  },
+  {
+   "package": "pandas",
+   "rule": "index-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#index-loop",
+   "fragment": "index-loop"
+  },
+  {
+   "package": "pandas",
+   "rule": "index-plus-offset",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#index-plus-offset",
+   "fragment": "index-plus-offset"
+  },
+  {
+   "package": "pandas",
+   "rule": "index-time-mask",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#index-time-mask",
+   "fragment": "index-time-mask"
+  },
+  {
+   "package": "pandas",
+   "rule": "index-year-mask",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#index-year-mask",
+   "fragment": "index-year-mask"
+  },
+  {
+   "package": "pandas",
+   "rule": "inline-column-list",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#inline-column-list",
+   "fragment": "inline-column-list"
+  },
+  {
+   "package": "pandas",
+   "rule": "inplace-on-column",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#inplace-on-column",
+   "fragment": "inplace-on-column"
+  },
+  {
+   "package": "pandas",
+   "rule": "inplace-result-assigned",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#inplace-result-assigned",
+   "fragment": "inplace-result-assigned"
+  },
+  {
+   "package": "pandas",
+   "rule": "lambda-in-assign",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#lambda-in-assign",
+   "fragment": "lambda-in-assign"
+  },
+  {
+   "package": "pandas",
+   "rule": "len-of-filter",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#len-of-filter",
+   "fragment": "len-of-filter"
+  },
+  {
+   "package": "pandas",
+   "rule": "level-values-unique",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#level-values-unique",
+   "fragment": "level-values-unique"
+  },
+  {
+   "package": "pandas",
+   "rule": "list-over-column",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#list-over-column",
+   "fragment": "list-over-column"
+  },
+  {
+   "package": "pandas",
+   "rule": "literal-contains",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#literal-contains",
+   "fragment": "literal-contains"
+  },
+  {
+   "package": "pandas",
+   "rule": "lookup-per-row",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#lookup-per-row",
+   "fragment": "lookup-per-row"
+  },
+  {
+   "package": "pandas",
+   "rule": "mask-precedence",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mask-precedence",
+   "fragment": "mask-precedence"
+  },
+  {
+   "package": "pandas",
+   "rule": "matplotlib-on-frame",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#matplotlib-on-frame",
+   "fragment": "matplotlib-on-frame"
+  },
+  {
+   "package": "pandas",
+   "rule": "melt-default-names",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#melt-default-names",
+   "fragment": "melt-default-names"
+  },
+  {
+   "package": "pandas",
+   "rule": "merge-asof-unsorted",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#merge-asof-unsorted",
+   "fragment": "merge-asof-unsorted"
+  },
+  {
+   "package": "pandas",
+   "rule": "merge-indicator-anti-join",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#merge-indicator-anti-join",
+   "fragment": "merge-indicator-anti-join"
+  },
+  {
+   "package": "pandas",
+   "rule": "merge-on-both-indexes",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#merge-on-both-indexes",
+   "fragment": "merge-on-both-indexes"
+  },
+  {
+   "package": "pandas",
+   "rule": "merge-without-on",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#merge-without-on",
+   "fragment": "merge-without-on"
+  },
+  {
+   "package": "pandas",
+   "rule": "merge-without-validate",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#merge-without-validate",
+   "fragment": "merge-without-validate"
+  },
+  {
+   "package": "pandas",
+   "rule": "mixed-offsets-without-utc",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mixed-offsets-without-utc",
+   "fragment": "mixed-offsets-without-utc"
+  },
+  {
+   "package": "pandas",
+   "rule": "multiindex-from-tuples",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#multiindex-from-tuples",
+   "fragment": "multiindex-from-tuples"
+  },
+  {
+   "package": "pandas",
+   "rule": "named-agg-lambda",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#named-agg-lambda",
+   "fragment": "named-agg-lambda"
+  },
+  {
+   "package": "pandas",
+   "rule": "nested-np-where",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#nested-np-where",
+   "fragment": "nested-np-where"
+  },
+  {
+   "package": "pandas",
+   "rule": "nested-step-calls",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#nested-step-calls",
+   "fragment": "nested-step-calls"
+  },
+  {
+   "package": "pandas",
+   "rule": "no-inplace",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#no-inplace",
+   "fragment": "no-inplace"
+  },
+  {
+   "package": "pandas",
+   "rule": "numpy-round-trip",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#numpy-round-trip",
+   "fragment": "numpy-round-trip"
+  },
+  {
+   "package": "pandas",
+   "rule": "object-dates",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#object-dates",
+   "fragment": "object-dates"
+  },
+  {
+   "package": "pandas",
+   "rule": "object-dtype-check",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#object-dtype-check",
+   "fragment": "object-dtype-check"
+  },
+  {
+   "package": "pandas",
+   "rule": "pickle-or-hdf-storage",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pickle-or-hdf-storage",
+   "fragment": "pickle-or-hdf-storage"
+  },
+  {
+   "package": "pandas",
+   "rule": "pivot-table-default-mean",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pivot-table-default-mean",
+   "fragment": "pivot-table-default-mean"
+  },
+  {
+   "package": "pandas",
+   "rule": "plot-kind-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#plot-kind-argument",
+   "fragment": "plot-kind-argument"
+  },
+  {
+   "package": "pandas",
+   "rule": "plot-without-plotly-backend",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#plot-without-plotly-backend",
+   "fragment": "plot-without-plotly-backend"
+  },
+  {
+   "package": "pandas",
+   "rule": "positional-key-on-labels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#positional-key-on-labels",
+   "fragment": "positional-key-on-labels"
+  },
+  {
+   "package": "pandas",
+   "rule": "query-string",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#query-string",
+   "fragment": "query-string"
+  },
+  {
+   "package": "pandas",
+   "rule": "range-mask",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#range-mask",
+   "fragment": "range-mask"
+  },
+  {
+   "package": "pandas",
+   "rule": "read-csv-converters",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-csv-converters",
+   "fragment": "read-csv-converters"
+  },
+  {
+   "package": "pandas",
+   "rule": "read-csv-slow-option",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-csv-slow-option",
+   "fragment": "read-csv-slow-option"
+  },
+  {
+   "package": "pandas",
+   "rule": "read-json-lines-engine",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-json-lines-engine",
+   "fragment": "read-json-lines-engine"
+  },
+  {
+   "package": "pandas",
+   "rule": "read-parquet-all-columns",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-parquet-all-columns",
+   "fragment": "read-parquet-all-columns"
+  },
+  {
+   "package": "pandas",
+   "rule": "read-parquet-then-filter",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-parquet-then-filter",
+   "fragment": "read-parquet-then-filter"
+  },
+  {
+   "package": "pandas",
+   "rule": "read-then-head",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#read-then-head",
+   "fragment": "read-then-head"
+  },
+  {
+   "package": "pandas",
+   "rule": "reassign-ladder",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#reassign-ladder",
+   "fragment": "reassign-ladder"
+  },
+  {
+   "package": "pandas",
+   "rule": "reduction-level-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#reduction-level-argument",
+   "fragment": "reduction-level-argument"
+  },
+  {
+   "package": "pandas",
+   "rule": "reindex-to-date-range",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#reindex-to-date-range",
+   "fragment": "reindex-to-date-range"
+  },
+  {
+   "package": "pandas",
+   "rule": "removed-in-pandas-3",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-pandas-3",
+   "fragment": "removed-in-pandas-3"
+  },
+  {
+   "package": "pandas",
+   "rule": "rename-after-agg",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rename-after-agg",
+   "fragment": "rename-after-agg"
+  },
+  {
+   "package": "pandas",
+   "rule": "repeat-rows-by-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#repeat-rows-by-index",
+   "fragment": "repeat-rows-by-index"
+  },
+  {
+   "package": "pandas",
+   "rule": "repeated-reset-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#repeated-reset-index",
+   "fragment": "repeated-reset-index"
+  },
+  {
+   "package": "pandas",
+   "rule": "replace-with-mapping",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#replace-with-mapping",
+   "fragment": "replace-with-mapping"
+  },
+  {
+   "package": "pandas",
+   "rule": "rolling-apply",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rolling-apply",
+   "fragment": "rolling-apply"
+  },
+  {
+   "package": "pandas",
+   "rule": "row-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#row-loop",
+   "fragment": "row-loop"
+  },
+  {
+   "package": "pandas",
+   "rule": "row-window-on-uneven-times",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#row-window-on-uneven-times",
+   "fragment": "row-window-on-uneven-times"
+  },
+  {
+   "package": "pandas",
+   "rule": "set-index-then-resample",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#set-index-then-resample",
+   "fragment": "set-index-then-resample"
+  },
+  {
+   "package": "pandas",
+   "rule": "sort-then-head",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sort-then-head",
+   "fragment": "sort-then-head"
+  },
+  {
+   "package": "pandas",
+   "rule": "sort-then-reset-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sort-then-reset-index",
+   "fragment": "sort-then-reset-index"
+  },
+  {
+   "package": "pandas",
+   "rule": "stack-dropna",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#stack-dropna",
+   "fragment": "stack-dropna"
+  },
+  {
+   "package": "pandas",
+   "rule": "stack-then-reset-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#stack-then-reset-index",
+   "fragment": "stack-then-reset-index"
+  },
+  {
+   "package": "pandas",
+   "rule": "str-replace-regex-default",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#str-replace-regex-default",
+   "fragment": "str-replace-regex-default"
+  },
+  {
+   "package": "pandas",
+   "rule": "strftime-date-part",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#strftime-date-part",
+   "fragment": "strftime-date-part"
+  },
+  {
+   "package": "pandas",
+   "rule": "strftime-round-trip",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#strftime-round-trip",
+   "fragment": "strftime-round-trip"
+  },
+  {
+   "package": "pandas",
+   "rule": "subtract-shift",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#subtract-shift",
+   "fragment": "subtract-shift"
+  },
+  {
+   "package": "pandas",
+   "rule": "text-time-key",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#text-time-key",
+   "fragment": "text-time-key"
+  },
+  {
+   "package": "pandas",
+   "rule": "timedelta-per-value",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#timedelta-per-value",
+   "fragment": "timedelta-per-value"
+  },
+  {
+   "package": "pandas",
+   "rule": "to-csv-append-header",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#to-csv-append-header",
+   "fragment": "to-csv-append-header"
+  },
+  {
+   "package": "pandas",
+   "rule": "to-csv-index",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#to-csv-index",
+   "fragment": "to-csv-index"
+  },
+  {
+   "package": "pandas",
+   "rule": "to-datetime-then-localize",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#to-datetime-then-localize",
+   "fragment": "to-datetime-then-localize"
+  },
+  {
+   "package": "pandas",
+   "rule": "tuple-slice-on-levels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#tuple-slice-on-levels",
+   "fragment": "tuple-slice-on-levels"
+  },
+  {
+   "package": "pandas",
+   "rule": "tz-localize-without-dst",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#tz-localize-without-dst",
+   "fragment": "tz-localize-without-dst"
+  },
+  {
+   "package": "pandas",
+   "rule": "unstack-without-fill",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unstack-without-fill",
+   "fragment": "unstack-without-fill"
+  },
+  {
+   "package": "pandas",
+   "rule": "value-counts-share",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#value-counts-share",
+   "fragment": "value-counts-share"
+  },
+  {
+   "package": "pandas",
+   "rule": "write-through-values",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#write-through-values",
+   "fragment": "write-through-values"
+  },
+  {
+   "package": "pandas",
+   "rule": "zip-over-columns",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#zip-over-columns",
+   "fragment": "zip-over-columns"
+  },
+  {
+   "package": "pandas",
+   "rule": "missing-pyarrow",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#missing-pyarrow",
+   "fragment": "missing-pyarrow"
+  },
+  {
+   "package": "pandas",
+   "rule": "missing-bottleneck",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#missing-bottleneck",
+   "fragment": "missing-bottleneck"
+  },
+  {
+   "package": "pandas",
+   "rule": "missing-plotly",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#missing-plotly",
+   "fragment": "missing-plotly"
+  },
+  {
+   "package": "pandas",
+   "rule": "missing-pandas-stubs",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#missing-pandas-stubs",
+   "fragment": "missing-pandas-stubs"
+  },
+  {
+   "package": "plotly",
+   "rule": "all-caps-title",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#all-caps-title",
+   "fragment": "all-caps-title"
+  },
+  {
+   "package": "plotly",
+   "rule": "animation-frame",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#animation-frame",
+   "fragment": "animation-frame"
+  },
+  {
+   "package": "plotly",
+   "rule": "area-axis-without-zero",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#area-axis-without-zero",
+   "fragment": "area-axis-without-zero"
+  },
+  {
+   "package": "plotly",
+   "rule": "axis-title-column-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#axis-title-column-name",
+   "fragment": "axis-title-column-name"
+  },
+  {
+   "package": "plotly",
+   "rule": "bar-axis-without-zero",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#bar-axis-without-zero",
+   "fragment": "bar-axis-without-zero"
+  },
+  {
+   "package": "plotly",
+   "rule": "box-plot-ink",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#box-plot-ink",
+   "fragment": "box-plot-ink"
+  },
+  {
+   "package": "plotly",
+   "rule": "boxed-axis-frame",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#boxed-axis-frame",
+   "fragment": "boxed-axis-frame"
+  },
+  {
+   "package": "plotly",
+   "rule": "default-template",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#default-template",
+   "fragment": "default-template"
+  },
+  {
+   "package": "plotly",
+   "rule": "dual-y-axis",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#dual-y-axis",
+   "fragment": "dual-y-axis"
+  },
+  {
+   "package": "plotly",
+   "rule": "explicit-grid",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#explicit-grid",
+   "fragment": "explicit-grid"
+  },
+  {
+   "package": "plotly",
+   "rule": "free-facet-scales",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#free-facet-scales",
+   "fragment": "free-facet-scales"
+  },
+  {
+   "package": "plotly",
+   "rule": "gauge-indicator",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#gauge-indicator",
+   "fragment": "gauge-indicator"
+  },
+  {
+   "package": "plotly",
+   "rule": "heatmap-smoothing",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#heatmap-smoothing",
+   "fragment": "heatmap-smoothing"
+  },
+  {
+   "package": "plotly",
+   "rule": "legend-instead-of-labels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legend-instead-of-labels",
+   "fragment": "legend-instead-of-labels"
+  },
+  {
+   "package": "plotly",
+   "rule": "marker-size-diameter",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#marker-size-diameter",
+   "fragment": "marker-size-diameter"
+  },
+  {
+   "package": "plotly",
+   "rule": "pattern-fill",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pattern-fill",
+   "fragment": "pattern-fill"
+  },
+  {
+   "package": "plotly",
+   "rule": "pie-chart",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pie-chart",
+   "fragment": "pie-chart"
+  },
+  {
+   "package": "plotly",
+   "rule": "polar-bar-area",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#polar-bar-area",
+   "fragment": "polar-bar-area"
+  },
+  {
+   "package": "plotly",
+   "rule": "rainbow-colorscale",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rainbow-colorscale",
+   "fragment": "rainbow-colorscale"
+  },
+  {
+   "package": "plotly",
+   "rule": "redundant-color",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#redundant-color",
+   "fragment": "redundant-color"
+  },
+  {
+   "package": "plotly",
+   "rule": "rotated-tick-labels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rotated-tick-labels",
+   "fragment": "rotated-tick-labels"
+  },
+  {
+   "package": "plotly",
+   "rule": "spline-line",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#spline-line",
+   "fragment": "spline-line"
+  },
+  {
+   "package": "plotly",
+   "rule": "sunburst-as-pie",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sunburst-as-pie",
+   "fragment": "sunburst-as-pie"
+  },
+  {
+   "package": "plotly",
+   "rule": "table-for-small-data",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#table-for-small-data",
+   "fragment": "table-for-small-data"
+  },
+  {
+   "package": "plotly",
+   "rule": "three-d-for-two-d",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#three-d-for-two-d",
+   "fragment": "three-d-for-two-d"
+  },
+  {
+   "package": "pymoo",
+   "rule": "algorithm-read-after-minimize",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#algorithm-read-after-minimize",
+   "fragment": "algorithm-read-after-minimize"
+  },
+  {
+   "package": "pymoo",
+   "rule": "constraint-not-declared",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#constraint-not-declared",
+   "fragment": "constraint-not-declared"
+  },
+  {
+   "package": "pymoo",
+   "rule": "decision-weights",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#decision-weights",
+   "fragment": "decision-weights"
+  },
+  {
+   "package": "pymoo",
+   "rule": "deprecated-in-pymoo",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-pymoo",
+   "fragment": "deprecated-in-pymoo"
+  },
+  {
+   "package": "pymoo",
+   "rule": "elementwise-runner",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#elementwise-runner",
+   "fragment": "elementwise-runner"
+  },
+  {
+   "package": "pymoo",
+   "rule": "evaluate-indexing",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#evaluate-indexing",
+   "fragment": "evaluate-indexing"
+  },
+  {
+   "package": "pymoo",
+   "rule": "evaluate-returns-value",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#evaluate-returns-value",
+   "fragment": "evaluate-returns-value"
+  },
+  {
+   "package": "pymoo",
+   "rule": "has-terminated-assignment",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#has-terminated-assignment",
+   "fragment": "has-terminated-assignment"
+  },
+  {
+   "package": "pymoo",
+   "rule": "hv-reference-point",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#hv-reference-point",
+   "fragment": "hv-reference-point"
+  },
+  {
+   "package": "pymoo",
+   "rule": "ignored-problem-keyword",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#ignored-problem-keyword",
+   "fragment": "ignored-problem-keyword"
+  },
+  {
+   "package": "pymoo",
+   "rule": "indicator-normalize-ignored",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#indicator-normalize-ignored",
+   "fragment": "indicator-normalize-ignored"
+  },
+  {
+   "package": "pymoo",
+   "rule": "minimize-ignored-keyword",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#minimize-ignored-keyword",
+   "fragment": "minimize-ignored-keyword"
+  },
+  {
+   "package": "pymoo",
+   "rule": "moead-arguments",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#moead-arguments",
+   "fragment": "moead-arguments"
+  },
+  {
+   "package": "pymoo",
+   "rule": "mutation-prob-per-individual",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mutation-prob-per-individual",
+   "fragment": "mutation-prob-per-individual"
+  },
+  {
+   "package": "pymoo",
+   "rule": "n-constr-keyword",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#n-constr-keyword",
+   "fragment": "n-constr-keyword"
+  },
+  {
+   "package": "pymoo",
+   "rule": "numpy-seed-ignored",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#numpy-seed-ignored",
+   "fragment": "numpy-seed-ignored"
+  },
+  {
+   "package": "pymoo",
+   "rule": "objectives-stacked-by-row",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#objectives-stacked-by-row",
+   "fragment": "objectives-stacked-by-row"
+  },
+  {
+   "package": "pymoo",
+   "rule": "positional-problem-bounds",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#positional-problem-bounds",
+   "fragment": "positional-problem-bounds"
+  },
+  {
+   "package": "pymoo",
+   "rule": "removed-in-pymoo",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-pymoo",
+   "fragment": "removed-in-pymoo"
+  },
+  {
+   "package": "pymoo",
+   "rule": "reused-algorithm-without-copy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#reused-algorithm-without-copy",
+   "fragment": "reused-algorithm-without-copy"
+  },
+  {
+   "package": "pymoo",
+   "rule": "setup-positional-termination",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#setup-positional-termination",
+   "fragment": "setup-positional-termination"
+  },
+  {
+   "package": "pymoo",
+   "rule": "unread-history",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unread-history",
+   "fragment": "unread-history"
+  },
+  {
+   "package": "pymoo",
+   "rule": "unseeded-run",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unseeded-run",
+   "fragment": "unseeded-run"
+  },
+  {
+   "package": "python",
+   "rule": "comprehension-among-arguments",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#comprehension-among-arguments",
+   "fragment": "comprehension-among-arguments"
+  },
+  {
+   "package": "python",
+   "rule": "comprehension-merges-dicts",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#comprehension-merges-dicts",
+   "fragment": "comprehension-merges-dicts"
+  },
+  {
+   "package": "python",
+   "rule": "comprehension-multi-line",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#comprehension-multi-line",
+   "fragment": "comprehension-multi-line"
+  },
+  {
+   "package": "python",
+   "rule": "comprehension-two-fors",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#comprehension-two-fors",
+   "fragment": "comprehension-two-fors"
+  },
+  {
+   "package": "python",
+   "rule": "counting-loop-without-counter",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#counting-loop-without-counter",
+   "fragment": "counting-loop-without-counter"
+  },
+  {
+   "package": "python",
+   "rule": "dict-str-any",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#dict-str-any",
+   "fragment": "dict-str-any"
+  },
+  {
+   "package": "python",
+   "rule": "elapsed-without-perf-counter",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#elapsed-without-perf-counter",
+   "fragment": "elapsed-without-perf-counter"
+  },
+  {
+   "package": "python",
+   "rule": "float-around-number",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#float-around-number",
+   "fragment": "float-around-number"
+  },
+  {
+   "package": "python",
+   "rule": "front-insert-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#front-insert-in-loop",
+   "fragment": "front-insert-in-loop"
+  },
+  {
+   "package": "python",
+   "rule": "import-side-effect",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#import-side-effect",
+   "fragment": "import-side-effect"
+  },
+  {
+   "package": "python",
+   "rule": "json-without-type",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#json-without-type",
+   "fragment": "json-without-type"
+  },
+  {
+   "package": "python",
+   "rule": "mock-import",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#mock-import",
+   "fragment": "mock-import"
+  },
+  {
+   "package": "python",
+   "rule": "module-private-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#module-private-name",
+   "fragment": "module-private-name"
+  },
+  {
+   "package": "python",
+   "rule": "multi-line-call-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#multi-line-call-argument",
+   "fragment": "multi-line-call-argument"
+  },
+  {
+   "package": "python",
+   "rule": "orjson-loads-decoded",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#orjson-loads-decoded",
+   "fragment": "orjson-loads-decoded"
+  },
+  {
+   "package": "python",
+   "rule": "pass-through-function",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pass-through-function",
+   "fragment": "pass-through-function"
+  },
+  {
+   "package": "python",
+   "rule": "record-without-namedtuple",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#record-without-namedtuple",
+   "fragment": "record-without-namedtuple"
+  },
+  {
+   "package": "python",
+   "rule": "same-type-conversion",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#same-type-conversion",
+   "fragment": "same-type-conversion"
+  },
+  {
+   "package": "python",
+   "rule": "setdefault-without-defaultdict",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#setdefault-without-defaultdict",
+   "fragment": "setdefault-without-defaultdict"
+  },
+  {
+   "package": "python",
+   "rule": "slotted-base-without-slots",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#slotted-base-without-slots",
+   "fragment": "slotted-base-without-slots"
+  },
+  {
+   "package": "python",
+   "rule": "strptime-without-fromisoformat",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#strptime-without-fromisoformat",
+   "fragment": "strptime-without-fromisoformat"
+  },
+  {
+   "package": "python",
+   "rule": "test-rerun",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#test-rerun",
+   "fragment": "test-rerun"
+  },
+  {
+   "package": "python",
+   "rule": "test-skip",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#test-skip",
+   "fragment": "test-skip"
+  },
+  {
+   "package": "python",
+   "rule": "test-sleep",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#test-sleep",
+   "fragment": "test-sleep"
+  },
+  {
+   "package": "python",
+   "rule": "toml-without-tomllib",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#toml-without-tomllib",
+   "fragment": "toml-without-tomllib"
+  },
+  {
+   "package": "python",
+   "rule": "typing-cast",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#typing-cast",
+   "fragment": "typing-cast"
+  },
+  {
+   "package": "python",
+   "rule": "unpacked-comprehension",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unpacked-comprehension",
+   "fragment": "unpacked-comprehension"
+  },
+  {
+   "package": "python",
+   "rule": "vague-module-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#vague-module-name",
+   "fragment": "vague-module-name"
+  },
+  {
+   "package": "scipy",
+   "rule": "callable-metric",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#callable-metric",
+   "fragment": "callable-metric"
+  },
+  {
+   "package": "scipy",
+   "rule": "cdf-complement",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#cdf-complement",
+   "fragment": "cdf-complement"
+  },
+  {
+   "package": "scipy",
+   "rule": "ckdtree",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#ckdtree",
+   "fragment": "ckdtree"
+  },
+  {
+   "package": "scipy",
+   "rule": "comb-by-factorials",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#comb-by-factorials",
+   "fragment": "comb-by-factorials"
+  },
+  {
+   "package": "scipy",
+   "rule": "default-that-warns",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#default-that-warns",
+   "fragment": "default-that-warns"
+  },
+  {
+   "package": "scipy",
+   "rule": "deprecated-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-argument",
+   "fragment": "deprecated-argument"
+  },
+  {
+   "package": "scipy",
+   "rule": "deprecated-in-scipy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-scipy",
+   "fragment": "deprecated-in-scipy"
+  },
+  {
+   "package": "scipy",
+   "rule": "distance-per-pair",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#distance-per-pair",
+   "fragment": "distance-per-pair"
+  },
+  {
+   "package": "scipy",
+   "rule": "empty-csr-write",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#empty-csr-write",
+   "fragment": "empty-csr-write"
+  },
+  {
+   "package": "scipy",
+   "rule": "legacy-api",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-api",
+   "fragment": "legacy-api"
+  },
+  {
+   "package": "scipy",
+   "rule": "legacy-fftpack",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-fftpack",
+   "fragment": "legacy-fftpack"
+  },
+  {
+   "package": "scipy",
+   "rule": "legacy-interpolate",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-interpolate",
+   "fragment": "legacy-interpolate"
+  },
+  {
+   "package": "scipy",
+   "rule": "legacy-odeint",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-odeint",
+   "fragment": "legacy-odeint"
+  },
+  {
+   "package": "scipy",
+   "rule": "legacy-optimize",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-optimize",
+   "fragment": "legacy-optimize"
+  },
+  {
+   "package": "scipy",
+   "rule": "legacy-signal",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#legacy-signal",
+   "fragment": "legacy-signal"
+  },
+  {
+   "package": "scipy",
+   "rule": "log-of-dist-method",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#log-of-dist-method",
+   "fragment": "log-of-dist-method"
+  },
+  {
+   "package": "scipy",
+   "rule": "log-of-scipy-det",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#log-of-scipy-det",
+   "fragment": "log-of-scipy-det"
+  },
+  {
+   "package": "scipy",
+   "rule": "log-of-special",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#log-of-special",
+   "fragment": "log-of-special"
+  },
+  {
+   "package": "scipy",
+   "rule": "minimize-unknown-option",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#minimize-unknown-option",
+   "fragment": "minimize-unknown-option"
+  },
+  {
+   "package": "scipy",
+   "rule": "minimize-unused-argument",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#minimize-unused-argument",
+   "fragment": "minimize-unused-argument"
+  },
+  {
+   "package": "scipy",
+   "rule": "per-value-scipy-call",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#per-value-scipy-call",
+   "fragment": "per-value-scipy-call"
+  },
+  {
+   "package": "scipy",
+   "rule": "ppf-of-complement",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#ppf-of-complement",
+   "fragment": "ppf-of-complement"
+  },
+  {
+   "package": "scipy",
+   "rule": "query-per-point",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#query-per-point",
+   "fragment": "query-per-point"
+  },
+  {
+   "package": "scipy",
+   "rule": "removed-in-scipy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-scipy",
+   "fragment": "removed-in-scipy"
+  },
+  {
+   "package": "scipy",
+   "rule": "removed-keyword",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-keyword",
+   "fragment": "removed-keyword"
+  },
+  {
+   "package": "scipy",
+   "rule": "rng-keyword",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#rng-keyword",
+   "fragment": "rng-keyword"
+  },
+  {
+   "package": "scipy",
+   "rule": "solve-in-loop",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#solve-in-loop",
+   "fragment": "solve-in-loop"
+  },
+  {
+   "package": "scipy",
+   "rule": "sparse-inv-then-multiply",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sparse-inv-then-multiply",
+   "fragment": "sparse-inv-then-multiply"
+  },
+  {
+   "package": "scipy",
+   "rule": "sparse-matrix-api",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#sparse-matrix-api",
+   "fragment": "sparse-matrix-api"
+  },
+  {
+   "package": "scipy",
+   "rule": "special-complement",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#special-complement",
+   "fragment": "special-complement"
+  },
+  {
+   "package": "sklearn",
+   "rule": "auc-from-labels",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#auc-from-labels",
+   "fragment": "auc-from-labels"
+  },
+  {
+   "package": "sklearn",
+   "rule": "column-transformer-removed",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#column-transformer-removed",
+   "fragment": "column-transformer-removed"
+  },
+  {
+   "package": "sklearn",
+   "rule": "cross-val-on-fitted-data",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#cross-val-on-fitted-data",
+   "fragment": "cross-val-on-fitted-data"
+  },
+  {
+   "package": "sklearn",
+   "rule": "cross-val-score-per-metric",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#cross-val-score-per-metric",
+   "fragment": "cross-val-score-per-metric"
+  },
+  {
+   "package": "sklearn",
+   "rule": "deprecated-in-sklearn",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-sklearn",
+   "fragment": "deprecated-in-sklearn"
+  },
+  {
+   "package": "sklearn",
+   "rule": "deprecated-metric-api",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-metric-api",
+   "fragment": "deprecated-metric-api"
+  },
+  {
+   "package": "sklearn",
+   "rule": "fit-before-split",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#fit-before-split",
+   "fragment": "fit-before-split"
+  },
+  {
+   "package": "sklearn",
+   "rule": "fit-on-test",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#fit-on-test",
+   "fragment": "fit-on-test"
+  },
+  {
+   "package": "sklearn",
+   "rule": "fit-params-keyword",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#fit-params-keyword",
+   "fragment": "fit-params-keyword"
+  },
+  {
+   "package": "sklearn",
+   "rule": "groups-ignored",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#groups-ignored",
+   "fragment": "groups-ignored"
+  },
+  {
+   "package": "sklearn",
+   "rule": "leave-one-out-score",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#leave-one-out-score",
+   "fragment": "leave-one-out-score"
+  },
+  {
+   "package": "sklearn",
+   "rule": "metadata-routing",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#metadata-routing",
+   "fragment": "metadata-routing"
+  },
+  {
+   "package": "sklearn",
+   "rule": "metric-arguments-swapped",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#metric-arguments-swapped",
+   "fragment": "metric-arguments-swapped"
+  },
+  {
+   "package": "sklearn",
+   "rule": "missing-groups",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#missing-groups",
+   "fragment": "missing-groups"
+  },
+  {
+   "package": "sklearn",
+   "rule": "missing-random-state",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#missing-random-state",
+   "fragment": "missing-random-state"
+  },
+  {
+   "package": "sklearn",
+   "rule": "pandas-output-sparse",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pandas-output-sparse",
+   "fragment": "pandas-output-sparse"
+  },
+  {
+   "package": "sklearn",
+   "rule": "pipeline-fit-params",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pipeline-fit-params",
+   "fragment": "pipeline-fit-params"
+  },
+  {
+   "package": "sklearn",
+   "rule": "pipeline-step-form",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pipeline-step-form",
+   "fragment": "pipeline-step-form"
+  },
+  {
+   "package": "sklearn",
+   "rule": "predict-and-predict-proba",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#predict-and-predict-proba",
+   "fragment": "predict-and-predict-proba"
+  },
+  {
+   "package": "sklearn",
+   "rule": "predict-per-row",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#predict-per-row",
+   "fragment": "predict-per-row"
+  },
+  {
+   "package": "sklearn",
+   "rule": "random-state-without-shuffle",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#random-state-without-shuffle",
+   "fragment": "random-state-without-shuffle"
+  },
+  {
+   "package": "sklearn",
+   "rule": "refit-per-n-estimators",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#refit-per-n-estimators",
+   "fragment": "refit-per-n-estimators"
+  },
+  {
+   "package": "sklearn",
+   "rule": "removed-in-sklearn",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-sklearn",
+   "fragment": "removed-in-sklearn"
+  },
+  {
+   "package": "sklearn",
+   "rule": "removed-metric-api",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-metric-api",
+   "fragment": "removed-metric-api"
+  },
+  {
+   "package": "sklearn",
+   "rule": "score-after-predict",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#score-after-predict",
+   "fragment": "score-after-predict"
+  },
+  {
+   "package": "sklearn",
+   "rule": "score-on-training-rows",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#score-on-training-rows",
+   "fragment": "score-on-training-rows"
+  },
+  {
+   "package": "sklearn",
+   "rule": "stateful-function-transformer",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#stateful-function-transformer",
+   "fragment": "stateful-function-transformer"
+  },
+  {
+   "package": "sklearn",
+   "rule": "transformed-target-pair",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#transformed-target-pair",
+   "fragment": "transformed-target-pair"
+  },
+  {
+   "package": "sklearn",
+   "rule": "tsne-exact",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#tsne-exact",
+   "fragment": "tsne-exact"
+  },
+  {
+   "package": "sklearn",
+   "rule": "tune-on-test",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#tune-on-test",
+   "fragment": "tune-on-test"
+  },
+  {
+   "package": "sklearn",
+   "rule": "unknown-scoring-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unknown-scoring-name",
+   "fragment": "unknown-scoring-name"
+  },
+  {
+   "package": "sklearn",
+   "rule": "vectorizer-fit-then-transform",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#vectorizer-fit-then-transform",
+   "fragment": "vectorizer-fit-then-transform"
+  },
+  {
+   "package": "sklego",
+   "rule": "add-lags-positive",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#add-lags-positive",
+   "fragment": "add-lags-positive"
+  },
+  {
+   "package": "sklego",
+   "rule": "column-capper-fraction",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#column-capper-fraction",
+   "fragment": "column-capper-fraction"
+  },
+  {
+   "package": "sklego",
+   "rule": "dataset-frame-and-xy",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#dataset-frame-and-xy",
+   "fragment": "dataset-frame-and-xy"
+  },
+  {
+   "package": "sklego",
+   "rule": "debug-pipeline-default-log",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#debug-pipeline-default-log",
+   "fragment": "debug-pipeline-default-log"
+  },
+  {
+   "package": "sklego",
+   "rule": "decay-on-shuffled-rows",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#decay-on-shuffled-rows",
+   "fragment": "decay-on-shuffled-rows"
+  },
+  {
+   "package": "sklego",
+   "rule": "decay-without-sample-weight",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#decay-without-sample-weight",
+   "fragment": "decay-without-sample-weight"
+  },
+  {
+   "package": "sklego",
+   "rule": "deprecated-in-sklego",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#deprecated-in-sklego",
+   "fragment": "deprecated-in-sklego"
+  },
+  {
+   "package": "sklego",
+   "rule": "dict-mapper-not-int",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#dict-mapper-not-int",
+   "fragment": "dict-mapper-not-int"
+  },
+  {
+   "package": "sklego",
+   "rule": "estimator-transformer-proba",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#estimator-transformer-proba",
+   "fragment": "estimator-transformer-proba"
+  },
+  {
+   "package": "sklego",
+   "rule": "group-time-series-split-folds",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#group-time-series-split-folds",
+   "fragment": "group-time-series-split-folds"
+  },
+  {
+   "package": "sklego",
+   "rule": "grouped-shrinkage-arguments",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#grouped-shrinkage-arguments",
+   "fragment": "grouped-shrinkage-arguments"
+  },
+  {
+   "package": "sklego",
+   "rule": "log-step-extra-bare",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#log-step-extra-bare",
+   "fragment": "log-step-extra-bare"
+  },
+  {
+   "package": "sklego",
+   "rule": "outlier-remover-before-model",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#outlier-remover-before-model",
+   "fragment": "outlier-remover-before-model"
+  },
+  {
+   "package": "sklego",
+   "rule": "outlier-threshold",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#outlier-threshold",
+   "fragment": "outlier-threshold"
+  },
+  {
+   "package": "sklego",
+   "rule": "pca-outlier-after-scaler",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#pca-outlier-after-scaler",
+   "fragment": "pca-outlier-after-scaler"
+  },
+  {
+   "package": "sklego",
+   "rule": "regression-outlier-column-name",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#regression-outlier-column-name",
+   "fragment": "regression-outlier-column-name"
+  },
+  {
+   "package": "sklego",
+   "rule": "removed-in-sklego",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#removed-in-sklego",
+   "fragment": "removed-in-sklego"
+  },
+  {
+   "package": "sklego",
+   "rule": "scorer-called-as-metric",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#scorer-called-as-metric",
+   "fragment": "scorer-called-as-metric"
+  },
+  {
+   "package": "sklego",
+   "rule": "selector-without-feature-names",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#selector-without-feature-names",
+   "fragment": "selector-without-feature-names"
+  },
+  {
+   "package": "sklego",
+   "rule": "superseded-estimator",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#superseded-estimator",
+   "fragment": "superseded-estimator"
+  },
+  {
+   "package": "sklego",
+   "rule": "thresholder-score",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#thresholder-score",
+   "fragment": "thresholder-score"
+  },
+  {
+   "package": "sklego",
+   "rule": "unseeded-random-estimator",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#unseeded-random-estimator",
+   "fragment": "unseeded-random-estimator"
+  },
+  {
+   "package": "sklego",
+   "rule": "zero-inflated-roles",
+   "url": "https://bjoernaagaard.github.io/xpd/rules.html#zero-inflated-roles",
+   "fragment": "zero-inflated-roles"
+  },
+  {
+   "package": "xpd",
+   "rule": "unused-suppression",
+   "url": null,
+   "fragment": null
+  }
+ ]
+}

@@ -19,3 +19,6 @@ __pycache__/
 /website/node_modules/
 /website/dist/
 /website/.astro/
+
+# The rule and pack pages that website/scripts/rules.mjs writes from xpd rules
+/website/src/content/docs/rules/

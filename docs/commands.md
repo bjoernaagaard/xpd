@@ -1097,8 +1097,8 @@ Each folder that `project` makes also gets an empty `.gitkeep`.
 .
 ├── sgconfig.yml                       # ruleDirs: rules, utilDirs: utils, testConfigs: rule-tests
 ├── xpd.yml                            # the pack team, with ruleDirs: rules/team
-├── docs/rules.md                      # the documentation section of team/no-print
 ├── rules/team/no-print.yml
+├── rules/team/no-print.md             # the Markdown that explains team/no-print
 ├── rule-tests/team/no-print-test.yml  # id: team/no-print, valid: [], invalid: []
 └── utils/print-call.yml
 ```
@@ -1106,7 +1106,7 @@ Each folder that `project` makes also gets an empty `.gitkeep`.
 | Item | What it makes |
 | --- | --- |
 | `project` | `sgconfig.yml`, `xpd.yml`, and the `rules`, `rule-tests` and `utils` folders, with relative paths. Each `--pack MODULE` declares a pack whose rules run on files that import the module, or on every Python file with `--every-file` |
-| `rule` | A rule, with its section in `docs/rules.md`. A rule in a pack is a Python rule named `<pack>/<name>`. A rule outside a pack is a plain rule for any language, set with `--language`, and has no import gate |
+| `rule` | A rule, with the Markdown that explains it beside the rule file. A rule in a pack is a Python rule named `<pack>/<name>`. A rule outside a pack is a plain rule for any language, set with `--language`, and has no import gate |
 | `test` | An empty test case for a rule id or a public id. It writes no valid or invalid code |
 | `util` | A utility rule, which any rule uses with `matches: <name>` |
 
@@ -1129,7 +1129,7 @@ it exits 2 when the rule exists.
 | `--unless-holds VAR=RULE` | Drops a match when the variable holds a value of the rule's shape |
 | `--unless-imported RULE` | Turns the rule off in a file with a module level import statement of the rule's shape |
 | `--public-id ID` | The name that issues show, so several variants of a rule share one name |
-| `--note TEXT` | A longer explanation, for the rule's note and its documentation section |
+| `--note TEXT` | A longer explanation, for the rule's note and its Markdown |
 | `--with-test` | Also creates an empty test case |
 
 `xpd new help rule` prints the same help as `xpd new rule --help`.

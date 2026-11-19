@@ -1,0 +1,14 @@
+Casting an array that holds NaN to an int type turns each NaN into -9223372036854775808. Keep the float array, or replace NaN with a whole number before the cast.
+
+```diff lang="python"
+-counts = np.where(seen, totals, np.nan).astype(int)
++counts = np.where(seen, totals, 0).astype(int)
+```
+
+## What the rule reports
+
+The rule reports `np.where(m, x, np.nan).astype(int)`, which turns each NaN into -9223372036854775808.
+
+## How to fix it
+
+xpd has no automatic fix, so make the change by hand.

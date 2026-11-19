@@ -18,7 +18,8 @@ mdbook build
 """
 
 # The Starlight site that replaces the mdBook site. It builds on its own into website/dist/ until
-# GitHub Pages publishes it. The docs-preview daemon in pitchfork.toml serves it under /xpd/, the
+# GitHub Pages publishes it. Its build runs `cargo run -- rules` first and writes a page for each
+# rule from that catalog. The docs-preview daemon in pitchfork.toml serves it under /xpd/, the
 # path it has on Pages.
 [tasks."docs:starlight"]
 description = "Build the Starlight site into website/dist/"

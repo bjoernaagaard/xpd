@@ -1,11 +1,13 @@
-//! Embeds the rule packs under rules/, their sections of docs/rules.md, and the agent skills
-//! under skills/ into the binary.
+//! Embeds the rule packs under rules/, the Markdown that explains each rule, and the agent
+//! skills under skills/ into the binary.
 //!
 //! Each folder `rules/<module>/` is the pack for the Python library imported as `<module>`, or
 //! for Python itself when its manifest says `everyFile: true`.
-//! `pack.yml` is the pack's manifest, every other file is `<rule id>.yml`, the documents of one
-//! rule, and the folder `utils/` holds `<utility id>.yml`, one utility rule that every rule of
-//! the pack can name with `matches`. This script writes `OUT_DIR/packs.rs`, which src/pack.rs includes, so a new rule or
+//! `pack.yml` is the pack's manifest, `<rule id>.yml` holds the documents of one rule, and
+//! `<rule id>.md` explains a rule or a package check of the manifest. `pack.md` introduces the
+//! pack and lists each of its rules once under a heading, and the folder `utils/` holds
+//! `<utility id>.yml`, one utility rule that every rule of the pack can name with `matches`.
+//! The folder `rules/xpd/` holds only the Markdown of xpd's own rule, `xpd/unused-suppression`. This script writes `OUT_DIR/packs.rs`, which src/pack.rs includes, so a new rule or
 //! a new pack needs no Rust change. It also writes `OUT_DIR/skills.rs`, which src/skills.rs
 //! includes.
 
@@ -21,10 +23,14 @@ mod search;
 
 /// The file in a pack folder that is the manifest and not a rule.
 const MANIFEST: &str = "pack.yml";
+/// The file in a pack folder that introduces the pack and groups its rules.
+const PACK_PAGE: &str = "pack.md";
+/// The folder under `rules/` with the Markdown of xpd's own rules, which the code of src/pack.rs
+/// defines, and their ids.
+const OWN_PACK: &str = "xpd";
+const OWN_RULES: &[&str] = &["unused-suppression"];
 /// The folder in a pack folder that holds the pack's shared utility rules.
 const UTILS: &str = "utils";
-/// The page with one `#### <rule id>` section for every rule and package check.
-const RULES_PAGE: &str = "docs/rules.md";
 /// The manifest of the agent plugin that this repository is.
 const PLUGIN: &str = "plugin.json";
 /// The plugin's file that starts xpd with `uvx xpd@VERSION`.
@@ -35,25 +41,6 @@ const VECTORS: &str = "indexes/vectors.bin";
 /// hash of its text (u64 LE, as `text_hash` gives it), and `DIMENSIONS` signed bytes.
 const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
 const DIMENSIONS: usize = 256;
-/// The `## ` headings of the rules page that hold a pack's sections, each with the pack's
-/// module. A heading names the library as its project writes it, which is not always the name
-/// it is imported by.
-const PACK_HEADINGS: &[(&str, &str)] = &[
-    ("pandas", "pandas"),
-    ("NumPy", "numpy"),
-    ("SciPy", "scipy"),
-    ("scikit-learn", "sklearn"),
-    ("scikit-lego", "sklego"),
-    ("MAPIE", "mapie"),
-    ("Category Encoders", "category_encoders"),
-    ("linearmodels", "linearmodels"),
-    ("arch", "arch"),
-    ("pymoo", "pymoo"),
-    ("plotly", "plotly"),
-    ("Hamilton", "hamilton"),
-    ("Python", "python"),
-];
-
 /// Fails the build when the agent plugin names another version than the crate, so a release
 /// cannot ship skills under an old version or start an old xpd.
 fn plugin_version() -> Result<()> {
@@ -77,27 +64,37 @@ fn main() -> Result<()> {
     let root = Path::new("rules");
     // Cargo rescans a directory given here for changes to any file inside it.
     println!("cargo:rerun-if-changed={}", root.display());
-    println!("cargo:rerun-if-changed={RULES_PAGE}");
     println!("cargo:rerun-if-changed=skills");
     println!("cargo:rerun-if-changed={PLUGIN}");
     println!("cargo:rerun-if-changed={PLUGIN_MCP}");
     plugin_version()?;
     println!("cargo:rerun-if-changed=indexes");
-    let page =
-        fs::read_to_string(RULES_PAGE).with_context(|| format!("cannot read {RULES_PAGE}"))?;
-    let mut docs = rule_docs(&page)?;
-    discovery_source(&out, &docs)?;
-    let packs = sorted_entries(root)?
-        .iter()
-        .filter(|path| path.is_dir())
-        .map(|pack| pack_source(pack, &mut docs))
-        .collect::<Result<Vec<String>>>()?;
-    if let Some(module) = docs.keys().next() {
-        bail!(
-            "build.rs: PACK_HEADINGS names the module {module}, which has no folder under rules/"
-        );
+    let mut packs = Vec::new();
+    let mut docs = BTreeMap::new();
+    let mut own = None;
+    // The published rules page and `xpd check --rule` find a rule by its id alone, so an id
+    // belongs to one pack.
+    let mut owners = BTreeMap::new();
+    for pack in sorted_entries(root)?.iter().filter(|path| path.is_dir()) {
+        let module = utf8_name(pack)?;
+        if module == OWN_PACK {
+            let ids: Vec<String> = OWN_RULES.iter().map(|&id| id.to_owned()).collect();
+            own = Some(doc_sources(&rule_markdown(pack, &ids)?));
+            continue;
+        }
+        let (source, pack_docs) = pack_source(pack)?;
+        for id in pack_docs.keys() {
+            if let Some(first) = owners.insert(id.clone(), module.to_owned()) {
+                bail!("rules/{module}: the id {id} is also a rule of rules/{first}");
+            }
+        }
+        packs.push(source);
+        docs.insert(module.to_owned(), pack_docs);
     }
+    let own = own.with_context(|| format!("rules/{OWN_PACK} is missing"))?;
+    discovery_source(&out, &docs)?;
     write(&out.join("packs.rs"), &format!("&[\n{}]", packs.concat()))?;
+    write(&out.join("own_docs.rs"), &format!("&[\n{own}]"))?;
     write(&out.join("skills.rs"), &skills_source(Path::new("skills"))?)
 }
 
@@ -105,8 +102,9 @@ fn write(target: &Path, source: &str) -> Result<()> {
     fs::write(target, source).with_context(|| format!("cannot write {}", target.display()))
 }
 
-/// The `PackSource` literal for one pack folder. It takes the pack's sections out of `docs`.
-fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>) -> Result<String> {
+/// The `PackSource` literal for one pack folder, and the Markdown of each of its rules and
+/// package checks by id.
+fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
     let module = utf8_name(pack)?;
     ensure!(
         is_module_name(module),
@@ -119,7 +117,7 @@ fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>)
     for file in sorted_entries(pack)? {
         let name = utf8_name(&file)?;
         // Hidden files, such as the ones a file manager leaves, are not part of the pack.
-        if name.starts_with('.') {
+        if name.starts_with('.') || is_markdown(&file) {
             continue;
         }
         if name == UTILS && file.is_dir() {
@@ -139,7 +137,7 @@ fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>)
             );
         } else {
             let id = name.strip_suffix(".yml").with_context(|| {
-                format!("rules/{module}/{name}: a pack holds {MANIFEST} and <rule id>.yml files")
+                format!("rules/{module}/{name}: a pack holds {MANIFEST}, {PACK_PAGE}, <rule id>.yml and <rule id>.md files")
             })?;
             let mut found = yaml.lines().filter_map(|line| line.strip_prefix("id: "));
             ensure!(
@@ -154,27 +152,96 @@ fn pack_source(pack: &Path, docs: &mut BTreeMap<&str, BTreeMap<String, String>>)
         }
     }
     ensure!(!rules.is_empty(), "rules/{module}: the pack has no rules");
-    let Some(mut sections) = docs.remove(module) else {
-        bail!("rules/{module}: add the pack's heading on {RULES_PAGE} to PACK_HEADINGS in build.rs")
-    };
-    let mut pack_docs = Vec::new();
-    for id in &ids {
-        let text = sections.remove(id).with_context(|| {
-            format!("rules/{module}: {id} has no `#### {id}` section on {RULES_PAGE}")
-        })?;
-        pack_docs.push(format!(
-            "            DocSource {{ id: {id:?}, text: {text:?} }},\n"
-        ));
-    }
-    if let Some(stray) = sections.keys().next() {
-        bail!("{RULES_PAGE}: the section {stray} names no rule or package check of rules/{module}");
-    }
-    Ok(format!(
+    let docs = rule_markdown(pack, &ids)?;
+    let source = format!(
         "    PackSource {{\n        module: {module:?},\n        manifest: {manifest},\n        rules: &[\n{}        ],\n        utils: &[\n{}        ],\n        docs: &[\n{}        ],\n    }},\n",
         rules.concat(),
         utils.concat(),
-        pack_docs.concat()
-    ))
+        doc_sources(&docs)
+    );
+    Ok((source, docs))
+}
+
+/// The text of `<id>.md` in the pack folder for each id in `ids`, trimmed at the end. Fails when
+/// a rule has no Markdown file, when a Markdown file names no rule, and when `pack.md` does not
+/// list every id once.
+fn rule_markdown(pack: &Path, ids: &[String]) -> Result<BTreeMap<String, String>> {
+    let module = utf8_name(pack)?;
+    let mut docs = BTreeMap::new();
+    let mut page = None;
+    for file in sorted_entries(pack)? {
+        let name = utf8_name(&file)?;
+        let Some(id) = file
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .filter(|_| is_markdown(&file) && !name.starts_with('.'))
+        else {
+            continue;
+        };
+        let text =
+            fs::read_to_string(&file).with_context(|| format!("cannot read {}", file.display()))?;
+        if name == PACK_PAGE {
+            page = Some(text);
+        } else {
+            ensure!(
+                ids.iter().any(|known| known == id),
+                "rules/{module}/{name} names no rule or package check of the pack"
+            );
+            docs.insert(id.to_owned(), text.trim_end().to_owned());
+        }
+    }
+    for id in ids {
+        ensure!(
+            docs.contains_key(id),
+            "rules/{module}: {id} has no rules/{module}/{id}.md, which xpd rules, xpd find, the editor hover and the site show"
+        );
+    }
+    let page = page.with_context(|| format!("rules/{module} has no {PACK_PAGE}"))?;
+    let mut listed = BTreeSet::new();
+    let mut in_code = false;
+    for line in page.lines() {
+        if line.trim_start().starts_with("```") {
+            in_code = !in_code;
+        }
+        // A list item that is a bare rule id puts the rule in the group of the heading above.
+        let Some(item) = line.strip_prefix("- ").filter(|item| {
+            !in_code
+                && item
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        }) else {
+            continue;
+        };
+        ensure!(
+            docs.contains_key(item),
+            "rules/{module}/{PACK_PAGE} lists {item}, which is no rule or package check of the pack"
+        );
+        ensure!(
+            listed.insert(item),
+            "rules/{module}/{PACK_PAGE} lists {item} twice"
+        );
+    }
+    if let Some(id) = ids.iter().find(|id| !listed.contains(id.as_str())) {
+        bail!("rules/{module}/{PACK_PAGE} lists no `- {id}` under a heading");
+    }
+    Ok(docs)
+}
+
+/// The `DocSource` literals of the Markdown of a pack.
+fn doc_sources(docs: &BTreeMap<String, String>) -> String {
+    docs.iter().fold(String::new(), |mut out, (id, text)| {
+        // Writing to a String cannot fail.
+        let _ = writeln!(
+            out,
+            "            DocSource {{ id: {id:?}, text: {text:?} }},"
+        );
+        out
+    })
+}
+
+/// Whether `path` is a Markdown file, which explains a rule and is no rule itself.
+fn is_markdown(path: &Path) -> bool {
+    path.extension().is_some_and(|extension| extension == "md")
 }
 
 /// The `RuleSource` literals for the utility rules in the `utils` folder of the pack `module`.
@@ -202,60 +269,6 @@ fn util_sources(module: &str, utils: &Path) -> Result<Vec<String>> {
         ));
     }
     Ok(sources)
-}
-
-/// The `#### <id>` sections of the rules page, by the module of the pack heading they are
-/// under. A section runs from its heading to the next heading of level 4 or higher, and a `#`
-/// line inside a code block is code, not a heading.
-fn rule_docs(page: &str) -> Result<BTreeMap<&'static str, BTreeMap<String, String>>> {
-    let mut docs: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::new();
-    let mut seen = BTreeSet::new();
-    let mut module = None;
-    let mut section: Option<(String, Vec<&str>)> = None;
-    let mut in_code = false;
-    // A heading after the last line closes the last section.
-    for line in page.lines().chain(std::iter::once("# ")) {
-        if line.trim_start().starts_with("```") {
-            in_code = !in_code;
-        }
-        let level = heading_level(line).filter(|_| !in_code);
-        if level.is_some_and(|level| level <= 4)
-            && let (Some(module), Some((id, lines))) = (module, section.take())
-        {
-            let text = lines.join("\n").trim_end().to_owned();
-            docs.entry(module).or_default().insert(id, text);
-        }
-        match level {
-            Some(2) => {
-                let title = line[3..].trim();
-                module = PACK_HEADINGS
-                    .iter()
-                    .find(|(heading, _)| *heading == title)
-                    .map(|(_, module)| *module);
-            }
-            Some(4) if module.is_some() => {
-                let id = line[5..].trim().to_owned();
-                // The site builds the anchor from the heading alone, so a second section of
-                // the same id would get another anchor than the one `xpd rules` links to.
-                ensure!(
-                    seen.insert(id.clone()),
-                    "{RULES_PAGE}: two sections are headed `#### {id}`"
-                );
-                section = Some((id, Vec::new()));
-            }
-            _ => {}
-        }
-        if let Some((_, lines)) = &mut section {
-            lines.push(line);
-        }
-    }
-    Ok(docs)
-}
-
-/// The level of a Markdown heading line such as `## NumPy`, or `None` for another line.
-fn heading_level(line: &str) -> Option<usize> {
-    let level = line.bytes().take_while(|&b| b == b'#').count();
-    (level > 0 && line[level..].starts_with(' ')).then_some(level)
 }
 
 /// The `SkillSource` list for every skill folder under `root`, each with all of its files.
@@ -341,7 +354,7 @@ fn is_module_name(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
-fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>) -> Result<()> {
+fn discovery_source(out: &Path, docs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<()> {
     let mut entries = Vec::<serde_json::Value>::new();
     for path in sorted_entries(Path::new("indexes"))? {
         if path.extension().is_none_or(|e| e != "json") || path.ends_with("questions.json") {
@@ -358,13 +371,7 @@ fn discovery_source(out: &Path, docs: &BTreeMap<&str, BTreeMap<String, String>>)
     }
     for (package, sections) in docs {
         for (id, doc) in sections {
-            let prose = doc
-                .lines()
-                .skip(1)
-                .filter(|line| !line.starts_with("**Severity:"))
-                .collect::<Vec<_>>()
-                .join("\n");
-            entries.push(serde_json::json!({"kind":"rule","package":package,"name":format!("{package}/{id}"),"callable":null,"parameters":[],"summary":prose.trim(),"members":[],"rules":[]}));
+            entries.push(serde_json::json!({"kind":"rule","package":package,"name":format!("{package}/{id}"),"callable":null,"parameters":[],"summary":doc.trim(),"members":[],"rules":[]}));
         }
     }
     let mut records = String::from("&[\n");

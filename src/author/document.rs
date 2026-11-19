@@ -1,11 +1,11 @@
-//! The documents `xpd new` writes: rules, test cases, utilities and docs sections, each checked
+//! The documents `xpd new` writes: rules, test cases, utilities and the Markdown of a rule, each checked
 //! as ast-grep and xpd read it.
 
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use ast_grep_config::{DeserializeEnv, GlobalRules, SerializableGlobalRule, SerializableRule};
 use ast_grep_core::matcher::Pattern;
 use ast_grep_language::SupportLang;
@@ -265,44 +265,43 @@ impl RuleDoc {
         Ok(text)
     }
 
-    /// The rule's section of docs/rules.md, in the form of xpd's own rules page.
-    pub(super) fn docs_section(&self) -> String {
+    /// The Markdown that explains the rule, in the form of xpd's own rule pages: the message,
+    /// the note, then what the rule reports and how to fix it.
+    pub(super) fn markdown(&self) -> String {
         let language = self.language_name;
-        let fix = match &self.fix {
-            Some((fix, safety)) => format!("{safety}: `{fix}`"),
-            None => "none".to_owned(),
-        };
         let versions = match (&self.since, &self.until) {
             (Some(since), Some(until)) => Some(format!("from {since}, and before {until}")),
             (Some(since), None) => Some(format!("from {since}")),
             (None, Some(until)) => Some(format!("before {until}")),
             (None, None) => None,
         };
+        let fix = self.fix.as_ref().map(|(fix, safety)| {
+            let command = match *safety {
+                "safe" => "`xpd check --fix`",
+                _ => "`xpd check --fix --unsafe-fixes`",
+            };
+            format!(
+                "## How to fix it\n\n{command} applies the {safety} fix of this rule, which writes the code below.\n\n```{language}\n{fix}\n```"
+            )
+        });
         let paragraphs = [
-            Some(format!("#### {}", self.id.name)),
-            Some(format!("**Severity:** {}. **Fix:** {fix}.", self.severity)),
-            (versions.zip(self.id.pack.as_ref()))
-                .map(|(versions, pack)| format!("Applies to {pack} {versions}.")),
             Some(self.message.clone()),
             self.note.clone(),
-            Some(format!("Matches:\n\n```{language}\n{}\n```", self.pattern)),
-            (self.fix.as_ref()).map(|(fix, _)| format!("Fix:\n\n```{language}\n{fix}\n```")),
+            Some(format!(
+                "## What the rule reports\n\nThe rule reports code that matches this pattern.\n\n```{language}\n{}\n```",
+                self.pattern
+            )),
+            (versions.zip(self.id.pack.as_ref()))
+                .map(|(versions, pack)| format!("It applies to {pack} {versions}.")),
+            fix,
         ];
-        let mut section = paragraphs
+        let mut text = paragraphs
             .into_iter()
             .flatten()
             .collect::<Vec<_>>()
             .join("\n\n");
-        section.push('\n');
-        section
-    }
-
-    /// The `## ` heading that holds the rule's section on the docs page.
-    pub(super) fn docs_heading(&self) -> String {
-        match &self.id.pack {
-            Some(pack) => format!("## {pack}"),
-            None => "## Structural rules".to_owned(),
-        }
+        text.push('\n');
+        text
     }
 }
 
@@ -381,40 +380,4 @@ pub(super) fn checked_util(
     utils.push(ast_grep_config::from_str(&text).context("the new utility does not parse")?);
     DeserializeEnv::parse_global_utils(utils).context("ast-grep does not compile the utilities")?;
     Ok(text)
-}
-
-/// Adds the rule's section to the docs page `text`, at the end of its heading's sections. Fails
-/// when the heading already has a section for the rule.
-pub(super) fn docs_with_section(
-    text: Option<&str>,
-    heading: &str,
-    section: &str,
-) -> Result<String> {
-    let Some(text) = text else {
-        return Ok(format!("# Rules\n\n{heading}\n\n{section}"));
-    };
-    let lines: Vec<&str> = text.lines().collect();
-    let Some(start) = lines.iter().position(|line| line.trim_end() == heading) else {
-        let separator = if text.ends_with('\n') { "\n" } else { "\n\n" };
-        return Ok(format!("{text}{separator}{heading}\n\n{section}"));
-    };
-    let end = lines[start + 1..]
-        .iter()
-        .position(|line| line.starts_with("## ") || line.starts_with("# "))
-        .map_or(lines.len(), |offset| start + 1 + offset);
-    let section_heading = section.lines().next().unwrap_or_default();
-    if lines[start..end]
-        .iter()
-        .any(|line| line.trim_end() == section_heading)
-    {
-        bail!("the docs page already has {section_heading:?} under {heading:?}");
-    }
-    let before = lines[..end].join("\n");
-    let before = before.trim_end();
-    let after = lines[end..].join("\n");
-    Ok(if after.is_empty() {
-        format!("{before}\n\n{section}")
-    } else {
-        format!("{before}\n\n{section}\n{after}\n")
-    })
 }

@@ -2,6 +2,14 @@ import { satteri } from '@astrojs/markdown-satteri';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import mermaid from 'astro-mermaid';
+import { readFileSync } from 'node:fs';
+import { PACKS } from './src/packs.mjs';
+
+/** The name of a rule pack, from the first line of rules/<pack>/pack.md, such as scikit-learn. */
+const packTitle = (pack) =>
+  readFileSync(new URL(`../rules/${pack}/pack.md`, import.meta.url), 'utf8')
+    .split('\n')[0]
+    .replace(/^# /, '');
 
 // GitHub Pages serves the project site at https://bjoernaagaard.github.io/xpd/.
 export default defineConfig({
@@ -20,7 +28,16 @@ export default defineConfig({
         'A fast linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn.',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/bjoernaagaard/xpd' }],
       editLink: { baseUrl: 'https://github.com/bjoernaagaard/xpd/edit/main/website/' },
-      sidebar: [{ label: 'Get started', link: '/' }],
+      sidebar: [
+        { label: 'Get started', link: '/' },
+        {
+          label: 'Rules',
+          items: [
+            { label: 'All rules', link: '/rules/' },
+            ...PACKS.map((pack) => ({ label: packTitle(pack), link: `/rules/${pack}/` })),
+          ],
+        },
+      ],
       pagefind: true,
     }),
   ],

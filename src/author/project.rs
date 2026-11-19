@@ -17,7 +17,6 @@ use super::document::{self, Name, RuleDoc, RuleId};
 const SGCONFIG: &str = "sgconfig.yml";
 const SGCONFIG_YAML: &str = "sgconfig.yaml";
 const XPD_CONFIG: &str = "xpd.yml";
-const DOCS: &str = "docs/rules.md";
 const RULES: &str = "rules";
 const TESTS: &str = "rule-tests";
 const UTILS: &str = "utils";
@@ -443,7 +442,8 @@ impl Project {
         DeserializeEnv::parse_global_utils(utils).context("the project's utilities do not compile")
     }
 
-    /// Adds the rule's file, its docs section and, for a new pack, the pack's `xpd.yml` entry.
+    /// Adds the rule's file, its Markdown beside it and, for a new pack, the pack's `xpd.yml`
+    /// entry.
     pub(in crate::author) fn add_rule(
         &self,
         doc: &RuleDoc,
@@ -458,22 +458,12 @@ impl Project {
         })?;
         let path = self.inside(&format!("{dir}/{}.yml", doc.id.name))?;
         changes.stage(path, text, None);
+        let markdown = self.inside(&format!("{dir}/{}.md", doc.id.name))?;
+        changes.stage(markdown, doc.markdown(), None);
         if let Some(pack) = pack.filter(|pack| !pack.declared) {
             let text = with_pack(self.xpd_config.as_deref(), pack)?;
             changes.stage(self.inside(XPD_CONFIG)?, text, self.xpd_config.as_ref());
         }
-        let docs = self.inside(DOCS)?;
-        let existing = docs
-            .is_file()
-            .then(|| fs::read_to_string(&docs))
-            .transpose()
-            .with_context(|| format!("cannot read {}", docs.display()))?;
-        let text = document::docs_with_section(
-            existing.as_deref(),
-            &doc.docs_heading(),
-            &doc.docs_section(),
-        )?;
-        changes.stage(docs, text, existing.as_ref());
         Ok(())
     }
 

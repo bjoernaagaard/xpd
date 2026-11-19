@@ -33,12 +33,12 @@ struct PackSource {
     /// Each `rules/<module>/utils/<id>.yml`, a utility rule that every rule of the pack can
     /// name with `matches`.
     utils: &'static [RuleSource],
-    /// The `#### <id>` section of docs/rules.md for each rule and package check of the pack.
+    /// The Markdown of `rules/<module>/<id>.md` for each rule and package check of the pack.
     /// build.rs fails when one is missing.
     docs: &'static [DocSource],
 }
 
-/// One section of docs/rules.md, from its heading to the next heading.
+/// The Markdown that explains one rule or package check.
 #[derive(Debug)]
 struct DocSource {
     id: &'static str,
@@ -62,6 +62,9 @@ impl RuleSource {
 
 /// Every pack under `rules/`, in name order.
 const SOURCES: &[PackSource] = include!(concat!(env!("OUT_DIR"), "/packs.rs"));
+
+/// The Markdown of xpd's own rules, from `rules/xpd/<id>.md`.
+const OWN_DOCS: &[DocSource] = include!(concat!(env!("OUT_DIR"), "/own_docs.rs"));
 
 /// The package of the issues that xpd reports about a file's own suppression comments.
 const OWN_PACKAGE: &str = "xpd";
@@ -363,7 +366,7 @@ impl Pack {
             aliases: BTreeMap::new(),
             members: BTreeMap::new(),
             package_checks: Vec::new(),
-            docs: &[],
+            docs: OWN_DOCS,
             root: None,
         })
     }
@@ -443,7 +446,7 @@ impl Pack {
         }
     }
 
-    /// The Markdown section of docs/rules.md about the rule or package check `id`.
+    /// The Markdown that explains the rule or package check `id`.
     pub(crate) fn doc(&self, id: &str) -> Option<&'static str> {
         self.docs
             .iter()
@@ -451,9 +454,11 @@ impl Pack {
             .map(|doc| doc.text)
     }
 
-    /// Whether the pack ships with xpd, so that the rules page documents its rules.
+    /// Whether the pack ships with xpd and the published rules page documents its rules, so
+    /// that an issue links there. xpd's own pack has its Markdown in the catalog, and the
+    /// published page has no section for it yet.
     pub(crate) fn is_embedded(&self) -> bool {
-        !self.docs.is_empty()
+        !self.docs.is_empty() && !matches!(self.gate, Gate::Suppressions)
     }
 
     /// Keeps the rules for the `installed` version of the pack's library. A pack whose library
