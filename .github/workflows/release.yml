@@ -1,7 +1,7 @@
-# Builds wheels for xpd on native runners. A pushed v* tag also publishes them to PyPI with
-# trusted publishing and attaches them to a GitHub Release. Pushes to main build the same wheels
-# without publishing, which fills the sccache cache that a tag restores, since a tag can only
-# restore caches from the default branch. Started from `maturin generate-ci github` (maturin 1.16).
+# Builds wheels for xpd on native runners on each push to main. A pushed v* tag builds nothing.
+# It publishes the wheels that the run on main built for the same commit to PyPI with trusted
+# publishing, and attaches them to a GitHub Release. A release therefore compiles once, and the
+# tag waits only for the upload. Started from `maturin generate-ci github` (maturin 1.16).
 name: Release
 
 on:
@@ -22,6 +22,7 @@ concurrency:
 jobs:
   # mise.toml pins Rust. Runners ship older toolchains, so every build installs this one.
   toolchain:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -32,6 +33,7 @@ jobs:
         run: python3 -c 'import tomllib; print("rust=" + tomllib.load(open("mise.toml", "rb"))["tools"]["rust"]["version"])' >> "$GITHUB_OUTPUT"
 
   linux:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 30
@@ -79,6 +81,7 @@ jobs:
           path: dist
 
   musllinux:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 30
@@ -109,6 +112,7 @@ jobs:
           path: dist
 
   windows:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 30
@@ -150,6 +154,7 @@ jobs:
           path: dist
 
   macos:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 30
@@ -197,6 +202,7 @@ jobs:
           path: dist
 
   sdist:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -212,18 +218,44 @@ jobs:
           name: wheels-sdist
           path: dist
 
+  # The run on main that built the wheels of the tagged commit. The tag is pushed after that run
+  # passed, so a tag on a commit without one stops here and publishes nothing.
+  built:
+    name: Find the wheels built on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.find.outputs.run }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --branch main \
+            --commit "$GITHUB_SHA" --status success --json databaseId --jq '.[0].databaseId')
+          test -n "$run" || { echo "::error title=No wheels for this commit::No Release run on main passed for $GITHUB_SHA. Push the commit to main, wait for its Release run, and push the tag again."; exit 1; }
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   # Only this job may mint a PyPI token, as the uv publishing guide recommends.
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [built]
     environment: pypi
     permissions:
       id-token: write
+      # Reads the wheels of the run on main.
+      actions: read
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          run-id: ${{ needs.built.outputs.run }}
+          github-token: ${{ github.token }}
       - name: Check the tag matches the package version
         run: |
           expected="wheels-sdist/xpd-${GITHUB_REF_NAME#v}.tar.gz"
@@ -271,14 +303,18 @@ jobs:
     name: GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [publish]
+    needs: [built, publish]
     permissions:
       # actions/attest signs with an OIDC token and stores the attestation.
       id-token: write
       attestations: write
       contents: write
+      actions: read
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          run-id: ${{ needs.built.outputs.run }}
+          github-token: ${{ github.token }}
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: 'wheels-*/*'
