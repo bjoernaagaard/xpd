@@ -126,7 +126,7 @@ xpd
 ├── lint
 │   ├── check [paths]          lint files and folders, and rewrite with --fix
 │   ├── rules                  list every rule with its documentation
-│   └── hook                   lint the files that an agent's edit changed
+│   └── hook                   answer an agent's session: lint each edit, and hold a turn that leaves errors or warnings
 ├── look up a library
 │   ├── find "<task>"          find library symbols, rules and worked examples for a task
 │   ├── api <name>             read one symbol, method or worked example in full
@@ -158,7 +158,7 @@ once. Every other command only reads files.
 
 | You want | Do | Guide |
 | --- | --- | --- |
-| Claude Code to see the issues of each file it edits | Add `xpd hook` as a `PostToolUse` hook | [Claude Code and other agents](https://bjoernaagaard.github.io/xpd/guides/claude-code/) |
+| An agent to see the issues of each file it edits, and to keep working while one has an error or a warning | Install the plugin, or add `xpd hook` to the agent's hooks | [Claude Code and other agents](https://bjoernaagaard.github.io/xpd/guides/claude-code/) |
 | An agent to call xpd's tools | `claude mcp add xpd -- uvx xpd mcp` | [Connect an agent with MCP](https://bjoernaagaard.github.io/xpd/guides/mcp/) |
 | The hook, the MCP server and the skills in one step | Install this repository as a plugin in Claude Code or Codex | [Agent plugin](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-plugin) |
 | An agent to know when to run each command | `npx skills add bjoernaagaard/xpd` | [Agent skill](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-skill) |
@@ -166,20 +166,26 @@ once. Every other command only reads files.
 | Issues, fixes and rule help in your editor | Start `xpd lsp` from the editor | [Use xpd in an editor](https://bjoernaagaard.github.io/xpd/guides/editors/) |
 | A rule for your own project | `xpd new rule` | [Write a rule](https://bjoernaagaard.github.io/xpd/guides/write-a-rule/) |
 
-The hook for Claude Code goes in `.claude/settings.json` in your project.
+Install the plugin in Claude Code with the following commands. The guide has the commands for
+Codex.
 
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [{ "type": "command", "command": "xpd hook" }]
-      }
-    ]
-  }
-}
+```sh
+claude plugin marketplace add bjoernaagaard/xpd
+claude plugin install xpd@xpd
 ```
+
+The plugin runs `xpd hook` at four points of a session.
+
+```text
+session starts        xpd records the commit that the session began at
+user sends a prompt   xpd prints nothing in this version
+agent edits a file    xpd reports the issues of that file
+agent wants to stop   xpd lints every Python file the session changed,
+                      and holds the turn while one has an error or a warning
+```
+
+With `style = "strict"`, a rule of the house style counts as a warning, so the agent also keeps
+working until the code is in the style.
 
 ## License
 

@@ -159,6 +159,36 @@ In both clients, the agent sees the issues of a file right after its edit. In Co
 a shell command makes sends no such event, and the `Stop` check covers it, because that check
 lints every Python file the session changed.
 
+### Hold a turn on the house style
+
+The `Stop` check holds a turn on an error or a warning. A rule of the house style is `info`, so
+the agent may leave code that works and is not in the style. Set `style = "strict"` to make those
+rules warnings, and the agent then keeps working until the code is in the style. The
+[`xpd check` page](../../commands/check/#house-style) lists the two files that xpd reads the
+setting from.
+
+```toml
+# pyproject.toml, for one project
+[tool.xpd]
+style = "strict"
+```
+
+```toml
+# ~/.config/xpd/config.toml, for every project of one user
+style = "strict"
+```
+
+The agent below wrote three row filters in a row. The first run has no setting, and the second
+has `style = "strict"`.
+
+```text
+agent wants to stop
+  no setting    xpd lists the info issue for the user, and the turn ends
+  strict        xpd answers {"decision": "block"} with the line below, and the turn goes on
+
+orders.py:4:1: warning [pandas/filter-ladder] df is filtered three or more times in a row, ...
+```
+
 `xpd hook` also answers a client of the 1.1.0 draft of the
 [Agent Plugins](https://github.com/agentplugins/agent-plugins-spec) format, which sends another
 event after an edit. xpd tells the two kinds of client apart by the field that holds the result of

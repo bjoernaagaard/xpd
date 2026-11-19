@@ -33,10 +33,10 @@ Doctor reads the pytest settings from `pytest.toml`, `.pytest.toml` or `pyprojec
 | Setting | Where | What it changes |
 | --- | --- | --- |
 | `strict = true` | The pytest table | An unknown marker, an invalid setting, a repeated parameter id and an `xfail` test that passes each fail the run. |
-| `-ra` | `addopts` | The summary lists each skipped test and each expected failure. |
-| `--import-mode=importlib` | `addopts` | pytest imports a test file without adding its folder to `sys.path`. |
+| `pytest -ra` | `addopts` | The summary lists each skipped test and each expected failure. |
+| `pytest --import-mode=importlib` | `addopts` | pytest imports a test file without adding its folder to `sys.path`. |
 
-`strict` needs pytest 9.0. On pytest 8, doctor suggests `--strict-markers` and `--strict-config` in `addopts` and `xfail_strict = true` in the table.
+`strict` needs pytest 9.0. On pytest 8, doctor suggests `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in the table.
 
 ## Recommended pytest plugins
 
@@ -55,7 +55,7 @@ Doctor reads the dependency groups and the optional dependencies in `pyproject.t
 
 | In the project | Reason |
 | --- | --- |
-| `--reruns` and `--reruns-delay` in `addopts` | A rerun hides the run where the code was wrong. |
+| `pytest --reruns` and `pytest --reruns-delay` in `addopts` | A rerun hides the run where the code was wrong. |
 | `reruns` and `reruns_delay` in the pytest table | The same. |
 | `strict_xfail = false` and `xfail_strict = false` | An `xfail` test that passes no longer fails the run. |
 
@@ -99,7 +99,7 @@ pyproject.toml, table [tool.pytest.ini_options] at line 12
     Evidence: pyproject.toml:9 pytest-timeout
 ```
 
-The file reads as follows after the edits, with a limit of 60 seconds as an example. `strict` covers `--strict-markers`, so that flag goes too.
+The file reads as follows after the edits, with a limit of 60 seconds as an example. `strict` covers `pytest --strict-markers`, so that flag goes too.
 
 ```diff
  [dependency-groups]

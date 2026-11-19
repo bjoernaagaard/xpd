@@ -113,11 +113,11 @@ df = df[df["city"] != "Oslo"]
 
 ```console
 $ xpd check script.py --format text
-script.py:4:1: info [pandas/filter-ladder] df is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in df = df.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...], or one df.query(...) with the conditions joined by "and".
+script.py:4:1: info [pandas/filter-ladder] df is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in df = df.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...].
 xpd: 1 issue
 $ printf '[tool.xpd]\nstyle = "strict"\n' > pyproject.toml
 $ xpd check script.py --format text
-script.py:4:1: warning [pandas/filter-ladder] df is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in df = df.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...], or one df.query(...) with the conditions joined by "and".
+script.py:4:1: warning [pandas/filter-ladder] df is filtered three or more times in a row, each time into itself, so every line leaves a half-filtered frame under the final name. Write one chain, as in df = df.loc[lambda d: ...].loc[lambda d: ...].loc[lambda d: ...].
 xpd: 1 issue
 ```
 

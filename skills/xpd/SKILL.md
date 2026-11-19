@@ -14,6 +14,13 @@ Use `xpd` whenever you write or change Python code.
   `python/test-suppressed-health-check` report a test that hides a failure. Find why the test fails, or delete it and write down why.
   A `pandas/missing-<package>` warning names a package the project lacks. Ask the user
   before you add a dependency.
+  With the xpd plugin installed, `xpd hook` lints each Python file you edit, and it holds the
+  end of your turn while a file you changed has an `error` or a `warning`. When the code is right
+  as it is, write `# ast-grep-ignore: <pack>/<rule>` on the line above, with the reason after it.
+  A project or a user sets `style = "strict"` in `[tool.xpd]` of `pyproject.toml` or in
+  `~/.config/xpd/config.toml`. The rules of the house style are then warnings: write a frame's
+  steps as one method chain or as functions joined with `.pipe`, return `frame.assign(...)`
+  instead of writing `frame["x"] = ...`, and follow the plotly pack in a chart.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
   Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per
   kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.
