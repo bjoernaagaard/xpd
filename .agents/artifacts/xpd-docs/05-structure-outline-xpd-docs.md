@@ -14,7 +14,7 @@ A new reader should be able to copy a small Python file, run xpd and see exactly
 
 - [x] ✅ 1. Build a working Starlight quick start.
 - [x] ✅ 2. Give every rule a page and share its explanation with installed tools.
-- [ ] 3. Generate command and MCP references from the running tools.
+- [x] ✅ 3. Generate command and MCP references from the running tools.
 - [ ] 4. Rewrite the public guides and package README.
 - [ ] 5. Verify existing links and switch GitHub Pages to Starlight.
 
@@ -86,7 +86,7 @@ The agent also ran the manual steps in headless Chrome for Testing 158 against t
 - [x] Open pandas/chained-assignment from the candidate catalog and follow the link to the pandas pack.
 - [x] Check a rule with no automatic fix.
 
-## 3. Generate command and MCP references from the running tools
+## ✅ 3. Generate command and MCP references from the running tools
 
 **Change outline.** Use the CLI command definitions behind [src/cli.rs](../../../src/cli.rs) and the registrations in [the MCP server](../../../python/xpd/mcp/server.py) for names, nested commands, flags, arguments, defaults and tool signatures. Keep explanations of when to use a command, worked examples and exit behavior in authored prose. Cover MCP prompts and resources alongside its tools. Make generated fields part of the docs build so an option change appears on the next build.
 
@@ -111,9 +111,9 @@ When to use each command and tool, worked examples, exit status and tool errors 
 - [x] The 27 `$ xpd` lines in the authored pages give their shown output when run from the repository root, with pandas 3.1.1 and scikit-learn 1.9.1 for `profile`, `equiv` and `refit`. The tool examples are results of live calls to all 21 tools. 42,720 internal links on 492 pages resolve, fragments included.
 - [x] A wrong flag in a page and a page that names no command each stop the build with a message.
 
-The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. Ctrl+K searches for `--follow`, `debug-query`, `globs`, `discovery_gate`, `update_snapshots` and `unsafe_fixes` showed results titled by their command or tool, such as "xpd outline" with a "--follow" section and "check tool" with an "unsafe_fixes" section. Two Tabs and Enter opened `xpd run`, the `discovery_gate` tool and the `test` tool, and a click on the "--follow" section opened `commands/outline/#--follow`. A search for `--follow` lists the plotly pack page first, because Pagefind drops the dashes and the pack text uses "follow". At 390 pixels wide, 8 reference pages did not scroll sideways in light and dark themes, and the MCP sequence diagram rendered in both. Manual acceptance by the user is pending.
+The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. Ctrl+K searches for `--follow`, `debug-query`, `globs`, `discovery_gate`, `update_snapshots` and `unsafe_fixes` showed results titled by their command or tool, such as "xpd outline" with a "--follow" section and "check tool" with an "unsafe_fixes" section. Two Tabs and Enter opened `xpd run`, the `discovery_gate` tool and the `test` tool, and a click on the "--follow" section opened `commands/outline/#--follow`. A search for `--follow` lists the plotly pack page first, because Pagefind drops the dashes and the pack text uses "follow". At 390 pixels wide, 8 reference pages did not scroll sideways in light and dark themes, and the MCP sequence diagram rendered in both. The user authorized verified browser and integration checks as sign-off for phases 3 through 5, including publication and live verification.
 
-- [ ] Search for a flag and a tool name, and from each result identify the owning command or tool and how to supply the argument.
+- [x] Search for a flag and a tool name, and from each result identify the owning command or tool and how to supply the argument.
 
 ## 4. Rewrite the public guides and package README
 
