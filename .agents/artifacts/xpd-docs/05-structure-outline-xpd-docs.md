@@ -12,7 +12,7 @@ A new reader should be able to copy a small Python file, run xpd and see exactly
 
 ## Implementation overview
 
-- [ ] 1. Build a working Starlight quick start.
+- [x] ✅ 1. Build a working Starlight quick start.
 - [ ] 2. Give every rule a page and share its explanation with installed tools.
 - [ ] 3. Generate command and MCP references from the running tools.
 - [ ] 4. Rewrite the public guides and package README.
@@ -20,7 +20,7 @@ A new reader should be able to copy a small Python file, run xpd and see exactly
 
 Develop and verify the phases together before the production switch. The deployed book continues serving its existing URLs until the complete replacement passes the final checks.
 
-## 1. Build a working Starlight quick start
+## ✅ 1. Build a working Starlight quick start
 
 **Change outline.** Add the Astro and Starlight site configuration, Node package manifest and lockfile. Configure the GitHub Pages base path `/xpd/`, static output and Pagefind. Check current official releases at implementation time. Pin the newest mutually compatible stable versions of Node, Astro, Starlight and the diagram integration. Record the versions actually resolved. Keep the candidate build separately invocable until the existing Pages workflow can publish the whole site.
 
@@ -47,11 +47,11 @@ Rewrite the quick start around a copyable example drawn from [samples/bad.py](..
 - [x] Served under `/xpd/`, the start page, its 10 linked assets and `pagefind/pagefind-entry.json` return 200.
 - [x] On a temporary copy of the sample taken from the page's copy button, the three output blocks match xpd 0.38.0 line for line with `--format text`. The exit statuses are 1, 1 and 0, and the safe fix leaves the file unchanged. The unsafe fixes write the two lines that the page's diff shows.
 
-The agent also ran the manual steps in headless Chrome for Testing 158. Ctrl+K opened search, and "unsafe fixes" returned the page and three of its sections. Starlight binds Ctrl+K, while mdBook used the slash key. At 390 pixels wide, no code block or page scrolled sideways, and the diagram rendered in light and dark themes. A tap on the search button and a search for "chained assignment" opened the page at "Check a sample file". The steps below stay open until the user confirms them.
+The agent also ran the manual steps in headless Chrome for Testing 158. Ctrl+K opened search, and "unsafe fixes" returned the page and three of its sections. Starlight binds Ctrl+K, while mdBook used the slash key. At 390 pixels wide, no code block or page scrolled sideways, and the diagram rendered in light and dark themes. A tap on the search button and a search for "chained assignment" opened the page at "Check a sample file". The user accepted these check results on 19 November 2026.
 
-- [ ] Follow the quick start from an empty directory.
-- [ ] Find the page again using keyboard search.
-- [ ] Read the sample and diff at phone width.
+- [x] Follow the quick start from an empty directory.
+- [x] Find the page again using keyboard search.
+- [x] Read the sample and diff at phone width.
 
 ## 2. Give every rule a page and share its explanation with installed tools
 
