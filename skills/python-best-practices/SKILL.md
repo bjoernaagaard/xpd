@@ -281,7 +281,7 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | A test for an empty frame around a mean, `astype(...).to_numpy()` | `xpd check`: `pandas/empty-guard`, `pandas/astype-then-to-numpy` |
 | A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
 | A loop where one call on whole arrays or columns does the work: a recurrence, a mask per label, a draw per pass, a column per pass, a lambda in named `agg`, a filter before the frame | `xpd check`: `numpy/recurrence-loop`, `numpy/slice-fill-loop`, `numpy/mask-per-label`, `numpy/random-draw-loop`, `pandas/column-loop`, `pandas/named-agg-lambda`, `pandas/filter-before-frame` |
-| Mock imports, `monkeypatch.setattr` in a test | `xpd check`: `python/mock-import`, `python/test-setattr` |
+| Mock imports | `xpd check`: `python/mock-import` |
 | A skipped test, a test that is rerun, a sleep in a test | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep` |
 | Slow or wrong pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Hamilton code | `xpd check`, in files that import them |
 

@@ -161,8 +161,8 @@ The first two groups are where real bugs live.
 **Proof**
 
 - A change with no command a reader can run to see that it works.
-- Tests that mock the thing under test (`python/mock-import`, `python/test-setattr`), or
-  assert on private details, so they pass while the program fails.
+- Tests that mock the thing under test (`python/mock-import`), or assert on private
+  details, so they pass while the program fails.
 - A test that is skipped (`python/test-skip`), rerun until it passes
   (`python/test-rerun`) or waits with a sleep (`python/test-sleep`), so a failure stays
   unseen.
