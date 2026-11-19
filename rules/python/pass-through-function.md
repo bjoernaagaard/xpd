@@ -14,7 +14,9 @@ A function that only passes its parameters to one call adds a name without addin
 The rule reports a module level function whose body is one `return` of a call that takes only
 the function's own names as arguments, also when one more call wraps it, as in
 `float(curve(at_price))`. It leaves alone a method, a decorated function and a function that
-computes something, such as a formula.
+computes something, such as a formula. It also leaves alone a function that returns a chain of
+two or more `pipe` calls, such as `frame.pipe(clean).pipe(features)`, because that function names
+the steps of a pipeline in the order they run.
 
 ## How to fix it
 

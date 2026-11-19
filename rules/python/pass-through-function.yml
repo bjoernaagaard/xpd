@@ -1,7 +1,7 @@
 # A function that only hands its own parameters to one call gives that call a second name, and a
 # reader has to open the function to learn that it does nothing else. Call the other function
 # directly. A function that computes something, such as a formula, is left alone, and so is a
-# method and a decorated function. The rule has no fix, because the calls of the function are
+# method, a decorated function and a function that returns a chain of two or more pipe calls. The rule has no fix, because the calls of the function are
 # in other places and other files.
 id: pass-through-function
 language: python
@@ -16,6 +16,9 @@ rule:
       - has:
           kind: return_statement
           has: { matches: passes-names }
+          # A chain of two or more pipe calls names the steps of a pipeline in the order they
+          # run, which is what xpd graph reads, so the function does more than rename one call.
+          not: { has: { pattern: $FRAME.pipe($$$FIRST).pipe($$$NEXT) } }
       - not:
           has:
             any:
