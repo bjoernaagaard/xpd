@@ -1,14 +1,14 @@
-//! `xpd doctor`: the Ruff and ty settings worth changing in this project, each with the file it
-//! belongs in, the reason, and the evidence that makes a conditional one relevant.
+//! `xpd doctor` reports settings worth changing in Ruff, ty and pytest. Each suggestion gives
+//! the file, the reason, and any evidence that makes the advice relevant.
 //!
-//! The decisions come from a review of every rule and setting of one Ruff and one ty release,
-//! which `doctor/decisions.jsonl` holds. Ruff and ty are optional: doctor runs an installed one
-//! to read the settings it resolves, and labels the advice for a missing one unverified locally.
+//! The decisions in `doctor/decisions.jsonl` cover Ruff and ty's pinned releases and the pytest
+//! settings named in the testing policy. Missing tools leave their advice unverified locally.
 
 mod advice;
 pub(crate) mod catalog;
 mod evidence;
 mod probe;
+mod pytest;
 mod ruff;
 mod toml;
 mod ty;
@@ -37,7 +37,8 @@ pub(crate) fn run(format: Format) -> Result<()> {
         &catalog,
         probe::Checker::find(catalog::Tool::Ty, &root),
     );
-    let report = advice::evaluate(&root, &files, &catalog, &evidence, &ruff, &ty);
+    let mut report = advice::evaluate(&root, &files, &catalog, &evidence, &ruff, &ty);
+    report.pytest(&root, files.len(), &catalog, &pytest::analyze(&root));
     match format {
         Format::Json => println!("{}", report.to_json()),
         Format::Text => print!("{}", report.to_text()),

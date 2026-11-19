@@ -931,7 +931,8 @@ impl Report {
             }
         }
         for record in records {
-            if !seen.contains(&record.key) {
+            // The external inventories cover Ruff and ty. Pytest has a policy catalog.
+            if record.key.tool != Tool::Pytest && !seen.contains(&record.key) {
                 self.changed
                     .push(format!("{} is packaged and in no inventory", record.key));
             }

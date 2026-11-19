@@ -18,12 +18,14 @@ pub(crate) const DECISIONS: &str = include_str!("decisions.jsonl");
 /// The releases the decisions were reviewed for.
 pub(crate) const RUFF_RELEASE: &str = "0.17.4";
 pub(crate) const TY_RELEASE: &str = "0.0.106";
+pub(crate) const PYTEST_RELEASE: &str = "9.2.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Tool {
     Ruff,
     Ty,
+    Pytest,
 }
 
 impl Tool {
@@ -31,6 +33,7 @@ impl Tool {
         match self {
             Self::Ruff => "ruff",
             Self::Ty => "ty",
+            Self::Pytest => "pytest",
         }
     }
 
@@ -38,6 +41,7 @@ impl Tool {
         match self {
             Self::Ruff => RUFF_RELEASE,
             Self::Ty => TY_RELEASE,
+            Self::Pytest => PYTEST_RELEASE,
         }
     }
 }

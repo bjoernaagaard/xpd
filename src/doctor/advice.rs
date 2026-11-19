@@ -11,6 +11,7 @@ use serde::Serialize;
 use super::catalog::{Catalog, Record, Satisfied, Suggestion, Target, Tool, Trigger, When};
 use super::evidence::{Evidence, Location};
 use super::probe::Checker;
+use super::pytest::{self, Pytest};
 use super::ruff::{self, Ruff};
 use super::toml::{Destination, Observed, Placement};
 use super::ty::{self, Ty};
@@ -60,6 +61,8 @@ pub(crate) struct Advice {
     condition: Option<String>,
     evidence: Vec<Location>,
     status: String,
+    #[serde(skip)]
+    arguments: Option<(Placement, pytest::ArgumentStyle)>,
 }
 
 /// A deliberate choice of the project that doctor keeps.
@@ -455,6 +458,43 @@ fn shown(root: &Path, path: &Path) -> PathBuf {
 }
 
 impl Report {
+    pub(crate) fn pytest(&mut self, root: &Path, files: usize, catalog: &Catalog, pytest: &Pytest) {
+        let tool = Tool::Pytest;
+        let (installed, path) = pytest.installed.clone().unzip();
+        let pinned = tool.pinned();
+        let status = installed.as_ref().map_or_else(
+            || format!("unverified locally (decisions for pytest {pinned})"),
+            |version| format!("pytest {version} installed (decisions reviewed for {pinned})"),
+        );
+        self.tools.push(ToolStatus {
+            tool: tool.name(),
+            pinned,
+            installed,
+            path,
+        });
+        for note in &pytest.notes {
+            self.note(tool, note.clone());
+        }
+        let settings = match &pytest.settings {
+            Ok(Some(settings)) => settings,
+            Ok(None) => return,
+            Err(error) => {
+                self.note(tool, format!("cannot read pytest's settings: {error}"));
+                return;
+            }
+        };
+        let facts = Scope {
+            destination: &settings.destination,
+            name: scope_name(root, settings.config.as_deref(), "pytest's defaults"),
+            files,
+            status,
+            representative: None,
+        };
+        for (record, suggestion) in settings.suggestions(catalog) {
+            self.suggest(root, record, suggestion, None, Vec::new(), &facts);
+        }
+    }
+
     fn note(&mut self, tool: Tool, message: String) {
         self.notes.push(Note {
             tool: tool.name(),
@@ -479,6 +519,7 @@ impl Report {
             let checker = match tool {
                 Tool::Ruff => &ruff.checker,
                 Tool::Ty => &ty.checker,
+                Tool::Pytest => continue,
             };
             let version = checker
                 .installed
@@ -575,9 +616,17 @@ impl Report {
             Target::Command(command) => (command, String::new(), Assign::Command),
         };
         let placement = (assign != Assign::Command).then(|| facts.destination.place(key));
+        let arguments = placement
+            .as_ref()
+            .filter(|_| pytest::is_addopts(record.key.tool, &suggestion.target))
+            .map(|placement| (placement.clone(), pytest::argument_style(facts.destination)));
         let (value, edit) = if let Some(placement) = &placement {
             let file = shown(root, &facts.destination.file);
-            let edit = edit(placement, &value, assign, &file);
+            let edit = if let Some((placement, style)) = &arguments {
+                pytest::add_arguments(placement, &[&value], *style)
+            } else {
+                edit(placement, &value, assign, &file)
+            };
             (value, edit)
         } else {
             let command = match facts.representative {
@@ -619,6 +668,7 @@ impl Report {
             condition,
             evidence: relative(root, evidence),
             status: facts.status.clone(),
+            arguments,
         });
     }
 
@@ -726,6 +776,13 @@ impl Report {
                 let same: Vec<&Advice> = group.iter().filter(|m| m.key == key).copied().collect();
                 let values: Vec<&str> = same.iter().map(|m| m.value.as_str()).collect();
                 let _ = match (same.as_slice(), same[0].key_line) {
+                    _ if let Some((placement, style)) = &same[0].arguments => {
+                        writeln!(
+                            out,
+                            "  {}",
+                            pytest::add_arguments(placement, &values, *style)
+                        )
+                    }
                     ([single], Some(_)) => writeln!(out, "  {}", single.edit),
                     ([single], None) => writeln!(out, "  {key} = {}", single.value),
                     (_, Some(line)) => writeln!(
