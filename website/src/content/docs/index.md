@@ -156,9 +156,10 @@ Pick the page for what you want to do next.
 
 | You want to | Page |
 | --- | --- |
-| See every command, its output and its exit codes | [Commands](https://bjoernaagaard.github.io/xpd/commands.html) |
-| Lint each edit that Claude Code makes, or load xpd as an agent plugin | [Claude Code](https://bjoernaagaard.github.io/xpd/claude-code.html) |
-| Give an agent typed tools, resources and prompts | [MCP server](https://bjoernaagaard.github.io/xpd/mcp.html) |
-| Take a data file to a saved scikit-learn model with checks that xpd runs | [Code mode](https://bjoernaagaard.github.io/xpd/code-mode.html) |
-| See issues, fixes and rule documentation in an editor | [Language server](https://bjoernaagaard.github.io/xpd/lsp.html) |
-| Read every rule with code before and after, or write your own | [Rules](https://bjoernaagaard.github.io/xpd/rules.html) |
+| Read what a rule reports and how to fix it | [Rules](rules/) |
+| Show a coding agent the issues of each file it edits | [Claude Code and other agents](guides/claude-code/) |
+| Give an agent xpd's tools, rules and prompts | [Connect an agent with MCP](guides/mcp/) |
+| Take a data file to a saved scikit-learn model with checks that xpd runs | [Train a model in code mode](guides/code-mode/) |
+| See issues, fixes and rule help in an editor | [Use xpd in an editor](guides/editors/) |
+| Report a pattern of your own project | [Write a rule](guides/write-a-rule/) |
+| Look up a command, its options and its exit status | [Commands](commands/) |

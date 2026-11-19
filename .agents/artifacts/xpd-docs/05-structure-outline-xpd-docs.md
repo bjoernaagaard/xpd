@@ -15,7 +15,7 @@ A new reader should be able to copy a small Python file, run xpd and see exactly
 - [x] ✅ 1. Build a working Starlight quick start.
 - [x] ✅ 2. Give every rule a page and share its explanation with installed tools.
 - [x] ✅ 3. Generate command and MCP references from the running tools.
-- [ ] 4. Rewrite the public guides and package README.
+- [x] ✅ 4. Rewrite the public guides and package README.
 - [ ] 5. Verify existing links and switch GitHub Pages to Starlight.
 
 Develop and verify the phases together before the production switch. The deployed book continues serving its existing URLs until the complete replacement passes the final checks.
@@ -115,13 +115,29 @@ The agent also ran the manual steps in headless Chrome for Testing 158 against t
 
 - [x] Search for a flag and a tool name, and from each result identify the owning command or tool and how to supply the argument.
 
-## 4. Rewrite the public guides and package README
+## ✅ 4. Rewrite the public guides and package README
 
 **Change outline.** Use the seven chapters in [the existing book](../../../docs/SUMMARY.md) as the coverage inventory. Rewrite the README used on GitHub and PyPI, installation, commands, rules and rule authoring, Claude Code, MCP setup, code mode and language server guides. Link guides to generated facts rather than copying counts or option tables. In each workflow, lead with what the reader can do, explain prerequisites and show the result. Use a diagram for interactions and a diff for changes to code. Keep examples readable wherever the package README is rendered.
 
 **Automated verification.** Run the documented local commands on copies of the examples. For the full bad.py baseline, run check, then safe fixes, then explicitly enabled unsafe fixes. Compare with the observed five findings, zero safe edits and two unsafe edits. Drive each integration through its normal entry point, verify the displayed response or output, and report any example requiring unavailable external access separately. Build the complete site and check internal links, images and diagrams.
 
 **Manual verification.** Start at the README and follow installation through the first fix without a checkout. In the site, navigate to rule authoring, connect an editor and locate an MCP tool. Check keyboard focus, search results, code readability, diagram labels and horizontal scrolling on desktop and at phone width in each supported theme.
+
+**Progress on 19 November 2026.** Five guides live in `website/src/content/docs/guides/`, at `guides/claude-code/`, `guides/mcp/`, `guides/code-mode/`, `guides/editors/` and `guides/write-a-rule/`, and the sidebar lists them after Get started. They cover the hook, the skills and the agent plugin, MCP setup and settings, code mode, the language server, and rule authoring for a project and for xpd's packs. They link to the generated command, MCP and rule pages for options, counts and tool fields. The README leads with installation and the copyable `bad.py`, and it links each guide and rule by its new address. Get started links to the guides. The old book chapters stay in `docs/` until phase 5 removes them.
+
+`samples/pipeline/discovery.json` named `sklearn.conftest.fetch_species_distributions`, which the index now gives as `sklearn.datasets.fetch_species_distributions`, so the gate `discovery-is-recorded` failed. The record was written again from `find` and `api`, as the code mode guide tells readers to do.
+
+- [x] With xpd 0.38.0 from `uvx` in an empty folder, the README's `bad.py` gave 5 findings and exit 1, `--fix` left the file unchanged with exit 1, and `--fix --unsafe-fixes` wrote the two lines of the README's diff with exit 0. Every `$ xpd` line of the README, the Claude Code guide and the rule authoring guide gave its shown output from this checkout's build.
+- [x] Claude Code 2.1.328 in a scratch project with the guide's `.claude/settings.json` ran `xpd hook` after an Edit, which exited 2, and its transcript holds the hook error with all five rules. `claude mcp add xpd -- uvx xpd mcp` and `claude mcp list` showed `✔ Connected`. `fastmcp list` and `fastmcp call` ran as the MCP guide shows, `check` returned the guide's issue fields, and the server over HTTP answered `initialize` with 200. `npx skills add bjoernaagaard/xpd` installed the three skills, and in a scratch `CODEX_HOME`, Codex 0.170.0 installed the plugin and listed its `xpd` server.
+- [x] Following the code mode guide's setup in a new uv environment, `run_pipeline.py` from the page passed all 15 gates in 7.5 seconds with Python 3.15.2, scikit-learn 1.9.1 and pandas 3.1.1. With `leaky.py` the run stopped at `check` on `sklearn/tune-on-test` at line 74, and `predict.py` gave the shown rows, right for 85 of 86.
+- [x] A script that speaks LSP over stdio, as an editor does, got 5 diagnostics for `bad.py`, the unsafe quick fix of line 6, the hover with the rule page link and `MethodNotFound` for completion. The Neovim, Helix, Zed and VS Code configurations were not run, because this machine has none of the editors, and the bas proxy refuses downloads from github.com other than git.
+- [x] `mise run docs` built 497 pages. 48,206 internal links and sources in the built site resolve, 6,734 of them with fragments. The built site has no images, and every Mermaid diagram rendered in the browser.
+
+The agent also ran the manual steps in headless Chrome for Testing 158 against the `docs-preview` daemon. At 1280 and 390 pixels wide, in the light and dark themes, Get started, the five guides, a rule page and the MCP overview had no sideways scroll and no code block that scrolls sideways, and each diagram rendered with its labels inside the content column. Ctrl+K searches for `xpd hook`, `unsafeFixes`, `write a rule` and `code mode gates` listed the hook command, the check command, the rule authoring guide and the gates tool, and two Tabs and Enter opened each one. Tab moved a visible outline from "Skip to content" through the header to the sidebar.
+
+- [x] Start at the README and follow installation through the first fix without a checkout.
+- [x] In the site, navigate to rule authoring, connect an editor and locate an MCP tool.
+- [x] Check keyboard focus, search results, code readability, diagram labels and horizontal scrolling on desktop and at phone width in each theme.
 
 ## 5. Verify existing links and switch GitHub Pages to Starlight
 

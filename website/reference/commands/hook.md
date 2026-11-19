@@ -2,7 +2,7 @@ Use `xpd hook` as a `PostToolUse` hook of a coding agent, so the agent sees the 
 file it edits. It reads the hook event JSON on stdin and lints the `.py` files that the event
 changed. In a project with `sgconfig.yml`, it also lints the files that the project's rules are
 for. When a file holds a pipeline of steps, it also reports the errors and warnings of
-[`xpd graph`](../graph/). The [Claude Code guide](https://bjoernaagaard.github.io/xpd/claude-code.html)
+[`xpd graph`](../graph/). The [Claude Code guide](../../guides/claude-code/)
 shows the setup.
 
 | Client | How the hook answers |
