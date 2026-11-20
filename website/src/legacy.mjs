@@ -6,16 +6,17 @@
 // fragments are the heading ids of the old chapters, and a fragment that isn't listed opens the
 // chapter's new page.
 
-import { getCollection } from 'astro:content';
+import { getCollection, render } from 'astro:content';
 
 const headingSlug = (title) => title.toLowerCase().replace(/\s+/g, '-');
 
 /** The new page of each old fragment of `rules.html`, derived from the pages scripts/rules.mjs
  * wrote from `xpd rules`. */
-async function rulesFragments() {
+function rulesFragments(docs) {
   const fragments = {};
   const packs = [];
-  for (const { id, data } of await getCollection('docs', ({ id }) => id.startsWith('rules/'))) {
+  for (const { id, data } of docs) {
+    if (!id.startsWith('rules/')) continue;
     const [, pack, rule] = id.split('/');
     if (rule) fragments[rule] = `rules/${pack}/${rule}/`;
     else if (pack) packs.push([headingSlug(data.title), pack]);
@@ -33,9 +34,10 @@ async function rulesFragments() {
 
 /** The new page of each old fragment of `commands.html`, with top-level commands derived from the
  * pages scripts/reference.mjs wrote from `xpd commands`. */
-async function commandsFragments() {
+function commandsFragments(docs) {
   const commands = {};
-  for (const { id, data } of await getCollection('docs', ({ id }) => id.startsWith('commands/'))) {
+  for (const { id, data } of docs) {
+    if (!id.startsWith('commands/')) continue;
     const words = data.title.split(' ');
     if (words[0] === 'xpd' && words.length === 2) {
       commands[words[1]] = `${id}/`;
@@ -113,23 +115,67 @@ const lspFragments = {
   'another-editor': 'guides/editors/#another-editor',
 };
 
+/** Verifies that every page and `#heading` target in `pages` exists in the generated docs. */
+async function verifyTargets(docs, pages) {
+  const byPath = new Map(docs.map((entry) => [entry.id ? `${entry.id}/` : '', entry]));
+  const headingSets = new Map();
+  async function headingsOf(pagePath) {
+    if (!headingSets.has(pagePath)) {
+      const entry = byPath.get(pagePath);
+      const headings = entry.rendered?.metadata?.headings ?? (await render(entry)).headings;
+      headingSets.set(pagePath, new Set(headings.map((heading) => heading.slug)));
+    }
+    return headingSets.get(pagePath);
+  }
+
+  const problems = [];
+  for (const { path, page, fragments } of pages) {
+    if (!byPath.has(page)) {
+      problems.push(`${path} -> ${page}: target page does not exist`);
+    }
+    for (const [fragment, target] of Object.entries(fragments)) {
+      const hash = target.indexOf('#');
+      const targetPage = hash === -1 ? target : target.slice(0, hash);
+      const anchor = hash === -1 ? '' : target.slice(hash + 1);
+      if (!byPath.has(targetPage)) {
+        problems.push(`${path}#${fragment} -> ${target}: target page "${targetPage}" does not exist`);
+        continue;
+      }
+      if (anchor && !(await headingsOf(targetPage)).has(anchor)) {
+        problems.push(`${path}#${fragment} -> ${target}: heading "#${anchor}" does not exist on "${targetPage}"`);
+      }
+    }
+  }
+  if (problems.length) {
+    throw new Error(`legacy.mjs points at missing pages or headings:\n${problems.join('\n')}`);
+  }
+}
+
+let cachedPages;
+
 /**
  * Each old page with the new page it opens and the new address of each old fragment. The
  * mdBook site also answered at <chapter>/index.html, and those addresses for commands, mcp and
  * rules are pages of this site, so only the other three need a page of their own.
  */
-export async function legacyPages() {
-  return [
-    { path: 'commands.html', page: 'commands/', fragments: await commandsFragments() },
-    { path: 'claude-code.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
-    { path: 'claude-code/index.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
-    { path: 'mcp.html', page: 'guides/mcp/', fragments: mcpFragments },
-    { path: 'code-mode.html', page: 'guides/code-mode/', fragments: codeModeFragments },
-    { path: 'code-mode/index.html', page: 'guides/code-mode/', fragments: codeModeFragments },
-    { path: 'lsp.html', page: 'guides/editors/', fragments: lspFragments },
-    { path: 'lsp/index.html', page: 'guides/editors/', fragments: lspFragments },
-    { path: 'rules.html', page: 'rules/', fragments: await rulesFragments() },
-  ];
+export function legacyPages() {
+  cachedPages ??= (async () => {
+    const docs = await getCollection('docs');
+    const pages = [
+      { path: 'commands.html', page: 'commands/', fragments: commandsFragments(docs) },
+      { path: 'claude-code.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
+      { path: 'claude-code/index.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
+      { path: 'mcp.html', page: 'guides/mcp/', fragments: mcpFragments },
+      { path: 'code-mode.html', page: 'guides/code-mode/', fragments: codeModeFragments },
+      { path: 'code-mode/index.html', page: 'guides/code-mode/', fragments: codeModeFragments },
+      { path: 'lsp.html', page: 'guides/editors/', fragments: lspFragments },
+      { path: 'lsp/index.html', page: 'guides/editors/', fragments: lspFragments },
+      { path: 'rules.html', page: 'rules/', fragments: rulesFragments(docs) },
+    ];
+    await verifyTargets(docs, pages);
+    return pages;
+  })();
+  return cachedPages;
 }
 
 /** The HTML of an old page that opens `page`, or the new address of the fragment it was opened
@@ -154,4 +200,20 @@ export function legacyHtml(site, base, { page, fragments }) {
 </body>
 </html>
 `;
+}
+
+/** Builds Astro `getStaticPaths` and `GET` handlers for a subset of legacy redirect pages. */
+export function legacyEndpoint(match, paramsOf) {
+  return {
+    async getStaticPaths() {
+      return (await legacyPages())
+        .filter(({ path }) => match(path))
+        .map((legacy) => ({ params: paramsOf(legacy.path), props: legacy }));
+    },
+    GET({ props }) {
+      return new Response(legacyHtml(import.meta.env.SITE, import.meta.env.BASE_URL, props), {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    },
+  };
 }
