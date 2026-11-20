@@ -16,6 +16,7 @@ use ast_grep_language::SupportLang;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
+use crate::pack_names::OWN_PACK;
 use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
 use crate::rule_id::RuleId;
@@ -68,9 +69,6 @@ const SOURCES: &[PackSource] = include!(concat!(env!("OUT_DIR"), "/packs.rs"));
 
 /// The Markdown of xpd's own rules, from `rules/xpd/<id>.md`.
 const OWN_DOCS: &[DocSource] = include!(concat!(env!("OUT_DIR"), "/own_docs.rs"));
-
-/// The package of the issues that xpd reports about a file's own suppression comments.
-const OWN_PACKAGE: &str = "xpd";
 
 /// What belongs to a library as a whole and not to one rule: a `pack.yml` of an embedded pack,
 /// or one entry under `packs` in a project's `xpd.yml`.
@@ -354,11 +352,11 @@ impl Pack {
     /// hides nothing, and it never reports one that hides an issue.
     pub(crate) fn suppressions() -> Result<Self> {
         let config = CombinedScan::unused_config(Severity::Hint, SupportLang::Python);
-        let source = PathBuf::from(OWN_PACKAGE);
-        let rule = Rule::new(config, Origin::Structural, Some(OWN_PACKAGE), source, 1)?;
+        let source = PathBuf::from(OWN_PACK);
+        let rule = Rule::new(config, Origin::Structural, Some(OWN_PACK), source, 1)?;
         Ok(Self {
             style: Style::Default,
-            module: OWN_PACKAGE.to_owned(),
+            module: OWN_PACK.to_owned(),
             gate: Gate::Suppressions,
             rules: vec![rule],
             inactive_rules: Vec::new(),
@@ -540,8 +538,7 @@ pub(crate) fn symbol_rules(module: &str) -> Result<BTreeMap<String, Vec<String>>
             shared.insert(util.id(), value);
         }
         for rule in source.rules {
-            for document in rule.yaml.split("\n---") {
-                let value: serde_json::Value = ast_grep_config::from_str(document)?;
+            for value in ast_grep_config::from_multiple::<serde_json::Value>(rule.yaml)? {
                 let null = serde_json::Value::Null;
                 let own = value.get("utils").unwrap_or(&null);
                 let mut tokens = BTreeSet::new();

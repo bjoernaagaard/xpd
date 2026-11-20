@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::fix_safety::Applicability;
-use crate::rule::{Origin, Rule};
+use crate::rule::{Origin, Rule, pack_setting};
 use crate::rule_id::RuleId;
 use crate::severity::Severity;
 
@@ -48,7 +48,7 @@ impl fmt::Display for Name {
 /// Checks a pack's module, the name its library is imported by, such as `category_encoders`.
 pub(super) fn module(text: &str) -> Result<String> {
     ensure!(
-        crate::catalog::is_module_name(text),
+        crate::pack_names::is_module_name(text),
         "{text:?} is not a module name, such as pandas or category_encoders"
     );
     Ok(text.to_owned())
@@ -160,23 +160,7 @@ struct MetadataYaml<'a> {
 }
 
 impl RuleDoc {
-    fn yaml(&self, public_id: Option<&str>) -> Result<String> {
-        let metadata = MetadataYaml {
-            public_id,
-            fix: self.fix.as_ref().map(|(_, safety)| *safety),
-            since: self.since.as_deref(),
-            until: self.until.as_deref(),
-            holds: &self.holds,
-            unless_holds: &self.unless_holds,
-            unless_imported: self.unless_imported.as_ref(),
-        };
-        let has_metadata = metadata.public_id.is_some()
-            || metadata.fix.is_some()
-            || metadata.since.is_some()
-            || metadata.until.is_some()
-            || !metadata.holds.is_empty()
-            || !metadata.unless_holds.is_empty()
-            || metadata.unless_imported.is_some();
+    fn yaml(&self, metadata: Option<MetadataYaml<'_>>) -> Result<String> {
         let document = RuleYaml {
             id: self.id.to_string(),
             language: self.language_name,
@@ -187,7 +171,7 @@ impl RuleDoc {
                 pattern: &self.pattern,
             },
             fix: self.fix.as_ref().map(|(fix, _)| fix.as_str()),
-            metadata: has_metadata.then_some(metadata),
+            metadata,
         };
         Ok(serde_saphyr::to_string(&document)?)
     }
@@ -195,22 +179,27 @@ impl RuleDoc {
     /// The rule file's text, after checking it as `ast-grep scan` reads it, with the project's
     /// utilities, and as `xpd check` reads it.
     pub(super) fn checked_yaml(&self, utils: &GlobalRules) -> Result<String> {
-        if self.id.pack().is_none() {
-            ensure!(
-                self.since.is_none()
-                    && self.until.is_none()
-                    && self.holds.is_empty()
-                    && self.unless_holds.is_empty()
-                    && self.unless_imported.is_none(),
-                "--since, --until, --holds, --unless-holds and --unless-imported are about a \
-                 library's Python code, so they need a --pack"
-            );
-        }
+        let metadata = MetadataYaml {
+            public_id: self.public_id.as_deref(),
+            fix: self.fix.as_ref().map(|(_, safety)| *safety),
+            since: self.since.as_deref(),
+            until: self.until.as_deref(),
+            holds: &self.holds,
+            unless_holds: &self.unless_holds,
+            unless_imported: self.unless_imported.as_ref(),
+        };
+        let value = serde_json::to_value(&metadata)?;
+        let fields = value.as_object().context("metadata is a mapping")?;
+        ensure!(
+            self.id.pack().is_some() || pack_setting(fields).is_none(),
+            "--since, --until, --holds, --unless-holds and --unless-imported are about a \
+             library's Python code, so they need a --pack"
+        );
         if let Some(public_id) = &self.public_id {
             check_public_id(public_id, &self.id)?;
         }
         check_pattern(&self.pattern, self.language)?;
-        let text = self.yaml(self.public_id.as_deref())?;
+        let text = self.yaml((!fields.is_empty()).then_some(metadata))?;
         let mut configs = ast_grep_config::from_yaml_string::<SupportLang>(&text, utils)
             .context("ast-grep does not read the new rule")?;
         ensure!(configs.len() == 1, "the new rule is not one document");

@@ -15,6 +15,7 @@ use ast_grep_language::SupportLang;
 
 use crate::fix_safety::Applicability;
 use crate::pack::Pack;
+use crate::pack_names::OWN_PACK;
 use crate::package_check::Calls;
 use crate::report::{Issue, Position};
 use crate::rule::Rule;
@@ -341,7 +342,7 @@ impl Found {
         Self {
             labels: Vec::new(),
             issue: Issue {
-                id: RuleId::qualified("xpd", "invalid-rule"),
+                id: RuleId::qualified(OWN_PACK, "invalid-rule"),
                 file,
                 position: Some(Position { line: 1, column: 1 }),
                 severity: Severity::Error,

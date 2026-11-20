@@ -9,60 +9,37 @@ use std::path::{Component, Path, PathBuf};
 use anyhow::{Context, Result, bail, ensure};
 use ast_grep_config::{DeserializeEnv, GlobalRules, SerializableGlobalRule};
 use ast_grep_language::SupportLang;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use serde::de::IgnoredAny;
 use serde_json::{Value, json};
 
 use super::document::{self, Name, RuleDoc};
+use crate::project::{
+    self, PROJECT_FILES, PackList, RuleFolders, SGCONFIG, TestFolder, XPD_CONFIG, pack_entry,
+};
 use crate::rule_id::RuleId;
 
-const SGCONFIG: &str = "sgconfig.yml";
-const SGCONFIG_YAML: &str = "sgconfig.yaml";
-const XPD_CONFIG: &str = "xpd.yml";
 const RULES: &str = "rules";
 const TESTS: &str = "rule-tests";
 const UTILS: &str = "utils";
 
-/// What xpd reads of `sgconfig.yml`. ast-grep owns the file, so other keys are kept as they are.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SgConfig {
-    #[serde(default)]
-    rule_dirs: Vec<String>,
-    #[serde(default)]
-    util_dirs: Vec<String>,
-    #[serde(default)]
-    test_configs: Vec<TestConfig>,
-}
+type SgConfig = RuleFolders<Vec<String>, Vec<String>, Vec<TestFolder<String, IgnoredAny>>>;
+type XpdConfig = PackList<PackConfig>;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TestConfig {
-    test_dir: String,
+pack_entry! {
+    #[derive(Debug)]
+    PackConfig {
+        #[serde(default)]
+        Vec<String>,
+    }
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NewSgConfig<'a> {
     rule_dirs: [&'a str; 1],
-    test_configs: [TestConfig; 1],
+    test_configs: [TestFolder<String>; 1],
     util_dirs: [&'a str; 1],
-}
-
-/// What `xpd new` reads of `xpd.yml`.
-#[derive(Debug, Default, Deserialize)]
-struct XpdConfig {
-    #[serde(default)]
-    packs: Vec<PackConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PackConfig {
-    module: String,
-    #[serde(default)]
-    rule_dirs: Vec<String>,
-    #[serde(default)]
-    every_file: bool,
 }
 
 /// A pack entry of `xpd.yml` as `xpd new` writes one.
@@ -219,20 +196,9 @@ pub(in crate::author) struct Project {
 }
 
 impl Project {
-    /// The `sgconfig.yml` in `dir` or the nearest folder above it.
-    pub(in crate::author) fn config_at_or_above(dir: &Path) -> Option<PathBuf> {
-        dir.ancestors()
-            .flat_map(|dir| [dir.join(SGCONFIG), dir.join(SGCONFIG_YAML)])
-            .find(|path| path.is_file())
-    }
-
     /// The project whose `sgconfig.yml` is in `dir`.
     pub(in crate::author) fn find(dir: &Path) -> Result<Self> {
-        let Some(config_path) = [SGCONFIG, SGCONFIG_YAML]
-            .iter()
-            .map(|name| dir.join(name))
-            .find(|path| path.is_file())
-        else {
+        let Some(config_path) = project::config_in(dir) else {
             bail!(
                 "{} has no {SGCONFIG}. Create a project with xpd new project",
                 dir.display()
@@ -277,7 +243,7 @@ impl Project {
 
     /// The files of a new project in `dir`, with the packs in `xpd.yml`.
     pub(in crate::author) fn create(dir: &Path, packs: &[Pack]) -> Result<Changes> {
-        for name in [SGCONFIG, SGCONFIG_YAML, XPD_CONFIG] {
+        for name in PROJECT_FILES.into_iter().chain([XPD_CONFIG]) {
             ensure!(
                 fs::symlink_metadata(dir.join(name)).is_err(),
                 "{} already has {name}",
@@ -286,8 +252,9 @@ impl Project {
         }
         let sgconfig = serde_saphyr::to_string(&NewSgConfig {
             rule_dirs: [RULES],
-            test_configs: [TestConfig {
+            test_configs: [TestFolder {
                 test_dir: TESTS.to_owned(),
+                snapshot_dir: None,
             }],
             util_dirs: [UTILS],
         })?;
@@ -571,50 +538,74 @@ fn with_pack(text: Option<&str>, pack: &Pack) -> Result<String> {
     let mut expected: Value =
         ast_grep_config::from_str(text).with_context(|| format!("{XPD_CONFIG} does not parse"))?;
     let entry_value = serde_json::to_value(&entry)?;
-    match &mut expected {
-        Value::Null => expected = json!({ "packs": [entry_value] }),
-        Value::Object(config) => config
-            .entry("packs")
-            .or_insert_with(|| json!([]))
-            .as_array_mut()
-            .with_context(|| format!("packs in {XPD_CONFIG} is not a list"))?
-            .push(entry_value),
+    let edit = match &mut expected {
+        Value::Null => {
+            expected = json!({ "packs": [entry_value] });
+            PackEdit::AddKey
+        }
+        Value::Object(config) => {
+            let had_packs = config.contains_key("packs");
+            let packs = config
+                .entry("packs")
+                .or_insert_with(|| json!([]))
+                .as_array_mut()
+                .with_context(|| format!("packs in {XPD_CONFIG} is not a list"))?;
+            let edit = match (had_packs, packs.is_empty()) {
+                (false, _) => PackEdit::AddKey,
+                (true, true) => PackEdit::ReplaceEmptyList,
+                (true, false) => PackEdit::Append,
+            };
+            packs.push(entry_value);
+            edit
+        }
         _ => bail!("{XPD_CONFIG} is not a mapping"),
-    }
-    let base = if text.is_empty() || text.ends_with('\n') {
-        text.to_owned()
-    } else {
-        format!("{text}\n")
     };
-    let lines: Vec<&str> = base.lines().collect();
-    let indent = lines
-        .iter()
-        .skip_while(|line| !line.starts_with("packs:"))
-        .skip(1)
-        .find(|line| line.trim_start().starts_with("- "))
-        .map(|line| &line[..line.len() - line.trim_start().len()])
-        .unwrap_or_default();
-    let mut indented = String::new();
-    for line in item.lines() {
-        indented.push_str(indent);
-        indented.push_str(line);
-        indented.push('\n');
-    }
-    let flow_empty = lines.iter().position(|line| line.trim_end() == "packs: []");
-    let candidates = [
-        Some(format!("{base}{indented}")),
-        flow_empty.map(|at| {
-            let mut lines: Vec<String> = lines.iter().map(|line| format!("{line}\n")).collect();
-            lines[at] = format!("packs:\n{item}");
-            lines.concat()
-        }),
-        Some(format!("{base}packs:\n{item}")),
-    ];
-    candidates
-        .into_iter()
-        .flatten()
-        .find(|candidate| ast_grep_config::from_str::<Value>(candidate).ok().as_ref() == Some(&expected))
+    edit.apply(text, &item)
+        .filter(|candidate| ast_grep_config::from_str::<Value>(candidate).ok().as_ref() == Some(&expected))
         .with_context(|| {
             format!("cannot add pack {} to {XPD_CONFIG} without rewriting it. Add this entry to its packs:\n{item}", pack.module)
         })
+}
+
+enum PackEdit {
+    AddKey,
+    ReplaceEmptyList,
+    Append,
+}
+
+impl PackEdit {
+    fn apply(self, text: &str, item: &str) -> Option<String> {
+        let newline = if text.is_empty() || text.ends_with('\n') {
+            ""
+        } else {
+            "\n"
+        };
+        match self {
+            Self::AddKey => Some(format!("{text}{newline}packs:\n{item}")),
+            Self::ReplaceEmptyList => {
+                let mut lines: Vec<String> = text.lines().map(|line| format!("{line}\n")).collect();
+                let at = lines
+                    .iter()
+                    .position(|line| line.trim_end() == "packs: []")?;
+                lines[at] = format!("packs:\n{item}");
+                Some(lines.concat())
+            }
+            Self::Append => {
+                let indent = text
+                    .lines()
+                    .skip_while(|line| !line.starts_with("packs:"))
+                    .skip(1)
+                    .find(|line| line.trim_start().starts_with("- "))
+                    .map(|line| &line[..line.len() - line.trim_start().len()])
+                    .unwrap_or_default();
+                let mut result = format!("{text}{newline}");
+                for line in item.lines() {
+                    result.push_str(indent);
+                    result.push_str(line);
+                    result.push('\n');
+                }
+                Some(result)
+            }
+        }
+    }
 }

@@ -381,7 +381,7 @@ fn destination(directory: Option<&Path>, mode: Mode, default: &Path) -> Result<P
 /// `xpd new` to one folder. Without it, the project at or above the current folder.
 fn find_project(directory: Option<&Path>, mode: Mode) -> Result<Project> {
     let cwd = std::env::current_dir().context("no current folder")?;
-    let found = Project::config_at_or_above(&cwd).map_or(cwd, |config| {
+    let found = crate::project::nearest_config(&cwd).map_or(cwd, |config| {
         config.parent().map(Path::to_path_buf).unwrap_or_default()
     });
     Project::find(&destination(directory, mode, &found)?)

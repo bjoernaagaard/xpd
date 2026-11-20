@@ -48,10 +48,7 @@ impl Evidence {
 }
 
 fn configs() -> Result<Vec<RuleConfig<SupportLang>>> {
-    let utils = UTILS
-        .split("\n---\n")
-        .map(ast_grep_config::from_str::<SerializableGlobalRule<SupportLang>>)
-        .collect::<Result<Vec<_>, _>>()
+    let utils = ast_grep_config::from_multiple::<SerializableGlobalRule<SupportLang>>(UTILS)
         .context("evidence-utils.yml")?;
     let globals = DeserializeEnv::parse_global_utils(utils).context("evidence-utils.yml")?;
     ast_grep_config::from_yaml_string(RULES, &globals).context("evidence.yml")

@@ -33,6 +33,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::output::Format;
+use crate::project::{self, OutlineFolders};
 use crate::query::{JsonStyle, NoIgnore, languages};
 use crate::syntax::{self, Node, Root};
 
@@ -40,9 +41,6 @@ use crate::syntax::{self, Node, Root};
 const PYTHON_RULES: &str = include_str!("outline/python.yml");
 /// Every function and method of a Python file with its parameters, for `xpd index`.
 const PYTHON_CALLABLE_RULES: &str = include_str!("outline/python-callables.yml");
-/// The ast-grep project file, which names a project's own outline rules, under either name
-/// that ast-grep reads.
-const PROJECT_FILES: [&str; 2] = ["sgconfig.yml", "sgconfig.yaml"];
 
 type Rules = Vec<SerializableOutlineRule<SupportLang>>;
 
@@ -688,30 +686,15 @@ impl OutlineArgs {
     }
 }
 
-/// The outline settings of an ast-grep project file.
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Project {
-    /// One rule file per language, as ast-grep reads it.
-    #[serde(default)]
-    outline_rules: HashMap<SupportLang, PathBuf>,
-    /// Folders whose .yml and .yaml files are outline rules.
-    #[serde(default)]
-    outline_dirs: Vec<PathBuf>,
-}
-
 /// The outline rule files of the project that the working directory is in, relative to its
 /// sgconfig.yml.
 fn project_rule_files() -> Result<Vec<PathBuf>> {
     let cwd = std::env::current_dir()?;
-    let Some(config) = (cwd.ancestors())
-        .flat_map(|dir| PROJECT_FILES.map(|name| dir.join(name)))
-        .find(|path| path.is_file())
-    else {
+    let Some(config) = project::nearest_config(&cwd) else {
         return Ok(Vec::new());
     };
     let context = || format!("invalid {}", config.display());
-    let project: Project =
+    let project: OutlineFolders =
         ast_grep_config::from_str(&fs::read_to_string(&config).with_context(context)?)
             .with_context(context)?;
     let root = config.parent().unwrap_or(Path::new("."));

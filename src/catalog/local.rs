@@ -26,14 +26,12 @@ use ast_grep_language::config_file_type;
 use serde::Deserialize;
 
 use crate::pack::{self, AlsoOnSource, Manifest, Pack};
+use crate::pack_names::is_module_name;
 use crate::package_check::PackageCheckSource;
+use crate::project::{self, RuleFolders, SGCONFIG, TestFolder, XPD_CONFIG, pack_entry};
 use crate::rule::{Origin, Rule};
 use crate::scan::cannot_read;
 
-/// The names ast-grep finds its project file by, in the order it tries them.
-const CONFIG_NAMES: [&str; 2] = ["sgconfig.yml", "sgconfig.yaml"];
-/// The file beside the project file that lists the project's packs.
-const MANIFEST_NAME: &str = "xpd.yml";
 /// The manifest of an embedded pack, which a local rule folder must not hold.
 const EMBEDDED_MANIFEST: &str = "pack.yml";
 
@@ -42,18 +40,18 @@ const EMBEDDED_MANIFEST: &str = "pack.yml";
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SgConfig {
-    #[serde(default)]
-    rule_dirs: Vec<PathBuf>,
-    util_dirs: Option<Vec<PathBuf>>,
-    test_configs: Option<Vec<TestConfigSource>>,
+    #[serde(flatten)]
+    folders: RuntimeFolders,
     custom_languages: Option<serde_json::Value>,
     language_globs: Option<serde_json::Value>,
     language_injections: Option<serde_json::Value>,
 }
 
+type RuntimeFolders = RuleFolders<Vec<PathBuf>, Option<Vec<PathBuf>>, Option<Vec<TestFolder>>>;
+
 impl SgConfig {
     fn tests(&self, root: &Path) -> Result<Vec<TestConfig>> {
-        (self.test_configs.iter().flatten())
+        (self.folders.test_configs.iter().flatten())
             .map(|test| {
                 let test_dir = absolute(&root.join(&test.test_dir));
                 ensure!(
@@ -74,25 +72,21 @@ impl SgConfig {
 
     /// The keys that are set and that change which files ast-grep reads as which language,
     /// which xpd does not follow.
-    fn unsupported(&self) -> Vec<&'static str> {
+    fn unsupported(&self) -> Vec<UnsupportedLanguageSetting> {
+        use UnsupportedLanguageSetting::{CustomLanguages, FilenameDetection};
         [
-            ("customLanguages", &self.custom_languages),
-            ("languageGlobs", &self.language_globs),
-            ("languageInjections", &self.language_injections),
+            (CustomLanguages, &self.custom_languages),
+            (FilenameDetection("languageGlobs"), &self.language_globs),
+            (
+                FilenameDetection("languageInjections"),
+                &self.language_injections,
+            ),
         ]
         .into_iter()
         .filter(|(_, value)| value.is_some())
-        .map(|(key, _)| key)
+        .map(|(setting, _)| setting)
         .collect()
     }
-}
-
-/// One entry of `testConfigs`, as ast-grep writes it.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TestConfigSource {
-    test_dir: PathBuf,
-    snapshot_dir: Option<PathBuf>,
 }
 
 /// Where the project keeps the test cases of its rules.
@@ -104,29 +98,25 @@ pub(crate) struct TestConfig {
     pub(crate) snapshot_dir: Option<PathBuf>,
 }
 
-/// `xpd.yml`.
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 struct XpdConfig {
     #[serde(default)]
     packs: Vec<PackEntry>,
 }
 
-/// One entry under `packs` in `xpd.yml`: the manifest of a pack, with its module and folders.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct PackEntry {
-    module: String,
-    rule_dirs: Vec<PathBuf>,
-    #[serde(default)]
-    aliases: BTreeMap<String, String>,
-    #[serde(default)]
-    members: BTreeMap<String, String>,
-    #[serde(default)]
-    packages: Vec<PackageCheckSource>,
-    #[serde(default)]
-    every_file: bool,
-    also_on: Option<AlsoOnSource>,
+pack_entry! {
+    #[serde(deny_unknown_fields)]
+    PackEntry {
+        Vec<PathBuf>,
+        #[serde(default)]
+        aliases: BTreeMap<String, String>,
+        #[serde(default)]
+        members: BTreeMap<String, String>,
+        #[serde(default)]
+        packages: Vec<PackageCheckSource>,
+        also_on: Option<AlsoOnSource>,
+    }
 }
 
 /// A pack of `xpd.yml` as the project places it: its module and its rule folders.
@@ -134,6 +124,33 @@ struct PackEntry {
 struct LocalPack {
     module: String,
     rule_dirs: Vec<PathBuf>,
+}
+
+struct PendingPack {
+    placement: LocalPack,
+    manifest: Manifest,
+    rules: Vec<Rule>,
+}
+
+#[derive(Clone, Copy)]
+enum UnsupportedLanguageSetting {
+    CustomLanguages,
+    FilenameDetection(&'static str),
+}
+
+impl UnsupportedLanguageSetting {
+    fn warning(self, config: &Path) -> String {
+        match self {
+            Self::CustomLanguages => format!(
+                "{}: xpd skips rules and utilities for custom languages",
+                config.display()
+            ),
+            Self::FilenameDetection(key) => format!(
+                "{}: xpd does not read {key}, so it finds each file's language by the file's name alone",
+                config.display()
+            ),
+        }
+    }
 }
 
 /// One project's own rules, as the files said when the catalog was loaded. Every path is
@@ -151,7 +168,7 @@ pub(crate) struct LocalProject {
     pub(crate) util_dirs: Vec<PathBuf>,
     pub(crate) test_configs: Vec<TestConfig>,
     /// The keys of `sgconfig.yml` that are set and that xpd does not follow.
-    unsupported: Vec<&'static str>,
+    unsupported: Vec<UnsupportedLanguageSetting>,
     custom_languages: BTreeSet<String>,
     packs: Vec<LocalPack>,
     /// The project's utility rules, which each of its rules can name with `matches`.
@@ -216,16 +233,6 @@ fn yaml_files(dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-/// Whether `module` can be the module of a pack. It goes into the pattern of the import gate,
-/// so only an identifier is allowed.
-pub(crate) fn is_module_name(module: &str) -> bool {
-    let mut chars = module.chars();
-    chars
-        .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
 impl XpdConfig {
     /// Reads the text of the `xpd.yml` at `path`.
     fn parse(path: &Path, text: &str) -> Result<Self> {
@@ -248,17 +255,15 @@ impl LocalProject {
     /// or a folder above it, as ast-grep finds it. `None` when there is none.
     pub(crate) fn find(from: &Path) -> Result<Option<PathBuf>> {
         let from = absolute(from);
-        for dir in from.ancestors() {
-            let config = CONFIG_NAMES.iter().map(|name| dir.join(name));
-            if let Some(config) = config.into_iter().find(|path| path.is_file()) {
+        for folder in project::ancestors(&from) {
+            if let Some(config) = folder.config {
                 return Ok(Some(config));
             }
-            let manifest = dir.join(MANIFEST_NAME);
+            let manifest = folder.manifest();
             ensure!(
                 !manifest.is_file(),
-                "{} lists packs of an ast-grep project, and the folder has no {}",
-                manifest.display(),
-                CONFIG_NAMES[0]
+                "{} lists packs of an ast-grep project, and the folder has no {SGCONFIG}",
+                manifest.display()
             );
         }
         Ok(None)
@@ -268,14 +273,13 @@ impl LocalProject {
     /// the project with its packs: those of `xpd.yml` in the order of the file, then one for
     /// each package of the rules that no pack holds, in name order.
     pub(crate) fn read(config: &Path) -> Result<(Self, Vec<Pack>)> {
-        let (project, manifests) = Self::layout(config)?;
-        let packs = project.load_rules(manifests)?;
-        Ok((project, packs))
+        let (project, packs) = Self::layout(config)?;
+        project.load_rules(packs)
     }
 
     /// Reads the project file `config`, `xpd.yml` and the utility rules: everything but the
-    /// rule files. Returns the project with the manifest of each of its packs.
-    fn layout(config: &Path) -> Result<(Self, Vec<Manifest>)> {
+    /// rule files. Each pending pack carries its manifest and resolved placement.
+    fn layout(config: &Path) -> Result<(Self, Vec<PendingPack>)> {
         let config = fs::canonicalize(config).with_context(|| cannot_read(config))?;
         let root = config
             .parent()
@@ -296,7 +300,7 @@ impl LocalProject {
                     .collect()
             })
             .unwrap_or_default();
-        let manifest = Some(root.join(MANIFEST_NAME)).filter(|path| path.is_file());
+        let manifest = Some(root.join(XPD_CONFIG)).filter(|path| path.is_file());
         let entries = match &manifest {
             Some(path) => {
                 let text = fs::read_to_string(path).with_context(|| cannot_read(path))?;
@@ -305,21 +309,24 @@ impl LocalProject {
             None => Vec::new(),
         };
 
-        let mut rule_dirs = folders(&root, &sg.rule_dirs, "ruleDirs", &config)?;
+        let mut rule_dirs = folders(&root, &sg.folders.rule_dirs, "ruleDirs", &config)?;
         let util_dirs = folders(
             &root,
-            sg.util_dirs.as_deref().unwrap_or_default(),
+            sg.folders.util_dirs.as_deref().unwrap_or_default(),
             "utilDirs",
             &config,
         )?;
         let test_configs = sg.tests(&root)?;
-        let mut packs: Vec<LocalPack> = Vec::new();
-        let mut manifests = Vec::new();
+        let mut packs: Vec<PendingPack> = Vec::new();
         for entry in entries {
             let source = manifest.as_deref().unwrap_or(&config);
             let dirs = folders(&root, &entry.rule_dirs, "ruleDirs", source)?;
             for dir in &dirs {
-                if let Some(other) = packs.iter().find(|pack| pack.rule_dirs.contains(dir)) {
+                if let Some(other) = packs
+                    .iter()
+                    .map(|pack| &pack.placement)
+                    .find(|pack| pack.rule_dirs.contains(dir))
+                {
                     bail!(
                         "{}: the packs {} and {} both name the folder {}",
                         source.display(),
@@ -330,16 +337,19 @@ impl LocalProject {
                 }
             }
             rule_dirs.extend(dirs.iter().cloned());
-            packs.push(LocalPack {
-                module: entry.module,
-                rule_dirs: dirs,
-            });
-            manifests.push(Manifest {
-                aliases: entry.aliases,
-                members: entry.members,
-                packages: entry.packages,
-                every_file: entry.every_file,
-                also_on: entry.also_on,
+            packs.push(PendingPack {
+                placement: LocalPack {
+                    module: entry.module,
+                    rule_dirs: dirs,
+                },
+                manifest: Manifest {
+                    aliases: entry.aliases,
+                    members: entry.members,
+                    packages: entry.packages,
+                    every_file: entry.every_file,
+                    also_on: entry.also_on,
+                },
+                rules: Vec::new(),
             });
         }
 
@@ -367,15 +377,14 @@ impl LocalProject {
             rule_dirs,
             util_dirs,
             test_configs,
-            packs,
+            packs: Vec::new(),
             globals,
             config,
         };
-        Ok((project, manifests))
+        Ok((project, packs))
     }
 
-    fn load_rules(&self, manifests: Vec<Manifest>) -> Result<Vec<Pack>> {
-        let mut in_packs: Vec<Vec<Rule>> = self.packs.iter().map(|_| Vec::new()).collect();
+    fn load_rules(mut self, mut packs: Vec<PendingPack>) -> Result<(Self, Vec<Pack>)> {
         let mut structural: BTreeMap<String, Vec<Rule>> = BTreeMap::new();
         for path in yaml_files(&self.rule_dirs)? {
             if !self.is_rule_file(&path) {
@@ -384,14 +393,15 @@ impl LocalProject {
             ensure!(
                 path.file_name()
                     .is_none_or(|name| name != EMBEDDED_MANIFEST),
-                "{}: a rule folder of a project holds no {EMBEDDED_MANIFEST}. Describe the pack under packs in {MANIFEST_NAME}",
+                "{}: a rule folder of a project holds no {EMBEDDED_MANIFEST}. Describe the pack under packs in {XPD_CONFIG}",
                 path.display()
             );
             let text = fs::read_to_string(&path).with_context(|| cannot_read(&path))?;
-            let owner = self.owner(&path);
-            for rule in self.compile(&path, &text)? {
+            let owner = owner(&path, packs.iter().map(|pack| &pack.placement));
+            let module = owner.map(|index| packs[index].placement.module.as_str());
+            for rule in self.compile(&path, &text, module)? {
                 match owner {
-                    Some(pack) => in_packs[pack].push(rule),
+                    Some(index) => packs[index].rules.push(rule),
                     None => {
                         structural
                             .entry(rule.id.package().to_owned())
@@ -403,10 +413,16 @@ impl LocalProject {
         }
 
         let mut loaded = Vec::new();
-        for ((pack, manifest), rules) in self.packs.iter().zip(manifests).zip(in_packs) {
+        for PendingPack {
+            placement,
+            manifest,
+            rules,
+        } in packs
+        {
             let root = Some(self.root.clone());
-            let pack = Pack::library(&pack.module, manifest, rules, &self.globals, root)
-                .with_context(|| format!("the pack {} of {MANIFEST_NAME}", pack.module))?;
+            let pack = Pack::library(&placement.module, manifest, rules, &self.globals, root)
+                .with_context(|| format!("the pack {} of {XPD_CONFIG}", placement.module))?;
+            self.packs.push(placement);
             loaded.push(pack);
         }
         loaded.extend(
@@ -414,7 +430,7 @@ impl LocalProject {
                 .into_iter()
                 .map(|(package, rules)| Pack::structural(package, rules, self.root.clone())),
         );
-        Ok(loaded)
+        Ok((self, loaded))
     }
 
     /// Whether the YAML file at `path` under a rule folder is a rule file. The folders of the
@@ -433,23 +449,10 @@ impl LocalProject {
             && Some(path) != self.manifest.as_deref()
     }
 
-    /// The pack of `xpd.yml` that holds the rule file at `path`, by its place in the file. The
-    /// deepest folder wins, so a pack can have a folder inside a folder of plain rules.
-    fn owner(&self, path: &Path) -> Option<usize> {
-        let dirs = self.packs.iter().enumerate().flat_map(|(index, pack)| {
-            let dirs = pack.rule_dirs.iter().filter(|dir| path.starts_with(dir));
-            dirs.map(move |dir| (dir.components().count(), index))
-        });
-        dirs.max().map(|(_, index)| index)
-    }
-
     /// The rules of the rule file at `path` with the text `yaml`, compiled as the project
     /// loads them.
-    fn compile(&self, path: &Path, yaml: &str) -> Result<Vec<Rule>> {
+    fn compile(&self, path: &Path, yaml: &str, pack: Option<&str>) -> Result<Vec<Rule>> {
         let yaml = supported_yaml(yaml, &self.custom_languages)?;
-        let pack = self
-            .owner(path)
-            .map(|index| self.packs[index].module.as_str());
         let origin = match pack {
             Some(_) => Origin::LocalPack,
             None => Origin::Structural,
@@ -484,7 +487,9 @@ impl LocalProject {
             )
             .with_context(|| path.display().to_string())?;
         } else if self.is_rule_file(&path) {
-            return self.compile(&path, text);
+            let module =
+                owner(&path, self.packs.iter()).map(|index| self.packs[index].module.as_str());
+            return self.compile(&path, text, module);
         }
         Ok(Vec::new())
     }
@@ -493,17 +498,18 @@ impl LocalProject {
     pub(crate) fn warnings(&self) -> Vec<String> {
         self.unsupported
             .iter()
-            .map(|key| {
-                if *key == "customLanguages" {
-                    return format!("{}: xpd skips rules and utilities for custom languages", self.config.display());
-                }
-                format!(
-                    "{}: xpd does not read {key}, so it finds each file's language by the file's name alone",
-                    self.config.display()
-                )
-            })
+            .map(|setting| setting.warning(&self.config))
             .collect()
     }
+}
+
+/// The deepest pack folder wins, so a pack can live inside a folder of plain rules.
+fn owner<'a>(path: &Path, packs: impl Iterator<Item = &'a LocalPack>) -> Option<usize> {
+    let dirs = packs.enumerate().flat_map(|(index, pack)| {
+        let dirs = pack.rule_dirs.iter().filter(|dir| path.starts_with(dir));
+        dirs.map(move |dir| (dir.components().count(), index))
+    });
+    dirs.max().map(|(_, index)| index)
 }
 
 fn supported_yaml(text: &str, custom: &BTreeSet<String>) -> Result<String> {

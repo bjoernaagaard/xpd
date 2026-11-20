@@ -19,6 +19,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
+use ast_grep_config::UNUSED_SUPPRESSION_ID;
+use pack_names::{OWN_PACK, is_module_name};
+use serde_json::Value;
+
+#[path = "src/pack_names.rs"]
+mod pack_names;
 #[path = "src/search.rs"]
 mod search;
 
@@ -26,10 +32,6 @@ mod search;
 const MANIFEST: &str = "pack.yml";
 /// The file in a pack folder that introduces the pack and groups its rules.
 const PACK_PAGE: &str = "pack.md";
-/// The folder under `rules/` with the Markdown of xpd's own rules, which the code of src/pack.rs
-/// defines, and their ids.
-const OWN_PACK: &str = "xpd";
-const OWN_RULES: &[&str] = &["unused-suppression"];
 /// The folder in `rules/xpd/` that holds the playbooks, which are xpd's own recipes.
 const PLAYBOOKS: &str = "playbooks";
 /// Where the source of a playbook can be read.
@@ -83,7 +85,7 @@ fn main() -> Result<()> {
     for pack in sorted_entries(root)?.iter().filter(|path| path.is_dir()) {
         let module = utf8_name(pack)?;
         if module == OWN_PACK {
-            let ids: Vec<String> = OWN_RULES.iter().map(|&id| id.to_owned()).collect();
+            let ids = [UNUSED_SUPPRESSION_ID.to_owned()];
             own = Some(doc_sources(&rule_markdown(pack, &ids)?));
             continue;
         }
@@ -112,7 +114,7 @@ fn write(target: &Path, source: &str) -> Result<()> {
 fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
     let module = utf8_name(pack)?;
     ensure!(
-        is_module_name(module),
+        is_module_name(module) && !module.bytes().any(|byte| byte.is_ascii_uppercase()),
         "rules/{module}: the folder name must be a Python module name"
     );
     let mut manifest = String::from("None");
@@ -134,19 +136,24 @@ fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
             fs::read_to_string(&file).with_context(|| format!("cannot read {}", file.display()))?;
         if name == MANIFEST {
             manifest = format!("Some({include})");
-            // Package checks are the only list entries of a manifest with an id.
+            let data: Value =
+                ast_grep_config::from_str(&yaml).with_context(|| file.display().to_string())?;
             ids.extend(
-                yaml.lines()
-                    .filter_map(|line| line.trim_start().strip_prefix("- id: "))
-                    .map(|id| id.trim().to_owned()),
+                data.get("packages")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(yaml_id)
+                    .map(str::to_owned),
             );
         } else {
             let id = name.strip_suffix(".yml").with_context(|| {
                 format!("rules/{module}/{name}: a pack holds {MANIFEST}, {PACK_PAGE}, <rule id>.yml and <rule id>.md files")
             })?;
-            let mut found = yaml.lines().filter_map(|line| line.strip_prefix("id: "));
+            let documents: Vec<Value> = ast_grep_config::from_multiple(&yaml)
+                .with_context(|| file.display().to_string())?;
             ensure!(
-                found.all(|found| found.trim() == id),
+                !documents.is_empty() && documents.iter().all(|doc| yaml_id(doc) == Some(id)),
                 "rules/{module}/{name}: every rule document in the file must have the id {id:?}"
             );
             let path = format!("rules/{module}/{name}");
@@ -263,9 +270,10 @@ fn util_sources(module: &str, utils: &Path) -> Result<Vec<String>> {
             .with_context(|| format!("{path}: the folder holds <utility id>.yml files"))?;
         let yaml =
             fs::read_to_string(&file).with_context(|| format!("cannot read {}", file.display()))?;
-        let mut found = yaml.lines().filter_map(|line| line.strip_prefix("id: "));
+        let documents: Vec<Value> =
+            ast_grep_config::from_multiple(&yaml).with_context(|| file.display().to_string())?;
         ensure!(
-            found.next().map(str::trim) == Some(id) && found.next().is_none(),
+            matches!(documents.as_slice(), [document] if yaml_id(document) == Some(id)),
             "{path}: the file must hold one utility rule with the id {id:?}"
         );
         let include = include(&format!("/{path}"));
@@ -350,13 +358,8 @@ fn utf8_name(path: &Path) -> Result<&str> {
         .with_context(|| format!("{} has no UTF-8 name", path.display()))
 }
 
-/// Module names also go into a regex and a dist-info lookup, so only identifiers are allowed.
-fn is_module_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars
-        .next()
-        .is_some_and(|c| c.is_ascii_lowercase() || c == '_')
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+fn yaml_id(value: &Value) -> Option<&str> {
+    value.get("id").and_then(Value::as_str)
 }
 
 fn discovery_source(out: &Path, docs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<()> {

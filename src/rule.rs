@@ -119,6 +119,15 @@ metadata! {
     frame_script: Option<usize> => "frameScript",
 }
 
+pub(crate) fn pack_setting(
+    fields: &serde_json::Map<String, serde_json::Value>,
+) -> Option<&'static str> {
+    PACK_SETTINGS
+        .iter()
+        .copied()
+        .find(|key| fields.contains_key(*key))
+}
+
 impl Metadata {
     /// Reads the `metadata` of a rule document from `origin`. A structural rule may hold any
     /// metadata, as ast-grep allows, and xpd reads `fix` and `publicId` from it.
@@ -129,7 +138,7 @@ impl Metadata {
         let mut value = serde_json::to_value(metadata)?;
         if origin == Origin::Structural {
             let fields = value.as_object_mut().context("metadata is a mapping")?;
-            if let Some(setting) = PACK_SETTINGS.iter().find(|key| fields.contains_key(**key)) {
+            if let Some(setting) = pack_setting(fields) {
                 bail!(
                     "metadata.{setting} works only in a rule of a pack. Name the rule's folder under ruleDirs of a pack in xpd.yml"
                 );
