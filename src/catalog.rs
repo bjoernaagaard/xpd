@@ -5,7 +5,7 @@
 mod local;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::severity::Severity;
 use anyhow::{Context, Result, bail};
@@ -54,17 +54,20 @@ impl Filters {
 }
 
 impl Catalog {
-    /// The catalog for the project that `from` is in, which is the nearest folder at or above
-    /// it with an `sgconfig.yml`. Without such a folder the catalog holds the embedded rules.
-    /// `installed` selects the rules for the library versions of the project's venv, and
-    /// `style` the severity of the rules of the house style.
+    pub(crate) fn config(root: &Path, given: Option<&Path>) -> Result<Option<PathBuf>> {
+        given.map_or_else(
+            || LocalProject::find(root),
+            |path| Ok(Some(path.to_path_buf())),
+        )
+    }
+
     pub(crate) fn load(
-        from: &Path,
+        config: Option<&Path>,
         installed: Option<&Distributions>,
         style: Style,
     ) -> Result<Self> {
-        match LocalProject::find(from)? {
-            Some(config) => Self::load_config(&config, installed, style),
+        match config {
+            Some(config) => Self::load_config(config, installed, style),
             None => Self::embedded(installed, style),
         }
     }

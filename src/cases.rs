@@ -96,10 +96,8 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
     );
     let installed = venv.as_ref().map(Venv::distributions);
     // A case passes or fails the same way under every style setting, so none is read.
-    let catalog = match &options.config {
-        Some(config) => Catalog::load_config(config, installed.as_ref(), Style::Default)?,
-        None => Catalog::load(&root, installed.as_ref(), Style::Default)?,
-    };
+    let config = Catalog::config(&root, options.config.as_deref())?;
+    let catalog = Catalog::load(config.as_deref(), installed.as_ref(), Style::Default)?;
     let directories = directories(options, &catalog)?;
     let source_root = catalog
         .project

@@ -539,9 +539,12 @@ fn rules(options: RulesOptions, default: Format) -> ExitCode {
     let load = if builtin {
         Catalog::embedded(None, Style::Default)
     } else {
-        Settings::find(&project).and_then(|settings| match config {
-            Some(config) => Catalog::load_config(&config, None, settings.style),
-            None => Catalog::load(&project, None, settings.style),
+        Settings::find(&project).and_then(|settings| {
+            Catalog::load(
+                Catalog::config(&project, config.as_deref())?.as_deref(),
+                None,
+                settings.style,
+            )
         })
     };
     let catalog = match load.and_then(|mut catalog| {

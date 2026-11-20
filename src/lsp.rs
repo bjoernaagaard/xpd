@@ -11,7 +11,7 @@ use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::severity::Severity;
 use anyhow::{Context, Result};
@@ -45,13 +45,14 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use self::project::{Place, Workspace};
+use self::project::{OpenProjects, Place};
 use self::text::{Encoding, Lines};
 use crate::catalog::{Catalog, HelpLink};
 use crate::fix_safety::Applicability;
 use crate::package_check::Calls;
 use crate::report::Issue;
 use crate::scan::{self, Found, Replacement};
+use crate::workspace::Workspace;
 
 /// The name on every diagnostic, and the last part of the fix-all kind.
 const SOURCE: &str = "xpd";
@@ -331,6 +332,12 @@ impl Client {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Reload {
+    Rules,
+    WithImports,
+}
+
 /// One open document: the text the editor holds, which may differ from the file on disk.
 #[derive(Debug)]
 struct Document {
@@ -347,7 +354,7 @@ struct Document {
 /// A document's issues, with the rules that found them.
 #[derive(Debug)]
 struct Linted {
-    catalog: Rc<Catalog>,
+    workspace: Arc<Workspace>,
     found: Vec<Found>,
     /// What the `onlyWhere` shapes of the package checks matched in the document.
     calls: Calls,
@@ -356,28 +363,28 @@ struct Linted {
 /// The issues of `document`, linted now unless the document still holds them. Diagnostics, a
 /// hover and a code action for one version of a document share one lint this way.
 fn lint<'d>(
-    workspace: &mut Workspace,
+    workspace: &mut OpenProjects,
     document: &'d mut Document,
 ) -> Result<(&'d Document, &'d Linted)> {
     if document.linted.is_none() {
         let project = workspace.project(&document.place.root)?;
-        let catalog = Rc::clone(&project.catalog);
+        let workspace = Arc::clone(&project.workspace);
         let disk = document.place.disk();
         let file = scan::File {
             path: &document.place.path,
             disk: Some(&disk),
         };
-        let scan::Linted { mut found, calls } =
-            scan::analyze(file, &document.text, &catalog.packs, scan::Edits::Report);
+        let scan::Linted { mut found, calls } = workspace.analyze(file, &document.text);
         if disk
             .extension()
             .is_some_and(|ext| ext == "yml" || ext == "yaml")
         {
-            let error = catalog
+            let error = workspace
+                .catalog
                 .validate_document(&disk, &document.text)
                 .err()
                 .map(|error| format!("{error:#}"))
-                .or_else(|| project.load_error.clone());
+                .or_else(|| project.error.clone());
             if let Some(message) = error {
                 found.push(Found::invalid_rule(
                     document.place.path.clone(),
@@ -387,7 +394,7 @@ fn lint<'d>(
             }
         }
         document.linted = Some(Linted {
-            catalog,
+            workspace,
             found,
             calls,
         });
@@ -455,7 +462,7 @@ fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<
         .iter()
         .map(|found| {
             found_diagnostic(
-                &linted.catalog,
+                &linted.workspace.catalog,
                 found,
                 lsp_range(&lines, &marked(found, &lines)),
             )
@@ -510,7 +517,7 @@ struct Server<'c> {
     connection: &'c Connection,
     client: Client,
     settings: Settings,
-    workspace: Workspace,
+    workspace: OpenProjects,
     /// The open documents, by their address as the client wrote it.
     documents: HashMap<String, Document>,
     /// The file that holds each project's package warnings, by the project's folder.
@@ -524,7 +531,7 @@ struct Server<'c> {
 
 impl<'c> Server<'c> {
     fn new(connection: &'c Connection, params: &InitializeParams, refresh: Refresh) -> Self {
-        let mut workspace = Workspace::default();
+        let mut workspace = OpenProjects::default();
         #[expect(
             deprecated,
             reason = "a client older than workspace folders names its one folder in rootUri"
@@ -722,7 +729,7 @@ impl<'c> Server<'c> {
         if self.client.delivery == Delivery::Push {
             self.unpublished.insert(key);
         }
-        self.refresh_project(&root)
+        self.refresh_project(&root, Reload::Rules)
     }
 
     fn did_change(&mut self, params: DidChangeTextDocumentParams) -> Result<()> {
@@ -753,9 +760,7 @@ impl<'c> Server<'c> {
             return Ok(());
         };
         let root = document.place.root.clone();
-        self.workspace.refresh(&root)?;
-        self.lint_again(&root);
-        self.publish_package_issues(&root)
+        self.refresh_project(&root, Reload::WithImports)
     }
 
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<()> {
@@ -793,7 +798,7 @@ impl<'c> Server<'c> {
             return Ok(());
         }
         for root in self.roots() {
-            self.refresh_project(&root)?;
+            self.refresh_project(&root, Reload::Rules)?;
         }
         Ok(())
     }
@@ -824,7 +829,7 @@ impl<'c> Server<'c> {
             self.close_project(root);
         }
         for root in &now {
-            self.refresh_project(root)?;
+            self.refresh_project(root, Reload::Rules)?;
         }
         if self.client.delivery == Delivery::Pull(Refresh::Supported) {
             self.ask_to_pull_again();
@@ -842,8 +847,8 @@ impl<'c> Server<'c> {
 
     /// Reads the venv of the project in `root` again, and brings what the client shows for the
     /// project up to date.
-    fn refresh_project(&mut self, root: &Path) -> Result<()> {
-        if self.workspace.refresh(root)? {
+    fn refresh_project(&mut self, root: &Path, reload: Reload) -> Result<()> {
+        if self.workspace.refresh(root)? || matches!(reload, Reload::WithImports) {
             self.lint_again(root);
         }
         self.publish_package_issues(root)
@@ -912,7 +917,11 @@ impl<'c> Server<'c> {
             let (_, linted) = lint(&mut self.workspace, document)?;
             calls.merge(linted.calls.clone());
         }
-        let issues = self.workspace.project(root)?.package_issues(root, &calls);
+        let issues = self
+            .workspace
+            .project(root)?
+            .workspace
+            .package_issues(&calls);
         // Without a `pyproject.toml`, `xpd check` names the venv's folder, and an editor
         // cannot show an issue on a folder.
         let file = issues
@@ -1006,7 +1015,7 @@ impl<'c> Server<'c> {
             if !(marked.contains(&offset) || marked == (offset..offset)) {
                 continue;
             }
-            let Some((doc, url)) = rule_help(&linted.catalog, found) else {
+            let Some((doc, url)) = rule_help(&linted.workspace.catalog, found) else {
                 continue;
             };
             let name = found.id().to_string();
@@ -1071,7 +1080,7 @@ impl<'c> Server<'c> {
                     },
                     kind: Some(CodeActionKind::QUICKFIX),
                     diagnostics: Some(vec![found_diagnostic(
-                        &linted.catalog,
+                        &linted.workspace.catalog,
                         found,
                         lsp_range(&lines, &marked),
                     )]),
@@ -1095,7 +1104,7 @@ impl<'c> Server<'c> {
             let scan::Fixed {
                 source: fixed,
                 count,
-            } = scan::fix_source(file, document.text.clone(), &linted.catalog.packs, allowed);
+            } = linted.workspace.fix(file, document.text.clone(), allowed);
             if count > 0 {
                 let change = changed_part(&document.text, &fixed);
                 actions.push(CodeAction {

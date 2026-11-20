@@ -3,20 +3,12 @@
 use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use lsp_types::Uri;
 
 use super::uri;
-use crate::catalog::{Catalog, LocalProject};
-use crate::pack;
-use crate::package_check::{self, Calls};
-use crate::report::Issue;
-use crate::settings::Settings;
-use crate::style::Style;
-use crate::venv::{Distributions, Venv};
-use crate::version::Version;
+use crate::workspace::{LoadedWorkspace, WorkspaceCache};
 
 /// Where a document is, as `xpd check` would see it when run in the project's folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,42 +27,14 @@ impl Place {
     }
 }
 
-/// What the server knows about one project folder.
-#[derive(Debug)]
-pub(crate) struct Project {
-    /// The rules for the library versions in the project's venv.
-    pub(crate) catalog: Rc<Catalog>,
-    pub(crate) load_error: Option<String>,
-    /// The project's venv, with what it holds.
-    venv: Option<(Venv, Distributions)>,
-}
-
-impl Project {
-    /// One warning for each package the venv lacks, as `xpd check` adds them to a run. The
-    /// project is in `root`, and `calls` is what the checks' `onlyWhere` shapes matched in the
-    /// project's open documents.
-    pub(crate) fn package_issues(&self, root: &Path, calls: &Calls) -> Vec<Issue> {
-        match &self.venv {
-            Some((venv, installed)) => {
-                package_check::missing(&self.catalog.packs, venv, installed, root, calls)
-            }
-            None => Vec::new(),
-        }
-    }
-}
-
-/// The client's workspace folders and the projects of the open documents.
 #[derive(Debug, Default)]
-pub(crate) struct Workspace {
+pub(crate) struct OpenProjects {
     folders: Vec<PathBuf>,
-    /// The packs for each set of installed library versions and each style setting. Parsing
-    /// the rules takes about half a second, so projects with the same versions and the same
-    /// setting share one set.
-    loaded: HashMap<(Vec<Option<Version>>, Style), Rc<Catalog>>,
-    projects: HashMap<PathBuf, Project>,
+    cache: WorkspaceCache,
+    projects: HashMap<PathBuf, LoadedWorkspace>,
 }
 
-impl Workspace {
+impl OpenProjects {
     pub(crate) fn add_folder(&mut self, folder: &Uri) {
         if let Some(path) = uri::to_path(folder).filter(|path| !self.folders.contains(path)) {
             self.folders.push(path);
@@ -105,7 +69,7 @@ impl Workspace {
     }
 
     /// The project in `root`, read from its venv when the server has not seen it yet.
-    pub(crate) fn project(&mut self, root: &Path) -> Result<&Project> {
+    pub(crate) fn project(&mut self, root: &Path) -> Result<&LoadedWorkspace> {
         if !self.projects.contains_key(root) {
             self.refresh(root)?;
         }
@@ -117,48 +81,9 @@ impl Workspace {
     /// Reads the venv of the project in `root` again. Returns whether a project the server
     /// already knew got other rules, which happens when a library in its venv changed version.
     pub(crate) fn refresh(&mut self, root: &Path) -> Result<bool> {
-        let venv = Venv::find_from(root);
-        let installed = venv.as_ref().map(Venv::distributions);
-        let versions = pack::installed_versions(installed.as_ref());
-        // A project with its own rules reads them again each time, and the others share the
-        // embedded rules for their versions.
-        // A settings file that cannot be read is a load error, as a broken rule file is.
-        let loaded = match (Settings::find(root), LocalProject::find(root)?) {
-            (Err(error), _) => Err(error),
-            (Ok(settings), Some(config)) => {
-                Catalog::load_config(&config, installed.as_ref(), settings.style).map(Rc::new)
-            }
-            (Ok(settings), None) => {
-                let key = (versions, settings.style);
-                if let Some(catalog) = self.loaded.get(&key) {
-                    Ok(Rc::clone(catalog))
-                } else {
-                    let catalog = Rc::new(Catalog::embedded(installed.as_ref(), settings.style)?);
-                    self.loaded.insert(key, Rc::clone(&catalog));
-                    Ok(catalog)
-                }
-            }
-        };
-        let (catalog, load_error) = match loaded {
-            Ok(catalog) => (catalog, None),
-            Err(error) => {
-                let catalog = match self.projects.get(root) {
-                    Some(previous) => Rc::clone(&previous.catalog),
-                    None => Rc::new(Catalog::embedded(installed.as_ref(), Style::Default)?),
-                };
-                (catalog, Some(format!("{error:#}")))
-            }
-        };
-        let project = Project {
-            catalog,
-            load_error,
-            venv: venv.zip(installed),
-        };
-        let before = self.projects.insert(root.to_path_buf(), project);
-        let now = &self.projects[root];
-        Ok(before.is_some_and(|before| {
-            !Rc::ptr_eq(&before.catalog, &now.catalog) || before.load_error != now.load_error
-        }))
+        let (loaded, changed) = self.cache.reload(root, self.projects.get(root))?;
+        self.projects.insert(root.to_path_buf(), loaded);
+        Ok(changed)
     }
 
     /// Drops the project in `root`, after its last document closed.
