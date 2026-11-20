@@ -225,13 +225,16 @@ pub(crate) fn scan(
             let mut fixed = 0;
             let file = File::on_disk(path);
             if let Some(allowed) = fix {
-                (src, fixed) = fix_source(file, src, packs, allowed);
+                Fixed {
+                    source: src,
+                    count: fixed,
+                } = fix_source(file, src, packs, allowed);
                 if fixed > 0 {
                     fs::write(path, &src)
                         .with_context(|| format!("cannot write {}", path.display()))?;
                 }
             }
-            Ok(Some((lint_source(file, &src, packs), fixed)))
+            Ok(Some((analyze(file, &src, packs, Edits::Report), fixed)))
         })
         .collect::<Result<_>>()?;
     let skipped = per_file.iter().filter(|file| file.is_none()).count();
@@ -245,11 +248,17 @@ pub(crate) fn scan(
         scanned.fixed += fixed;
         scanned
             .issues
-            .extend(linted.found.into_iter().map(|found| found.issue));
+            .extend(linted.found.into_iter().map(Found::into_issue));
         scanned.calls.merge(linted.calls);
     }
     (scanned.issues).sort_by(|a, b| (&a.file, a.position).cmp(&(&b.file, b.position)));
     Ok(scanned)
+}
+
+#[derive(Clone, Copy)]
+struct Suppressions<'p> {
+    present: bool,
+    unused: Option<(&'p Pack, &'p Rule)>,
 }
 
 struct MatchedRule<'p, 'r> {
@@ -263,32 +272,26 @@ struct MatchedRule<'p, 'r> {
 /// the matches that a suppression comment names.
 fn matched_rules<'p, 'r>(
     root: &'r Root,
-    src: &str,
     file: File<'_>,
     language: SupportLang,
-    packs: &'p [Pack],
+    applicable: &[&'p Pack],
+    suppressions: Suppressions<'p>,
 ) -> Vec<MatchedRule<'p, 'r>> {
-    let mut selected: Vec<_> = packs
-        .iter()
-        .filter(|pack| pack.applies(root, src, language))
-        .flat_map(|pack| {
-            let path = pack.glob_path(file);
-            pack.rules
-                .iter()
-                .filter(move |rule| rule.config.language == language && rule.runs_on(&path))
-                .map(move |rule| (pack, rule))
-        })
-        .collect();
-    let inactive = packs
-        .iter()
-        .filter(|pack| src.contains("ast-grep-ignore") && pack.applies(root, src, language))
-        .flat_map(|pack| {
-            let path = pack.glob_path(file);
-            pack.inactive_rules
-                .iter()
-                .filter(move |rule| rule.config.language == language && rule.runs_on(&path))
-                .map(|rule| &rule.config)
-        });
+    let mut selected = Vec::new();
+    let mut inactive = Vec::new();
+    for &pack in applicable {
+        let path = pack.glob_path(file);
+        let runs_here = |rule: &&Rule| rule.config.language == language && rule.runs_on(&path);
+        selected.extend(pack.rules.iter().filter(runs_here).map(|rule| (pack, rule)));
+        if suppressions.present {
+            inactive.extend(
+                pack.inactive_rules
+                    .iter()
+                    .filter(runs_here)
+                    .map(|rule| &rule.config),
+            );
+        }
+    }
     let mut combined = CombinedScan::new(
         selected
             .iter()
@@ -296,9 +299,7 @@ fn matched_rules<'p, 'r>(
             .chain(inactive)
             .collect(),
     );
-    let unused = packs
-        .iter()
-        .find_map(|pack| pack.unused_suppression().map(|rule| (pack, rule)));
+    let unused = suppressions.unused;
     if let Some((_, rule)) = unused {
         combined.set_unused_suppression_rule(&rule.config);
     }
@@ -329,15 +330,33 @@ fn matched_rules<'p, 'r>(
 /// needs, as the language server does.
 #[derive(Debug)]
 pub(crate) struct Found {
-    pub(crate) issue: Issue,
+    issue: Issue,
     pub(crate) labels: Vec<Label>,
     /// The bytes of the source that the rule matched.
     pub(crate) range: Range<usize>,
     /// What the rule's fix writes for this match. `None` when the issue has no fix.
-    pub(crate) fix: Option<Replacement>,
+    pub(crate) fix: Option<Fix>,
 }
 
 impl Found {
+    pub(crate) fn id(&self) -> &RuleId {
+        &self.issue.id
+    }
+
+    pub(crate) fn issue(&self) -> Issue {
+        Issue {
+            fix: self.fix.as_ref().map(|fix| fix.level),
+            ..self.issue.clone()
+        }
+    }
+
+    pub(crate) fn into_issue(self) -> Issue {
+        Issue {
+            fix: self.fix.map(|fix| fix.level),
+            ..self.issue
+        }
+    }
+
     pub(crate) fn invalid_rule(file: PathBuf, text: &str, message: String) -> Self {
         Self {
             labels: Vec::new(),
@@ -363,6 +382,12 @@ pub(crate) struct Label {
     pub(crate) message: Option<String>,
 }
 
+#[derive(Debug)]
+pub(crate) struct Fix {
+    pub(crate) level: Applicability,
+    pub(crate) replacement: Replacement,
+}
+
 /// New text for a range of bytes of the source.
 #[derive(Debug)]
 pub(crate) struct Replacement {
@@ -370,24 +395,34 @@ pub(crate) struct Replacement {
     pub(crate) text: String,
 }
 
-/// `src` after every fix up to `allowed`, with the number of fixes applied. `file` is the file
-/// the source belongs to.
+#[derive(Debug)]
+pub(crate) struct Fixed {
+    pub(crate) source: String,
+    pub(crate) count: usize,
+}
+
 pub(crate) fn fix_source(
     file: File<'_>,
-    mut src: String,
+    mut source: String,
     packs: &[Pack],
     allowed: Applicability,
-) -> (String, usize) {
-    let mut fixed = 0;
+) -> Fixed {
+    let mut count = 0;
     for _ in 0..MAX_FIX_PASSES {
-        let (next, applied) = fix_pass(file, &src, packs, allowed);
-        if applied == 0 {
+        let analysis = analyze(file, &source, packs, Edits::Apply(allowed));
+        let mut edits = EditBatch::default();
+        for (_, edit) in analysis.proposals(allowed) {
+            if edits.fits(edit) {
+                edits.push(edit);
+            }
+        }
+        if edits.is_empty() {
             break;
         }
-        src = next;
-        fixed += applied;
+        count += edits.len();
+        source = edits.apply(&source);
     }
-    (src, fixed)
+    Fixed { source, count }
 }
 
 /// What one file's source holds for a run.
@@ -399,15 +434,56 @@ pub(crate) struct Linted {
     pub(crate) calls: Calls,
 }
 
-/// The issues in one file's source, and the code that package checks ask about. `file` is the
-/// file the source belongs to.
-pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
+impl Linted {
+    pub(crate) fn proposals(&self, allowed: Applicability) -> Vec<(&Found, &Replacement)> {
+        let mut edits: Vec<_> = self
+            .found
+            .iter()
+            .filter_map(|found| {
+                let fix = found.fix.as_ref().filter(|fix| fix.level <= allowed)?;
+                Some((found, &fix.replacement))
+            })
+            .collect();
+        edits.sort_by_key(|(_, edit)| edit.range.start);
+        edits
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Edits {
+    Report,
+    Apply(Applicability),
+}
+
+impl Edits {
+    fn includes(self, level: Applicability) -> bool {
+        match self {
+            Self::Report => true,
+            Self::Apply(allowed) => level <= allowed,
+        }
+    }
+}
+
+pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -> Linted {
     let language = language_of(file.path);
     if !packs.iter().any(|pack| pack.may_apply(src, language)) {
         return Linted::default();
     }
     let root = parse_as(src, language);
-    let calls = Calls::find(file.path, &root, src, language, packs);
+    let applicable: Vec<_> = packs
+        .iter()
+        .filter(|pack| pack.applies(&root, src, language))
+        .collect();
+    let suppressions = Suppressions {
+        present: src.contains("ast-grep-ignore"),
+        unused: packs
+            .iter()
+            .find_map(|pack| pack.unused_suppression().map(|rule| (pack, rule))),
+    };
+    let calls = match edits {
+        Edits::Report => Calls::find(file.path, &root, &applicable),
+        Edits::Apply(_) => Calls::default(),
+    };
     let imports = imports(&root, language);
     let parsed = Parsed::new(src, language, &root);
     let mut found = Vec::new();
@@ -415,12 +491,19 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
         pack,
         rule,
         matches,
-    } in matched_rules(&root, src, file, language, packs)
+    } in matched_rules(&root, file, language, &applicable, suppressions)
     {
+        let level = rule.fix.filter(|level| edits.includes(*level));
+        if matches!(edits, Edits::Apply(_)) && level.is_none() {
+            continue;
+        }
         let unbound = unbound_names(pack, imports.as_deref());
         for m in matches {
             let start = m.start_pos();
-            let fix = replacement(rule, &m, &unbound, src);
+            let fix = level.and_then(|level| {
+                let replacement = replacement(rule, &m, &unbound, src)?;
+                Some(Fix { level, replacement })
+            });
             let issue = Issue {
                 id: rule.id.clone(),
                 file: file.path.to_path_buf(),
@@ -430,7 +513,7 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
                 }),
                 severity: rule.severity_under(pack.style),
                 message: rule.config.get_message(&m),
-                fix: rule.fix.filter(|_| fix.is_some()),
+                fix: None,
                 help: pack
                     .page(rule.id.name())
                     .or_else(|| rule.config.url.clone()),
@@ -452,62 +535,12 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
             });
         }
     }
-    let fixes: Vec<&Replacement> = found
-        .iter()
-        .filter_map(|found| found.fix.as_ref())
-        .collect();
-    let mut accepted = parsed.accepted(&fixes).into_iter();
-    for found in found.iter_mut().filter(|found| found.fix.is_some()) {
-        if !accepted.next().expect("one answer for each fix") {
-            found.fix = None;
-            found.issue.fix = None;
-        }
+    parsed.validate(found.iter_mut().map(|finding| &mut finding.fix));
+    if matches!(edits, Edits::Report) {
+        // A stable sort keeps pack and rule order for findings at the same position.
+        found.sort_by_key(|found| found.issue.position);
     }
-    // A stable sort, so issues at one position keep the order of their packs and rules.
-    found.sort_by_key(|found| found.issue.position);
     Linted { found, calls }
-}
-
-/// Applies every fix up to `allowed` that does not overlap an earlier one, and returns the new
-/// source with the number of fixes applied. Overlapping fixes wait for the next pass.
-fn fix_pass(file: File<'_>, src: &str, packs: &[Pack], allowed: Applicability) -> (String, usize) {
-    let language = language_of(file.path);
-    if !packs.iter().any(|pack| pack.may_apply(src, language)) {
-        return (src.to_owned(), 0);
-    }
-    let root = parse_as(src, language);
-    let imports = imports(&root, language);
-    let parsed = Parsed::new(src, language, &root);
-    let mut edits = Vec::new();
-    for MatchedRule {
-        pack,
-        rule,
-        matches,
-    } in matched_rules(&root, src, file, language, packs)
-    {
-        let unbound = unbound_names(pack, imports.as_deref());
-        if rule.fix.is_none_or(|a| a > allowed) {
-            continue;
-        }
-        for m in matches {
-            edits.extend(replacement(rule, &m, &unbound, src));
-        }
-    }
-    let accepted = parsed.accepted(&edits.iter().collect::<Vec<_>>());
-    let mut edits: Vec<&Replacement> = (edits.iter().zip(accepted))
-        .filter_map(|(edit, accepted)| accepted.then_some(edit))
-        .collect();
-    edits.sort_by_key(|edit| edit.range.start);
-    let mut applied: Vec<&Replacement> = Vec::new();
-    for edit in edits {
-        if applied
-            .last()
-            .is_none_or(|last| last.range.end <= edit.range.start)
-        {
-            applied.push(edit);
-        }
-    }
-    (splice(src, &applied), applied.len())
 }
 
 /// Every import in the file that binds a name a fix can write anywhere in the file. An import
@@ -623,44 +656,76 @@ impl<'s> Parsed<'s> {
         }
     }
 
-    /// For each of `fixes`, whether the file is still valid code with that fix applied. Fixes
-    /// that do not overlap are applied together and parsed once, and a group that fails is
-    /// split in two until the fix that breaks the code is alone.
-    fn accepted(&self, fixes: &[&Replacement]) -> Vec<bool> {
-        let mut order: Vec<usize> = (0..fixes.len()).collect();
-        order.sort_by_key(|&i| (fixes[i].range.start, fixes[i].range.end));
-        let mut layers: Vec<Vec<usize>> = Vec::new();
-        for i in order {
-            let fits = |layer: &&mut Vec<usize>| {
+    /// Validate nonoverlapping edits together, bisecting each group that does not parse.
+    fn validate<'f>(&self, fixes: impl Iterator<Item = &'f mut Option<Fix>>) {
+        let mut ordered: Vec<_> = fixes.filter(|slot| slot.is_some()).collect();
+        ordered.sort_by_key(|slot| {
+            (
+                edit_in(slot.as_ref()).range.start,
+                edit_in(slot.as_ref()).range.end,
+            )
+        });
+        let mut layers: Vec<Vec<&mut Option<Fix>>> = Vec::new();
+        for slot in ordered {
+            let start = edit_in(slot.as_ref()).range.start;
+            let fits = |layer: &&mut Vec<&mut Option<Fix>>| {
                 layer
                     .last()
-                    .is_none_or(|&last| fixes[last].range.end <= fixes[i].range.start)
+                    .is_none_or(|last| edit_in(last.as_ref()).range.end <= start)
             };
             match layers.iter_mut().find(fits) {
-                Some(layer) => layer.push(i),
-                None => layers.push(vec![i]),
+                Some(layer) => layer.push(slot),
+                None => layers.push(vec![slot]),
             }
         }
-        let mut accepted = vec![false; fixes.len()];
-        for layer in layers {
-            self.accept_group(fixes, &layer, &mut accepted);
+        for mut layer in layers {
+            self.validate_group(&mut layer);
         }
-        accepted
     }
 
-    /// Marks the fixes of `group`, which do not overlap and are in the order of their
-    /// positions, that leave valid code.
-    fn accept_group(&self, fixes: &[&Replacement], group: &[usize], accepted: &mut [bool]) {
-        let applied: Vec<&Replacement> = group.iter().map(|&i| fixes[i]).collect();
+    fn validate_group(&self, group: &mut [&mut Option<Fix>]) {
+        let applied: Vec<_> = group.iter().map(|slot| edit_in(slot.as_ref())).collect();
         if self.accepts(&splice(self.src, &applied)) {
-            for &i in group {
-                accepted[i] = true;
-            }
-        } else if group.len() > 1 {
-            let (first, second) = group.split_at(group.len() / 2);
-            self.accept_group(fixes, first, accepted);
-            self.accept_group(fixes, second, accepted);
+            return;
         }
+        if let [slot] = group {
+            **slot = None;
+        } else {
+            let (first, second) = group.split_at_mut(group.len() / 2);
+            self.validate_group(first);
+            self.validate_group(second);
+        }
+    }
+}
+
+fn edit_in(slot: Option<&Fix>) -> &Replacement {
+    &slot.expect("validation groups contain edits").replacement
+}
+
+#[derive(Default)]
+pub(crate) struct EditBatch<'s>(Vec<&'s Replacement>);
+
+impl<'s> EditBatch<'s> {
+    pub(crate) fn fits(&self, edit: &Replacement) -> bool {
+        self.0
+            .last()
+            .is_none_or(|last| last.range.end <= edit.range.start)
+    }
+
+    pub(crate) fn push(&mut self, edit: &'s Replacement) {
+        self.0.push(edit);
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub(crate) fn apply(&self, source: &str) -> String {
+        splice(source, &self.0)
     }
 }
 
@@ -680,7 +745,7 @@ fn splice(src: &str, fixes: &[&Replacement]) -> String {
 /// The replacement `rule` makes for `m`, or `None` when the rule has no fix, its fix writes one
 /// of the `unbound` names, or its fix leaves the text as it is. A fix is a text template, so it
 /// cannot know every form of the code around a match, such as an argument list that ends in a
-/// comment. [`Parsed::accepted`] therefore checks the fixed file before a fix is offered.
+/// comment. [`Parsed::validate`] therefore checks the fixed file before a fix is offered.
 fn replacement(
     rule: &Rule,
     m: &NodeMatch<'_, StrDoc<SupportLang>>,

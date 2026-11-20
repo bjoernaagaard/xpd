@@ -218,17 +218,18 @@ fn run_case(
         .map(|s| (s, false))
         .chain(case.invalid.iter().map(|s| (s, true)))
     {
-        let found = scan::lint_source(
+        let found = scan::analyze(
             scan::File {
                 path: &filename,
                 disk: Some(&disk),
             },
             source,
             packs,
+            scan::Edits::Report,
         )
         .found
         .into_iter()
-        .find(|found| selected.iter().any(|rule| rule.id == found.issue.id));
+        .find(|found| selected.iter().any(|rule| &rule.id == found.id()));
         let actual = found.map(|found| snapshot(found, source));
         let status = if !invalid && actual.is_some() {
             "unexpected finding"
@@ -271,7 +272,10 @@ fn snapshot(found: scan::Found, source: &str) -> Value {
                 value
             }).collect();
     let mut result = json!({"labels": labels});
-    if let Some(edit) = found.fix {
+    if let Some(scan::Fix {
+        replacement: edit, ..
+    }) = found.fix
+    {
         let mut fixed = source.to_owned();
         fixed.replace_range(edit.range, &edit.text);
         result["fixed"] = Value::String(fixed);

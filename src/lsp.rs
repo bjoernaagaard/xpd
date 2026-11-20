@@ -368,7 +368,7 @@ fn lint<'d>(
             disk: Some(&disk),
         };
         let scan::Linted { mut found, calls } =
-            scan::lint_source(file, &document.text, &catalog.packs);
+            scan::analyze(file, &document.text, &catalog.packs, scan::Edits::Report);
         if disk
             .extension()
             .is_some_and(|ext| ext == "yml" || ext == "yaml")
@@ -445,7 +445,7 @@ fn diagnostic(issue: &Issue, range: lsp_types::Range, url: Option<&str>) -> Diag
 /// project's own rule links to the page it names, or to its file.
 fn found_diagnostic(catalog: &Catalog, found: &Found, range: lsp_types::Range) -> Diagnostic {
     let url = rule_help(catalog, found).and_then(|(_, url)| url);
-    diagnostic(&found.issue, range, url.as_deref())
+    diagnostic(&found.issue(), range, url.as_deref())
 }
 
 fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<Diagnostic> {
@@ -464,7 +464,7 @@ fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<
 }
 
 fn rule_help<'a>(catalog: &'a Catalog, found: &Found) -> Option<(&'a str, Option<String>)> {
-    let (doc, link) = catalog.help(&found.issue.id)?;
+    let (doc, link) = catalog.help(found.id())?;
     let url = match link {
         Some(HelpLink::Url(url)) => Some(url),
         Some(HelpLink::File(path)) => uri::from_path(&path).map(|uri| uri.as_str().to_owned()),
@@ -1006,11 +1006,10 @@ impl<'c> Server<'c> {
             if !(marked.contains(&offset) || marked == (offset..offset)) {
                 continue;
             }
-            let issue = &found.issue;
             let Some((doc, url)) = rule_help(&linted.catalog, found) else {
                 continue;
             };
-            let name = issue.id.to_string();
+            let name = found.id().to_string();
             let link = url.map_or_else(|| name.clone(), |url| format!("[{name}]({url})"));
             let section = format!("{}\n\n{link}", doc.trim_end());
             // Two matches of one rule at the cursor share one section.
@@ -1055,15 +1054,14 @@ impl<'c> Server<'c> {
         if wants(only, &CodeActionKind::QUICKFIX) {
             for found in &linted.found {
                 let marked = marked(found, &lines);
-                let (Some(level), Some(fix)) = (found.issue.fix, &found.fix) else {
+                let Some(scan::Fix { level, replacement }) = &found.fix else {
                     continue;
                 };
                 // A cursor at either end of the mark counts as on it.
                 if marked.start > asked.end || asked.start > marked.end {
                     continue;
                 }
-                let issue = &found.issue;
-                let name = issue.id.to_string();
+                let name = found.id().to_string();
                 actions.push(CodeAction {
                     title: match level {
                         Applicability::Safe => format!("xpd: fix {name}"),
@@ -1077,25 +1075,27 @@ impl<'c> Server<'c> {
                         found,
                         lsp_range(&lines, &marked),
                     )]),
-                    edit: Some(edit(form, document, &lines, fix)),
+                    edit: Some(edit(form, document, &lines, replacement)),
                     // The editor applies a preferred fix on its "auto fix" key, so only a fix
                     // that keeps what the code does is preferred.
-                    is_preferred: Some(level == Applicability::Safe),
+                    is_preferred: Some(*level == Applicability::Safe),
                     ..CodeAction::default()
                 });
             }
         }
         let allowed = self.settings.allowed();
         // Without an issue that has a fix of the allowed level, the pass below changes nothing.
-        let fixable = |found: &Found| found.issue.fix.is_some_and(|level| level <= allowed);
+        let fixable = |found: &Found| found.fix.as_ref().is_some_and(|fix| fix.level <= allowed);
         if wants(only, &FIX_ALL) && linted.found.iter().any(fixable) {
             let disk = document.place.disk();
             let file = scan::File {
                 path: &document.place.path,
                 disk: Some(&disk),
             };
-            let (fixed, count) =
-                scan::fix_source(file, document.text.clone(), &linted.catalog.packs, allowed);
+            let scan::Fixed {
+                source: fixed,
+                count,
+            } = scan::fix_source(file, document.text.clone(), &linted.catalog.packs, allowed);
             if count > 0 {
                 let change = changed_part(&document.text, &fixed);
                 actions.push(CodeAction {

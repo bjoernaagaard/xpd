@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use ast_grep_config::{GlobalRules, SerializableRule};
-use ast_grep_language::SupportLang;
 use serde::Deserialize;
 
 use crate::pack::{ManifestRule, Pack};
@@ -137,24 +136,13 @@ impl Seen {
 }
 
 impl Calls {
-    /// The matches in the parsed file `root` at `path`, of `src` and `language`. A check's
-    /// shape runs only on a file that its pack's rules run on.
-    pub(crate) fn find(
-        path: &Path,
-        root: &Root,
-        src: &str,
-        language: SupportLang,
-        packs: &[Pack],
-    ) -> Self {
+    pub(crate) fn find(path: &Path, root: &Root, applicable: &[&Pack]) -> Self {
         let mut calls = Self::default();
-        for pack in packs {
-            let checks = pack.package_checks.iter();
-            let mut shaped = checks
-                .filter_map(|check| Some((check, check.when.only_where.as_ref()?)))
-                .peekable();
-            if shaped.peek().is_none() || !pack.applies(root, src, language) {
-                continue;
-            }
+        for pack in applicable {
+            let shaped = pack
+                .package_checks
+                .iter()
+                .filter_map(|check| Some((check, check.when.only_where.as_ref()?)));
             for (check, only_where) in shaped {
                 let lines: Vec<usize> = (root.root().find_all(&only_where.shape))
                     .map(|found| found.start_pos().line() + 1)

@@ -17,7 +17,7 @@ pub(crate) struct Position {
 }
 
 /// One thing a rule or a package check found.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Issue {
     pub(crate) id: RuleId,
     pub(crate) file: PathBuf,

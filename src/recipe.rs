@@ -51,9 +51,11 @@ pub(crate) fn playbook_issues(recipe: &Recipe) -> Result<Vec<String>> {
         disk: None,
     };
     let code = recipe.code.as_deref().unwrap_or_default();
-    Ok((scan::lint_source(file, code, &packs).found.iter())
-        .map(|found| found.issue.line(Applicability::Safe))
-        .collect())
+    Ok((scan::analyze(file, code, &packs, scan::Edits::Report)
+        .found
+        .iter())
+    .map(|found| found.issue().line(Applicability::Safe))
+    .collect())
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -508,9 +510,18 @@ fn validate(code: String, package: &str, packs: &[pack::Pack]) -> Option<Verifie
         path: Path::new("recipe.py"),
         disk: None,
     };
-    let clean = scan::lint_source(file, &code, packs).found.is_empty();
-    let (code, fixes) = scan::fix_source(file, code, packs, Applicability::Unsafe);
-    if !complete(&code) || !scan::lint_source(file, &code, packs).found.is_empty() {
+    let clean = scan::analyze(file, &code, packs, scan::Edits::Report)
+        .found
+        .is_empty();
+    let scan::Fixed {
+        source: code,
+        count: fixes,
+    } = scan::fix_source(file, code, packs, Applicability::Unsafe);
+    if !complete(&code)
+        || !scan::analyze(file, &code, packs, scan::Edits::Report)
+            .found
+            .is_empty()
+    {
         return None;
     }
     let symbols = symbols(&code, package);

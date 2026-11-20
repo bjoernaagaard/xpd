@@ -26,15 +26,17 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
         let Ok(source) = fs::read_to_string(path) else {
             continue;
         };
-        let mut proposals = scan::lint_source(File::on_disk(path), &source, packs).found;
-        proposals.sort_by_key(|found| found.fix.as_ref().map(|edit| edit.range.start));
-        let mut accepted: Vec<Replacement> = Vec::new();
+        let mut proposals =
+            scan::analyze(File::on_disk(path), &source, packs, scan::Edits::Report).found;
+        proposals.sort_by_key(|found| found.fix.as_ref().map(|fix| fix.replacement.range.start));
+        let mut accepted: Vec<&Replacement> = Vec::new();
         let mut end = 0;
-        for found in proposals {
-            if found.issue.fix.is_none_or(|fix| fix > allowed) {
+        for found in &proposals {
+            if found.fix.as_ref().is_none_or(|fix| fix.level > allowed) {
                 continue;
             }
-            let Some(edit) = found.fix else { continue };
+            let Some(fix) = &found.fix else { continue };
+            let edit = &fix.replacement;
             if edit.range.start < end {
                 continue;
             }
@@ -42,7 +44,7 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
                 let mut proposed = source.clone();
                 proposed.replace_range(edit.range.clone(), &edit.text);
                 let name = path.to_string_lossy();
-                eprintln!("{}", found.issue.line(allowed));
+                eprintln!("{}", found.issue().line(allowed));
                 eprint!(
                     "{}",
                     similar::TextDiff::from_lines(&source, &proposed)
