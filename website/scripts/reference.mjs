@@ -12,31 +12,24 @@
 // scripts/examples.mjs describes. It fails when an example differs from what xpd does, and when
 // the page of a command or a tool has no example that runs it.
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { editUrl, firstSentence, page, parseMarkdown, sectionsText, yaml } from '../src/markdown.mjs';
 import { exampleRunner } from './examples.mjs';
+import { run as exec } from './exec.mjs';
 
 const website = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repository = join(website, '..');
 const authored = join(website, 'reference');
 const docs = join(website, 'src', 'content', 'docs');
-const editBase = 'https://github.com/bjoernaagaard/xpd/edit/main/website/reference';
 // The Python that runs the MCP server for the listing. Python 3.14 is the newest release that uv
 // offers with the global interpreter lock on every platform it supports.
 const venv = join(website, '.mcp-venv');
 const PYTHON_VERSION = '3.14';
 
-const run = (command, args, options = {}) =>
-  execFileSync(command, args, {
-    cwd: repository,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'inherit'],
-    ...options,
-  });
+const run = (command, args, options = {}) => exec(command, args, { cwd: repository, ...options });
 
 /** The path of the xpd binary that cargo builds from this checkout. */
 function buildXpd() {
@@ -108,44 +101,14 @@ function reflow(value) {
 }
 
 const cell = (value) => reflow(value).replaceAll('\n', ' ');
-const yaml = (value) => JSON.stringify(value);
 const code = (value) => `\`${String(value).replaceAll('`', '')}\``;
-
-function page(frontmatter, body) {
-  const lines = Object.entries(frontmatter).map(([key, value]) =>
-    typeof value === 'object' ? `${key}:\n${Object.entries(value).map(([k, v]) => `  ${k}: ${v}`).join('\n')}` : `${key}: ${value}`,
-  );
-  return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
-}
 
 /** An authored file split into the text before its first `## ` heading and its sections. */
 function readAuthored(path) {
   const source = readFileSync(path, 'utf8');
-  const sections = [];
-  let intro = [];
-  let current = null;
-  let fenced = false;
-  for (const line of source.split('\n')) {
-    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
-    if (!fenced && line.startsWith('## ')) {
-      current = { heading: line.slice(3).trim(), lines: [] };
-      sections.push(current);
-    } else if (current) {
-      current.lines.push(line);
-    } else {
-      intro.push(line);
-    }
-  }
-  const body = (lines) => lines.join('\n').trim();
-  return {
-    source,
-    intro: body(intro),
-    sections: sections.map((section) => ({ heading: section.heading, body: body(section.lines) })),
-  };
+  const { intro, sections } = parseMarkdown(source);
+  return { source, intro, sections };
 }
-
-const sectionsText = (sections) =>
-  sections.map((section) => `## ${section.heading}\n\n${section.body}`).join('\n\n');
 
 /** Every Markdown file under `folder`, as paths relative to it without `.md`. */
 function markdownFiles(folder) {
@@ -271,12 +234,8 @@ function unknownFlags(source, pageCommand) {
       }
     }
   };
-  let fenced = false;
-  for (const line of source.split('\n')) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      fenced = !fenced;
-      continue;
-    }
+  for (const { line, fenced, isFence } of parseMarkdown(source).lines) {
+    if (isFence) continue;
     if (fenced) {
       check(line.trim(), `"${line.trim()}"`);
       continue;
@@ -344,7 +303,7 @@ for (const [slug, command] of bySlug) {
       {
         title: yaml(command.name),
         description: yaml(command.about),
-        editUrl: yaml(`${editBase}/commands/${slug}.md`),
+        editUrl: yaml(editUrl(`website/reference/commands/${slug}.md`)),
         sidebar: { label: yaml(slug.split('/').pop()), order: hasChildren ? 0 : 1 },
         tableOfContents: { maxHeadingLevel: 2 },
       },
@@ -366,7 +325,7 @@ for (const [slug, command] of bySlug) {
       {
         title: yaml('Commands'),
         description: yaml(`The ${bySlug.size} commands of xpd, with their arguments, options and exit status.`),
-        editUrl: yaml(`${editBase}/commands/README.md`),
+        editUrl: yaml(editUrl('website/reference/commands/README.md')),
         sidebar: { label: yaml('All commands'), order: 0 },
       },
       [
@@ -495,8 +454,6 @@ const toolNames = mcp.tools.map((tool) => tool.name);
 sameNames('tool', join(mcpFolder, 'tools'), toolNames, markdownFiles(join(mcpFolder, 'tools')));
 sameNames('page', mcpFolder, ['index', 'resources', 'prompts', ...toolNames.map((name) => `tools/${name}`)], markdownFiles(mcpFolder));
 
-const firstSentence = (value) => (reflow(value).split('\n')[0].match(/^.*?[.!?](?=\s|$)/)?.[0] ?? reflow(value).split('\n')[0]);
-
 for (const tool of mcp.tools) {
   const source = join(mcpFolder, 'tools', `${tool.name}.md`);
   const prose = readAuthored(source);
@@ -510,8 +467,8 @@ for (const tool of mcp.tools) {
     page(
       {
         title: yaml(`${tool.name} tool`),
-        description: yaml(`The ${tool.name} tool of the xpd MCP server. ${firstSentence(tool.description).replaceAll('\\', '')}`),
-        editUrl: yaml(`${editBase}/mcp/tools/${tool.name}.md`),
+        description: yaml(`The ${tool.name} tool of the xpd MCP server. ${firstSentence(tool.description)}`),
+        editUrl: yaml(editUrl(`website/reference/mcp/tools/${tool.name}.md`)),
         sidebar: { label: yaml(tool.name) },
         tableOfContents: { maxHeadingLevel: 3 },
       },
@@ -570,7 +527,7 @@ function namedSections(what, source, items, render) {
       {
         title: yaml('MCP resources'),
         description: yaml(`The ${mcp.resources.length} resources and ${mcp.resource_templates.length} resource templates of the xpd MCP server.`),
-        editUrl: yaml(`${editBase}/mcp/resources.md`),
+        editUrl: yaml(editUrl('website/reference/mcp/resources.md')),
         sidebar: { label: yaml('Resources'), order: 1 },
       },
       `The server lists ${mcp.resources.length} resources and ${mcp.resource_templates.length} resource templates.\n\n${body}`,
@@ -599,7 +556,7 @@ function namedSections(what, source, items, render) {
       {
         title: yaml('MCP prompts'),
         description: yaml(`The ${mcp.prompts.length} prompts of the xpd MCP server, with their arguments.`),
-        editUrl: yaml(`${editBase}/mcp/prompts.md`),
+        editUrl: yaml(editUrl('website/reference/mcp/prompts.md')),
         sidebar: { label: yaml('Prompts'), order: 2 },
       },
       `The server lists ${mcp.prompts.length} prompts.\n\n${body}`,
@@ -621,7 +578,7 @@ function namedSections(what, source, items, render) {
     '',
     '| Tool | What it does | May change files |',
     '| --- | --- | --- |',
-    ...mcp.tools.map((tool) => `| [${code(tool.name)}](./tools/${tool.name}/) | ${firstSentence(tool.description)} | ${behavior(tool)} |`),
+    ...mcp.tools.map((tool) => `| [${code(tool.name)}](./tools/${tool.name}/) | ${text(firstSentence(tool.description))} | ${behavior(tool)} |`),
     '',
     'The [resources](./resources/) page lists the resources and templates, and the [prompts](./prompts/) page lists the prompts.',
     '',
@@ -653,7 +610,7 @@ function namedSections(what, source, items, render) {
       {
         title: yaml('MCP server reference'),
         description: yaml(`The tools, resources and prompts of the xpd MCP server, as xpd ${mcp.server.version} lists them.`),
-        editUrl: yaml(`${editBase}/mcp/index.md`),
+        editUrl: yaml(editUrl('website/reference/mcp/index.md')),
         sidebar: { label: yaml('Overview'), order: 0 },
       },
       body.join('\n'),

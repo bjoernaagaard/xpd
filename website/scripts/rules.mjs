@@ -5,24 +5,21 @@
 // back from `xpd rules --builtin --format json`, so the site shows what an installed xpd prints.
 // The pack pages come from rules/<pack>/pack.md, and the overview from rules/README.md.
 
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { editUrl, firstSentence, page, parseMarkdown, splitTitle, yaml } from '../src/markdown.mjs';
 import { PACKS } from '../src/packs.mjs';
+import { run } from './exec.mjs';
 
 const website = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repository = join(website, '..');
 const rulesFolder = join(repository, 'rules');
 const out = join(website, 'src', 'content', 'docs', 'rules');
-const editBase = 'https://github.com/bjoernaagaard/xpd/edit/main/rules';
 
 const catalog = JSON.parse(
-  execFileSync('cargo', ['run', '--quiet', '--', 'rules', '--builtin', '--format', 'json'], {
+  run('cargo', ['run', '--quiet', '--', 'rules', '--builtin', '--format', 'json'], {
     cwd: repository,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'inherit'],
   }),
 );
 
@@ -48,15 +45,8 @@ for (const rule of catalog) {
   byPack.get(rule.package).push(rule);
 }
 
-/** The text of a YAML scalar, as JSON, which YAML reads as the same string. */
-const yaml = (text) => JSON.stringify(text);
-
 /** The first sentence of the first paragraph of a rule's Markdown, as plain text. */
-function summary(doc) {
-  const paragraph = doc.split('\n\n')[0].replaceAll('\n', ' ');
-  const sentence = paragraph.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? paragraph;
-  return sentence.replaceAll('`', '');
-}
+const summary = (doc) => firstSentence(doc).replaceAll('`', '');
 
 /**
  * Turns the links between Markdown files under rules/ into links between site pages. `depth` is
@@ -90,20 +80,9 @@ function severityText(rule) {
   return `${rule.severities.default}${strict}. A rule of the [house style](../../../commands/check/#house-style)`;
 }
 
-function page(frontmatter, body) {
-  const lines = Object.entries(frontmatter).map(([key, value]) => `${key}: ${value}`);
-  return `---\n${lines.join('\n')}\n---\n\n${body.trim()}\n`;
-}
-
 /** The pack page's title and its Markdown after the title. */
-function packPage(pack) {
-  const text = readFileSync(join(rulesFolder, pack, 'pack.md'), 'utf8');
-  const [first, ...rest] = text.split('\n');
-  if (!first.startsWith('# ')) {
-    throw new Error(`rules/${pack}/pack.md must start with "# <pack name>"`);
-  }
-  return { title: first.slice(2).trim(), body: rest.join('\n') };
-}
+const packPage = (pack) =>
+  splitTitle(readFileSync(join(rulesFolder, pack, 'pack.md'), 'utf8'), `rules/${pack}/pack.md`);
 
 rmSync(out, { recursive: true, force: true });
 const titles = new Map(PACKS.map((pack) => [pack, packPage(pack).title]));
@@ -140,7 +119,7 @@ for (const [pack, rules] of byPack) {
         {
           title: yaml(`${pack}/${rule.rule}`),
           description: yaml(summary(rule.doc)),
-          editUrl: yaml(`${editBase}/${pack}/${rule.rule}.md`),
+          editUrl: yaml(editUrl(`rules/${pack}/${rule.rule}.md`)),
         },
         body,
       ),
@@ -157,10 +136,8 @@ for (const [pack, rules] of byPack) {
       table = [];
     }
   };
-  let inCode = false;
-  for (const line of packPage(pack).body.split('\n')) {
-    if (line.trimStart().startsWith('```')) inCode = !inCode;
-    const id = !inCode && line.match(/^- ([a-z0-9-]+)$/)?.[1];
+  for (const { line, fenced } of parseMarkdown(packPage(pack).body).lines) {
+    const id = !fenced && line.match(/^- ([a-z0-9-]+)$/)?.[1];
     if (id && ids.has(id)) {
       const rule = ids.get(id);
       listed.add(id);
@@ -183,14 +160,14 @@ for (const [pack, rules] of byPack) {
       {
         title: yaml(title),
         description: yaml(`The ${rules.length} xpd ${rules.length === 1 ? 'rule' : 'rules'} for ${title}.`),
-        editUrl: yaml(`${editBase}/${pack}/pack.md`),
+        editUrl: yaml(editUrl(`rules/${pack}/pack.md`)),
       },
       `${intro}\n\n${siteLinks(lines.join('\n'), 1)}`,
     ),
   );
 }
 
-const overview = readFileSync(join(rulesFolder, 'README.md'), 'utf8').replace(/^# .*\n/, '');
+const overview = splitTitle(readFileSync(join(rulesFolder, 'README.md'), 'utf8'), 'rules/README.md').body;
 const table = [
   '| Pack | Rules | Safe fix | Unsafe fix | No fix |',
   '| --- | ---: | ---: | ---: | ---: |',
@@ -207,7 +184,7 @@ writeFileSync(
     {
       title: yaml('Rules'),
       description: yaml(`The ${catalog.length} rules that xpd checks, by pack.`),
-      editUrl: yaml(`${editBase}/README.md`),
+      editUrl: yaml(editUrl('rules/README.md')),
     },
     `${overview.trim()}\n\n${table.join('\n')}`,
   ),

@@ -3,13 +3,13 @@ import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import mermaid from 'astro-mermaid';
 import { readFileSync } from 'node:fs';
+import { editUrl, REPO_URL, splitTitle } from './src/markdown.mjs';
 import { PACKS } from './src/packs.mjs';
 
 /** The name of a rule pack, from the first line of rules/<pack>/pack.md, such as scikit-learn. */
 const packTitle = (pack) =>
-  readFileSync(new URL(`../rules/${pack}/pack.md`, import.meta.url), 'utf8')
-    .split('\n')[0]
-    .replace(/^# /, '');
+  splitTitle(readFileSync(new URL(`../rules/${pack}/pack.md`, import.meta.url), 'utf8'), `rules/${pack}/pack.md`)
+    .title;
 
 // GitHub Pages serves the project site at https://bjoernaagaard.github.io/xpd/.
 export default defineConfig({
@@ -29,8 +29,8 @@ export default defineConfig({
       title: 'xpd',
       description:
         'A fast linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn.',
-      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/bjoernaagaard/xpd' }],
-      editLink: { baseUrl: 'https://github.com/bjoernaagaard/xpd/edit/main/website/' },
+      social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
+      editLink: { baseUrl: editUrl('website/') },
       sidebar: [
         { label: 'Get started', link: '/' },
         {

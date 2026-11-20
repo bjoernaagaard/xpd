@@ -27,34 +27,13 @@ import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
+import { parseMarkdown } from '../src/markdown.mjs';
+import { MAX_BUFFER } from './exec.mjs';
+
 const scripts = dirname(fileURLToPath(import.meta.url));
 const SHOWN_ROOT = '/tmp/project';
 const ANY = '...';
-
-/** The fenced code blocks of a Markdown source, each with the heading of its `## ` section. */
-function blocks(source) {
-  const found = [];
-  let open = null;
-  let section = '';
-  for (const [index, line] of source.split('\n').entries()) {
-    if (open) {
-      if (line.trimEnd() === open.fence) {
-        found.push(open);
-        open = null;
-      } else {
-        open.lines.push(line);
-      }
-      continue;
-    }
-    const start = line.match(/^(```+|~~~+)\s*([\w-]*)\s*(.*)$/);
-    if (start) {
-      open = { fence: start[1], language: start[2], meta: start[3], lines: [], line: index + 1, section };
-    } else if (line.startsWith('## ')) {
-      section = line.slice(3).trim();
-    }
-  }
-  return found;
-}
+const CONSOLE_TIMEOUT_MS = 300_000;
 
 const metaValue = (meta, key) => meta.match(new RegExp(`\\b${key}=(?:"([^"]*)"|(\\S+))`))?.slice(1).find(Boolean);
 
@@ -75,14 +54,14 @@ const trimmed = (lines) => {
   return kept;
 };
 
-/** Whether the real lines are the shown lines, where a shown `...` is any number of real lines. */
-function linesMatch(shown, real) {
+/** Whether `real` matches `shown`, where `ANY` in `shown` matches zero or more elements. */
+function sequenceMatches(shown, real, itemMatches) {
   const reach = new Set([0]);
-  for (const line of shown) {
+  for (const item of shown) {
     const next = new Set();
     for (const at of reach) {
-      if (line === ANY) for (let to = at; to <= real.length; to += 1) next.add(to);
-      else if (real[at] === line) next.add(at + 1);
+      if (item === ANY) for (let to = at; to <= real.length; to += 1) next.add(to);
+      else if (at < real.length && itemMatches(item, real[at])) next.add(at + 1);
     }
     if (!next.size) return false;
     reach.clear();
@@ -91,23 +70,14 @@ function linesMatch(shown, real) {
   return reach.has(real.length);
 }
 
+/** Whether the real lines are the shown lines, where a shown `...` is any number of real lines. */
+const linesMatch = (shown, real) => sequenceMatches(shown, real, (a, b) => a === b);
+
 /** Whether the real value holds what the page shows of it. */
 function valueMatches(shown, real) {
   if (shown === ANY) return true;
   if (Array.isArray(shown)) {
-    if (!Array.isArray(real)) return false;
-    const reach = new Set([0]);
-    for (const item of shown) {
-      const next = new Set();
-      for (const at of reach) {
-        if (item === ANY) for (let to = at; to <= real.length; to += 1) next.add(to);
-        else if (at < real.length && valueMatches(item, real[at])) next.add(at + 1);
-      }
-      if (!next.size) return false;
-      reach.clear();
-      for (const at of next) reach.add(at);
-    }
-    return reach.has(real.length);
+    return Array.isArray(real) && sequenceMatches(shown, real, valueMatches);
   }
   if (shown && typeof shown === 'object') {
     return Boolean(real) && typeof real === 'object' && !Array.isArray(real) && Object.entries(shown).every(([key, value]) => key in real && valueMatches(value, real[key]));
@@ -178,7 +148,7 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
     const script = cases
       .map(({ command }, index) => `${command.replaceAll(SHOWN_ROOT, root)}\n__status=$?; printf '\\n${mark} ${index}\\n'; (exit $__status)`)
       .join('\n');
-    const result = spawnSync('bash', ['-c', `exec 2>&1\n${script}`], { cwd: root, env, encoding: 'utf8', input: '', timeout: 300_000, maxBuffer: 64 * 1024 * 1024 });
+    const result = spawnSync('bash', ['-c', `exec 2>&1\n${script}`], { cwd: root, env, encoding: 'utf8', input: '', timeout: CONSOLE_TIMEOUT_MS, maxBuffer: MAX_BUFFER });
     const parts = shown(root, result.stdout ?? '').split(new RegExp(`\\n${mark} \\d+\\n`));
     return cases.map((_, index) => trimmed((parts[index] ?? '').split('\n')));
   }
@@ -226,7 +196,7 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
     const env = sessionEnv(root);
     let count = 0;
     let pending = null;
-    for (const block of blocks(source)) {
+    for (const block of parseMarkdown(source).blocks) {
       const where = `${file}:${block.line}`;
       const title = metaValue(block.meta, 'title');
       if (title && !title.includes(' ')) {
