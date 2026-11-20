@@ -42,23 +42,30 @@ jobs:
     timeout-minutes: 5
     outputs:
       rust: ${{ steps.read.outputs.rust }}
+      platforms: ${{ steps.read.outputs.platforms }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: read
-        run: python3 -c 'import tomllib; print("rust=" + tomllib.load(open("mise.toml", "rb"))["tools"]["rust"]["version"])' >> "$GITHUB_OUTPUT"
+        run: |
+          python3 - <<'PYTHON' >> "$GITHUB_OUTPUT"
+          import json
+          import tomllib
+          from pathlib import Path
+
+          rust = tomllib.loads(Path("mise.toml").read_text())["tools"]["rust"]
+          print("rust=" + (rust if isinstance(rust, str) else rust["version"]))
+          platforms = json.loads(Path(".github/wheel-platforms.json").read_text())
+          print("platforms=" + json.dumps(platforms))
+          PYTHON
 
   linux:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
       matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: aarch64
+        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -83,15 +90,11 @@ jobs:
   musllinux:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
       matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: aarch64
+        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -143,19 +146,11 @@ jobs:
   macos:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ${{ matrix.platform.macos }}
     timeout-minutes: 30
     strategy:
       matrix:
-        platform:
-          # llama.cpp uses std::filesystem, which macOS has from 10.15. maturin's default for
-          # x86_64 is 10.12.
-          - runner: macos-15-intel
-            target: x86_64
-            deployment: "10.15"
-          - runner: macos-latest
-            target: aarch64
-            deployment: "11.0"
+        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels

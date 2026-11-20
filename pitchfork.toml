@@ -5,7 +5,7 @@
 # `ssh -N -L 4321:localhost:4321 homelab`.
 [daemons.docs-preview]
 dir = "website"
-run = "npm ci && npm run build && exec npm run preview -- --port 4321"
+run = "mise run docs && exec npm run preview -- --port 4321"
 mise = true
 ready_http = { url = "http://127.0.0.1:4321/xpd/", timeout = "5m" }
 retry = 3
