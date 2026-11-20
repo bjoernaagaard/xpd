@@ -34,13 +34,6 @@
 //! ty/environment.md          docs/reference/environment.md at the tag 0.0.106
 //! ```
 
-#[path = "../src/doctor/catalog.rs"]
-#[expect(
-    dead_code,
-    reason = "the verifier reads the records, not the parts doctor evaluates"
-)]
-mod catalog;
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -50,7 +43,7 @@ use anyhow::{Context, Result, bail};
 use regex::Regex;
 use serde_json::Value;
 
-use catalog::{Decision, Key, Kind, Record, Surface, Tool};
+use xpd::doctor::catalog::{self, Decision, Key, Kind, Record, Surface, Tool};
 
 /// The release whose live index lists the rules newer than the pinned Ruff.
 const NEWER_RUFF: &str = "0.17.5";
@@ -89,7 +82,7 @@ fn run() -> Result<bool> {
             .problems
             .push(format!("the catalog does not load: {error:#}")),
     }
-    report.evidence(&records);
+    report.evidence(&records)?;
     compare_surfaces(&source, &records, &mut report)?;
     report.newer(&source, &records)?;
     if let Some(dir) = inventories {
@@ -182,13 +175,8 @@ impl Report {
     }
 
     /// Every trigger on code has an evidence rule of its name, and every evidence rule a trigger.
-    fn evidence(&mut self, records: &[Record]) {
-        let yaml = include_str!("../src/doctor/evidence.yml");
-        let rules: BTreeSet<String> = yaml
-            .lines()
-            .filter_map(|line| line.strip_prefix("id: "))
-            .map(str::to_owned)
-            .collect();
+    fn evidence(&mut self, records: &[Record]) -> Result<()> {
+        let rules: BTreeSet<String> = xpd::doctor::evidence_rule_ids()?.into_iter().collect();
         let triggers: BTreeSet<String> = catalog::Trigger::ALL
             .into_iter()
             .filter(|trigger| trigger.in_code())
@@ -211,6 +199,7 @@ impl Report {
                     .push(format!("{} names an unknown trigger", record.key));
             }
         }
+        Ok(())
     }
 
     /// The live entries beyond the pinned release stay out of the pinned set, each with the

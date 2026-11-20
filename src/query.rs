@@ -12,7 +12,7 @@ use ast_grep_language::SupportLang;
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 use clap::{ArgGroup, ValueEnum};
 
-use crate::cli::Format;
+use crate::output::Format;
 
 /// How JSON is printed: one array over several lines, one array on one line, or one object per
 /// line.

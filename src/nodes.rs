@@ -9,11 +9,9 @@ use std::collections::BTreeSet;
 
 use ast_grep_core::Node;
 
+use crate::graph_diagnostic::{Finding, Level};
 use crate::outline::{self, Function, Parameter};
-use crate::scan;
-
-/// A node of the syntax tree of a Python file.
-type Syntax<'r> = scan::Node<'r>;
+use crate::syntax::{self, Node as Syntax, string_literal};
 
 /// Decorators that build nodes in a way this module does not read.
 const UNREAD: &[&str] = &[
@@ -100,35 +98,6 @@ impl Origin {
     }
 }
 
-/// How sure a finding is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Level {
-    /// Hamilton raises, or Python drops the function.
-    Error,
-    /// A guess that a person should look at.
-    Warning,
-    /// Something `xpd graph` could not read.
-    Note,
-}
-
-impl Level {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Error => "error",
-            Self::Warning => "warning",
-            Self::Note => "note",
-        }
-    }
-}
-
-/// Something about one function that the graph alone does not show.
-#[derive(Debug)]
-pub(crate) struct Finding {
-    pub(crate) line: usize,
-    pub(crate) level: Level,
-    pub(crate) message: String,
-}
-
 /// What one module defines.
 #[derive(Debug, Default)]
 pub(crate) struct Module {
@@ -150,7 +119,7 @@ struct Decorator<'r> {
 
 /// Reads the nodes of the module in `src`.
 pub(crate) fn read(src: &str) -> Module {
-    let root = scan::parse(src);
+    let root = syntax::parse(src);
     let mut module = Module::default();
     let mut defined: Vec<(String, usize)> = Vec::new();
     let mut kept: Vec<(String, Vec<NodeDef>, Vec<Finding>)> = Vec::new();
@@ -294,7 +263,7 @@ impl Effects {
                 }
                 _ if d.has_part("load_from") => {
                     let injected = keyword(&arguments, "inject_")
-                        .and_then(|value| literal(&value))
+                        .and_then(|value| string_literal(&value))
                         .or_else(|| match params {
                             [only] => Some(only.name.clone()),
                             _ => None,
@@ -305,7 +274,8 @@ impl Effects {
                         .extend(arguments.iter().flat_map(source_names));
                 }
                 _ if d.has_part("save_to") => {
-                    let output = keyword(&arguments, "output_name_").and_then(|v| literal(&v));
+                    let output =
+                        keyword(&arguments, "output_name_").and_then(|v| string_literal(&v));
                     effects.saved.extend(output);
                     effects
                         .sources
@@ -475,7 +445,7 @@ fn parameterized(d: &Decorator<'_>) -> Option<Vec<Variant>> {
     if d.name == "parameterize_values" {
         // parameterize_values(parameter="n", assigned_output={("name", "doc"): value})
         let parameter =
-            positional_or_keyword(&arguments, 0, "parameter").and_then(|v| literal(&v))?;
+            positional_or_keyword(&arguments, 0, "parameter").and_then(|v| string_literal(&v))?;
         let outputs = positional_or_keyword(&arguments, 1, "assigned_output")
             .filter(|v| v.kind() == "dictionary")?;
         return outputs
@@ -486,7 +456,7 @@ fn parameterized(d: &Decorator<'_>) -> Option<Vec<Variant>> {
                 let name = key
                     .children()
                     .find(Node::is_named)
-                    .and_then(|n| literal(&n))?;
+                    .and_then(|n| string_literal(&n))?;
                 Some(Variant {
                     name,
                     assigned: BTreeSet::from([parameter.clone()]),
@@ -510,7 +480,7 @@ fn parameterized(d: &Decorator<'_>) -> Option<Vec<Variant>> {
             for (param, given) in pairs(&assignment)? {
                 assigned.insert(param);
                 if by_string {
-                    sources.push(literal(&given)?);
+                    sources.push(string_literal(&given)?);
                 } else {
                     sources.extend(source_names(&given));
                 }
@@ -548,7 +518,7 @@ fn pairs<'r>(mapping: &Syntax<'r>) -> Option<Vec<(String, Syntax<'r>)>> {
                 if pair.kind() != "pair" {
                     return None;
                 }
-                Some((literal(&pair.field("key")?)?, pair.field("value")?))
+                Some((string_literal(&pair.field("key")?)?, pair.field("value")?))
             })
             .collect();
     }
@@ -582,7 +552,7 @@ fn source_names(node: &Syntax<'_>) -> Vec<String> {
         .filter_map(|call| {
             let arguments = call.field("arguments")?;
             let first = arguments.children().find(Node::is_named)?;
-            literal(&first)
+            string_literal(&first)
         })
         .collect()
 }
@@ -594,7 +564,7 @@ fn literal_names(arguments: &[Syntax<'_>]) -> (Vec<String>, bool) {
     let mut complete = true;
     for argument in arguments {
         match argument.kind().as_ref() {
-            "string" => match literal(argument) {
+            "string" => match string_literal(argument) {
                 Some(name) => names.push(name),
                 None => complete = false,
             },
@@ -638,20 +608,4 @@ fn positional_or_keyword<'r>(
         .nth(position)
         .cloned()
         .or_else(|| keyword(arguments, name))
-}
-
-/// The text of a string literal with no interpolation, without its quotes.
-pub(crate) fn literal(node: &Syntax<'_>) -> Option<String> {
-    if node.kind() != "string" {
-        return None;
-    }
-    let mut text = String::new();
-    for part in node.children() {
-        match part.kind().as_ref() {
-            "string_content" => text.push_str(&part.text()),
-            "string_start" | "string_end" => {}
-            _ => return None,
-        }
-    }
-    Some(text)
 }

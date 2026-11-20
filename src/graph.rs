@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::nodes::{self, Level, NodeDef};
+use crate::graph_diagnostic::Level;
+use crate::nodes::{self, NodeDef};
 use crate::steps::{self, Pipeline};
 
 /// A name shorter than this is not compared with the node names, because short names such as

@@ -12,19 +12,20 @@ use serde_json::Value;
 
 use crate::author;
 use crate::catalog::{self, Catalog, Filters};
+use crate::check::{FixMode, Scope, lint};
 use crate::graph::Graph;
 use crate::index::{self, Kind};
 use crate::lsp;
 use crate::mcp;
 use crate::outline::OutlineArgs;
-use crate::package_check;
+use crate::output::Format;
 use crate::query::RunArgs;
-use crate::report::{self, Report};
 use crate::rule::Applicability;
 use crate::scan;
 use crate::settings::{Settings, Style};
+use crate::severity;
 use crate::skills;
-use crate::venv::{self, Venv};
+use crate::venv;
 
 /// The agent skill that `xpd skill` prints.
 const SKILL: &str = include_str!("../skills/xpd/SKILL.md");
@@ -44,13 +45,6 @@ const PYTHON_NOT_STARTED: u8 = 127;
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
-}
-
-/// How `graph`, `rules`, `find`, `api`, `new` and `test` print what they found.
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub(crate) enum Format {
-    Text,
-    Json,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -99,7 +93,7 @@ struct RulesOptions {
     #[arg(long = "rule", value_name = "NAME")]
     rules: Vec<String>,
     /// List only the rules of this severity and above: error, warning, info or hint.
-    #[arg(long, value_parser = report::parse_severity)]
+    #[arg(long, value_parser = severity::parse)]
     severity: Option<Severity>,
     /// Output format. Default: text on a terminal, json otherwise.
     #[arg(long, value_enum)]
@@ -196,10 +190,10 @@ enum Cmd {
         #[arg(long = "rule", value_name = "NAME")]
         rules: Vec<String>,
         /// Run only the rules of this severity and above: error, warning, info or hint.
-        #[arg(long, value_parser = report::parse_severity)]
+        #[arg(long, value_parser = severity::parse)]
         severity: Option<Severity>,
         /// Exit 1 when an issue of this severity or above is left: error, warning, info or hint.
-        #[arg(long, value_parser = report::parse_severity, default_value = "error")]
+        #[arg(long, value_parser = severity::parse, default_value = "error")]
         fail_on: Severity,
         /// The project file to read instead of the nearest sgconfig.yml.
         #[arg(short, long)]
@@ -331,7 +325,8 @@ enum Cmd {
 }
 
 /// Runs the command the arguments name.
-pub(crate) fn run() -> ExitCode {
+/// Runs the xpd command line and returns its exit code.
+pub fn run() -> ExitCode {
     use std::io::IsTerminal;
 
     let default_format = if io::stdout().is_terminal() {
@@ -572,71 +567,6 @@ fn rules(options: RulesOptions, default: Format) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
-}
-
-/// Whether a lint run writes fixes, and up to which level.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum FixMode {
-    Apply(Option<Applicability>),
-    Review(Applicability),
-}
-
-/// The issues of the files under `paths`, with the rules and the settings of the project in the
-/// working directory.
-pub(crate) fn lint(
-    paths: &[PathBuf],
-    mode: FixMode,
-    scope: Scope,
-    filters: &Filters,
-    config: Option<&Path>,
-) -> Result<Report> {
-    let venv = Venv::find();
-    let installed = venv.as_ref().map(Venv::distributions);
-    let project = std::env::current_dir()?;
-    let style = Settings::find(&project)?.style;
-    let mut catalog = match config {
-        Some(config) => Catalog::load_config(config, installed.as_ref(), style)?,
-        None => Catalog::load(&project, installed.as_ref(), style)?,
-    };
-    catalog.select(filters)?;
-    let files = scan::collect_files(paths, &catalog.packs)?;
-    let scanned = match mode {
-        FixMode::Apply(fix) => scan::scan(&files, &catalog.packs, fix)?,
-        FixMode::Review(allowed) => crate::review::scan(&files, &catalog.packs, allowed)?,
-    };
-    let mut issues = scanned.issues;
-    if let (Scope::Project, Some(venv), Some(installed)) = (scope, &venv, &installed) {
-        issues.extend(package_check::missing(
-            &catalog.packs,
-            venv,
-            installed,
-            &project,
-            &scanned.calls,
-        ));
-    }
-    if matches!(scope, Scope::Project) {
-        for warning in catalog
-            .project
-            .iter()
-            .flat_map(catalog::LocalProject::warnings)
-        {
-            eprintln!("xpd: {warning}");
-        }
-    }
-    Ok(Report {
-        issues,
-        fixed: scanned.fixed,
-        skipped: scanned.skipped,
-    })
-}
-
-/// How much a lint run looks at.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Scope {
-    /// The given files only. The hook runs after every edit, so it stops here.
-    Files,
-    /// The files, and the packages the project's venv lacks.
-    Project,
 }
 
 /// `allowed` is the fix level that `[*]` and the summary count as fixable.

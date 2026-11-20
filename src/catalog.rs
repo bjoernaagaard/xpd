@@ -14,19 +14,11 @@ use serde_json::{Value, json};
 pub(crate) use self::local::{LocalProject, is_module_name};
 use crate::pack::{self, Pack};
 use crate::package_check;
-use crate::report::severity_name;
 use crate::rule::{Applicability, Mark, Rule};
 use crate::settings::Style;
+use crate::severity::{name as severity_name, rank};
 use crate::venv::Distributions;
 use crate::version::Version;
-
-/// The folder of the published rule pages, one page for each pack and each rule in it.
-const RULES_URL: &str = concat!(env!("CARGO_PKG_HOMEPAGE"), "rules/");
-
-/// The address of the published page about the rule or package check `id` of the pack `module`.
-pub(crate) fn url(module: &str, id: &str) -> String {
-    format!("{RULES_URL}{module}/{id}/")
-}
 
 /// The rules of one project for one set of installed libraries.
 #[derive(Debug)]
@@ -250,17 +242,6 @@ impl Entry<'_> {
             "url": self.url,
             "doc": self.doc,
         })
-    }
-}
-
-/// How severe a severity is, so that merging a rule's documents keeps the highest.
-pub(crate) fn rank(severity: &Severity) -> u8 {
-    match severity {
-        Severity::Error => 4,
-        Severity::Warning => 3,
-        Severity::Info => 2,
-        Severity::Hint => 1,
-        Severity::Off => 0,
     }
 }
 

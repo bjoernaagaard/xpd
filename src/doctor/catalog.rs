@@ -13,23 +13,23 @@ use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 
 /// The packaged decisions, one JSON record per line.
-pub(crate) const DECISIONS: &str = include_str!("decisions.jsonl");
+pub const DECISIONS: &str = include_str!("decisions.jsonl");
 
 /// The releases the decisions were reviewed for.
-pub(crate) const RUFF_RELEASE: &str = "0.17.4";
-pub(crate) const TY_RELEASE: &str = "0.0.106";
-pub(crate) const PYTEST_RELEASE: &str = "9.2.0";
+pub const RUFF_RELEASE: &str = "0.17.4";
+pub const TY_RELEASE: &str = "0.0.106";
+pub const PYTEST_RELEASE: &str = "9.2.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Tool {
+pub enum Tool {
     Ruff,
     Ty,
     Pytest,
 }
 
 impl Tool {
-    pub(crate) fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::Ruff => "ruff",
             Self::Ty => "ty",
@@ -37,7 +37,7 @@ impl Tool {
         }
     }
 
-    pub(crate) fn pinned(self) -> &'static str {
+    pub fn pinned(self) -> &'static str {
         match self {
             Self::Ruff => RUFF_RELEASE,
             Self::Ty => TY_RELEASE,
@@ -49,7 +49,7 @@ impl Tool {
 /// Where a setting is written, or the registry a rule belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Surface {
+pub enum Surface {
     Rules,
     Project,
     Editor,
@@ -58,7 +58,7 @@ pub(crate) enum Surface {
 }
 
 impl Surface {
-    pub(crate) fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::Rules => "rules",
             Self::Project => "project",
@@ -83,7 +83,7 @@ impl Surface {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Kind {
+pub enum Kind {
     /// A rule of the release's registry, including Ruff's removed rules.
     Rule,
     /// A rule the live index lists that the pinned release lacks.
@@ -113,7 +113,7 @@ pub(crate) enum Kind {
 }
 
 impl Kind {
-    pub(crate) fn name(self) -> String {
+    pub fn name(self) -> String {
         kebab_name(self)
     }
 
@@ -133,17 +133,17 @@ fn kebab_name(variant: impl Serialize) -> String {
 /// The identity of a record. A rule, its key in a settings table and its historical alias are
 /// different records, and so are a removed rule and the redirect of its old selector.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct Key {
-    pub(crate) tool: Tool,
-    pub(crate) release: String,
-    pub(crate) surface: Surface,
-    pub(crate) kind: Kind,
-    pub(crate) id: String,
+pub struct Key {
+    pub tool: Tool,
+    pub release: String,
+    pub surface: Surface,
+    pub kind: Kind,
+    pub id: String,
 }
 
 impl Key {
     /// The key of a record of the pinned release of `tool`.
-    pub(crate) fn pinned(tool: Tool, surface: Surface, kind: Kind, id: &str) -> Self {
+    pub fn pinned(tool: Tool, surface: Surface, kind: Kind, id: &str) -> Self {
         Self {
             tool,
             release: tool.pinned().to_owned(),
@@ -172,7 +172,7 @@ impl fmt::Display for Key {
 /// an evidence rule in `evidence.yml` with the same name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Trigger {
+pub enum Trigger {
     ExplicitAny,
     LazyImport,
     NumpyImport,
@@ -212,7 +212,7 @@ pub(crate) enum Trigger {
 }
 
 impl Trigger {
-    pub(crate) const ALL: [Self; 30] = [
+    pub const ALL: [Self; 30] = [
         Self::ExplicitAny,
         Self::LazyImport,
         Self::NumpyImport,
@@ -246,12 +246,12 @@ impl Trigger {
     ];
 
     /// The trigger's name in the catalog, which is also its evidence rule's id.
-    pub(crate) fn name(self) -> String {
+    pub fn name(self) -> String {
         kebab_name(self)
     }
 
     /// Whether the trigger is found in Python source, by the evidence rule of its name.
-    pub(crate) fn in_code(self) -> bool {
+    pub fn in_code(self) -> bool {
         !matches!(
             self,
             Self::PreviewBroadSelect
@@ -267,7 +267,7 @@ impl Trigger {
 /// How doctor tells that a setting already has the suggested effect.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Satisfied {
+pub enum Satisfied {
     /// The effective value equals the suggested one.
     #[default]
     Equals,
@@ -279,14 +279,14 @@ pub(crate) enum Satisfied {
 
 /// A ty diagnostic level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum Level {
+pub enum Level {
     Ignore,
     Warn,
     Error,
 }
 
 impl Level {
-    pub(crate) fn parse(text: &str) -> Option<Self> {
+    pub fn parse(text: &str) -> Option<Self> {
         match text.trim_matches('"') {
             "ignore" => Some(Self::Ignore),
             "warn" => Some(Self::Warn),
@@ -295,7 +295,7 @@ impl Level {
         }
     }
 
-    pub(crate) fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::Ignore => "ignore",
             Self::Warn => "warn",
@@ -306,7 +306,7 @@ impl Level {
 
 /// What a suggestion changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Target {
+pub enum Target {
     /// Add a Ruff rule's code to a selector array, such as `lint.extend-select`.
     Select { key: String, code: String },
     /// Set a ty rule's level in a rules table, such as `rules.disjoint-cast`.
@@ -325,7 +325,7 @@ pub(crate) enum Target {
 
 /// When a suggestion applies.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum When {
+pub enum When {
     /// Recommended for every project where it is not already effective.
     Always,
     /// Shown when the trigger finds evidence, with the condition the developer decides.
@@ -333,15 +333,15 @@ pub(crate) enum When {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Suggestion {
-    pub(crate) target: Target,
-    pub(crate) when: When,
+pub struct Suggestion {
+    pub target: Target,
+    pub when: When,
     /// Ruff rules of which one must run for the suggestion to have an effect.
-    pub(crate) requires: Vec<String>,
+    pub requires: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Decision {
+pub enum Decision {
     /// Doctor preserves the project's choice and suggests nothing.
     Leave,
     /// The decision of the linked record applies.
@@ -353,7 +353,7 @@ pub(crate) enum Decision {
 
 impl Decision {
     /// The decision's word in the inventories.
-    pub(crate) fn word(&self) -> &'static str {
+    pub fn word(&self) -> &'static str {
         match self {
             Self::Leave => "leave",
             Self::Inherit(_) => "inherit",
@@ -374,38 +374,38 @@ impl Decision {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Record {
-    pub(crate) key: Key,
+pub struct Record {
+    pub key: Key,
     /// A Ruff rule's name, beside its code.
-    pub(crate) name: Option<String>,
+    pub name: Option<String>,
     /// A Ruff rule's selector prefix: the linter's, plus its category for pycodestyle and
     /// Pylint, such as `PTH`, `E` or `PLC`.
-    pub(crate) prefix: Option<String>,
-    pub(crate) status: Option<String>,
-    pub(crate) since: Option<String>,
+    pub prefix: Option<String>,
+    pub status: Option<String>,
+    pub since: Option<String>,
     /// As the inventory writes it: `on / off` for a Ruff rule in the stable and preview defaults,
     /// a level for a ty rule, a TOML value for a setting.
-    pub(crate) default: Option<String>,
-    pub(crate) canonical: Option<Key>,
+    pub default: Option<String>,
+    pub canonical: Option<Key>,
     /// The selector a Ruff redirect maps its old selector to. `None` for a redirect whose target
     /// the release rejects too.
-    pub(crate) target: Option<String>,
-    pub(crate) source: String,
+    pub target: Option<String>,
+    pub source: String,
     /// The decision and its reason, as the reviewed inventory states them.
-    pub(crate) reason: String,
-    pub(crate) decision: Decision,
+    pub reason: String,
+    pub decision: Decision,
 }
 
 /// Ruff's mode, which decides the default rules and whether preview rules can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Mode {
+pub enum Mode {
     Stable,
     Preview,
 }
 
 impl Record {
     /// Whether the Ruff rule runs by default in `mode`.
-    pub(crate) fn ruff_default(&self, mode: Mode) -> bool {
+    pub fn ruff_default(&self, mode: Mode) -> bool {
         let Some(default) = &self.default else {
             return false;
         };
@@ -416,16 +416,16 @@ impl Record {
         default.split('/').map(str::trim).nth(index) == Some("on")
     }
 
-    pub(crate) fn is_preview(&self) -> bool {
+    pub fn is_preview(&self) -> bool {
         self.status.as_deref() == Some("preview")
     }
 
-    pub(crate) fn is_removed(&self) -> bool {
+    pub fn is_removed(&self) -> bool {
         self.status.as_deref() == Some("removed")
     }
 
     /// The reason without the inventory's Markdown.
-    pub(crate) fn plain_reason(&self) -> String {
+    pub fn plain_reason(&self) -> String {
         self.reason.replace(['*', '`'], "")
     }
 }
@@ -618,7 +618,11 @@ impl Proposal {
 
 /// Every record of `text`, in order, duplicates included. A line that is not a valid record is
 /// an error that names the line.
-pub(crate) fn parse_lines(text: &str) -> Result<Vec<Record>> {
+///
+/// # Errors
+///
+/// Returns an error if a record cannot be decoded or validated.
+pub fn parse_lines(text: &str) -> Result<Vec<Record>> {
     text.lines()
         .enumerate()
         .filter(|(_, line)| !line.trim().is_empty())
@@ -633,20 +637,28 @@ pub(crate) fn parse_lines(text: &str) -> Result<Vec<Record>> {
 
 /// The records, each once, with every link resolved.
 #[derive(Debug)]
-pub(crate) struct Catalog {
+pub struct Catalog {
     records: Vec<Record>,
     index: HashMap<Key, usize>,
 }
 
 impl Catalog {
     /// The packaged decisions.
-    pub(crate) fn packaged() -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundled catalog cannot be parsed or contains duplicate records.
+    pub fn packaged() -> Result<Self> {
         Self::new(parse_lines(DECISIONS)?)
     }
 
     /// Fails on a duplicate key, a link to no record and an inheritance that does not end in
     /// exactly one decision.
-    pub(crate) fn new(records: Vec<Record>) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the catalog contains duplicate records.
+    pub fn new(records: Vec<Record>) -> Result<Self> {
         let mut index = HashMap::new();
         let mut duplicates = BTreeMap::new();
         for (position, record) in records.iter().enumerate() {
@@ -673,17 +685,21 @@ impl Catalog {
         Ok(catalog)
     }
 
-    pub(crate) fn records(&self) -> &[Record] {
+    pub fn records(&self) -> &[Record] {
         &self.records
     }
 
-    pub(crate) fn get(&self, key: &Key) -> Option<&Record> {
+    pub fn get(&self, key: &Key) -> Option<&Record> {
         self.index.get(key).map(|&position| &self.records[position])
     }
 
     /// The record whose own decision applies to `record`: itself, or the end of its chain of
     /// inheritance.
-    pub(crate) fn resolve<'a>(&'a self, record: &'a Record) -> Result<&'a Record> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a canonical link is missing or forms a cycle.
+    pub fn resolve<'a>(&'a self, record: &'a Record) -> Result<&'a Record> {
         let mut current = record;
         for _ in 0..self.records.len() {
             match &current.decision {
@@ -699,7 +715,7 @@ impl Catalog {
     }
 
     /// The records that doctor evaluates, each with its suggestion.
-    pub(crate) fn suggestions(&self) -> impl Iterator<Item = (&Record, &Suggestion)> {
+    pub fn suggestions(&self) -> impl Iterator<Item = (&Record, &Suggestion)> {
         self.records
             .iter()
             .filter_map(|record| match &record.decision {
@@ -709,7 +725,7 @@ impl Catalog {
     }
 
     /// Ruff's rules of the pinned release, removed rules included.
-    pub(crate) fn ruff_rules(&self) -> impl Iterator<Item = &Record> {
+    pub fn ruff_rules(&self) -> impl Iterator<Item = &Record> {
         self.records.iter().filter(|record| {
             record.key.tool == Tool::Ruff
                 && record.key.release == RUFF_RELEASE
@@ -718,7 +734,7 @@ impl Catalog {
     }
 
     /// The selector a Ruff redirect maps `selector` to, or `selector` itself.
-    pub(crate) fn redirect<'a>(&'a self, selector: &'a str) -> &'a str {
+    pub fn redirect<'a>(&'a self, selector: &'a str) -> &'a str {
         let key = Key::pinned(Tool::Ruff, Surface::Rules, Kind::Redirect, selector);
         self.get(&key)
             .and_then(|record| record.target.as_deref())
@@ -726,7 +742,7 @@ impl Catalog {
     }
 
     /// The current ty rule that `name` spells, which is `name` itself or a historical alias.
-    pub(crate) fn ty_rule<'a>(&'a self, name: &str) -> Option<&'a Record> {
+    pub fn ty_rule<'a>(&'a self, name: &str) -> Option<&'a Record> {
         let rule = Key::pinned(Tool::Ty, Surface::Rules, Kind::Rule, name);
         let alias = Key::pinned(Tool::Ty, Surface::Rules, Kind::Alias, name);
         self.get(&rule).or_else(|| {

@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow, bail};
 use toml_edit::TableLike;
 
-use crate::doctor::toml;
+use crate::toml;
 
 /// The file of a project that can hold xpd's settings.
 const PROJECT_FILE: &str = "pyproject.toml";

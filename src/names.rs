@@ -16,7 +16,7 @@ use ast_grep_core::{Matcher, NodeMatch};
 use ast_grep_language::SupportLang;
 
 use crate::pack::Library;
-use crate::scan::Node;
+use crate::syntax::Node;
 
 /// What gives a name its value at the place of one use.
 pub(crate) struct Origin<'t> {

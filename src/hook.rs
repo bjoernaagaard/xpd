@@ -20,14 +20,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::catalog::{self, Catalog, Filters};
-use crate::cli::{self, FixMode, Scope};
+use crate::check::{self, FixMode, Scope};
 use crate::embed;
 use crate::graph::Graph;
 use crate::index;
-use crate::report::{self, Issue};
+use crate::report::Issue;
 use crate::rule::Applicability;
 use crate::scan;
 use crate::settings::{Settings, Style};
+use crate::severity;
+use crate::syntax;
 
 /// Claude Code shows stderr to the agent only when a hook exits 2.
 const BLOCK: u8 = 2;
@@ -335,7 +337,7 @@ fn brief(files: &[PathBuf]) -> Result<String> {
         .par_iter()
         .filter_map(|file| {
             let src = fs::read_to_string(file).ok()?;
-            let root = scan::parse(&src);
+            let root = syntax::parse(&src);
             let packs: Vec<String> = (catalog.packs.iter())
                 .filter(|pack| pack.applies(&root, &src, SupportLang::Python))
                 .map(|pack| pack.module.clone())
@@ -474,7 +476,7 @@ fn open_issues(files: &[PathBuf]) -> Result<String> {
         files_read(files),
         style.as_str()
     );
-    let report = cli::lint(
+    let report = check::lint(
         files,
         FixMode::Apply(None),
         Scope::Files,
@@ -501,12 +503,12 @@ fn open_issues(files: &[PathBuf]) -> Result<String> {
     for (pack, issues) in packs {
         let severities: Vec<String> = [Severity::Error, Severity::Warning, Severity::Info]
             .iter()
-            .filter_map(|severity| {
+            .filter_map(|level| {
                 let count = (issues.iter())
-                    .filter(|issue| catalog::rank(&issue.severity) == catalog::rank(severity))
+                    .filter(|issue| severity::rank(&issue.severity) == severity::rank(level))
                     .count();
-                let name = report::severity_name(severity);
-                (count > 0).then(|| match severity {
+                let name = severity::name(level);
+                (count > 0).then(|| match level {
                     Severity::Info => format!("{count} {name}"),
                     _ => counted(count, name),
                 })
@@ -920,7 +922,7 @@ fn findings(files: &[PathBuf]) -> Result<Vec<Finding>> {
     if files.is_empty() {
         return Ok(Vec::new());
     }
-    let report = cli::lint(
+    let report = check::lint(
         &files,
         FixMode::Apply(None),
         Scope::Files,
@@ -929,7 +931,7 @@ fn findings(files: &[PathBuf]) -> Result<Vec<Finding>> {
     )?;
     let issues = report.issues.iter().map(|issue| Finding {
         line: issue.line(Applicability::Safe),
-        holds: catalog::rank(&issue.severity) >= catalog::rank(&Severity::Warning),
+        holds: severity::rank(&issue.severity) >= severity::rank(&Severity::Warning),
     });
     let python = files.iter().filter(|file| scan::is_python(file));
     let steps = python.flat_map(|file| {

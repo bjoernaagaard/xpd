@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::pack::{ManifestRule, Pack};
 use crate::report::Issue;
-use crate::scan::Root;
+use crate::syntax::Root;
 use crate::venv::{Distributions, Venv};
 
 /// One entry under `packages` in a pack's `pack.yml`, as it is written.

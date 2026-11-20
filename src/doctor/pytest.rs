@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 
 use super::catalog::{Record, Target, Tool};
 use super::evidence::Location;
-use super::toml::{self, Destination, Toml};
+use super::placement::{Destination, Placement};
+use crate::toml::{self, Toml};
 use crate::venv::Venv;
 
 const STANDALONE: &[&str] = &["pytest"];
@@ -299,11 +300,7 @@ impl Settings {
         value
     }
 
-    pub(crate) fn removals(
-        &self,
-        record: &Record,
-        key: &str,
-    ) -> Vec<(Option<String>, toml::Placement)> {
+    pub(crate) fn removals(&self, record: &Record, key: &str) -> Vec<(Option<String>, Placement)> {
         let placement = self.destination.place(key);
         if key == "addopts" {
             let mut removals = Vec::new();
@@ -332,7 +329,7 @@ impl Settings {
                 };
                 removals.push((
                     Some(item),
-                    toml::Placement {
+                    Placement {
                         key_line: arg.line.or(placement.key_line),
                         ..placement.clone()
                     },
@@ -385,7 +382,7 @@ impl Settings {
 
 /// How to edit addopts while preserving any other arguments.
 pub(crate) fn add_arguments(
-    placement: &toml::Placement,
+    placement: &Placement,
     values: &[&str],
     style: ArgumentStyle,
 ) -> String {
@@ -470,7 +467,7 @@ impl Project {
         Some(Group { path, array })
     }
 
-    pub(crate) fn place_group(&self, path: &[&str]) -> toml::Placement {
+    pub(crate) fn place_group(&self, path: &[&str]) -> Placement {
         let mut placement = self.destination.place_path(path);
         if placement.table.is_empty() {
             placement.table = path[..path.len() - 1].join(".");
@@ -526,7 +523,7 @@ impl Group<'_> {
         })
     }
 
-    pub(crate) fn place(&self, project: &Project, entry: &toml_edit::Value) -> toml::Placement {
+    pub(crate) fn place(&self, project: &Project, entry: &toml_edit::Value) -> Placement {
         let mut placement = project.place_group(&self.path);
         if let Some(doc) = &project.destination.doc
             && let Some(span) = entry.span()

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
+use crate::syntax;
 use crate::{
     catalog::Catalog,
     index::{Entry, Kind},
@@ -245,7 +246,7 @@ fn candidates(path: &Path, text: &str) -> Vec<(String, String, usize)> {
             1,
         )];
     }
-    let tree = scan::parse(text);
+    let tree = syntax::parse(text);
     let mut result = Vec::new();
     for node in tree.root().dfs().filter(|n| {
         matches!(
@@ -316,7 +317,7 @@ fn candidates(path: &Path, text: &str) -> Vec<(String, String, usize)> {
 }
 
 fn symbols(code: &str, package: &str) -> Vec<String> {
-    let tree = scan::parse(code);
+    let tree = syntax::parse(code);
     let mut bindings = BTreeMap::new();
     for node in tree.root().dfs() {
         if node.kind() == "import_statement" {
@@ -388,7 +389,7 @@ fn symbols(code: &str, package: &str) -> Vec<String> {
 }
 
 fn complete(code: &str) -> bool {
-    let tree = scan::parse(code);
+    let tree = syntax::parse(code);
     let root = tree.root();
     let mut defined = BTreeSet::new();
     for node in root.dfs() {

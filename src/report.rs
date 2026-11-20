@@ -7,6 +7,7 @@ use ast_grep_config::Severity;
 use serde_json::{Value, json};
 
 use crate::rule::Applicability;
+use crate::severity::{name as severity_name, rank};
 
 /// Where in a file an issue starts. Lines and columns count from 1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -29,29 +30,6 @@ pub(crate) struct Issue {
     /// `None` when the rule has no fix.
     pub(crate) fix: Option<Applicability>,
     pub(crate) help: Option<String>,
-}
-
-pub(crate) fn severity_name(severity: &Severity) -> &'static str {
-    match severity {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        Severity::Info => "info",
-        Severity::Hint => "hint",
-        Severity::Off => "off",
-    }
-}
-
-/// The severity that `name` names, as a rule file writes it. `off` is no severity to ask for.
-pub(crate) fn parse_severity(name: &str) -> Result<Severity, String> {
-    [
-        Severity::Error,
-        Severity::Warning,
-        Severity::Info,
-        Severity::Hint,
-    ]
-    .into_iter()
-    .find(|severity| severity_name(severity) == name)
-    .ok_or_else(|| format!("{name} is not error, warning, info or hint"))
 }
 
 impl Issue {
@@ -186,8 +164,7 @@ impl Report {
 
     /// Whether any issue has the severity `lowest` or a higher one, which makes `check` exit 1.
     pub(crate) fn has_issues_from(&self, lowest: &Severity) -> bool {
-        (self.issues.iter())
-            .any(|i| crate::catalog::rank(&i.severity) >= crate::catalog::rank(lowest))
+        (self.issues.iter()).any(|i| rank(&i.severity) >= rank(lowest))
     }
 
     /// `fixable` counts the issues that `--fix` fixes at the `allowed` level.

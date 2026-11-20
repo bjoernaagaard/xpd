@@ -1,0 +1,43 @@
+//! xpd is an opinionated linter for Python library habits that give slow or wrong results, for
+//! humans and coding agents. Each library gets one rule pack under `rules/`.
+
+mod author;
+mod cases;
+mod catalog;
+mod check;
+mod cli;
+mod commands;
+mod docs;
+pub mod doctor;
+mod embed;
+mod frames;
+mod graph;
+mod graph_diagnostic;
+mod hook;
+mod imports;
+mod index;
+mod lsp;
+mod mcp;
+mod names;
+mod nodes;
+mod outline;
+mod output;
+mod pack;
+mod package_check;
+mod query;
+mod recipe;
+mod report;
+mod review;
+mod rule;
+mod scan;
+mod search;
+mod settings;
+mod severity;
+mod skills;
+mod steps;
+mod syntax;
+mod toml;
+mod venv;
+mod version;
+
+pub use cli::run;

@@ -18,7 +18,8 @@ use serde::Deserialize;
 
 use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
-use crate::scan::{File, Root};
+use crate::scan::File;
+use crate::syntax::Root;
 use crate::venv::Distributions;
 use crate::version::Version;
 
@@ -457,7 +458,7 @@ impl Pack {
     /// The published page of the rule or package check `id`, for a pack that ships with xpd and
     /// so has its Markdown in the binary. A project's own pack has no page.
     pub(crate) fn page(&self, id: &str) -> Option<String> {
-        (!self.docs.is_empty()).then(|| crate::catalog::url(&self.module, id))
+        (!self.docs.is_empty()).then(|| crate::docs::rule_url(&self.module, id))
     }
 
     /// Keeps the rules for the `installed` version of the pack's library. A pack whose library

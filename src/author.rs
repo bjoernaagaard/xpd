@@ -17,7 +17,7 @@ use clap::{Subcommand, ValueEnum};
 use inquire::validator::Validation;
 use serde::Serialize;
 
-use crate::cli::Format;
+use crate::output::Format;
 use crate::version::Version;
 use document::{Name, RuleDoc, RuleId};
 use project::{Changes, Gate, Pack, Project};
@@ -506,7 +506,7 @@ fn new_rule(args: RuleArgs, project: &Project, mode: Mode) -> Result<Outcome> {
         id,
         language: language.0,
         language_name: language.name(),
-        severity: severity_name(severity),
+        severity: crate::severity::name(&severity.into()),
         message,
         note,
         pattern,
@@ -614,15 +614,6 @@ fn new_util(args: UtilArgs, project: &Project, mode: Mode) -> Result<Outcome> {
     Outcome::of("util", Some(name.to_string()), changes)
 }
 
-fn severity_name(severity: Severity) -> &'static str {
-    match severity {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        Severity::Info => "info",
-        Severity::Hint => "hint",
-    }
-}
-
 fn fix_safety_name(safety: FixSafety) -> &'static str {
     match safety {
         FixSafety::Safe => "safe",
@@ -630,9 +621,20 @@ fn fix_safety_name(safety: FixSafety) -> &'static str {
     }
 }
 
+impl From<Severity> for ast_grep_config::Severity {
+    fn from(severity: Severity) -> Self {
+        match severity {
+            Severity::Error => Self::Error,
+            Severity::Warning => Self::Warning,
+            Severity::Info => Self::Info,
+            Severity::Hint => Self::Hint,
+        }
+    }
+}
+
 impl fmt::Display for Severity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(severity_name(*self))
+        f.write_str(crate::severity::name(&(*self).into()))
     }
 }
 

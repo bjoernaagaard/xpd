@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 
 use super::catalog::{self, Catalog, Decision, Key, Kind, Mode, Record, Surface, Target, Tool};
 use super::evidence::Location;
+use super::placement::Destination;
 use super::probe::Checker;
-use super::toml::{self, Destination, Observed, Toml};
+use crate::toml::{self, Observed, Toml};
 
 /// The files that one configuration governs, and what Ruff runs on them.
 #[derive(Debug)]
@@ -415,7 +416,7 @@ fn default(catalog: &Catalog, key: &str) -> Option<Observed> {
         Kind::Option,
         key,
     ))?;
-    Observed::parse(record.default.as_deref()?)
+    Observed::parse(record.default.as_deref()?.trim_matches('`'))
 }
 
 /// The rules that `per-file-ignores` and `extend-per-file-ignores` turn off, with each pattern.

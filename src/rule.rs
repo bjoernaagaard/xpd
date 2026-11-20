@@ -16,8 +16,8 @@ use crate::frames;
 use crate::imports;
 use crate::names;
 use crate::pack::Library;
-use crate::scan::Root;
 use crate::settings::Style;
+use crate::syntax::Root;
 use crate::version::Version;
 
 /// A shape of code that a rule's metadata names, as an ast-grep rule that can use the `utils`

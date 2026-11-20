@@ -9,7 +9,7 @@ use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::scan::{self, Node, Root};
+use crate::syntax::{self, Node, Root};
 
 /// The file that makes a folder a package.
 const INIT: &str = "__init__.py";
@@ -28,7 +28,7 @@ pub(crate) fn any_loaded(path: &Path, root: &Root, found: impl Fn(&Root) -> bool
         let Ok(text) = fs::read_to_string(&module) else {
             continue;
         };
-        let tree = scan::parse(&text);
+        let tree = syntax::parse(&text);
         if found(&tree) {
             return true;
         }

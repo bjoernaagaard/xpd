@@ -13,13 +13,6 @@
 //! one where each applies, one where each is already in effect, and one without the evidence
 //! that a conditional record needs. A failure names the case and the record.
 
-#[path = "../src/doctor/catalog.rs"]
-#[expect(
-    dead_code,
-    reason = "the cases use part of the catalog that doctor uses"
-)]
-mod catalog;
-
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,7 +21,7 @@ use std::process::{Command, ExitCode};
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
-use catalog::{Catalog, Target, When};
+use xpd::doctor::catalog::{self, Catalog, Target, When};
 
 fn main() -> ExitCode {
     match run() {
@@ -247,8 +240,11 @@ impl Runner {
                 (!text.contains(expected_edit)).then(|| format!("{name}: missing {expected_edit}")),
             );
             self.check(
-                (!text.contains("unverified locally (decisions for pytest 9.2.0)"))
-                    .then(|| format!("{name}: pytest advice should say unverified locally")),
+                (!text.contains(&format!(
+                    "unverified locally (decisions for pytest {})",
+                    catalog::PYTEST_RELEASE
+                )))
+                .then(|| format!("{name}: pytest advice should say unverified locally")),
             );
         }
         Ok(())
@@ -998,8 +994,8 @@ impl Runner {
         ] {
             let report = self.doctor(&plain, bins)?;
             for (tool, verified, pinned) in [
-                ("ruff", ruff_verified, "0.17.4"),
-                ("ty", ty_verified, "0.0.106"),
+                ("ruff", ruff_verified, catalog::RUFF_RELEASE),
+                ("ty", ty_verified, catalog::TY_RELEASE),
             ] {
                 let statuses: BTreeSet<&str> = report["suggestions"]
                     .as_array()
@@ -1025,7 +1021,11 @@ impl Runner {
             "no checker",
             "doctor text",
             &text,
-            &["ruff 0.17.4", "ty 0.0.106", "unverified locally"],
+            &[
+                &format!("ruff {}", catalog::RUFF_RELEASE),
+                &format!("ty {}", catalog::TY_RELEASE),
+                "unverified locally",
+            ],
             &[],
         );
         Ok(())
@@ -1062,10 +1062,13 @@ impl Runner {
             .filter(|s| s["tool"] == "ruff")
             .filter_map(|s| s["status"].as_str())
             .collect();
+        let expected = format!(
+            "verified with ruff 0.17.5 (decisions reviewed for {})",
+            catalog::RUFF_RELEASE
+        );
         self.check(
-            (statuses
-                != BTreeSet::from(["verified with ruff 0.17.5 (decisions reviewed for 0.17.4)"]))
-            .then(|| format!("ruff 0.17.5: statuses are {statuses:?}")),
+            (statuses != BTreeSet::from([expected.as_str()]))
+                .then(|| format!("ruff 0.17.5: statuses are {statuses:?}")),
         );
         Ok(())
     }

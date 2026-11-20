@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{catalog::Catalog, cli::Format, pack, scan, settings::Style, venv::Venv};
+use crate::{catalog::Catalog, output::Format, pack, scan, settings::Style, venv::Venv};
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub(crate) enum Engine {

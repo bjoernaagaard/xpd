@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use serde::Deserialize;
 
 use crate::names::{self, Binders, Binding, LibraryNames};
-use crate::scan::{Node, Root};
+use crate::syntax::{Node, Root};
 
 /// The name pandas is imported by. A constructor or an annotation must start at such an import.
 const PANDAS: &str = "pandas";

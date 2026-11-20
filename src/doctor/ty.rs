@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 
 use super::catalog::{Catalog, Key, Kind, Level, Surface, Target, Tool};
 use super::evidence::Location;
+use super::placement::Destination;
 use super::probe::Checker;
-use super::toml::{self, Destination, Observed, Toml};
+use crate::toml::{self, Observed, Toml};
 
 /// A level the project sets, and where.
 #[derive(Debug, Clone)]
@@ -196,7 +197,7 @@ fn settings(catalog: &Catalog, prefix: &[&str], doc: Option<&Toml>) -> BTreeMap<
                 let id = format!("tool.ty.{key}");
                 let record =
                     catalog.get(&Key::pinned(Tool::Ty, Surface::Project, Kind::Option, &id))?;
-                Observed::parse(record.default.as_deref()?)
+                Observed::parse(record.default.as_deref()?.trim_matches('`'))
             });
         if let Some(observed) = observed {
             settings.insert(key.to_owned(), observed);

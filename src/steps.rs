@@ -15,12 +15,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ast_grep_core::Node;
 
-use crate::nodes::{Finding, Level, literal};
+use crate::graph_diagnostic::{Finding, Level};
 use crate::outline::{self, Function};
-use crate::scan;
-
-/// A node of the syntax tree of a Python file.
-type Syntax<'r> = scan::Node<'r>;
+use crate::syntax::{self, Node as Syntax, string_literal};
 
 /// Methods that keep the columns of the frame they are called on.
 const KEEPS_COLUMNS: &[&str] = &["astype", "clip", "fillna", "mask", "round", "where"];
@@ -213,7 +210,7 @@ struct StepBody {
 
 /// The pipelines of the module in `src`. Empty when the module has none.
 pub(crate) fn read(src: &str) -> Vec<Pipeline> {
-    let root = scan::parse(src);
+    let root = syntax::parse(src);
     let module = root.root();
     // Python binds each name to its last definition.
     let outline::Module {
@@ -803,7 +800,7 @@ impl<'r, 'a> Reader<'r, 'a> {
             return None;
         }
         match node.kind().as_ref() {
-            "string" => literal(node).map(|name| vec![name]),
+            "string" => string_literal(node).map(|name| vec![name]),
             "identifier" => {
                 let name = node.text();
                 let value = self
@@ -1420,7 +1417,11 @@ fn col_name(node: &Syntax<'_>) -> Option<String> {
     let arguments = node.field("arguments")?;
     let mut arguments = arguments.children().filter(Node::is_named);
     let name = arguments.next().filter(|a| a.kind() == "string")?;
-    arguments.next().is_none().then(|| literal(&name)).flatten()
+    arguments
+        .next()
+        .is_none()
+        .then(|| string_literal(&name))
+        .flatten()
 }
 
 /// The one parameter of a lambda, as `d` in `lambda d: d["a"] * 2`.

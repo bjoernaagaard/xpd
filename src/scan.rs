@@ -10,31 +10,14 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use ast_grep_config::CombinedScan;
 use ast_grep_core::tree_sitter::StrDoc;
-use ast_grep_core::{AstGrep, Language, NodeMatch};
+use ast_grep_core::{Language, NodeMatch};
 use ast_grep_language::SupportLang;
 
 use crate::pack::Pack;
 use crate::package_check::Calls;
 use crate::report::{Issue, Position};
 use crate::rule::{Applicability, Rule};
-
-/// A parsed file.
-pub(crate) type Root = AstGrep<StrDoc<SupportLang>>;
-
-/// One node of a parsed file.
-pub(crate) type Node<'t> = ast_grep_core::Node<'t, StrDoc<SupportLang>>;
-
-/// Parses Python source. A syntax error gives a tree with error nodes, not a failure.
-pub(crate) fn parse(src: &str) -> Root {
-    parse_as(src, SupportLang::Python)
-}
-
-/// Parses source of `language`.
-fn parse_as(src: &str, language: SupportLang) -> Root {
-    use ast_grep_core::tree_sitter::LanguageExt;
-
-    language.ast_grep(src)
-}
+use crate::syntax::{Node, Root, parse, parse_as};
 
 /// The language of the file at `path`, by its name. A file that names no language is read as
 /// Python, so that a script without an extension is linted.

@@ -5,19 +5,21 @@
 //! settings named in the testing policy. Missing tools leave their advice unverified locally.
 
 mod advice;
-pub(crate) mod catalog;
+pub mod catalog;
 mod evidence;
+mod placement;
 mod probe;
 mod pytest;
 mod ruff;
-pub(crate) mod toml;
 mod ty;
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::cli::Format;
+use crate::output::Format;
+
+pub use evidence::evidence_rule_ids;
 
 /// Prints the advice for the project in the working directory.
 pub(crate) fn run(format: Format) -> Result<()> {

@@ -10,11 +10,12 @@ use serde::Serialize;
 
 use super::catalog::{Catalog, Kind, Record, Satisfied, Suggestion, Target, Tool, Trigger, When};
 use super::evidence::{Evidence, Location};
+use super::placement::{Destination, Placement};
 use super::probe::Checker;
 use super::pytest::{self, Project, Pytest};
 use super::ruff::{self, Ruff};
-use super::toml::{Destination, Observed, Placement};
 use super::ty::{self, Ty};
+use crate::toml::Observed;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Report {
@@ -440,7 +441,8 @@ fn setting_verdict(
 
 /// Whether `current` already has the effect of the TOML value `suggested`.
 fn is_satisfied(satisfied: Satisfied, current: Option<&Observed>, suggested: &str) -> bool {
-    let (Some(current), Some(suggested)) = (current, Observed::parse(suggested)) else {
+    let (Some(current), Some(suggested)) = (current, Observed::parse(suggested.trim_matches('`')))
+    else {
         return false;
     };
     match (satisfied, current, &suggested) {

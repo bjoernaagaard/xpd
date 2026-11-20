@@ -11,6 +11,7 @@ use ast_grep_language::SupportLang;
 
 use super::catalog::Trigger;
 use crate::scan;
+use crate::syntax;
 
 const RULES: &str = include_str!("evidence.yml");
 const UTILS: &str = include_str!("evidence-utils.yml");
@@ -46,16 +47,31 @@ impl Evidence {
     }
 }
 
-/// The evidence rules, each with the trigger of its id.
-fn rules() -> Result<Vec<(Trigger, RuleConfig<SupportLang>)>> {
+fn configs() -> Result<Vec<RuleConfig<SupportLang>>> {
     let utils = UTILS
         .split("\n---\n")
         .map(ast_grep_config::from_str::<SerializableGlobalRule<SupportLang>>)
         .collect::<Result<Vec<_>, _>>()
         .context("evidence-utils.yml")?;
     let globals = DeserializeEnv::parse_global_utils(utils).context("evidence-utils.yml")?;
-    let mut configs = ast_grep_config::from_yaml_string::<SupportLang>(RULES, &globals)
-        .context("evidence.yml")?;
+    ast_grep_config::from_yaml_string(RULES, &globals).context("evidence.yml")
+}
+
+/// Returns the IDs of the bundled doctor evidence rules.
+///
+/// # Errors
+///
+/// Returns an error if a bundled rule or utility cannot be loaded.
+pub fn evidence_rule_ids() -> Result<Vec<String>> {
+    Ok(configs()?
+        .into_iter()
+        .map(|config| config.id.clone())
+        .collect())
+}
+
+/// The evidence rules, each with the trigger of its id.
+fn rules() -> Result<Vec<(Trigger, RuleConfig<SupportLang>)>> {
+    let mut configs = configs()?;
     let mut rules = Vec::new();
     for trigger in Trigger::ALL.into_iter().filter(|trigger| trigger.in_code()) {
         let name = trigger.name();
@@ -80,7 +96,7 @@ pub(crate) fn find(files: &[PathBuf]) -> Result<Evidence> {
             let Some(src) = scan::read_source(file) else {
                 return Vec::new();
             };
-            let root = scan::parse(&src);
+            let root = syntax::parse(&src);
             let mut found = Vec::new();
             for (config, matches) in combined.scan(&root, false).matches {
                 let Some((trigger, _)) = rules.iter().find(|(_, rule)| std::ptr::eq(rule, config))
@@ -106,7 +122,7 @@ pub(crate) fn find(files: &[PathBuf]) -> Result<Evidence> {
 }
 
 /// The place of `node`, shown as the source line it starts on.
-fn location(file: &Path, src: &str, node: &scan::Node<'_>) -> Location {
+fn location(file: &Path, src: &str, node: &syntax::Node<'_>) -> Location {
     let row = node.start_pos().line();
     let line = src.lines().nth(row).unwrap_or_default().trim();
     let mut text: String = line.chars().take(80).collect();

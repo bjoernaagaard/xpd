@@ -32,9 +32,9 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::cli::Format;
+use crate::output::Format;
 use crate::query::{JsonStyle, NoIgnore, languages};
-use crate::scan::{self, Node, Root};
+use crate::syntax::{self, Node, Root};
 
 /// The Python rules of `xpd outline` and `xpd graph`.
 const PYTHON_RULES: &str = include_str!("outline/python.yml");
@@ -268,7 +268,7 @@ pub(crate) struct Callable {
 /// Every function and method of the Python source `src`.
 pub(crate) fn python_callables(src: &str) -> Vec<Callable> {
     static RULES: OnceLock<CombinedExtractors<SupportLang>> = OnceLock::new();
-    let root = scan::parse(src);
+    let root = syntax::parse(src);
     compiled(PYTHON_CALLABLE_RULES, &RULES)
         .extract(root.root())
         .map(|item| {
