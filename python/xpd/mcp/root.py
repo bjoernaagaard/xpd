@@ -15,8 +15,7 @@ from mcp.types import (
     ListRootsResult,
     RootsCapability,
 )
-
-from xpd.mcp.protocol import uses_handshake
+from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 
 # The key of the client's roots in a round of the modern protocol.
 ROOTS = "project_roots"
@@ -24,6 +23,17 @@ NO_ROOTS = (
     "xpd does not know the project root, because the client names no folder as a root. "
     "Start the server with --root or XPD_MCP_ROOT."
 )
+
+
+def uses_handshake(ctx: Context) -> bool:
+    """Whether the client can be asked mid-call. The 2026-07-28 protocol and background tasks
+    ask by returning an InputRequiredResult instead."""
+    request = ctx.request_context
+    return (
+        not ctx.is_background_task
+        and request is not None
+        and request.protocol_version not in MODERN_PROTOCOL_VERSIONS
+    )
 
 
 @dataclass(frozen=True)

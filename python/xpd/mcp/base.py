@@ -14,8 +14,7 @@ from mcp.types import (
 )
 
 from xpd.mcp.binary import Command, T, Xpd
-from xpd.mcp.protocol import uses_handshake
-from xpd.mcp.root import Project, Root, RootsRequiredError
+from xpd.mcp.root import Project, Root, RootsRequiredError, uses_handshake
 
 P = ParamSpec("P")
 R = TypeVar("R")
