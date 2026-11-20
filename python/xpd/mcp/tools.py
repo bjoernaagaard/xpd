@@ -7,7 +7,6 @@ from fastmcp import Context, FastMCP
 from mcp.types import (
     InputRequiredResult,
 )
-from pydantic import BaseModel, Field
 
 from xpd.mcp.base import READS, RUNS_CODE, WRITES, confirmed, rooted, run
 from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, REFIT, Xpd
@@ -19,9 +18,9 @@ from xpd.mcp.models import (
     GraphReport,
     Profile,
     Refit,
-    Severity,
 )
-from xpd.mcp.root import Project, Root
+from xpd.mcp.options import CheckOptions
+from xpd.mcp.root import Project
 
 
 async def unsafe_confirmed(
@@ -50,26 +49,6 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     register_discovery(mcp, xpd)
     register_lint(mcp, xpd, project)
     register_data(mcp, xpd, project)
-
-
-class CheckOptions(BaseModel):
-    rules: list[str] = Field(default_factory=list, description="Packages or public rule names.")
-    severity: Severity | None = Field(
-        default=None, description="Run only the rules of this severity and above."
-    )
-    config: str | None = Field(
-        default=None,
-        description="A project file to read instead of the nearest sgconfig.yml, relative to the "
-        "project root.",
-    )
-
-    def flags(self, root: Root) -> list[str]:
-        flags = [f"--rule={name}" for name in self.rules]
-        if self.severity is not None:
-            flags.append(f"--severity={self.severity}")
-        if self.config is not None:
-            flags.append(f"--config={root.inside(self.config)}")
-        return flags
 
 
 def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
