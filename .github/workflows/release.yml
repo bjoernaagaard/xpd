@@ -5,14 +5,25 @@
 #
 # When one job fails for a reason outside the code, such as a timed out artifact upload, rerun the
 # failed job on the run's page before tagging. A push that changes no file starts no run here,
-# because of paths-ignore.
+# because of its path filters.
 name: Release
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
-    paths-ignore: [website/**, "**.md", .agents/artifacts/**]
+    paths:
+      - "**"
+      - "!website/**"
+      - "!**.md"
+      - README.md
+      - rules/**
+      - skills/**
+      - licenses/**
+      - src/**
+      - indexes/**
+      - py/**
+      - "!.agents/artifacts/**"
   workflow_dispatch:
 
 permissions:

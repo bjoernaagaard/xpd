@@ -23,6 +23,12 @@ on:
       - README.md
       - pyproject.toml
       - mise.toml
+      - .cargo/config.toml
+      - .claude-plugin/plugin.json
+      - mcp.json
+      - licenses/**
+      - LICENSE-*
+      - .github/actions/build-setup/**
       - .github/workflows/docs.yml
   push:
     branches: [main]
