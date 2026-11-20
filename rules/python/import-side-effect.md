@@ -39,6 +39,8 @@ has parsed its own arguments.
 
 - A file that is run and never imported
   - A file with no function and no class. It is a script, which runs from top to bottom.
+  - A file with a `# %%` cell marker. An editor such as VS Code runs it cell by cell in an
+    interactive window.
   - A `__main__.py`.
 - A call that sets up the module itself
   - A method that edits a collection the module defines, such as `NAMES.append("id")`.
