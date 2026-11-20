@@ -7,10 +7,10 @@ import shutil
 import subprocess
 import sys
 import sysconfig
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, Literal, TypeVar
+from typing import Generic, TypeVar
 
 from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
@@ -44,26 +44,27 @@ class Command(Generic[T]):
     """One xpd command: its leading arguments, the shape of its JSON and its result codes."""
 
     args: tuple[str, ...]
-    output: TypeAdapter[T]
+    decode: Callable[[bytes], T]
     results: frozenset[int]
-    encoding: Literal["json", "text"] = "json"
 
 
-FIND = Command(("find", "--format", "json"), TypeAdapter(DiscoveryMatches), SUCCESS)
-API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]), SUCCESS)
-CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport), FINDINGS)
-QUERY = Command(("run", "--format", "json"), TypeAdapter(list[CodeMatch]), FINDINGS)
-REWRITE = Command(("run", "--update-all", "--color=never"), TypeAdapter(str), FINDINGS, "text")
-OUTLINE = Command(("outline", "--format", "json"), TypeAdapter(list[OutlineFile]), SUCCESS)
-NEW = Command(("new",), TypeAdapter(CreatedFiles), SUCCESS)
-TEST = Command(("test", "--format", "json"), TypeAdapter(CaseReport), FINDINGS)
-GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport), FINDINGS)
-PROFILE = Command(("profile",), TypeAdapter(Profile), SUCCESS)
-REFIT = Command(("refit",), TypeAdapter(Refit), FINDINGS)
-EQUIV = Command(("equiv",), TypeAdapter(Equivalence), FINDINGS)
-RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]), SUCCESS)
-BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.output, SUCCESS)
-SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]), SUCCESS)
+FIND = Command(("find", "--format", "json"), TypeAdapter(DiscoveryMatches).validate_json, SUCCESS)
+API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]).validate_json, SUCCESS)
+CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport).validate_json, FINDINGS)
+QUERY = Command(("run", "--format", "json"), TypeAdapter(list[CodeMatch]).validate_json, FINDINGS)
+REWRITE = Command(("run", "--update-all", "--color=never"), bytes.decode, FINDINGS)
+OUTLINE = Command(
+    ("outline", "--format", "json"), TypeAdapter(list[OutlineFile]).validate_json, SUCCESS
+)
+NEW = Command(("new",), TypeAdapter(CreatedFiles).validate_json, SUCCESS)
+TEST = Command(("test", "--format", "json"), TypeAdapter(CaseReport).validate_json, FINDINGS)
+GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport).validate_json, FINDINGS)
+PROFILE = Command(("profile",), TypeAdapter(Profile).validate_json, SUCCESS)
+REFIT = Command(("refit",), TypeAdapter(Refit).validate_json, FINDINGS)
+EQUIV = Command(("equiv",), TypeAdapter(Equivalence).validate_json, FINDINGS)
+RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]).validate_json, SUCCESS)
+BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.decode, SUCCESS)
+SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]).validate_json, SUCCESS)
 
 
 def _json_error(stdout: bytes) -> bytes | None:
@@ -148,6 +149,4 @@ class Xpd:
             shown = " ".join([*command.args[:1], *args])
             msg = f"xpd {shown} exited with {code}: {reason}"
             raise ToolError(msg)
-        if command.encoding == "text":
-            return command.output.validate_python(stdout.decode())
-        return command.output.validate_json(stdout)
+        return command.decode(stdout)

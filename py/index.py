@@ -32,7 +32,8 @@ def require_griffe() -> None:
         )
 
 
-require_griffe()
+if __name__ == "__main__":
+    require_griffe()
 import griffe  # noqa: E402  Name the exact install command before importing the build dependency.
 
 Unresolved = (griffe.AliasResolutionError, griffe.CyclicAliasError)
@@ -92,12 +93,43 @@ class Callables(griffe.Extension):
     """Keep the callables that Griffe's reading drops. Each case names one that is lost."""
 
     def __init__(self) -> None:
+        self.source_files: dict[griffe.Function, str] = {}
+        self.merged: set[griffe.Function] = set()
         self.functions: list[griffe.Function] = []
         self.assignments: list[griffe.Attribute] = []
         self.imports: dict[str, tuple[str, bool]] = {}
         self.imported: dict[str, griffe.Alias] = {}
         self.computed_exports: set[str] = set()
         self.stub_exports: set[str] = set()
+
+    def definitions(self, obj: griffe.Object | griffe.Alias) -> list[Definition]:
+        """The definitions whose parameters are the parameters of `obj`.
+
+        A class takes the parameters of its constructor. A function that only stubs declare, as
+        overloads, takes the parameters of every overload.
+        """
+        if obj.is_class:
+            obj = constructor(obj)
+            if obj is None:
+                return []
+        function = obj.final_target if obj.is_alias else obj
+        overloads = function.overloads if function in self.merged else [function]
+        return [self.definition(f) for f in overloads]
+
+    def definition(self, function: griffe.Function) -> Definition:
+        """Where xpd reads the parameters of `function`.
+
+        A function of a class takes its object or its class first, unless it is a static method.
+        `pandas.compat.set_function_name` is a function of a module with a parameter named `cls`,
+        which a call passes.
+        """
+        receiver = function.parent.is_class and "staticmethod" not in function.labels
+        file = self.source_files.get(function)
+        if file is None:
+            return Built(
+                name=function.name, parameters=built_parameters(function), receiver=receiver
+            )
+        return Source(name=function.name, file=file, line=function.lineno, receiver=receiver)
 
     def on_alias_instance(self, *, alias: griffe.Alias, **_kwargs: object) -> None:
         """Griffe's dataclass reading raises on a class member imported from another library.
@@ -127,8 +159,7 @@ class Callables(griffe.Extension):
     def on_class_members(self, *, cls: griffe.Class, **_kwargs: object) -> None:
         self.add_overloads(cls)
 
-    @staticmethod
-    def add_overloads(obj: griffe.Module | griffe.Class) -> None:
+    def add_overloads(self, obj: griffe.Module | griffe.Class) -> None:
         """`numpy.zeros` exists only as overloads in `_core/multiarray.pyi`."""
         if obj.filepath.suffix != ".pyi":
             return
@@ -145,7 +176,7 @@ class Callables(griffe.Extension):
                     docstring=first.docstring,
                 )
                 function.overloads = overloads
-                function.extra["xpd"]["merged"] = True
+                self.merged.add(function)
                 obj.set_member(name, function)
 
     def on_attribute_instance(
@@ -175,7 +206,7 @@ class Callables(griffe.Extension):
         Record the file being read, because Griffe moves a function of a stub into the module
         that the stub describes.
         """
-        func.extra["xpd"]["file"] = str(func.module.filepath)
+        self.source_files[func] = str(func.module.filepath)
         if not func.parent.is_module:
             return
         imported = self.imported.get(func.path)
@@ -294,35 +325,6 @@ def summary(obj: griffe.Object | griffe.Alias) -> str:
     return " ".join(paragraphs[0].split())
 
 
-def definitions(obj: griffe.Object | griffe.Alias) -> list[Definition]:
-    """The definitions whose parameters are the parameters of `obj`.
-
-    A class takes the parameters of its constructor. A function that only stubs declare, as
-    overloads, takes the parameters of every overload.
-    """
-    if obj.is_class:
-        obj = constructor(obj)
-        if obj is None:
-            return []
-    function = obj.final_target if obj.is_alias else obj
-    overloads = function.overloads if function.extra["xpd"].get("merged") else [function]
-    return [definition(f) for f in overloads]
-
-
-def definition(function: griffe.Function) -> Definition:
-    """Where xpd reads the parameters of `function`.
-
-    A function of a class takes its object or its class first, unless it is a static method.
-    `pandas.compat.set_function_name` is a function of a module with a parameter named `cls`,
-    which a call passes.
-    """
-    receiver = function.parent.is_class and "staticmethod" not in function.labels
-    file = function.extra["xpd"].get("file")
-    if file is None:
-        return Built(name=function.name, parameters=built_parameters(function), receiver=receiver)
-    return Source(name=function.name, file=file, line=function.lineno, receiver=receiver)
-
-
 def built_parameters(function: griffe.Function) -> list[Parameter]:
     """The parameters of a function that no source defines, each as a `def` would write it."""
     result = []
@@ -341,7 +343,7 @@ def built_parameters(function: griffe.Function) -> list[Parameter]:
     return result
 
 
-def members(obj: griffe.Class) -> list[Member]:
+def members(obj: griffe.Class, callables: Callables) -> list[Member]:
     """The public methods and properties, with the inherited ones."""
     result = []
     for name, member in sorted(obj.all_members.items()):
@@ -352,7 +354,7 @@ def members(obj: griffe.Class) -> list[Member]:
                 result.append(
                     Member(
                         name=name,
-                        definitions=definitions(member),
+                        definitions=callables.definitions(member),
                         summary=summary(member),
                         property=False,
                     )
@@ -491,11 +493,11 @@ def public_paths(
             continue
 
 
-def entries(module: griffe.Module, imports: dict[str, tuple[str, bool]]) -> list[Entry]:
+def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
     """Name each definition once for each public name, by the path with the fewest parts."""
     names: dict[tuple[str, str], tuple[str, griffe.Object]] = {}
     package = module.name
-    for path, target in public_paths(module, package, imports, frozenset({module.path})):
+    for path, target in public_paths(module, package, callables.imports, frozenset({module.path})):
         key = (target.path, path.rsplit(".", 1)[1])
         best = names.get(key)
         if best is None or (path.count("."), len(path), path) < (
@@ -510,10 +512,10 @@ def entries(module: griffe.Module, imports: dict[str, tuple[str, bool]]) -> list
             package=package,
             name=path,
             callable="class" if target.is_class else "function",
-            definitions=definitions(target),
+            definitions=callables.definitions(target),
             summary=summary(target),
             keywords=[" ".join(documentation(target).split("\nExamples\n", 1)[0].split())],
-            members=members(target) if target.is_class else [],
+            members=members(target, callables) if target.is_class else [],
             rules=[],
         )
         for path, target in sorted(names.values(), key=lambda item: item[0])
@@ -543,7 +545,7 @@ def main() -> None:
         {
             "package": package,
             "version": version,
-            "entries": entries(module, callables.imports),
+            "entries": entries(module, callables),
         },
         sys.stdout,
     )

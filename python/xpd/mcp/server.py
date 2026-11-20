@@ -11,38 +11,52 @@ from fastmcp_tasks import TasksExtension
 
 from xpd.mcp import catalog, discovery, pipeline, prompts, structure, tools, views
 from xpd.mcp.binary import BUILTIN_RULES, SKILLS, Xpd, find_binary
+from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
 
-INSTRUCTIONS = """\
+
+def instructions(skill_uris: dict[str, str]) -> str:
+    return f"""\
 xpd lints Python for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn, scikit-lego, \
 MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Apache Hamilton, reads the \
 dataflow of step code and Hamilton modules, profiles data files, and checks that a refactor keeps \
 its result. Every path is relative to the project root.
 
-- Before choosing a library, call `find` with the task, then `api` with a returned name. Call \
-`api` with `Class.method` to read a method's parameters with their defaults before you call it.\
+- Before choosing a library, call `{ToolName.FIND}` with the task, then `{ToolName.API}` with \
+a returned name. Call \
+`{ToolName.API}` with `Class.method` to read a method's parameters with their defaults before \
+you call it.\
 
-- After choosing and writing code, call `discovery_gate` on its files before `equiv`.\
+- After choosing and writing code, call `{ToolName.DISCOVERY_GATE}` on its files before \
+`{ToolName.EQUIV}`.\
 
-- After you write or change Python, call `check`. Fix every error. Fix a warning unless you can \
-say why the code is right. `fix` writes xpd's fixes, and asks the user before unsafe ones.
-- Use `query` to find code patterns and preview replacements, and `rewrite` to apply them after \
-confirmation. Use `outline` to browse project symbols, imports and members in supported languages.
-- Use `new` to create a local rule project, rule, empty case template or shared utility.
-- To learn why a rule fires and see its before and after code, call `rule`. `rules` lists and \
+- After you write or change Python, call `{ToolName.CHECK}`. Fix every error. Fix a warning \
+unless you can \
+say why the code is right. `{ToolName.FIX}` writes xpd's fixes, and asks the user before \
+unsafe ones.
+- Use `{ToolName.QUERY}` to find code patterns and preview replacements, and \
+`{ToolName.REWRITE}` to apply them after \
+confirmation. Use `{ToolName.OUTLINE}` to browse project symbols, imports and members in \
+supported languages.
+- Use `{ToolName.NEW}` to create a local rule project, rule, empty case template or shared utility.
+- To learn why a rule fires and see its before and after code, call `{ToolName.RULE}`. \
+`{ToolName.RULES}` lists and \
 filters all of them.
-- After you add, move or rename a step or a Hamilton node, call `graph`, and reuse columns that \
+- After you add, move or rename a step or a Hamilton node, call `{ToolName.GRAPH}`, and reuse \
+columns that \
 exist instead of computing their formulas again.
-- Before you choose methods for a data file, call `profile`.
-- After you refactor data logic, call `equiv` on the old and new script. The refactor is done \
+- Before you choose methods for a data file, call `{ToolName.PROFILE}`.
+- After you refactor data logic, call `{ToolName.EQUIV}` on the old and new script. The \
+refactor is done \
 when it says `equivalent: true`.
 - To build a model from a data file, follow the `build_pipeline` prompt. The run is done when \
-`gates` returns `passed: true` for the results of `profile`, `check`, `graph`, `equiv`, \
-`refit` and `contract`. With code mode on, one `execute` call chains them.
+`{ToolName.GATES}` returns `passed: true` for the results of `{ToolName.PROFILE}`, \
+`{ToolName.CHECK}`, `{ToolName.GRAPH}`, `{ToolName.EQUIV}`, \
+`{ToolName.REFIT}` and `{ToolName.CONTRACT}`. With code mode on, one `execute` call chains them.
 - The show_ tools draw the same results as tables and charts in hosts that render apps.
-- skill://xpd/SKILL.md, skill://python-best-practices/SKILL.md and \
-skill://python-review/SKILL.md hold the style a linter cannot check."""
+- {skill_uris["xpd"]}, {skill_uris["python-best-practices"]} and \
+{skill_uris["python-review"]} hold the style a linter cannot check."""
 
 
 def build(settings: Settings) -> FastMCP:
@@ -53,22 +67,23 @@ def build(settings: Settings) -> FastMCP:
         Skill.from_files({file.path: file.text for file in skill.files})
         for skill in xpd.run_now(SKILLS)
     ]
+    skill_uris = {skill.name: str(skill.to_mcp_skill().uri) for skill in skills}
     mcp = FastMCP(
         "xpd",
-        instructions=INSTRUCTIONS,
+        instructions=instructions(skill_uris),
         version=xpd.version(),
         website_url="https://bjoernaagaard.github.io/xpd/",
         providers=[SkillCatalogProvider(skills)],
         transforms=[CodeMode()] if settings.code_mode else [],
     )
     mcp.add_extension(TasksExtension())
-    tools.register(mcp, xpd, project)
+    analysis = tools.register(mcp, xpd, project)
     structure.register(mcp, xpd, project)
     discovery.register(mcp, xpd, project)
-    views.register(mcp, xpd, project)
+    views.register(mcp, analysis)
     catalog.register(mcp, fallback_rules, xpd, project)
     pipeline.register(mcp, project, fallback_rules)
-    prompts.register(mcp)
+    prompts.register(mcp, skill_uris["python-review"])
 
     @mcp.resource(
         "xpd://version",

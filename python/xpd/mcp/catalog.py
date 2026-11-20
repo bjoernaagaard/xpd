@@ -18,10 +18,11 @@ from mcp.types import (
     ResourceTemplateReference,
 )
 
+from xpd.mcp.base import READS
 from xpd.mcp.binary import RULES, Xpd
-from xpd.mcp.models import Rule, RuleList, RuleSummary, Severity
+from xpd.mcp.models import Rule, RuleList, Severity
+from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project
-from xpd.mcp.tools import READS
 
 RULES_URI = "xpd://rules"
 PACK_URI = "xpd://rules/{package}"
@@ -35,10 +36,6 @@ RULE_SUFFIXES = {".yml", ".yaml"}
 
 # Each file `xpd rules` reads in one root, with its modification time and size.
 Inputs = tuple[tuple[str, int, int], ...]
-
-
-def summary(rule: Rule) -> RuleSummary:
-    return RuleSummary.model_validate(rule.model_dump(exclude={"doc"}))
 
 
 @dataclass(frozen=True)
@@ -163,7 +160,7 @@ class Catalogs:
 def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
     catalogs = Catalogs(xpd, project, catalog)
 
-    @mcp.tool(name="rules", tags={"rules"}, annotations=READS)
+    @mcp.tool(name=ToolName.RULES, tags={"rules"}, annotations=READS)
     async def list_rules(
         ctx: Context,
         package: str | None = None,
@@ -188,7 +185,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
         needle = query.casefold() if query else None
         return RuleList(
             rules=[
-                summary(rule)
+                rule
                 for rule in rules
                 if (severity is None or rule.severity == severity)
                 and (fixable is None or (rule.fix is not None) == fixable)
@@ -199,7 +196,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
             ]
         )
 
-    @mcp.tool(name="rule", tags={"rules"}, annotations=READS)
+    @mcp.tool(name=ToolName.RULE, tags={"rules"}, annotations=READS)
     async def one_rule(ctx: Context, package: str, rule: str) -> Rule:
         """Read one rule: why it matters, what it reports, and its before and after examples.
 
@@ -218,7 +215,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
     )
     async def all_rules(ctx: Context) -> str:
         """Every rule and package check of xpd, without their documentation."""
-        return dumps(summary(rule) for rule in (await catalogs.load(ctx)).rules)
+        return dumps((await catalogs.load(ctx)).rules)
 
     @mcp.resource(
         PACK_URI,
@@ -229,7 +226,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
     )
     async def pack_rules(ctx: Context, package: str) -> str:
         """The rules of one pack, such as xpd://rules/pandas, without their documentation."""
-        return dumps(summary(rule) for rule in (await catalogs.load(ctx)).of(package))
+        return dumps((await catalogs.load(ctx)).of(package))
 
     @mcp.resource(
         RULE_URI,
@@ -249,12 +246,10 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
         argument: CompletionArgument,
         context: CompletionContext | None,
     ) -> list[str] | None:
-        if isinstance(ref, ResourceTemplateReference) and ref.uri in {PACK_URI, RULE_URI}:
-            return (await catalogs.load(Context(mcp))).complete(argument, context)
-        if isinstance(ref, PromptReference):
+        if isinstance(ref, PromptReference) or ref.uri in {PACK_URI, RULE_URI}:
             return (await catalogs.load(Context(mcp))).complete(argument, context)
         return None
 
 
-def dumps(rules: Iterable[RuleSummary]) -> str:
-    return json.dumps([rule.model_dump(mode="json") for rule in rules])
+def dumps(rules: Iterable[Rule]) -> str:
+    return json.dumps([rule.model_dump(mode="json", exclude={"doc"}) for rule in rules])

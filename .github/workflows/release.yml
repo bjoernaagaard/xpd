@@ -5,14 +5,24 @@
 #
 # When one job fails for a reason outside the code, such as a timed out artifact upload, rerun the
 # failed job on the run's page before tagging. A push that changes no file starts no run here,
-# because of paths-ignore.
+# because of its path filters.
 name: Release
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
-    paths-ignore: [website/**, "**.md", .agents/artifacts/**]
+    paths:
+      - "**"
+      - "!website/**"
+      - "!**.md"
+      - README.md
+      - rules/**
+      - skills/**
+      - licenses/**
+      - src/**
+      - indexes/**
+      - py/**
   workflow_dispatch:
 
 permissions:
@@ -31,23 +41,30 @@ jobs:
     timeout-minutes: 5
     outputs:
       rust: ${{ steps.read.outputs.rust }}
+      platforms: ${{ steps.read.outputs.platforms }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: read
-        run: python3 -c 'import tomllib; print("rust=" + tomllib.load(open("mise.toml", "rb"))["tools"]["rust"]["version"])' >> "$GITHUB_OUTPUT"
+        run: |
+          python3 - <<'PYTHON' >> "$GITHUB_OUTPUT"
+          import json
+          import tomllib
+          from pathlib import Path
+
+          rust = tomllib.loads(Path("mise.toml").read_text())["tools"]["rust"]
+          print("rust=" + (rust if isinstance(rust, str) else rust["version"]))
+          platforms = json.loads(Path(".github/wheel-platforms.json").read_text())
+          print("platforms=" + json.dumps(platforms))
+          PYTHON
 
   linux:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
       matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: aarch64
+        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -61,23 +78,8 @@ jobs:
           args: --release --out dist --zig
           sccache: 'true'
           manylinux: auto
-      # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: ./.github/actions/smoke
         if: matrix.platform.target == 'x86_64'
-        with:
-          enable-cache: false
-      - name: Smoke test the wheel
-        if: matrix.platform.target == 'x86_64'
-        shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
-      - name: Smoke test the MCP server
-        if: matrix.platform.target == 'x86_64'
-        shell: bash
-        run: |
-          wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -87,15 +89,11 @@ jobs:
   musllinux:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
       matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: aarch64
+        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -137,20 +135,7 @@ jobs:
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           args: --release --out dist
           sccache: 'true'
-      # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: false
-      - name: Smoke test the wheel
-        shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
-      - name: Smoke test the MCP server
-        shell: bash
-        run: |
-          wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+      - uses: ./.github/actions/smoke
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -160,19 +145,11 @@ jobs:
   macos:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ${{ matrix.platform.macos }}
     timeout-minutes: 30
     strategy:
       matrix:
-        platform:
-          # llama.cpp uses std::filesystem, which macOS has from 10.15. maturin's default for
-          # x86_64 is 10.12.
-          - runner: macos-15-intel
-            target: x86_64
-            deployment: "10.15"
-          - runner: macos-latest
-            target: aarch64
-            deployment: "11.0"
+        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -185,20 +162,7 @@ jobs:
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           args: --release --out dist
           sccache: 'true'
-      # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: false
-      - name: Smoke test the wheel
-        shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
-      - name: Smoke test the MCP server
-        shell: bash
-        run: |
-          wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+      - uses: ./.github/actions/smoke
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -298,10 +262,9 @@ jobs:
             sleep 20
           done
           exit 1
-      # The MCP server of the same version, started and called through FastMCP's own client.
-      - run: |
-          uv run --isolated --no-project --python 3.11 --with "xpd==${GITHUB_REF_NAME#v}" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+      - uses: ./.github/actions/smoke
+        with:
+          published: 'true'
 
   github-release:
     name: GitHub Release
