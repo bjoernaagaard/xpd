@@ -131,6 +131,8 @@ function answerValue(text, failed) {
  */
 export function exampleRunner({ repository, xpd, python, pythonPath }) {
   const work = mkdtempSync(join(tmpdir(), 'xpd-examples-'));
+  // The session folders go when the build ends, also when it fails before `finish`.
+  process.on('exit', () => rmSync(work, { recursive: true, force: true }));
   const home = join(work, 'home');
   mkdirSync(home);
   // `xpd find` keeps its search model here, and a new download for each build is slow.
@@ -250,9 +252,8 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
     return count;
   }
 
-  /** Removes the session folders, and fails when an example differed from its page. */
+  /** Fails when an example differed from its page. */
   function finish() {
-    rmSync(work, { recursive: true, force: true });
     if (problems.length) {
       throw new Error(`${problems.length} problems with the examples of the pages:\n\n${problems.join('\n\n')}`);
     }
