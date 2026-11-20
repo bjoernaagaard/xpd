@@ -12,7 +12,7 @@ The result holds `pipelines`, `nodes`, `inputs`, `unread` and `problems`. These 
 `problems`.
 
 ```json
-[{"file":"samples/graph/steps_wrong_order.py","line":11,"severity":"error","message":"margin() reads the column total_cost, which costs() adds later in report(). The read raises KeyError. Move margin() after costs()."},{"file":"samples/graph/steps_wrong_order.py","line":27,"severity":"error","message":"costs_again() joins the column total_cost, which costs() added already. The join raises \"columns overlap\"."}]
+{"problems":[{"file":"samples/graph/steps_wrong_order.py","line":11,"severity":"error","message":"margin() reads the column total_cost, which costs() adds later in report(). The read raises KeyError. Move margin() after costs()."},{"file":"samples/graph/steps_wrong_order.py","line":27,"severity":"error","message":"costs_again() joins the column total_cost, which costs() added already. The join raises \"columns overlap\"."}]}
 ```
 
 ## Errors

@@ -7,7 +7,7 @@ load only a model you trust.
 
 With the server's root at `samples/pipeline`, after `train.py` wrote its model:
 
-```json
+```json root=samples/pipeline
 {"file":"model/contract.json"}
 ```
 

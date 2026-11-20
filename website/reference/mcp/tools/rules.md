@@ -9,10 +9,10 @@ and [`rule`](../rule/) reads one in full. `package` is a module name, such as `n
 {"package":"pandas","query":"inplace"}
 ```
 
-The result has `rules`. These are their names and fixes.
+The result has `rules`. Each is shown with its name and its fix.
 
 ```json
-[{"rule":"inplace-on-column","fix":"unsafe"},{"rule":"inplace-result-assigned","fix":"unsafe"},{"rule":"no-inplace","fix":"unsafe"}]
+{"rules":[{"rule":"inplace-on-column","fix":"unsafe"},{"rule":"inplace-result-assigned","fix":"unsafe"},{"rule":"no-inplace","fix":"unsafe"}]}
 ```
 
 ## Errors
