@@ -5,14 +5,15 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+use crate::severity::Severity;
 use anyhow::{Context, Result};
-use ast_grep_config::Severity;
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
 use crate::author;
 use crate::catalog::{self, Catalog, Filters};
 use crate::check::{FixMode, Scope, lint};
+use crate::fix_safety::Applicability;
 use crate::graph::Graph;
 use crate::index::{self, Kind};
 use crate::lsp;
@@ -20,11 +21,10 @@ use crate::mcp;
 use crate::outline::OutlineArgs;
 use crate::output::Format;
 use crate::query::RunArgs;
-use crate::rule::Applicability;
 use crate::scan;
-use crate::settings::{Settings, Style};
-use crate::severity;
+use crate::settings::Settings;
 use crate::skills;
+use crate::style::Style;
 use crate::venv;
 
 /// The agent skill that `xpd skill` prints.
@@ -93,7 +93,7 @@ struct RulesOptions {
     #[arg(long = "rule", value_name = "NAME")]
     rules: Vec<String>,
     /// List only the rules of this severity and above: error, warning, info or hint.
-    #[arg(long, value_parser = severity::parse)]
+    #[arg(long, value_parser = Severity::parse)]
     severity: Option<Severity>,
     /// Output format. Default: text on a terminal, json otherwise.
     #[arg(long, value_enum)]
@@ -190,10 +190,10 @@ enum Cmd {
         #[arg(long = "rule", value_name = "NAME")]
         rules: Vec<String>,
         /// Run only the rules of this severity and above: error, warning, info or hint.
-        #[arg(long, value_parser = severity::parse)]
+        #[arg(long, value_parser = Severity::parse)]
         severity: Option<Severity>,
         /// Exit 1 when an issue of this severity or above is left: error, warning, info or hint.
-        #[arg(long, value_parser = severity::parse, default_value = "error")]
+        #[arg(long, value_parser = Severity::parse, default_value = "error")]
         fail_on: Severity,
         /// The project file to read instead of the nearest sgconfig.yml.
         #[arg(short, long)]
@@ -366,7 +366,7 @@ pub fn run() -> ExitCode {
                 fixes,
                 allowed,
                 &Filters { rules, severity },
-                &fail_on,
+                fail_on,
                 config.as_deref(),
             )
         }
@@ -576,7 +576,7 @@ fn check(
     fixes: FixMode,
     allowed: Applicability,
     filters: &Filters,
-    fail_on: &Severity,
+    fail_on: Severity,
     config: Option<&Path>,
 ) -> ExitCode {
     let report = match lint(paths, fixes, Scope::Project, filters, config) {

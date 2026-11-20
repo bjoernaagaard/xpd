@@ -13,10 +13,13 @@ use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_core::{Language, NodeMatch};
 use ast_grep_language::SupportLang;
 
+use crate::fix_safety::Applicability;
 use crate::pack::Pack;
 use crate::package_check::Calls;
 use crate::report::{Issue, Position};
-use crate::rule::{Applicability, Rule};
+use crate::rule::Rule;
+use crate::rule_id::RuleId;
+use crate::severity::Severity;
 use crate::syntax::{Node, Root, parse, parse_as};
 
 /// The language of the file at `path`, by its name. A file that names no language is read as
@@ -327,11 +330,29 @@ fn matched_rules<'p, 'r>(
 pub(crate) struct Found {
     pub(crate) issue: Issue,
     pub(crate) labels: Vec<Label>,
-    pub(crate) variant: Option<crate::rule::VariantId>,
     /// The bytes of the source that the rule matched.
     pub(crate) range: Range<usize>,
     /// What the rule's fix writes for this match. `None` when the issue has no fix.
     pub(crate) fix: Option<Replacement>,
+}
+
+impl Found {
+    pub(crate) fn invalid_rule(file: PathBuf, text: &str, message: String) -> Self {
+        Self {
+            labels: Vec::new(),
+            issue: Issue {
+                id: RuleId::qualified("xpd", "invalid-rule"),
+                file,
+                position: Some(Position { line: 1, column: 1 }),
+                severity: Severity::Error,
+                message,
+                fix: None,
+                help: None,
+            },
+            range: 0..text.lines().next().map_or(0, str::len),
+            fix: None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -400,20 +421,20 @@ pub(crate) fn lint_source(file: File<'_>, src: &str, packs: &[Pack]) -> Linted {
             let start = m.start_pos();
             let fix = replacement(rule, &m, &unbound, src);
             let issue = Issue {
-                package: pack.module.clone(),
-                rule: rule.id.clone(),
+                id: rule.id.clone(),
                 file: file.path.to_path_buf(),
                 position: Some(Position {
                     line: start.line() + 1,
                     column: start.column(&m) + 1,
                 }),
-                severity: rule.config.severity.clone(),
+                severity: rule.severity_under(pack.style),
                 message: rule.config.get_message(&m),
                 fix: rule.fix.filter(|_| fix.is_some()),
-                help: pack.page(&rule.id).or_else(|| rule.config.url.clone()),
+                help: pack
+                    .page(rule.id.name())
+                    .or_else(|| rule.config.url.clone()),
             };
             found.push(Found {
-                variant: Some(rule.variant.clone()),
                 issue,
                 labels: rule
                     .config

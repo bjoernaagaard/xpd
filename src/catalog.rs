@@ -7,16 +7,17 @@ mod local;
 use std::collections::HashMap;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail, ensure};
-use ast_grep_config::Severity;
+use crate::severity::Severity;
+use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 
 pub(crate) use self::local::{LocalProject, is_module_name};
+use crate::fix_safety::Applicability;
 use crate::pack::{self, Pack};
 use crate::package_check;
-use crate::rule::{Applicability, Mark, Rule};
-use crate::settings::Style;
-use crate::severity::{name as severity_name, rank};
+use crate::rule::Rule;
+use crate::rule_id::RuleId;
+use crate::style::{Mark, Style};
 use crate::venv::Distributions;
 use crate::version::Version;
 
@@ -42,13 +43,13 @@ pub(crate) struct Filters {
 }
 
 impl Filters {
-    fn keeps(&self, package: &str, id: &str, severity: &Severity) -> bool {
+    fn keeps(&self, package: &str, id: &str, severity: Severity) -> bool {
         let named = |selector: &String| match selector.split_once('/') {
             Some((in_package, rule)) => in_package == package && rule == id,
             None => selector == package || selector == id,
         };
         (self.rules.is_empty() || self.rules.iter().any(named))
-            && (self.severity.as_ref()).is_none_or(|lowest| rank(severity) >= rank(lowest))
+            && self.severity.is_none_or(|lowest| severity >= lowest)
     }
 }
 
@@ -92,25 +93,20 @@ impl Catalog {
         let mut packs = pack::embedded().context("invalid embedded rules")?;
         packs.extend(local);
         packs.push(Pack::suppressions()?);
-        // Public names may be shared by variants, but declared names belong to one file.
-        let mut sources: HashMap<&str, &Path> = HashMap::new();
+        let mut sources = DeclaredSources::default();
         for rule in packs.iter().flat_map(|pack| &pack.rules) {
-            let first = sources.entry(&rule.declared_id).or_insert(&rule.source);
-            ensure!(
-                *first == rule.source,
-                "the rule {} is in {} and in {}",
-                rule.config.id,
-                first.display(),
-                rule.source.display()
-            );
+            if let Some(first) = sources.record(rule) {
+                bail!(
+                    "the rule {} is in {} and in {}",
+                    rule.id,
+                    first.display(),
+                    rule.source().display()
+                );
+            }
         }
         for pack in &mut packs {
             pack.keep_rules_for(installed);
-            // Every later reader of a rule's severity, such as a report, `--severity` and the
-            // Stop check of the hook, then sees the severity of this run.
-            for rule in &mut pack.rules {
-                rule.report_under(style);
-            }
+            pack.style = style;
         }
         Ok(Self { packs, project })
     }
@@ -130,9 +126,9 @@ impl Catalog {
                 severity: None,
             };
             let known = self.packs.iter().any(|pack| {
-                let checks = pack.package_checks.iter().map(|check| &check.id);
-                let mut ids = pack.rules.iter().map(|rule| &rule.id).chain(checks);
-                ids.any(|id| only.keeps(&pack.module, id, &Severity::Error))
+                let checks = pack.package_checks.iter().map(|check| check.id.as_str());
+                let mut ids = pack.rules.iter().map(|rule| rule.id.name()).chain(checks);
+                ids.any(|id| only.keeps(&pack.module, id, Severity::Error))
             });
             if !known {
                 bail!("no rule or package is named {selector}. `xpd rules` lists them");
@@ -143,40 +139,88 @@ impl Catalog {
                 module,
                 rules,
                 package_checks,
+                style,
                 ..
             } = pack;
-            rules.retain(|rule| filters.keeps(module, &rule.id, &rule.config.severity));
+            rules.retain(|rule| filters.keeps(module, rule.id.name(), rule.severity_under(*style)));
             package_checks
-                .retain(|check| filters.keeps(module, &check.id, &package_check::SEVERITY));
+                .retain(|check| filters.keeps(module, &check.id, package_check::SEVERITY));
         }
         Ok(())
     }
 
-    /// Checks `text` as the content of the YAML file at `path`, which need not be saved, the
-    /// way the catalog would load it: a rule file compiles against the project's utility
-    /// rules, with the pack that `xpd.yml` gives its folder, and none of its rules may have
-    /// the name of a rule in another file.
+    /// Checks an editor's rule document with the project's utilities and declared IDs.
     pub(crate) fn validate_document(&self, path: &Path, text: &str) -> Result<()> {
-        let rules = if let Some(project) = &self.project {
-            project.check_document(path, text)?
-        } else {
+        let Some(project) = &self.project else {
             return Ok(());
         };
-        let known = || self.packs.iter().flat_map(|pack| &pack.rules);
+        let rules = project.check_document(path, text)?;
+        let mut sources = DeclaredSources::default();
+        for rule in self.packs.iter().flat_map(|pack| &pack.rules) {
+            let _ = sources.record(rule);
+        }
         for rule in &rules {
-            let same_name = |other: &&Rule| other.declared_id == rule.declared_id;
-            if let Some(other) =
-                known().find(|other| same_name(other) && other.source != rule.source)
-            {
+            if let Some(other) = sources.record(rule) {
                 bail!(
                     "{}: the rule {} is also in {}",
-                    rule.source.display(),
-                    rule.config.id,
-                    other.source.display()
+                    rule.source().display(),
+                    rule.id,
+                    other.display()
                 );
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Default)]
+struct DeclaredSources<'a>(HashMap<&'a RuleId, &'a Path>);
+
+impl<'a> DeclaredSources<'a> {
+    fn record(&mut self, rule: &'a Rule) -> Option<&'a Path> {
+        let first = *self
+            .0
+            .entry(&rule.declared_id)
+            .or_insert_with(|| rule.source());
+        (first != rule.source()).then_some(first)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum HelpLink {
+    Url(String),
+    File(std::path::PathBuf),
+}
+
+impl Catalog {
+    pub(crate) fn help(&self, id: &RuleId) -> Option<(&str, Option<HelpLink>)> {
+        let name = id.name();
+        let find = |rule: &&Rule| {
+            if id.source().is_some() {
+                rule.id == *id
+            } else {
+                rule.id.name() == name
+            }
+        };
+        let (pack, rule) = self
+            .packs
+            .iter()
+            .filter(|pack| pack.module == id.package())
+            .find_map(|pack| {
+                let rule = pack.rules.iter().find(find);
+                (rule.is_some() || (id.source().is_none() && pack.doc(name).is_some()))
+                    .then_some((pack, rule))
+            })?;
+        let doc = pack.doc(name).or_else(|| {
+            rule.map(|rule| rule.config.note.as_deref().unwrap_or(&rule.config.message))
+        })?;
+        let url = pack
+            .page(name)
+            .or_else(|| rule.and_then(|rule| rule.config.url.clone()));
+        let link = url
+            .map(HelpLink::Url)
+            .or_else(|| rule.map(|rule| HelpLink::File(rule.source().to_owned())));
+        Some((doc, link))
     }
 }
 
@@ -186,11 +230,9 @@ impl Catalog {
 /// `since`, which is no version at all when one document applies to every version.
 #[derive(Debug)]
 pub(crate) struct Entry<'a> {
-    /// Module name of the pack the rule belongs to.
-    package: &'a str,
-    rule: &'a str,
+    id: RuleId,
     /// The severity that the catalog's run reports the rule with.
-    severity: &'a Severity,
+    severity: Severity,
     /// What `metadata.style` marks the rule as. `None` for a rule that is not about style.
     style: Option<Mark>,
     /// The severity without a style setting, and the one with `style = "strict"`.
@@ -218,23 +260,20 @@ impl Entry<'_> {
             .map(|since| format!(" (since {since})"))
             .unwrap_or_default();
         format!(
-            "{} [{}/{}]{fix}{since} {}",
-            severity_name(self.severity),
-            self.package,
-            self.rule,
-            self.message
+            "{} [{}]{fix}{since} {}",
+            self.severity, self.id, self.message
         )
     }
 
     pub(crate) fn to_json(&self) -> Value {
         json!({
-            "package": self.package,
-            "rule": self.rule,
-            "severity": severity_name(self.severity),
+            "package": self.id.package(),
+            "rule": self.id.name(),
+            "severity": self.severity.as_str(),
             "style": self.style.map(Mark::as_str),
             "severities": {
-                Style::Default.as_str(): severity_name(&self.by_style[0]),
-                Style::Strict.as_str(): severity_name(&self.by_style[1]),
+                Style::Default.as_str(): self.by_style[0].as_str(),
+                Style::Strict.as_str(): self.by_style[1].as_str(),
             },
             "message": self.message,
             "fix": self.fix.map(Applicability::as_str),
@@ -253,28 +292,27 @@ impl Catalog {
             let first = entries.len();
             let page = |id: &str| pack.page(id);
             for rule in &pack.rules {
-                let id = rule.id.as_str();
+                let id = rule.id.name();
+                let effective = rule.severity_under(pack.style);
                 let since = rule.since.as_ref();
                 let by_style =
                     [Style::Default, Style::Strict].map(|style| rule.severity_under(style));
-                match entries[first..].iter_mut().find(|entry| entry.rule == id) {
+                match entries[first..]
+                    .iter_mut()
+                    .find(|entry| entry.id.name() == id)
+                {
                     Some(entry) => {
-                        if rank(&rule.config.severity) > rank(entry.severity) {
-                            entry.severity = &rule.config.severity;
-                        }
+                        entry.severity = entry.severity.max(effective);
                         entry.style = entry.style.or(rule.style);
                         for (highest, severity) in entry.by_style.iter_mut().zip(by_style) {
-                            if rank(&severity) > rank(highest) {
-                                *highest = severity;
-                            }
+                            *highest = (*highest).max(severity);
                         }
                         entry.fix = entry.fix.max(rule.fix);
                         entry.since = entry.since.zip(since).map(|(a, b)| a.min(b));
                     }
                     None => entries.push(Entry {
-                        package: &pack.module,
-                        rule: id,
-                        severity: &rule.config.severity,
+                        id: rule.id.clone(),
+                        severity: effective,
                         style: rule.style,
                         by_style,
                         message: &rule.config.message,
@@ -286,9 +324,8 @@ impl Catalog {
                 }
             }
             entries.extend(pack.package_checks.iter().map(|check| Entry {
-                package: &pack.module,
-                rule: &check.id,
-                severity: &package_check::SEVERITY,
+                id: RuleId::qualified(&pack.module, &check.id),
+                severity: package_check::SEVERITY,
                 style: None,
                 by_style: [package_check::SEVERITY, package_check::SEVERITY],
                 message: &check.message,

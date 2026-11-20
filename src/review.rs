@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use anyhow::{Context as _, Result, ensure};
 
+use crate::fix_safety::Applicability;
 use crate::pack::Pack;
-use crate::rule::Applicability;
 use crate::scan::{self, File, Replacement, Scanned};
 
 pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) -> Result<Scanned> {

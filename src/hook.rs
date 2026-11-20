@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::severity::Severity;
 use anyhow::{Context, Result};
-use ast_grep_config::Severity;
 use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -22,13 +22,13 @@ use serde_json::{Value, json};
 use crate::catalog::{self, Catalog, Filters};
 use crate::check::{self, FixMode, Scope};
 use crate::embed;
+use crate::fix_safety::Applicability;
 use crate::graph::Graph;
 use crate::index;
 use crate::report::Issue;
-use crate::rule::Applicability;
 use crate::scan;
-use crate::settings::{Settings, Style};
-use crate::severity;
+use crate::settings::Settings;
+use crate::style::Style;
 use crate::syntax;
 
 /// Claude Code shows stderr to the agent only when a hook exits 2.
@@ -489,10 +489,8 @@ fn open_issues(files: &[PathBuf]) -> Result<String> {
     let mut packs = BTreeMap::<&str, Vec<&Issue>>::new();
     let mut rules = BTreeMap::<String, usize>::new();
     for issue in &report.issues {
-        packs.entry(&issue.package).or_default().push(issue);
-        *rules
-            .entry(format!("{}/{}", issue.package, issue.rule))
-            .or_default() += 1;
+        packs.entry(issue.id.package()).or_default().push(issue);
+        *rules.entry(issue.id.to_string()).or_default() += 1;
     }
     let mut lines = vec![format!(
         "{checked} and found {}.",
@@ -505,9 +503,9 @@ fn open_issues(files: &[PathBuf]) -> Result<String> {
             .iter()
             .filter_map(|level| {
                 let count = (issues.iter())
-                    .filter(|issue| severity::rank(&issue.severity) == severity::rank(level))
+                    .filter(|issue| issue.severity == *level)
                     .count();
-                let name = severity::name(level);
+                let name = level.as_str();
                 (count > 0).then(|| match level {
                     Severity::Info => format!("{count} {name}"),
                     _ => counted(count, name),
@@ -931,7 +929,7 @@ fn findings(files: &[PathBuf]) -> Result<Vec<Finding>> {
     )?;
     let issues = report.issues.iter().map(|issue| Finding {
         line: issue.line(Applicability::Safe),
-        holds: severity::rank(&issue.severity) >= severity::rank(&Severity::Warning),
+        holds: issue.severity >= Severity::Warning,
     });
     let python = files.iter().filter(|file| scan::is_python(file));
     let steps = python.flat_map(|file| {

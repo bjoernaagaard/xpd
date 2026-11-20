@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow, bail};
 use toml_edit::TableLike;
 
+use crate::style::Style;
 use crate::toml;
 
 /// The file of a project that can hold xpd's settings.
@@ -24,28 +25,6 @@ const PROJECT_FILE: &str = "pyproject.toml";
 const PROJECT_TABLE: [&str; 2] = ["tool", "xpd"];
 /// The key of the house style.
 const STYLE: &str = "style";
-
-/// How xpd reports the rules of the house style, which `metadata.style: house` marks. Such a
-/// rule states a preference about code that works.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub(crate) enum Style {
-    /// Each rule has the severity that its file gives it.
-    #[default]
-    Default,
-    /// A rule of the house style that is `info` is a `warning`.
-    Strict,
-}
-
-impl Style {
-    const ALL: [Self; 2] = [Self::Default, Self::Strict];
-
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Default => "default",
-            Self::Strict => "strict",
-        }
-    }
-}
 
 /// What the settings files say for one project.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

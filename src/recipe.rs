@@ -8,11 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::syntax;
 use crate::{
     catalog::Catalog,
+    fix_safety::Applicability,
     index::{Entry, Kind},
-    pack,
-    rule::Applicability,
-    scan,
-    settings::Style,
+    pack, scan,
+    style::Style,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

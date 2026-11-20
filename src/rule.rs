@@ -5,60 +5,27 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
-use ast_grep_config::{RuleConfig, SerializableRule, Severity};
+use ast_grep_config::{RuleConfig, SerializableRule};
 use ast_grep_core::NodeMatch;
 use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_language::SupportLang;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
+use crate::fix_safety::Applicability;
 use crate::frames;
 use crate::imports;
 use crate::names;
 use crate::pack::Library;
-use crate::settings::Style;
+use crate::rule_id::RuleId;
+use crate::severity::Severity;
+use crate::style::{Mark, Style};
 use crate::syntax::Root;
 use crate::version::Version;
 
 /// A shape of code that a rule's metadata names, as an ast-grep rule that can use the `utils`
 /// of its document.
 type Shape = ast_grep_config::Rule;
-
-/// Whether a fix keeps the code's behavior. `xpd check --fix` applies safe fixes, and
-/// `--unsafe-fixes` adds the unsafe ones. The order matters: a fix applies when its
-/// applicability is at or below the one asked for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum Applicability {
-    Safe,
-    Unsafe,
-}
-
-impl Applicability {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Safe => "safe",
-            Self::Unsafe => "unsafe",
-        }
-    }
-}
-
-/// What `metadata.style` says about a rule.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum Mark {
-    /// The rule states a preference of the house style about code that works. With
-    /// `style = "strict"` in the settings, such a rule that is `info` is a `warning`.
-    House,
-}
-
-impl Mark {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::House => "house",
-        }
-    }
-}
 
 /// Where a rule document comes from, which decides how its `metadata` is read and whether
 /// xpd's Python checks run on its matches.
@@ -75,66 +42,82 @@ pub(crate) enum Origin {
     Structural,
 }
 
-/// The name of one rule document, which no other document of the catalog has. Several
-/// documents can share one public name, one for each form or library version the rule
-/// matches, and this tells them apart: `rules/pandas/chained-assignment.yml#2` is the second
-/// document of that file.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct VariantId(String);
-
-impl fmt::Display for VariantId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+impl Origin {
+    fn fix_policy(self) -> FixPolicy {
+        match self {
+            Self::Embedded => FixPolicy::ExplicitSingle,
+            Self::LocalPack | Self::Structural => FixPolicy::FirstWithUnsafeDefault,
+        }
     }
 }
 
-/// The package of the rules that no pack holds and whose name has no package.
-pub(crate) const LOCAL_PACKAGE: &str = "local";
-
-/// What a rule's `metadata` may hold, such as `metadata: { fix: unsafe, since: "3.1" }`.
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Metadata {
-    fix: Option<Applicability>,
-    /// The name the rule reports under, when the document's own `id` must differ from it.
-    /// ast-grep's own tools refuse two rule files with one id, so the documents of one rule
-    /// that are in several files each take their own `id` and share this name.
-    public_id: Option<String>,
-    since: Option<Version>,
-    until: Option<Version>,
-    /// `holds: { FIG: <rule> }` keeps a match only when the variable that `$FIG` matched holds
-    /// a value of the rule's shape.
-    #[serde(default)]
-    holds: BTreeMap<String, SerializableRule>,
-    /// Drops a match when the same proof as `holds` succeeds, for fallback advice.
-    #[serde(default)]
-    unless_holds: BTreeMap<String, SerializableRule>,
-    /// `unlessImported: <rule>` drops the matches in a file that imports a module of its
-    /// project with a direct module statement or expression of the rule's shape.
-    unless_imported: Option<SerializableRule>,
-    /// `style: house` marks a rule of the house style.
-    style: Option<Mark>,
-    /// `frame: { DF: any }` keeps a match only when the name that `$DF` matched holds a pandas
-    /// frame where the matched statement starts. `parameter` asks for a frame that the function
-    /// around the match was given.
-    #[serde(default)]
-    frame: BTreeMap<String, frames::Role>,
-    /// `frameScript: 10` keeps a match only when it is the first of at least ten statements
-    /// at the top of its module that assign or write a frame, and no function of the module
-    /// takes a frame.
-    frame_script: Option<usize>,
+#[derive(Clone, Copy)]
+enum FixPolicy {
+    ExplicitSingle,
+    FirstWithUnsafeDefault,
 }
 
-/// The settings that need a pack, with how each is written in `metadata`.
-const PACK_SETTINGS: [&str; 7] = [
-    "since",
-    "until",
-    "holds",
-    "unlessHolds",
-    "unlessImported",
-    "frame",
-    "frameScript",
-];
+impl FixPolicy {
+    fn resolve(
+        self,
+        count: usize,
+        declared: Option<Applicability>,
+    ) -> Result<Option<Applicability>> {
+        if count == 0 {
+            ensure!(
+                declared.is_none(),
+                "metadata.fix is set, but the rule has no fix"
+            );
+            return Ok(None);
+        }
+        match self {
+            Self::ExplicitSingle => {
+                ensure!(
+                    count == 1,
+                    "a rule may have only one fix, and this one has {count}"
+                );
+                declared
+                    .map(Some)
+                    .context("a rule with a fix needs metadata.fix: safe or unsafe")
+            }
+            Self::FirstWithUnsafeDefault => Ok(Some(declared.unwrap_or(Applicability::Unsafe))),
+        }
+    }
+}
+
+macro_rules! metadata {
+    ($($(#[$attr:meta])* $field:ident: $ty:ty $(=> $pack_key:literal)?,)*) => {
+        #[derive(Default, Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Metadata {
+            $($(#[$attr])* $(#[serde(rename = $pack_key)])? $field: $ty,)*
+        }
+
+        const PACK_SETTINGS: &[&str] = &[$($($pack_key,)?) *];
+    };
+}
+
+metadata! {
+    fix: Option<Applicability>,
+    /// Several documents can report under the same name while keeping distinct IDs in ast-grep.
+    public_id: Option<String>,
+    since: Option<Version> => "since",
+    until: Option<Version> => "until",
+    /// The captured variable must hold a value of the rule's shape.
+    #[serde(default)]
+    holds: BTreeMap<String, SerializableRule> => "holds",
+    /// Drops a match when the same proof as `holds` succeeds.
+    #[serde(default)]
+    unless_holds: BTreeMap<String, SerializableRule> => "unlessHolds",
+    /// Drops matches when an imported module contains the given shape.
+    unless_imported: Option<SerializableRule> => "unlessImported",
+    style: Option<Mark>,
+    /// The captured variable must hold a pandas frame at the start of the statement.
+    #[serde(default)]
+    frame: BTreeMap<String, frames::Role> => "frame",
+    /// The minimum number of top-level frame statements for the rule to match a script.
+    frame_script: Option<usize> => "frameScript",
+}
 
 impl Metadata {
     /// Reads the `metadata` of a rule document from `origin`. A structural rule may hold any
@@ -161,17 +144,10 @@ impl Metadata {
 
 /// One rule document of a pack.
 pub(crate) struct Rule {
-    /// The rule's name in its package, such as `chained-assignment`, which a report shows.
-    pub(crate) id: String,
-    /// The document's own name.
-    pub(crate) variant: VariantId,
-    pub(crate) declared_id: String,
-    /// `config.id` is `<package>/<id>`, and not the `id` the document has on disk. ast-grep
-    /// reads a suppression comment against it, so `# ast-grep-ignore: pandas/chained-assignment`
-    /// silences every document of the rule.
+    pub(crate) id: RuleId,
+    pub(crate) declared_id: RuleId,
+    /// ast-grep uses the public name to match suppression comments across variants.
     pub(crate) config: RuleConfig<SupportLang>,
-    /// The rule file the document is in.
-    pub(crate) source: PathBuf,
     /// `None` when the rule has no fix.
     pub(crate) fix: Option<Applicability>,
     /// The first library version the rule applies to.
@@ -199,9 +175,6 @@ pub(crate) struct Rule {
     unless_imported: Option<Shape>,
     /// From `metadata.style`. `None` for a rule that is not about style.
     pub(crate) style: Option<Mark>,
-    /// The severity that the rule's file gives it. `config.severity` is the one a run reports,
-    /// which [`Rule::report_under`] sets.
-    declared_severity: Severity,
     /// From `metadata.frame`: each variable of the rule that must name a pandas frame, which
     /// `frames::holds` proves from the file.
     frames: Vec<(String, frames::Role)>,
@@ -272,20 +245,9 @@ impl Rule {
         number: usize,
     ) -> Result<Self> {
         let metadata = Metadata::read(&config, origin)?;
-        let fix = match (config.fixer.len(), metadata.fix, origin) {
-            (0, None, _) => None,
-            (0, Some(_), _) => bail!("metadata.fix is set, but the rule has no fix"),
-            (1, Some(applicability), _) => Some(applicability),
-            (1, None, Origin::Embedded) => {
-                bail!("a rule with a fix needs metadata.fix: safe or unsafe")
-            }
-            (fixes, _, Origin::Embedded) => {
-                bail!("a rule may have only one fix, and this one has {fixes}")
-            }
-            (_, applicability, Origin::LocalPack | Origin::Structural) => {
-                Some(applicability.unwrap_or(Applicability::Unsafe))
-            }
-        };
+        let fix = origin
+            .fix_policy()
+            .resolve(config.fixer.len(), metadata.fix)?;
         let python_checks = origin != Origin::Structural && config.language == SupportLang::Python;
         ensure!(
             python_checks
@@ -325,37 +287,14 @@ impl Rule {
         let unless_holds = held_shapes(metadata.unless_holds, "unlessHolds")?;
         let unless_imported =
             (metadata.unless_imported.map(shape).transpose()).context("metadata.unlessImported")?;
-        let declared_id = if config.id.contains('/') {
-            config.id.clone()
-        } else {
-            format!("{}/{}", pack.unwrap_or(LOCAL_PACKAGE), config.id)
-        };
-        let declared = metadata.public_id.unwrap_or_else(|| config.id.clone());
-        let (package, id) = match (declared.split_once('/'), pack) {
-            (None, Some(pack)) => (pack, declared.as_str()),
-            (None, None) => (LOCAL_PACKAGE, declared.as_str()),
-            (Some((package, id)), None) => (package, id),
-            (Some((package, id)), Some(pack)) => {
-                ensure!(
-                    package == pack,
-                    "the rule is named {declared}, and its file belongs to the pack {pack}"
-                );
-                (pack, id)
-            }
-        };
-        ensure!(
-            !package.is_empty() && !id.is_empty(),
-            "the rule needs a name, as <rule> or <package>/<rule>, and has {declared:?}"
-        );
-        let id = id.to_owned();
-        config.id = format!("{package}/{id}");
-        let declared_severity = config.severity.clone();
+        let declared_id = RuleId::declared(&config.id, pack);
+        let reported = metadata.public_id.as_deref().unwrap_or(&config.id);
+        let id = RuleId::reported(reported, pack, source, number)?;
+        config.id = id.to_string();
         Ok(Self {
             id,
             declared_id,
-            variant: VariantId(format!("{}#{number}", source.display())),
             config,
-            source,
             fix,
             since: metadata.since,
             until: metadata.until,
@@ -366,31 +305,20 @@ impl Rule {
             unless_holds,
             unless_imported,
             style: metadata.style,
-            declared_severity,
             frames,
             frame_script: metadata.frame_script,
         })
     }
 
-    /// The package the rule reports under, which is the module of its pack.
-    pub(crate) fn package(&self) -> &str {
-        let package = self.config.id.len() - self.id.len() - 1;
-        &self.config.id[..package]
+    pub(crate) fn source(&self) -> &Path {
+        self.id
+            .source()
+            .expect("a compiled rule has a source document")
     }
-}
 
-impl Rule {
     /// The severity that a run with the setting `style` reports the rule with.
     pub(crate) fn severity_under(&self, style: Style) -> Severity {
-        match (style, self.style, &self.declared_severity) {
-            (Style::Strict, Some(Mark::House), Severity::Info) => Severity::Warning,
-            (_, _, declared) => declared.clone(),
-        }
-    }
-
-    /// Makes the rule report with its severity under `style`.
-    pub(crate) fn report_under(&mut self, style: Style) {
-        self.config.severity = self.severity_under(style);
+        style.severity(Severity::from(&self.config.severity), self.style)
     }
 }
 
@@ -483,8 +411,6 @@ impl fmt::Debug for Rule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Rule")
             .field("id", &self.id)
-            .field("variant", &self.variant)
-            .field("source", &self.source)
             .field("fix", &self.fix)
             .field("since", &self.since)
             .field("until", &self.until)

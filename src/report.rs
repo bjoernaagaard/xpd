@@ -3,11 +3,11 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use ast_grep_config::Severity;
+use crate::severity::Severity;
 use serde_json::{Value, json};
 
-use crate::rule::Applicability;
-use crate::severity::{name as severity_name, rank};
+use crate::fix_safety::Applicability;
+use crate::rule_id::RuleId;
 
 /// Where in a file an issue starts. Lines and columns count from 1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -19,9 +19,7 @@ pub(crate) struct Position {
 /// One thing a rule or a package check found.
 #[derive(Debug)]
 pub(crate) struct Issue {
-    /// Module name of the pack the rule belongs to.
-    pub(crate) package: String,
-    pub(crate) rule: String,
+    pub(crate) id: RuleId,
     pub(crate) file: PathBuf,
     /// `None` for an issue about the project as a whole, such as a missing package.
     pub(crate) position: Option<Position>,
@@ -45,22 +43,19 @@ impl Issue {
         };
         let mark = if self.fixable(allowed) { " [*]" } else { "" };
         format!(
-            "{place}: {} [{}/{}]{mark} {}",
-            severity_name(&self.severity),
-            self.package,
-            self.rule,
-            self.message
+            "{place}: {} [{}]{mark} {}",
+            self.severity, self.id, self.message
         )
     }
 
     fn to_json(&self) -> Value {
         json!({
-            "package": self.package,
-            "rule": self.rule,
+            "package": self.id.package(),
+            "rule": self.id.name(),
             "file": self.file.display().to_string(),
             "line": self.position.map(|at| at.line),
             "column": self.position.map(|at| at.column),
-            "severity": severity_name(&self.severity),
+            "severity": self.severity.as_str(),
             "message": self.message,
             "fix": self.fix.map(Applicability::as_str),
         })
@@ -82,7 +77,7 @@ impl Report {
         let ids: BTreeMap<_, _> = self
             .issues
             .iter()
-            .map(|issue| (format!("{}/{}", issue.package, issue.rule), issue))
+            .map(|issue| (issue.id.to_string(), issue))
             .collect();
         let rules: Vec<_> = ids
             .iter()
@@ -102,7 +97,7 @@ impl Report {
             .issues
             .iter()
             .map(|issue| {
-                let id = format!("{}/{}", issue.package, issue.rule);
+                let id = issue.id.to_string();
                 let level = match issue.severity {
                     Severity::Error => "error",
                     Severity::Warning => "warning",
@@ -152,7 +147,7 @@ impl Report {
                     _ => "notice",
                 };
                 let file = annotation_property(&issue.file.to_string_lossy());
-                let title = annotation_property(&format!("{}/{}", issue.package, issue.rule));
+                let title = annotation_property(&issue.id.to_string());
                 let position = issue.position.map_or_else(String::new, |position| {
                     format!(",line={},col={}", position.line, position.column)
                 });
@@ -163,8 +158,8 @@ impl Report {
     }
 
     /// Whether any issue has the severity `lowest` or a higher one, which makes `check` exit 1.
-    pub(crate) fn has_issues_from(&self, lowest: &Severity) -> bool {
-        (self.issues.iter()).any(|i| rank(&i.severity) >= rank(lowest))
+    pub(crate) fn has_issues_from(&self, lowest: Severity) -> bool {
+        (self.issues.iter()).any(|i| i.severity >= lowest)
     }
 
     /// `fixable` counts the issues that `--fix` fixes at the `allowed` level.

@@ -13,7 +13,8 @@ use crate::catalog::{Catalog, LocalProject};
 use crate::pack;
 use crate::package_check::{self, Calls};
 use crate::report::Issue;
-use crate::settings::{Settings, Style};
+use crate::settings::Settings;
+use crate::style::Style;
 use crate::venv::{Distributions, Venv};
 use crate::version::Version;
 

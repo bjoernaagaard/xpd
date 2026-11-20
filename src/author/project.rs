@@ -12,7 +12,8 @@ use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::document::{self, Name, RuleDoc, RuleId};
+use super::document::{self, Name, RuleDoc};
+use crate::rule_id::RuleId;
 
 const SGCONFIG: &str = "sgconfig.yml";
 const SGCONFIG_YAML: &str = "sgconfig.yaml";
@@ -145,8 +146,8 @@ impl Pack {
 /// A rule of the project, as its file names it.
 #[derive(Debug)]
 struct ExistingRule {
-    id: String,
-    public_id: Option<String>,
+    id: RuleId,
+    public_id: Option<RuleId>,
 }
 
 /// The files one `xpd new` writes, all checked before the first is written.
@@ -403,8 +404,8 @@ impl Project {
                     .pointer("/metadata/publicId")
                     .and_then(Value::as_str);
                 rules.push(ExistingRule {
-                    id: id.to_owned(),
-                    public_id: public_id.map(str::to_owned),
+                    id: RuleId::parse(id),
+                    public_id: public_id.map(RuleId::parse),
                 });
             }
         }
@@ -417,6 +418,7 @@ impl Project {
             .existing_rules()?
             .into_iter()
             .flat_map(|rule| std::iter::once(rule.id).chain(rule.public_id))
+            .map(|id| id.to_string())
             .collect();
         ids.sort();
         ids.dedup();
@@ -425,11 +427,10 @@ impl Project {
 
     /// Fails when a rule already has the id, as its own id or as a public id.
     pub(in crate::author) fn check_new_rule_id(&self, id: &RuleId) -> Result<()> {
-        let id = id.to_string();
         let taken = self
             .existing_rules()?
             .iter()
-            .any(|rule| rule.id == id || rule.public_id.as_deref() == Some(id.as_str()));
+            .any(|rule| rule.id == *id || rule.public_id.as_ref() == Some(id));
         ensure!(!taken, "the project already has a rule {id}");
         Ok(())
     }
@@ -458,9 +459,9 @@ impl Project {
             Some(pack) => format!("pack {} in {XPD_CONFIG} has no ruleDirs", pack.module),
             None => format!("{SGCONFIG} has no ruleDirs"),
         })?;
-        let path = inside(&self.root, &format!("{dir}/{}.yml", doc.id.name))?;
+        let path = inside(&self.root, &format!("{dir}/{}.yml", doc.id.name()))?;
         changes.stage(path, text, WriteMode::Create);
-        let markdown = inside(&self.root, &format!("{dir}/{}.md", doc.id.name))?;
+        let markdown = inside(&self.root, &format!("{dir}/{}.md", doc.id.name()))?;
         changes.stage(markdown, doc.markdown(), WriteMode::Create);
         if let Some(pack) = pack.filter(|pack| !pack.declared) {
             let text = with_pack(self.xpd_config.as_deref(), pack)?;

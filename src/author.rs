@@ -17,9 +17,12 @@ use clap::{Subcommand, ValueEnum};
 use inquire::validator::Validation;
 use serde::Serialize;
 
+use crate::fix_safety::Applicability;
 use crate::output::Format;
+use crate::rule_id::RuleId;
+use crate::severity::Severity;
 use crate::version::Version;
-use document::{Name, RuleDoc, RuleId};
+use document::{Name, RuleDoc};
 use project::{Changes, Gate, Pack, Project};
 
 /// Create a rule project, or a rule, test case or utility in one.
@@ -125,7 +128,7 @@ struct RuleArgs {
     /// Whether the fix keeps the code's behavior. `xpd check --fix` applies safe fixes, and
     /// --unsafe-fixes adds the unsafe ones. Required with --fix.
     #[arg(long, value_enum, requires = "fix")]
-    fix_safety: Option<FixSafety>,
+    fix_safety: Option<Applicability>,
     /// The first version of the pack's library the rule applies to.
     #[arg(long, value_name = "VERSION")]
     since: Option<String>,
@@ -168,20 +171,6 @@ struct UtilArgs {
     /// The code the utility matches.
     #[arg(long, short)]
     pattern: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum Severity {
-    Error,
-    Warning,
-    Info,
-    Hint,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum FixSafety {
-    Safe,
-    Unsafe,
 }
 
 /// A language that ast-grep parses, named on the command line by any of its aliases.
@@ -472,7 +461,10 @@ fn new_rule(args: RuleArgs, project: &Project, mode: Mode) -> Result<Outcome> {
         (Some(_), _) => Lang::PYTHON,
         (None, language) => mode.or_ask(language, "--language", ask_language)?,
     };
-    let id = RuleId::new(pack.as_ref().map(|pack| pack.module.clone()), name);
+    let id = RuleId::new(
+        pack.as_ref().map(|pack| pack.module.clone()),
+        name.to_string(),
+    );
     project.check_new_rule_id(&id)?;
     let pattern = mode.or_ask(args.pattern, "--pattern", || ask_pattern(language))?;
     let message = mode.or_ask(args.message, "--message", || {
@@ -506,7 +498,7 @@ fn new_rule(args: RuleArgs, project: &Project, mode: Mode) -> Result<Outcome> {
         id,
         language: language.0,
         language_name: language.name(),
-        severity: crate::severity::name(&severity.into()),
+        severity,
         message,
         note,
         pattern,
@@ -526,21 +518,37 @@ fn new_rule(args: RuleArgs, project: &Project, mode: Mode) -> Result<Outcome> {
     Outcome::of("rule", Some(doc.id.to_string()), changes)
 }
 
+struct FixChoice(Applicability);
+
+impl fmt::Display for FixChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let description = match self.0 {
+            Applicability::Safe => "it keeps the code's behavior",
+            Applicability::Unsafe => "it may change the behavior",
+        };
+        write!(f, "{}: {description}", self.0)
+    }
+}
+
 /// The fix and how safe it is.
 fn choose_fix(
     fix: Option<String>,
-    safety: Option<FixSafety>,
+    safety: Option<Applicability>,
     mode: Mode,
-) -> Result<Option<(String, &'static str)>> {
+) -> Result<Option<(String, Applicability)>> {
     let Some(fix) = mode.or_maybe_ask(fix, || ask_optional("Fix (empty for none):", |_| Ok(())))?
     else {
         return Ok(None);
     };
     let safety = mode.or_ask(safety, "--fix-safety", || {
-        let safeties = FixSafety::value_variants().to_vec();
-        ask_select("Does the fix keep the code's behavior?", safeties, 1)
+        let choices = Applicability::value_variants()
+            .iter()
+            .copied()
+            .map(FixChoice)
+            .collect();
+        ask_select("Does the fix keep the code's behavior?", choices, 1).map(|choice| choice.0)
     })?;
-    Ok(Some((fix, fix_safety_name(safety))))
+    Ok(Some((fix, safety)))
 }
 
 /// The pack of a new rule: a declared one, a new one, or none for a structural rule.
@@ -614,40 +622,6 @@ fn new_util(args: UtilArgs, project: &Project, mode: Mode) -> Result<Outcome> {
     Outcome::of("util", Some(name.to_string()), changes)
 }
 
-fn fix_safety_name(safety: FixSafety) -> &'static str {
-    match safety {
-        FixSafety::Safe => "safe",
-        FixSafety::Unsafe => "unsafe",
-    }
-}
-
-impl From<Severity> for ast_grep_config::Severity {
-    fn from(severity: Severity) -> Self {
-        match severity {
-            Severity::Error => Self::Error,
-            Severity::Warning => Self::Warning,
-            Severity::Info => Self::Info,
-            Severity::Hint => Self::Hint,
-        }
-    }
-}
-
-impl fmt::Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(crate::severity::name(&(*self).into()))
-    }
-}
-
-impl fmt::Display for FixSafety {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Safe => "safe: it keeps the code's behavior",
-            Self::Unsafe => "unsafe: it may change the behavior",
-        })
-    }
-}
-
-/// A prompt's check, shown under the prompt until the answer passes it.
 fn validator(
     check: impl Fn(&str) -> Result<()> + Clone + 'static,
 ) -> impl inquire::validator::StringValidator {

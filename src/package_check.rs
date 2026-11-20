@@ -6,12 +6,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use ast_grep_config::{GlobalRules, SerializableRule, Severity};
+use ast_grep_config::{GlobalRules, SerializableRule};
 use ast_grep_language::SupportLang;
 use serde::Deserialize;
 
 use crate::pack::{ManifestRule, Pack};
 use crate::report::Issue;
+use crate::rule_id::RuleId;
+use crate::severity::Severity;
 use crate::syntax::Root;
 use crate::venv::{Distributions, Venv};
 
@@ -220,8 +222,7 @@ pub(crate) fn missing(
         .filter_map(|(pack, check)| {
             let message = check.report(installed, configured, calls.get(pack, check))?;
             Some(Issue {
-                package: pack.module.clone(),
-                rule: check.id.clone(),
+                id: RuleId::qualified(&pack.module, &check.id),
                 file: file.clone(),
                 position: None,
                 severity: SEVERITY,

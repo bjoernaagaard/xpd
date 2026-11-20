@@ -18,7 +18,9 @@ use serde::Deserialize;
 
 use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
+use crate::rule_id::RuleId;
 use crate::scan::File;
+use crate::style::Style;
 use crate::syntax::Root;
 use crate::venv::Distributions;
 use crate::version::Version;
@@ -170,6 +172,7 @@ pub(crate) enum Gate {
 
 /// One package's rules: a library's, a project's own, or xpd's.
 pub(crate) struct Pack {
+    pub(crate) style: Style,
     /// The name issues are reported under. For a library's pack it is the name the library is
     /// imported by, such as `pandas`. Two packs can share it, as a project's own pandas rules
     /// do with the embedded ones.
@@ -204,18 +207,10 @@ pub(crate) fn compile_rules(
     pack: Option<&str>,
 ) -> Result<Vec<Rule>> {
     let configs = ast_grep_config::from_yaml_string::<SupportLang>(yaml, globals)?;
-    let several = configs.len() > 1;
+    let count = configs.len();
     let mut rules = Vec::new();
     for (index, mut config) in configs.into_iter().enumerate() {
-        if config.id.is_empty() {
-            let stem = path.file_stem().and_then(|stem| stem.to_str());
-            let stem = stem.context("a rule without an id needs a file name to take it from")?;
-            config.id = if several {
-                format!("{stem}-{index}")
-            } else {
-                stem.to_owned()
-            };
-        }
+        config.id = RuleId::document_name(&config.id, path, index, count)?;
         if config.severity != Severity::Off {
             let id = config.id.clone();
             let rule = Rule::new(config, origin, pack, path.to_path_buf(), index + 1);
@@ -298,8 +293,8 @@ impl Pack {
             {
                 bail!(
                     "{}: the rule {} is for {} files, and the pack {module} runs on Python files that import {module}. Set everyFile: true for the pack, or move the rule out of it",
-                    rule.source.display(),
-                    rule.id,
+                    rule.source().display(),
+                    rule.id.name(),
                     rule.config.language
                 );
             }
@@ -320,6 +315,7 @@ impl Pack {
             .collect::<Result<_>>()
             .context("packages")?;
         Ok(Self {
+            style: Style::Default,
             module: module.to_owned(),
             gate,
             rules,
@@ -336,6 +332,7 @@ impl Pack {
     /// `package`. They are plain ast-grep rules, so they run on every file of their language.
     pub(crate) fn structural(package: String, rules: Vec<Rule>, root: PathBuf) -> Self {
         Self {
+            style: Style::Default,
             module: package,
             gate: Gate::EveryFile,
             rules,
@@ -360,6 +357,7 @@ impl Pack {
         let source = PathBuf::from(OWN_PACKAGE);
         let rule = Rule::new(config, Origin::Structural, Some(OWN_PACKAGE), source, 1)?;
         Ok(Self {
+            style: Style::Default,
             module: OWN_PACKAGE.to_owned(),
             gate: Gate::Suppressions,
             rules: vec![rule],

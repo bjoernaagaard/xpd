@@ -392,7 +392,12 @@ impl LocalProject {
             for rule in self.compile(&path, &text)? {
                 match owner {
                     Some(pack) => in_packs[pack].push(rule),
-                    None => (structural.entry(rule.package().to_owned()).or_default()).push(rule),
+                    None => {
+                        structural
+                            .entry(rule.id.package().to_owned())
+                            .or_default()
+                            .push(rule);
+                    }
                 }
             }
         }

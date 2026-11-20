@@ -1,35 +1,62 @@
-use ast_grep_config::Severity;
+use std::fmt;
 
-pub(crate) fn name(severity: &Severity) -> &'static str {
-    match severity {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        Severity::Info => "info",
-        Severity::Hint => "hint",
-        Severity::Off => "off",
+use ast_grep_config::Severity as AstSeverity;
+use clap::{ValueEnum, builder::PossibleValue};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Severity {
+    Off,
+    Hint,
+    Info,
+    Warning,
+    Error,
+}
+
+impl Severity {
+    const SELECTABLE: [Self; 4] = [Self::Error, Self::Warning, Self::Info, Self::Hint];
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info => "info",
+            Self::Hint => "hint",
+            Self::Off => "off",
+        }
+    }
+
+    pub(crate) fn parse(text: &str) -> Result<Self, String> {
+        Self::SELECTABLE
+            .into_iter()
+            .find(|severity| severity.as_str() == text)
+            .ok_or_else(|| format!("{text} is not error, warning, info or hint"))
     }
 }
 
-/// The severity that `name` names, as a rule file writes it. `off` is no severity to ask for.
-pub(crate) fn parse(text: &str) -> Result<Severity, String> {
-    [
-        Severity::Error,
-        Severity::Warning,
-        Severity::Info,
-        Severity::Hint,
-    ]
-    .into_iter()
-    .find(|severity| name(severity) == text)
-    .ok_or_else(|| format!("{text} is not error, warning, info or hint"))
+impl ValueEnum for Severity {
+    fn value_variants<'a>() -> &'a [Self] {
+        &Self::SELECTABLE
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        (*self != Self::Off).then(|| PossibleValue::new(self.as_str()))
+    }
 }
 
-/// How severe a severity is, so that merging a rule's documents keeps the highest.
-pub(crate) fn rank(severity: &Severity) -> u8 {
-    match severity {
-        Severity::Error => 4,
-        Severity::Warning => 3,
-        Severity::Info => 2,
-        Severity::Hint => 1,
-        Severity::Off => 0,
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<&AstSeverity> for Severity {
+    fn from(severity: &AstSeverity) -> Self {
+        match severity {
+            AstSeverity::Off => Self::Off,
+            AstSeverity::Hint => Self::Hint,
+            AstSeverity::Info => Self::Info,
+            AstSeverity::Warning => Self::Warning,
+            AstSeverity::Error => Self::Error,
+        }
     }
 }

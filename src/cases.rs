@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{catalog::Catalog, output::Format, pack, scan, settings::Style, venv::Venv};
+use crate::{catalog::Catalog, output::Format, pack, scan, style::Style, venv::Venv};
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub(crate) enum Engine {
@@ -186,13 +186,7 @@ fn run_case(
     let selected: Vec<_> = packs
         .iter()
         .flat_map(|pack| &pack.rules)
-        .filter(|rule| {
-            rule.id == case.id
-                || rule.config.id == case.id
-                || rule.declared_id == case.id
-                || (!case.id.contains('/')
-                    && rule.declared_id.rsplit('/').next() == Some(case.id.as_str()))
-        })
+        .filter(|rule| rule.id.matches_case(&rule.declared_id, &case.id))
         .collect();
     let rule = selected
         .first()
@@ -234,12 +228,7 @@ fn run_case(
         )
         .found
         .into_iter()
-        .find(|found| {
-            found
-                .variant
-                .as_ref()
-                .is_some_and(|variant| selected.iter().any(|rule| rule.variant == *variant))
-        });
+        .find(|found| selected.iter().any(|rule| rule.id == found.issue.id));
         let actual = found.map(|found| snapshot(found, source));
         let status = if !invalid && actual.is_some() {
             "unexpected finding"

@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::rc::Rc;
 
+use crate::severity::Severity;
 use anyhow::{Context, Result};
-use ast_grep_config::Severity;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::{
     Cancel, DidChangeConfiguration, DidChangeTextDocument, DidChangeWatchedFiles,
@@ -47,10 +47,10 @@ use serde_json::Value;
 
 use self::project::{Place, Workspace};
 use self::text::{Encoding, Lines};
-use crate::catalog::Catalog;
+use crate::catalog::{Catalog, HelpLink};
+use crate::fix_safety::Applicability;
 use crate::package_check::Calls;
 use crate::report::Issue;
-use crate::rule::Applicability;
 use crate::scan::{self, Found, Replacement};
 
 /// The name on every diagnostic, and the last part of the fix-all kind.
@@ -379,22 +379,11 @@ fn lint<'d>(
                 .map(|error| format!("{error:#}"))
                 .or_else(|| project.load_error.clone());
             if let Some(message) = error {
-                found.push(Found {
-                    labels: Vec::new(),
-                    variant: None,
-                    issue: Issue {
-                        package: "xpd".into(),
-                        rule: "invalid-rule".into(),
-                        file: document.place.path.clone(),
-                        position: Some(crate::report::Position { line: 1, column: 1 }),
-                        severity: Severity::Error,
-                        message,
-                        fix: None,
-                        help: None,
-                    },
-                    range: 0..document.text.lines().next().map_or(0, str::len),
-                    fix: None,
-                });
+                found.push(Found::invalid_rule(
+                    document.place.path.clone(),
+                    &document.text,
+                    message,
+                ));
             }
         }
         document.linted = Some(Linted {
@@ -426,7 +415,7 @@ fn lsp_range(lines: &Lines<'_>, bytes: &Range<usize>) -> lsp_types::Range {
     }
 }
 
-fn severity(severity: &Severity) -> DiagnosticSeverity {
+fn severity(severity: Severity) -> DiagnosticSeverity {
     match severity {
         Severity::Error => DiagnosticSeverity::ERROR,
         Severity::Warning => DiagnosticSeverity::WARNING,
@@ -441,8 +430,8 @@ fn severity(severity: &Severity) -> DiagnosticSeverity {
 fn diagnostic(issue: &Issue, range: lsp_types::Range, url: Option<&str>) -> Diagnostic {
     Diagnostic {
         range,
-        severity: Some(severity(&issue.severity)),
-        code: Some(NumberOrString::String(issue.rule.clone())),
+        severity: Some(severity(issue.severity)),
+        code: Some(NumberOrString::String(issue.id.name().to_owned())),
         code_description: url
             .and_then(|href| href.parse().ok())
             .map(|href| CodeDescription { href }),
@@ -475,30 +464,12 @@ fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<
 }
 
 fn rule_help<'a>(catalog: &'a Catalog, found: &Found) -> Option<(&'a str, Option<String>)> {
-    let issue = &found.issue;
-    let matches = |rule: &&crate::rule::Rule| {
-        found
-            .variant
-            .as_ref()
-            .map_or_else(|| rule.id == issue.rule, |variant| rule.variant == *variant)
+    let (doc, link) = catalog.help(&found.issue.id)?;
+    let url = match link {
+        Some(HelpLink::Url(url)) => Some(url),
+        Some(HelpLink::File(path)) => uri::from_path(&path).map(|uri| uri.as_str().to_owned()),
+        None => None,
     };
-    let pack = catalog.packs.iter().find(|pack| {
-        pack.module == issue.package
-            && (pack.rules.iter().any(|rule| matches(&rule))
-                || (found.variant.is_none() && pack.doc(&issue.rule).is_some()))
-    })?;
-    let rule = pack.rules.iter().find(matches);
-    let doc = pack
-        .doc(&issue.rule)
-        .or_else(|| rule.map(|rule| rule.config.note.as_deref().unwrap_or(&rule.config.message)))?;
-    let url = pack.page(&issue.rule).or_else(|| {
-        rule.and_then(|rule| {
-            rule.config
-                .url
-                .clone()
-                .or_else(|| uri::from_path(&rule.source).map(|uri| uri.as_str().to_owned()))
-        })
-    });
     Some((doc, url))
 }
 
@@ -1039,7 +1010,7 @@ impl<'c> Server<'c> {
             let Some((doc, url)) = rule_help(&linted.catalog, found) else {
                 continue;
             };
-            let name = format!("{}/{}", issue.package, issue.rule);
+            let name = issue.id.to_string();
             let link = url.map_or_else(|| name.clone(), |url| format!("[{name}]({url})"));
             let section = format!("{}\n\n{link}", doc.trim_end());
             // Two matches of one rule at the cursor share one section.
@@ -1092,7 +1063,7 @@ impl<'c> Server<'c> {
                     continue;
                 }
                 let issue = &found.issue;
-                let name = format!("{}/{}", issue.package, issue.rule);
+                let name = issue.id.to_string();
                 actions.push(CodeAction {
                     title: match level {
                         Applicability::Safe => format!("xpd: fix {name}"),

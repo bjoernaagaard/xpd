@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 
 use crate::catalog::{self, Catalog, Filters};
+use crate::fix_safety::Applicability;
 use crate::package_check;
 use crate::report::Report;
-use crate::rule::Applicability;
 use crate::scan;
 use crate::settings::Settings;
 use crate::venv::Venv;

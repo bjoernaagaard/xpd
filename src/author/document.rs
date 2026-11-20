@@ -12,7 +12,10 @@ use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::fix_safety::Applicability;
 use crate::rule::{Origin, Rule};
+use crate::rule_id::RuleId;
+use crate::severity::Severity;
 
 /// The name of a rule or utility, which is also its file name: lowercase ASCII letters, digits,
 /// `-` and `_`, starting with a letter or digit.
@@ -49,28 +52,6 @@ pub(super) fn module(text: &str) -> Result<String> {
         "{text:?} is not a module name, such as pandas or category_encoders"
     );
     Ok(text.to_owned())
-}
-
-/// A rule's id: `<pack>/<name>` in a pack, and `<name>` for a structural rule.
-#[derive(Debug, Clone)]
-pub(super) struct RuleId {
-    pub(super) pack: Option<String>,
-    pub(super) name: Name,
-}
-
-impl RuleId {
-    pub(super) fn new(pack: Option<String>, name: Name) -> Self {
-        Self { pack, name }
-    }
-}
-
-impl fmt::Display for RuleId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.pack {
-            Some(pack) => write!(f, "{pack}/{}", self.name),
-            None => write!(f, "{}", self.name),
-        }
-    }
 }
 
 pub(super) fn non_empty(text: &str, what: &str) -> Result<()> {
@@ -122,12 +103,12 @@ pub(super) struct RuleDoc {
     pub(super) id: RuleId,
     pub(super) language: SupportLang,
     pub(super) language_name: &'static str,
-    pub(super) severity: &'static str,
+    pub(super) severity: Severity,
     pub(super) message: String,
     pub(super) note: Option<String>,
     pub(super) pattern: String,
     /// The fix and how safe it is.
-    pub(super) fix: Option<(String, &'static str)>,
+    pub(super) fix: Option<(String, Applicability)>,
     pub(super) since: Option<String>,
     pub(super) until: Option<String>,
     pub(super) holds: BTreeMap<String, Value>,
@@ -165,7 +146,7 @@ struct MetadataYaml<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     public_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    fix: Option<&'a str>,
+    fix: Option<Applicability>,
     #[serde(skip_serializing_if = "Option::is_none")]
     since: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -199,7 +180,7 @@ impl RuleDoc {
         let document = RuleYaml {
             id: self.id.to_string(),
             language: self.language_name,
-            severity: self.severity,
+            severity: self.severity.as_str(),
             message: &self.message,
             note: self.note.as_deref(),
             rule: PatternRule {
@@ -214,7 +195,7 @@ impl RuleDoc {
     /// The rule file's text, after checking it as `ast-grep scan` reads it, with the project's
     /// utilities, and as `xpd check` reads it.
     pub(super) fn checked_yaml(&self, utils: &GlobalRules) -> Result<String> {
-        if self.id.pack.is_none() {
+        if self.id.pack().is_none() {
             ensure!(
                 self.since.is_none()
                     && self.until.is_none()
@@ -238,7 +219,7 @@ impl RuleDoc {
             config.id == self.id.to_string() && config.language == self.language,
             "the new rule does not keep its id and language"
         );
-        let origin = if self.id.pack.is_some() {
+        let origin = if self.id.pack().is_some() {
             Origin::LocalPack
         } else {
             Origin::Structural
@@ -246,7 +227,7 @@ impl RuleDoc {
         let rule = Rule::new(
             config,
             origin,
-            self.id.pack.as_deref(),
+            self.id.pack(),
             self.id.to_string().into(),
             1,
         )
@@ -272,8 +253,8 @@ impl RuleDoc {
         };
         let fix = self.fix.as_ref().map(|(fix, safety)| {
             let command = match *safety {
-                "safe" => "`xpd check --fix`",
-                _ => "`xpd check --fix --unsafe-fixes`",
+                Applicability::Safe => "`xpd check --fix`",
+                Applicability::Unsafe => "`xpd check --fix --unsafe-fixes`",
             };
             format!(
                 "## How to fix it\n\n{command} applies the {safety} fix of this rule, which writes the code below.\n\n```{language}\n{fix}\n```"
@@ -286,7 +267,7 @@ impl RuleDoc {
                 "## What the rule reports\n\nThe rule reports code that matches this pattern.\n\n```{language}\n{}\n```",
                 self.pattern
             )),
-            (versions.zip(self.id.pack.as_ref()))
+            (versions.zip(self.id.pack()))
                 .map(|(versions, pack)| format!("It applies to {pack} {versions}.")),
             fix,
         ];
@@ -302,19 +283,13 @@ impl RuleDoc {
 
 /// A public id names the rule's pack as its own id does, so its issues stay in the pack.
 fn check_public_id(public_id: &str, id: &RuleId) -> Result<()> {
-    let (pack, name) = match public_id.split_once('/') {
-        Some((pack, name)) => (Some(pack), name),
-        None => (None, public_id),
-    };
-    name.parse::<Name>()?;
+    let public = RuleId::parse(public_id);
+    public.name().parse::<Name>()?;
     ensure!(
-        pack == id.pack.as_deref(),
+        public.pack() == id.pack(),
         "--public-id {public_id} must name the rule's pack as its id {id} does"
     );
-    ensure!(
-        public_id != id.to_string(),
-        "--public-id is the rule's own id"
-    );
+    ensure!(public != *id, "--public-id is the rule's own id");
     Ok(())
 }
 
