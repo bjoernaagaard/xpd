@@ -1,5 +1,6 @@
 //! Walks paths, fixes and lints each file with the rule packs that apply to it.
 
+use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
@@ -74,6 +75,34 @@ fn syntax_errors(root: &Root) -> usize {
     top.dfs()
         .filter(|node| node.is_error() || node.is_missing())
         .count()
+}
+
+/// Whether libcst parses `code` as Python.
+fn parses_as_python(code: &str) -> bool {
+    libcst_native::parse_module(code, None).is_ok()
+}
+
+/// `code` with each `IPython` magic line turned into a comment, as in `%matplotlib inline` and
+/// `!pip list`. An interactive window runs such a line in a cell, and Python itself does not
+/// read it. Code that is Python as it is written comes back unchanged, so a line such as
+/// `% b)` that continues an expression is never touched. Otherwise a line counts when a syntax
+/// error starts on it and its first character after the indent is `%` or `!`. A `#` replaces
+/// that character, so no position in the text moves.
+fn hide_magics(code: &str) -> Cow<'_, str> {
+    if parses_as_python(code) {
+        return Cow::Borrowed(code);
+    }
+    let root = parse(code);
+    let mut hidden = code.to_owned();
+    for error in (root.root().dfs()).filter(|node| node.is_error() || node.is_missing()) {
+        let at = error.range().start;
+        let line = code[..at].rfind('\n').map_or(0, |end| end + 1);
+        let indent = code[line..at].chars().all(|c| matches!(c, ' ' | '\t'));
+        if indent && (code[at..].starts_with('%') || code[at..].starts_with('!')) {
+            hidden.replace_range(at..=at, "#");
+        }
+    }
+    Cow::Owned(hidden)
 }
 
 /// One file, as a lint run names it.
@@ -577,11 +606,12 @@ impl<'s> Parsed<'s> {
 
     /// Whether `after`, the file with some fixes applied, is still valid code. Python is parsed
     /// with libcst, which reads the grammar of Python itself, so a file that libcst cannot
-    /// parse before the fixes gets no fix. tree-sitter recovers from errors that Python does
+    /// parse before the fixes gets no fix. The magic lines of a file that runs cell by cell are
+    /// hidden from libcst first ([`hide_magics`]). tree-sitter recovers from errors that Python does
     /// not accept, so it is the check only for the other languages, which libcst does not read.
     fn accepts(&self, after: &str) -> bool {
         if self.language == SupportLang::Python {
-            let parses = |code: &str| libcst_native::parse_module(code, None).is_ok();
+            let parses = |code: &str| parses_as_python(&hide_magics(code));
             *self.python.get_or_init(|| parses(self.src)) && parses(after)
         } else {
             syntax_errors(&parse_as(after, self.language)) <= self.errors

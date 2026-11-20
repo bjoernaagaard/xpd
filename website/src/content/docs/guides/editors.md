@@ -277,6 +277,12 @@ marker.
 | [`pandas/filter-ladder`](../../rules/pandas/filter-ladder/), [`pandas/reassign-ladder`](../../rules/pandas/reassign-ladder/) and [`pandas/frame-column-write`](../../rules/pandas/frame-column-write/) | A marker ends a run of statements, so one step in each cell is not reported |
 | [`pandas/script-steps`](../../rules/pandas/script-steps/) | Leaves the file alone |
 
+A cell can hold an IPython magic line, such as `%matplotlib inline`, `%%time` or `!pip list`.
+xpd reports the issues around such a line and offers their fixes, and a fix leaves the line as
+it is. The body of a cell that is not Python, as under `%%bash`, still takes the fixes away from
+the file. [`xpd equiv`](../../commands/equiv/) runs a file with Python itself, so it reports a
+magic line as `raised SyntaxError`.
+
 xpd does not read a Jupyter notebook. `xpd check notebook.ipynb` says so and exits with 2. Write
 the notebook as a `.py` file with markers, as `jupytext --to py:percent notebook.ipynb` does, and
 check that file.
