@@ -27,7 +27,7 @@ rule:
     - inside: { stopBy: end, kind: function_definition }
     - not:
         follows:
-          stopBy: { not: { kind: comment } }
+          stopBy: { matches: ladder-end }
           kind: expression_statement
           has: { pattern: '$F[$K0] = $V0' }
 constraints:
@@ -50,16 +50,16 @@ rule:
   not: { inside: { kind: block } }
   all:
     - has: { pattern: '$F[$K1] = $V1' }
-    # The next statement, with any comments between the two passed over.
+    # The next statement, with any comments between the two passed over (utils/ladder-end.yml).
     - precedes:
-        stopBy: { not: { kind: comment } }
+        stopBy: { matches: ladder-end }
         kind: expression_statement
         all:
           - has: { pattern: '$F[$K2] = $V2' }
-          - precedes: { stopBy: { not: { kind: comment } }, kind: expression_statement, has: { pattern: '$F[$K3] = $V3' } }
+          - precedes: { stopBy: { matches: ladder-end }, kind: expression_statement, has: { pattern: '$F[$K3] = $V3' } }
     - not:
         follows:
-          stopBy: { not: { kind: comment } }
+          stopBy: { matches: ladder-end }
           kind: expression_statement
           has: { pattern: '$F[$K0] = $V0' }
 constraints:

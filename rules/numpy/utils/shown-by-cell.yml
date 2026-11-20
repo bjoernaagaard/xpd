@@ -1,0 +1,13 @@
+id: shown-by-cell
+language: python
+# The last statement of a cell, in a file with cell markers. An interactive window shows the
+# value of that statement, so it is not a result that the code drops. The statement is at the
+# top of the module, and only comments stand between it and the next cell marker or the end of
+# the file.
+rule:
+  inside:
+    kind: expression_statement
+    inside: { kind: module, has: { matches: cell-marker } }
+    any:
+      - precedes: { stopBy: { not: { kind: comment } }, matches: cell-marker }
+      - not: { precedes: { stopBy: end, not: { kind: comment } } }

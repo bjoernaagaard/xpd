@@ -32,7 +32,7 @@ The rule reports the first statement of a module that has both of the following:
 - ten or more statements at its top that give a name a frame, as in `df = df.dropna()`, or write into a frame, as in `df["x"] = ...`
 - no function that takes a frame
 
-xpd counts a statement only when it can prove the frame. The value must be a call such as `pd.read_parquet(...)`, a method of a frame that returns a frame, or a selection of rows from a frame. A statement inside a function, a loop or a branch does not count. A function takes a frame when a parameter is annotated `pd.DataFrame`, when a call passes it a frame, or when a `.pipe(...)` call names it.
+xpd counts a statement only when it can prove the frame. The value must be a call such as `pd.read_parquet(...)`, a method of a frame that returns a frame, or a selection of rows from a frame. A statement inside a function, a loop or a branch does not count. The rule leaves alone a file with a cell marker (`# %%`, `# <codecell>` or `# In[1]:`), because an editor runs such a file cell by cell. A function takes a frame when a parameter is annotated `pd.DataFrame`, when a call passes it a frame, or when a `.pipe(...)` call names it.
 
 The script and its rewrite as step functions gave an equal frame, by [`xpd equiv`](https://bjoernaagaard.github.io/xpd/commands/equiv/). [`xpd graph`](https://bjoernaagaard.github.io/xpd/commands/graph/) reads the `pipe` form as a pipeline of steps, and it lists the columns that each step reads and adds.
 

@@ -1,0 +1,9 @@
+id: ladder-end
+language: python
+# Where the search for the next statement of a ladder stops: at the first node that is not a
+# comment, and at a cell marker. A file that runs cell by cell has one step in each cell, so a
+# ladder does not reach from one cell into the next.
+rule:
+  any:
+    - not: { kind: comment }
+    - matches: cell-marker

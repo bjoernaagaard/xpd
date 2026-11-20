@@ -19,7 +19,8 @@ severity: info
 message: This module builds its frames in ten or more statements at its top, and no function of it takes a frame, so no step can be called or checked alone. Move the statements into functions that take a frame and return one, and join them with pipe, as in pd.read_parquet(path).pipe(clean).pipe(add_columns). xpd graph reads that form as a pipeline of steps.
 rule:
   kind: expression_statement
-  # At the top of the module, which is in no block.
-  not: { inside: { kind: block } }
+  # At the top of the module, which is in no block. A module with a cell marker runs cell by
+  # cell and is left alone.
+  not: { any: [{ inside: { kind: block } }, { inside: { kind: module, has: { matches: cell-marker } } }] }
   has: { any: [{ kind: assignment }, { kind: augmented_assignment }] }
 metadata: { style: house, frameScript: 10 }

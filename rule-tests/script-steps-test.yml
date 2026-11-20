@@ -14,6 +14,8 @@ valid:
   - "import pandas as pd\noptions = {}\noptions[\"a\"] = 0\noptions[\"b\"] = 1\noptions[\"c\"] = 2\noptions[\"d\"] = 3\noptions[\"e\"] = 4\noptions[\"f\"] = 5\noptions[\"g\"] = 6\noptions[\"h\"] = 7\noptions[\"i\"] = 8\noptions[\"j\"] = 9"
   # A name whose value xpd cannot prove.
   - "import pandas as pd\ndf = load()\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]\ndf[\"u\"] = df[\"a\"] * 0\ndf[\"v\"] = df[\"a\"] * 1\ndf[\"w\"] = df[\"a\"] * 2\ndf[\"x\"] = df[\"a\"] * 3\ndf[\"y\"] = df[\"a\"] * 4\ndf[\"z\"] = df[\"a\"] * 5"
+  # Ten statements in a file that runs cell by cell.
+  - "# %%\nimport pandas as pd\ndf = pd.read_parquet(\"orders.parquet\")\n# %%\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\n# %%\ndf = df[df[\"c\"] > 0]\ndf[\"u\"] = df[\"a\"] * 0\n# %%\ndf[\"v\"] = df[\"a\"] * 1\ndf[\"w\"] = df[\"a\"] * 2\n# %%\ndf[\"x\"] = df[\"a\"] * 3\ndf[\"y\"] = df[\"a\"] * 4\ndf[\"z\"] = df[\"a\"] * 5"
 invalid:
   - "import pandas as pd\ndf = pd.read_parquet(\"orders.parquet\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]\ndf[\"u\"] = df[\"a\"] * 0\ndf[\"v\"] = df[\"a\"] * 1\ndf[\"w\"] = df[\"a\"] * 2\ndf[\"x\"] = df[\"a\"] * 3\ndf[\"y\"] = df[\"a\"] * 4\ndf[\"z\"] = df[\"a\"] * 5"
   - "import pandas as pd\ndef load(path: str) -> None:\n    print(path)\ndf = pd.read_parquet(\"orders.parquet\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]\ndf[\"u\"] = df[\"a\"] * 0\ndf[\"v\"] = df[\"a\"] * 1\ndf[\"w\"] = df[\"a\"] * 2\ndf[\"x\"] = df[\"a\"] * 3\ndf[\"y\"] = df[\"a\"] * 4\ndf[\"z\"] = df[\"a\"] * 5\ndf.loc[df[\"a\"] > 1, \"u\"] = 0\nother = pd.DataFrame({\"a\": [1]})\ndf = df.merge(other, on=\"a\", validate=\"many_to_one\")"

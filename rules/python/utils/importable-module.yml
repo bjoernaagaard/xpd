@@ -1,0 +1,14 @@
+id: importable-module
+language: python
+# A module that other code imports: it defines a function or a class, and it has no cell
+# marker. A file with no function and no class is a script, and a file with a cell marker is run
+# cell by cell.
+rule:
+  kind: module
+  has:
+    any:
+      - kind: function_definition
+      - kind: class_definition
+      - kind: decorated_definition
+  not:
+    has: { matches: cell-marker }

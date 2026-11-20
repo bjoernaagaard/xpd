@@ -12,14 +12,14 @@ rule:
   kind: expression_statement
   all:
     - has: { pattern: '$DF = $DF.$M1($$$A1)' }
-    # The next statement, with any comments between the two passed over.
+    # The next statement, with any comments between the two passed over (utils/ladder-end.yml).
     - precedes:
-        stopBy: { not: { kind: comment } }
+        stopBy: { matches: ladder-end }
         kind: expression_statement
         all:
           - has: { pattern: '$DF = $DF.$M2($$$A2)' }
-          - precedes: { stopBy: { not: { kind: comment } }, kind: expression_statement, has: { pattern: '$DF = $DF.$M3($$$A3)' } }
-    - not: { follows: { stopBy: { not: { kind: comment } }, kind: expression_statement, has: { pattern: '$DF = $DF.$M0($$$A0)' } } }
+          - precedes: { stopBy: { matches: ladder-end }, kind: expression_statement, has: { pattern: '$DF = $DF.$M3($$$A3)' } }
+    - not: { follows: { stopBy: { matches: ladder-end }, kind: expression_statement, has: { pattern: '$DF = $DF.$M0($$$A0)' } } }
 constraints:
   DF: { kind: identifier }
   M1: { regex: &frame-method ^(assign|rename|rename_axis|drop|dropna|fillna|ffill|bfill|interpolate|query|merge|join|sort_values|sort_index|reset_index|set_index|set_axis|astype|convert_dtypes|drop_duplicates|pipe|melt|pivot|pivot_table|stack|unstack|explode|filter|reindex|replace|round|clip|where|mask|head|tail|sample|nlargest|nsmallest|add_prefix|add_suffix|droplevel|swaplevel|reorder_levels|tz_localize|tz_convert|asfreq|shift|diff|transform|apply|map|eval|truncate|to_frame|squeeze)$ }

@@ -30,6 +30,8 @@ valid:
   - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2\nrows = len(df)\ndf[\"c\"] = 3"
   # pd that is not pandas.
   - "import polars as pd\nimport pandas\ndf = pd.read_csv(\"a.csv\")\ndf[\"a\"] = 1\ndf[\"b\"] = 2\ndf[\"c\"] = 3"
+  # One write in each cell of a file that runs cell by cell.
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\n# %%\ndf[\"u\"] = df[\"a\"] * 0\n# %%\ndf[\"v\"] = df[\"a\"] * 1\n# <codecell>\ndf[\"w\"] = df[\"a\"] * 2"
 invalid:
   - "import pandas as pd\ndef add(frame: pd.DataFrame) -> pd.DataFrame:\n    frame[\"a\"] = 1\n    return frame"
   - "from pandas import DataFrame\ndef add(frame: DataFrame, rate: float = 1.25) -> DataFrame:\n    if rate:\n        frame[\"a\"] = frame[\"b\"] * rate\n    return frame"

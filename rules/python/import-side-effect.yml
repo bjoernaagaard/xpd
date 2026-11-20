@@ -10,8 +10,8 @@
 # imported.
 #
 # A file with no function and no class is a script, which runs top to bottom, so it is left
-# alone too. So is a file with a `# %%` cell marker, which an editor such as VS Code runs cell by
-# cell in an interactive window. The rule has no fix, because the function that the call moves
+# alone too. So is a file with a cell marker, such as `# %%`, which an editor such as VS Code runs
+# cell by cell in an interactive window (utils/importable-module.yml). The rule has no fix, because the function that the call moves
 # into is not in the file.
 id: import-side-effect
 language: python
@@ -31,16 +31,6 @@ rule:
         - regex: (^|\.)_?register
         - regex: \.(include_router|add_typer|add_middleware|mount)$
         - regex: ^pytest\.importorskip$
-utils:
-  importable-module:
-    kind: module
-    has:
-      any:
-        - kind: function_definition
-        - kind: class_definition
-        - kind: decorated_definition
-    not:
-      has: { kind: comment, regex: ^#\s*%% }
 ---
 # The environment is read once, in main(), and the values are passed down. A module level
 # read fixes the value at the first import, before the program has parsed its own arguments. No
@@ -61,13 +51,3 @@ rule:
     inside: { matches: importable-module }
   not:
     inside: { stopBy: end, kind: lambda }
-utils:
-  importable-module:
-    kind: module
-    has:
-      any:
-        - kind: function_definition
-        - kind: class_definition
-        - kind: decorated_definition
-    not:
-      has: { kind: comment, regex: ^#\s*%% }

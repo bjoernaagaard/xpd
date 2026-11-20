@@ -9,7 +9,7 @@ Functions such as `np.sort` and `np.append` return a new array and leave the inp
 
 The rule reports `np.sort(x)`, `np.append(x, 4)`, `np.clip(x, 0, 1)`, `x.astype(float)` and `m.reshape(3, 2)` standing alone as a statement. Each call returns a new array that the code drops, so the statement does nothing.
 
-The rule leaves alone a call with `out=`, a call in a `try` block or in a `with pytest.raises` block, and a call in a benchmark method of asv (airspeed velocity). After the fix, other names bound to the old array keep its old values.
+The rule leaves alone a call with `out=`, a call in a `try` block or in a `with pytest.raises` block, and a call in a benchmark method of asv (airspeed velocity). In a file with a cell marker (`# %%`, `# <codecell>` or `# In[1]:`), the rule leaves the last statement of each cell alone, because an interactive window shows its value. After the fix, other names bound to the old array keep its old values.
 
 ## How to fix it
 

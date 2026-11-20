@@ -1,0 +1,10 @@
+id: cell-marker
+language: python
+# A comment at the top of a module that starts a cell, in a file that an editor such as VS Code,
+# Spyder or PyCharm runs cell by cell in an interactive window: `# %%`, `# <codecell>` or
+# `# In[1]:`. These are the markers of VS Code's default `cellMarker.codeRegex`. The same file
+# is in the numpy, pandas and python packs.
+rule:
+  kind: comment
+  regex: '^#\s*(%%|<codecell>|In\[[0-9 ]*\]:?)'
+  inside: { kind: module }

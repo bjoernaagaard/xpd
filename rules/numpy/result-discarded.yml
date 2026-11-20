@@ -1,6 +1,8 @@
 # These calls return a new array and leave their input as it was, so a call that stands alone as
 # a statement does nothing. Calls in a try block or in a with block that checks for an exception
-# or a warning, and calls in asv benchmark methods, run for their side effect and are left alone. The fixes assign the
+# or a warning, and calls in asv benchmark methods, run for their side effect and are left alone. The last
+# statement of a cell is left alone too, because an interactive window shows its value
+# (utils/shown-by-cell.yml). The fixes assign the
 # result back to the input. They are unsafe, because other names bound to the old array keep its
 # old values, and the code may have meant another name.
 
@@ -23,6 +25,7 @@ utils:
       - inside: { kind: expression_statement }
       - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(out|copy)$' } } } }
       - not: { matches: positional-out }
+      - not: { matches: shown-by-cell }
       - not: { matches: checks-side-effect }
   # The ufuncs take out as their second positional argument, round as its third, and clip as its
   # fourth. nan_to_num takes copy as its second.
@@ -73,6 +76,7 @@ utils:
       - inside: { kind: expression_statement }
       - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(out|copy)$' } } } }
       - not: { matches: positional-out }
+      - not: { matches: shown-by-cell }
       - not: { matches: checks-side-effect }
   # x.clip(lo, hi, out) and x.round(decimals, out) write into out.
   positional-out:

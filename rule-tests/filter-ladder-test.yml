@@ -18,6 +18,8 @@ valid:
   - "import pandas as pd\nfor df in frames:\n    df = df[df[\"a\"] > 0]\n    df = df[df[\"b\"] > 0]\n    df = df[df[\"c\"] > 0]"
   # The chain.
   - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df.loc[lambda d: d[\"a\"] > 0].loc[lambda d: d[\"b\"] > 0].loc[lambda d: d[\"c\"] > 0]"
+  # One filter in each cell of a file that runs cell by cell.
+  - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\n# %%\ndf = df[df[\"a\"] > 0]\n# %%\ndf = df[df[\"b\"] > 0]\n# In[3]:\ndf = df[df[\"c\"] > 0]"
 invalid:
   - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df[df[\"a\"] > 0]\ndf = df[df[\"b\"] > 0]\ndf = df[df[\"c\"] > 0]"
   - "import pandas as pd\ndf = pd.read_csv(\"a.csv\")\ndf = df.loc[df[\"a\"] > 0]\n# the second filter\ndf = df[df[\"b\"].notna()]\ndf = df.loc[~df[\"c\"].isin(skipped)]\ndf = df[mask]"

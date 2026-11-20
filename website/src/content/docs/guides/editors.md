@@ -263,6 +263,24 @@ Hover over an issue to read the explanation of its rule, which is the text of th
 with a link to the page at the end. For a rule of your project, the hover shows the rule's `note`,
 or its `message` when it has no note.
 
+## Files that run cell by cell
+
+An editor such as VS Code, Spyder or PyCharm runs a `.py` file cell by cell in an interactive
+window when the file has cell markers. xpd reads such a file as any other `.py` file, and it
+knows the markers `# %%`, `# <codecell>` and `# In[1]:`. Four things differ in a file with a
+marker.
+
+| Rule | In a file with a cell marker |
+| --- | --- |
+| [`python/import-side-effect`](../../rules/python/import-side-effect/) | Leaves the file alone, because the file is run and never imported |
+| [`numpy/result-discarded`](../../rules/numpy/result-discarded/) | Leaves the last statement of each cell alone, because the window shows its value |
+| [`pandas/filter-ladder`](../../rules/pandas/filter-ladder/), [`pandas/reassign-ladder`](../../rules/pandas/reassign-ladder/) and [`pandas/frame-column-write`](../../rules/pandas/frame-column-write/) | A marker ends a run of statements, so one step in each cell is not reported |
+| [`pandas/script-steps`](../../rules/pandas/script-steps/) | Leaves the file alone |
+
+xpd does not read a Jupyter notebook. `xpd check notebook.ipynb` says so and exits with 2. Write
+the notebook as a `.py` file with markers, as `jupytext --to py:percent notebook.ipynb` does, and
+check that file.
+
 ## Settings
 
 The server has one setting. Set `unsafeFixes` to `true` to make the `source.fixAll.xpd` action
@@ -308,7 +326,7 @@ following names, types or imports across files.
 | Completion, go to definition, references, rename, symbols, signature help | xpd does not resolve names |
 | Formatting | xpd has no formatter. Use Ruff |
 | The findings of [`xpd graph`](../../commands/graph/) | They come from another command |
-| Jupyter notebooks | `xpd check` reads `.py` files |
+| Jupyter notebooks | `xpd check` reads `.py` files. See [Files that run cell by cell](#files-that-run-cell-by-cell) |
 | Settings that pick rules, as `--rule` and `--severity` do | The server runs every rule. Use a `# ast-grep-ignore` comment to turn one rule off on one line |
 
 Any other request gets the error `MethodNotFound`, -32601, with a message such as

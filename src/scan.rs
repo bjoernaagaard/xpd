@@ -114,8 +114,17 @@ pub(crate) fn cannot_read(path: &Path) -> String {
 
 /// The text of the file at `path`. A file that cannot be read, such as one that is not UTF-8,
 /// is named on stderr and gives `None`, so that one such file does not stop a run over the
-/// others. The run then counts it as skipped and exits with 2.
+/// others. The run then counts it as skipped and exits with 2. A Jupyter notebook is JSON, which
+/// no rule reads, so it is named and skipped the same way.
 pub(crate) fn read_source(path: &Path) -> Option<String> {
+    if (path.extension()).is_some_and(|x| x.eq_ignore_ascii_case("ipynb")) {
+        eprintln!(
+            "xpd: {} is a Jupyter notebook, and xpd reads .py files. Write it as a .py file with cell markers, as in `jupytext --to py:percent {}`, and check that file",
+            path.display(),
+            path.display()
+        );
+        return None;
+    }
     fs::read_to_string(path)
         .map_err(|e| eprintln!("xpd: {}: {e}", cannot_read(path)))
         .ok()

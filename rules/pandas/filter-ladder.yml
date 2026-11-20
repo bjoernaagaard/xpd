@@ -20,19 +20,19 @@ rule:
   kind: expression_statement
   all:
     - has: { any: [{ pattern: '$DF = $DF[$I1]' }, { pattern: '$DF = $DF.loc[$I1]' }] }
-    # The next statement, with any comments between the two passed over.
+    # The next statement, with any comments between the two passed over (utils/ladder-end.yml).
     - precedes:
-        stopBy: { not: { kind: comment } }
+        stopBy: { matches: ladder-end }
         kind: expression_statement
         all:
           - has: { any: [{ pattern: '$DF = $DF[$I2]' }, { pattern: '$DF = $DF.loc[$I2]' }] }
           - precedes:
-              stopBy: { not: { kind: comment } }
+              stopBy: { matches: ladder-end }
               kind: expression_statement
               has: { any: [{ pattern: '$DF = $DF[$I3]' }, { pattern: '$DF = $DF.loc[$I3]' }] }
     - not:
         follows:
-          stopBy: { not: { kind: comment } }
+          stopBy: { matches: ladder-end }
           kind: expression_statement
           has: { any: [{ pattern: '$DF = $DF[$I0]' }, { pattern: '$DF = $DF.loc[$I0]' }] }
 constraints:
