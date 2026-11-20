@@ -39,5 +39,7 @@ line-length = 100
 [tool.ruff.lint]
 select = ["ALL"]
 # D: docstrings; COM812, ISC001: clash with ruff format; CPY: no copyright headers;
-# T20: the helpers print their JSON result; INP001: py/ holds scripts, not a package.
-ignore = ["D", "COM812", "ISC001", "CPY", "T20", "INP001"]
+ignore = ["D", "COM812", "ISC001", "CPY"]
+
+[tool.ruff.lint.per-file-ignores]
+"py/*.py" = ["T20", "INP001"]
