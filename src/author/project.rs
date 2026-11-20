@@ -156,11 +156,17 @@ pub(in crate::author) struct Changes {
     replace: Vec<(PathBuf, String)>,
 }
 
+#[derive(Clone, Copy)]
+enum WriteMode {
+    Create,
+    Replace,
+}
+
 impl Changes {
-    fn stage(&mut self, path: PathBuf, text: String, previous: Option<&String>) {
-        match previous {
-            Some(_) => self.replace.push((path, text)),
-            None => self.create.push((path, text)),
+    fn stage(&mut self, path: PathBuf, text: String, mode: WriteMode) {
+        match mode {
+            WriteMode::Replace => self.replace.push((path, text)),
+            WriteMode::Create => self.create.push((path, text)),
         }
     }
 
@@ -307,8 +313,8 @@ impl Project {
             "the new {XPD_CONFIG} does not keep its packs"
         );
         let mut changes = Changes::default();
-        changes.stage(inside(dir, SGCONFIG)?, sgconfig, None);
-        changes.stage(inside(dir, XPD_CONFIG)?, xpd_config, None);
+        changes.stage(inside(dir, SGCONFIG)?, sgconfig, WriteMode::Create);
+        changes.stage(inside(dir, XPD_CONFIG)?, xpd_config, WriteMode::Create);
         let folders = [RULES, TESTS, UTILS]
             .map(str::to_owned)
             .into_iter()
@@ -316,7 +322,7 @@ impl Project {
         for folder in folders {
             let keep = inside(dir, &format!("{folder}/.gitkeep"))?;
             if fs::symlink_metadata(&keep).is_err() {
-                changes.stage(keep, String::new(), None);
+                changes.stage(keep, String::new(), WriteMode::Create);
             }
         }
         Ok(changes)
@@ -353,15 +359,11 @@ impl Project {
         &self.config.util_dirs
     }
 
-    fn inside(&self, relative: &str) -> Result<PathBuf> {
-        inside(&self.root, relative)
-    }
-
     /// The .yml and .yaml files under the folders, each with its text.
     fn yaml_files(&self, dirs: &[String]) -> Result<Vec<(PathBuf, String)>> {
         let mut files = Vec::new();
         for dir in dirs {
-            let dir = self.inside(dir)?;
+            let dir = inside(&self.root, dir)?;
             if !dir.is_dir() {
                 continue;
             }
@@ -456,13 +458,18 @@ impl Project {
             Some(pack) => format!("pack {} in {XPD_CONFIG} has no ruleDirs", pack.module),
             None => format!("{SGCONFIG} has no ruleDirs"),
         })?;
-        let path = self.inside(&format!("{dir}/{}.yml", doc.id.name))?;
-        changes.stage(path, text, None);
-        let markdown = self.inside(&format!("{dir}/{}.md", doc.id.name))?;
-        changes.stage(markdown, doc.markdown(), None);
+        let path = inside(&self.root, &format!("{dir}/{}.yml", doc.id.name))?;
+        changes.stage(path, text, WriteMode::Create);
+        let markdown = inside(&self.root, &format!("{dir}/{}.md", doc.id.name))?;
+        changes.stage(markdown, doc.markdown(), WriteMode::Create);
         if let Some(pack) = pack.filter(|pack| !pack.declared) {
             let text = with_pack(self.xpd_config.as_deref(), pack)?;
-            changes.stage(self.inside(XPD_CONFIG)?, text, self.xpd_config.as_ref());
+            let mode = if self.xpd_config.is_some() {
+                WriteMode::Replace
+            } else {
+                WriteMode::Create
+            };
+            changes.stage(inside(&self.root, XPD_CONFIG)?, text, mode);
         }
         Ok(())
     }
@@ -478,8 +485,8 @@ impl Project {
         let dir = dir
             .or(dirs.first().map(String::as_str))
             .with_context(|| format!("{SGCONFIG} has no testConfigs"))?;
-        let path = self.inside(&format!("{dir}/{id}-test.yml"))?;
-        changes.stage(path, document::empty_test(id)?, None);
+        let path = inside(&self.root, &format!("{dir}/{id}-test.yml"))?;
+        changes.stage(path, document::empty_test(id)?, WriteMode::Create);
         Ok(())
     }
 
@@ -511,8 +518,8 @@ impl Project {
             );
         }
         let text = document::checked_util(name, language, language_name, pattern, &others)?;
-        let path = self.inside(&format!("{dir}/{name}.yml"))?;
-        changes.stage(path, text, None);
+        let path = inside(&self.root, &format!("{dir}/{name}.yml"))?;
+        changes.stage(path, text, WriteMode::Create);
         Ok(())
     }
 }

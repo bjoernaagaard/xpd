@@ -150,9 +150,6 @@ pub(crate) struct LocalProject {
     /// The folders whose YAML files are utility rules.
     pub(crate) util_dirs: Vec<PathBuf>,
     pub(crate) test_configs: Vec<TestConfig>,
-    /// Every file the catalog read for this project. A change to one of them, or a new YAML
-    /// file in `rule_dirs` or `util_dirs`, makes the loaded catalog stale.
-    pub(crate) inputs: Vec<PathBuf>,
     /// The keys of `sgconfig.yml` that are set and that xpd does not follow.
     unsupported: Vec<&'static str>,
     custom_languages: BTreeSet<String>,
@@ -271,7 +268,7 @@ impl LocalProject {
     /// the project with its packs: those of `xpd.yml` in the order of the file, then one for
     /// each package of the rules that no pack holds, in name order.
     pub(crate) fn read(config: &Path) -> Result<(Self, Vec<Pack>)> {
-        let (mut project, manifests) = Self::layout(config)?;
+        let (project, manifests) = Self::layout(config)?;
         let packs = project.load_rules(manifests)?;
         Ok((project, packs))
     }
@@ -362,11 +359,6 @@ impl LocalProject {
         )
         .with_context(|| format!("the utility rules of {}", config.display()))?;
 
-        let inputs = [config.clone()]
-            .into_iter()
-            .chain(manifest.clone())
-            .chain(util_files)
-            .collect();
         let project = Self {
             root,
             unsupported: sg.unsupported(),
@@ -375,7 +367,6 @@ impl LocalProject {
             rule_dirs,
             util_dirs,
             test_configs,
-            inputs,
             packs,
             globals,
             config,
@@ -383,8 +374,7 @@ impl LocalProject {
         Ok((project, manifests))
     }
 
-    /// Compiles every rule file of the project into its packs, and adds the files to `inputs`.
-    fn load_rules(&mut self, manifests: Vec<Manifest>) -> Result<Vec<Pack>> {
+    fn load_rules(&self, manifests: Vec<Manifest>) -> Result<Vec<Pack>> {
         let mut in_packs: Vec<Vec<Rule>> = self.packs.iter().map(|_| Vec::new()).collect();
         let mut structural: BTreeMap<String, Vec<Rule>> = BTreeMap::new();
         for path in yaml_files(&self.rule_dirs)? {
@@ -405,7 +395,6 @@ impl LocalProject {
                     None => (structural.entry(rule.package().to_owned()).or_default()).push(rule),
                 }
             }
-            self.inputs.push(path);
         }
 
         let mut loaded = Vec::new();

@@ -34,8 +34,7 @@ pub(crate) struct Catalog {
     /// The embedded packs in name order, then the project's packs, then xpd's own pack. A
     /// scan reports the issues at one place in this order.
     pub(crate) packs: Vec<Pack>,
-    /// The project whose rules the catalog holds beside the embedded ones. Its `inputs` are
-    /// the files to watch, and loading again reads them again.
+    /// The project whose rules the catalog holds beside the embedded ones.
     pub(crate) project: Option<LocalProject>,
 }
 
@@ -268,59 +267,56 @@ pub(crate) fn rank(severity: &Severity) -> u8 {
 impl Catalog {
     /// Every rule of each pack and then its package checks, pack by pack.
     pub(crate) fn entries(&self) -> Vec<Entry<'_>> {
-        entries(&self.packs)
-    }
-}
-
-fn entries(packs: &[Pack]) -> Vec<Entry<'_>> {
-    let mut entries: Vec<Entry<'_>> = Vec::new();
-    for pack in packs {
-        let first = entries.len();
-        let page = |id: &str| pack.page(id);
-        for rule in &pack.rules {
-            let id = rule.id.as_str();
-            let since = rule.since.as_ref();
-            let by_style = [Style::Default, Style::Strict].map(|style| rule.severity_under(style));
-            match entries[first..].iter_mut().find(|entry| entry.rule == id) {
-                Some(entry) => {
-                    if rank(&rule.config.severity) > rank(entry.severity) {
-                        entry.severity = &rule.config.severity;
-                    }
-                    entry.style = entry.style.or(rule.style);
-                    for (highest, severity) in entry.by_style.iter_mut().zip(by_style) {
-                        if rank(&severity) > rank(highest) {
-                            *highest = severity;
+        let mut entries: Vec<Entry<'_>> = Vec::new();
+        for pack in &self.packs {
+            let first = entries.len();
+            let page = |id: &str| pack.page(id);
+            for rule in &pack.rules {
+                let id = rule.id.as_str();
+                let since = rule.since.as_ref();
+                let by_style =
+                    [Style::Default, Style::Strict].map(|style| rule.severity_under(style));
+                match entries[first..].iter_mut().find(|entry| entry.rule == id) {
+                    Some(entry) => {
+                        if rank(&rule.config.severity) > rank(entry.severity) {
+                            entry.severity = &rule.config.severity;
                         }
+                        entry.style = entry.style.or(rule.style);
+                        for (highest, severity) in entry.by_style.iter_mut().zip(by_style) {
+                            if rank(&severity) > rank(highest) {
+                                *highest = severity;
+                            }
+                        }
+                        entry.fix = entry.fix.max(rule.fix);
+                        entry.since = entry.since.zip(since).map(|(a, b)| a.min(b));
                     }
-                    entry.fix = entry.fix.max(rule.fix);
-                    entry.since = entry.since.zip(since).map(|(a, b)| a.min(b));
+                    None => entries.push(Entry {
+                        package: &pack.module,
+                        rule: id,
+                        severity: &rule.config.severity,
+                        style: rule.style,
+                        by_style,
+                        message: &rule.config.message,
+                        fix: rule.fix,
+                        since,
+                        url: page(id).or_else(|| rule.config.url.clone()),
+                        doc: pack.doc(id).or(rule.config.note.as_deref()),
+                    }),
                 }
-                None => entries.push(Entry {
-                    package: &pack.module,
-                    rule: id,
-                    severity: &rule.config.severity,
-                    style: rule.style,
-                    by_style,
-                    message: &rule.config.message,
-                    fix: rule.fix,
-                    since,
-                    url: page(id).or_else(|| rule.config.url.clone()),
-                    doc: pack.doc(id).or(rule.config.note.as_deref()),
-                }),
             }
+            entries.extend(pack.package_checks.iter().map(|check| Entry {
+                package: &pack.module,
+                rule: &check.id,
+                severity: &package_check::SEVERITY,
+                style: None,
+                by_style: [package_check::SEVERITY, package_check::SEVERITY],
+                message: &check.message,
+                fix: None,
+                since: None,
+                url: page(&check.id),
+                doc: pack.doc(&check.id),
+            }));
         }
-        entries.extend(pack.package_checks.iter().map(|check| Entry {
-            package: &pack.module,
-            rule: &check.id,
-            severity: &package_check::SEVERITY,
-            style: None,
-            by_style: [package_check::SEVERITY, package_check::SEVERITY],
-            message: &check.message,
-            fix: None,
-            since: None,
-            url: page(&check.id),
-            doc: pack.doc(&check.id),
-        }));
+        entries
     }
-    entries
 }

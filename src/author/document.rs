@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::rule::{Origin, Rule};
-use crate::version::Version;
 
 /// The name of a rule or utility, which is also its file name: lowercase ASCII letters, digits,
 /// `-` and `_`, starting with a letter or digit.
@@ -77,10 +76,6 @@ impl fmt::Display for RuleId {
 pub(super) fn non_empty(text: &str, what: &str) -> Result<()> {
     ensure!(!text.trim().is_empty(), "{what} is empty");
     Ok(())
-}
-
-pub(super) fn version(text: &str) -> Result<Version> {
-    text.parse()
 }
 
 /// Checks that `pattern` parses as one piece of `language` code, as `ast-grep run` reads it.

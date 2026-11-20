@@ -384,7 +384,7 @@ pub(crate) fn run() -> ExitCode {
             index,
             check,
             write_vectors,
-        } => discovery((|| {
+        } => unit_result((|| {
             if let Some(path) = write_vectors {
                 index::write_vectors(&path)
             } else if let Some(path) = check {
@@ -400,13 +400,14 @@ pub(crate) fn run() -> ExitCode {
             name,
             format,
             index,
-        } => discovery((|| {
+        } => unit_result((|| {
             let entries = index::load(index.as_deref())?;
-            let entry =
+            let mut entry =
                 index::api(&entries, &name)?.with_context(|| format!("no entry named {name}"))?;
-            print_entries(&[&entry], format, Detail::Full)
+            entry.keywords.clear();
+            print_entries(&[entry], format, Detail::Full)
         })()),
-        Cmd::Index(args) => discovery(refresh_index(args)),
+        Cmd::Index(args) => unit_result(refresh_index(args)),
         Cmd::Hook => crate::hook::run(),
         Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
         Cmd::Run(args) => command_result(args.run()),
@@ -415,7 +416,7 @@ pub(crate) fn run() -> ExitCode {
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
         Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
         Cmd::Rules(options) => rules(options, default_format),
-        Cmd::Doctor { format } => discovery(crate::doctor::run(format.unwrap_or(default_format))),
+        Cmd::Doctor { format } => unit_result(crate::doctor::run(format.unwrap_or(default_format))),
         Cmd::Skill { json: false } => print_out(SKILL),
         Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),
         Cmd::Mcp { args } => mcp::run(&args),
@@ -436,7 +437,7 @@ fn print_out(text: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn discovery(result: Result<()>) -> ExitCode {
+fn unit_result(result: Result<()>) -> ExitCode {
     command_result(result.map(|()| ExitCode::SUCCESS))
 }
 
@@ -469,7 +470,7 @@ fn print_matches(mut found: index::Matches, kind: Option<Kind>, format: Format) 
             ] {
                 if kind.is_none_or(|k| k == selected) {
                     println!("{heading}");
-                    print_entries(&group.iter().collect::<Vec<_>>(), format, Detail::Summary)?;
+                    print_entries(group, format, Detail::Summary)?;
                 }
             }
         }
@@ -734,21 +735,9 @@ fn first_paragraph(summary: &str) -> String {
     summary.split("\n\n").next().unwrap_or_default().to_owned()
 }
 
-fn print_entries(entries: &[&index::Entry], format: Format, detail: Detail) -> Result<()> {
-    let entries: Vec<_> = entries
-        .iter()
-        .map(|entry| {
-            let mut entry = (*entry).clone();
-            entry.keywords.clear();
-            if matches!(detail, Detail::Summary) {
-                entry.members.clear();
-                entry.summary = first_paragraph(&entry.summary);
-            }
-            entry
-        })
-        .collect();
+fn print_entries(entries: &[index::Entry], format: Format, detail: Detail) -> Result<()> {
     match format {
-        Format::Json => println!("{}", serde_json::to_string(&entries)?),
+        Format::Json => println!("{}", serde_json::to_string(entries)?),
         Format::Text => {
             for entry in entries {
                 let signature = if entry.kind != Kind::Symbol

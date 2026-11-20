@@ -18,6 +18,7 @@ use inquire::validator::Validation;
 use serde::Serialize;
 
 use crate::cli::Format;
+use crate::version::Version;
 use document::{Name, RuleDoc, RuleId};
 use project::{Changes, Gate, Pack, Project};
 
@@ -701,7 +702,7 @@ fn ask_pattern(language: Lang) -> Result<String> {
 }
 
 fn ask_version(prompt: &str) -> Result<Option<String>> {
-    ask_optional(prompt, |text| document::version(text).map(drop))
+    ask_optional(prompt, |text| text.parse::<Version>().map(drop))
 }
 
 fn ask_gate() -> Result<Gate> {
