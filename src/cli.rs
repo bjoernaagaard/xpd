@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::author;
 use crate::catalog::{self, Catalog, Filters};
-use crate::check::{FixMode, Scope, lint};
+use crate::check::{FixMode, lint};
 use crate::fix_safety::Applicability;
 use crate::graph::Graph;
 use crate::index::{self, Kind};
@@ -579,7 +579,7 @@ fn check(
     fail_on: Severity,
     config: Option<&Path>,
 ) -> ExitCode {
-    let report = match lint(paths, fixes, Scope::Project, filters, config) {
+    let report = match lint(paths, fixes, filters, config) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("xpd: {e:#}");
@@ -612,7 +612,7 @@ fn check(
 
 /// Prints the dataflow of the files under `paths`.
 fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
-    let graph = match scan::python_files(paths).map(|files| Graph::read(&files)) {
+    let graph = match scan::python_files(paths).map(|files| Graph::read(Path::new(""), &files)) {
         Ok(graph) => graph,
         Err(e) => {
             eprintln!("xpd: {e:#}");

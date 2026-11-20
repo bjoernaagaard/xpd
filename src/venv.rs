@@ -26,6 +26,12 @@ impl Venv {
         Self::active().or_else(|| Self::above(dir))
     }
 
+    pub(crate) fn in_directory(self, directory: &Path) -> Self {
+        Self {
+            root: directory.join(self.root),
+        }
+    }
+
     fn active() -> Option<Self> {
         let root = env::var_os("VIRTUAL_ENV")?;
         Some(Self { root: root.into() })

@@ -123,14 +123,18 @@ fn pipeline_lines(placed: &PlacedPipeline) -> Vec<String> {
 impl Graph {
     /// Reads `files` as the modules of one dataflow.
     /// A file that cannot be read is named on stderr and counted as skipped.
-    pub(crate) fn read(files: &[PathBuf]) -> Self {
+    pub(crate) fn read(root: &Path, files: &[PathBuf]) -> Self {
         let mut pipelines = Vec::new();
         let mut nodes = Vec::new();
         let mut problems = Vec::new();
         let mut functions = 0;
         let mut skipped = 0;
         for file in files {
-            let Some(src) = crate::scan::read_source(file) else {
+            let disk = root.join(file);
+            let Some(src) = crate::scan::read_source(crate::scan::File {
+                path: file,
+                disk: Some(&disk),
+            }) else {
                 skipped += 1;
                 continue;
             };

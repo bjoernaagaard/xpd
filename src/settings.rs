@@ -37,6 +37,10 @@ impl Settings {
     /// that is no setting and a value that a setting does not take are errors that name the
     /// file.
     pub(crate) fn find(project: &Path) -> Result<Self> {
+        Self::find_in(project, Path::new(""))
+    }
+
+    pub(crate) fn find_in(project: &Path, invocation_dir: &Path) -> Result<Self> {
         let project_style = match project_table(project)? {
             Some((file, doc)) => {
                 let table = toml::get(&doc, &PROJECT_TABLE).and_then(|item| item.as_table_like());
@@ -49,7 +53,7 @@ impl Settings {
         };
         let style = match project_style {
             Some(style) => Some(style),
-            None => user_style()?,
+            None => user_style(invocation_dir)?,
         };
         Ok(Self {
             style: style.unwrap_or_default(),
@@ -72,11 +76,11 @@ fn project_table(project: &Path) -> Result<Option<(PathBuf, toml::Toml)>> {
 }
 
 /// The style that the user's own file sets. `None` without such a file.
-fn user_style() -> Result<Option<Style>> {
+fn user_style(invocation_dir: &Path) -> Result<Option<Style>> {
     let Some(file) = user_file() else {
         return Ok(None);
     };
-    match toml::read(&file).map_err(|error| anyhow!(error))? {
+    match toml::read(&invocation_dir.join(&file)).map_err(|error| anyhow!(error))? {
         Some(doc) => style(doc.as_table(), &file),
         None => Ok(None),
     }

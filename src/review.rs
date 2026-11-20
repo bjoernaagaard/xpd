@@ -27,10 +27,17 @@ pub(crate) fn apply(
             break;
         }
         // The scan after the review names and counts a file that cannot be read.
-        let Ok(source) = fs::read_to_string(path) else {
+        let disk = workspace.root.join(path);
+        let Ok(source) = fs::read_to_string(&disk) else {
             continue;
         };
-        let analysis = workspace.analyze(File::on_disk(path), &source);
+        let analysis = workspace.analyze(
+            File {
+                path,
+                disk: Some(&disk),
+            },
+            &source,
+        );
         let mut accepted = EditBatch::default();
         for (found, edit) in analysis.proposals(allowed) {
             if !accepted.fits(edit) {
@@ -63,11 +70,11 @@ pub(crate) fn apply(
             continue;
         }
         ensure!(
-            fs::read_to_string(path)? == source,
+            fs::read_to_string(&disk)? == source,
             "{} changed during review; no reviewed edits were written to it",
             path.display()
         );
-        fs::write(path, accepted.apply(&source))
+        fs::write(&disk, accepted.apply(&source))
             .with_context(|| format!("cannot write {}", path.display()))?;
         fixed += accepted.len();
     }

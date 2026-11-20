@@ -132,7 +132,8 @@ pub(crate) fn cannot_read(path: &Path) -> String {
 /// is named on stderr and gives `None`, so that one such file does not stop a run over the
 /// others. The run then counts it as skipped and exits with 2. A Jupyter notebook is JSON, which
 /// no rule reads, so it is named and skipped the same way.
-pub(crate) fn read_source(path: &Path) -> Option<String> {
+pub(crate) fn read_source(file: File<'_>) -> Option<String> {
+    let path = file.path;
     if (path.extension()).is_some_and(|x| x.eq_ignore_ascii_case("ipynb")) {
         eprintln!(
             "xpd: {} is a Jupyter notebook, and xpd reads .py files. Write it as a .py file with cell markers, as in `jupytext --to py:percent {}`, and check that file",
@@ -141,7 +142,7 @@ pub(crate) fn read_source(path: &Path) -> Option<String> {
         );
         return None;
     }
-    fs::read_to_string(path)
+    fs::read_to_string(file.disk.unwrap_or(path))
         .map_err(|e| eprintln!("xpd: {}: {e}", cannot_read(path)))
         .ok()
 }
@@ -149,43 +150,53 @@ pub(crate) fn read_source(path: &Path) -> Option<String> {
 /// The files under `paths` that `packs` have rules for, each once: the Python files, and the
 /// files of each other language that a rule names. A path that is a file is always taken.
 /// Folders respect `.gitignore`.
-pub(crate) fn collect_files(paths: &[PathBuf], packs: &[Pack]) -> Result<Vec<PathBuf>> {
+pub(crate) fn collect_files(
+    root: &Path,
+    paths: &[PathBuf],
+    packs: &[Pack],
+) -> Result<Vec<PathBuf>> {
     let languages: HashSet<SupportLang> = (packs.iter())
         .flat_map(|pack| pack.rules.iter().map(|rule| rule.config.language))
         .filter(|language| *language != SupportLang::Python)
         .collect();
-    files_under(paths, |path| {
+    files_under(root, paths, |path| {
         is_python(path) || SupportLang::from_path(path).is_some_and(|l| languages.contains(&l))
     })
 }
 
 /// The Python files under `paths`, each once. Folders respect `.gitignore`.
 pub(crate) fn python_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
-    files_under(paths, is_python)
+    files_under(Path::new(""), paths, is_python)
 }
 
 /// The files under `paths` that `wanted` keeps, each once. A path that is a file is always
 /// taken.
-fn files_under(paths: &[PathBuf], wanted: impl Fn(&Path) -> bool) -> Result<Vec<PathBuf>> {
+fn files_under(
+    root: &Path,
+    paths: &[PathBuf],
+    wanted: impl Fn(&Path) -> bool,
+) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let mut seen = HashSet::new();
-    let mut add = |path: &Path| -> Result<()> {
-        let real = fs::canonicalize(path).with_context(|| cannot_read(path))?;
+    let mut add = |path: &Path, disk: &Path| -> Result<()> {
+        let real = fs::canonicalize(disk).with_context(|| cannot_read(path))?;
         if seen.insert(real) {
             files.push(path.to_path_buf());
         }
         Ok(())
     };
     for p in paths {
-        let meta = fs::metadata(p).with_context(|| cannot_read(p))?;
+        let disk = root.join(p);
+        let meta = fs::metadata(&disk).with_context(|| cannot_read(p))?;
         if meta.is_file() {
-            add(p)?;
+            add(p, &disk)?;
             continue;
         }
-        for entry in ignore::WalkBuilder::new(p).build() {
+        for entry in ignore::WalkBuilder::new(&disk).build() {
             let entry = entry.with_context(|| cannot_read(p))?;
             if entry.file_type().is_some_and(|t| t.is_file()) && wanted(entry.path()) {
-                add(entry.path())?;
+                let tail = entry.path().strip_prefix(&disk).unwrap_or(entry.path());
+                add(&p.join(tail), entry.path())?;
             }
         }
     }
@@ -210,6 +221,7 @@ const MAX_FIX_PASSES: usize = 100;
 
 /// Lints each file, after applying fixes up to `fix` when it is set and writing them back.
 pub(crate) fn scan(
+    root: &Path,
     files: &[PathBuf],
     packs: &[Pack],
     fix: Option<Applicability>,
@@ -219,18 +231,25 @@ pub(crate) fn scan(
     let per_file: Vec<Option<(Linted, usize)>> = files
         .par_iter()
         .map(|path| {
-            let Some(mut src) = read_source(path) else {
+            let disk = root.join(path);
+            let Some(mut src) = read_source(File {
+                path,
+                disk: Some(&disk),
+            }) else {
                 return Ok(None);
             };
             let mut fixed = 0;
-            let file = File::on_disk(path);
+            let file = File {
+                path,
+                disk: Some(&disk),
+            };
             if let Some(allowed) = fix {
                 Fixed {
                     source: src,
                     count: fixed,
                 } = fix_source(file, src, packs, allowed);
                 if fixed > 0 {
-                    fs::write(path, &src)
+                    fs::write(&disk, &src)
                         .with_context(|| format!("cannot write {}", path.display()))?;
                 }
             }

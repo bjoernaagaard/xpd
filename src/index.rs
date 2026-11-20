@@ -276,9 +276,9 @@ pub(crate) struct Library {
 impl Library {
     /// The same library, which searches by meaning only when the embedding model is already
     /// on this machine. The hook searches on every prompt, and it must not wait for a download.
-    pub(crate) fn without_download(self) -> Self {
+    pub(crate) fn without_download(self, project: &Path) -> Self {
         Self {
-            model: OnceCell::from(Model::cached()),
+            model: OnceCell::from(Model::cached(project)),
             ..self
         }
     }

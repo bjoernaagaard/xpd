@@ -5,7 +5,6 @@ use anyhow::Result;
 use crate::catalog::{self, Filters};
 use crate::fix_safety::Applicability;
 use crate::report::Report;
-use crate::scan;
 use crate::workspace::Workspace;
 
 /// Whether a lint run writes fixes, and up to which level.
@@ -20,39 +19,36 @@ pub(crate) enum FixMode {
 pub(crate) fn lint(
     paths: &[PathBuf],
     mode: FixMode,
-    scope: Scope,
     filters: &Filters,
     config: Option<&Path>,
 ) -> Result<Report> {
     let workspace = Workspace::open(std::env::current_dir()?, config, filters)?;
-    workspace.check(paths, mode, scope)
+    workspace.check(paths, mode)
 }
 
 impl Workspace {
-    pub(crate) fn check(&self, paths: &[PathBuf], mode: FixMode, scope: Scope) -> Result<Report> {
-        let catalog = &self.catalog;
-        let files = scan::collect_files(paths, &catalog.packs)?;
+    pub(crate) fn check(&self, paths: &[PathBuf], mode: FixMode) -> Result<Report> {
+        let files = self.collect_files(paths)?;
         let (scanned, fixed) = match mode {
             FixMode::Apply(fix) => {
-                let scanned = scan::scan(&files, &catalog.packs, fix)?;
+                let scanned = self.scan_files(&files, fix)?;
                 let fixed = scanned.fixed;
                 (scanned, fixed)
             }
             FixMode::Review(allowed) => {
                 let fixed = crate::review::apply(&files, self, allowed)?;
-                (scan::scan(&files, &catalog.packs, None)?, fixed)
+                (self.scan_files(&files, None)?, fixed)
             }
         };
         let mut issues = scanned.issues;
-        if matches!(scope, Scope::Project) {
-            issues.extend(self.package_issues(&scanned.calls));
-            for warning in catalog
-                .project
-                .iter()
-                .flat_map(catalog::LocalProject::warnings)
-            {
-                eprintln!("xpd: {warning}");
-            }
+        issues.extend(self.package_issues(&scanned.calls));
+        for warning in self
+            .catalog
+            .project
+            .iter()
+            .flat_map(catalog::LocalProject::warnings)
+        {
+            eprintln!("xpd: {warning}");
         }
         Ok(Report {
             issues,
@@ -60,13 +56,4 @@ impl Workspace {
             skipped: scanned.skipped,
         })
     }
-}
-
-/// How much a lint run looks at.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Scope {
-    /// The given files only. The hook runs after every edit, so it stops here.
-    Files,
-    /// The files, and the packages the project's venv lacks.
-    Project,
 }

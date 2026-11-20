@@ -19,8 +19,7 @@ use ast_grep_language::SupportLang;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::catalog::{self, Catalog, Filters};
-use crate::check::{self, FixMode, Scope};
+use crate::catalog::Filters;
 use crate::embed;
 use crate::fix_safety::Applicability;
 use crate::graph::Graph;
@@ -30,6 +29,8 @@ use crate::scan;
 use crate::settings::Settings;
 use crate::style::Style;
 use crate::syntax;
+use crate::venv::Venv;
+use crate::workspace::Workspace;
 
 /// Claude Code shows stderr to the agent only when a hook exits 2.
 const BLOCK: u8 = 2;
@@ -251,7 +252,7 @@ pub(crate) fn run() -> ExitCode {
 /// changed and committed. In a project with a Python file it then prints the session brief,
 /// also after a compaction, which drops the brief the session began with.
 fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> {
-    let session = Session::open(session)?;
+    let session = Session::open(Path::new(""), session)?;
     session.forget_old_sessions();
     let records = session.records()?;
     let began = (records.iter()).any(|record| matches!(record, Record::Start(_)));
@@ -262,10 +263,10 @@ fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> 
         session.append(&Record::Start(commit))?;
         session.append(&Record::Began(now()))?;
     }
-    std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
-    let files = project_files(MOST_FILES);
+    let cwd = project_root(cwd)?;
+    let files = project_files(&cwd, MOST_FILES);
     if !files.is_empty() {
-        print_context(&brief(&files)?);
+        print_context(&brief(&cwd, &files)?);
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -279,8 +280,8 @@ fn print_context(text: &str) {
 /// The Python files of the project in the working directory, in the order of their names and
 /// at most `most` of them. Folders respect `.gitignore`, as in `xpd check`. Each file is named
 /// from the working directory, as the agent names it.
-fn project_files(most: usize) -> Vec<PathBuf> {
-    ignore::WalkBuilder::new(".")
+fn project_files(root: &Path, most: usize) -> Vec<PathBuf> {
+    ignore::WalkBuilder::new(root)
         .sort_by_file_name(Ord::cmp)
         .build()
         .take(MOST_ENTRIES)
@@ -289,7 +290,7 @@ fn project_files(most: usize) -> Vec<PathBuf> {
         .map(ignore::DirEntry::into_path)
         .filter(|path| scan::is_python(path))
         .map(|path| {
-            path.strip_prefix(".")
+            path.strip_prefix(root)
                 .map(Path::to_path_buf)
                 .unwrap_or(path)
         })
@@ -326,23 +327,28 @@ struct Census {
 /// What xpd knows about the project before the agent writes anything: the packs whose rules
 /// run on `files`, the style setting, the pipelines and the Hamilton nodes that `xpd graph`
 /// reads, and the three commands that fit between the edits.
-fn brief(files: &[PathBuf]) -> Result<String> {
+fn brief(project: &Path, files: &[PathBuf]) -> Result<String> {
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-    let project = std::env::current_dir()?;
-    let style = Settings::find(&project)?.style;
+    let settings = Settings::find_in(project, project)?;
     // The packs apply by the imports of a file, whatever versions the project's venv holds.
-    let catalog = Catalog::load(&project, None, style)?;
+    let workspace = Workspace::load(
+        project.to_path_buf(),
+        None,
+        settings,
+        None,
+        &Filters::default(),
+    )?;
     let read: Vec<(&PathBuf, Census)> = files
         .par_iter()
         .filter_map(|file| {
-            let src = fs::read_to_string(file).ok()?;
+            let src = fs::read_to_string(project.join(file)).ok()?;
             let root = syntax::parse(&src);
-            let packs: Vec<String> = (catalog.packs.iter())
+            let packs: Vec<String> = (workspace.catalog.packs.iter())
                 .filter(|pack| pack.applies(&root, &src, SupportLang::Python))
                 .map(|pack| pack.module.clone())
                 .collect();
-            let (pipelines, nodes) = Graph::read(std::slice::from_ref(file)).counts();
+            let (pipelines, nodes) = Graph::read(project, std::slice::from_ref(file)).counts();
             let nodes = if packs.iter().any(|pack| pack == "hamilton") {
                 nodes
             } else {
@@ -365,7 +371,7 @@ fn brief(files: &[PathBuf]) -> Result<String> {
     let packs: Vec<String> = (packs.iter())
         .map(|(name, count)| format!("{name} ({})", counted(*count, "file")))
         .collect();
-    let style_line = match style {
+    let style_line = match settings.style {
         Style::Strict => {
             "The style setting is strict, so a rule of the house style is a warning, and the \
              Stop check holds a turn that leaves a warning."
@@ -424,18 +430,18 @@ fn placed(read: &[(&PathBuf, Census)], count: impl Fn(&Census) -> usize) -> Stri
 /// the playbook, a prompt that asks what to make or improve gets the open issues of the
 /// project, and any other prompt gets nothing.
 fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
-    std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
-    if project_files(1).is_empty() {
+    let cwd = project_root(cwd)?;
+    if project_files(&cwd, 1).is_empty() {
         return Ok(ExitCode::SUCCESS);
     }
-    let library = index::load(None)?.without_download();
+    let library = index::load(None)?.without_download(&cwd);
     let mut text = Vec::new();
     if let Some(playbook) = index::playbook_for(&library, prompt) {
         text.push(playbook_lines(&playbook));
     }
     let lowered = prompt.to_lowercase();
     if OPEN_ASKS.iter().any(|ask| lowered.contains(ask)) {
-        text.push(open_issues(&project_files(MOST_FILES))?);
+        text.push(open_issues(&cwd, &project_files(&cwd, MOST_FILES))?);
     }
     if !text.is_empty() {
         print_context(&text.join("\n"));
@@ -469,20 +475,15 @@ fn playbook_lines(playbook: &index::Entry) -> String {
 
 /// The open issues of `files` under the style in force, counted by pack and severity, with
 /// the rules that have the most.
-fn open_issues(files: &[PathBuf]) -> Result<String> {
-    let style = Settings::find(&std::env::current_dir()?)?.style;
+fn open_issues(project: &Path, files: &[PathBuf]) -> Result<String> {
+    let workspace = hook_workspace(project)?;
+    let style = workspace.settings.style;
     let checked = format!(
         "xpd checked {} of this project under the {} style",
         files_read(files),
         style.as_str()
     );
-    let report = check::lint(
-        files,
-        FixMode::Apply(None),
-        Scope::Files,
-        &Filters::default(),
-        None,
-    )?;
+    let report = workspace.scan_files(&workspace.collect_files(files)?, None)?;
     if report.issues.is_empty() {
         return Ok(format!("{checked} and found no open issue."));
     }
@@ -534,30 +535,22 @@ fn open_issues(files: &[PathBuf]) -> Result<String> {
 /// Lints the files that a tool call changed, and hands the issues to the client the way that
 /// client reads them.
 fn post_tool_use(client: &Client, session: Option<&str>, files: &[PathBuf]) -> Result<ExitCode> {
-    // The project's venv and its own rules are found from the working directory, as in a
-    // user's run.
-    if let Client::AgentPlugin { cwd: Some(cwd) } = client {
-        std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
-    }
-    // Only a project with its own rules can have rules for a file that is not Python.
-    let project = std::env::current_dir().unwrap_or_default();
-    let has_rules = matches!(catalog::LocalProject::find(&project), Ok(Some(_)));
-    let files: Vec<PathBuf> = files
-        .iter()
-        .filter(|file| scan::is_python(file) || (has_rules && scan::names_language(file)))
-        .cloned()
-        .collect();
+    let project = match client {
+        Client::AgentPlugin { cwd: Some(cwd) } => project_root(cwd)?,
+        _ => std::env::current_dir()?,
+    };
+    let files = Workspace::edited_files(&project, files);
     if files.is_empty() {
         return Ok(ExitCode::SUCCESS);
     }
     // The lint still runs when the record cannot be written, because the agent needs the
     // issues of this edit either way.
     if let Some(session) = session
-        && let Err(e) = record_edits(session, &files)
+        && let Err(e) = record_edits(&project, session, &files)
     {
         eprintln!("xpd hook: cannot record the edit: {e:#}");
     }
-    let lines: Vec<String> = (findings(&files)?.into_iter())
+    let lines: Vec<String> = (findings(&project, &files)?.into_iter())
         .map(|finding| finding.line)
         .collect();
     if lines.is_empty() {
@@ -577,10 +570,10 @@ fn post_tool_use(client: &Client, session: Option<&str>, files: &[PathBuf]) -> R
 
 /// Writes the edited Python files to the session file. The Stop check reads them in a project
 /// without git, where nothing else tells which files the session changed.
-fn record_edits(session: &str, files: &[PathBuf]) -> Result<()> {
-    let session = Session::open(session)?;
+fn record_edits(project: &Path, session: &str, files: &[PathBuf]) -> Result<()> {
+    let session = Session::open(project, session)?;
     for file in files.iter().filter(|file| scan::is_python(file)) {
-        session.append(&Record::Edited(std::path::absolute(file)?))?;
+        session.append(&Record::Edited(std::path::absolute(project.join(file))?))?;
     }
     Ok(())
 }
@@ -591,12 +584,13 @@ fn record_edits(session: &str, files: &[PathBuf]) -> Result<()> {
 /// Claude Code and Codex both read `decision` and `reason` from JSON on stdout, and Codex takes
 /// no plain text on this event. Both show `systemMessage` to the user and not to the agent.
 fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
-    std::env::set_current_dir(cwd).context("cannot enter the agent's working directory")?;
-    let session = Session::open(session)?;
+    let cwd = project_root(cwd)?;
+    let session = Session::open(&cwd, session)?;
     let records = session.records()?;
-    let (held, advice): (Vec<Finding>, Vec<Finding>) = findings(&changed_files(&records)?)?
-        .into_iter()
-        .partition(|finding| finding.holds);
+    let (held, advice): (Vec<Finding>, Vec<Finding>) =
+        findings(&cwd, &changed_files(&cwd, &records)?)?
+            .into_iter()
+            .partition(|finding| finding.holds);
     let lines = |found: Vec<Finding>| -> Vec<String> {
         found.into_iter().map(|finding| finding.line).collect()
     };
@@ -653,9 +647,8 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
 /// session began, so an edit through the shell and a committed edit both count. A file that
 /// only a pull, a merge or a checkout changed is left out. Without git, they are the files that
 /// `PostToolUse` recorded.
-fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
-    let here = fs::canonicalize(".")?;
-    let mut files: Vec<PathBuf> = if let Some(top) = repository(&here) {
+fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
+    let mut files: Vec<PathBuf> = if let Some(top) = repository(here) {
         let began = records.iter().rev().find_map(|record| match record {
             Record::Start(commit) => commit.as_deref(),
             Record::Began(_) | Record::Edited(_) | Record::Held(_) => None,
@@ -709,7 +702,7 @@ fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
     Ok(files
         .into_iter()
         .map(|file| {
-            file.strip_prefix(&here)
+            file.strip_prefix(here)
                 .map(Path::to_path_buf)
                 .unwrap_or(file)
         })
@@ -841,14 +834,17 @@ struct Session {
 impl Session {
     /// The file of the session that the client names `id`. The id becomes the file name, so
     /// an id that could name another folder is refused.
-    fn open(id: &str) -> Result<Self> {
+    fn open(project: &Path, id: &str) -> Result<Self> {
         let plain = |c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.');
         anyhow::ensure!(
             !id.is_empty() && !id.starts_with('.') && id.chars().all(plain),
             "the session id {id:?} cannot name a session file"
         );
         Ok(Self {
-            file: embed::cache_folder()?.join("sessions").join(id),
+            file: project
+                .join(embed::cache_folder()?)
+                .join("sessions")
+                .join(id),
         })
     }
 
@@ -911,33 +907,48 @@ struct Finding {
 
 /// The issues of the files in `files`. A Python file with a pipeline of steps also gets the
 /// errors and warnings of `xpd graph`.
-fn findings(files: &[PathBuf]) -> Result<Vec<Finding>> {
+fn findings(project: &Path, files: &[PathBuf]) -> Result<Vec<Finding>> {
     // One call can edit a file and then move or delete it, so a named file may be gone.
     let files: Vec<PathBuf> = (files.iter())
-        .filter(|file| file.is_file())
+        .filter(|file| project.join(file).is_file())
         .cloned()
         .collect();
     if files.is_empty() {
         return Ok(Vec::new());
     }
-    let report = check::lint(
-        &files,
-        FixMode::Apply(None),
-        Scope::Files,
-        &Filters::default(),
-        None,
-    )?;
+    let workspace = hook_workspace(project)?;
+    let report = workspace.scan_files(&workspace.collect_files(&files)?, None)?;
     let issues = report.issues.iter().map(|issue| Finding {
         line: issue.line(Applicability::Safe),
         holds: issue.severity >= Severity::Warning,
     });
     let python = files.iter().filter(|file| scan::is_python(file));
     let steps = python.flat_map(|file| {
-        fs::read_to_string(file)
+        fs::read_to_string(project.join(file))
             .map(|src| Graph::step_lines(file, &src))
             .unwrap_or_default()
     });
     // `step_lines` gives errors and warnings only.
     let steps = steps.map(|line| Finding { line, holds: true });
     Ok(issues.chain(steps).collect())
+}
+
+fn project_root(cwd: &Path) -> Result<PathBuf> {
+    anyhow::ensure!(
+        !cwd.as_os_str().is_empty(),
+        "cannot enter the agent's working directory: empty path"
+    );
+    fs::canonicalize(cwd.join(".")).context("cannot enter the agent's working directory")
+}
+
+fn hook_workspace(project: &Path) -> Result<Workspace> {
+    let settings = Settings::find_in(project, project)?;
+    let venv = Venv::find_from(project).map(|venv| venv.in_directory(project));
+    Workspace::load(
+        project.to_path_buf(),
+        None,
+        settings,
+        venv,
+        &Filters::default(),
+    )
 }

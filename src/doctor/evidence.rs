@@ -90,7 +90,7 @@ pub(crate) fn find(files: &[PathBuf]) -> Result<Evidence> {
     let per_file: Vec<Vec<(Trigger, Location)>> = files
         .par_iter()
         .map(|file| {
-            let Some(src) = scan::read_source(file) else {
+            let Some(src) = scan::read_source(scan::File::on_disk(file)) else {
                 return Vec::new();
             };
             let root = syntax::parse(&src);

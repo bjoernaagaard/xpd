@@ -61,8 +61,11 @@ impl Model {
 
     /// The model from the cache folder. `None` when it is not there or cannot be loaded, and
     /// nothing is downloaded.
-    pub(crate) fn cached() -> Option<Self> {
-        let path = path().ok().filter(|path| path.is_file())?;
+    pub(crate) fn cached(project: &Path) -> Option<Self> {
+        let path = path()
+            .ok()
+            .map(|path| project.join(path))
+            .filter(|path| path.is_file())?;
         Self::load(&path).ok()
     }
 
