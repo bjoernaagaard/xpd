@@ -14,7 +14,7 @@ import tempfile
 from typing import Any
 
 from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
+from mcp_server import stdio_server
 from pydantic import BaseModel
 
 
@@ -23,14 +23,7 @@ def dump(items: list[BaseModel]) -> list[dict[str, Any]]:
 
 
 async def listing(root: str, *flags: str) -> dict[str, Any]:
-    # The transport passes a short list of variables unless it is given an environment, and the
-    # server needs XPD_BIN and PYTHONPATH from this one.
-    server = StdioTransport(
-        command=sys.executable,
-        args=["-m", "xpd.mcp", "--root", root, *flags],
-        env=dict(os.environ),
-    )
-    async with Client(server) as client:
+    async with Client(stdio_server(root, *flags)) as client:
         info = client.server_info
         return {
             "server": info.model_dump(mode="json", exclude_none=True) if info else None,
@@ -60,4 +53,5 @@ def main() -> None:
     json.dump({**default, "code_mode_tools": code_mode["tools"], "help": help_text}, sys.stdout)
 
 
-main()
+if __name__ == "__main__":
+    main()

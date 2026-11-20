@@ -230,11 +230,11 @@ const flagsOf = new Map(
 );
 const canonical = new Map(commands.flatMap((command) => [command.name, ...command.aliases.map((alias) => command.name.replace(/\S+$/, alias))].map((name) => [name, command.name])));
 /** Runs the examples of an authored page, and fails when none of them runs `name`. */
-function runExamples(source, name, options) {
+async function runExamples(source, name, options) {
   const file = relative(repository, source);
   const before = { commands: examples.ran.commands.length, tools: examples.ran.tools.length };
   // The page of a tool with no example still shows its arguments and its result, as text.
-  examples.check(file, NO_EXAMPLE[name] ? {} : options);
+  await examples.check(file, NO_EXAMPLE[name] ? {} : options);
   const spellings = [...canonical].filter(([, command]) => command === name).map(([spelling]) => new RegExp(`\\b${spelling}\\b`));
   const ranIt = options?.tool
     ? examples.ran.tools.length > before.tools
@@ -305,7 +305,7 @@ for (const [slug, command] of bySlug) {
     throw new Error(`${relative(repository, source)} needs an "## Exit status" section`);
   }
   flagProblems.push(...unknownFlags(prose.source, command.name).map((problem) => `${relative(repository, source)}: ${problem}`));
-  runExamples(source, command.name);
+  await runExamples(source, command.name);
 
   const body = [text(command.about), prose.intro, '## Usage', '', '```sh', command.usage, '```'];
   if (command.aliases.length) {
@@ -504,7 +504,7 @@ for (const tool of mcp.tools) {
     throw new Error(`${relative(repository, source)} needs an "## Errors" section`);
   }
   flagProblems.push(...unknownFlags(prose.source, null).map((problem) => `${relative(repository, source)}: ${problem}`));
-  runExamples(source, tool.name, { tool: tool.name });
+  await runExamples(source, tool.name, { tool: tool.name });
   writeFileSync(
     join(mcpOut, 'tools', `${tool.name}.md`),
     page(
@@ -669,14 +669,14 @@ const otherPages = [join(repository, 'README.md'), join(docs, 'index.md'), join(
 for (const source of otherPages) {
   const file = relative(repository, source);
   flagProblems.push(...unknownFlags(readFileSync(source, 'utf8'), null).map((problem) => `${file}: ${problem}`));
-  examples.check(file);
+  await examples.check(file);
 }
 
 if (flagProblems.length) {
   throw new Error(`Pages name flags that their command does not take:\n${flagProblems.join('\n')}`);
 }
 
-const ran = examples.finish();
+const ran = await examples.finish();
 
 console.log(
   `reference.mjs: ran ${ran.commands.length} commands and ${ran.tools.length} tool calls of the examples, and wrote ${bySlug.size} command pages and ${mcp.tools.length} tool pages, with ` +

@@ -1,21 +1,20 @@
 """Makes the tool calls that the MCP reference shows as examples, and prints their answers as JSON.
 
-It reads a JSON list of calls on stdin, each with a `root`, a `tool` and its `arguments`. It starts
-the server the way a client does, as `python -m xpd.mcp` over stdio, and prints one answer for
-each call, with the text that the tool returned and whether the call failed. The text of a tool
-that also draws a view is its report. The client declines every question that a tool asks the
-user.
+It reads one JSON call per line on stdin, each with a `root`, a `tool` and its `arguments`, and
+writes one JSON answer per line on stdout. It starts one `python -m xpd.mcp` server over stdio and
+supplies each call's `root` through the MCP roots callback. The text of a tool that also draws a
+view is its report. The client declines every question that a tool asks the user.
 """
 
 import asyncio
 import json
-import os
 import sys
+from pathlib import Path
 from typing import TypedDict
 
 from fastmcp import Client
 from fastmcp.client.elicitation import ElicitResult
-from fastmcp.client.transports import StdioTransport
+from mcp_server import stdio_server
 
 
 class Call(TypedDict):
@@ -33,25 +32,26 @@ async def decline(*_: object) -> ElicitResult:
     return ElicitResult(action="decline")
 
 
-async def answer(call: Call) -> Answer:
-    server = StdioTransport(
-        command=sys.executable,
-        args=["-m", "xpd.mcp", "--root", call["root"]],
-        env=dict(os.environ),
-    )
-    async with Client(server, elicitation_handler=decline) as client:
-        result = await client.call_tool(call["tool"], call["arguments"], raise_on_error=False)
-    text = "".join(getattr(part, "text", "") for part in result.content)
-    return Answer(text=text, failed=result.is_error)
+async def serve() -> None:
+    current_root: Path | None = None
 
+    async def roots(_context: object) -> list[str]:
+        return [current_root.as_uri()] if current_root is not None else []
 
-async def answers(calls: list[Call]) -> list[Answer]:
-    return [await answer(call) for call in calls]
+    async with Client(stdio_server(), roots=roots, elicitation_handler=decline) as client:
+        while line := await asyncio.to_thread(sys.stdin.readline):
+            if not line.strip():
+                continue
+            call: Call = json.loads(line)
+            current_root = Path(call["root"])
+            result = await client.call_tool(call["tool"], call["arguments"], raise_on_error=False)
+            text = "".join(getattr(part, "text", "") for part in result.content)
+            sys.stdout.write(f"{json.dumps(Answer(text=text, failed=result.is_error))}\n")
+            sys.stdout.flush()
 
 
 def main() -> None:
-    calls: list[Call] = json.load(sys.stdin)
-    json.dump(asyncio.run(answers(calls)), sys.stdout)
+    asyncio.run(serve())
 
 
 if __name__ == "__main__":

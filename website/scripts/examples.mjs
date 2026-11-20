@@ -20,10 +20,11 @@
 // `XPD_EXAMPLES=write npm run reference` writes what xpd prints into each console block that
 // differs, so a change of xpd's output is one command and a review of the diff.
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const scripts = dirname(fileURLToPath(import.meta.url));
@@ -182,17 +183,41 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
     return cases.map((_, index) => trimmed((parts[index] ?? '').split('\n')));
   }
 
-  /** The results of tool calls, each made with the server's root at `call.root`. */
-  function callTools(env, calls) {
-    const out = execFileSync(python, [join(scripts, 'mcp_examples.py')], { env, input: JSON.stringify(calls), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
-    return JSON.parse(out);
+  /** One long-lived MCP client/server process shared by every tool example in the build. */
+  let mcpClient = null;
+  function startMcp() {
+    if (mcpClient) return mcpClient;
+    const child = spawn(python, [join(scripts, 'mcp_examples.py')], {
+      cwd: template,
+      env: sessionEnv(join(work, 'mcp')),
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+    const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
+    const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+    process.on('exit', () => child.kill());
+    mcpClient = {
+      async call(request) {
+        child.stdin.write(`${JSON.stringify(request)}\n`);
+        const next = await lines.next();
+        if (next.done) {
+          const { code, signal } = await exited;
+          throw new Error(`mcp_examples.py exited before answering ${request.tool} (code ${code}, signal ${signal})`);
+        }
+        return JSON.parse(next.value);
+      },
+      async close() {
+        child.stdin.end();
+        await exited;
+      },
+    };
+    return mcpClient;
   }
 
   /**
    * Runs the examples of one page. `tool` names the MCP tool that a page of the tool reference
    * is about. Returns how many examples ran.
    */
-  function check(file, { tool } = {}) {
+  async function check(file, { tool } = {}) {
     const source = readFileSync(join(repository, file), 'utf8');
     const rewritten = source.split('\n');
     sessions += 1;
@@ -241,7 +266,7 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
           problems.push(`${call.where}: the arguments or the result of the example are not JSON: ${error.message}`);
           continue;
         }
-        const [answer] = callTools(env, [{ root: call.root, tool, arguments: JSON.parse(call.text.replaceAll(SHOWN_ROOT, root)) }]);
+        const answer = await startMcp().call({ root: call.root, tool, arguments: JSON.parse(call.text.replaceAll(SHOWN_ROOT, root)) });
         const real = answerValue(shown(root, answer.text), answer.failed);
         if (!valueMatches(parsed.result, real)) {
           problems.push(`${where}: ${tool} ${call.text.trim()}\n  the page shows:\n    ${text.trim()}\n  the tool returns:\n    ${JSON.stringify(real)}`);
@@ -253,7 +278,8 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
   }
 
   /** Fails when an example differed from its page. */
-  function finish() {
+  async function finish() {
+    if (mcpClient) await mcpClient.close();
     if (problems.length) {
       throw new Error(`${problems.length} problems with the examples of the pages:\n\n${problems.join('\n\n')}`);
     }
