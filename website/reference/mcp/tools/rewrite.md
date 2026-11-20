@@ -4,15 +4,15 @@ matches of `query`, asks the user to confirm, and only then writes the replaceme
 
 ## Example
 
-On a copy of `samples/bad.py`, the user declined the question, so the tool wrote nothing and
+On `samples/bad.py`, the user declined the question, so the tool wrote nothing and
 returned the preview. The match below is shown without its offsets.
 
 ```json
-{"query":{"pattern":"pd.merge($$$A)","rewrite":"df.merge(other, on=\"k\")","language":"python"},"paths":["bad.py"]}
+{"query":{"pattern":"pd.merge($$$A)","rewrite":"df.merge(other, on=\"k\")","language":"python"},"paths":["samples/bad.py"]}
 ```
 
 ```json
-{"text":"pd.merge(df, other, on=\"k\")","file":"bad.py","replacement":"df.merge(other, on=\"k\")","lines":"m = pd.merge(df, other, on=\"k\")"}
+[{"text":"pd.merge(df, other, on=\"k\")","file":"samples/bad.py","replacement":"df.merge(other, on=\"k\")","lines":"m = pd.merge(df, other, on=\"k\")"}]
 ```
 
 ## Errors

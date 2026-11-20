@@ -102,7 +102,7 @@ when the file sets a key that xpd does not read.
 The example runs xpd on a `script.py` that filters one frame in three statements, first without
 the setting and then with it.
 
-```python
+```python title="script.py"
 import pandas as pd
 
 df = pd.read_csv("orders.csv")

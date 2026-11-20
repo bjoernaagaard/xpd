@@ -6,7 +6,7 @@ reads the JSON file and runs no binary. Pass its result to [`gates`](../gates/).
 
 With the server's root at `samples/pipeline`:
 
-```json
+```json root=samples/pipeline
 {"file":"model/contract.json"}
 ```
 

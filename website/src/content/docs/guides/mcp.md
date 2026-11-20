@@ -20,7 +20,7 @@ claude mcp add xpd -- uvx xpd mcp
 
 `claude mcp list` then shows the server as connected.
 
-```console
+```text
 $ claude mcp list
 xpd: uvx xpd mcp - ✔ Connected
 ```

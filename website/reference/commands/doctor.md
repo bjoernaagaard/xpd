@@ -75,28 +75,40 @@ dev = [
 addopts = "--reruns 2 --strict-markers"
 ```
 
-Doctor prints one block for each table, and each `remove` line names the line to edit. The output below leaves out the `Source:` line under each reason.
+Doctor prints one block for each table, and each `remove` line names the line to edit. The `...`
+stands for the lines above the two pytest tables, which name the tools that doctor found and give
+the Ruff and ty advice.
 
 ```console
 $ xpd doctor --format text
-pyproject.toml, table [dependency-groups] at line 5
-  remove "pytest-rerunfailures" from dev at line 8
+...
+pyproject.toml, table [dependency-groups] at line 1
+  For 132 Python files under pyproject.toml, unverified locally (decisions for pytest 9.2.0).
+  remove "pytest-rerunfailures" from dev at line 4
     pytest-rerunfailures. A retry can hide the first failure.
-  add "pytest-randomly" to the existing dev array at line 6
+    Source: https://github.com/pytest-dev/pytest-rerunfailures/blob/master/README.rst
+  add "pytest-randomly" to the existing dev array at line 2
     pytest-randomly. Shuffle test order to find tests that depend on shared state.
+    Source: https://github.com/pytest-dev/pytest-randomly/blob/main/README.rst
 
-pyproject.toml, table [tool.pytest.ini_options] at line 12
-  remove --reruns 2 from addopts at line 13
+pyproject.toml, table [tool.pytest.ini_options] at line 8
+  For 132 Python files under pyproject.toml, unverified locally (decisions for pytest 9.2.0).
+  remove --reruns 2 from addopts at line 9
     --reruns. Keep the first failure visible so you can find and fix its cause.
+    Source: https://github.com/pytest-dev/pytest-rerunfailures/blob/master/README.rst
   strict = true
     strict. Fail on unknown markers, invalid settings, duplicate parameter IDs and unexpectedly passing xfails.
-  append -ra --import-mode=importlib inside the addopts string at line 13
+    Source: https://docs.pytest.org/en/stable/reference/reference.html#confval-strict
+  append -ra --import-mode=importlib inside the addopts string at line 9
     -ra. Show skipped tests and expected failures in the short test summary.
+    Source: https://docs.pytest.org/en/stable/reference/reference.html#cmdoption-r
     --import-mode=importlib. Import test files without putting their directories on sys.path.
+    Source: https://docs.pytest.org/en/stable/reference/reference.html#cmdoption-import-mode
   timeout = "<seconds>"
     timeout. pytest-timeout sets no time limit by default. Choose a limit so a hanging test fails.
     Condition: Choose a number of seconds above the longest expected test run.
-    Evidence: pyproject.toml:9 pytest-timeout
+    Source: https://github.com/pytest-dev/pytest-timeout/blob/main/README.rst
+    Evidence: pyproject.toml:5 pytest-timeout
 ```
 
 The file reads as follows after the edits, with a limit of 60 seconds as an example. `strict` covers `pytest --strict-markers`, so that flag goes too.

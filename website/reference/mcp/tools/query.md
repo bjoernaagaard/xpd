@@ -8,11 +8,11 @@ preview a replacement. Give exactly one of `pattern` and `kind`. It changes no f
 {"query":{"pattern":"$X.iterrows()","language":"python"},"paths":["samples/bad.py"]}
 ```
 
-The result is a list with one entry for each match. This is the first, without its byte offsets
-and metavariable ranges. Lines and columns count from zero.
+The result is a list with one entry for each match. The one match is shown without its byte
+offsets and metavariables. Lines and columns count from zero.
 
 ```json
-{"text":"df.iterrows()","file":"samples/bad.py","language":"Python","lines":"for i, row in df.iterrows():","replacement":null,"start":{"line":4,"column":14}}
+[{"text":"df.iterrows()","file":"samples/bad.py","language":"Python","range":{"start":{"line":4,"column":14},"end":{"line":4,"column":27}},"replacement":null,"lines":"for i, row in df.iterrows():"}]
 ```
 
 ## Errors

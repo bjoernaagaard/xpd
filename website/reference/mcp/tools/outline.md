@@ -8,11 +8,11 @@ and members, and runs no code.
 {"paths":["samples/graph/steps.py"],"options":{"items":"structure"}}
 ```
 
-The result is a list with one entry for each file. This is the third item of the file, without
-its ranges and members.
+The result is a list with one entry for each file. One item of the file is shown, without its
+ranges and members, and each `"..."` stands for the items around it.
 
 ```json
-{"name":"totals","symbolType":"function","signature":"def totals(orders: pd.DataFrame) -> pd.DataFrame","astKind":"function_definition","isExported":true}
+[{"path":"samples/graph/steps.py","language":"Python","items":["...",{"name":"totals","symbolType":"function","signature":"def totals(orders: pd.DataFrame) -> pd.DataFrame","astKind":"function_definition","isExported":true},"..."]}]
 ```
 
 ## Errors

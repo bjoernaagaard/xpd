@@ -10,10 +10,10 @@ file.
 {"task":"rounded bars","kind":"recipe","limit":1}
 ```
 
-The result has `symbols`, `rules` and `recipes`. This is the one recipe, without its code.
+The result has `symbols`, `rules` and `recipes`. The one recipe is shown without its code.
 
 ```json
-{"kind":"recipe","package":"plotly","name":"plotly/recipe/rounded-bars","callable":null,"rules":[],"recipe":{"title":"Rounded Bars","symbols":["plotly.data.medals_wide","plotly.graph_objects.Bar","plotly.subplots.make_subplots"],"source":"https://github.com/plotly/plotly.py/blob/v7.1.0/doc/python/bar-charts.md#L746","license":"MIT","modified":false},"signature":null}
+{"symbols":[],"rules":[],"recipes":[{"kind":"recipe","package":"plotly","name":"plotly/recipe/rounded-bars","callable":null,"rules":[],"recipe":{"title":"Rounded Bars","symbols":["plotly.data.medals_wide","plotly.graph_objects.Bar","plotly.subplots.make_subplots"],"source":"https://github.com/plotly/plotly.py/blob/v7.1.0/doc/python/bar-charts.md#L746","license":"MIT","modified":false},"signature":null}]}
 ```
 
 ## Errors

@@ -8,6 +8,14 @@ xpd completions bash > ~/.local/share/bash-completion/completions/xpd
 xpd completions zsh > "${fpath[1]}/_xpd"
 ```
 
+The script starts like this.
+
+```console
+$ xpd completions bash | head -n 2
+_xpd() {
+    local i cur prev opts cmd
+```
+
 ## Exit status
 
 It exits 0, and 2 for a shell it does not know.

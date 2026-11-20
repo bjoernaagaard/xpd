@@ -52,6 +52,20 @@ You can run the hook by hand with the event that Claude Code sends. With the `ba
 [Get started](../../#check-a-sample-file) in the current folder, the hook prints the five issues
 and exits with 2.
 
+```python title="bad.py"
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2], "k": [1, 2]})
+other = df.copy()
+for i, row in df.iterrows():
+    df["a"][i] = row["a"] * 2
+df.dropna(inplace=True)
+m = pd.merge(df, other, on="k")
+out = pd.DataFrame()
+for f in ["x.csv"]:
+    out = pd.concat([out, pd.read_csv(f)])
+```
+
 ```console
 $ echo '{"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"bad.py"}}' | xpd hook
 bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").

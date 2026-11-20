@@ -375,7 +375,6 @@ fn choose_item() -> Result<Item> {
 
 /// The folder `--directory` names, or the one the user picks, starting from `default`.
 fn destination(directory: Option<&Path>, mode: Mode, default: &Path) -> Result<PathBuf> {
-    let cwd = std::env::current_dir().context("no current folder")?;
     let chosen = match (directory, mode) {
         (Some(directory), _) => directory.to_path_buf(),
         (None, Mode::FlagsOnly) => default.to_path_buf(),
@@ -384,7 +383,8 @@ fn destination(directory: Option<&Path>, mode: Mode, default: &Path) -> Result<P
             PathBuf::from(ask_text_default("Project folder:", &default)?)
         }
     };
-    Ok(cwd.join(chosen))
+    // `absolute` also drops the `.` of `--directory .`, so the paths that `new` prints hold none.
+    std::path::absolute(&chosen).with_context(|| format!("cannot read {}", chosen.display()))
 }
 
 /// The project in `--directory`, which must hold its sgconfig.yml so that a caller can confine
