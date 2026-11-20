@@ -21,6 +21,7 @@ from mcp.types import (
 from xpd.mcp.base import READS
 from xpd.mcp.binary import RULES, Xpd
 from xpd.mcp.models import Rule, RuleList, RuleSummary, Severity
+from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project
 
 RULES_URI = "xpd://rules"
@@ -163,7 +164,7 @@ class Catalogs:
 def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
     catalogs = Catalogs(xpd, project, catalog)
 
-    @mcp.tool(name="rules", tags={"rules"}, annotations=READS)
+    @mcp.tool(name=ToolName.RULES, tags={"rules"}, annotations=READS)
     async def list_rules(
         ctx: Context,
         package: str | None = None,
@@ -199,7 +200,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
             ]
         )
 
-    @mcp.tool(name="rule", tags={"rules"}, annotations=READS)
+    @mcp.tool(name=ToolName.RULE, tags={"rules"}, annotations=READS)
     async def one_rule(ctx: Context, package: str, rule: str) -> Rule:
         """Read one rule: why it matters, what it reports, and its before and after examples.
 

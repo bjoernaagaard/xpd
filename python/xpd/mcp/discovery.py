@@ -10,6 +10,7 @@ from mcp.types import InputRequiredResult
 from xpd.mcp.base import READS, rooted
 from xpd.mcp.binary import API, Xpd
 from xpd.mcp.models import Discovery, DiscoveryEntry, DiscoveryProof, Gate
+from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project
 
 
@@ -87,7 +88,7 @@ async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Disco
                 failures.append(f"{place} {name} is not known to api.")
                 continue
             entry = next((item for item in entries if item.name == name), None)
-            if entry is None or entry.kind != "symbol" or entry.callable in {None, "property"}:
+            if entry is None or entry.signature is None:
                 failures.append(f"{place} {name} is not an indexed callable symbol.")
                 continue
             used.add(name)
@@ -110,7 +111,7 @@ async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Disco
 
 
 def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(tags={"discovery", "pipeline"}, annotations=READS)
+    @mcp.tool(name=ToolName.DISCOVERY_GATE, tags={"discovery", "pipeline"}, annotations=READS)
     @rooted
     async def discovery_gate(
         ctx: Context, paths: list[str], discovery: Discovery

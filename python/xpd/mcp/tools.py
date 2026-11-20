@@ -20,6 +20,7 @@ from xpd.mcp.models import (
     Profile,
     Refit,
 )
+from xpd.mcp.names import ToolName
 from xpd.mcp.options import CheckOptions
 from xpd.mcp.root import Project
 
@@ -121,9 +122,9 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> Analysis:
 
 
 def register_lint(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) -> None:
-    mcp.tool(tags={"lint"}, annotations=READS, task=True)(analysis.check)
+    mcp.tool(name=ToolName.CHECK, tags={"lint"}, annotations=READS, task=True)(analysis.check)
 
-    @mcp.tool(tags={"lint", "fix"}, annotations=WRITES, task=True)
+    @mcp.tool(name=ToolName.FIX, tags={"lint", "fix"}, annotations=WRITES, task=True)
     @rooted
     async def fix(
         ctx: Context,
@@ -156,11 +157,11 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) 
 
 
 def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) -> None:
-    mcp.tool(tags={"dataflow"}, annotations=READS)(analysis.graph)
+    mcp.tool(name=ToolName.GRAPH, tags={"dataflow"}, annotations=READS)(analysis.graph)
 
-    mcp.tool(tags={"data"}, annotations=READS, task=True)(analysis.profile)
+    mcp.tool(name=ToolName.PROFILE, tags={"data"}, annotations=READS, task=True)(analysis.profile)
 
-    @mcp.tool(tags={"pipeline"}, annotations=RUNS_CODE, task=True)
+    @mcp.tool(name=ToolName.REFIT, tags={"pipeline"}, annotations=RUNS_CODE, task=True)
     @rooted
     async def refit(ctx: Context, file: str) -> Refit | InputRequiredResult:
         """Fit a clone of the saved Pipeline on raw training rows and compare held out
@@ -173,7 +174,7 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) 
         root = await project.required_root(ctx)
         return await run(ctx, xpd, REFIT, root, [root.inside(file)])
 
-    @mcp.tool(tags={"data", "refactor"}, annotations=RUNS_CODE, task=True)
+    @mcp.tool(name=ToolName.EQUIV, tags={"data", "refactor"}, annotations=RUNS_CODE, task=True)
     @rooted
     async def equiv(ctx: Context, old: str, new: str) -> Equivalence | InputRequiredResult:
         """Run two scripts with the project's Python, each in its own process, and check that
@@ -191,7 +192,7 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) 
 
 
 def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
-    @mcp.tool(tags={"discovery"}, annotations=READS)
+    @mcp.tool(name=ToolName.FIND, tags={"discovery"}, annotations=READS)
     async def find(
         task: str, package: str | None = None, kind: str | None = None, limit: int | None = None
     ) -> DiscoveryMatches:
@@ -216,7 +217,7 @@ def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
             flags.append(f"--kind={kind}")
         return await xpd.run(FIND, Path.cwd(), [task], *flags)
 
-    @mcp.tool(tags={"discovery"}, annotations=READS)
+    @mcp.tool(name=ToolName.API, tags={"discovery"}, annotations=READS)
     async def api(name: str) -> DiscoveryEntry:
         """Read a public dotted name's parameters, summary, own class members and rule links.
 

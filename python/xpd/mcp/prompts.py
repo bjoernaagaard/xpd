@@ -4,50 +4,54 @@ import json
 
 from fastmcp import FastMCP
 
-DISCOVERY = """\
-found = await call_tool("find", {"task": TASK})
-inspected = {
-    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
+from xpd.mcp.catalog import PACK_URI, RULE_URI
+from xpd.mcp.names import ToolName
+
+DISCOVERY = f"""\
+found = await call_tool("{ToolName.FIND}", {{"task": TASK}})
+inspected = {{
+    kind: [await call_tool("{ToolName.API}", {{"name": item["name"]}}) for item in found[kind]]
     for kind in ("symbols", "rules", "recipes")
-}
-discovery = {
-    "question": {"task": TASK}, "candidates": inspected,
-    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
-}
-api_proof = await call_tool("discovery_gate", {
+}}
+discovery = {{
+    "question": {{"task": TASK}}, "candidates": inspected,
+    "choice": {{"name": CHOICE, "reason": REASON, "symbols": SYMBOLS}},
+}}
+api_proof = await call_tool("{ToolName.DISCOVERY_GATE}", {{
     "paths": [TRAIN, PREDICT, FEATURES], "discovery": discovery,
-})
+}})
 if not api_proof["gate"]["passed"]:
     return api_proof
 """
 
 # The stages of a pipeline run as one code mode script. Each result is handed to `gates`.
-STAGES = """\
-profile = await call_tool("profile", {"file": DATA})
-lint = await call_tool("check", {"paths": [TRAIN, PREDICT, FEATURES]})
+STAGES = f"""\
+profile = await call_tool("{ToolName.PROFILE}", {{"file": DATA}})
+lint = await call_tool("{ToolName.CHECK}", {{"paths": [TRAIN, PREDICT, FEATURES]}})
 if any(issue["severity"] == "error" for issue in lint["issues"]):
-    return {"passed": False, "lint": lint, "discovery": api_proof}
-dataflow = await call_tool("graph", {"paths": [FEATURES]})
-reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
-served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
-contract = await call_tool("contract", {"file": CONTRACT})
-refitted = await call_tool("refit", {"file": CONTRACT})
-proof = {
+    return {{"passed": False, "lint": lint, "discovery": api_proof}}
+dataflow = await call_tool("{ToolName.GRAPH}", {{"paths": [FEATURES]}})
+reproducible = await call_tool("{ToolName.EQUIV}", {{"old": TRAIN, "new": TRAIN}})
+served = await call_tool("{ToolName.EQUIV}", {{"old": TRAIN, "new": PREDICT}})
+contract = await call_tool("{ToolName.CONTRACT}", {{"file": CONTRACT}})
+refitted = await call_tool("{ToolName.REFIT}", {{"file": CONTRACT}})
+proof = {{
     "lint": lint, "dataflow": dataflow, "refit": refitted,
     "reproducible": reproducible,
     "served": served, "discovery": api_proof,
-}
-report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
-return {
+}}
+report = await call_tool("{ToolName.GATES}", \
+{{"profile": profile, "contract": contract, "proof": proof}})
+return {{
     "passed": report["passed"],
     "gates": [
-        {"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}
+        {{"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}}
         for gate in report["gates"]
     ],
     "refit": refitted,
     "validation": contract["validation"],
     "model": contract["model"],
-}"""
+}}"""
 
 
 def discovery_task(target: str, task: str = "") -> str:
@@ -71,7 +75,7 @@ def stages_script(data: str, target: str, task: str = "") -> str:
     return "\n".join([*constants, "SYMBOLS = [CHOICE]", DISCOVERY, STAGES])
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, review_uri: str) -> None:
     @mcp.prompt(tags={"lint"})
     def lint_and_fix(path: str = ".") -> str:
         """Lint a path with xpd, fix what it reports, and lint again until it is clean.
@@ -81,16 +85,17 @@ def register(mcp: FastMCP) -> None:
         """
         return f"""Lint {path} with xpd and fix what it finds.
 
-1. Call the `check` tool with paths ["{path}"].
-2. Call the `fix` tool with the same paths to write the safe fixes.
-3. For each issue left, read the rule with the `rule` tool and change the code as its
+1. Call the `{ToolName.CHECK}` tool with paths ["{path}"].
+2. Call the `{ToolName.FIX}` tool with the same paths to write the safe fixes.
+3. For each issue left, read the rule with the `{ToolName.RULE}` tool and change the code as its
    example shows. Fix every `error`. Fix a `warning` unless you can say why the code is right
    here, and say so. Don't silence rules.
-4. If an issue has an unsafe fix, you may call `fix` with `unsafe` true. The user is asked to
+4. If an issue has an unsafe fix, you may call `{ToolName.FIX}` with `unsafe` true. The user \
+is asked to
    confirm. Read the diff afterwards.
 5. A `pandas/missing-<package>` warning names a package the project lacks. Ask the user before
    you add it.
-6. Call `check` again. You are done when it reports no error and every warning left has a
+6. Call `{ToolName.CHECK}` again. You are done when it reports no error and every warning left has a
    reason."""
 
     @mcp.prompt(tags={"review"})
@@ -106,17 +111,19 @@ def register(mcp: FastMCP) -> None:
         if rule and package:
             focus = (
                 f"\nLook closest at the rule {package}/{rule}. "
-                f"Read xpd://rules/{package}/{rule} first."
+                f"Read {RULE_URI.format(package=package, rule=rule)} first."
             )
         elif package:
-            focus = f"\nLook closest at the {package} rules. xpd://rules/{package} lists them."
+            uri = PACK_URI.format(package=package)
+            focus = f"\nLook closest at the {package} rules. {uri} lists them."
         return f"""Review {target} and report what is slow, wrong or hard to maintain.{focus}
 
-1. Read skill://python-review/SKILL.md and follow it. It cites a rule for every finding.
+1. Read {review_uri} and follow it. It cites a rule for every finding.
 2. If {target} is a git range, list the changed .py files with git and review those.
-3. Call the `check` tool on the files. Each issue is a finding. Cite it as
-   `<package>/<rule>` and link the rule's `url` from the `rule` tool.
-4. If a file has a pipeline of steps or Apache Hamilton nodes, call the `graph` tool on it and
+3. Call the `{ToolName.CHECK}` tool on the files. Each issue is a finding. Cite it as
+   `<package>/<rule>` and link the rule's `url` from the `{ToolName.RULE}` tool.
+4. If a file has a pipeline of steps or Apache Hamilton nodes, call the `{ToolName.GRAPH}` \
+tool on it and
    add its errors and warnings as findings.
 5. Then read the code for what a linter cannot see, as the skill describes.
 6. Report the findings, worst first, each with the file and line, the rule, and the fix. Change
@@ -132,15 +139,17 @@ def register(mcp: FastMCP) -> None:
         """
         return f"""Refactor {path} so that: {goal}
 
-1. If the script reads a data file, call the `profile` tool on it first, so your choices fit
+1. If the script reads a data file, call the `{ToolName.PROFILE}` tool on it first, so your \
+choices fit
    the real dtypes, nulls and sizes.
 2. Copy {path} to a new file beside it, such as {path}.old.py, before you change anything.
    Both files must leave their output in a variable named `result`. Add one if it is missing.
-3. Change {path}. Call the `check` tool on it and fix what it reports.
-4. Call the `equiv` tool with old set to the copy and new set to {path}. The refactor is done
+3. Change {path}. Call the `{ToolName.CHECK}` tool on it and fix what it reports.
+4. Call the `{ToolName.EQUIV}` tool with old set to the copy and new set to {path}. The \
+refactor is done
    only when it returns `equivalent` true. If it returns false, read `detail` and fix the new
    code, not the comparison.
-5. Delete the copy, and tell the user what changed and that `equiv` passed."""
+5. Delete the copy, and tell the user what changed and that `{ToolName.EQUIV}` passed."""
 
     @mcp.prompt(tags={"dataflow"})
     def add_to_dataflow(path: str, change: str) -> str:
@@ -153,15 +162,16 @@ def register(mcp: FastMCP) -> None:
         """
         return f"""Make this change to the dataflow in {path}: {change}
 
-1. Call the `graph` tool on {path} first. For Apache Hamilton, pass every module of the
+1. Call the `{ToolName.GRAPH}` tool on {path} first. For Apache Hamilton, pass every module of the
    Driver. Read `pipelines[].steps` or `nodes` to see what exists.
 2. Reuse a column or node that exists instead of computing its formula again.
 3. In step code, return `frame.assign(...)` or `frame.join(...)`, and don't write
    `frame["x"] = ...` on the frame a step was given.
-4. Make the change, then call `graph` again. Fix every `error`. Fix a `warning` unless you can
+4. Make the change, then call `{ToolName.GRAPH}` again. Fix every `error`. Fix a `warning` \
+unless you can
    say why the code is right. For Hamilton, a warning about an input one edit from a node name
    is usually a typing error.
-5. Call the `check` tool on {path} and fix what it reports."""
+5. Call the `{ToolName.CHECK}` tool on {path} and fix what it reports."""
 
     @mcp.prompt(tags={"pipeline"})
     def build_pipeline(data: str, target: str, task: str = "") -> str:
@@ -178,7 +188,8 @@ def register(mcp: FastMCP) -> None:
         return f"""Build a model that predicts {target} from {data}. Write three scripts in the \
 project root, which is where each of them runs, and save the model in the folder model.
 
-First call `find` with the task {discovery_task(target, task)}, then `api` on the candidates.
+First call `{ToolName.FIND}` with the task {discovery_task(target, task)}, then \
+`{ToolName.API}` on the candidates.
 Keep each candidate's kind, name, signature, summary and guarding rules. Kinds may include
 recipes as well as symbols and rules. Choose a candidate and state why. For a recipe, name
 its indexed callable symbols too. Set TASK, CHOICE, REASON and SYMBOLS in the script to those
@@ -190,7 +201,8 @@ The sandbox cannot write files or ask an LLM to choose. Write the files with the
 normal editing tools before execute. One execute call repeats discovery and checks that
 written choice, then checks code and runs the pipeline stages. It does not generate code.
 
-1. Call the `profile` tool on {data}. Choose the steps from the real dtypes, nulls and distinct
+1. Call the `{ToolName.PROFILE}` tool on {data}. Choose the steps from the real dtypes, nulls \
+and distinct
    values. The target must have no nulls.
 2. Write features.py. It holds the features that read one row at a time, as step code: each
    step returns `frame.assign(...)`, and one function runs them as `frame.pipe(a).pipe(b)`.

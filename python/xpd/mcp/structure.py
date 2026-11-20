@@ -7,6 +7,7 @@ from mcp.types import InputRequiredResult
 from xpd.mcp.base import READS, REWRITES, WRITES, confirmed, rooted, run
 from xpd.mcp.binary import NEW, OUTLINE, QUERY, REWRITE, TEST, Xpd
 from xpd.mcp.models import CaseReport, CodeMatch, CreatedFiles, OutlineFile
+from xpd.mcp.names import ToolName
 from xpd.mcp.options import CaseOptions, NewItem, OutlineOptions, Query
 from xpd.mcp.root import Project
 
@@ -18,7 +19,7 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 
 def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(tags={"structure"}, annotations=READS, task=True)
+    @mcp.tool(name=ToolName.QUERY, tags={"structure"}, annotations=READS, task=True)
     @rooted
     async def query(
         ctx: Context, query: Query, paths: list[str] | None = None
@@ -32,7 +33,7 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         root = await project.required_root(ctx)
         return await run(ctx, xpd, QUERY, root, root.all_inside(paths or ["."]), *query.flags())
 
-    @mcp.tool(tags={"structure", "fix"}, annotations=REWRITES, task=True)
+    @mcp.tool(name=ToolName.REWRITE, tags={"structure", "fix"}, annotations=REWRITES, task=True)
     @rooted
     async def rewrite(
         ctx: Context, query: Query, paths: list[str] | None = None
@@ -69,7 +70,7 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 
 def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(tags={"structure"}, annotations=READS, task=True)
+    @mcp.tool(name=ToolName.OUTLINE, tags={"structure"}, annotations=READS, task=True)
     @rooted
     async def outline(
         ctx: Context, paths: list[str] | None = None, options: OutlineOptions | None = None
@@ -87,7 +88,7 @@ def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 
 def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(tags={"rules", "authoring"}, annotations=WRITES, task=True)
+    @mcp.tool(name=ToolName.NEW, tags={"rules", "authoring"}, annotations=WRITES, task=True)
     @rooted
     async def new(ctx: Context, item: NewItem) -> CreatedFiles | InputRequiredResult:
         """Create a project, rule, empty case template or shared utility without prompts.

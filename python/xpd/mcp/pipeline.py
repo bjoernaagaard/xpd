@@ -26,24 +26,27 @@ from xpd.mcp.models import (
     Refit,
     Stage,
 )
+from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project
 
 # The rules of each pack that report a split, an estimator, an encoder, a bootstrap, a simulation
 # or an optimizer run that draws without a seed. A pack without such a rule is not listed.
 SEED_RULES = {
-    "sklearn": ("missing-random-state", "random-state-without-shuffle"),
-    "sklego": ("unseeded-random-estimator",),
-    "mapie": ("unseeded-resampling",),
-    "category_encoders": ("encoder-noise-without-seed",),
-    "arch": ("arch-unseeded-draws",),
-    "pymoo": ("unseeded-run", "numpy-seed-ignored"),
+    "sklearn": ("scikit-learn", ("missing-random-state", "random-state-without-shuffle")),
+    "sklego": ("scikit-lego", ("unseeded-random-estimator",)),
+    "mapie": ("MAPIE", ("unseeded-resampling",)),
+    "category_encoders": ("Category Encoders", ("encoder-noise-without-seed",)),
+    "arch": ("arch", ("arch-unseeded-draws",)),
+    "pymoo": ("pymoo", ("unseeded-run", "numpy-seed-ignored")),
 }
 PIPELINE = "sklearn.pipeline.Pipeline"
 # What a later run needs to rebuild the environment that wrote the model.
 VERSIONS = ("python", "scikit-learn", "pandas")
 MIN_FOLDS = 2
 # The libraries that SEED_RULES covers, as the detail of `split-is-seeded` names them.
-SEED_LIBRARIES = "scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo"
+*seed_libraries, last_library = (label for label, _ in SEED_RULES.values())
+SEED_LIBRARIES = f"{', '.join(seed_libraries)} or {last_library}"
+SEED_IDS = {(pack, rule) for pack, (_, names) in SEED_RULES.items() for rule in names}
 
 
 def gate(
@@ -94,7 +97,7 @@ def split_is_seeded(lint: CheckReport, contract: Contract) -> Gate:
     failures = [
         f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
         for issue in lint.issues
-        if issue.rule in SEED_RULES.get(issue.package, ())
+        if (issue.package, issue.rule) in SEED_IDS
     ]
     found = (
         f"The contract records the seed {contract.split.seed}, and check reports no unseeded "
@@ -280,6 +283,31 @@ def refit_matches_scores(contract: Contract, result: Refit) -> Gate:
     )
 
 
+def discovery_gates(contract: Contract, proof: Proof) -> list[Gate]:
+    if contract.discovery is None and proof.discovery is None:
+        return []
+    gates = []
+
+    failures = []
+    if proof.discovery is None:
+        failures.append("No discovery_gate result was supplied.")
+    else:
+        gates.append(proof.discovery.gate)
+        recorded = contract.discovery.decision() if contract.discovery else None
+        if recorded != proof.discovery.discovery.decision():
+            failures.append("The contract and proof record different discovery choices.")
+    gates.append(
+        gate(
+            "discovery-is-recorded",
+            "discovery",
+            ["contract"],
+            failures,
+            "The contract records the discovery question, candidates and reason of the proof.",
+        )
+    )
+    return gates
+
+
 def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
     gates = [
         data_is_profiled(profile, contract),
@@ -308,35 +336,17 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
         ),
         versions_recorded(profile, contract),
     ]
-    if contract.discovery is not None or proof.discovery is not None:
-        failures = []
-        if proof.discovery is None:
-            failures.append("No discovery_gate result was supplied.")
-        else:
-            gates.append(proof.discovery.gate)
-            recorded = contract.discovery.decision() if contract.discovery else None
-            if recorded != proof.discovery.discovery.decision():
-                failures.append("The contract and proof record different discovery choices.")
-        gates.append(
-            gate(
-                "discovery-is-recorded",
-                "discovery",
-                ["contract"],
-                failures,
-                "The contract records the discovery question, candidates and reason of the proof.",
-            )
-        )
+    gates.extend(discovery_gates(contract, proof))
     failed = [gate.name for gate in gates if not gate.passed]
     return GateReport(passed=not failed, failed=failed, gates=gates)
 
 
 def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
     # A rule that the binary renamed would never match, and its gate would pass every run.
-    for package, names in SEED_RULES.items():
-        for rule in names:
-            rules.find(package, rule)
+    for package, rule in SEED_IDS:
+        rules.find(package, rule)
 
-    @mcp.tool(tags={"pipeline"}, annotations=READS)
+    @mcp.tool(name=ToolName.CONTRACT, tags={"pipeline"}, annotations=READS)
     @rooted
     async def contract(ctx: Context, file: str) -> Contract | InputRequiredResult:
         """Read the contract that a training script saved beside its model: the data file and
@@ -378,7 +388,7 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
             }
         )
 
-    @mcp.tool(tags={"pipeline"}, annotations=READS)
+    @mcp.tool(name=ToolName.GATES, tags={"pipeline"}, annotations=READS)
     def gates(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
         """Judge a pipeline run from raw rows to a saved model. Each gate is one requirement,
         with the tools whose results decide it. The run is done when `passed` is true. Changes
