@@ -7,10 +7,14 @@ use std::path::PathBuf;
 use anyhow::{Context as _, Result, ensure};
 
 use crate::fix_safety::Applicability;
-use crate::pack::Pack;
-use crate::scan::{self, File, Replacement, Scanned};
+use crate::scan::{EditBatch, File};
+use crate::workspace::Workspace;
 
-pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) -> Result<Scanned> {
+pub(crate) fn apply(
+    files: &[PathBuf],
+    workspace: &Workspace,
+    allowed: Applicability,
+) -> Result<usize> {
     ensure!(
         io::stdin().is_terminal(),
         "--review needs an interactive terminal"
@@ -26,18 +30,10 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
         let Ok(source) = fs::read_to_string(path) else {
             continue;
         };
-        let mut proposals =
-            scan::analyze(File::on_disk(path), &source, packs, scan::Edits::Report).found;
-        proposals.sort_by_key(|found| found.fix.as_ref().map(|fix| fix.replacement.range.start));
-        let mut accepted: Vec<&Replacement> = Vec::new();
-        let mut end = 0;
-        for found in &proposals {
-            if found.fix.as_ref().is_none_or(|fix| fix.level > allowed) {
-                continue;
-            }
-            let Some(fix) = &found.fix else { continue };
-            let edit = &fix.replacement;
-            if edit.range.start < end {
+        let analysis = workspace.analyze(File::on_disk(path), &source);
+        let mut accepted = EditBatch::default();
+        for (found, edit) in analysis.proposals(allowed) {
+            if !accepted.fits(edit) {
                 continue;
             }
             if !accept_all {
@@ -61,7 +57,6 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
                     Answer::Yes => {}
                 }
             }
-            end = edit.range.end;
             accepted.push(edit);
         }
         if accepted.is_empty() {
@@ -72,16 +67,11 @@ pub(crate) fn scan(files: &[PathBuf], packs: &[Pack], allowed: Applicability) ->
             "{} changed during review; no reviewed edits were written to it",
             path.display()
         );
-        let mut updated = source;
-        for edit in accepted.iter().rev() {
-            updated.replace_range(edit.range.clone(), &edit.text);
-        }
-        fs::write(path, updated).with_context(|| format!("cannot write {}", path.display()))?;
+        fs::write(path, accepted.apply(&source))
+            .with_context(|| format!("cannot write {}", path.display()))?;
         fixed += accepted.len();
     }
-    let mut scanned = scan::scan(files, packs, None)?;
-    scanned.fixed = fixed;
-    Ok(scanned)
+    Ok(fixed)
 }
 
 enum Answer {

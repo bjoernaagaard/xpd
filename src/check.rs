@@ -32,9 +32,16 @@ impl Workspace {
     pub(crate) fn check(&self, paths: &[PathBuf], mode: FixMode, scope: Scope) -> Result<Report> {
         let catalog = &self.catalog;
         let files = scan::collect_files(paths, &catalog.packs)?;
-        let scanned = match mode {
-            FixMode::Apply(fix) => scan::scan(&files, &catalog.packs, fix)?,
-            FixMode::Review(allowed) => crate::review::scan(&files, &catalog.packs, allowed)?,
+        let (scanned, fixed) = match mode {
+            FixMode::Apply(fix) => {
+                let scanned = scan::scan(&files, &catalog.packs, fix)?;
+                let fixed = scanned.fixed;
+                (scanned, fixed)
+            }
+            FixMode::Review(allowed) => {
+                let fixed = crate::review::apply(&files, self, allowed)?;
+                (scan::scan(&files, &catalog.packs, None)?, fixed)
+            }
         };
         let mut issues = scanned.issues;
         if matches!(scope, Scope::Project) {
@@ -49,7 +56,7 @@ impl Workspace {
         }
         Ok(Report {
             issues,
-            fixed: scanned.fixed,
+            fixed,
             skipped: scanned.skipped,
         })
     }

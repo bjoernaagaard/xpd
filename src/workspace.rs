@@ -5,6 +5,7 @@ use anyhow::Result;
 use crate::catalog::{Catalog, Filters};
 use crate::package_check::{self, Calls};
 use crate::report::Issue;
+use crate::scan::{self, Edits, File, Linted};
 use crate::settings::Settings;
 use crate::venv::{Distributions, Venv};
 
@@ -40,6 +41,10 @@ impl Workspace {
             catalog,
             environment: venv.zip(installed),
         })
+    }
+
+    pub(crate) fn analyze(&self, file: File<'_>, source: &str) -> Linted {
+        scan::analyze(file, source, &self.catalog.packs, Edits::Report)
     }
 
     pub(crate) fn package_issues(&self, calls: &Calls) -> Vec<Issue> {
