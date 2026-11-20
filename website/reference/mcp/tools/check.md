@@ -19,7 +19,7 @@ The call below lints one file for one rule, and counts the unsafe fix in `fixabl
 A path outside the project root fails before xpd runs.
 
 ```text
-../outside.py is outside the project root /home/bsa/src/pdx. Pass a path inside it.
+../outside.py is outside the project root /tmp/project. Pass a path inside it.
 ```
 
 A failure of the binary, such as a file it cannot read, comes back as a tool error with the

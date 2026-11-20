@@ -11,20 +11,21 @@ stdin, and xpd reads the event's name from `hook_event_name`. The
 
 The brief and the prompt answer are plain text on stdout, which Claude Code and Codex both add to
 what the agent reads. Each states what xpd found, and neither gives the agent an order. xpd prints
-them only in a project with a Python file, and each is at most 2,000 characters long.
+them only in a project with a Python file, and keeps each response short.
 
 ## When a session starts
 
 On `SessionStart`, xpd first records the commit that is checked out, which the `Stop` check
-compares the files with. It then reads the Python files of the project and prints the brief below.
-This one is from the xpd repository.
+compares the files with. It then reads the Python files of the project and prints a brief.
 
-```text
-xpd read 153 Python files of this project.
-Rule packs that apply: python (153 files), numpy (68 files), pandas (66 files), sklearn (31 files), plotly (30 files), arch (11 files), linearmodels (7 files), mapie (7 files), pymoo (7 files), category_encoders (6 files), sklego (6 files), scipy (5 files), hamilton (1 file).
-The style setting is strict, so a rule of the house style is a warning, and the Stop check holds a turn that leaves a warning.
-Pipelines of steps that `xpd graph` reads: 7 in 6 files: samples/graph/chain.py (2), samples/graph/steps.py (1), samples/graph/steps_wrong_order.py (1), and 3 more.
-Hamilton nodes that `xpd graph` reads: 19 in 1 file: samples/hamilton/mutation.py (19).
+```console
+$ mkdir -p brief && cp samples/graph/steps.py brief/
+$ echo '{"session_id":"s0","cwd":"/tmp/project/brief","hook_event_name":"SessionStart"}' | xpd hook
+xpd read 1 Python file of this project.
+Rule packs that apply: pandas (1 file), python (1 file).
+The style setting is default, so a rule of the house style is info, which holds no turn.
+Pipelines of steps that `xpd graph` reads: 1 in 1 file: steps.py (1).
+Hamilton nodes that `xpd graph` reads: none.
 Three xpd commands fit between the edits of a session.
 - `xpd find "<task>"` ranks library symbols, rules and playbooks for a task, and it comes before the choice of a library or a method.
 - `xpd graph <file>` prints the dataflow of a file, and it comes after a step or a node is added, moved or renamed.
@@ -38,11 +39,10 @@ Three xpd commands fit between the edits of a session.
 | Pipelines of steps | What [`xpd graph`](../graph/) finds in each file |
 | Hamilton nodes | What `xpd graph` finds in each file that imports Hamilton |
 
-xpd reads at most 1,000 Python files and looks at no more than 20,000 files and folders, so the
-brief stays fast in a large project. The brief says so when it stopped at 1,000 files. Folders
-respect `.gitignore`, as in `xpd check`. On the 153 files of the xpd repository, the release build
-printed the brief in 0.5 seconds. After a compaction, the client sends `SessionStart` again and
-xpd prints the brief again.
+xpd caps how many Python files and directory entries it scans so the brief stays fast in a large
+project, and notes in the brief when it stops at the cap. Folders respect `.gitignore`, as in
+`xpd check`. After a compaction, the client sends `SessionStart` again and xpd prints the brief
+again.
 
 ## On each prompt
 
@@ -53,7 +53,7 @@ to print as follows.
 on(UserPromptSubmit)
   if the project has no Python file
     print nothing
-  if the first recipe that find gives for the prompt is a playbook, and its keyword score is 24 or more
+  if the first recipe that find gives for the prompt is a playbook and clears the keyword threshold
     print the playbook       # its name, its commands in order, its rules and its name for xpd api
   if the prompt asks what to make or improve
     print the open issues    # counted by pack and severity, with the five rules that have the most
@@ -62,9 +62,8 @@ on(UserPromptSubmit)
 ```
 
 A [playbook](../find/#playbooks) is one of xpd's own recipes, which holds the house style for a
-kind of task. A prompt asks what to make or improve when it holds one of the phrases "what should
-I", "what should we", "what can I", "what could I", "what to make", "what to build", "what to
-improve", "what to do next" or "what next", or one of the words "improve", "optimize" or "better".
+kind of task. A prompt asks what to make or improve when it asks what to do next or asks to
+improve, optimize or make the code better.
 
 | Prompt | What xpd prints |
 | --- | --- |
@@ -75,15 +74,12 @@ improve", "what to do next" or "what next", or one of the words "improve", "opti
 | "rename this variable" | Nothing |
 | "why does the merge duplicate rows?" | Nothing |
 
-The score of 24 is the keyword score that `xpd find` ranks by. Ten loose asks, among them every
-ask that `indexes/questions.json` expects a playbook for, scored 28 and above for their playbook.
-Thirty prompts about other work got no playbook as their first recipe, and the best playbook of
-each scored 18 and below. The hook searches by meaning only when the search model of `xpd find` is
-already on the machine, and it never downloads the model. The score comes from the keywords alone,
-so the same prompts get a playbook with and without the model.
+The hook searches by meaning only when the search model of `xpd find` is already on the machine,
+and it never downloads the model. The playbook threshold comes from the keywords alone, so the
+same prompts get a playbook with and without the model.
 
-The open issues are the ones that `xpd check` reports for the first 1,000 Python files of the
-project, under the style setting of the project.
+The open issues are the ones that `xpd check` reports for the project's scanned Python files, under
+the style setting of the project.
 
 ## After an edit
 
@@ -122,8 +118,8 @@ turn end. It then prints the list as `systemMessage`, which the client shows to 
 agent. The `info` issues of a turn that ends reach you the same way.
 
 xpd keeps one small file for each session in `sessions` in its cache folder, which is
-`$XDG_CACHE_HOME/xpd` or `xpd` in the cache folder of your platform. `SessionStart` deletes the
-session files that are older than seven days.
+`$XDG_CACHE_HOME/xpd` or `xpd` in the cache folder of your platform. `SessionStart` deletes stale
+session files.
 
 ## Examples
 

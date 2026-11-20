@@ -5,10 +5,38 @@ sidebar:
   order: 3
 ---
 
+import { Code } from '@astrojs/starlight/components';
+import stagesScript from 'virtual:xpd-code-mode-script';
+
+export const runPipeline = `import asyncio
+import json
+import sys
+
+from fastmcp import Client
+from fastmcp.client.transports import StdioTransport
+
+STAGES = """
+${stagesScript}
+"""
+
+
+async def main() -> None:
+    server = StdioTransport(
+        "xpd",
+        ["mcp", "--code-mode", "--root", "samples/pipeline"],
+        env={"VIRTUAL_ENV": sys.prefix},
+    )
+    async with Client(server) as client:
+        result = await client.call_tool("execute", {"code": STAGES})
+        print(json.dumps(result.structured_content, indent=2))
+
+
+asyncio.run(main())`;
+
 Start xpd's MCP server with `--code-mode`, and an agent can train, check and save a scikit-learn
 model from a data file in one `execute` call. The `gates` tool then says whether the run is done,
 with one line of evidence for each check. On this page you run the sample project in
-`samples/pipeline/` of the xpd repository, which passes all 15 gates.
+`samples/pipeline/` of the xpd repository, which passes every gate.
 
 With `--code-mode`, the server lists FastMCP's three
 [code mode](https://gofastmcp.com/docs/servers/transforms/code-mode) tools, `search`,
@@ -93,101 +121,10 @@ run it from the root of the repository with `$VIRTUAL_ENV/bin/python run_pipelin
 FastMCP's stdio client passes on only a few environment variables, so the client passes
 `VIRTUAL_ENV` to the server itself.
 
-```python title="run_pipeline.py"
-import asyncio
-import json
-import sys
+<Code code={runPipeline} lang="python" title="run_pipeline.py" />
 
-from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
-
-STAGES = """
-DATA = "penguins.csv"
-FEATURES = "features.py"
-TRAIN = "train.py"
-PREDICT = "predict.py"
-CONTRACT = "model/contract.json"
-TASK = "classify penguin species with a logistic regression pipeline"
-CHOICE = "sklearn.linear_model.LogisticRegression"
-REASON = "Class probabilities for the species target."
-SYMBOLS = [CHOICE]
-found = await call_tool("find", {"task": TASK})
-inspected = {
-    kind: [await call_tool("api", {"name": item["name"]}) for item in found[kind]]
-    for kind in ("symbols", "rules", "recipes")
-}
-discovery = {
-    "question": {"task": TASK}, "candidates": inspected,
-    "choice": {"name": CHOICE, "reason": REASON, "symbols": SYMBOLS},
-}
-api_proof = await call_tool("discovery_gate", {
-    "paths": [TRAIN, PREDICT, FEATURES], "discovery": discovery,
-})
-if not api_proof["gate"]["passed"]:
-    return api_proof
-
-profile = await call_tool("profile", {"file": DATA})
-lint = await call_tool("check", {"paths": [TRAIN, PREDICT, FEATURES]})
-if any(issue["severity"] == "error" for issue in lint["issues"]):
-    return {"passed": False, "lint": lint, "discovery": api_proof}
-dataflow = await call_tool("graph", {"paths": [FEATURES]})
-reproducible = await call_tool("equiv", {"old": TRAIN, "new": TRAIN})
-served = await call_tool("equiv", {"old": TRAIN, "new": PREDICT})
-contract = await call_tool("contract", {"file": CONTRACT})
-refitted = await call_tool("refit", {"file": CONTRACT})
-proof = {
-    "lint": lint, "dataflow": dataflow, "refit": refitted,
-    "reproducible": reproducible,
-    "served": served, "discovery": api_proof,
-}
-report = await call_tool("gates", {"profile": profile, "contract": contract, "proof": proof})
-return {
-    "passed": report["passed"],
-    "gates": [
-        {"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}
-        for gate in report["gates"]
-    ],
-    "refit": refitted,
-    "validation": contract["validation"],
-    "model": contract["model"],
-}
-"""
-
-
-async def main() -> None:
-    server = StdioTransport(
-        "xpd",
-        ["mcp", "--code-mode", "--root", "samples/pipeline"],
-        env={"VIRTUAL_ENV": sys.prefix},
-    )
-    async with Client(server) as client:
-        result = await client.call_tool("execute", {"code": STAGES})
-        print(json.dumps(result.structured_content, indent=2))
-
-
-asyncio.run(main())
-```
-
-The run took 7.5 seconds and returned `passed: true`, with the gates below. It ran with xpd 0.38.0,
-FastMCP 4.2.2, Python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, NumPy 2.5.5 and joblib 1.6.0.
-
-| Gate | Detail |
-| --- | --- |
-| `data-is-profiled` | penguins.csv has 344 rows, and the target species has no nulls. |
-| `split-covers-every-row` | The contract counts 258 training rows and 86 held out rows. |
-| `split-is-seeded` | The contract records the seed 0, and check reports no unseeded scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo draw. |
-| `inputs-are-file-columns` | The 6 inputs of the contract have the names and dtypes of columns of penguins.csv. |
-| `dataflow-connects` | 2 feature steps read only input columns and columns of earlier steps. |
-| `one-pipeline` | The contract lists one Pipeline of FunctionTransformer then ColumnTransformer then LogisticRegression. |
-| `check-reports-no-error` | check reports no error. |
-| `cross-validated` | The contract records accuracy 0.9803921568627451 to 1.0 on 5 folds, and 0.9883720930232558 as the held out score. |
-| `reproducible` | Two runs of the training script, each in its own Python process, leave an equal `result`. |
-| `refit-matches-model` | The raw training refit matches the saved model on predict_proba. |
-| `refit-matches-scores` | The contract scores and row and fold counts match the raw training refit. |
-| `saved-model-predicts` | The prediction script, in its own Python process, leaves the `result` that the training script left. |
-| `versions-recorded` | The contract records python 3.15.2, scikit-learn 1.9.1, pandas 3.1.1, numpy 2.5.5, joblib 1.6.0. |
-| `indexed-api-calls` | Checked 1 direct imported calls for indexed callable names and literal keyword names in api's parameter lists. No code was run. |
-| `discovery-is-recorded` | The contract records the discovery question, candidates and reason of the proof. |
+On `samples/pipeline/`, the run returns `passed: true`, one entry per gate with its `name`,
+`passed` and `detail`, and the `refit`, `validation` and `model` summaries from the contract.
 
 ## The stages
 
@@ -255,27 +192,12 @@ record in `discovery.json` and runs `train.py` again, or the gate `discovery-is-
 ## The gates
 
 A run is done when every gate passes. [`gates`](../../mcp/tools/gates/) judges the results that
-the script passes to it, and the table says what each gate needs.
-
-| Gate | The gate passes when |
-| --- | --- |
-| `data-is-profiled` | The contract names the profiled file with its row count, and the target has no nulls |
-| `split-covers-every-row` | Each side of the split has rows, and together they hold every row of the file |
-| `split-is-seeded` | `check` reports no draw without a seed from scikit-learn, scikit-lego, MAPIE, Category Encoders, arch or pymoo |
-| `inputs-are-file-columns` | Each input of the contract has the name and dtype of a column of the file, and none is the target |
-| `dataflow-connects` | `graph` reports no error or warning, and each feature step reads only input columns and columns of earlier steps |
-| `one-pipeline` | The saved object is one `sklearn.pipeline.Pipeline`, and the contract lists its steps |
-| `check-reports-no-error` | `check` reports no error of any pack |
-| `cross-validated` | The contract has two or more folds and one score for each fold |
-| `reproducible` | Two runs of the training script, each in its own Python process, leave an equal `result` |
-| `refit-matches-model` | A clone fitted on the raw training rows gives the held out outputs of the saved model |
-| `refit-matches-scores` | The recorded scores, row counts and fold count equal what `refit` computes |
-| `saved-model-predicts` | The prediction script, which loads the model from disk, leaves the `result` of the training script |
-| `versions-recorded` | The contract records Python, scikit-learn and pandas, and its pandas is the one `profile` ran with |
-| `indexed-api-calls` | `discovery_gate` passed |
-| `discovery-is-recorded` | The contract and the proof hold the same question, candidates and choice |
-
-The last two gates are judged only when the contract or the proof holds a discovery record.
+the script passes to it — checking the profiled data, the seeded split, the input columns and
+feature dataflow, a single scikit-learn `Pipeline`, zero lint errors, cross-validation scores,
+reproducibility, raw-training refit agreement, saved-model prediction equivalence and recorded
+versions. When the contract or the proof holds a discovery record, it also checks the indexed API
+calls and that the discovery choice matches the contract. See [`gates`](../../mcp/tools/gates/)
+for the live tool description and schema.
 
 ## A leak stops the run at check
 

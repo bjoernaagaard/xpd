@@ -1,6 +1,6 @@
 Run `xpd doctor` at the root of a Python project to see which Ruff, ty and pytest settings to change and which pytest plugins to add or remove. Doctor reads the project's configuration and Python files. It prints edits for you to review and apply. Ruff and ty run their own checks.
 
-Doctor ships a catalog reviewed against Ruff 0.17.4, ty 0.0.106 and pytest 9.2.0. Doctor consults Ruff and ty in the project's environment or on `PATH`. It gets the installed pytest version from the project's virtual environment. Advice for a missing tool is marked "unverified locally".
+Doctor ships a catalog reviewed against pinned releases of Ruff, ty and pytest, which each report names. Doctor consults Ruff and ty in the project's environment or on `PATH`. It gets the installed pytest version from the project's virtual environment. Advice for a missing tool is marked "unverified locally".
 
 ## Recommended Ruff rules
 
@@ -83,7 +83,7 @@ the Ruff and ty advice.
 $ xpd doctor --format text
 ...
 pyproject.toml, table [dependency-groups] at line 1
-  For 132 Python files under pyproject.toml, unverified locally (decisions for pytest 9.2.0).
+...
   remove "pytest-rerunfailures" from dev at line 4
     pytest-rerunfailures. A retry can hide the first failure.
     Source: https://github.com/pytest-dev/pytest-rerunfailures/blob/master/README.rst
@@ -92,7 +92,7 @@ pyproject.toml, table [dependency-groups] at line 1
     Source: https://github.com/pytest-dev/pytest-randomly/blob/main/README.rst
 
 pyproject.toml, table [tool.pytest.ini_options] at line 8
-  For 132 Python files under pyproject.toml, unverified locally (decisions for pytest 9.2.0).
+...
   remove --reruns 2 from addopts at line 9
     --reruns. Keep the first failure visible so you can find and fix its cause.
     Source: https://github.com/pytest-dev/pytest-rerunfailures/blob/master/README.rst
@@ -162,14 +162,14 @@ def ratio(total: float, units: int) -> float:
     return total / units
 ```
 
-Run `xpd doctor --format text`. With Ruff 0.17.4 and ty 0.0.107 installed, Doctor suggested adding three missing Ruff codes to the new project's configuration:
+Run `xpd doctor --format text`. Doctor suggests adding the missing Ruff codes to the new project's configuration:
 
 ```toml
 [tool.ruff.lint]
 extend-select = ["PTH118", "PGH003", "PGH004"]
 ```
 
-The other four recommended Ruff codes were already enabled. Doctor also suggested the three recommended ty levels above. Separately, it pointed to `return total / units` on line 2 as evidence for the conditional `division-by-zero = "warn"`. Review whether that check suits your code before adding it.
+Doctor also suggests the three recommended ty levels above. Separately, it points to `return total / units` on line 2 as evidence for the conditional `division-by-zero = "warn"`. Review whether that check suits your code before adding it.
 
 For a machine-readable report, run:
 

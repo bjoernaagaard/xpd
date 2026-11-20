@@ -610,11 +610,19 @@ function namedSections(what, source, items, render) {
   );
 }
 
+/** Every Markdown or MDX file under `folder`, as absolute paths. */
+function docFiles(folder) {
+  if (!existsSync(folder)) return [];
+  return readdirSync(folder, { recursive: true })
+    .filter((file) => /\.mdx?$/.test(file))
+    .map((file) => join(folder, file));
+}
+
 // The README, the guides and the skills are about no single command or tool. Their examples run
 // too, and the flags they name must exist.
 const guides = join(docs, 'guides');
 const skills = join(repository, 'skills');
-const otherPages = [join(repository, 'README.md'), join(docs, 'index.md'), join(commandFolder, 'README.md'), ...['index', 'resources', 'prompts'].map((name) => join(mcpFolder, `${name}.md`)), ...markdownFiles(guides).map((name) => join(guides, `${name}.md`)), ...markdownFiles(skills).map((name) => join(skills, `${name}.md`))];
+const otherPages = [join(repository, 'README.md'), join(docs, 'index.md'), join(commandFolder, 'README.md'), ...['index', 'resources', 'prompts'].map((name) => join(mcpFolder, `${name}.md`)), ...docFiles(guides), ...docFiles(skills)];
 for (const source of otherPages) {
   const file = relative(repository, source);
   flagProblems.push(...unknownFlags(readFileSync(source, 'utf8'), null).map((problem) => `${file}: ${problem}`));

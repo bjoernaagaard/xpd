@@ -11,7 +11,7 @@ It lists the project's own rules as well, and reads them again after the project
 
 ## xpd://version
 
-The resource holds the version and nothing else, such as `0.38.0`.
+The resource holds the installed xpd version and nothing else.
 
 ## skill://python-best-practices/
 
