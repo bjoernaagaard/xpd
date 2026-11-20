@@ -62,10 +62,10 @@ def build(settings: Settings) -> FastMCP:
         transforms=[CodeMode()] if settings.code_mode else [],
     )
     mcp.add_extension(TasksExtension())
-    tools.register(mcp, xpd, project)
+    analysis = tools.register(mcp, xpd, project)
     structure.register(mcp, xpd, project)
     discovery.register(mcp, xpd, project)
-    views.register(mcp, xpd, project)
+    views.register(mcp, analysis)
     catalog.register(mcp, fallback_rules, xpd, project)
     pipeline.register(mcp, project, fallback_rules)
     prompts.register(mcp)

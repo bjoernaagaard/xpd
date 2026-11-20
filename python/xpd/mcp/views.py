@@ -5,6 +5,8 @@ keep their output schemas. A view's text content is the same JSON the data tool 
 host that renders no UI and for the model."""
 
 from collections import Counter
+from itertools import count
+from typing import get_args
 
 from fastmcp import Context, FastMCP
 from fastmcp.tools import ToolResult
@@ -21,10 +23,9 @@ from prefab_ui.components import (
     Row,
 )
 
-from xpd.mcp.base import READS, rooted, run
-from xpd.mcp.binary import CHECK, GRAPH, PROFILE, Xpd
-from xpd.mcp.models import GraphReport, Output
-from xpd.mcp.root import Project
+from xpd.mcp.base import READS
+from xpd.mcp.models import GraphReport, Output, Severity
+from xpd.mcp.tools import Analysis
 
 SEVERITY_BADGES = {
     "error": "destructive",
@@ -53,32 +54,37 @@ def dataflow_chart(report: GraphReport) -> str:
     its place in the chart, such as s0 or n3, since a step of a chain is named like
     `.assign(gross)` and a name such as `end` is a Mermaid keyword. Steps are named within
     their pipeline, and Apache Hamilton nodes and inputs within the whole report."""
-    boxes: dict[tuple[int, str], str] = {}
+    ids = count()
 
-    def box(pipeline: int, name: str) -> str:
-        prefix = "n" if pipeline < 0 else "s"
-        return boxes.setdefault((pipeline, name), f"{prefix}{len(boxes)}")
+    def box(names: dict[str, str], prefix: str, name: str) -> str:
+        if name not in names:
+            names[name] = f"{prefix}{next(ids)}"
+        return names[name]
 
     lines = ["flowchart LR"]
-    for index, pipeline in enumerate(report.pipelines):
+    for pipeline in report.pipelines:
+        steps: dict[str, str] = {}
         for step in pipeline.steps:
             shown = f"{step.name}()" if step.kind == "function" else step.name
-            lines.append(f"  {box(index, step.name)}[{label(shown)}]")
+            lines.append(f"  {box(steps, 's', step.name)}[{label(shown)}]")
         lines.extend(
-            f"  {box(index, link.source)} -->|{label(', '.join(link.columns))}| "
-            f"{box(index, link.to)}"
+            f"  {box(steps, 's', link.source)} -->|{label(', '.join(link.columns))}| "
+            f"{box(steps, 's', link.to)}"
             for link in pipeline.links
         )
-    lines.extend(f"  {box(-1, name.name)}([{label(name.name)}])" for name in report.inputs)
+    nodes: dict[str, str] = {}
+    lines.extend(f"  {box(nodes, 'n', name.name)}([{label(name.name)}])" for name in report.inputs)
     for node in report.nodes:
-        lines.append(f"  {box(-1, node.name)}[{label(node.name)}]")
-        lines.extend(f"  {box(-1, source.name)} --> {box(-1, node.name)}" for source in node.inputs)
+        lines.append(f"  {box(nodes, 'n', node.name)}[{label(node.name)}]")
+        lines.extend(
+            f"  {box(nodes, 'n', source.name)} --> {box(nodes, 'n', node.name)}"
+            for source in node.inputs
+        )
     return "\n".join(lines)
 
 
-def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
+def register(mcp: FastMCP, analysis: Analysis) -> None:
     @mcp.tool(app=True, tags={"lint", "app"}, annotations=READS)
-    @rooted
     async def show_issues(
         ctx: Context, paths: list[str] | None = None
     ) -> ToolResult | InputRequiredResult:
@@ -88,8 +94,9 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         Args:
             paths: Files or folders inside the project root. Default: the whole root.
         """
-        root = await project.required_root(ctx)
-        report = await run(ctx, xpd, CHECK, root, root.all_inside(paths or ["."]))
+        report = await analysis.check(ctx, paths)
+        if isinstance(report, InputRequiredResult):
+            return report
         rows = [
             {
                 "place": f"{issue.file}:{issue.line}" if issue.line else issue.file,
@@ -103,7 +110,9 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         counts = Counter(issue.severity for issue in report.issues)
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             with Row(gap=6):
-                for level in ("error", "warning", "info"):
+                for level in get_args(Severity):
+                    if level == "hint":
+                        continue
                     Metric(label=f"{level}s", value=counts[level])
                 Metric(label="fixable", value=report.fixable)
             DataTable(
@@ -121,7 +130,6 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         return shown(app, report)
 
     @mcp.tool(app=True, tags={"dataflow", "app"}, annotations=READS)
-    @rooted
     async def show_dataflow(ctx: Context, paths: list[str]) -> ToolResult | InputRequiredResult:
         """Show what `graph` reads as a flowchart of steps or nodes and a table of its problems,
         in hosts that render MCP Apps. Use `graph` when you need the data.
@@ -129,8 +137,9 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         Args:
             paths: Files or folders inside the project root.
         """
-        root = await project.required_root(ctx)
-        report = await run(ctx, xpd, GRAPH, root, root.all_inside(paths))
+        report = await analysis.graph(ctx, paths)
+        if isinstance(report, InputRequiredResult):
+            return report
         rows = [
             {
                 "place": f"{problem.file}:{problem.line}",
@@ -151,7 +160,6 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         return shown(app, report)
 
     @mcp.tool(app=True, tags={"data", "app"}, annotations=READS)
-    @rooted
     async def show_columns(ctx: Context, file: str) -> ToolResult | InputRequiredResult:
         """Show what `profile` reads as a table of columns, in hosts that render MCP Apps. Use
         `profile` when you need the data. Needs pandas in the project's Python.
@@ -159,8 +167,9 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         Args:
             file: The data file, inside the project root.
         """
-        root = await project.required_root(ctx)
-        profile = await run(ctx, xpd, PROFILE, root, [root.inside(file)])
+        profile = await analysis.profile(ctx, file)
+        if isinstance(profile, InputRequiredResult):
+            return profile
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             with Row(gap=6):
                 Metric(label="rows", value=profile.rows)

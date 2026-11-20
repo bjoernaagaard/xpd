@@ -1,6 +1,7 @@
 """The tools that run xpd on the project's files."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastmcp import Context, FastMCP
@@ -45,16 +46,14 @@ async def unsafe_confirmed(
     return answer
 
 
-def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    register_discovery(mcp, xpd)
-    register_lint(mcp, xpd, project)
-    register_data(mcp, xpd, project)
+@dataclass(frozen=True)
+class Analysis:
+    xpd: Xpd
+    project: Project
 
-
-def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(tags={"lint"}, annotations=READS, task=True)
     @rooted
     async def check(
+        self,
         ctx: Context,
         paths: list[str] | None = None,
         *,
@@ -77,12 +76,52 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             unsafe_fixes: Count unsafe fixes, which may change behavior, in `fixable` too.
             options: Which rules run, and the project file that adds the project's own rules.
         """
-        root = await project.required_root(ctx)
+        root = await self.project.required_root(ctx)
         args = root.all_inside(paths or ["."])
         flags = (options or CheckOptions()).flags(root)
         if unsafe_fixes:
             flags.append("--unsafe-fixes")
-        return await run(ctx, xpd, CHECK, root, args, *flags)
+        return await run(ctx, self.xpd, CHECK, root, args, *flags)
+
+    @rooted
+    async def graph(self, ctx: Context, paths: list[str]) -> GraphReport | InputRequiredResult:
+        """Read the dataflow of step code or Apache Hamilton modules without running them: which
+        step or node reads which, and what does not connect. Changes no file.
+
+        Run it after you add, move or rename a step or a node. Fix every `error`, and fix a
+        `warning` unless you can say why the code is right. Before you add a column to step
+        code, read `pipelines[].steps` and reuse a column that exists. For Hamilton, pass all
+        modules of one Driver together. `inputs` are what the caller passes.
+
+        Args:
+            paths: Files or folders inside the project root.
+        """
+        root = await self.project.required_root(ctx)
+        return await run(ctx, self.xpd, GRAPH, root, root.all_inside(paths))
+
+    @rooted
+    async def profile(self, ctx: Context, file: str) -> Profile | InputRequiredResult:
+        """Profile a data file (csv, parquet, feather, json or xlsx): each column's dtype,
+        nulls, distinct values and memory. Run it before you choose methods for the data.
+        Needs pandas in the project's Python. Changes no file.
+
+        Args:
+            file: The data file, inside the project root.
+        """
+        root = await self.project.required_root(ctx)
+        return await run(ctx, self.xpd, PROFILE, root, [root.inside(file)])
+
+
+def register(mcp: FastMCP, xpd: Xpd, project: Project) -> Analysis:
+    analysis = Analysis(xpd, project)
+    register_discovery(mcp, xpd)
+    register_lint(mcp, xpd, project, analysis)
+    register_data(mcp, xpd, project, analysis)
+    return analysis
+
+
+def register_lint(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) -> None:
+    mcp.tool(tags={"lint"}, annotations=READS, task=True)(analysis.check)
 
     @mcp.tool(tags={"lint", "fix"}, annotations=WRITES, task=True)
     @rooted
@@ -116,36 +155,10 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         return await run(ctx, xpd, CHECK, root, args, *flags)
 
 
-def register_data(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(tags={"dataflow"}, annotations=READS)
-    @rooted
-    async def graph(ctx: Context, paths: list[str]) -> GraphReport | InputRequiredResult:
-        """Read the dataflow of step code or Apache Hamilton modules without running them: which
-        step or node reads which, and what does not connect. Changes no file.
+def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) -> None:
+    mcp.tool(tags={"dataflow"}, annotations=READS)(analysis.graph)
 
-        Run it after you add, move or rename a step or a node. Fix every `error`, and fix a
-        `warning` unless you can say why the code is right. Before you add a column to step
-        code, read `pipelines[].steps` and reuse a column that exists. For Hamilton, pass all
-        modules of one Driver together. `inputs` are what the caller passes.
-
-        Args:
-            paths: Files or folders inside the project root.
-        """
-        root = await project.required_root(ctx)
-        return await run(ctx, xpd, GRAPH, root, root.all_inside(paths))
-
-    @mcp.tool(tags={"data"}, annotations=READS, task=True)
-    @rooted
-    async def profile(ctx: Context, file: str) -> Profile | InputRequiredResult:
-        """Profile a data file (csv, parquet, feather, json or xlsx): each column's dtype,
-        nulls, distinct values and memory. Run it before you choose methods for the data.
-        Needs pandas in the project's Python. Changes no file.
-
-        Args:
-            file: The data file, inside the project root.
-        """
-        root = await project.required_root(ctx)
-        return await run(ctx, xpd, PROFILE, root, [root.inside(file)])
+    mcp.tool(tags={"data"}, annotations=READS, task=True)(analysis.profile)
 
     @mcp.tool(tags={"pipeline"}, annotations=RUNS_CODE, task=True)
     @rooted
