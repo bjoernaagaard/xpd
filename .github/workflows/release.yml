@@ -23,7 +23,6 @@ on:
       - src/**
       - indexes/**
       - py/**
-      - "!.agents/artifacts/**"
   workflow_dispatch:
 
 permissions:

@@ -2,12 +2,8 @@
 name: CI
 on:
   pull_request:
-  # Pushes to main fill the build cache that pull requests restore. A push that changes only
-  # planning notes in .agents/artifacts/ starts no run. Pull requests always run, so the lefthook
-  # check stays reported if a branch rule ever requires it.
   push:
     branches: [main]
-    paths-ignore: [.agents/artifacts/**]
 permissions:
   contents: read
 # A new push to the same pull request or branch cancels its older runs.
