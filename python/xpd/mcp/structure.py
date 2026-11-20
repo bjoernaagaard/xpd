@@ -7,10 +7,10 @@ from fastmcp.exceptions import ToolError
 from mcp.types import InputRequiredResult
 from pydantic import BaseModel, Field
 
+from xpd.mcp.base import READS, REWRITES, WRITES, confirmed, rooted, run
 from xpd.mcp.binary import NEW, OUTLINE, QUERY, REWRITE, TEST, Xpd
 from xpd.mcp.models import CaseReport, CodeMatch, CreatedFiles, FixSafety, OutlineFile, Severity
 from xpd.mcp.root import Project, Root
-from xpd.mcp.tools import READS, REWRITES, WRITES, confirmed, run
 
 
 class Query(BaseModel):
@@ -191,6 +191,7 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"structure"}, annotations=READS, task=True)
+    @rooted
     async def query(
         ctx: Context, query: Query, paths: list[str] | None = None
     ) -> list[CodeMatch] | InputRequiredResult:
@@ -200,12 +201,11 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             query: The pattern or kind to find, and the replacement to preview.
             paths: Files or folders inside the project root. Default: the whole root.
         """
-        root = await project.root(ctx)
-        if isinstance(root, InputRequiredResult):
-            return root
+        root = await project.required_root(ctx)
         return await run(ctx, xpd, QUERY, root, root.all_inside(paths or ["."]), *query.flags())
 
     @mcp.tool(tags={"structure", "fix"}, annotations=REWRITES, task=True)
+    @rooted
     async def rewrite(
         ctx: Context, query: Query, paths: list[str] | None = None
     ) -> list[CodeMatch] | InputRequiredResult:
@@ -218,20 +218,21 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         if query.rewrite is None:
             msg = "Provide a rewrite template."
             raise ToolError(msg)
-        root = await project.root(ctx)
-        if isinstance(root, InputRequiredResult):
-            return root
+        root = await project.required_root(ctx)
         paths = root.all_inside(paths or ["."])
         flags = query.flags()
         preview = await run(ctx, xpd, QUERY, root, paths, *flags)
         if not preview:
             return preview
         answer = await confirmed(
-            ctx, f"Apply {len(preview)} structural rewrites? They may change the code's behavior."
+            ctx,
+            project,
+            f"Apply {len(preview)} structural rewrites? They may change the code's behavior.",
+            key="confirm_unsafe_fixes",
+            title="Apply unsafe fixes",
         )
         if isinstance(answer, InputRequiredResult):
-            requests = {**(answer.input_requests or {}), **project.roots_request(ctx)}
-            return answer.model_copy(update={"input_requests": requests})
+            return answer
         if not answer:
             return preview
         output = await run(ctx, xpd, REWRITE, root, paths, *flags)
@@ -241,6 +242,7 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"structure"}, annotations=READS, task=True)
+    @rooted
     async def outline(
         ctx: Context, paths: list[str] | None = None, options: OutlineOptions | None = None
     ) -> list[OutlineFile] | InputRequiredResult:
@@ -250,9 +252,7 @@ def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             paths: Files or folders inside the project root. Default: the whole root.
             options: The language and items to read, and an extra outline rule file.
         """
-        root = await project.root(ctx)
-        if isinstance(root, InputRequiredResult):
-            return root
+        root = await project.required_root(ctx)
         options = options or OutlineOptions()
         flags = [f"--items={options.items}"]
         if options.language is not None:
@@ -264,19 +264,19 @@ def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
 
 def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     @mcp.tool(tags={"rules", "authoring"}, annotations=WRITES, task=True)
+    @rooted
     async def new(ctx: Context, item: NewItem) -> CreatedFiles | InputRequiredResult:
         """Create a project, rule, empty case template or shared utility without prompts.
 
         Args:
             item: What to create, and the answers that `xpd new` would otherwise ask for.
         """
-        root = await project.root(ctx)
-        if isinstance(root, InputRequiredResult):
-            return root
+        root = await project.required_root(ctx)
         names = [item.name] if item.name is not None else []
         return await run(ctx, xpd, NEW, root, names, *item.flags(root))
 
     @mcp.tool(name="test", tags={"rules", "authoring"}, annotations=WRITES, task=True)
+    @rooted
     async def test_rules(
         ctx: Context, options: CaseOptions | None = None
     ) -> CaseReport | InputRequiredResult:
@@ -288,7 +288,5 @@ def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         Args:
             options: The project file, the test folder and filter, and what to do with snapshots.
         """
-        root = await project.root(ctx)
-        if isinstance(root, InputRequiredResult):
-            return root
+        root = await project.required_root(ctx)
         return await run(ctx, xpd, TEST, root, [], *(options or CaseOptions()).flags(root))

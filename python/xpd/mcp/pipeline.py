@@ -11,6 +11,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import InputRequiredResult
 from pydantic import ValidationError
 
+from xpd.mcp.base import READS, rooted
 from xpd.mcp.catalog import Catalog
 from xpd.mcp.models import (
     CheckReport,
@@ -26,7 +27,6 @@ from xpd.mcp.models import (
     Stage,
 )
 from xpd.mcp.root import Project
-from xpd.mcp.tools import READS
 
 # The rules of each pack that report a split, an estimator, an encoder, a bootstrap, a simulation
 # or an optimizer run that draws without a seed. A pack without such a rule is not listed.
@@ -337,6 +337,7 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
             rules.find(package, rule)
 
     @mcp.tool(tags={"pipeline"}, annotations=READS)
+    @rooted
     async def contract(ctx: Context, file: str) -> Contract | InputRequiredResult:
         """Read the contract that a training script saved beside its model: the data file and
         target, the split, the input columns, the steps of the Pipeline, the validation scores,
@@ -349,9 +350,7 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         Args:
             file: The contract, a JSON file inside the project root.
         """
-        root = await project.root(ctx)
-        if isinstance(root, InputRequiredResult):
-            return root
+        root = await project.required_root(ctx)
         path = root.path / root.inside(file)
         try:
             read = Contract.model_validate_json(path.read_bytes())

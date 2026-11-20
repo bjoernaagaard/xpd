@@ -18,10 +18,10 @@ from mcp.types import (
     ResourceTemplateReference,
 )
 
+from xpd.mcp.base import READS
 from xpd.mcp.binary import RULES, Xpd
 from xpd.mcp.models import Rule, RuleList, RuleSummary, Severity
 from xpd.mcp.root import Project
-from xpd.mcp.tools import READS
 
 RULES_URI = "xpd://rules"
 PACK_URI = "xpd://rules/{package}"
@@ -249,9 +249,7 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
         argument: CompletionArgument,
         context: CompletionContext | None,
     ) -> list[str] | None:
-        if isinstance(ref, ResourceTemplateReference) and ref.uri in {PACK_URI, RULE_URI}:
-            return (await catalogs.load(Context(mcp))).complete(argument, context)
-        if isinstance(ref, PromptReference):
+        if isinstance(ref, PromptReference) or ref.uri in {PACK_URI, RULE_URI}:
             return (await catalogs.load(Context(mcp))).complete(argument, context)
         return None
 
