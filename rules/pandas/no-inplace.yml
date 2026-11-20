@@ -6,7 +6,7 @@
 id: no-inplace
 language: python
 severity: info
-message: inplace=True gives no speedup and blocks chaining. Reassign instead.
+message: inplace=True is slower than it looks. Reassign instead.
 rule:
   pattern: $OBJ.$M($$$ARGS)
   inside: { kind: expression_statement }
@@ -45,7 +45,7 @@ metadata: { style: house, fix: unsafe }
 id: no-inplace
 language: python
 severity: info
-message: inplace=True gives no speedup and blocks chaining. Reassign instead.
+message: inplace=True is slower than it looks. Reassign instead.
 rule:
   kind: call
   has: { field: arguments, has: { matches: inplace-true } }
