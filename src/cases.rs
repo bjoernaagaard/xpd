@@ -12,7 +12,14 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{catalog::Catalog, output::Format, pack, scan, style::Style, venv::Venv};
+use crate::{
+    catalog::{Catalog, Filters},
+    output::Format,
+    scan,
+    settings::Settings,
+    venv::Venv,
+    workspace::Workspace,
+};
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub(crate) enum Engine {
@@ -94,16 +101,20 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
             .and_then(Path::parent)
             .unwrap_or(&root),
     );
-    let installed = venv.as_ref().map(Venv::distributions);
-    // A case passes or fails the same way under every style setting, so none is read.
-    let config = Catalog::config(&root, options.config.as_deref())?;
-    let catalog = Catalog::load(config.as_deref(), installed.as_ref(), Style::Default)?;
-    let directories = directories(options, &catalog)?;
-    let source_root = catalog
+    // Snapshots use the default house style regardless of the user's settings.
+    let workspace = Workspace::load(
+        root,
+        options.config.as_deref(),
+        Settings::default(),
+        venv,
+        &Filters::default(),
+    )?;
+    let directories = directories(options, &workspace.catalog)?;
+    let source_root = workspace
+        .catalog
         .project
         .as_ref()
-        .map_or(root.as_path(), |project| project.root.as_path());
-    let packs = &catalog.packs;
+        .map_or(workspace.root.as_path(), |project| project.root.as_path());
     let mut outcomes = Vec::new();
     for (directory, snapshot_dir) in directories {
         ensure!(
@@ -142,7 +153,7 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
             }
             outcomes.extend(run_case(
                 options,
-                packs,
+                &workspace,
                 &case,
                 &directory,
                 &snapshot_dir,
@@ -175,13 +186,15 @@ pub(crate) fn run(options: &Options) -> Result<ExitCode> {
 
 fn run_case(
     options: &Options,
-    packs: &[pack::Pack],
+    workspace: &Workspace,
     case: &Case,
     path: &Path,
     snapshot_dir: &Path,
     root: &Path,
 ) -> Result<Vec<Outcome>> {
-    let selected: Vec<_> = packs
+    let selected: Vec<_> = workspace
+        .catalog
+        .packs
         .iter()
         .flat_map(|pack| &pack.rules)
         .filter(|rule| rule.id.matches_case(&rule.declared_id, &case.id))
@@ -216,18 +229,17 @@ fn run_case(
         .map(|s| (s, false))
         .chain(case.invalid.iter().map(|s| (s, true)))
     {
-        let found = scan::analyze(
-            scan::File {
-                path: &filename,
-                disk: Some(&disk),
-            },
-            source,
-            packs,
-            scan::Edits::Report,
-        )
-        .found
-        .into_iter()
-        .find(|found| selected.iter().any(|rule| &rule.id == found.id()));
+        let found = workspace
+            .analyze(
+                scan::File {
+                    path: &filename,
+                    disk: Some(&disk),
+                },
+                source,
+            )
+            .found
+            .into_iter()
+            .find(|found| selected.iter().any(|rule| &rule.id == found.id()));
         let actual = found.map(|found| snapshot(found, source));
         let status = if !invalid && actual.is_some() {
             "unexpected finding"
