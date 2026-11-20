@@ -44,5 +44,6 @@ mod syntax;
 mod toml;
 mod venv;
 mod version;
+mod workspace;
 
 pub use cli::run;
