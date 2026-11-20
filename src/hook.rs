@@ -6,7 +6,7 @@
 //! agent reads, when the hook exits 0. That text states what xpd found and gives no order,
 //! because Claude Code may show text that reads as a system command to the user instead.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -650,7 +650,9 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
 
 /// The Python files that the session changed. With git, they are the files that differ from
 /// the commit the session began on and the untracked files, when they were written after the
-/// session began, so an edit through the shell and a committed edit both count. Without git, they are the files that `PostToolUse` recorded.
+/// session began, so an edit through the shell and a committed edit both count. A file that
+/// only a pull, a merge or a checkout changed is left out. Without git, they are the files that
+/// `PostToolUse` recorded.
 fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
     let here = fs::canonicalize(".")?;
     let mut files: Vec<PathBuf> = if let Some(top) = repository(&here) {
@@ -681,7 +683,13 @@ fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
             Record::Began(seconds) => Some(*seconds),
             Record::Start(_) | Record::Edited(_) | Record::Held(_) => None,
         });
-        (differing.split('\0').chain(untracked.split('\0')))
+        // A commit that a pull, a merge or a checkout brought also changes files after the
+        // session began, and they are not the session's own either.
+        let own = since.and_then(|since| own_files(&top, since));
+        let differing = differing
+            .split('\0')
+            .filter(|name| own.as_ref().is_none_or(|own| own.contains(*name)));
+        (differing.chain(untracked.split('\0')))
             .filter(|name| !name.is_empty())
             .map(|name| top.join(name))
             .filter(|file| since.is_none_or(|since| written(file) >= since))
@@ -706,6 +714,61 @@ fn changed_files(records: &[Record]) -> Result<Vec<PathBuf>> {
                 .unwrap_or(file)
         })
         .collect())
+}
+
+/// The files in the repository at `top` that the session itself changed since it began at
+/// `since`, in seconds since 1970: the files that differ from the commit checked out now, and
+/// the files of each commit that was made in this checkout since then. git logs how each
+/// commit was checked out, so a commit that a pull, a merge, a rebase or a checkout brought is
+/// told from one that `git commit`, `git cherry-pick` or `git revert` made here. `None` when
+/// git keeps no such log, and then every file that differs counts.
+fn own_files(top: &Path, since: u64) -> Option<HashSet<String>> {
+    let log = git(
+        top,
+        &[
+            "reflog",
+            "show",
+            "--date=unix",
+            "--format=%H%x09%gd%x09%gs",
+            "HEAD",
+        ],
+    )?;
+    let made_here = log.lines().filter_map(|line| {
+        let mut fields = line.splitn(3, '\t');
+        let (commit, selector, action) = (fields.next()?, fields.next()?, fields.next()?);
+        let at: u64 = selector
+            .split_once('{')?
+            .1
+            .strip_suffix('}')?
+            .parse()
+            .ok()?;
+        let made = ["commit", "cherry-pick", "revert"]
+            .iter()
+            .any(|verb| action.starts_with(verb));
+        (at >= since && made).then_some(commit)
+    });
+    let mut own: HashSet<String> = HashSet::new();
+    let mut add = |names: String| {
+        own.extend(
+            (names.split('\0'))
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned),
+        );
+    };
+    add(git(top, &["diff", "--name-only", "-z", "HEAD", "--"]).unwrap_or_default());
+    for commit in made_here {
+        let args = [
+            "diff-tree",
+            "--root",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            "-z",
+            commit,
+        ];
+        add(git(top, &args)?);
+    }
+    Some(own)
 }
 
 /// The top folder of the git repository that holds `folder`. `None` outside a repository, and

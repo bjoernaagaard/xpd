@@ -102,7 +102,9 @@ On `Stop`, xpd lints every Python file that differs from the commit that `Sessio
 and every untracked Python file, when the file was written after the session began. A file that
 was already changed or untracked before the session is not the session's own, so xpd leaves it
 out. This also covers a file that the agent changed through the shell
-and a file that it committed. In a project without git, xpd lints the Python files that the
+and a file that it committed. A file that only a pull, a merge, a rebase or a checkout changed is
+not the session's own either, so xpd leaves it out. xpd reads this from git's reflog, which says
+how each commit was checked out. In a project without git, xpd lints the Python files that the
 `PostToolUse` events of the session named.
 
 While a file has an error or a warning, xpd prints `{"decision": "block", "reason": ...}` on
