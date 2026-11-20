@@ -61,23 +61,8 @@ jobs:
           args: --release --out dist --zig
           sccache: 'true'
           manylinux: auto
-      # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: ./.github/actions/smoke
         if: matrix.platform.target == 'x86_64'
-        with:
-          enable-cache: false
-      - name: Smoke test the wheel
-        if: matrix.platform.target == 'x86_64'
-        shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
-      - name: Smoke test the MCP server
-        if: matrix.platform.target == 'x86_64'
-        shell: bash
-        run: |
-          wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -137,20 +122,7 @@ jobs:
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           args: --release --out dist
           sccache: 'true'
-      # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: false
-      - name: Smoke test the wheel
-        shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
-      - name: Smoke test the MCP server
-        shell: bash
-        run: |
-          wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+      - uses: ./.github/actions/smoke
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -185,20 +157,7 @@ jobs:
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           args: --release --out dist
           sccache: 'true'
-      # As the uv GitHub guide does: install the wheel alone and run it, before anything is published.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: false
-      - name: Smoke test the wheel
-        shell: bash
-        run: uv run --isolated --no-project --python 3.11 --with dist/*.whl -- xpd check samples/good.py --format text
-      # FastMCP's own client starts `xpd mcp` from the wheel and calls a tool.
-      - name: Smoke test the MCP server
-        shell: bash
-        run: |
-          wheel=$(ls dist/*.whl)
-          uv run --isolated --no-project --python 3.11 --with "./$wheel" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+      - uses: ./.github/actions/smoke
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -298,10 +257,9 @@ jobs:
             sleep 20
           done
           exit 1
-      # The MCP server of the same version, started and called through FastMCP's own client.
-      - run: |
-          uv run --isolated --no-project --python 3.11 --with "xpd==${GITHUB_REF_NAME#v}" -- \
-            fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+      - uses: ./.github/actions/smoke
+        with:
+          published: 'true'
 
   github-release:
     name: GitHub Release

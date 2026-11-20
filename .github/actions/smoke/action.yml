@@ -1,0 +1,26 @@
+name: Check the xpd installation
+description: Run the CLI and MCP server from the wheel or the published version.
+inputs:
+  published:
+    description: Test the release tag after the workflow has checked its PyPI installation.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - if: inputs.published != 'true'
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        enable-cache: false
+    - shell: bash
+      env:
+        PUBLISHED: ${{ inputs.published }}
+      run: |
+        if [[ "$PUBLISHED" != true ]]; then
+          wheels=(./dist/*.whl)
+          package=${wheels[0]}
+          uv run --isolated --no-project --python 3.11 --with "$package" -- xpd check samples/good.py --format text
+        else
+          package="xpd==${GITHUB_REF_NAME#v}"
+        fi
+        uv run --isolated --no-project --python 3.11 --with "$package" -- \
+          fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
