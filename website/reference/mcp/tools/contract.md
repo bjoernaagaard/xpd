@@ -11,10 +11,10 @@ With the server's root at `samples/pipeline`:
 ```
 
 The result has `discovery`, `data`, `split`, `inputs`, `steps`, `validation` and `model`. These
-are its `validation` and `model`.
+are its `validation` and `model`, where each `"..."` stands for a version.
 
 ```json
-{"validation":{"splitter":{"class":"StratifiedKFold","args":{"n_splits":5,"shuffle":true,"random_state":0}},"scoring":"accuracy","folds":5,"cv_scores":[0.9807692307692307,0.9807692307692307,1.0,1.0,0.9803921568627451],"test_score":0.9883720930232558},"model":{"file":"model/model.joblib","type":"sklearn.pipeline.Pipeline","versions":{"python":"3.14.10","scikit-learn":"1.9.1","pandas":"3.1.1","numpy":"2.5.5","joblib":"1.6.0"},"code":["features.py"]}}
+{"validation":{"splitter":{"class":"StratifiedKFold","args":{"n_splits":5,"shuffle":true,"random_state":0}},"scoring":"accuracy","folds":5,"cv_scores":[0.9807692307692307,0.9807692307692307,1.0,1.0,0.9803921568627451],"test_score":0.9883720930232558},"model":{"file":"model/model.joblib","type":"sklearn.pipeline.Pipeline","versions":{"python":"...","scikit-learn":"...","pandas":"...","numpy":"...","joblib":"..."},"code":["features.py"]}}
 ```
 
 ## Errors
