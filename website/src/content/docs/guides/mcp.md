@@ -1,6 +1,8 @@
 ---
 title: Connect an agent with MCP
 description: Add xpd's MCP server to Claude Code or another client, pick the project root, and let the agent lint, fix and look up libraries.
+sidebar:
+  order: 2
 ---
 
 Run `claude mcp add xpd -- uvx xpd mcp`, and Claude Code can call xpd's tools, such as `check`,

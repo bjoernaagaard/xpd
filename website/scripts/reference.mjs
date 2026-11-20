@@ -13,12 +13,12 @@
 // the page of a command or a tool has no example that runs it.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { editUrl, firstSentence, page, parseMarkdown, sectionsText, yaml } from '../src/markdown.mjs';
 import { exampleRunner } from './examples.mjs';
-import { run as exec } from './exec.mjs';
+import { buildXpd, run as exec } from './exec.mjs';
 
 const website = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repository = join(website, '..');
@@ -30,19 +30,6 @@ const venv = join(website, '.mcp-venv');
 const PYTHON_VERSION = '3.14';
 
 const run = (command, args, options = {}) => exec(command, args, { cwd: repository, ...options });
-
-/** The path of the xpd binary that cargo builds from this checkout. */
-function buildXpd() {
-  const messages = run('cargo', ['build', '--quiet', '--message-format=json-render-diagnostics']);
-  for (const line of messages.split('\n')) {
-    if (!line.startsWith('{')) continue;
-    const message = JSON.parse(line);
-    if (message.reason === 'compiler-artifact' && message.target?.name === 'xpd' && message.executable) {
-      return message.executable;
-    }
-  }
-  throw new Error('cargo build named no xpd executable');
-}
 
 // The libraries that the scripts in samples/ import, which the examples of `check`, `equiv`,
 // `profile` and `refit` read or run. The pins keep an example's output the same from build to
@@ -133,22 +120,24 @@ function sameNames(what, folder, listed, files) {
 // ---------------------------------------------------------------------------------------------
 // Commands
 
-const xpd = buildXpd();
-const python = serverPython();
-const examples = exampleRunner({ repository, xpd, python, pythonPath: join(repository, 'python') });
 // Why the page of a command or a tool runs no example of it.
 const NO_EXAMPLE = {
   'xpd lsp': 'It speaks the Language Server Protocol on stdin, which no shell line shows.',
   gates: 'Its arguments are the full results of six other tools.',
   discovery_gate: 'Its arguments hold a discovery record, which is 28 kB for samples/pipeline.',
 };
-const commands = JSON.parse(run(xpd, ['commands']));
-const bySlug = new Map(commands.map((command) => [command.name.split(' ').slice(1).join('/'), command]));
-const commandFolder = join(authored, 'commands');
+
 // The page of a command, below commands/. Astro reads `index` as the page of its folder, which is
 // the overview, so `xpd index` has the page xpd-index.
 const pagePath = (slug) => (slug === 'index' ? 'xpd-index' : slug);
-sameNames('command', commandFolder, ['README', ...bySlug.keys()], markdownFiles(commandFolder));
+
+export async function generateReference(xpd) {
+  const python = serverPython();
+  const examples = exampleRunner({ repository, xpd, python, pythonPath: join(repository, 'python') });
+  const commands = JSON.parse(run(xpd, ['commands']));
+  const bySlug = new Map(commands.map((command) => [command.name.split(' ').slice(1).join('/'), command]));
+  const commandFolder = join(authored, 'commands');
+  sameNames('command', commandFolder, ['README', ...bySlug.keys()], markdownFiles(commandFolder));
 
 /** How a reader writes an argument, such as `-c, --config <CONFIG>` or `<PATHS>...`. */
 function syntax(arg) {
@@ -314,7 +303,11 @@ for (const [slug, command] of bySlug) {
 
 {
   const prose = readAuthored(join(commandFolder, 'README.md'));
-  flagProblems.push(...unknownFlags(prose.source, null).map((problem) => `website/reference/commands/README.md: ${problem}`));
+  const topLevel = commands.filter((c) => c.name.split(' ').length === 2);
+  const subSummary = topLevel
+    .filter((c) => c.subcommands.length > 0)
+    .map((c) => `, and ${code(c.name)} has ${c.subcommands.length} of its own`)
+    .join('');
   const rows = [...bySlug].map(([slug, command]) => {
     const aliases = command.aliases.map((alias) => code(command.name.replace(/\S+$/, alias))).join(', ');
     return `| [${code(command.name)}](./${pagePath(slug)}/) | ${aliases} | ${cell(command.about)} |`;
@@ -330,7 +323,7 @@ for (const [slug, command] of bySlug) {
       },
       [
         prose.intro,
-        `xpd ${mcp.server.version} has ${commands.filter((c) => c.name.split(' ').length === 2).length} commands, and ${code('xpd new')} has ${bySlug.get('new').subcommands.length} of its own.`,
+        `xpd ${mcp.server.version} has ${topLevel.length} commands${subSummary}.`,
         '',
         '| Command | Also called | What it does |',
         '| --- | --- | --- |',
@@ -418,8 +411,9 @@ function toolPage(tool, prose) {
   const required = new Set(schema.required ?? []);
   const body = [prose.intro, '## Call', '', '```python', signature(tool), '```'];
   const annotations = tool.annotations ?? {};
-  const behavior = BEHAVIOR.filter(([key]) => key in annotations).map(([key, yes, no]) => (annotations[key] ? yes : no));
-  if (annotations.readOnlyHint) behavior.splice(1, 1);
+  const behavior = BEHAVIOR
+    .filter(([key]) => key in annotations && !(annotations.readOnlyHint && key === 'destructiveHint'))
+    .map(([key, yes, no]) => (annotations[key] ? yes : no));
   if (behavior.length) body.push('', ...behavior.map((line) => `- ${line}`));
   const tags = tool._meta?.fastmcp?.tags ?? [];
   if (tags.length) body.push('', `Tags: ${tags.map(code).join(', ')}.`);
@@ -490,7 +484,6 @@ function namedSections(what, source, items, render) {
         `Missing: ${missing.join(', ') || 'none'}. Naming no ${what}: ${extra.join(', ') || 'none'}.`,
     );
   }
-  flagProblems.push(...unknownFlags(prose.source, null).map((problem) => `${relative(repository, source)}: ${problem}`));
   const byHeading = new Map(prose.sections.map((section) => [section.heading, section.body]));
   const sections = items.map((item) => [`## ${item.heading}`, '', render(item), '', byHeading.get(item.key)].join('\n'));
   const about = prose.sections.filter((section) => section.heading.startsWith('About ')).map((section) => `## ${section.heading.slice(6)}\n\n${section.body}`);
@@ -567,7 +560,6 @@ function namedSections(what, source, items, render) {
 // The overview: what the server lists, the tools in code mode, and the server's instructions.
 {
   const prose = readAuthored(join(mcpFolder, 'index.md'));
-  flagProblems.push(...unknownFlags(prose.source, null).map((problem) => `website/reference/mcp/index.md: ${problem}`));
   const behavior = (tool) => (tool.annotations?.readOnlyHint ? 'No' : 'Yes');
   const body = [
     prose.intro,
@@ -639,3 +631,8 @@ console.log(
   `reference.mjs: ran ${ran.commands.length} commands and ${ran.tools.length} tool calls of the examples, and wrote ${bySlug.size} command pages and ${mcp.tools.length} tool pages, with ` +
     `${mcp.resources.length} resources, ${mcp.resource_templates.length} templates and ${mcp.prompts.length} prompts`,
 );
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await generateReference(buildXpd(repository));
+}

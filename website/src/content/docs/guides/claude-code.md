@@ -1,6 +1,8 @@
 ---
 title: Claude Code and other agents
 description: Show a coding agent the issues of each Python file it edits, and give it xpd's tools and skills.
+sidebar:
+  order: 1
 ---
 
 Install the xpd plugin in Claude Code or Codex, and the agent sees xpd's issues for each Python

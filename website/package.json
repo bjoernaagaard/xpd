@@ -8,8 +8,8 @@
   "scripts": {
     "rules": "node scripts/rules.mjs",
     "reference": "node scripts/reference.mjs",
-    "dev": "node scripts/rules.mjs && node scripts/reference.mjs && astro dev",
-    "build": "node scripts/rules.mjs && node scripts/reference.mjs && astro build",
+    "dev": "node scripts/generate.mjs && astro dev",
+    "build": "node scripts/generate.mjs && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

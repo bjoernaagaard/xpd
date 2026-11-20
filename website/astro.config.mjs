@@ -2,14 +2,8 @@ import { satteri } from '@astrojs/markdown-satteri';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import mermaid from 'astro-mermaid';
-import { readFileSync } from 'node:fs';
-import { editUrl, REPO_URL, splitTitle } from './src/markdown.mjs';
-import { PACKS } from './src/packs.mjs';
-
-/** The name of a rule pack, from the first line of rules/<pack>/pack.md, such as scikit-learn. */
-const packTitle = (pack) =>
-  splitTitle(readFileSync(new URL(`../rules/${pack}/pack.md`, import.meta.url), 'utf8'), `rules/${pack}/pack.md`)
-    .title;
+import { editUrl, REPO_URL } from './src/markdown.mjs';
+import { PACKS, packPage } from './src/packs.mjs';
 
 // GitHub Pages serves the project site at https://bjoernaagaard.github.io/xpd/.
 export default defineConfig({
@@ -27,27 +21,17 @@ export default defineConfig({
     mermaid({ autoTheme: true, enableLog: false }),
     starlight({
       title: 'xpd',
-      description:
-        'A fast linter for Python library habits, starting with pandas, NumPy, SciPy and scikit-learn.',
+      description: 'A fast linter for Python library habits.',
       social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
       editLink: { baseUrl: editUrl('website/') },
       sidebar: [
         { label: 'Get started', link: '/' },
-        {
-          label: 'Guides',
-          items: [
-            'guides/claude-code',
-            'guides/mcp',
-            'guides/code-mode',
-            'guides/editors',
-            'guides/write-a-rule',
-          ],
-        },
+        { label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
         {
           label: 'Rules',
           items: [
             { label: 'All rules', link: '/rules/' },
-            ...PACKS.map((pack) => ({ label: packTitle(pack), link: `/rules/${pack}/` })),
+            ...PACKS.map((pack) => ({ label: packPage(pack).title, link: `/rules/${pack}/` })),
           ],
         },
         // scripts/reference.mjs writes these pages from the CLI and the MCP server.

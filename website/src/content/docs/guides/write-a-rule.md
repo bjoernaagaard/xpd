@@ -1,6 +1,8 @@
 ---
 title: Write a rule
 description: Add a rule for your own project with xpd new and xpd test, or add a rule to one of xpd's packs.
+sidebar:
+  order: 5
 ---
 
 Run `xpd new rule` in your project to make a rule from a code pattern, and `xpd check` reports the

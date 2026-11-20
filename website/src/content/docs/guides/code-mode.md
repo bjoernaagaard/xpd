@@ -1,6 +1,8 @@
 ---
 title: Train a model in code mode
 description: Let an agent take a data file to a saved scikit-learn model in one execute call, and check the run with xpd's gates.
+sidebar:
+  order: 3
 ---
 
 Start xpd's MCP server with `--code-mode`, and an agent can train, check and save a scikit-learn

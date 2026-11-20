@@ -8,51 +8,19 @@
 
 import { getCollection } from 'astro:content';
 
-const COMMANDS = [
-  'check',
-  'rules',
-  'doctor',
-  'run',
-  'outline',
-  'graph',
-  'profile',
-  'refit',
-  'equiv',
-  'find',
-  'api',
-  'new',
-  'test',
-  'hook',
-  'lsp',
-  'mcp',
-  'skill',
-  'completions',
-];
+const headingSlug = (title) => title.toLowerCase().replace(/\s+/g, '-');
 
-/** The new page of each old fragment of `rules.html`. The rule pages are the ones that
- * scripts/rules.mjs wrote from the catalog, so every rule has an entry. */
+/** The new page of each old fragment of `rules.html`, derived from the pages scripts/rules.mjs
+ * wrote from `xpd rules`. */
 async function rulesFragments() {
   const fragments = {};
-  for (const { id } of await getCollection('docs', ({ id }) => id.startsWith('rules/'))) {
+  const packs = [];
+  for (const { id, data } of await getCollection('docs', ({ id }) => id.startsWith('rules/'))) {
     const [, pack, rule] = id.split('/');
     if (rule) fragments[rule] = `rules/${pack}/${rule}/`;
+    else if (pack) packs.push([headingSlug(data.title), pack]);
   }
-  const packHeadings = {
-    pandas: 'pandas',
-    numpy: 'numpy',
-    scipy: 'scipy',
-    'scikit-learn': 'sklearn',
-    'scikit-lego': 'sklego',
-    mapie: 'mapie',
-    'category-encoders': 'category_encoders',
-    linearmodels: 'linearmodels',
-    arch: 'arch',
-    pymoo: 'pymoo',
-    plotly: 'plotly',
-    hamilton: 'hamilton',
-    python: 'python',
-  };
-  for (const [heading, pack] of Object.entries(packHeadings)) {
+  for (const [heading, pack] of packs) {
     fragments[heading] ??= `rules/${pack}/`;
   }
   return {
@@ -63,24 +31,35 @@ async function rulesFragments() {
   };
 }
 
-const commandsFragments = {
-  ...Object.fromEntries(COMMANDS.map((command) => [command, `commands/${command}/`])),
-  index: 'commands/xpd-index/',
-  fixes: 'commands/check/#fixes',
-  'output-and-exit-codes': 'commands/check/#exit-status',
-  'select-rules': 'commands/check/#--rule',
-  'project-rules': 'commands/check/#project-rules',
-  'suppress-an-issue': 'commands/check/#suppress-an-issue',
-  'step-code': 'commands/graph/',
-  'method-chains': 'commands/graph/',
-  'hamilton-modules': 'commands/graph/',
-  'output-and-exit-code': 'commands/graph/#exit-status',
-  ranking: 'commands/find/#ranking',
-  'index-file': 'commands/xpd-index/#index-file',
-  'public-names': 'commands/xpd-index/',
-  recipes: 'commands/xpd-index/#recipes',
-  'discovery-questions': 'commands/find/#discovery-questions',
-};
+/** The new page of each old fragment of `commands.html`, with top-level commands derived from the
+ * pages scripts/reference.mjs wrote from `xpd commands`. */
+async function commandsFragments() {
+  const commands = {};
+  for (const { id, data } of await getCollection('docs', ({ id }) => id.startsWith('commands/'))) {
+    const words = data.title.split(' ');
+    if (words[0] === 'xpd' && words.length === 2) {
+      commands[words[1]] = `${id}/`;
+    }
+  }
+  const indexPage = commands.index;
+  return {
+    ...commands,
+    fixes: 'commands/check/#fixes',
+    'output-and-exit-codes': 'commands/check/#exit-status',
+    'select-rules': 'commands/check/#--rule',
+    'project-rules': 'commands/check/#project-rules',
+    'suppress-an-issue': 'commands/check/#suppress-an-issue',
+    'step-code': 'commands/graph/',
+    'method-chains': 'commands/graph/',
+    'hamilton-modules': 'commands/graph/',
+    'output-and-exit-code': 'commands/graph/#exit-status',
+    ranking: 'commands/find/#ranking',
+    'index-file': `${indexPage}#index-file`,
+    'public-names': indexPage,
+    recipes: `${indexPage}#recipes`,
+    'discovery-questions': 'commands/find/#discovery-questions',
+  };
+}
 
 const claudeCodeFragments = {
   'what-the-hook-does': 'guides/claude-code/#lint-each-edit-with-the-hook',
@@ -141,7 +120,7 @@ const lspFragments = {
  */
 export async function legacyPages() {
   return [
-    { path: 'commands.html', page: 'commands/', fragments: commandsFragments },
+    { path: 'commands.html', page: 'commands/', fragments: await commandsFragments() },
     { path: 'claude-code.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
     { path: 'claude-code/index.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
     { path: 'mcp.html', page: 'guides/mcp/', fragments: mcpFragments },

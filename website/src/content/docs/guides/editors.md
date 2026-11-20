@@ -1,6 +1,8 @@
 ---
 title: Use xpd in an editor
 description: Start xpd's language server from Neovim, Helix, Zed or VS Code, and see issues, rule help and fixes as you type.
+sidebar:
+  order: 4
 ---
 
 Configure your editor to start `xpd lsp`, and it shows xpd's issues while you type, offers each
