@@ -4,16 +4,27 @@ never asks, which suits scripts and agents.
 
 ## Examples
 
-```sh
-xpd new
-xpd new project --pack team --yes
-xpd new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes
-xpd new test team/no-print --yes
-xpd new util print-call --lang python --pattern 'print($X)' --yes
+```console
+$ xpd new project --pack team --yes
+Created project
+  created  /tmp/project/sgconfig.yml
+  created  /tmp/project/xpd.yml
+  created  /tmp/project/rules/.gitkeep
+  created  /tmp/project/rule-tests/.gitkeep
+  created  /tmp/project/utils/.gitkeep
+  created  /tmp/project/rules/team/.gitkeep
+$ xpd new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes
+Created rule team/no-print
+  created  /tmp/project/rules/team/no-print.yml
+  created  /tmp/project/rules/team/no-print.md
+  created  /tmp/project/rule-tests/team/no-print-test.yml
+$ xpd new util print-call --lang python --pattern 'print($X)' --yes
+Created util print-call
+  created  /tmp/project/utils/print-call.yml
 ```
 
-The `project`, `rule` and `util` commands above, run in an empty folder, write these files. Each
-folder that `project` makes also gets an empty `.gitkeep`.
+The commands above write these files. Each folder that `project` makes also gets an empty
+`.gitkeep`.
 
 ```text
 .

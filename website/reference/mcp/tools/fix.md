@@ -21,11 +21,11 @@ result, and calls `fix` again with the answer.
 
 ## Example
 
-On a copy of `samples/bad.py`, whose two fixes are both unsafe, the user declined the question.
+On `samples/bad.py`, whose two fixes are both unsafe, the user declined the question.
 The tool wrote no fix and returned the 5 issues that are left.
 
 ```json
-{"paths":["bad.py"],"unsafe":true}
+{"paths":["samples/bad.py"],"unsafe":true}
 ```
 
 ```json

@@ -9,10 +9,11 @@ server's renderer resource. A host that does not render apps gets the JSON of `c
 {"paths":["samples/bad.py"]}
 ```
 
-The text content of the result starts like this.
+The text content of the result is the report of `check`. Its first issue is shown without its
+message, and `"..."` stands for the other issues.
 
 ```json
-{"fixed":0,"fixable":0,"issues":[{"package":"pandas","rule":"row-loop","file":"samples/bad.py","line":5,"column":15,"severity":"warning","message":"iterrows() b...
+{"fixed":0,"fixable":0,"issues":[{"package":"pandas","rule":"row-loop","file":"samples/bad.py","line":5,"column":15,"severity":"warning"},"..."]}
 ```
 
 ## Errors

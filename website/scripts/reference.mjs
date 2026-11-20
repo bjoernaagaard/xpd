@@ -7,11 +7,17 @@
 // command or a tool, worked examples and exit behavior are written by hand in reference/, one
 // Markdown file for each command and tool. The build fails when a command or a tool has no such
 // file, when a file names none, and when a file names a flag that its command does not take.
+//
+// The build also runs every example on those pages, in the README and in the guides, as
+// scripts/examples.mjs describes. It fails when an example differs from what xpd does, and when
+// the page of a command or a tool has no example that runs it.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { exampleRunner } from './examples.mjs';
 
 const website = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repository = join(website, '..');
@@ -45,11 +51,23 @@ function buildXpd() {
   throw new Error('cargo build named no xpd executable');
 }
 
-/** What the MCP server lists, from a Python environment with the server's dependencies. */
-function mcpListing(xpd) {
+// The libraries that the scripts in samples/ import, which the examples of `check`, `equiv`,
+// `profile` and `refit` read or run. The pins keep an example's output the same from build to
+// build. The weekly build sets XPD_NEWEST_LIBRARIES, which drops the pins, so it shows when a new
+// release of a library changes what an example prints.
+const SAMPLE_LIBRARIES = ['pandas==3.1.1', 'pyarrow==26.0.1', 'scikit-learn==1.9.1', 'joblib==1.6.0', 'numpy==2.5.5'].map((pin) =>
+  process.env.XPD_NEWEST_LIBRARIES ? pin.split('==')[0] : pin,
+);
+
+/** The Python of an environment with the MCP server's dependencies and the samples' libraries. */
+function serverPython() {
   run('uv', ['venv', '--quiet', '--allow-existing', '--python', PYTHON_VERSION, venv]);
-  run('uv', ['pip', 'install', '--quiet', '--python', venv, '-r', join(repository, 'pyproject.toml')]);
-  const python = join(venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  run('uv', ['pip', 'install', '--quiet', '--upgrade', '--python', venv, '-r', join(repository, 'pyproject.toml'), ...SAMPLE_LIBRARIES]);
+  return join(venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+}
+
+/** What the MCP server lists. */
+function mcpListing(xpd, python) {
   return JSON.parse(
     run(python, [join(website, 'scripts', 'mcp_listing.py')], {
       env: { ...process.env, XPD_BIN: xpd, PYTHONPATH: join(repository, 'python') },
@@ -153,6 +171,14 @@ function sameNames(what, folder, listed, files) {
 // Commands
 
 const xpd = buildXpd();
+const python = serverPython();
+const examples = exampleRunner({ repository, xpd, python, pythonPath: join(repository, 'python') });
+// Why the page of a command or a tool runs no example of it.
+const NO_EXAMPLE = {
+  'xpd lsp': 'It speaks the Language Server Protocol on stdin, which no shell line shows.',
+  gates: 'Its arguments are the full results of six other tools.',
+  discovery_gate: 'Its arguments hold a discovery record, which is 28 kB for samples/pipeline.',
+};
 const commands = JSON.parse(run(xpd, ['commands']));
 const bySlug = new Map(commands.map((command) => [command.name.split(' ').slice(1).join('/'), command]));
 const commandFolder = join(authored, 'commands');
@@ -203,6 +229,21 @@ const flagsOf = new Map(
   ]),
 );
 const canonical = new Map(commands.flatMap((command) => [command.name, ...command.aliases.map((alias) => command.name.replace(/\S+$/, alias))].map((name) => [name, command.name])));
+/** Runs the examples of an authored page, and fails when none of them runs `name`. */
+function runExamples(source, name, options) {
+  const file = relative(repository, source);
+  const before = { commands: examples.ran.commands.length, tools: examples.ran.tools.length };
+  // The page of a tool with no example still shows its arguments and its result, as text.
+  examples.check(file, NO_EXAMPLE[name] ? {} : options);
+  const spellings = [...canonical].filter(([, command]) => command === name).map(([spelling]) => new RegExp(`\\b${spelling}\\b`));
+  const ranIt = options?.tool
+    ? examples.ran.tools.length > before.tools
+    : examples.ran.commands.slice(before.commands).some((command) => spellings.some((spelling) => spelling.test(command)));
+  if (ranIt === Boolean(NO_EXAMPLE[name])) {
+    examples.report(ranIt ? `${file} runs an example of ${name}, so take ${name} out of NO_EXAMPLE` : `${file} needs an example that runs ${name}`);
+  }
+}
+
 const builtinFlags = new Set(['--help', '--version']);
 
 /**
@@ -254,7 +295,7 @@ function unknownFlags(source, pageCommand) {
 const commandsOut = join(docs, 'commands');
 rmSync(commandsOut, { recursive: true, force: true });
 const flagProblems = [];
-const mcp = mcpListing(xpd);
+const mcp = mcpListing(xpd, python);
 
 for (const [slug, command] of bySlug) {
   const source = join(commandFolder, `${slug}.md`);
@@ -264,6 +305,7 @@ for (const [slug, command] of bySlug) {
     throw new Error(`${relative(repository, source)} needs an "## Exit status" section`);
   }
   flagProblems.push(...unknownFlags(prose.source, command.name).map((problem) => `${relative(repository, source)}: ${problem}`));
+  runExamples(source, command.name);
 
   const body = [text(command.about), prose.intro, '## Usage', '', '```sh', command.usage, '```'];
   if (command.aliases.length) {
@@ -462,6 +504,7 @@ for (const tool of mcp.tools) {
     throw new Error(`${relative(repository, source)} needs an "## Errors" section`);
   }
   flagProblems.push(...unknownFlags(prose.source, null).map((problem) => `${relative(repository, source)}: ${problem}`));
+  runExamples(source, tool.name, { tool: tool.name });
   writeFileSync(
     join(mcpOut, 'tools', `${tool.name}.md`),
     page(
@@ -618,11 +661,24 @@ function namedSections(what, source, items, render) {
   );
 }
 
-if (flagProblems.length) {
-  throw new Error(`Authored reference pages name flags that their command does not take:\n${flagProblems.join('\n')}`);
+// The README, the guides and the skills are about no single command or tool. Their examples run
+// too, and the flags they name must exist.
+const guides = join(docs, 'guides');
+const skills = join(repository, 'skills');
+const otherPages = [join(repository, 'README.md'), join(docs, 'index.md'), join(commandFolder, 'README.md'), ...['index', 'resources', 'prompts'].map((name) => join(mcpFolder, `${name}.md`)), ...markdownFiles(guides).map((name) => join(guides, `${name}.md`)), ...markdownFiles(skills).map((name) => join(skills, `${name}.md`))];
+for (const source of otherPages) {
+  const file = relative(repository, source);
+  flagProblems.push(...unknownFlags(readFileSync(source, 'utf8'), null).map((problem) => `${file}: ${problem}`));
+  examples.check(file);
 }
 
+if (flagProblems.length) {
+  throw new Error(`Pages name flags that their command does not take:\n${flagProblems.join('\n')}`);
+}
+
+const ran = examples.finish();
+
 console.log(
-  `reference.mjs: wrote ${bySlug.size} command pages and ${mcp.tools.length} tool pages, with ` +
+  `reference.mjs: ran ${ran.commands.length} commands and ${ran.tools.length} tool calls of the examples, and wrote ${bySlug.size} command pages and ${mcp.tools.length} tool pages, with ` +
     `${mcp.resources.length} resources, ${mcp.resource_templates.length} templates and ${mcp.prompts.length} prompts`,
 );

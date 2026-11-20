@@ -12,10 +12,19 @@ plain rules without them.
 
 ## Examples
 
-With this test file in the project that [`xpd new`](../new/) makes, the first run fails because
-no snapshot exists yet. `xpd test -U` then writes the snapshot.
+[`xpd new`](../new/) makes the project, the rule and an empty test file.
 
-```yaml
+```console
+$ xpd new project --pack team --yes --format json | jq -c .item
+"project"
+$ xpd new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes --format json | jq -c .id
+"team/no-print"
+```
+
+With this test file, the first run fails because no snapshot exists yet. `xpd test -U` then writes
+the snapshot.
+
+```yaml title="rule-tests/team/no-print-test.yml"
 id: team/no-print
 valid:
   - "log(1)"
@@ -23,7 +32,7 @@ invalid:
   - "import team\nprint(1)"
 ```
 
-```sh
+```console
 $ xpd test
 team/no-print: passed
 team/no-print: snapshot mismatch

@@ -14,15 +14,25 @@ of the packs that ship with xpd.
 The example adds a rule that reports `print` calls, in an empty folder. First, create the rule
 project.
 
-```sh
-xpd new project --yes
+```console
+$ xpd new project --yes
+Created project
+  created  /tmp/project/sgconfig.yml
+  created  /tmp/project/xpd.yml
+  created  /tmp/project/rules/.gitkeep
+  created  /tmp/project/rule-tests/.gitkeep
+  created  /tmp/project/utils/.gitkeep
 ```
 
 xpd writes `sgconfig.yml` and `xpd.yml`, and the folders `rules/`, `rule-tests/` and `utils/`.
 Second, create the rule from a pattern, where `$X` matches any one argument.
 
-```sh
-xpd new rule no-print --language python --pattern 'print($X)' --message 'Use the logger, so the output has a level and a time.' --with-test --yes
+```console
+$ xpd new rule no-print --language python --pattern 'print($X)' --message 'Use the logger, so the output has a level and a time.' --with-test --yes
+Created rule no-print
+  created  /tmp/project/rules/no-print.yml
+  created  /tmp/project/rules/no-print.md
+  created  /tmp/project/rule-tests/no-print-test.yml
 ```
 
 xpd writes the rule, its Markdown and an empty test file.
@@ -36,7 +46,8 @@ xpd writes the rule, its Markdown and an empty test file.
 └── rule-tests/no-print-test.yml  id: no-print, valid: [], invalid: []
 ```
 
-```yaml title="rules/no-print.yml"
+```console
+$ cat rules/no-print.yml
 id: no-print
 language: python
 severity: warning
@@ -97,8 +108,12 @@ its report differs from the snapshot. Commit the `rule-tests/__snapshots__/` fol
 A rule about a library should run only on the files that import it. Put such rules in a pack,
 named after the module that the rules are about.
 
-```sh
-xpd new rule old-api --pack mylib --pattern 'mylib.old($X)' --fix 'mylib.new($X)' --fix-safety safe --message 'old() was removed in 2.0.' --yes
+```console
+$ xpd new rule old-api --pack mylib --pattern 'mylib.old($X)' --fix 'mylib.new($X)' --fix-safety safe --message 'old() was removed in 2.0.' --yes
+Created rule mylib/old-api
+  created  /tmp/project/rules/mylib/old-api.yml
+  created  /tmp/project/rules/mylib/old-api.md
+  modified /tmp/project/xpd.yml
 ```
 
 `--pack` adds the pack to `xpd.yml` and writes the rule to `rules/mylib/`. The rule then runs on

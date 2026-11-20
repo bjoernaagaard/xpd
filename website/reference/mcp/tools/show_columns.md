@@ -9,10 +9,11 @@ server's renderer resource. A host that does not render apps gets the JSON of `p
 {"file":"samples/data.csv"}
 ```
 
-The text content of the result starts like this.
+The text content of the result is the report of `profile`. Its first column is shown, and
+`"..."` stands for the other column.
 
 ```json
-{"file":"samples/data.csv","pandas":"3.1.1","rows":3,"memory_bytes":183,"columns":[{"column":"a","dtype":"float64","nulls":1,"unique":2,"memory_bytes":24},{"col...
+{"file":"samples/data.csv","rows":3,"columns":[{"column":"a","dtype":"float64","nulls":1,"unique":2,"memory_bytes":24},"..."]}
 ```
 
 ## Errors

@@ -23,7 +23,7 @@ You can also run xpd once without installing it, with `uvx xpd` in place of `xpd
 Save the following code as `bad.py` in an empty folder. xpd reads the code and doesn't run it, so
 you don't need pandas.
 
-```python
+```python title="bad.py"
 import pandas as pd
 
 df = pd.DataFrame({"a": [1, 2], "k": [1, 2]})
@@ -37,11 +37,12 @@ for f in ["x.csv"]:
     out = pd.concat([out, pd.read_csv(f)])
 ```
 
-Run xpd on the file. It prints one line for each issue, with the place, the severity, the rule and
+Run xpd on the file. On a terminal `--format text` is the default, and elsewhere xpd prints JSON.
+It prints one line for each issue, with the place, the severity, the rule and
 what to write instead, and it exits with 1 because one issue is an error.
 
 ```console
-$ xpd check bad.py
+$ xpd check bad.py --format text
 bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
 bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
 bad.py:7:1: info [pandas/no-inplace] inplace=True gives no speedup and blocks chaining. Reassign instead.
@@ -63,7 +64,7 @@ issues has one, so the file stays as it was. `--unsafe-fixes` adds the fixes tha
 the code does, so read the diff after you use it.
 
 ```console
-$ xpd check bad.py --fix --unsafe-fixes
+$ xpd check bad.py --fix --unsafe-fixes --format text
 bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
 bad.py:8:5: warning [pandas/merge-without-validate] merge without validate= can silently duplicate rows.
 bad.py:11:5: warning [pandas/concat-in-loop] out grows by one concat per pass, and each concat copies every earlier row. Collect the frames in a list and concat once after the loop.

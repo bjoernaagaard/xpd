@@ -9,10 +9,11 @@ server's renderer resource. A host that does not render apps gets the JSON of `g
 {"paths":["samples/graph/steps.py"]}
 ```
 
-The text content of the result starts like this.
+The text content of the result is the report of `graph`. The first step of its one pipeline is
+shown without its columns, and `"..."` stands for the other steps.
 
 ```json
-{"pipelines":[{"name":"features","file":"samples/graph/steps.py","line":51,"steps":[{"name":"totals","kind":"function","line":18,"reads":["discount","quantity",...
+{"pipelines":[{"name":"features","file":"samples/graph/steps.py","line":51,"steps":[{"name":"totals","kind":"function","line":18},"..."]}]}
 ```
 
 ## Errors

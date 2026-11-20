@@ -133,8 +133,9 @@ samples/bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for ev
 samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
 ```
 
-A `UserPromptSubmit` event in a project with one script that draws four plotly figures gives this
-answer.
+A `UserPromptSubmit` event whose prompt fits a playbook gives this answer, in a copy of the
+repository's `samples/` folder. The `...` stands for the lines after the playbook, which count the
+open issues of the project.
 
 ```console
 $ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"improve my charts"}' | xpd hook
@@ -146,18 +147,15 @@ Its commands, in order:
 3. `xpd find "<chart form>" --kind rule` names the rule for a form, such as "small multiples" or "pie chart".
 4. `xpd check <file> --format json` after the change, and the chart is done when it reports 0 issues.
 The rules that its code satisfies: plotly/default-template, plotly/legend-instead-of-labels, plotly/axis-title-column-name, plotly/bar-axis-without-zero, plotly/area-axis-without-zero, plotly/explicit-grid, plotly/boxed-axis-frame, plotly/redundant-color, plotly/rainbow-colorscale, plotly/pie-chart, plotly/rotated-tick-labels, plotly/all-caps-title.
-xpd checked 1 Python file of this project under the strict style and found 12 open issues.
-plotly: 11 warnings
-pandas: 1 warning
-The rules with the most issues: pandas/pivot-table-default-mean (1), plotly/all-caps-title (1), plotly/bar-axis-without-zero (1), plotly/default-template (1), plotly/explicit-grid (1).
-`xpd check . --format json` lists each issue with its file and line, and `xpd rules --rule <pack>/<rule>` explains a rule.
+...
 ```
 
-A `Stop` event in a project where the session added `loop.py` gives this answer.
+A `Stop` event after the session edited `samples/bad.py` gives this answer.
 
 ```console
+$ echo '{"session_id":"s1","cwd":"/tmp/project","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"samples/bad.py"}}' | xpd hook 2> /dev/null
 $ echo '{"session_id":"s1","cwd":"/tmp/project","hook_event_name":"Stop","stop_hook_active":false}' | xpd hook
-{"decision":"block","reason":"xpd holds this turn, because the Python files that this session changed have errors or warnings. Fix each line below. When the code is right as it is, write `# ast-grep-ignore: <pack>/<rule>` on the line above it, with the reason after the rule.\nloop.py:4:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df[\"a\"] * df[\"w\"]. When each row has to become a Python object, loop over itertuples() or to_dict(\"records\")."}
+{"decision":"block","reason":"xpd holds this turn, because the Python files that this session changed have errors or warnings. Fix each line below. When the code is right as it is, write `# ast-grep-ignore: <pack>/<rule>` on the line above it, with the reason after the rule.\nsamples/bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df[\"a\"] * df[\"w\"]. When each row has to become a Python object, loop over itertuples() or to_dict(\"records\").\nsamples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, \"a\"] instead.\nsamples/bad.py:8:5: warning [pandas/merge-without-validate] merge without validate= can silently duplicate rows.\nsamples/bad.py:11:5: warning [pandas/concat-in-loop] out grows by one concat per pass, and each concat copies every earlier row. Collect the frames in a list and concat once after the loop.\nThe lines below are advice, and they do not hold the turn.\nsamples/bad.py:7:1: info [pandas/no-inplace] inplace=True gives no speedup and blocks chaining. Reassign instead."}
 ```
 
 ## Exit status

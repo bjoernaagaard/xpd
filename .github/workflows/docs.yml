@@ -1,7 +1,10 @@
 # Builds the documentation site with `mise run docs` and publishes site/ to GitHub Pages. A pull
 # request only builds the site, so a broken page or reference fails the check before it merges.
 # A push to main builds and deploys. The site reads the rule catalog, the command tree and the MCP
-# server of the xpd that this checkout builds, so their sources are inputs too.
+# server of the xpd that this checkout builds, so their sources are inputs too. The build also runs
+# every example on the pages and in the README with that xpd, on the files in samples/, and fails
+# when an example differs from what xpd does. Each Monday it runs the examples with the newest
+# release of the libraries that the samples import, so a change in a library shows within a week.
 name: Documentation
 on:
   pull_request:
@@ -15,12 +18,17 @@ on:
       - indexes/**
       - python/**
       - skills/**
+      - samples/**
+      - py/**
+      - README.md
       - pyproject.toml
       - mise.toml
       - .github/workflows/docs.yml
   push:
     branches: [main]
     paths: *inputs
+  schedule:
+    - cron: "17 5 * * 1"
   workflow_dispatch:
 permissions: {}
 jobs:
@@ -45,9 +53,16 @@ jobs:
       # mise.toml routes cargo through mbx. Its action restores target/ and the cargo registry
       # from the cache that pushes to main save.
       - uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
+      # The examples of `xpd find` rank with the embedding model, which xpd downloads when it is
+      # absent.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/xpd/models
+          key: xpd-models-embeddinggemma-300M-Q8_0
       - run: mise run docs
         env:
           MISE_TASK_RUN_AUTO_INSTALL: "false"
+          XPD_NEWEST_LIBRARIES: ${{ github.event_name == 'schedule' && '1' || '' }}
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - if: github.event_name != 'pull_request'
@@ -55,7 +70,7 @@ jobs:
         with:
           path: site
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.event_name != 'schedule'
     needs: build
     permissions:
       pages: write
