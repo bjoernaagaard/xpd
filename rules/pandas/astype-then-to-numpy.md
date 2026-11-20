@@ -9,6 +9,8 @@
 
 The rule reports `s.astype(float).to_numpy()`.
 
+It leaves a text dtype alone, such as `s.astype(str).to_numpy()`, because the two forms differ for it. On pandas 3.0.5 `astype(str).to_numpy()` gave an object array and `to_numpy(dtype=str)` a fixed-width one, and a datetime column gave `"2025-01-01"` with the first and `"2025-01-01T00:00:00.000000"` with the second.
+
 ## How to fix it
 
 `xpd check --fix --unsafe-fixes` applies the fixes of this rule. Check the result, because an unsafe fix can change what the code does.

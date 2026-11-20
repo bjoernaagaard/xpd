@@ -1,15 +1,16 @@
 # Only a mapping held in a name is reported. With a few literal keys replace is fast enough.
+# The file must show that the name holds a dict (utils/dict-name.yml), because a Path and a
+# str have a replace too: source.replace(destination) moves a file, and a Path has no get.
 # Unsafe: on pandas 3.1.1, a key of NaN replaced the missing values and the lambda left them, text
 # mapped to integers stayed object with replace and became int64 with map, and a dict of dicts on
-# a frame replaced per column with replace and nothing with map. The name may also hold a list,
-# which has no get.
+# a frame replaced per column with replace and nothing with map.
 id: replace-with-mapping
 language: python
 severity: warning
 message: 'replace takes longer with every key in the mapping. Write $S.map(lambda v: $M.get(v, v)), which keeps the values and the dtype.'
 rule: { pattern: $S.replace($M) }
 constraints:
-  M: { kind: identifier }
+  M: { kind: identifier, matches: dict-name }
   S: { not: { regex: '\.str$' } }
 fix: '$S.map(lambda v: $M.get(v, v))'
 metadata: { fix: unsafe }

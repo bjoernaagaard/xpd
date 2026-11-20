@@ -1,0 +1,9 @@
+id: dict-value
+language: python
+# A value that is a dict where it is written.
+rule:
+  any:
+    - kind: dictionary
+    - kind: dictionary_comprehension
+    - kind: call
+      has: { field: function, regex: '^(collections\.)?(dict|defaultdict|OrderedDict)$' }

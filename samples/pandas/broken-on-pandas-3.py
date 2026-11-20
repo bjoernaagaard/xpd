@@ -402,6 +402,17 @@ def chained_attribute_and_indexer(df):
 
 
 @case
+def dict_of_frames_stays(df):
+    # The name holds a dict, so the first key takes a frame or an array out of it.
+    tables = {"head": df[["b"]].head(3)}
+    tables["head"].loc[0] = 0.0
+    tables["head"].iloc[1] = 1.0
+    arrays = {"b": df["b"].to_numpy(copy=True)}
+    arrays["b"][0] = 5.0
+    return tables["head"], arrays["b"]
+
+
+@case
 def writes_that_reach_the_frame(df):
     df.loc[df.a > 50, "b"] = 0.0
     df.update(pd.DataFrame({"b": [9.0]}, index=[1]))

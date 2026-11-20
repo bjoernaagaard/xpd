@@ -1,0 +1,6 @@
+id: dict-type
+language: python
+# An annotation that names a dict or a Mapping, such as dict[str, pd.DataFrame].
+rule:
+  kind: type
+  regex: '^((typing|t|collections|collections\.abc)\.)?(dict|Dict|defaultdict|DefaultDict|OrderedDict|Mapping|MutableMapping)\b'

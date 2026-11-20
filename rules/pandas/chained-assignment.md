@@ -15,6 +15,7 @@ The rule leaves alone code that more often fills a list or a dict, as the table 
 | --- | --- |
 | a dict, list or set assigned to `x["a"][key]` | the code fills a nested dict |
 | two plain keys, as in `rows[0]["name"] = v` | the value is more often a list or a dict |
+| a name that the file shows holds a dict, as in `tables["direction"].loc[row] = v` after `tables = {...}` | the first key takes a frame or an array out of the dict, and a dict has no `.loc` |
 
 ## How to fix it
 
@@ -22,8 +23,10 @@ The rule leaves alone code that more often fills a list or a dict, as the table 
 
 The unsafe fix writes `df.loc[i, "a"] = v`, and `df.loc[df.index[0], "a"] = v` for a write through `.iloc` or `.iat` on a column, which writes every row when the index holds the label twice. Other chains and `update` on a column have no fix.
 
-The fix is unsafe, because xpd cannot see whether the value on the left is a frame. The table shows
-which forms get a fix.
+The fix is unsafe, because xpd cannot always see whether the value on the left is a frame. A name
+counts as a dict when the function or the module assigns it a dict, a dict comprehension or a call
+of `dict`, or annotates it as `dict` or `Mapping`. A dict that a parameter without an annotation or
+another function's result holds is still reported. The table shows which forms get a fix.
 
 | Reported form | Fix |
 | --- | --- |

@@ -1,5 +1,8 @@
 # Each fix replaces only the target on the left, so an augmented assignment such as
 # `df["a"][i] += 1` keeps its operator. The fixes are unsafe: the target may not be a DataFrame.
+# A dict of frames or arrays is written the same way, as in tables["direction"].loc[row] = v,
+# and a dict has no .loc. So a name that the file shows holds a dict (utils/dict-name.yml) is
+# left alone where a text key comes first.
 
 # df["col"][row] = v. A dict, list or set assigned to it is a nested dict being filled, as in
 # results["cv"][metric] = {...}, and is left alone.
@@ -19,7 +22,7 @@ constraints:
   # A slice of a column selects by position, and .loc would select by label. A text label
   # after a text label is more often a nested dict, such as config["db"]["host"].
   ROW: { not: { any: [{ kind: slice }, { kind: string }] } }
-  DF: { not: { matches: indexer } }
+  DF: { not: { any: [{ matches: indexer }, { matches: dict-name }] } }
 utils:
   indexer: { kind: attribute, has: { field: attribute, regex: ^(loc|iloc|at|iat)$ } }
 fix: $DF.loc[$ROW, $COL]
@@ -318,6 +321,7 @@ rule:
         - inside: { kind: augmented_assignment, field: left }
 constraints:
   COL: { kind: string }
+  DF: { not: { matches: dict-name } }
 fix: $DF.loc[$ROW, $COL]
 metadata: { fix: unsafe }
 ---
@@ -337,6 +341,7 @@ rule:
         - inside: { kind: augmented_assignment, field: left }
 constraints:
   COL: { kind: string }
+  DF: { not: { matches: dict-name } }
 fix: $DF.loc[$DF.index[$ROW], $COL]
 metadata: { fix: unsafe }
 ---

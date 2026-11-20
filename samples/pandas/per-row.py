@@ -263,6 +263,15 @@ def replace_with_mapping(df):
 
 
 @case
+def replace_that_stays(df):
+    # Nothing shows what the name holds here, and a Path and a str have a replace too.
+    def renamed(column, names):
+        return column.replace(names)
+
+    return renamed(df["k"], {"g1": "one", "g2": "two"})
+
+
+@case
 def replace_with_literals(df):
     return df["k"].replace({"g1": "one"}), df["s"].str.replace("_", " "), df["k"].map({"g1": "one"}).fillna(df["k"])
 

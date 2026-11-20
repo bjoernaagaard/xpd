@@ -200,6 +200,11 @@ def loads(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return df["load"].astype(float).to_numpy(), df["load"].to_numpy(dtype=float)  # xpd: astype-then-to-numpy
 
 
+def loads_as_text(df: pd.DataFrame) -> np.ndarray:
+    # to_numpy(dtype=str) gives a fixed-width array, and writes a datetime with its time.
+    return df["load"].astype(str).to_numpy()
+
+
 def renamed_by_hand(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"area": df["region"], "mw": df["load"], "h": df["hour"]})  # xpd: frame-rebuilt-from-columns
 

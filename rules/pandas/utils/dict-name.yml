@@ -1,0 +1,76 @@
+id: dict-name
+language: python
+# A name the file shows holds a dict. In the nearest function or module, an assignment gives
+# the name a dict, a dict comprehension or a call of dict, defaultdict or OrderedDict, or an
+# annotation says it is a dict or a Mapping, and no other assignment or parameter gives the
+# name something else. A name that a function reads but does not bind is looked up at the
+# top of the module.
+#
+# The two shapes are anchors of this file and not utilities of their own, because a utility
+# named with `matches` gets its own variables and would not see $DICT_NAME.
+rule:
+  kind: identifier
+  pattern: $DICT_NAME
+  any:
+    - inside:
+        stopBy: { any: [{ kind: function_definition }, { kind: module }] }
+        any: [{ kind: function_definition }, { kind: module }]
+        has: &binds-dict
+          stopBy: end
+          any:
+            - kind: assignment
+              all:
+                - has: { field: left, pattern: $DICT_NAME }
+                - any:
+                    - has: { field: right, matches: dict-value }
+                    - has: { field: type, matches: dict-type }
+            - any: [{ kind: typed_parameter }, { kind: typed_default_parameter }]
+              all:
+                - has: { kind: identifier, pattern: $DICT_NAME }
+                - has: { field: type, matches: dict-type }
+        not:
+          has: &binds-other
+            stopBy: end
+            any:
+              - kind: assignment
+                all:
+                  - has: { field: left, pattern: $DICT_NAME }
+                  - not: { has: { field: right, matches: dict-value } }
+                  - not: { has: { field: type, matches: dict-type } }
+              - any: [{ kind: typed_parameter }, { kind: typed_default_parameter }]
+                all:
+                  - has: { kind: identifier, pattern: $DICT_NAME }
+                  - not: { has: { field: type, matches: dict-type } }
+              - kind: default_parameter
+                has: { field: name, pattern: $DICT_NAME }
+              - kind: identifier
+                pattern: $DICT_NAME
+                inside: { kind: parameters }
+    - all:
+        - inside:
+            stopBy: { any: [{ kind: function_definition }, { kind: module }] }
+            kind: function_definition
+            not: { has: *binds-dict }
+        - inside:
+            stopBy: { any: [{ kind: function_definition }, { kind: module }] }
+            kind: function_definition
+            not: { has: *binds-other }
+        - inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: { kind: function_definition }
+              kind: assignment
+              all:
+                - has: { field: left, pattern: $DICT_NAME }
+                - any:
+                    - has: { field: right, matches: dict-value }
+                    - has: { field: type, matches: dict-type }
+            not:
+              has:
+                stopBy: { kind: function_definition }
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $DICT_NAME }
+                  - not: { has: { field: right, matches: dict-value } }
+                  - not: { has: { field: type, matches: dict-type } }

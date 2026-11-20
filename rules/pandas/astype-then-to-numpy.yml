@@ -1,11 +1,18 @@
 # astype builds a second Series with the new dtype, and to_numpy then takes its values. to_numpy
 # takes the dtype itself and converts once. The fix is unsafe, because a missing value in a
 # nullable column can convert in another way.
+#
+# A text dtype is left alone, because the two forms differ for it. On pandas 3.0.5,
+# astype(str).to_numpy() gave an object array and to_numpy(dtype=str) a fixed-width one, and a
+# datetime column gave "2025-01-01" with the first and "2025-01-01T00:00:00.000000" with the
+# second. to_numpy(dtype="string") raised TypeError.
 id: astype-then-to-numpy
 language: python
 severity: warning
 message: astype builds a Series only to take its values. Pass the dtype to to_numpy, as in $X.to_numpy(dtype=$T).
 rule:
   pattern: $X.astype($T).to_numpy()
+constraints:
+  T: { not: { regex: '^(str|bytes|["''](str|string|U\d*|S\d*)\b.*|(np|numpy)\.(str_|bytes_)|(pd|pandas)\.StringDtype\(.*\))$' } }
 fix: $X.to_numpy(dtype=$T)
 metadata: { fix: unsafe }
