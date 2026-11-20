@@ -25,7 +25,7 @@ pub use evidence::evidence_rule_ids;
 pub(crate) fn run(format: Format) -> Result<()> {
     let root = std::env::current_dir()?;
     let catalog = catalog::Catalog::packaged()?;
-    let mut files: Vec<PathBuf> = crate::scan::python_files(std::slice::from_ref(&root))?;
+    let mut files: Vec<PathBuf> = crate::source::python_files(std::slice::from_ref(&root))?;
     files.sort();
     let evidence = evidence::find(&files)?;
     let ruff = ruff::analyze(
@@ -39,8 +39,7 @@ pub(crate) fn run(format: Format) -> Result<()> {
         &catalog,
         probe::Checker::find(catalog::Tool::Ty, &root),
     );
-    let mut report = advice::evaluate(&root, &files, &catalog, &evidence, &ruff, &ty);
-    report.pytest(&root, files.len(), &catalog, &pytest::analyze(&root));
+    let report = advice::evaluate(&root, &files, &catalog, &evidence, &ruff, &ty);
     match format {
         Format::Json => println!("{}", report.to_json()),
         Format::Text => print!("{}", report.to_text()),

@@ -20,7 +20,7 @@ use crate::pack_names::OWN_PACK;
 use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
 use crate::rule_id::RuleId;
-use crate::scan::File;
+use crate::source::File;
 use crate::style::Style;
 use crate::syntax::Root;
 use crate::venv::Distributions;

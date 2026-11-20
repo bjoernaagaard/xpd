@@ -1,6 +1,5 @@
 //! Walks paths, fixes and lints each file with the rule packs that apply to it.
 
-use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
@@ -21,13 +20,8 @@ use crate::report::{Issue, Position};
 use crate::rule::Rule;
 use crate::rule_id::RuleId;
 use crate::severity::Severity;
-use crate::syntax::{Node, Root, parse, parse_as};
-
-/// The language of the file at `path`, by its name. A file that names no language is read as
-/// Python, so that a script without an extension is linted.
-fn language_of(path: &Path) -> SupportLang {
-    SupportLang::from_path(path).unwrap_or(SupportLang::Python)
-}
+use crate::source::{File, files_under, is_python, language_of, read_source};
+use crate::syntax::{Node, Root, parse_as, parses_python_cells};
 
 /// How a file binds a name that it imports.
 #[derive(Debug, PartialEq, Eq)]
@@ -64,89 +58,6 @@ fn syntax_errors(root: &Root) -> usize {
         .count()
 }
 
-/// Whether libcst parses `code` as Python.
-fn parses_as_python(code: &str) -> bool {
-    libcst_native::parse_module(code, None).is_ok()
-}
-
-/// `code` with each `IPython` magic line turned into a comment, as in `%matplotlib inline` and
-/// `!pip list`. An interactive window runs such a line in a cell, and Python itself does not
-/// read it. Code that is Python as it is written comes back unchanged, so a line such as
-/// `% b)` that continues an expression is never touched. Otherwise a line counts when a syntax
-/// error starts on it and its first character after the indent is `%` or `!`. A `#` replaces
-/// that character, so no position in the text moves.
-fn hide_magics(code: &str) -> Cow<'_, str> {
-    if parses_as_python(code) {
-        return Cow::Borrowed(code);
-    }
-    let root = parse(code);
-    let mut hidden = code.to_owned();
-    for error in (root.root().dfs()).filter(|node| node.is_error() || node.is_missing()) {
-        let at = error.range().start;
-        let line = code[..at].rfind('\n').map_or(0, |end| end + 1);
-        let indent = code[line..at].chars().all(|c| matches!(c, ' ' | '\t'));
-        if indent && (code[at..].starts_with('%') || code[at..].starts_with('!')) {
-            hidden.replace_range(at..=at, "#");
-        }
-    }
-    Cow::Owned(hidden)
-}
-
-/// One file, as a lint run names it.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct File<'a> {
-    /// The path that the `files` and `ignores` globs of a rule match, which selects the rules
-    /// that run.
-    pub(crate) path: &'a Path,
-    /// Where the file is on disk, from which a rule follows its imports. `None` for code that
-    /// is in no file, such as a recipe.
-    pub(crate) disk: Option<&'a Path>,
-}
-
-impl<'a> File<'a> {
-    /// A file that is on disk at the path its rules match.
-    pub(crate) fn on_disk(path: &'a Path) -> Self {
-        Self {
-            path,
-            disk: Some(path),
-        }
-    }
-}
-
-/// Whether `path` has the `.py` extension.
-pub(crate) fn is_python(path: &Path) -> bool {
-    path.extension()
-        .is_some_and(|x| x.eq_ignore_ascii_case("py"))
-}
-
-/// Whether the name of `path` tells its language.
-pub(crate) fn names_language(path: &Path) -> bool {
-    SupportLang::from_path(path).is_some()
-}
-
-pub(crate) fn cannot_read(path: &Path) -> String {
-    format!("cannot read {}", path.display())
-}
-
-/// The text of the file at `path`. A file that cannot be read, such as one that is not UTF-8,
-/// is named on stderr and gives `None`, so that one such file does not stop a run over the
-/// others. The run then counts it as skipped and exits with 2. A Jupyter notebook is JSON, which
-/// no rule reads, so it is named and skipped the same way.
-pub(crate) fn read_source(file: File<'_>) -> Option<String> {
-    let path = file.path;
-    if (path.extension()).is_some_and(|x| x.eq_ignore_ascii_case("ipynb")) {
-        eprintln!(
-            "xpd: {} is a Jupyter notebook, and xpd reads .py files. Write it as a .py file with cell markers, as in `jupytext --to py:percent {}`, and check that file",
-            path.display(),
-            path.display()
-        );
-        return None;
-    }
-    fs::read_to_string(file.disk.unwrap_or(path))
-        .map_err(|e| eprintln!("xpd: {}: {e}", cannot_read(path)))
-        .ok()
-}
-
 /// The files under `paths` that `packs` have rules for, each once: the Python files, and the
 /// files of each other language that a rule names. A path that is a file is always taken.
 /// Folders respect `.gitignore`.
@@ -162,45 +73,6 @@ pub(crate) fn collect_files(
     files_under(root, paths, |path| {
         is_python(path) || SupportLang::from_path(path).is_some_and(|l| languages.contains(&l))
     })
-}
-
-/// The Python files under `paths`, each once. Folders respect `.gitignore`.
-pub(crate) fn python_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
-    files_under(Path::new(""), paths, is_python)
-}
-
-/// The files under `paths` that `wanted` keeps, each once. A path that is a file is always
-/// taken.
-fn files_under(
-    root: &Path,
-    paths: &[PathBuf],
-    wanted: impl Fn(&Path) -> bool,
-) -> Result<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    let mut seen = HashSet::new();
-    let mut add = |path: &Path, disk: &Path| -> Result<()> {
-        let real = fs::canonicalize(disk).with_context(|| cannot_read(path))?;
-        if seen.insert(real) {
-            files.push(path.to_path_buf());
-        }
-        Ok(())
-    };
-    for p in paths {
-        let disk = root.join(p);
-        let meta = fs::metadata(&disk).with_context(|| cannot_read(p))?;
-        if meta.is_file() {
-            add(p, &disk)?;
-            continue;
-        }
-        for entry in ignore::WalkBuilder::new(&disk).build() {
-            let entry = entry.with_context(|| cannot_read(p))?;
-            if entry.file_type().is_some_and(|t| t.is_file()) && wanted(entry.path()) {
-                let tail = entry.path().strip_prefix(&disk).unwrap_or(entry.path());
-                add(&p.join(tail), entry.path())?;
-            }
-        }
-    }
-    Ok(files)
 }
 
 /// What a scan found, after any fixes it wrote.
@@ -244,10 +116,7 @@ pub(crate) fn scan(
                 disk: Some(&disk),
             };
             if let Some(allowed) = fix {
-                Fixed {
-                    source: src,
-                    count: fixed,
-                } = fix_source(file, src, packs, allowed);
+                (src, fixed) = fix_source(file, src, packs, allowed).into_parts();
                 if fixed > 0 {
                     fs::write(&disk, &src)
                         .with_context(|| format!("cannot write {}", path.display()))?;
@@ -415,9 +284,19 @@ pub(crate) struct Replacement {
 }
 
 #[derive(Debug)]
-pub(crate) struct Fixed {
-    pub(crate) source: String,
-    pub(crate) count: usize,
+pub(crate) enum Fixed {
+    Converged { source: String, count: usize },
+    PassLimit { source: String, count: usize },
+}
+
+impl Fixed {
+    pub(crate) fn into_parts(self) -> (String, usize) {
+        match self {
+            Self::Converged { source, count } | Self::PassLimit { source, count } => {
+                (source, count)
+            }
+        }
+    }
 }
 
 pub(crate) fn fix_source(
@@ -436,12 +315,12 @@ pub(crate) fn fix_source(
             }
         }
         if edits.is_empty() {
-            break;
+            return Fixed::Converged { source, count };
         }
         count += edits.len();
         source = edits.apply(&source);
     }
-    Fixed { source, count }
+    Fixed::PassLimit { source, count }
 }
 
 /// What one file's source holds for a run.
@@ -668,8 +547,7 @@ impl<'s> Parsed<'s> {
     /// not accept, so it is the check only for the other languages, which libcst does not read.
     fn accepts(&self, after: &str) -> bool {
         if self.language == SupportLang::Python {
-            let parses = |code: &str| parses_as_python(&hide_magics(code));
-            *self.python.get_or_init(|| parses(self.src)) && parses(after)
+            *self.python.get_or_init(|| parses_python_cells(self.src)) && parses_python_cells(after)
         } else {
             syntax_errors(&parse_as(after, self.language)) <= self.errors
         }

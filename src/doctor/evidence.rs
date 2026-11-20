@@ -10,7 +10,7 @@ use ast_grep_config::{CombinedScan, DeserializeEnv, RuleConfig, SerializableGlob
 use ast_grep_language::SupportLang;
 
 use super::catalog::Trigger;
-use crate::scan;
+use crate::source;
 use crate::syntax;
 
 const RULES: &str = include_str!("evidence.yml");
@@ -90,7 +90,7 @@ pub(crate) fn find(files: &[PathBuf]) -> Result<Evidence> {
     let per_file: Vec<Vec<(Trigger, Location)>> = files
         .par_iter()
         .map(|file| {
-            let Some(src) = scan::read_source(scan::File::on_disk(file)) else {
+            let Some(src) = source::read_source(source::File::on_disk(file)) else {
                 return Vec::new();
             };
             let root = syntax::parse(&src);

@@ -38,6 +38,7 @@ mod search;
 mod settings;
 mod severity;
 mod skills;
+mod source;
 mod steps;
 mod style;
 mod syntax;

@@ -21,9 +21,9 @@ use crate::mcp;
 use crate::outline::OutlineArgs;
 use crate::output::Format;
 use crate::query::RunArgs;
-use crate::scan;
 use crate::settings::Settings;
 use crate::skills;
+use crate::source;
 use crate::style::Style;
 use crate::venv;
 
@@ -615,7 +615,7 @@ fn check(
 
 /// Prints the dataflow of the files under `paths`.
 fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
-    let graph = match scan::python_files(paths).map(|files| Graph::read(Path::new(""), &files)) {
+    let graph = match source::python_files(paths).map(|files| Graph::read(Path::new(""), &files)) {
         Ok(graph) => graph,
         Err(e) => {
             eprintln!("xpd: {e:#}");

@@ -44,12 +44,19 @@ pub(crate) struct Filters {
 
 impl Filters {
     fn keeps(&self, package: &str, id: &str, severity: Severity) -> bool {
-        let named = |selector: &String| match selector.split_once('/') {
-            Some((in_package, rule)) => in_package == package && rule == id,
-            None => selector == package || selector == id,
-        };
-        (self.rules.is_empty() || self.rules.iter().any(named))
+        (self.rules.is_empty()
+            || self
+                .rules
+                .iter()
+                .any(|selector| names(selector, package, id)))
             && self.severity.is_none_or(|lowest| severity >= lowest)
+    }
+}
+
+fn names(selector: &str, package: &str, id: &str) -> bool {
+    match selector.split_once('/') {
+        Some((in_package, rule)) => in_package == package && rule == id,
+        None => selector == package || selector == id,
     }
 }
 
@@ -124,14 +131,10 @@ impl Catalog {
         self.packs
             .retain(|pack| pack.unused_suppression().is_none());
         for selector in &filters.rules {
-            let only = Filters {
-                rules: vec![selector.clone()],
-                severity: None,
-            };
             let known = self.packs.iter().any(|pack| {
                 let checks = pack.package_checks.iter().map(|check| check.id.as_str());
                 let mut ids = pack.rules.iter().map(|rule| rule.id.name()).chain(checks);
-                ids.any(|id| only.keeps(&pack.module, id, Severity::Error))
+                ids.any(|id| names(selector, &pack.module, id))
             });
             if !known {
                 bail!("no rule or package is named {selector}. `xpd rules` lists them");

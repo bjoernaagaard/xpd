@@ -12,6 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::source;
 use crate::{
     catalog::{Catalog, Filters},
     output::Format,
@@ -231,7 +232,7 @@ fn run_case(
     {
         let found = workspace
             .analyze(
-                scan::File {
+                source::File {
                     path: &filename,
                     disk: Some(&disk),
                 },

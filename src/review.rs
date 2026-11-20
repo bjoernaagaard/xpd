@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use anyhow::{Context as _, Result, ensure};
 
 use crate::fix_safety::Applicability;
-use crate::scan::{EditBatch, File};
+use crate::scan::EditBatch;
+use crate::source::File;
 use crate::workspace::Workspace;
 
 pub(crate) fn apply(

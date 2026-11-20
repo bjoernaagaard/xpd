@@ -30,7 +30,7 @@ use crate::pack_names::is_module_name;
 use crate::package_check::PackageCheckSource;
 use crate::project::{self, RuleFolders, SGCONFIG, TestFolder, XPD_CONFIG, pack_entry};
 use crate::rule::{Origin, Rule};
-use crate::scan::cannot_read;
+use crate::source::cannot_read;
 
 /// The manifest of an embedded pack, which a local rule folder must not hold.
 const EMBEDDED_MANIFEST: &str = "pack.yml";

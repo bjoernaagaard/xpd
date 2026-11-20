@@ -300,6 +300,7 @@ pub(crate) fn evaluate(
         }
     }
     report.finish(unsupported, ruff, ty);
+    report.pytest(root, files.len(), catalog, &pytest::analyze(root));
     report
 }
 
@@ -468,7 +469,7 @@ fn shown(root: &Path, path: &Path) -> PathBuf {
 }
 
 impl Report {
-    pub(crate) fn pytest(&mut self, root: &Path, files: usize, catalog: &Catalog, pytest: &Pytest) {
+    fn pytest(&mut self, root: &Path, files: usize, catalog: &Catalog, pytest: &Pytest) {
         let tool = Tool::Pytest;
         let (installed, path) = pytest.installed.clone().unzip();
         let pinned = tool.pinned();

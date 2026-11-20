@@ -25,8 +25,8 @@ use crate::fix_safety::Applicability;
 use crate::graph::Graph;
 use crate::index;
 use crate::report::Issue;
-use crate::scan;
 use crate::settings::Settings;
+use crate::source;
 use crate::style::Style;
 use crate::syntax;
 use crate::venv::Venv;
@@ -288,7 +288,7 @@ fn project_files(root: &Path, most: usize) -> Vec<PathBuf> {
         .flatten()
         .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
         .map(ignore::DirEntry::into_path)
-        .filter(|path| scan::is_python(path))
+        .filter(|path| source::is_python(path))
         .map(|path| {
             path.strip_prefix(root)
                 .map(Path::to_path_buf)
@@ -572,7 +572,7 @@ fn post_tool_use(client: &Client, session: Option<&str>, files: &[PathBuf]) -> R
 /// without git, where nothing else tells which files the session changed.
 fn record_edits(project: &Path, session: &str, files: &[PathBuf]) -> Result<()> {
     let session = Session::open(project, session)?;
-    for file in files.iter().filter(|file| scan::is_python(file)) {
+    for file in files.iter().filter(|file| source::is_python(file)) {
         session.append(&Record::Edited(std::path::absolute(project.join(file))?))?;
     }
     Ok(())
@@ -695,7 +695,7 @@ fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
             })
             .collect()
     };
-    files.retain(|file| scan::is_python(file));
+    files.retain(|file| source::is_python(file));
     files.sort();
     files.dedup();
     // A file under the working directory is named from there, as the agent names it.
@@ -854,7 +854,7 @@ impl Session {
         let text = match fs::read_to_string(&self.file) {
             Ok(text) => text,
             Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
-            Err(e) => return Err(e).context(scan::cannot_read(&self.file)),
+            Err(e) => return Err(e).context(source::cannot_read(&self.file)),
         };
         Ok(text
             .lines()
@@ -922,7 +922,7 @@ fn findings(project: &Path, files: &[PathBuf]) -> Result<Vec<Finding>> {
         line: issue.line(Applicability::Safe),
         holds: issue.severity >= Severity::Warning,
     });
-    let python = files.iter().filter(|file| scan::is_python(file));
+    let python = files.iter().filter(|file| source::is_python(file));
     let steps = python.flat_map(|file| {
         fs::read_to_string(project.join(file))
             .map(|src| Graph::step_lines(file, &src))

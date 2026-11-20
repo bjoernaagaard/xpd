@@ -14,6 +14,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use crate::severity::Severity;
+use crate::source;
 use anyhow::{Context, Result};
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::{
@@ -355,9 +356,7 @@ struct Document {
 #[derive(Debug)]
 struct Linted {
     workspace: Arc<Workspace>,
-    found: Vec<Found>,
-    /// What the `onlyWhere` shapes of the package checks matched in the document.
-    calls: Calls,
+    analysis: scan::Linted,
 }
 
 /// The issues of `document`, linted now unless the document still holds them. Diagnostics, a
@@ -370,11 +369,11 @@ fn lint<'d>(
         let project = workspace.project(&document.place.root)?;
         let workspace = Arc::clone(&project.workspace);
         let disk = document.place.disk();
-        let file = scan::File {
+        let file = source::File {
             path: &document.place.path,
             disk: Some(&disk),
         };
-        let scan::Linted { mut found, calls } = workspace.analyze(file, &document.text);
+        let mut analysis = workspace.analyze(file, &document.text);
         if disk
             .extension()
             .is_some_and(|ext| ext == "yml" || ext == "yaml")
@@ -386,7 +385,7 @@ fn lint<'d>(
                 .map(|error| format!("{error:#}"))
                 .or_else(|| project.error.clone());
             if let Some(message) = error {
-                found.push(Found::invalid_rule(
+                analysis.found.push(Found::invalid_rule(
                     document.place.path.clone(),
                     &document.text,
                     message,
@@ -395,8 +394,7 @@ fn lint<'d>(
         }
         document.linted = Some(Linted {
             workspace,
-            found,
-            calls,
+            analysis,
         });
     }
     let document: &'d Document = document;
@@ -458,6 +456,7 @@ fn found_diagnostic(catalog: &Catalog, found: &Found, range: lsp_types::Range) -
 fn diagnostics(document: &Document, linted: &Linted, encoding: Encoding) -> Vec<Diagnostic> {
     let lines = Lines::new(&document.text, encoding);
     linted
+        .analysis
         .found
         .iter()
         .map(|found| {
@@ -915,7 +914,7 @@ impl<'c> Server<'c> {
         let documents = self.documents.values_mut();
         for document in documents.filter(|document| document.place.root == root) {
             let (_, linted) = lint(&mut self.workspace, document)?;
-            calls.merge(linted.calls.clone());
+            calls.merge(linted.analysis.calls.clone());
         }
         let issues = self
             .workspace
@@ -1009,7 +1008,7 @@ impl<'c> Server<'c> {
         let offset = lines.offset(at.position);
         let mut sections: Vec<String> = Vec::new();
         let mut range = None;
-        for found in &linted.found {
+        for found in &linted.analysis.found {
             let marked = marked(found, &lines);
             // An empty mark, as for a rule about the whole file, is under a cursor at it.
             if !(marked.contains(&offset) || marked == (offset..offset)) {
@@ -1061,7 +1060,7 @@ impl<'c> Server<'c> {
         let asked = lines.offset(range.start)..lines.offset(range.end);
         let mut actions = Vec::new();
         if wants(only, &CodeActionKind::QUICKFIX) {
-            for found in &linted.found {
+            for found in &linted.analysis.found {
                 let marked = marked(found, &lines);
                 let Some(scan::Fix { level, replacement }) = &found.fix else {
                     continue;
@@ -1095,16 +1094,16 @@ impl<'c> Server<'c> {
         let allowed = self.settings.allowed();
         // Without an issue that has a fix of the allowed level, the pass below changes nothing.
         let fixable = |found: &Found| found.fix.as_ref().is_some_and(|fix| fix.level <= allowed);
-        if wants(only, &FIX_ALL) && linted.found.iter().any(fixable) {
+        if wants(only, &FIX_ALL) && linted.analysis.found.iter().any(fixable) {
             let disk = document.place.disk();
-            let file = scan::File {
+            let file = source::File {
                 path: &document.place.path,
                 disk: Some(&disk),
             };
-            let scan::Fixed {
-                source: fixed,
-                count,
-            } = linted.workspace.fix(file, document.text.clone(), allowed);
+            let (fixed, count) = linted
+                .workspace
+                .fix(file, document.text.clone(), allowed)
+                .into_parts();
             if count > 0 {
                 let change = changed_part(&document.text, &fixed);
                 actions.push(CodeAction {

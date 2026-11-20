@@ -131,7 +131,7 @@ impl Graph {
         let mut skipped = 0;
         for file in files {
             let disk = root.join(file);
-            let Some(src) = crate::scan::read_source(crate::scan::File {
+            let Some(src) = crate::source::read_source(crate::source::File {
                 path: file,
                 disk: Some(&disk),
             }) else {

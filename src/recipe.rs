@@ -5,13 +5,13 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
+use crate::source;
 use crate::syntax;
 use crate::{
-    catalog::Catalog,
     fix_safety::Applicability,
     index::{Entry, Kind},
-    pack, scan,
     style::Style,
+    workspace::Workspace,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,18 +44,16 @@ impl Recipe {
 /// The issues of the code of a playbook under the strict style, one line each. A playbook
 /// states the house style, so its code has none.
 pub(crate) fn playbook_issues(recipe: &Recipe) -> Result<Vec<String>> {
-    let packs = Catalog::embedded(None, Style::Strict)?.packs;
+    let workspace = Workspace::bundled(Style::Strict)?;
     // A recipe is in no file, so no import of it is followed.
-    let file = scan::File {
+    let file = source::File {
         path: Path::new("playbook.py"),
         disk: None,
     };
     let code = recipe.code.as_deref().unwrap_or_default();
-    Ok((scan::analyze(file, code, &packs, scan::Edits::Report)
-        .found
-        .iter())
-    .map(|found| found.issue().line(Applicability::Safe))
-    .collect())
+    Ok((workspace.analyze(file, code).found.iter())
+        .map(|found| found.issue().line(Applicability::Safe))
+        .collect())
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -497,7 +495,7 @@ struct Verified {
     clean: bool,
 }
 
-fn validate(code: String, package: &str, packs: &[pack::Pack]) -> Option<Verified> {
+fn validate(code: String, package: &str, workspace: &Workspace) -> Option<Verified> {
     if !complete(&code)
         || !code
             .lines()
@@ -506,22 +504,15 @@ fn validate(code: String, package: &str, packs: &[pack::Pack]) -> Option<Verifie
         return None;
     }
     // A recipe is in no file, so no import of it is followed.
-    let file = scan::File {
+    let file = source::File {
         path: Path::new("recipe.py"),
         disk: None,
     };
-    let clean = scan::analyze(file, &code, packs, scan::Edits::Report)
-        .found
-        .is_empty();
-    let scan::Fixed {
-        source: code,
-        count: fixes,
-    } = scan::fix_source(file, code, packs, Applicability::Unsafe);
-    if !complete(&code)
-        || !scan::analyze(file, &code, packs, scan::Edits::Report)
-            .found
-            .is_empty()
-    {
+    let clean = workspace.analyze(file, &code).found.is_empty();
+    let (code, fixes) = workspace
+        .fix(file, code, Applicability::Unsafe)
+        .into_parts();
+    if !complete(&code) || !workspace.analyze(file, &code).found.is_empty() {
         return None;
     }
     let symbols = symbols(&code, package);
@@ -546,7 +537,7 @@ pub(crate) fn harvest(
     entries: &mut Vec<Entry>,
 ) -> Result<Stats> {
     let license = license_name(source)?;
-    let packs = Catalog::embedded(None, Style::Default)?.packs;
+    let workspace = Workspace::bundled(Style::Default)?;
     let mut files = Vec::new();
     paths(source.root, &mut files)?;
     files.sort();
@@ -564,7 +555,7 @@ pub(crate) fn harvest(
                 continue;
             }
             stats.candidates += 1;
-            let Some(verified) = validate(code, package, &packs) else {
+            let Some(verified) = validate(code, package, &workspace) else {
                 stats.dropped += 1;
                 continue;
             };

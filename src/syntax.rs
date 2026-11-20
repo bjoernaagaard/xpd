@@ -35,3 +35,27 @@ pub(crate) fn string_literal(node: &Node<'_>) -> Option<String> {
     }
     Some(text)
 }
+
+/// `IPython` magic lines are valid between cell markers. Mask only line-leading syntax errors
+/// so that a continuation such as `% b)` is preserved.
+pub(crate) fn parses_python_cells(code: &str) -> bool {
+    let parses = |source: &str| libcst_native::parse_module(source, None).is_ok();
+    if parses(code) {
+        return true;
+    }
+    let root = parse(code);
+    let mut hidden = code.to_owned();
+    for error in root
+        .root()
+        .dfs()
+        .filter(|node| node.is_error() || node.is_missing())
+    {
+        let at = error.range().start;
+        let line = code[..at].rfind('\n').map_or(0, |end| end + 1);
+        let indent = code[line..at].chars().all(|c| matches!(c, ' ' | '\t'));
+        if indent && (code[at..].starts_with('%') || code[at..].starts_with('!')) {
+            hidden.replace_range(at..=at, "#");
+        }
+    }
+    parses(&hidden)
+}

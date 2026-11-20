@@ -9,8 +9,9 @@ use crate::fix_safety::Applicability;
 use crate::pack;
 use crate::package_check::{self, Calls};
 use crate::report::Issue;
-use crate::scan::{self, Edits, File, Fixed, Linted, Scanned};
+use crate::scan::{self, Edits, Fixed, Linted, Scanned};
 use crate::settings::Settings;
+use crate::source::{self, File};
 use crate::style::Style;
 use crate::venv::{Distributions, Venv};
 use crate::version::Version;
@@ -53,6 +54,15 @@ impl Workspace {
         })
     }
 
+    pub(crate) fn bundled(style: Style) -> Result<Self> {
+        Ok(Self {
+            root: PathBuf::new(),
+            settings: Settings { style },
+            catalog: Arc::new(Catalog::load(None, None, style)?),
+            environment: None,
+        })
+    }
+
     pub(crate) fn collect_files(&self, paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
         scan::collect_files(&self.root, paths, &self.catalog.packs)
     }
@@ -70,7 +80,7 @@ impl Workspace {
         let has_rules = LocalProject::find(root).is_ok_and(|config| config.is_some());
         paths
             .iter()
-            .filter(|file| scan::is_python(file) || (has_rules && scan::names_language(file)))
+            .filter(|file| source::is_python(file) || (has_rules && source::names_language(file)))
             .cloned()
             .collect()
     }
