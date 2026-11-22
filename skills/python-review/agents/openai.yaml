@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Review"
+  short_description: "Review Python code for correctness and clarity"
+  default_prompt: "Use $python-review to review Python code for correctness and clarity."

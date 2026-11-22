@@ -1,0 +1,4 @@
+interface:
+  display_name: "Xpd"
+  short_description: "Check Python data code with the xpd tools"
+  default_prompt: "Use $xpd to check Python data code with the xpd tools."

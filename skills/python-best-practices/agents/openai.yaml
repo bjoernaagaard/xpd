@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Best Practices"
+  short_description: "Write clear and idiomatic Python code"
+  default_prompt: "Use $python-best-practices to write clear and idiomatic Python code."
