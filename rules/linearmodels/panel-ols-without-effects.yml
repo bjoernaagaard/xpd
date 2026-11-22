@@ -9,7 +9,7 @@
 id: panel-ols-without-effects
 language: python
 severity: warning
-message: PanelOLS has no effects unless it is told to, so this call fits pooled OLS. On the wage panel it returned the coefficients of PooledOLS, with exper at 0.0349, against 0.0698 with entity_effects=True. Pass entity_effects=True or time_effects=True for fixed effects, or use PooledOLS to say that none is meant.
+message: In linearmodels, PanelOLS has no effects unless it is told to, so this call fits pooled OLS. On the wage panel it returned the coefficients of PooledOLS, with exper at 0.0349, against 0.0698 with entity_effects=True. Pass entity_effects=True or time_effects=True for fixed effects, or use PooledOLS to say that none is meant.
 rule:
   kind: call
   all:
@@ -25,7 +25,7 @@ utils:
 id: panel-ols-without-effects
 language: python
 severity: warning
-message: $F has no EntityEffects or TimeEffects term, so PanelOLS fits pooled OLS. On the wage panel PanelOLS without effects returned the coefficients of PooledOLS, with exper at 0.0349, against 0.0698 with entity effects. Add EntityEffects to the formula, or use PooledOLS.from_formula to say that none is meant.
+message: In linearmodels, $F has no EntityEffects or TimeEffects term, so PanelOLS fits pooled OLS. On the wage panel PanelOLS without effects returned the coefficients of PooledOLS, with exper at 0.0349, against 0.0698 with entity effects. Add EntityEffects to the formula, or use PooledOLS.from_formula to say that none is meant.
 rule:
   kind: string
   pattern: $F

@@ -23,7 +23,7 @@
 id: unknown-cov-type
 language: python
 severity: error
-message: PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS take "unadjusted", "robust", "clustered", "kernel" and "ac", so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: In linearmodels, PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS take "unadjusted", "robust", "clustered", "kernel" and "ac", so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:
@@ -37,7 +37,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: BetweenOLS takes "unadjusted", "robust" and "clustered", and has no kernel covariance, since its rows are the entities, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: In linearmodels, BetweenOLS takes "unadjusted", "robust" and "clustered", and has no kernel covariance, since its rows are the entities, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:
@@ -51,7 +51,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: FamaMacBeth takes "unadjusted", "robust" and "kernel", and has no clustered covariance, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: In linearmodels, FamaMacBeth takes "unadjusted", "robust" and "kernel", and has no clustered covariance, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:
@@ -67,7 +67,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: OLS, IV2SLS, IVLIML and AbsorbingLS take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. For the statsmodels names, "HC0" is "robust", "HC1" is "robust" with debiased=True, "nonrobust" is "unadjusted" with debiased=True, "cluster" is "clustered" with clusters= and debiased=True, and "HAC" is "kernel".
+message: In linearmodels, OLS, IV2SLS, IVLIML and AbsorbingLS take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. For the statsmodels names, "HC0" is "robust", "HC1" is "robust" with debiased=True, "nonrobust" is "unadjusted" with debiased=True, "cluster" is "clustered" with clusters= and debiased=True, and "kernel" uses a HAC estimator with different bandwidth defaults.
 rule:
   kind: call
   all:
@@ -91,7 +91,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: OLS, IV2SLS, IVLIML and AbsorbingLS take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. For the statsmodels names, "HC0" is "robust", "HC1" is "robust" with debiased=True, "nonrobust" is "unadjusted" with debiased=True, "cluster" is "clustered" with clusters= and debiased=True, and "HAC" is "kernel".
+message: In linearmodels, OLS, IV2SLS, IVLIML and AbsorbingLS take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. For the statsmodels names, "HC0" is "robust", "HC1" is "robust" with debiased=True, "nonrobust" is "unadjusted" with debiased=True, "cluster" is "clustered" with clusters= and debiased=True, and "kernel" uses a HAC estimator with different bandwidth defaults.
 rule:
   kind: call
   all:
@@ -106,7 +106,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: IVGMM, IVGMMCUE and IVJIVE take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: In linearmodels, IVGMM, IVGMMCUE and IVJIVE take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:
@@ -120,7 +120,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: SUR and IV3SLS take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: In linearmodels, SUR and IV3SLS take "unadjusted", "robust", "kernel" and "clustered", so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:
@@ -134,7 +134,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: IVSystemGMM takes "unadjusted", "robust" and "kernel", and has no clustered covariance, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: In linearmodels, IVSystemGMM takes "unadjusted", "robust" and "kernel", and has no clustered covariance, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:
@@ -148,7 +148,7 @@ utils:
 id: unknown-cov-type
 language: python
 severity: error
-message: The factor models take "robust" and "kernel", and have no unadjusted and no clustered covariance, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
+message: The linearmodels factor models take "robust" and "kernel", and have no unadjusted and no clustered covariance, so cov_type=$C raises an error at fit. The statsmodels names, such as "HC1", "HAC", "cluster" and "nonrobust", are not among them.
 rule:
   kind: call
   all:

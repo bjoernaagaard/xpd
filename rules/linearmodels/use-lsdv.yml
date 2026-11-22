@@ -8,7 +8,7 @@
 id: use-lsdv
 language: python
 severity: warning
-message: use_lsdv=True builds a dummy column for each entity and solves the whole system, where the default subtracts the entity means. It ran 17 times slower with 500 entities and 1,508 times slower with 3,000, 77 seconds against 0.05, and gave the same coefficients. Leave use_lsdv out.
+message: On linearmodels PanelOLS, use_lsdv=True builds a dummy column for each entity and solves the whole system, where the default subtracts the entity means. It ran 17 times slower with 500 entities and 1,508 times slower with 3,000, 77 seconds against 0.05, and gave the same coefficients. Leave use_lsdv out.
 rule:
   kind: call
   all:

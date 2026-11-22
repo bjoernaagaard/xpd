@@ -12,7 +12,7 @@
 id: absorb-not-categorical
 language: python
 severity: info
-message: AbsorbingLS absorbs a column as fixed effects only when its dtype is categorical. A numeric column is absorbed as one continuous regressor. With an integer firm id the coefficient was 3.397, the same as with no absorb, against 1.022 with the id as a category, where the true value is 1.0. This file never makes a categorical, so check the dtypes, or pass $X.astype("category").
+message: In linearmodels, AbsorbingLS absorbs a column as fixed effects only when its dtype is categorical. A numeric column is absorbed as one continuous regressor. With an integer firm id the coefficient was 3.397, the same as with no absorb, against 1.022 with the id as a category, where the true value is 1.0. This file never makes a categorical, so check the dtypes, or pass $X.astype("category").
 rule:
   kind: call
   all:

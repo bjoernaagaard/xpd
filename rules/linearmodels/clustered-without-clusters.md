@@ -1,4 +1,4 @@
-`cov_type="clustered"` with no cluster variable puts each observation in a cluster of its own, which is the robust covariance under another name. Pass `cluster_entity=True`, `cluster_time=True` or `clusters=`.
+A clustered fit in linearmodels needs the intended groups. With no groups, models such as `PanelOLS` and `IV2SLS` put each observation in its own cluster, while `IVGMM` raises an error. Pass `clusters=` with the group labels, or use `cluster_entity=True` or `cluster_time=True` on a panel model that supports it.
 
 ```diff lang="python"
 -result = PanelOLS(y, X, entity_effects=True).fit(cov_type="clustered")
@@ -8,8 +8,8 @@
 ## What the rule reports
 
 The rule reports `fit(cov_type="clustered")` with none of `cluster_entity`, `cluster_time` and
-`clusters`. Without them every observation is a cluster of its own, which is the
-heteroskedasticity robust covariance under another name.
+`clusters`. Models that accept omitted groups put each observation in its own cluster,
+which gives the heteroskedasticity robust covariance. `IVGMM`, `IVGMMCUE` and `IVJIVE` require groups.
 
 ## How to fix it
 

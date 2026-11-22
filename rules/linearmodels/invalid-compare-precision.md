@@ -1,4 +1,4 @@
-`compare` takes only `"tstats"`, `"std_errors"` or `"pvalues"` for `precision`, so another value raises ValueError. Use the name that `compare` takes for the same number.
+In linearmodels, `compare` takes only `"tstats"`, `"std_errors"` or `"pvalues"` for `precision`, so another value raises ValueError. Use the name that `compare` takes for the same number.
 
 ```diff lang="python"
 -table = compare({"pooled": pooled, "fixed": fixed}, precision="se")

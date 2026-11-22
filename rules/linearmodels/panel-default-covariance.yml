@@ -14,7 +14,7 @@
 id: panel-default-covariance
 language: python
 severity: info
-message: fit without cov_type gives the unadjusted covariance, which takes the errors of one entity to be unrelated over time. In a simulation where they were related, it rejected a true coefficient of 0 in 17.3% of 1,000 draws at the 5% level, against 5.7% with cov_type="clustered", cluster_entity=True. Pass those two unless the errors are known to be independent.
+message: In linearmodels, PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS default to unadjusted covariance, which takes the errors of one entity to be unrelated over time. In a simulation where they were related, it rejected a true coefficient of 0 in 17.3% of 1,000 draws at the 5% level, against 5.7% with cov_type="clustered", cluster_entity=True. Pass those two unless the errors are known to be independent.
 rule:
   kind: call
   all:

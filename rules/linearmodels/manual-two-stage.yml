@@ -14,7 +14,7 @@
 id: manual-two-stage
 language: python
 severity: warning
-message: This regression takes the fitted values of another one as a regressor, which is two stage least squares by hand. The coefficient is the one IV2SLS gives, but the standard errors come from the wrong residuals. In a simulation the 95% interval of the second stage covered the true value in 99.6% of 2,000 draws, against 95.7% for IV2SLS. Use IV2SLS(dependent, exog, endog, instruments).
+message: This linearmodels regression takes the fitted values of another one as a regressor, which is two stage least squares by hand. The coefficient is the one IV2SLS gives, but the standard errors come from the wrong residuals. In a simulation the 95% interval of the second stage covered the true value in 99.6% of 2,000 draws, against 95.7% for IV2SLS. Use IV2SLS(dependent, exog, endog, instruments).
 rule:
   kind: call
   all:

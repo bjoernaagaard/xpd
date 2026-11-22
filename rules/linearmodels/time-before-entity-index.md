@@ -1,4 +1,4 @@
-The panel models read the first index level as the entity and the second as the time, and here the time comes first, so the effects are on the wrong level. Put the entity first in `set_index`.
+The linearmodels panel models read the first index level as the entity and the second as the time, and here the time comes first, so the effects are on the wrong level. Put the entity first in `set_index`.
 
 ```diff lang="python"
 -data = wage.set_index(["year", "nr"])

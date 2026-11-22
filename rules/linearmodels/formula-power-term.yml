@@ -7,7 +7,7 @@
 id: formula-power-term
 language: python
 severity: error
-message: A formula reads ** as a power of interactions, not of the values, so a term such as exper**2 in $F is exper itself. "lwage ~ 1 + exper + exper**2" gave a model with the columns Intercept and exper, with no error. Write I(exper**2) for the squared values.
+message: A linearmodels formula reads ** as a power of interactions, not of the values, so a term such as exper**2 in $F is exper itself. "lwage ~ 1 + exper + exper**2" gave a model with the columns Intercept and exper, with no error. Write I(exper**2) for the squared values.
 rule:
   kind: string
   pattern: $F

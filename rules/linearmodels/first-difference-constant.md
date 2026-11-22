@@ -1,4 +1,4 @@
-`FirstDifferenceOLS` takes no constant, so a `1` term or `add_constant` raises ValueError. Take the constant out, because the difference removes the intercept.
+In linearmodels, `FirstDifferenceOLS` takes no constant, so a `1` term or `add_constant` raises ValueError. Take the constant out, because the difference removes the intercept.
 
 ```diff lang="python"
 -model = FirstDifferenceOLS.from_formula("lwage ~ 1 + hours", data)

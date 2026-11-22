@@ -29,3 +29,9 @@ describes.
 
 A pack holds the rules for one library. xpd runs a pack on the files that import its library,
 and the Python and xpd packs on every file.
+
+To see which library a rule covers, read the `package` field in `xpd rules --format json`.
+For example, `linearmodels/statsmodels-result-name` checks a linearmodels result. Its name
+mentions statsmodels because that is where the mistaken attribute comes from.
+When writing a rule that compares libraries, name the library being checked in both the
+message and the opening sentence of its page. Agents may see either one on its own.
