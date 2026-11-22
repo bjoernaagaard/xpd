@@ -77,11 +77,12 @@ impl Model {
         Ok(Self { model, backend })
     }
 
-    /// The vector of a search query.
-    pub(crate) fn query(&self, query: &str) -> Result<Vec<f32>> {
-        Ok(self
-            .embed(&[format!("task: search result | query: {query}")])?
-            .remove(0))
+    pub(crate) fn queries(&self, queries: &[&str]) -> Result<Vec<Vec<f32>>> {
+        let texts: Vec<_> = queries
+            .iter()
+            .map(|query| format!("task: search result | query: {query}"))
+            .collect();
+        self.embed(&texts)
     }
 
     /// The vectors of index records, each given by its name and summary.

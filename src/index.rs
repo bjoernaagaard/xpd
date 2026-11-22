@@ -494,17 +494,19 @@ pub(crate) fn find(
     }
     let passes =
         |e: &Stored| package.is_none_or(|p| e.package == p) && kind.is_none_or(|k| e.kind == k);
-    let meaning = library.model().and_then(|model| {
-        model
-            .query(query)
-            .inspect_err(|e| {
-                eprintln!("xpd: cannot embed the query: {e:#}. Search uses keywords only.");
-            })
-            .ok()
-    });
     let mut ranked = keyword_ranking(query, passes);
-    if let Some(meaning) = meaning {
-        ranked = fuse(&ranked, &meaning_ranking(&meaning, passes));
+    if let Some(model) = library.model() {
+        let mut queries = vec![query];
+        if kind.is_none_or(|kind| kind == Kind::Rule) && limit != Some(0) {
+            queries.extend(rule_query_parts(query));
+        }
+        match model.queries(&queries) {
+            Ok(vectors) => {
+                ranked = fuse(&ranked, &meaning_ranking(&vectors[0], passes));
+                prioritize_rules(&mut ranked, &queries[1..], &vectors[1..], package);
+            }
+            Err(e) => eprintln!("xpd: cannot embed the query: {e:#}. Search uses keywords only."),
+        }
     }
     let mut counts = [0; 3];
     Matches::collect(
@@ -518,6 +520,77 @@ pub(crate) fn find(
             .map(|(i, _)| RECORDS[i].entry().expect("build validated index entry")),
         limit,
     )
+}
+
+fn rule_query_parts(query: &str) -> Vec<&str> {
+    let mut start = 0;
+    let mut parts = Vec::new();
+    for (index, mark) in query.match_indices(['.', '?', '!', ';', '\n']) {
+        let end = index + mark.len();
+        if mark == "\n" || query[end..].starts_with(char::is_whitespace) {
+            parts.push(query[start..end].trim());
+            start = end;
+        }
+    }
+    parts.push(query[start..].trim());
+    parts.retain(|part| tokens(part).len() >= 3);
+    if !(2..=5).contains(&parts.len()) {
+        parts.clear();
+    }
+    parts
+}
+
+fn prioritize_rules(
+    ranked: &mut [(usize, f64)],
+    queries: &[&str],
+    vectors: &[Vec<f32>],
+    package: Option<&str>,
+) {
+    if queries.is_empty() {
+        return;
+    }
+    let rankings: Vec<_> = vectors
+        .iter()
+        .map(|vector| {
+            meaning_ranking(vector, |entry| {
+                entry.kind == Kind::Rule && package.is_none_or(|package| entry.package == package)
+            })
+        })
+        .collect();
+    let mut leads: Vec<_> = rankings
+        .iter()
+        .filter_map(|ranking| ranking.first().map(|&(index, _)| index))
+        .collect();
+    if let ([first, second], [one, two]) = (&leads[..], queries)
+        && one.ends_with('?') != two.ends_with('?')
+        && RECORDS[*first].package == RECORDS[*second].package
+    {
+        let package = RECORDS[*first].package;
+        let focus = usize::from(two.ends_with('?'));
+        leads.swap(0, 1 - focus);
+        let keywords = keyword_ranking(queries[focus], |entry| {
+            entry.kind == Kind::Rule && entry.package == package
+        });
+        let meaning: Vec<_> = rankings[focus]
+            .iter()
+            .copied()
+            .filter(|&(index, _)| RECORDS[index].package == package)
+            .collect();
+        leads.extend(
+            fuse(&keywords, &meaning)
+                .into_iter()
+                .take(5)
+                .map(|(index, _)| index),
+        );
+        ranked.sort_by_key(|&(index, _)| {
+            leads
+                .iter()
+                .position(|&lead| lead == index)
+                .unwrap_or(usize::MAX)
+        });
+    } else {
+        ranked.sort_by_key(|&(index, _)| !leads.contains(&index));
+    }
 }
 
 /// Sorts `(record, score)` pairs by score, best first. Between equal scores a playbook comes
