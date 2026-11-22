@@ -1,4 +1,4 @@
 interface:
   display_name: "Audit code comments"
   short_description: "Audit and retire comments in the xpd repository"
-  default_prompt: "Use $delete-comment to audit the selected paths, retire their allowances and verify lint."
+  default_prompt: "Use $xpd:delete-comment (the repository’s $delete-comment skill) to audit the selected paths, retire their allowances and verify lint."

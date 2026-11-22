@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import tokenize
+import tomllib
 from bisect import bisect_left
 from difflib import SequenceMatcher
 from functools import cache
@@ -38,7 +39,6 @@ LANGUAGES = {
     ".svg": "xml",
 }
 BASELINE = Path(__file__).with_name("legacy.json")
-SCRIPT = Path("tools/comments.py")
 REVISION = "8f1403be577f03c577f03432b3cf15871ffb3b76"
 
 
@@ -51,6 +51,22 @@ def parser(language):
         "xml": "language_xml",
     }.get(language, "language")
     return Parser(Language(getattr(module, factory)()))
+
+
+def safety_reason(node):
+    if not re.match(rb"//\s*SAFETY:\s+\S", node.text):
+        return False
+    statement = node.next_named_sibling
+    if statement is None:
+        return False
+    pending = [statement]
+    while pending:
+        part = pending.pop()
+        if part.type == "unsafe":
+            return True
+        if part.type not in {"block", "declaration_list"}:
+            pending.extend(part.children)
+    return False
 
 
 def tokens(path, data):
@@ -81,12 +97,16 @@ def tokens(path, data):
                 and node.next_named_sibling.type == "export_statement"
             ):
                 kind = "exported_jsdoc"
+            if path.suffix == ".rs" and safety_reason(node):
+                kind = "unsafe_justification"
             yield node.start_byte, node.start_byte + len(node.text.rstrip(b"\r\n")), kind
         else:
             stack.extend(reversed(node.named_children))
 
 
 def protection(path, text, kind, row, source):
+    if kind == "unsafe_justification":
+        return "Clippy safety justification on an unsafe operation"
     if kind == "exported_jsdoc":
         return "JSDoc on an exported declaration"
     notice = re.fullmatch(r"(?:#|//|/\*|<!--) SPDX-License-Identifier: (.+?)(?: \*/| -->)?", text)
@@ -108,18 +128,6 @@ def protection(path, text, kind, row, source):
         path.suffix == ".py" and row == 1 and text.startswith("#!")
     ):
         return "interpreter directive"
-    if (
-        path == SCRIPT
-        and b"\n# ///\n" in source
-        and source.startswith(b"# /// script\n")
-        and (
-            text in {"# ///", "# /// script", "# dependencies = [", "# ]"}
-            or re.fullmatch(r'# requires-python = "[<>=.,0-9]+"', text)
-            or re.fullmatch(r'# +(?:"[a-z-]+==[0-9.]+", *)+', text)
-        )
-        and row <= source.split(b"\n# ///\n", 1)[0].count(b"\n") + 2
-    ):
-        return "uv script metadata"
     if path.suffix == ".py":
         if row <= 2:
             header = source.split(b"\n", 2)
@@ -127,7 +135,9 @@ def protection(path, text, kind, row, source):
             if cookie and (row == 1 or re.match(rb"^[ \t\f]*(?:#|\r?$)", header[0])):
                 return "Python source encoding declaration"
         if re.fullmatch(
-            r"# (?:noqa(?:: [A-Z]+\d+(?:, *[A-Z]+\d+)*)?|(?:fmt|ruff): (?:off|on|skip)|type: ignore(?:\[[\w,-]+\])?)",
+            r"# (?:(?:(?:ruff|flake8): )?noqa(?:: [A-Z]+\d+(?:, *[A-Z]+\d+)*)?"
+            r"|fmt: (?:off|on|skip)|(?:type|pyright|ty): ignore(?:\[[\w, -]+\])?"
+            r"|pragma: no (?:cover|branch)|mypy: ignore-errors)",
             text,
         ):
             return "Python tool directive"
@@ -148,12 +158,37 @@ def protection(path, text, kind, row, source):
     return ""
 
 
+def metadata_lines(data, offsets):
+    result = set()
+    for block in re.finditer(rb"(?m)^# /// script\r?\n((?:^#(?: [^\n]*)?\r?\n)*?)^# ///\r?$", data):
+        if block.start() not in offsets:
+            continue
+        lines = block[1].splitlines()
+        body = b"\n".join(line[2:] for line in lines)
+        try:
+            fields = tomllib.loads(body.decode())
+        except tomllib.TOMLDecodeError:
+            continue
+        if fields.keys() - {"dependencies", "requires-python", "tool"}:
+            continue
+        start = data.count(b"\n", 0, block.start()) + 1
+        result.update(range(start, start + len(lines) + 2))
+        for a, _, _ in tokens(Path("metadata.toml"), body):
+            result.discard(start + 1 + body.count(b"\n", 0, a))
+    return result
+
+
 def inventory(path, data):
     if path.suffix == ".py":
         encoding, _ = tokenize.detect_encoding(BytesIO(data).readline)
         data = data.decode(encoding).encode("utf-8")
     ends = [m.start() for m in re.finditer(b"\n", data)]
     spans = list(tokens(path, data))
+    metadata = (
+        metadata_lines(data, {a for a, _, _ in spans})
+        if path.suffix == ".py" and b"# /// script" in data
+        else set()
+    )
     code = bytearray(data)
     for start, end, _ in spans:
         code[start:end] = re.sub(b"[^\n]", b" ", data[start:end])
@@ -174,7 +209,9 @@ def inventory(path, data):
             text=text,
             only=only,
             column=start - (ends[first - 1] + 1 if first else 0),
-            protected=protection(path, text, kind, first + 1, data),
+            protected="PEP 723 script metadata"
+            if first + 1 in metadata
+            else protection(path, text, kind, first + 1, data),
             **({"directive": mixed[1], "rationale": mixed[2]} if mixed else {}),
         )
 
@@ -276,11 +313,21 @@ def check(retire):
             mapping = unchanged_lines(path, data.count(b"\n") + 1)
             before = subprocess.check_output(["git", "show", f"{REVISION}:{name}"])
             previous = list(inventory(path, before))
-            old_code, new_code = matched_code(code_lines(before, previous), code_lines(data, rows))
+            before_code = code_lines(before, previous)
+            old_code, new_code = matched_code(before_code, code_lines(data, rows))
+            anchor_rows = [n for n, _ in before_code]
+            surviving = set(old_code)
+            attached = {
+                r["line"]
+                for r in previous
+                if anchor_rows
+                and anchor_rows[min(bisect_left(anchor_rows, r["line"]), len(anchor_rows) - 1)]
+                in surviving
+            }
             mapping = {
                 new: old
                 for new, old in mapping.items()
-                if bisect_left(old_code, old) == bisect_left(new_code, new)
+                if old in attached and bisect_left(old_code, old) == bisect_left(new_code, new)
             }
             original = {(r["line"], r["column"], r["text"]) for r in previous}
         for row in rows:
