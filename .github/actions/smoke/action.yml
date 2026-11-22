@@ -18,9 +18,9 @@ runs:
         if [[ "$PUBLISHED" != true ]]; then
           wheels=(./dist/*.whl)
           package=${wheels[0]}
-          uv run --isolated --no-project --python 3.11 --with "$package" -- xpd check samples/good.py --format text
+          uv run --isolated --no-project --python 3.13 --with "$package" -- xpd check samples/good.py --format text
         else
           package="xpd==${GITHUB_REF_NAME#v}"
         fi
-        uv run --isolated --no-project --python 3.11 --with "$package" -- \
+        uv run --isolated --no-project --python 3.13 --with "$package" -- \
           fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'

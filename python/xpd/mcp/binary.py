@@ -10,7 +10,6 @@ import sysconfig
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, TypeVar
 
 from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
@@ -35,12 +34,9 @@ from xpd.mcp.models import (
 FINDINGS = frozenset({0, 1})
 SUCCESS = frozenset({0})
 
-# The type parameter syntax of Python 3.12 is out, because the wheel supports 3.11.
-T = TypeVar("T")
-
 
 @dataclass(frozen=True)
-class Command(Generic[T]):
+class Command[T]:
     """One xpd command: its leading arguments, the shape of its JSON and its result codes."""
 
     args: tuple[str, ...]
@@ -103,7 +99,7 @@ def find_binary() -> Path:
 class Xpd:
     binary: Path
 
-    async def run(self, command: Command[T], cwd: Path, paths: Sequence[str], *flags: str) -> T:
+    async def run[T](self, command: Command[T], cwd: Path, paths: Sequence[str], *flags: str) -> T:
         """Runs in `cwd`, the project root, so the binary finds the project's venv as a user's
         run does."""
         args = argv(paths, flags)
@@ -119,7 +115,7 @@ class Xpd:
         stdout, stderr = await process.communicate()
         return self._parse(command, args, process.returncode, stdout, stderr)
 
-    def run_now(self, command: Command[T]) -> T:
+    def run_now[T](self, command: Command[T]) -> T:
         """Runs a command that answers at once, for what the server needs before it starts."""
         done = subprocess.run(  # noqa: S603  the binary and its arguments come from this module
             [self.binary, *command.args],
@@ -137,7 +133,7 @@ class Xpd:
         return done.stdout.split()[-1]
 
     @staticmethod
-    def _parse(
+    def _parse[T](
         command: Command[T],
         args: tuple[str, ...],
         code: int | None,

@@ -19,7 +19,7 @@
   "py/refit.py": "131",
   "pyproject.toml": "18-19,23,33,41",
   "python/xpd/mcp/base.py": "36,40-41,45-46,50,99",
-  "python/xpd/mcp/binary.py": "34,38,124,133,136",
+  "python/xpd/mcp/binary.py": "34,124,133,136",
   "python/xpd/mcp/catalog.py": "30,32,37",
   "python/xpd/mcp/models.py": "115,254-266",
   "python/xpd/mcp/pipeline.py": "32-33,43,46,345,377",

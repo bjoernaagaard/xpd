@@ -10,10 +10,10 @@ The documentation is at <https://bjoernaagaard.github.io/xpd/>, with a page for 
 
 ## Install
 
-Install the `xpd` command with [uv](https://docs.astral.sh/uv/).
+xpd requires Python 3.13 or newer. Install it with [uv](https://docs.astral.sh/uv/).
 
 ```sh
-uv tool install xpd
+uv tool install --python '>=3.13' xpd
 ```
 
 You can also run xpd once without installing it, with `uvx xpd` in place of `xpd`.

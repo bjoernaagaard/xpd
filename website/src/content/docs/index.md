@@ -10,10 +10,10 @@ Encoders, linearmodels, arch, skfolio, pymoo, plotly or Apache Hamilton.
 
 ## Install
 
-Install the `xpd` command with [uv](https://docs.astral.sh/uv/getting-started/installation/).
+xpd requires Python 3.13 or newer. Install it with [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```sh
-uv tool install xpd
+uv tool install --python '>=3.13' xpd
 ```
 
 You can also run xpd once without installing it, with `uvx xpd` in place of `xpd` in each command

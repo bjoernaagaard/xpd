@@ -5,7 +5,9 @@
       "type": "stdio",
       "command": "uvx",
       "args": [
-        "xpd@0.41.6",
+        "--python",
+        ">=3.13",
+        "xpd@0.42.0",
         "mcp"
       ]
     }

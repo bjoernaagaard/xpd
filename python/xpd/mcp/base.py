@@ -2,7 +2,6 @@
 
 from collections.abc import Awaitable, Callable, Sequence
 from functools import wraps
-from typing import ParamSpec, TypeVar
 
 from fastmcp import Context
 from mcp.types import (
@@ -13,14 +12,13 @@ from mcp.types import (
     ToolAnnotations,
 )
 
-from xpd.mcp.binary import Command, T, Xpd
+from xpd.mcp.binary import Command, Xpd
 from xpd.mcp.root import Project, Root, RootsRequiredError, uses_handshake
 
-P = ParamSpec("P")
-R = TypeVar("R")
 
-
-def rooted(tool: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R | InputRequiredResult]]:
+def rooted[**P, R](
+    tool: Callable[P, Awaitable[R]],
+) -> Callable[P, Awaitable[R | InputRequiredResult]]:
     """Return the roots request on protocols that resume tools in another round."""
 
     @wraps(tool)
@@ -53,7 +51,7 @@ RUNS_CODE = ToolAnnotations(
 )
 
 
-async def run(
+async def run[T](
     ctx: Context, xpd: Xpd, command: Command[T], root: Root, paths: Sequence[str], *flags: str
 ) -> T:
     """Runs one command in the root with progress and a log line, which also reach a background
