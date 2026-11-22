@@ -1,0 +1,52 @@
+id: polars-eager-read-before-query
+language: python
+severity: info
+message: Start this lazy query with a scan to enable projection and predicate pushdown. On 50,000 and
+  500,000 Parquet rows the scan ran 4.64 and 32.60 times faster.
+rule:
+  all:
+  - kind: call
+    all:
+    - has:
+        field: function
+        kind: attribute
+        all:
+        - has:
+            field: object
+            all:
+            - pattern: $R
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  matches:
+                    polars-member:
+                      MEMBER:
+                        regex: ^(read_csv|read_parquet|read_ipc|read_ndjson)$
+              - not:
+                  has:
+                    field: arguments
+                    has:
+                      any:
+                      - kind: keyword_argument
+                        all:
+                        - has:
+                            field: name
+                            regex: ^(use_pyarrow)$
+                      - kind: dictionary_splat
+        - has:
+            field: attribute
+            regex: ^(lazy)$
+  - inside:
+      kind: attribute
+      all:
+      - has:
+          field: object
+          kind: call
+      - has:
+          field: attribute
+          regex: ^(filter|select)$
+metadata:
+  holds:
+    R:
+      matches: polars-dataframe

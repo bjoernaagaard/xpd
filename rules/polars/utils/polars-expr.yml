@@ -1,0 +1,62 @@
+id: polars-expr
+language: python
+rule:
+  any:
+  - any:
+    - kind: call
+      all:
+      - has:
+          field: function
+          matches:
+            polars-member:
+              MEMBER:
+                regex: ^(Expr|col|lit|all|len|element|exclude|struct|when)$
+    - matches:
+        polars-member:
+          MEMBER:
+            regex: ^(Expr|col|lit|all|len|element|exclude|struct|when)$
+    - kind: type
+      has:
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Expr|col|lit|all|len|element|exclude|struct|when)$
+  - all:
+    - kind: call
+      all:
+      - has:
+          field: function
+          has:
+            field: attribute
+            regex: ^(cast|alias|clone|rename|filter|sort|shift|fill_null|abs|is_null|is_not_null|is_in|sum|mean|min|max|count|len|strptime|to_date|to_datetime|to_time|over|otherwise|eq|ne|gt|lt|ge|le|and_|or_|not_)$
+    - has:
+        any:
+        - kind: call
+          all:
+          - has:
+              field: function
+              matches:
+                polars-member:
+                  MEMBER:
+                    regex: ^(Expr|col|lit|all|len|element|exclude|struct|when)$
+        - matches:
+            polars-member:
+              MEMBER:
+                regex: ^(Expr|col|lit|all|len|element|exclude|struct|when)$
+        - kind: type
+          has:
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Expr|col|lit|all|len|element|exclude|struct|when)$
+        stopBy:
+          not:
+            any:
+            - kind: attribute
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  has:
+                    field: attribute
+                    regex: ^(cast|alias|clone|rename|filter|sort|shift|fill_null|abs|is_null|is_not_null|is_in|sum|mean|min|max|count|len|strptime|to_date|to_datetime|to_time|over|otherwise|eq|ne|gt|lt|ge|le|and_|or_|not_)$

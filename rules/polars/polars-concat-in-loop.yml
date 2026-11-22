@@ -1,0 +1,33 @@
+id: polars-concat-in-loop
+language: python
+severity: info
+message: Concatenating into the same frame on every iteration repeatedly grows the result. Collect the
+  pieces and concatenate once.
+rule:
+  all:
+  - pattern: $R = $F([$R, $PIECE], $$$ARGS)
+  - inside:
+      stopBy:
+        kind: function_definition
+      all:
+      - any:
+        - kind: for_statement
+        - kind: while_statement
+      - follows:
+          kind: expression_statement
+          has:
+            pattern: $R = $INIT
+  - has:
+      field: right
+      has:
+        field: function
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(concat)$
+metadata:
+  holds:
+    F:
+      matches: polars-member-any
+    INIT:
+      matches: polars-frame

@@ -1,0 +1,15 @@
+id: skfolio-expected-exception
+language: python
+rule:
+  any:
+    - inside:
+        stopBy: end
+        all:
+          - {kind: with_statement}
+          - {regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
+    - {inside: {stopBy: end, all: [{kind: try_statement}, {has: {kind: except_clause}}]}}
+    - inside:
+        stopBy: end
+        all:
+          - {kind: if_statement}
+          - {has: {field: condition, regex: '\b(?:hasattr|__version__)\b'}}

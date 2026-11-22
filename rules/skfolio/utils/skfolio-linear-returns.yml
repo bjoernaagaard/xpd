@@ -1,0 +1,11 @@
+id: skfolio-linear-returns
+language: python
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, regex: '(^|\.)(?:prices_to_returns)$'}}
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:log_returns)$'}}]}
+    - {not: {has: {field: arguments, has: {kind: dictionary_splat}}}}

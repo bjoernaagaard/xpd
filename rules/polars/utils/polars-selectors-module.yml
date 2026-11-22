@@ -1,0 +1,43 @@
+id: polars-selectors-module
+language: python
+rule:
+  any:
+  - pattern: polars.selectors
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        matches: polars-module
+    - has:
+        field: attribute
+        regex: ^(selectors)$
+  - all:
+    - pattern: $SELECTORS
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          stopBy: end
+          any:
+          - kind: aliased_import
+            all:
+            - has:
+                field: name
+                regex: ^(polars\.selectors)$
+            - has:
+                field: alias
+                pattern: $SELECTORS
+          - kind: import_from_statement
+            all:
+            - has:
+                field: module_name
+                regex: ^(polars)$
+            - has:
+                kind: aliased_import
+                all:
+                - has:
+                    field: name
+                    regex: ^(selectors)$
+                - has:
+                    field: alias
+                    pattern: $SELECTORS

@@ -1,0 +1,215 @@
+id: skfolio-shuffled-returns-split
+language: python
+severity: warning
+message: Shuffling skfolio asset returns can train on future observations. In a 20-row split, training included
+  row 19 and testing included row 0. Split in observation order.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:train_test_split)$'}}}
+    - any:
+        - {has: {field: function, regex: '(^|\.)(?:train_test_split)$'}}
+        - has:
+            field: function
+            all:
+              - {kind: identifier}
+              - {pattern: $SK_ALIAS}
+              - inside:
+                  stopBy: end
+                  all:
+                    - {kind: module}
+                    - has:
+                        stopBy: end
+                        all:
+                          - {kind: aliased_import}
+                          - {has: {field: alias, pattern: $SK_ALIAS}}
+                          - {has: {field: name, regex: '(^|\.)(?:train_test_split)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {nthChild: 1}
+            - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+            - {pattern: $DATA}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:shuffle)$'}}
+                - {has: {field: value, regex: ^True$}}
+        - all:
+            - not:
+                has:
+                  field: arguments
+                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:shuffle)$'}}]}
+            - {not: {has: {field: arguments, has: {kind: dictionary_splat}}}}
+metadata: {since: 1.14.4, holds: {DATA: {matches: skfolio-return-conversion}}}
+---
+id: skfolio-shuffled-returns-split
+language: python
+severity: warning
+message: Shuffled folds can train on future skfolio asset returns. All 4 shuffled KFold folds on 20 rows trained
+  on observations after the first test row. Use WalkForward for forward evaluation.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $SPLITTER}}
+          - {has: {field: attribute, regex: '^(?:split)$'}}
+    - has:
+        stopBy: end
+        any:
+          - all:
+              - {kind: call}
+              - has:
+                  field: function
+                  matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:KFold)$'}}}
+              - any:
+                  - {has: {field: function, regex: '(^|\.)(?:KFold)$'}}
+                  - has:
+                      field: function
+                      all:
+                        - {kind: identifier}
+                        - {pattern: $SK_ALIAS}
+                        - inside:
+                            stopBy: end
+                            all:
+                              - {kind: module}
+                              - has:
+                                  stopBy: end
+                                  all:
+                                    - {kind: aliased_import}
+                                    - {has: {field: alias, pattern: $SK_ALIAS}}
+                                    - {has: {field: name, regex: '(^|\.)(?:KFold)$'}}
+              - has:
+                  field: arguments
+                  has:
+                    all:
+                      - {kind: keyword_argument}
+                      - {has: {field: name, regex: '^(?:shuffle)$'}}
+                      - {has: {field: value, regex: ^True$}}
+          - all:
+              - {kind: call}
+              - has:
+                  field: function
+                  matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:ShuffleSplit)$'}}}
+              - any:
+                  - {has: {field: function, regex: '(^|\.)(?:ShuffleSplit)$'}}
+                  - has:
+                      field: function
+                      all:
+                        - {kind: identifier}
+                        - {pattern: $SK_ALIAS}
+                        - inside:
+                            stopBy: end
+                            all:
+                              - {kind: module}
+                              - has:
+                                  stopBy: end
+                                  all:
+                                    - {kind: aliased_import}
+                                    - {has: {field: alias, pattern: $SK_ALIAS}}
+                                    - {has: {field: name, regex: '(^|\.)(?:ShuffleSplit)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {nthChild: 1}
+            - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+            - {pattern: $DATA}
+metadata: {since: 1.14.4, holds: {DATA: {matches: skfolio-return-conversion}}}
+---
+id: skfolio-shuffled-returns-split
+language: python
+severity: warning
+message: Shuffled folds can train on future skfolio asset returns. All 4 shuffled KFold folds on 20 rows trained
+  on observations after the first test row. Use WalkForward for forward evaluation.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:cross_val_predict)$'}]}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 2}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $DATA}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:X)$'}}
+                - {has: {field: value, pattern: $DATA}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:cv)$'}}
+            - has:
+                field: value
+                any:
+                  - all:
+                      - {kind: call}
+                      - has:
+                          field: function
+                          matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:KFold)$'}}}
+                      - any:
+                          - {has: {field: function, regex: '(^|\.)(?:KFold)$'}}
+                          - has:
+                              field: function
+                              all:
+                                - {kind: identifier}
+                                - {pattern: $SK_ALIAS}
+                                - inside:
+                                    stopBy: end
+                                    all:
+                                      - {kind: module}
+                                      - has:
+                                          stopBy: end
+                                          all:
+                                            - {kind: aliased_import}
+                                            - {has: {field: alias, pattern: $SK_ALIAS}}
+                                            - {has: {field: name, regex: '(^|\.)(?:KFold)$'}}
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {kind: keyword_argument}
+                              - {has: {field: name, regex: '^(?:shuffle)$'}}
+                              - {has: {field: value, regex: ^True$}}
+                  - all:
+                      - {kind: call}
+                      - has:
+                          field: function
+                          matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:ShuffleSplit)$'}}}
+                      - any:
+                          - {has: {field: function, regex: '(^|\.)(?:ShuffleSplit)$'}}
+                          - has:
+                              field: function
+                              all:
+                                - {kind: identifier}
+                                - {pattern: $SK_ALIAS}
+                                - inside:
+                                    stopBy: end
+                                    all:
+                                      - {kind: module}
+                                      - has:
+                                          stopBy: end
+                                          all:
+                                            - {kind: aliased_import}
+                                            - {has: {field: alias, pattern: $SK_ALIAS}}
+                                            - {has: {field: name, regex: '(^|\.)(?:ShuffleSplit)$'}}
+metadata:
+  since: 1.14.4
+  holds: {F: {regex: '(^|\.)(?:cross_val_predict)$'}, DATA: {matches: skfolio-return-conversion}}

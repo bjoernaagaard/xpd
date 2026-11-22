@@ -1,0 +1,50 @@
+id: skfolio-base-hierarchical-check
+language: python
+severity: warning
+message: skfolio HRP, HERC and Schur all return False in checks against BaseHierarchicalOptimization. Use BaseOptimization
+  for any optimizer or check specific classes.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, regex: '^(?:isinstance|issubclass)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {nthChild: 1}
+            - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+            - {pattern: $SUBJECT}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {nthChild: 2}
+            - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+            - {pattern: $BASE}
+            - {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    BASE: {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}
+    SUBJECT:
+      any:
+        - all:
+            - {kind: call}
+            - has:
+                field: function
+                regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+        - regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+---
+id: skfolio-base-hierarchical-check
+language: python
+severity: info
+message: BaseHierarchicalOptimization is deprecated in skfolio. Inherit from BaseOptimization and implement fit
+  to set weights_.
+rule:
+  all:
+    - {kind: class_definition}
+    - has:
+        field: superclasses
+        has: {all: [{pattern: $BASE}, {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}]}
+metadata: {since: 1.14.4, holds: {BASE: {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}}}

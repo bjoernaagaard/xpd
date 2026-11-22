@@ -1,0 +1,127 @@
+id: skfolio-missing-fallback-in-cv
+language: python
+severity: info
+message: Consider a fallback for skfolio cross-validation when a fold may be infeasible. Supply fallback= or handle
+  failed predictions with raise_on_failure=False.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:GridSearchCV)$'}}}
+    - any:
+        - {has: {field: function, regex: '(^|\.)(?:GridSearchCV)$'}}
+        - has:
+            field: function
+            all:
+              - {kind: identifier}
+              - {pattern: $SK_ALIAS}
+              - inside:
+                  stopBy: end
+                  all:
+                    - {kind: module}
+                    - has:
+                        stopBy: end
+                        all:
+                          - {kind: aliased_import}
+                          - {has: {field: alias, pattern: $SK_ALIAS}}
+                          - {has: {field: name, regex: '(^|\.)(?:GridSearchCV)$'}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $MODEL}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:estimator)$'}}
+                - {has: {field: value, pattern: $MODEL}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      all:
+        - {matches: skfolio-convex-call}
+        - any:
+            - not:
+                has:
+                  field: arguments
+                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:fallback)$'}}]}
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:fallback)$'}}
+                    - {has: {field: value, regex: ^None$}}
+        - not:
+            has:
+              field: arguments
+              has:
+                all:
+                  - {kind: keyword_argument}
+                  - {has: {field: name, regex: '^(?:raise_on_failure)$'}}
+                  - {has: {field: value, regex: ^False$}}
+        - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+---
+id: skfolio-missing-fallback-in-cv
+language: python
+severity: info
+message: Consider a fallback for skfolio cross-validation when a fold may be infeasible. Supply fallback= or handle
+  failed predictions with raise_on_failure=False.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - {regex: '(^|\.)(?:OnlineGridSearch|OnlineRandomizedSearch|cross_val_predict)$'}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $MODEL}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:estimator)$'}}
+                - {has: {field: value, pattern: $MODEL}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      all:
+        - {matches: skfolio-convex-call}
+        - any:
+            - not:
+                has:
+                  field: arguments
+                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:fallback)$'}}]}
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:fallback)$'}}
+                    - {has: {field: value, regex: ^None$}}
+        - not:
+            has:
+              field: arguments
+              has:
+                all:
+                  - {kind: keyword_argument}
+                  - {has: {field: name, regex: '^(?:raise_on_failure)$'}}
+                  - {has: {field: value, regex: ^False$}}
+        - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    F: {regex: '(^|\.)(?:OnlineGridSearch|OnlineRandomizedSearch|cross_val_predict)$'}

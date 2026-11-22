@@ -1,0 +1,62 @@
+id: polars-series
+language: python
+rule:
+  any:
+  - any:
+    - kind: call
+      all:
+      - has:
+          field: function
+          matches:
+            polars-member:
+              MEMBER:
+                regex: ^(Series)$
+    - matches:
+        polars-member:
+          MEMBER:
+            regex: ^(Series)$
+    - kind: type
+      has:
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Series)$
+  - all:
+    - kind: call
+      all:
+      - has:
+          field: function
+          has:
+            field: attribute
+            regex: ^(cast|alias|clone|rename|filter|sort|shift|fill_null|abs)$
+    - has:
+        any:
+        - kind: call
+          all:
+          - has:
+              field: function
+              matches:
+                polars-member:
+                  MEMBER:
+                    regex: ^(Series)$
+        - matches:
+            polars-member:
+              MEMBER:
+                regex: ^(Series)$
+        - kind: type
+          has:
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Series)$
+        stopBy:
+          not:
+            any:
+            - kind: attribute
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  has:
+                    field: attribute
+                    regex: ^(cast|alias|clone|rename|filter|sort|shift|fill_null|abs)$

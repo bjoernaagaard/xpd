@@ -25,7 +25,33 @@ pub(crate) fn tokens(text: &str) -> Vec<String> {
                 .strip_suffix('s')
                 .filter(|_| s.len() > 4 && !s.ends_with("ss"))
                 .unwrap_or(s);
-            s.to_owned()
+            if let Some(stem) = s
+                .strip_suffix("ification")
+                .or_else(|| s.strip_suffix("ifier"))
+                .filter(|stem| stem.len() > 4)
+            {
+                format!("{stem}if")
+            } else if let Some(stem) = s
+                .strip_suffix("ization")
+                .or_else(|| s.strip_suffix("izer"))
+                .filter(|stem| stem.len() > 4)
+            {
+                format!("{stem}iz")
+            } else if let Some(stem) = s
+                .strip_suffix("ation")
+                .or_else(|| s.strip_suffix("ator"))
+                .filter(|stem| stem.len() > 4)
+            {
+                format!("{stem}at")
+            } else if let Some(stem) = s
+                .strip_suffix("ion")
+                .or_else(|| s.strip_suffix("or"))
+                .filter(|stem| stem.len() > 4 && (stem.ends_with("ss") || stem.ends_with("ct")))
+            {
+                stem.to_owned()
+            } else {
+                s.to_owned()
+            }
         })
         .collect()
 }

@@ -1,0 +1,111 @@
+id: skfolio-metadata-routing-setup
+language: python
+severity: info
+message: Check skfolio metadata routing for this parent fit. Enable routing when required by your scikit-learn configuration
+  and request the key on the consuming estimator.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $MODEL}}
+          - {has: {field: attribute, regex: '^(?:fit|partial_fit)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:implied_vol|active_mask|characteristics|factors)$'}}
+    - not:
+        inside:
+          stopBy: end
+          all:
+            - {kind: module}
+            - has:
+                stopBy: end
+                all:
+                  - {kind: call}
+                  - {has: {field: function, regex: '(^|\.)(?:set_config|config_context)$'}}
+                  - has:
+                      field: arguments
+                      has:
+                        all:
+                          - {kind: keyword_argument}
+                          - {has: {field: name, regex: '^(?:enable_metadata_routing)$'}}
+                          - {has: {field: value, regex: ^True$}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      any:
+        - {matches: skfolio-optimizer}
+        - {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:EmpiricalPrior)$'}}]}
+---
+id: skfolio-metadata-routing-setup
+language: python
+severity: info
+message: Request implied_vol on the skfolio ImpliedCovariance estimator. Enabling routing alone can still raise
+  UnsetMetadataPassedError.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $MODEL}}
+          - {has: {field: attribute, regex: '^(?:fit|partial_fit)$'}}
+    - has:
+        field: arguments
+        has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:implied_vol)$'}}]}
+    - inside:
+        stopBy: end
+        all:
+          - {kind: module}
+          - has:
+              stopBy: end
+              all:
+                - {kind: call}
+                - {has: {field: function, regex: '(^|\.)(?:set_config|config_context)$'}}
+                - has:
+                    field: arguments
+                    has:
+                      all:
+                        - {kind: keyword_argument}
+                        - {has: {field: name, regex: '^(?:enable_metadata_routing)$'}}
+                        - {has: {field: value, regex: ^True$}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      any:
+        - all: &id001
+            - {kind: call}
+            - {has: {field: function, regex: '(^|\.)(?:EmpiricalPrior)$'}}
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:covariance_estimator)$'}}
+                    - has:
+                        field: value
+                        all:
+                          - {kind: call}
+                          - {has: {field: function, regex: '(^|\.)(?:ImpliedCovariance)$'}}
+        - all:
+            - {kind: call}
+            - has:
+                field: function
+                regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:prior_estimator)$'}}
+                    - has:
+                        field: value
+                        all: *id001

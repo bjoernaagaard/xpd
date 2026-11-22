@@ -1,0 +1,328 @@
+id: polars-lazyframe
+language: python
+rule:
+  any:
+  - any:
+    - any:
+      - kind: call
+        all:
+        - has:
+            field: function
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+      - kind: type
+        has:
+          matches:
+            polars-member:
+              MEMBER:
+                regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+    - kind: call
+      all:
+      - has:
+          field: function
+          kind: attribute
+          all:
+          - has:
+              field: object
+              any:
+              - any:
+                - any:
+                  - kind: call
+                    all:
+                    - has:
+                        field: function
+                        matches:
+                          polars-member:
+                            MEMBER:
+                              regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                  - kind: type
+                    has:
+                      matches:
+                        polars-member:
+                          MEMBER:
+                            regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                - kind: call
+                  all:
+                  - has:
+                      field: function
+                      kind: attribute
+                      all:
+                      - has:
+                          field: object
+                          any:
+                          - kind: call
+                            all:
+                            - has:
+                                field: function
+                                matches:
+                                  polars-member:
+                                    MEMBER:
+                                      regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                          - matches:
+                              polars-member:
+                                MEMBER:
+                                  regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                          - kind: type
+                            has:
+                              matches:
+                                polars-member:
+                                  MEMBER:
+                                    regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                      - has:
+                          field: attribute
+                          regex: ^(collect)$
+              - all:
+                - kind: call
+                  all:
+                  - has:
+                      field: function
+                      has:
+                        field: attribute
+                        regex: ^(filter|select|select_seq|with_columns|with_columns_seq|head|tail|slice|sort|rename|drop|drop_nulls|unique|unpivot|join|join_asof|explode|cast|clone|with_row_index|set_sorted)$
+                - has:
+                    any:
+                    - any:
+                      - kind: call
+                        all:
+                        - has:
+                            field: function
+                            matches:
+                              polars-member:
+                                MEMBER:
+                                  regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                      - matches:
+                          polars-member:
+                            MEMBER:
+                              regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                      - kind: type
+                        has:
+                          matches:
+                            polars-member:
+                              MEMBER:
+                                regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                    - kind: call
+                      all:
+                      - has:
+                          field: function
+                          kind: attribute
+                          all:
+                          - has:
+                              field: object
+                              any:
+                              - kind: call
+                                all:
+                                - has:
+                                    field: function
+                                    matches:
+                                      polars-member:
+                                        MEMBER:
+                                          regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                              - matches:
+                                  polars-member:
+                                    MEMBER:
+                                      regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                              - kind: type
+                                has:
+                                  matches:
+                                    polars-member:
+                                      MEMBER:
+                                        regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                          - has:
+                              field: attribute
+                              regex: ^(collect)$
+                    stopBy:
+                      not:
+                        any:
+                        - kind: attribute
+                        - kind: call
+                          all:
+                          - has:
+                              field: function
+                              has:
+                                field: attribute
+                                regex: ^(filter|select|select_seq|with_columns|with_columns_seq|head|tail|slice|sort|rename|drop|drop_nulls|unique|unpivot|join|join_asof|explode|cast|clone|with_row_index|set_sorted)$
+          - has:
+              field: attribute
+              regex: ^(lazy)$
+  - all:
+    - kind: call
+      all:
+      - has:
+          field: function
+          has:
+            field: attribute
+            regex: ^(filter|select|select_seq|with_columns|with_columns_seq|head|tail|slice|sort|rename|drop|drop_nulls|unique|unpivot|join|join_asof|explode|cast|clone|with_row_index|set_sorted)$
+    - has:
+        any:
+        - any:
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+          - matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+          - kind: type
+            has:
+              matches:
+                polars-member:
+                  MEMBER:
+                    regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+        - kind: call
+          all:
+          - has:
+              field: function
+              kind: attribute
+              all:
+              - has:
+                  field: object
+                  any:
+                  - any:
+                    - any:
+                      - kind: call
+                        all:
+                        - has:
+                            field: function
+                            matches:
+                              polars-member:
+                                MEMBER:
+                                  regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                      - matches:
+                          polars-member:
+                            MEMBER:
+                              regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                      - kind: type
+                        has:
+                          matches:
+                            polars-member:
+                              MEMBER:
+                                regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                    - kind: call
+                      all:
+                      - has:
+                          field: function
+                          kind: attribute
+                          all:
+                          - has:
+                              field: object
+                              any:
+                              - kind: call
+                                all:
+                                - has:
+                                    field: function
+                                    matches:
+                                      polars-member:
+                                        MEMBER:
+                                          regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                              - matches:
+                                  polars-member:
+                                    MEMBER:
+                                      regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                              - kind: type
+                                has:
+                                  matches:
+                                    polars-member:
+                                      MEMBER:
+                                        regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                          - has:
+                              field: attribute
+                              regex: ^(collect)$
+                  - all:
+                    - kind: call
+                      all:
+                      - has:
+                          field: function
+                          has:
+                            field: attribute
+                            regex: ^(filter|select|select_seq|with_columns|with_columns_seq|head|tail|slice|sort|rename|drop|drop_nulls|unique|unpivot|join|join_asof|explode|cast|clone|with_row_index|set_sorted)$
+                    - has:
+                        any:
+                        - any:
+                          - kind: call
+                            all:
+                            - has:
+                                field: function
+                                matches:
+                                  polars-member:
+                                    MEMBER:
+                                      regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                          - matches:
+                              polars-member:
+                                MEMBER:
+                                  regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                          - kind: type
+                            has:
+                              matches:
+                                polars-member:
+                                  MEMBER:
+                                    regex: ^(DataFrame|read_csv|read_parquet|read_ipc|read_ndjson|read_avro|read_ipc_stream|read_excel|read_json|from_pandas|from_dicts|from_records)$
+                        - kind: call
+                          all:
+                          - has:
+                              field: function
+                              kind: attribute
+                              all:
+                              - has:
+                                  field: object
+                                  any:
+                                  - kind: call
+                                    all:
+                                    - has:
+                                        field: function
+                                        matches:
+                                          polars-member:
+                                            MEMBER:
+                                              regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                                  - matches:
+                                      polars-member:
+                                        MEMBER:
+                                          regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                                  - kind: type
+                                    has:
+                                      matches:
+                                        polars-member:
+                                          MEMBER:
+                                            regex: ^(LazyFrame|scan_csv|scan_parquet|scan_ipc|scan_ndjson)$
+                              - has:
+                                  field: attribute
+                                  regex: ^(collect)$
+                        stopBy:
+                          not:
+                            any:
+                            - kind: attribute
+                            - kind: call
+                              all:
+                              - has:
+                                  field: function
+                                  has:
+                                    field: attribute
+                                    regex: ^(filter|select|select_seq|with_columns|with_columns_seq|head|tail|slice|sort|rename|drop|drop_nulls|unique|unpivot|join|join_asof|explode|cast|clone|with_row_index|set_sorted)$
+              - has:
+                  field: attribute
+                  regex: ^(lazy)$
+        stopBy:
+          not:
+            any:
+            - kind: attribute
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  has:
+                    field: attribute
+                    regex: ^(filter|select|select_seq|with_columns|with_columns_seq|head|tail|slice|sort|rename|drop|drop_nulls|unique|unpivot|join|join_asof|explode|cast|clone|with_row_index|set_sorted)$

@@ -1,0 +1,36 @@
+id: skfolio-string-enum-option
+language: python
+severity: error
+message: A string risk_measure such as 'variance' raises AttributeError during skfolio fit. Pass a RiskMeasure member.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:risk_measure)$'}}
+            - {has: {field: value, all: [{kind: string}, {not: {has: {kind: interpolation}}}]}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}
+---
+id: skfolio-string-enum-option
+language: python
+severity: error
+message: A string objective_function such as 'minimize_risk' raises TypeError during skfolio MeanRisk fit. Pass
+  an ObjectiveFunction member.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk)$'}]}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:objective_function)$'}}
+            - {has: {field: value, all: [{kind: string}, {not: {has: {kind: interpolation}}}]}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk)$'}}}

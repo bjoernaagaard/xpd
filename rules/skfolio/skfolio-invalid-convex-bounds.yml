@@ -1,0 +1,192 @@
+id: skfolio-invalid-convex-bounds
+language: python
+severity: error
+message: The minimum asset weight exceeds the maximum. With min_weights=0.7 and max_weights=0.2, the skfolio solver
+  reported infeasible constraints.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - any:
+        - all:
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:min_weights)$'}}
+                    - {has: {field: value, regex: '^(?:[1-9][0-9]*(?:\.[0-9]*)?|0?\.[0-9]*[1-9][0-9]*)$'}}
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:max_weights)$'}}
+                    - {has: {field: value, regex: '^(?:-\s*[0-9]+(?:\.[0-9]*)?|0(?:\.0*)?)$'}}
+        - all:
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:min_weights)$'}}
+                    - has:
+                        field: value
+                        any: &id001
+                          - {regex: '^(?:[2-9][0-9]*(?:\.[0-9]*)?|[1-9][0-9]+(?:\.[0-9]*)?|1\.[0-9]*[1-9][0-9]*)$'}
+                          - {regex: '^1(?:\.0*)?$'}
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:max_weights)$'}}
+                    - has:
+                        field: value
+                        all:
+                          - {regex: '^(?:0|0?\.[0-9]+|1(?:\.0*)?|-\s*[0-9]+(?:\.[0-9]*)?)$'}
+                          - not:
+                              any: *id001
+        - all:
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:min_weights)$'}}
+                    - has:
+                        field: value
+                        regex: ^(?:[2-9][0-9]*(?:\.[0-9]*)?|[1-9][0-9]+(?:\.[0-9]*)?|1\.[0-9]*[1-9][0-9]*)$
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:max_weights)$'}}
+                    - {has: {field: value, regex: '^(?:0|0?\.[0-9]+|1(?:\.0*)?|-\s*[0-9]+(?:\.[0-9]*)?)$'}}
+        - all:
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:min_weights)$'}}
+                    - {has: {field: value, regex: '^(?:0?\.[5-9][0-9]*)$'}}
+            - has:
+                field: arguments
+                has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:max_weights)$'}}
+                    - {has: {field: value, regex: '^(?:0?\.[0-4][0-9]*)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}
+---
+id: skfolio-invalid-convex-bounds
+language: python
+severity: error
+message: Negative l1_coef or l2_coef can make the skfolio objective nonconvex. MeanRisk raised DCPError for each
+  coefficient at -0.1.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk)$'}]}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:l1_coef|l2_coef)$'}}
+            - {has: {field: value, regex: '^-\s*(?:[1-9][0-9]*(?:\.[0-9]*)?|0?\.[0-9]*[1-9][0-9]*)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk)$'}}}
+---
+id: skfolio-invalid-convex-bounds
+language: python
+severity: warning
+message: The skfolio confidence level is outside [0, 1]. At -0.2 or 1.2, the selected tail measure gave an unbounded
+  objective or an invalid logarithm.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:cvar_beta)$'}}
+            - has:
+                field: value
+                any:
+                  - {regex: '^-\s*(?:[1-9][0-9]*(?:\.[0-9]*)?|0?\.[0-9]*[1-9][0-9]*)$'}
+                  - {regex: '^(?:[2-9][0-9]*(?:\.[0-9]*)?|[1-9][0-9]+(?:\.[0-9]*)?|1\.[0-9]*[1-9][0-9]*)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:risk_measure)$'}}
+            - {has: {field: value, regex: '(^|\.)(?:CVAR)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}
+---
+id: skfolio-invalid-convex-bounds
+language: python
+severity: warning
+message: The skfolio confidence level is outside [0, 1]. At -0.2 or 1.2, the selected tail measure gave an unbounded
+  objective or an invalid logarithm.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:evar_beta)$'}}
+            - has:
+                field: value
+                any:
+                  - {regex: '^-\s*(?:[1-9][0-9]*(?:\.[0-9]*)?|0?\.[0-9]*[1-9][0-9]*)$'}
+                  - {regex: '^(?:[2-9][0-9]*(?:\.[0-9]*)?|[1-9][0-9]+(?:\.[0-9]*)?|1\.[0-9]*[1-9][0-9]*)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:risk_measure)$'}}
+            - {has: {field: value, regex: '(^|\.)(?:EVAR)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}
+---
+id: skfolio-invalid-convex-bounds
+language: python
+severity: warning
+message: The skfolio confidence level is outside [0, 1]. At -0.2 or 1.2, the selected tail measure gave an unbounded
+  objective or an invalid logarithm.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:cdar_beta)$'}}
+            - has:
+                field: value
+                any:
+                  - {regex: '^-\s*(?:[1-9][0-9]*(?:\.[0-9]*)?|0?\.[0-9]*[1-9][0-9]*)$'}
+                  - {regex: '^(?:[2-9][0-9]*(?:\.[0-9]*)?|[1-9][0-9]+(?:\.[0-9]*)?|1\.[0-9]*[1-9][0-9]*)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:risk_measure)$'}}
+            - {has: {field: value, regex: '(^|\.)(?:CDAR)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}

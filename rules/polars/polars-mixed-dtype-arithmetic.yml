@@ -1,0 +1,341 @@
+id: polars-mixed-dtype-arithmetic
+language: python
+severity: error
+message: Polars 2.1.0 rejects string and numeric Series arithmetic. Cast the strings explicitly, or use
+  string concatenation for text.
+rule:
+  kind: binary_operator
+  all:
+  - has:
+      field: operator
+      regex: ^(\+|-|\*|/|//|%|\*\*)$
+  - any:
+    - all:
+      - has:
+          field: left
+          all:
+          - pattern: $R
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(Series)$
+            - has:
+                field: arguments
+                has:
+                  kind: list
+                  all:
+                  - has:
+                      kind: string
+                  - not:
+                      has:
+                        all:
+                        - not:
+                            kind: string
+                        - regex: ^[^\s\[\],#]
+                  nthChild:
+                    position: 1
+                    ofRule:
+                      not:
+                        any:
+                        - kind: comment
+                        - kind: line_continuation
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    any:
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(dtype)$
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(values)$
+                    - kind: dictionary_splat
+      - has:
+          field: right
+          any:
+          - any:
+            - kind: integer
+            - kind: float
+          - all:
+            - pattern: $S
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  matches:
+                    polars-member:
+                      MEMBER:
+                        regex: ^(Series)$
+              - has:
+                  field: arguments
+                  has:
+                    kind: list
+                    all:
+                    - has:
+                        any:
+                        - kind: integer
+                        - kind: float
+                    - not:
+                        has:
+                          all:
+                          - not:
+                              any:
+                              - kind: integer
+                              - kind: float
+                          - regex: ^[^\s\[\],#]
+                    nthChild:
+                      position: 1
+                      ofRule:
+                        not:
+                          any:
+                          - kind: comment
+                          - kind: line_continuation
+              - not:
+                  has:
+                    field: arguments
+                    has:
+                      any:
+                      - kind: keyword_argument
+                        all:
+                        - has:
+                            field: name
+                            regex: ^(dtype)$
+                      - kind: keyword_argument
+                        all:
+                        - has:
+                            field: name
+                            regex: ^(values)$
+                      - kind: dictionary_splat
+    - all:
+      - has:
+          field: right
+          all:
+          - pattern: $R
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(Series)$
+            - has:
+                field: arguments
+                has:
+                  kind: list
+                  all:
+                  - has:
+                      kind: string
+                  - not:
+                      has:
+                        all:
+                        - not:
+                            kind: string
+                        - regex: ^[^\s\[\],#]
+                  nthChild:
+                    position: 1
+                    ofRule:
+                      not:
+                        any:
+                        - kind: comment
+                        - kind: line_continuation
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    any:
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(dtype)$
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(values)$
+                    - kind: dictionary_splat
+      - has:
+          field: left
+          any:
+          - any:
+            - kind: integer
+            - kind: float
+          - all:
+            - pattern: $S
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  matches:
+                    polars-member:
+                      MEMBER:
+                        regex: ^(Series)$
+              - has:
+                  field: arguments
+                  has:
+                    kind: list
+                    all:
+                    - has:
+                        any:
+                        - kind: integer
+                        - kind: float
+                    - not:
+                        has:
+                          all:
+                          - not:
+                              any:
+                              - kind: integer
+                              - kind: float
+                          - regex: ^[^\s\[\],#]
+                    nthChild:
+                      position: 1
+                      ofRule:
+                        not:
+                          any:
+                          - kind: comment
+                          - kind: line_continuation
+              - not:
+                  has:
+                    field: arguments
+                    has:
+                      any:
+                      - kind: keyword_argument
+                        all:
+                        - has:
+                            field: name
+                            regex: ^(dtype)$
+                      - kind: keyword_argument
+                        all:
+                        - has:
+                            field: name
+                            regex: ^(values)$
+                      - kind: dictionary_splat
+    - all:
+      - has:
+          field: left
+          all:
+          - pattern: $R
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(Series)$
+            - has:
+                field: arguments
+                has:
+                  kind: list
+                  all:
+                  - has:
+                      any:
+                      - kind: integer
+                      - kind: float
+                  - not:
+                      has:
+                        all:
+                        - not:
+                            any:
+                            - kind: integer
+                            - kind: float
+                        - regex: ^[^\s\[\],#]
+                  nthChild:
+                    position: 1
+                    ofRule:
+                      not:
+                        any:
+                        - kind: comment
+                        - kind: line_continuation
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    any:
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(dtype)$
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(values)$
+                    - kind: dictionary_splat
+      - has:
+          field: right
+          kind: string
+    - all:
+      - has:
+          field: right
+          all:
+          - pattern: $R
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(Series)$
+            - has:
+                field: arguments
+                has:
+                  kind: list
+                  all:
+                  - has:
+                      any:
+                      - kind: integer
+                      - kind: float
+                  - not:
+                      has:
+                        all:
+                        - not:
+                            any:
+                            - kind: integer
+                            - kind: float
+                        - regex: ^[^\s\[\],#]
+                  nthChild:
+                    position: 1
+                    ofRule:
+                      not:
+                        any:
+                        - kind: comment
+                        - kind: line_continuation
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    any:
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(dtype)$
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(values)$
+                    - kind: dictionary_splat
+      - has:
+          field: left
+          kind: string
+metadata:
+  since: '2.1'
+  holds:
+    R:
+      matches: polars-series
+    S:
+      matches: polars-series

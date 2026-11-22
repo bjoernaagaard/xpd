@@ -1,0 +1,51 @@
+id: polars-join-without-validate
+language: python
+severity: info
+message: A Polars join allows duplicate keys on either side by default. Pass validate when the keys should
+  be unique on one or both sides.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          pattern: $R
+      - has:
+          field: attribute
+          regex: ^(join)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(on)$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(validate)$
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(how)$
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(join_nulls)$
+          - kind: dictionary_splat
+metadata:
+  holds:
+    R:
+      matches: polars-frame

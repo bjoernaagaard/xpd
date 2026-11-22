@@ -1,0 +1,134 @@
+id: deprecated-in-polars
+language: python
+severity: warning
+message: Polars 2.1.0 emits DeprecationWarning for cut and qcut. Use bin_intervals or bin_quantiles with
+  explicit labels and the interval closure you need.
+rule:
+  kind: attribute
+  all:
+  - has:
+      field: object
+      pattern: $R
+  - has:
+      field: attribute
+      regex: ^(cut|qcut)$
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: deprecated-in-polars
+language: python
+severity: warning
+message: Polars 2.1.0 emits DeprecationWarning for strict=True with how="horizontal". Omit strict because
+  horizontal concatenation already requires equal heights.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      all:
+      - pattern: $F
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(concat|union)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(strict)$
+        - has:
+            field: value
+            kind: 'true'
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(how)$
+        - has:
+            field: value
+            regex: ^["']horizontal["']$
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+---
+id: deprecated-in-polars
+language: python
+severity: info
+message: Polars 2.1.0 exposes Utf8 as the same dtype object as String. Use String in new code.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(Utf8)$
+  - not:
+      inside:
+        kind: assignment
+        field: left
+fix: $R.String
+metadata:
+  holds:
+    R:
+      matches: polars-module
+  fix: safe
+---
+id: deprecated-in-polars
+language: python
+severity: info
+message: Polars 2.1.0 emits UnstableWarning for Avro reads when warn_unstable is enabled. Use a stable
+  storage format if you need a stable API.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      all:
+      - pattern: $F
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(read_avro)$
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+---
+id: deprecated-in-polars
+language: python
+severity: info
+message: Polars 2.1.0 emits UnstableWarning for Avro writes when warn_unstable is enabled. Use a stable
+  storage format if you need a stable API.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          pattern: $R
+      - has:
+          field: attribute
+          regex: ^(write_avro)$
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe

@@ -1,0 +1,29 @@
+id: polars-null-comparison
+language: python
+severity: warning
+message: Polars 2.1.0 emits UserWarning for comparison to None. Use is_null to test for nulls.
+rule:
+  any:
+  - pattern: $R == None
+  - pattern: None == $R
+fix: $R.is_null()
+metadata:
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: polars-null-comparison
+language: python
+severity: warning
+message: Polars 2.1.0 emits UserWarning for comparison to None. Use is_not_null to test for nulls.
+rule:
+  any:
+  - pattern: $R != None
+  - pattern: None != $R
+fix: $R.is_not_null()
+metadata:
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe

@@ -1,0 +1,144 @@
+id: polars-lazy-schema-property
+language: python
+severity: warning
+message: Polars 2.1.0 emits PerformanceWarning when code reads LazyFrame.schema. Use collect_schema to
+  make schema resolution explicit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(schema)$
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - not:
+      inside:
+        kind: interpolation
+        stopBy: end
+        has:
+          regex: '^=$'
+fix: $R.collect_schema()
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: safe
+---
+id: polars-lazy-schema-property
+language: python
+severity: warning
+message: Polars 2.1.0 emits PerformanceWarning when code reads LazyFrame.columns. Use collect_schema to
+  make schema resolution explicit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(columns)$
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - not:
+      inside:
+        kind: interpolation
+        stopBy: end
+        has:
+          regex: '^=$'
+fix: $R.collect_schema().names()
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: safe
+---
+id: polars-lazy-schema-property
+language: python
+severity: warning
+message: Polars 2.1.0 emits PerformanceWarning when code reads LazyFrame.dtypes. Use collect_schema to
+  make schema resolution explicit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(dtypes)$
+  - not:
+      inside:
+        kind: assignment
+        field: left
+  - not:
+      inside:
+        kind: interpolation
+        stopBy: end
+        has:
+          regex: '^=$'
+fix: $R.collect_schema().dtypes()
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: safe
+---
+id: polars-lazy-schema-property
+language: python
+severity: warning
+message: Polars 2.1.0 emits PerformanceWarning when code reads LazyFrame.schema, columns or dtypes. Use
+  collect_schema to make schema resolution explicit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(schema|columns|dtypes)$
+  - inside:
+      kind: interpolation
+      stopBy: end
+      has:
+        regex: '^=$'
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe
+---
+id: polars-lazy-schema-property
+language: python
+severity: warning
+message: Polars 2.1.0 emits PerformanceWarning when code reads LazyFrame.width. Use collect_schema to
+  make schema resolution explicit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(width)$
+  - not:
+      inside:
+        kind: assignment
+        field: left
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe

@@ -1,0 +1,33 @@
+id: polars-join-asof-unsorted
+language: python
+severity: info
+message: An as-of join needs ascending join keys. Check that each input is sorted by the join key within
+  each group.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          pattern: $R
+      - has:
+          field: attribute
+          regex: ^(join_asof)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(check_sortedness)$
+        - has:
+            field: value
+            kind: 'false'
+metadata:
+  holds:
+    R:
+      matches: polars-frame

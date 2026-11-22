@@ -1,0 +1,3 @@
+id: skfolio-return-conversion
+language: python
+rule: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:prices_to_returns)$'}}]}

@@ -1,0 +1,16 @@
+id: polars-compatibility-guard
+language: python
+rule:
+  inside:
+    stopBy: end
+    any:
+    - all:
+      - kind: if_statement
+      - has:
+          field: condition
+          regex: \b(hasattr|__version__)\b
+    - all:
+      - kind: try_statement
+      - has:
+          kind: except_clause
+          regex: except[^:\n]*(AttributeError|TypeError|ImportError)

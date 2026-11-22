@@ -1,0 +1,11 @@
+id: polars-groupby-join-over
+language: python
+severity: info
+message: A join to an aggregation of the same Polars frame can often be written as a window expression.
+  Check the output names and how null keys should be grouped.
+rule:
+  pattern: $R.join($R.group_by($$$GROUP).agg($$$AGG), $$$JOIN)
+metadata:
+  holds:
+    R:
+      matches: polars-frame

@@ -1,0 +1,22 @@
+id: polars-module
+language: python
+rule:
+  any:
+  - regex: ^(polars)$
+  - kind: identifier
+    all:
+    - pattern: $POLARS_MODULE
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          kind: import_statement
+          has:
+            kind: aliased_import
+            all:
+            - has:
+                field: name
+                regex: ^(polars)$
+            - has:
+                field: alias
+                pattern: $POLARS_MODULE

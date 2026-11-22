@@ -5,8 +5,8 @@ description: Install xpd, check a small pandas file, and choose which of its fix
 
 Run `uvx xpd check .` in a Python project to find the lines that are slow or give a wrong result.
 On this page you check a small file, read what xpd reports, and decide which fixes it may write.
-xpd checks code that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category
-Encoders, linearmodels, arch, pymoo, plotly or Apache Hamilton.
+xpd checks code that uses pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category
+Encoders, linearmodels, arch, skfolio, pymoo, plotly or Apache Hamilton.
 
 ## Install
 

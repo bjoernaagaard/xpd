@@ -1,10 +1,10 @@
 # xpd
 
 Run `uvx xpd check .` to find the lines of your Python code that are slow or give a wrong result,
-and add `--fix` to let xpd rewrite the ones it can. xpd checks code that uses pandas, NumPy, SciPy,
-scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly or Apache
-Hamilton. It reads the files and starts no Python, so you or a coding agent can run it after every
-edit.
+and add `--fix` to let xpd rewrite the ones it can. xpd checks code that uses pandas, Polars, NumPy,
+SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, skfolio, pymoo, plotly
+or Apache Hamilton. It reads the files and starts no Python, so you or a coding agent can run it
+after every edit.
 
 The documentation is at <https://bjoernaagaard.github.io/xpd/>, with a page for every rule.
 

@@ -1,0 +1,32 @@
+id: polars-collect-then-write
+language: python
+severity: info
+message: Collect builds a DataFrame before writing. Use a matching sink when only the file is needed.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          kind: call
+          all:
+          - has:
+              field: function
+              kind: attribute
+              all:
+              - has:
+                  field: object
+                  pattern: $R
+              - has:
+                  field: attribute
+                  regex: ^(collect)$
+      - has:
+          field: attribute
+          regex: ^(write_csv|write_parquet|write_ipc|write_ndjson)$
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe

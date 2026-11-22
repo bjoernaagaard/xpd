@@ -1,0 +1,25 @@
+id: polars-expr-mask-precedence
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for this unparenthesized mask. Enclose each comparison in parentheses
+  before combining it.
+rule:
+  kind: comparison_operator
+  all:
+  - has:
+      all:
+      - kind: binary_operator
+      - has:
+          field: operator
+          regex: ^[&|^]$
+  - has:
+      all:
+      - pattern: $R
+      - any:
+        - kind: identifier
+        - kind: call
+  - regex: (?:[<>]=?|==|!=)[^\n]*[&|^][^\n]*(?:[<>]=?|==|!=)
+metadata:
+  holds:
+    R:
+      matches: polars-element

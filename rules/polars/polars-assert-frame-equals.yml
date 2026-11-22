@@ -1,0 +1,48 @@
+id: polars-assert-frame-equals
+language: python
+severity: warning
+message: Polars DataFrame.equals returned True on equal values with Int32 and Int64 columns. Use assert_frame_equal
+  to check dtypes and report the differences.
+rule:
+  kind: assert_statement
+  has:
+    kind: call
+    all:
+    - has:
+        field: function
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(equals)$
+    - has:
+        field: arguments
+        has:
+          pattern: $OTHER
+          nthChild:
+            position: 1
+            ofRule:
+              not:
+                any:
+                - kind: comment
+                - kind: line_continuation
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+            - kind: keyword_argument
+              all:
+              - has:
+                  field: name
+                  regex: ^(null_equal)$
+            - kind: dictionary_splat
+metadata:
+  holds:
+    R:
+      matches: polars-dataframe
+    OTHER:
+      matches: polars-dataframe

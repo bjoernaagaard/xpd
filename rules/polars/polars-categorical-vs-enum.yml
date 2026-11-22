@@ -1,0 +1,34 @@
+id: polars-categorical-vs-enum
+language: python
+severity: info
+message: Categorical accepts every string label. Use Enum when you have a fixed list and want unknown
+  labels to raise.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      all:
+      - pattern: $F
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Series)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(dtype)$
+        - has:
+            field: value
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Categorical)$
+metadata:
+  holds:
+    F:
+      matches: polars-member-any

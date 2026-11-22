@@ -209,6 +209,18 @@
     "expected": "hamilton.driver.Builder"
   },
   {
+    "query": "lazily scan a parquet file in polars",
+    "expected": "polars.scan_parquet"
+  },
+  {
+    "query": "combinatorial purged cross validation for portfolio backtesting",
+    "expected": "skfolio.model_selection.CombinatorialPurgedCV"
+  },
+  {
+    "query": "hierarchical risk parity portfolio optimization",
+    "expected": "skfolio.optimization.HierarchicalRiskParity"
+  },
+  {
     "needs_model": true,
     "query": "bar chart of amounts by category",
     "reason": "The ColorBar classes under plotly.graph_objs rank above it.",

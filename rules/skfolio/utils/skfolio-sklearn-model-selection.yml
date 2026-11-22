@@ -1,0 +1,74 @@
+id: skfolio-sklearn-model-selection
+language: python
+arguments:
+  - NAME
+rule:
+  any:
+    - all:
+        - {kind: identifier}
+        - {pattern: $SK_NAME}
+        - inside:
+            stopBy: end
+            all:
+              - {kind: module}
+              - has:
+                  stopBy: end
+                  all:
+                    - {kind: import_from_statement}
+                    - {has: {field: module_name, regex: ^sklearn\.model_selection$}}
+                    - any:
+                        - {has: {all: [{kind: dotted_name}, {pattern: $SK_NAME}]}}
+                        - has:
+                            all:
+                              - {kind: aliased_import}
+                              - {has: {field: alias, pattern: $SK_NAME}}
+                              - {has: {field: name, matches: NAME}}
+        - not:
+            inside:
+              stopBy: end
+              all:
+                - {kind: module}
+                - has:
+                    stopBy: end
+                    all:
+                      - {kind: import_from_statement}
+                      - {has: {field: module_name, not: {regex: ^sklearn\.model_selection$}}}
+                      - {has: {all: [{kind: dotted_name}, {pattern: $SK_NAME}]}}
+    - all:
+        - {kind: attribute}
+        - {has: {field: attribute, matches: NAME}}
+        - any:
+            - all:
+                - {has: {field: object, regex: ^sklearn\.model_selection$}}
+                - inside:
+                    stopBy: end
+                    all:
+                      - {kind: module}
+                      - has:
+                          stopBy: end
+                          all:
+                            - {kind: import_statement}
+                            - {regex: '^import\s+sklearn\.model_selection(?:\s*,|\s*$)'}
+            - all:
+                - {has: {field: object, pattern: $SK_MODULE}}
+                - inside:
+                    stopBy: end
+                    all:
+                      - {kind: module}
+                      - has:
+                          stopBy: end
+                          any:
+                            - all:
+                                - {kind: aliased_import}
+                                - {has: {field: name, regex: ^sklearn\.model_selection$}}
+                                - {has: {field: alias, pattern: $SK_MODULE}}
+                            - all:
+                                - {kind: import_from_statement}
+                                - {has: {field: module_name, regex: ^sklearn$}}
+                                - any:
+                                    - {has: {all: [{regex: ^model_selection$}, {pattern: $SK_MODULE}]}}
+                                    - has:
+                                        all:
+                                          - {kind: aliased_import}
+                                          - {has: {field: name, regex: ^model_selection$}}
+                                          - {has: {field: alias, pattern: $SK_MODULE}}

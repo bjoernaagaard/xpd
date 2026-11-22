@@ -1,0 +1,8 @@
+id: skfolio-convex-call
+language: python
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR)$

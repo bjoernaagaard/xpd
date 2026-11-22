@@ -1,0 +1,111 @@
+id: skfolio-preselection-before-split
+language: python
+severity: warning
+message: Fitting skfolio preselection on all returns leaks test data. Selection chose B with all 6 rows and A with
+  the 3 training rows. Fit the selector per training split or put it in the cross-validation pipeline.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:train_test_split)$'}}}
+    - any:
+        - {has: {field: function, regex: '(^|\.)(?:train_test_split)$'}}
+        - has:
+            field: function
+            all:
+              - {kind: identifier}
+              - {pattern: $SK_ALIAS}
+              - inside:
+                  stopBy: end
+                  all:
+                    - {kind: module}
+                    - has:
+                        stopBy: end
+                        all:
+                          - {kind: aliased_import}
+                          - {has: {field: alias, pattern: $SK_ALIAS}}
+                          - {has: {field: name, regex: '(^|\.)(?:train_test_split)$'}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $DATA}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:X)$'}}
+                - {has: {field: value, pattern: $DATA}}
+metadata:
+  since: 1.14.4
+  holds:
+    DATA:
+      all:
+        - {kind: call}
+        - has:
+            field: function
+            all:
+              - {kind: attribute}
+              - {has: {field: object, pattern: $SELECTOR}}
+              - {has: {field: attribute, regex: '^(?:fit_transform)$'}}
+        - has:
+            field: function
+            has:
+              field: object
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    regex: (^|\.)(?:DropCorrelated|DropZeroVariance|SelectKExtremes|SelectNonDominated|SelectComplete|SelectNonExpiring)$
+---
+id: skfolio-preselection-before-split
+language: python
+severity: warning
+message: Fitting skfolio preselection on all returns leaks test data. Selection chose B with all 6 rows and A with
+  the 3 training rows. Fit the selector per training split or put it in the cross-validation pipeline.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:cross_val_predict)$'}]}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 2}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $DATA}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:X)$'}}
+                - {has: {field: value, pattern: $DATA}}
+metadata:
+  since: 1.14.4
+  holds:
+    DATA:
+      all:
+        - {kind: call}
+        - has:
+            field: function
+            all:
+              - {kind: attribute}
+              - {has: {field: object, pattern: $SELECTOR}}
+              - {has: {field: attribute, regex: '^(?:fit_transform)$'}}
+        - has:
+            field: function
+            has:
+              field: object
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    regex: (^|\.)(?:DropCorrelated|DropZeroVariance|SelectKExtremes|SelectNonDominated|SelectComplete|SelectNonExpiring)$
+    F: {regex: '(^|\.)(?:cross_val_predict)$'}

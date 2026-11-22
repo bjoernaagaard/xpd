@@ -1,0 +1,25 @@
+id: polars-sql-frame-globals
+language: python
+severity: info
+message: Polars sql resolves table names from Python globals. Use SQLContext with explicit table bindings
+  when the query should depend on named inputs.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      all:
+      - pattern: $F
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(sql)$
+  - has:
+      field: arguments
+      has:
+        kind: string
+        regex: (?i)\bfrom\s+[a-z_]\w*
+metadata:
+  holds:
+    F:
+      matches: polars-member-any

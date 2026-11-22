@@ -1,0 +1,40 @@
+id: polars-list-get-oob
+language: python
+severity: info
+message: Polars raises ComputeError for an out-of-bounds list offset by default. Pass null_on_oob=True
+  when shorter lists are expected.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          kind: attribute
+          all:
+          - has:
+              field: object
+              pattern: $R
+          - has:
+              field: attribute
+              regex: ^(list)$
+      - has:
+          field: attribute
+          regex: ^(get)$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(null_on_oob)$
+          - kind: dictionary_splat
+metadata:
+  holds:
+    R:
+      matches: polars-element

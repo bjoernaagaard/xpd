@@ -1,0 +1,6 @@
+id: polars-frame
+language: python
+rule:
+  any:
+  - matches: polars-dataframe
+  - matches: polars-lazyframe

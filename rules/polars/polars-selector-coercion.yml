@@ -1,0 +1,77 @@
+id: polars-selector-coercion
+language: python
+severity: info
+message: A selector combined with col by &, | or ^ becomes a value expression in Polars 2.1.0. Use selectors.by_name
+  to combine column selections.
+rule:
+  kind: binary_operator
+  all:
+  - has:
+      field: operator
+      regex: ^[&|^]$
+  - any:
+    - all:
+      - has:
+          field: left
+          all:
+          - pattern: $S
+          - kind: call
+            all:
+            - has:
+                field: function
+                kind: attribute
+                all:
+                - has:
+                    field: object
+                    matches: polars-selectors-module
+                - has:
+                    field: attribute
+                    regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$
+      - has:
+          field: right
+          all:
+          - pattern: $R
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(col)$
+    - all:
+      - has:
+          field: right
+          all:
+          - pattern: $S
+          - kind: call
+            all:
+            - has:
+                field: function
+                kind: attribute
+                all:
+                - has:
+                    field: object
+                    matches: polars-selectors-module
+                - has:
+                    field: attribute
+                    regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$
+      - has:
+          field: left
+          all:
+          - pattern: $R
+          - kind: call
+            all:
+            - has:
+                field: function
+                matches:
+                  polars-member:
+                    MEMBER:
+                      regex: ^(col)$
+metadata:
+  since: '2.0'
+  holds:
+    S:
+      matches: polars-selector
+    R:
+      matches: polars-expr

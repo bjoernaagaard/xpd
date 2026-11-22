@@ -1,0 +1,50 @@
+id: polars-row-iteration
+language: python
+severity: info
+message: Use a Polars expression to compute a reduction over rows. A column sum ran 1,279 and 623 times
+  faster on 50,000 and 500,000 rows.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      all:
+      - pattern: sum
+      - not:
+          inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              any:
+              - kind: assignment
+                has:
+                  field: left
+                  regex: ^(sum)$
+              - kind: function_definition
+                has:
+                  field: name
+                  regex: ^(sum)$
+  - has:
+      field: arguments
+      kind: generator_expression
+      has:
+        kind: for_in_clause
+        has:
+          field: right
+          kind: call
+          all:
+          - has:
+              field: function
+              kind: attribute
+              all:
+              - has:
+                  field: object
+                  pattern: $R
+              - has:
+                  field: attribute
+                  regex: ^(iter_rows)$
+metadata:
+  holds:
+    R:
+      matches: polars-dataframe

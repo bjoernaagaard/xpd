@@ -1,0 +1,23 @@
+id: polars-pandas-api-name
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for this pandas API name. Use Polars equivalents such as
+  group_by, join, fill_null, drop_nulls, sort, is_null, is_not_null, or Polars expressions instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(groupby|merge|apply|loc|iloc|iterrows|fillna|dropna|sort_values|reset_index|set_index|isna|notna)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series

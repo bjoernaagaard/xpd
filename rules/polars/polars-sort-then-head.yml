@@ -1,0 +1,11 @@
+id: polars-sort-then-head
+language: python
+severity: info
+message: For a small number of rows, top_k or bottom_k can avoid a full sort. Sort the small result if
+  its output order matters.
+rule:
+  pattern: $R.sort($$$SORT).head($$$HEAD)
+metadata:
+  holds:
+    R:
+      matches: polars-frame

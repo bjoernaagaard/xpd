@@ -1,0 +1,21 @@
+id: polars-map-elements-native
+language: python
+severity: warning
+message: Polars 2.1.0 emits PolarsInefficientMapWarning when map_elements wraps addition in this lambda.
+  Add the value directly with a Polars expression.
+rule:
+  all:
+  - pattern: '$R.map_elements(lambda $ITEM: $ITEM + $VALUE, $$$ARGS)'
+  - has:
+      field: arguments
+      has:
+        kind: lambda
+constraints:
+  VALUE:
+    any:
+    - kind: integer
+    - kind: float
+metadata:
+  holds:
+    R:
+      matches: polars-element

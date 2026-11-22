@@ -1,0 +1,22 @@
+id: polars-array
+language: python
+rule:
+  any:
+  - kind: call
+    all:
+    - has:
+        field: function
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Array)$
+  - matches:
+      polars-member:
+        MEMBER:
+          regex: ^(Array)$
+  - kind: type
+    has:
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(Array)$

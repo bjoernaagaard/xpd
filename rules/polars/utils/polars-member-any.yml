@@ -1,0 +1,7 @@
+id: polars-member-any
+language: python
+rule:
+  matches:
+    polars-member:
+      MEMBER:
+        regex: ^[A-Za-z_]\w*$

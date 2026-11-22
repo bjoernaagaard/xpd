@@ -1,0 +1,17 @@
+id: skfolio-estimator-on-optimizer
+language: python
+severity: error
+message: MeanRisk and RiskBudgeting raise TypeError for direct mu_estimator or covariance_estimator keywords. Configure
+  these estimators in a skfolio EmpiricalPrior.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:mu_estimator|covariance_estimator)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}

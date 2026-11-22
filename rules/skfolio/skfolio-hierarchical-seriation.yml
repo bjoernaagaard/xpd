@@ -1,0 +1,91 @@
+id: skfolio-hierarchical-seriation
+language: python
+severity: warning
+message: skfolio HRP and Schur raise FutureWarning at fit for hierarchical_clustering_estimator. Put the clustering
+  estimator inside HierarchicalSeriation.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:hierarchical_clustering_estimator)$'}}
+            - {has: {field: value, not: {regex: ^None$}}}
+    - not:
+        has:
+          field: arguments
+          has:
+            all:
+              - {kind: keyword_argument}
+              - {has: {field: name, regex: '^(?:seriation_estimator)$'}}
+              - {has: {field: value, not: {regex: ^None$}}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}}}
+---
+id: skfolio-hierarchical-seriation
+language: python
+severity: error
+message: skfolio HRP and Schur raise ValueError at fit when both ordering estimators are set. Pass only seriation_estimator.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:hierarchical_clustering_estimator)$'}}
+            - {has: {field: value, not: {regex: ^None$}}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:seriation_estimator)$'}}
+            - {has: {field: value, not: {regex: ^None$}}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}}}
+---
+id: skfolio-hierarchical-seriation
+language: python
+severity: warning
+message: On a fitted skfolio HRP or Schur with hierarchical seriation, hierarchical_clustering_estimator_ raises
+  FutureWarning. Read seriation_estimator_.hierarchical_clustering_estimator_.
+rule:
+  all:
+    - {kind: attribute}
+    - {has: {field: object, pattern: $MODEL}}
+    - {has: {field: attribute, regex: '^(?:hierarchical_clustering_estimator_)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      any:
+        - all:
+            - {kind: call}
+            - {has: {field: function, regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}}
+        - all:
+            - {kind: call}
+            - has:
+                field: function
+                all:
+                  - {kind: attribute}
+                  - has:
+                      field: object
+                      all:
+                        - {kind: call}
+                        - {has: {field: function, regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}}
+                  - {has: {field: attribute, regex: ^fit$}}

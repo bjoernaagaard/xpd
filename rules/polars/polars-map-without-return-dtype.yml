@@ -1,0 +1,46 @@
+id: polars-map-without-return-dtype
+language: python
+severity: info
+message: Polars may fail to infer the result type of a Python function. Pass return_dtype to declare the
+  output type before collecting.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          pattern: $R
+      - has:
+          field: attribute
+          regex: ^(map_elements|map_batches)$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(return_dtype)$
+          - kind: dictionary_splat
+  - not:
+      has:
+        field: arguments
+        has:
+          not:
+            kind: keyword_argument
+          nthChild:
+            position: 2
+            ofRule:
+              not:
+                any:
+                - kind: comment
+                - kind: line_continuation
+metadata:
+  holds:
+    R:
+      matches: polars-expr

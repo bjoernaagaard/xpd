@@ -1,0 +1,216 @@
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: The old hierarchical skfolio export raises FutureWarning. Import the optimizer from skfolio.optimization.hierarchical.
+rule:
+  all:
+    - {kind: import_from_statement}
+    - {has: {field: module_name, regex: '^skfolio\.optimization\.cluster(?:\.hierarchical)?$'}}
+    - has:
+        any:
+          - all:
+              - {kind: dotted_name}
+              - regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+          - all:
+              - {kind: aliased_import}
+              - has:
+                  field: name
+                  regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4}
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: The annualized_factor keyword raises FutureWarning in skfolio. Use annualization_factor.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:annualized_factor)$'}}
+    - {has: {field: value, pattern: $VALUE}}
+    - {not: {has: {field: value, regex: ^None$}}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:Portfolio)$'}]}}
+                - not:
+                    any:
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {kind: keyword_argument}
+                              - {has: {field: name, regex: '^(?:annualization_factor)$'}}
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {nthChild: 9}
+                              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                              - {regex: '(?s)^'}
+                      - {has: {field: arguments, has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Portfolio)$'}}, fix: safe}
+fix: annualization_factor=$VALUE
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: The annualized_factor keyword raises FutureWarning in skfolio. Use annualization_factor.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:annualized_factor)$'}}
+    - {has: {field: value, pattern: $VALUE}}
+    - {not: {has: {field: value, regex: ^None$}}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MultiPeriodPortfolio)$'}]}
+                - not:
+                    any:
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {kind: keyword_argument}
+                              - {has: {field: name, regex: '^(?:annualization_factor)$'}}
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {nthChild: 5}
+                              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                              - {regex: '(?s)^'}
+                      - {has: {field: arguments, has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MultiPeriodPortfolio)$'}}, fix: safe}
+fix: annualization_factor=$VALUE
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: The annualized_factor keyword raises FutureWarning in skfolio. Use annualization_factor.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:annualized_factor)$'}}
+    - {has: {field: value, pattern: $VALUE}}
+    - {not: {has: {field: value, regex: ^None$}}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:ImpliedCovariance)$'}]}}
+                - not:
+                    any:
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {kind: keyword_argument}
+                              - {has: {field: name, regex: '^(?:annualization_factor)$'}}
+                      - has:
+                          field: arguments
+                          has:
+                            all:
+                              - {nthChild: 2}
+                              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                              - {regex: '(?s)^'}
+                      - {has: {field: arguments, has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:ImpliedCovariance)$'}}, fix: safe}
+fix: annualization_factor=$VALUE
+---
+id: deprecated-in-skfolio
+language: python
+severity: error
+message: skfolio raises ValueError when both annualized_factor and annualization_factor are set. Pass annualization_factor
+  alone.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - {regex: '(^|\.)(?:Portfolio|MultiPeriodPortfolio|ImpliedCovariance)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:annualized_factor)$'}}
+            - {has: {field: value, any: [{kind: integer}, {kind: float}, {kind: unary_operator}]}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:annualization_factor)$'}}
+            - {has: {field: value, any: [{kind: integer}, {kind: float}, {kind: unary_operator}]}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds: {F: {regex: '(^|\.)(?:Portfolio|MultiPeriodPortfolio|ImpliedCovariance)$'}}
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: Portfolio.annualized_factor raises FutureWarning in skfolio. Use annualization_factor.
+rule:
+  all:
+    - {kind: attribute}
+    - {has: {field: object, pattern: $MODEL}}
+    - {has: {field: attribute, regex: '^(?:annualized_factor)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      all:
+        - {kind: call}
+        - {has: {field: function, regex: '(^|\.)(?:Portfolio|MultiPeriodPortfolio)$'}}
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: skfolio's non_denominated_sort raises FutureWarning. Call non_dominated_sort.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:non_denominated_sort)$'}]}
+    - has:
+        field: function
+        any:
+          - {kind: identifier}
+          - {has: {field: object, regex: '(^|\.)(?:sorting)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:non_denominated_sort)$'}}}
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: skfolio's Population.non_denominated_sort raises FutureWarning. Call non_dominated_sort.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $MODEL}}
+          - {has: {field: attribute, regex: '^(?:non_denominated_sort)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:Population)$'}}]}

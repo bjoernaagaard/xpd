@@ -6,6 +6,7 @@ import { splitTitle } from './markdown.mjs';
 
 export const PACKS = [
   'pandas',
+  'polars',
   'numpy',
   'scipy',
   'sklearn',
@@ -14,6 +15,7 @@ export const PACKS = [
   'category_encoders',
   'linearmodels',
   'arch',
+  'skfolio',
   'pymoo',
   'plotly',
   'hamilton',

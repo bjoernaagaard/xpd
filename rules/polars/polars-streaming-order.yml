@@ -1,0 +1,56 @@
+id: polars-streaming-order
+language: python
+severity: info
+message: Polars 2.0 made streaming the default for lazy queries. Sort on the keys that define the required
+  order before taking a positional slice.
+rule:
+  all:
+  - pattern: $R.$METHOD($$$INPUT).head($$$LIMIT).collect($$$COLLECT)
+  - has:
+      field: function
+      has:
+        field: object
+        has:
+          field: function
+          has:
+            field: object
+            all:
+            - kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(unpivot|join)$
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    any:
+                    - kind: keyword_argument
+                      all:
+                      - has:
+                          field: name
+                          regex: ^(maintain_order)$
+                    - kind: dictionary_splat
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(engine)$
+          - kind: dictionary_splat
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe

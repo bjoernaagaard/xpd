@@ -1,0 +1,39 @@
+id: skfolio-prices-not-returns
+language: python
+severity: warning
+message: The skfolio dataset loader supplies prices. In a 59-row example of converted prices, an equal-weighted
+  portfolio mean was 0.0003062 compared with 101.7354 when fed levels. Convert prices to returns first.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $MODEL}}
+          - {has: {field: attribute, regex: '^(?:fit|partial_fit|predict)$'}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $DATA}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:X)$'}}
+                - {has: {field: value, pattern: $DATA}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL: {matches: skfolio-optimizer}
+    DATA:
+      all:
+        - {kind: call}
+        - has:
+            field: function
+            regex: (^|\.)(?:load_sp500_dataset|load_ftse100_dataset|load_nasdaq_dataset)$

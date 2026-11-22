@@ -1,0 +1,120 @@
+id: skfolio-sklearn-cross-val-predict
+language: python
+severity: warning
+message: scikit-learn cross_val_predict raises ValueError with WalkForward, CombinatorialPurgedCV and MultipleRandomizedCV
+  in skfolio. Use skfolio.model_selection.cross_val_predict.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:cross_val_predict)$'}}}
+    - any:
+        - {has: {field: function, regex: '(^|\.)(?:cross_val_predict)$'}}
+        - has:
+            field: function
+            all:
+              - {kind: identifier}
+              - {pattern: $SK_ALIAS}
+              - inside:
+                  stopBy: end
+                  all:
+                    - {kind: module}
+                    - has:
+                        stopBy: end
+                        all:
+                          - {kind: aliased_import}
+                          - {has: {field: alias, pattern: $SK_ALIAS}}
+                          - {has: {field: name, regex: '(^|\.)(?:cross_val_predict)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:cv)$'}}
+            - {has: {field: value, pattern: $CV}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    CV:
+      all:
+        - {kind: call}
+        - has: {field: function, regex: '(^|\.)(?:WalkForward|CombinatorialPurgedCV|MultipleRandomizedCV)$'}
+---
+id: skfolio-sklearn-cross-val-predict
+language: python
+severity: warning
+message: scikit-learn cross_val_predict converts a skfolio portfolio prediction into a NumPy array when given
+  a partitioning splitter. Use skfolio.model_selection.cross_val_predict to preserve portfolio objects.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:cross_val_predict)$'}}}
+    - any:
+        - {has: {field: function, regex: '(^|\.)(?:cross_val_predict)$'}}
+        - has:
+            field: function
+            all:
+              - {kind: identifier}
+              - {pattern: $SK_ALIAS}
+              - inside:
+                  stopBy: end
+                  all:
+                    - {kind: module}
+                    - has:
+                        stopBy: end
+                        all:
+                          - {kind: aliased_import}
+                          - {has: {field: alias, pattern: $SK_ALIAS}}
+                          - {has: {field: name, regex: '(^|\.)(?:cross_val_predict)$'}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $MODEL}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:estimator)$'}}
+                - {has: {field: value, pattern: $MODEL}}
+    - any:
+        - not:
+            has:
+              field: arguments
+              has:
+                all:
+                  - {kind: keyword_argument}
+                  - {has: {field: name, regex: '^(?:cv)$'}}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:cv)$'}}
+                - {has: {field: value, pattern: $CV}}
+    - not:
+        has:
+          field: arguments
+          has:
+            all:
+              - {kind: keyword_argument}
+              - {has: {field: name, regex: '^(?:method)$'}}
+              - {has: {field: value, not: {regex: '^[''"]predict[''"]$'}}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL: {matches: skfolio-optimizer}
+  unlessHolds:
+    CV:
+      all:
+        - {kind: call}
+        - has: {field: function, regex: '(^|\.)(?:WalkForward|CombinatorialPurgedCV|MultipleRandomizedCV)$'}

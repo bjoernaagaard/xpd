@@ -1,0 +1,10 @@
+id: skfolio-optimizer
+language: python
+rule:
+  any:
+    - all:
+        - {kind: call}
+        - has:
+            field: function
+            regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$
+    - regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$

@@ -1,0 +1,40 @@
+id: polars-member
+language: python
+arguments:
+- MEMBER
+rule:
+  any:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        matches: polars-module
+    - has:
+        field: attribute
+        matches: MEMBER
+  - kind: identifier
+    all:
+    - pattern: $POLARS_NAME
+    - inside:
+        kind: module
+        stopBy: end
+        has:
+          kind: import_from_statement
+          all:
+          - has:
+              field: module_name
+              regex: ^(polars)$
+          - has:
+              any:
+              - kind: aliased_import
+                all:
+                - has:
+                    field: name
+                    matches: MEMBER
+                - has:
+                    field: alias
+                    pattern: $POLARS_NAME
+              - kind: dotted_name
+                all:
+                - pattern: $POLARS_NAME
+                - matches: MEMBER

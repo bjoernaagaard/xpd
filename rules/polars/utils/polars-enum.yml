@@ -1,0 +1,22 @@
+id: polars-enum
+language: python
+rule:
+  any:
+  - kind: call
+    all:
+    - has:
+        field: function
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Enum)$
+  - matches:
+      polars-member:
+        MEMBER:
+          regex: ^(Enum)$
+  - kind: type
+    has:
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(Enum)$

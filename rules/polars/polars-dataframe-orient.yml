@@ -1,0 +1,62 @@
+id: polars-dataframe-orient
+language: python
+severity: info
+message: Nested list data can fit both DataFrame orientations. Set orient explicitly so the values land
+  in the intended columns.
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      all:
+      - pattern: $F
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(DataFrame)$
+  - has:
+      field: arguments
+      has:
+        kind: list
+        all:
+        - has:
+            kind: list
+        - not:
+            has:
+              all:
+              - not:
+                  kind: list
+              - regex: ^[^\s\[\],#]
+        nthChild:
+          position: 1
+          ofRule:
+            not:
+              any:
+              - kind: comment
+              - kind: line_continuation
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(schema)$
+        - has:
+            field: value
+            kind: list
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(orient)$
+          - kind: dictionary_splat
+metadata:
+  holds:
+    F:
+      matches: polars-member-any

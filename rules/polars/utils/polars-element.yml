@@ -1,0 +1,6 @@
+id: polars-element
+language: python
+rule:
+  any:
+  - matches: polars-expr
+  - matches: polars-series

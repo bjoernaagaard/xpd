@@ -1,0 +1,38 @@
+id: polars-builtin-on-expr-or-series
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError when this Python builtin tries to size or iterate an Expr. Use
+  the corresponding expression method.
+rule:
+  all:
+  - pattern: $F($R)
+  - has:
+      field: function
+      regex: ^(len|sum|min|max|sorted)$
+  - not:
+      inside:
+        stopBy: end
+        kind: module
+        has:
+          stopBy: end
+          any:
+          - kind: assignment
+            has:
+              field: left
+              pattern: $F
+          - kind: function_definition
+            has:
+              field: name
+              pattern: $F
+          - kind: import_from_statement
+            has:
+              stopBy: end
+              pattern: $F
+          - kind: parameters
+            has:
+              stopBy: end
+              pattern: $F
+metadata:
+  holds:
+    R:
+      matches: polars-expr

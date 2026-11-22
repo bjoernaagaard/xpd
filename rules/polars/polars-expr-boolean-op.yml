@@ -1,0 +1,55 @@
+id: polars-expr-boolean-op
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError when a Python boolean operator tests a Polars expression or Series.
+  Use parenthesized masks with &, | or ~.
+rule:
+  any:
+  - kind: boolean_operator
+    has:
+      field: left
+      any:
+      - all:
+        - pattern: $R
+        - any:
+          - kind: identifier
+          - kind: call
+      - kind: parenthesized_expression
+        has:
+          all:
+          - kind: comparison_operator
+          - has:
+              field: operators
+              regex: '^(==|!=|<=?|>=?)$'
+          - has:
+              all:
+              - pattern: $R
+              - any:
+                - kind: identifier
+                - kind: call
+  - kind: not_operator
+    has:
+      field: argument
+      any:
+      - all:
+        - pattern: $R
+        - any:
+          - kind: identifier
+          - kind: call
+      - kind: parenthesized_expression
+        has:
+          all:
+          - kind: comparison_operator
+          - has:
+              field: operators
+              regex: '^(==|!=|<=?|>=?)$'
+          - has:
+              all:
+              - pattern: $R
+              - any:
+                - kind: identifier
+                - kind: call
+metadata:
+  holds:
+    R:
+      matches: polars-element

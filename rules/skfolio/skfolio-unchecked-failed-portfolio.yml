@@ -1,0 +1,66 @@
+id: skfolio-unchecked-failed-portfolio
+language: python
+severity: info
+message: skfolio can return FailedPortfolio after optimization fails. The measured failed portfolio had 3 NaN weights.
+  Check for failure before using portfolio values.
+rule:
+  all:
+    - {kind: attribute}
+    - {has: {field: object, pattern: $MODEL}}
+    - has:
+        field: attribute
+        regex: ^(?:weights|returns|mean|sharpe_ratio|composition|cumulative_returns)$
+    - not:
+        inside:
+          stopBy: end
+          all:
+            - {kind: function_definition}
+            - {has: {stopBy: end, regex: \bFailedPortfolio\b}}
+    - not:
+        inside:
+          stopBy: end
+          all:
+            - {kind: module}
+            - has:
+                all:
+                  - {kind: if_statement}
+                  - {has: {field: condition, regex: ^isinstance\(.*\bFailedPortfolio\b}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      all:
+        - {kind: call}
+        - has:
+            field: function
+            all:
+              - {kind: attribute}
+              - {has: {field: object, pattern: $MODEL}}
+              - {has: {field: attribute, regex: '^(?:predict)$'}}
+        - has:
+            field: function
+            has:
+              field: object
+              any:
+                - all: &id001
+                    - {kind: call}
+                    - has:
+                        field: function
+                        regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$
+                    - has:
+                        field: arguments
+                        has:
+                          all:
+                            - {kind: keyword_argument}
+                            - {has: {field: name, regex: '^(?:raise_on_failure)$'}}
+                            - {has: {field: value, regex: ^False$}}
+                - all:
+                    - {kind: call}
+                    - has:
+                        field: function
+                        all:
+                          - {kind: attribute}
+                          - has:
+                              field: object
+                              all: *id001
+                          - {has: {field: attribute, regex: ^fit$}}

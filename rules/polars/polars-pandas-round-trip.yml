@@ -1,0 +1,20 @@
+id: polars-pandas-round-trip
+language: python
+severity: info
+message: A Polars to pandas to Polars round trip converts the data twice. Keep the original frame when
+  no pandas operation is needed.
+rule:
+  all:
+  - pattern: $F($R.to_pandas())
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(from_pandas)$
+metadata:
+  holds:
+    F:
+      matches: polars-member-any
+    R:
+      matches: polars-dataframe

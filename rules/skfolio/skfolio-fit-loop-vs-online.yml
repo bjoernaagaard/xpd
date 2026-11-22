@@ -1,0 +1,47 @@
+id: skfolio-fit-loop-vs-online
+language: python
+severity: info
+message: This skfolio optimizer supports partial_fit. Consider online_predict or online_score for expanding training
+  windows when the prior supports incremental updates.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $MODEL}}
+          - {has: {field: attribute, regex: '^(?:fit)$'}}
+    - inside:
+        stopBy: end
+        all:
+          - {kind: for_statement}
+          - has:
+              field: right
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    all:
+                      - {kind: attribute}
+                      - {has: {field: object, pattern: $WINDOW}}
+                      - {has: {field: attribute, regex: '^(?:split)$'}}
+                - has:
+                    field: function
+                    has:
+                      field: object
+                      all:
+                        - {kind: call}
+                        - {has: {field: function, regex: '(^|\.)(?:WalkForward)$'}}
+                        - has:
+                            field: arguments
+                            has:
+                              all:
+                                - {kind: keyword_argument}
+                                - {has: {field: name, regex: '^(?:expand_train)$'}}
+                                - {has: {field: value, regex: ^True$}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL: {matches: skfolio-online-optimizer}
+    WINDOW: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:WalkForward)$'}}]}

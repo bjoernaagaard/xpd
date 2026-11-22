@@ -1,0 +1,15 @@
+id: polars-selector
+language: python
+rule:
+  kind: call
+  all:
+  - has:
+      field: function
+      kind: attribute
+      all:
+      - has:
+          field: object
+          matches: polars-selectors-module
+      - has:
+          field: attribute
+          regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$

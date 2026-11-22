@@ -1,0 +1,130 @@
+id: skfolio-panel-inactive-policy
+language: python
+severity: error
+message: skfolio FieldCategorical raises ValueError for InactivePolicy.ZERO because code 0 is a category. Use MISSING
+  and encode inactive entries as -1.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:FieldCategorical)$'}]}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:inactive_policy)$'}}
+            - has:
+                field: value
+                all:
+                  - {pattern: $POLICY}
+                  - {kind: attribute}
+                  - {has: {field: object, pattern: $ENUM}}
+                  - {has: {field: attribute, regex: '^(?:ZERO)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds: {F: {regex: '(^|\.)(?:FieldCategorical)$'}, ENUM: {regex: '(^|\.)(?:InactivePolicy)$'}}
+---
+id: skfolio-panel-inactive-policy
+language: python
+severity: error
+message: skfolio panel fields raise TypeError for string inactive_policy values. Pass an InactivePolicy member.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - {regex: '(^|\.)(?:Field2D|Field3D|FieldCategorical)$'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:inactive_policy)$'}}
+            - {has: {field: value, all: [{kind: string}, {not: {has: {kind: interpolation}}}]}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Field2D|Field3D|FieldCategorical)$'}}}
+---
+id: skfolio-panel-inactive-policy
+language: python
+severity: info
+message: Check the skfolio AssetPanel fields outside active_mask. Raw numeric fields use InactivePolicy.MISSING,
+  which rejected one finite inactive value in a two-asset example.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:AssetPanel)$'}]}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:active_mask)$'}}
+            - {has: {field: value, not: {regex: ^None$}}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {kind: dictionary}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:fields)$'}}
+                - {has: {field: value, kind: dictionary}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: dictionary}
+            - has:
+                all:
+                  - {kind: pair}
+                  - has:
+                      field: value
+                      any:
+                        - {kind: list}
+                        - {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:array)$'}}]}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:AssetPanel)$'}}}
+---
+id: skfolio-panel-inactive-policy
+language: python
+severity: error
+message: skfolio CharacteristicsFactorModel raises TypeError for a DataFrame supplied as characteristics. Pass an
+  AssetPanel or AssetPanelView.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: object, pattern: $MODEL}}
+          - {has: {field: attribute, regex: '^(?:fit|partial_fit)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:characteristics)$'}}
+            - {has: {field: value, pattern: $PANEL_DATA}}
+    - {not: {matches: skfolio-expected-exception}}
+metadata:
+  since: 1.14.4
+  holds:
+    MODEL:
+      all:
+        - {kind: call}
+        - {has: {field: function, regex: '(^|\.)(?:CharacteristicsFactorModel)$'}}
+    PANEL_DATA:
+      all:
+        - {kind: call}
+        - has:
+            field: function
+            regex: (^|\.)(?:load_sp500_dataset|load_ftse100_dataset|load_nasdaq_dataset|prices_to_returns)$

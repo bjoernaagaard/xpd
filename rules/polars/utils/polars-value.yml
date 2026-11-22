@@ -1,0 +1,6 @@
+id: polars-value
+language: python
+rule:
+  any:
+  - matches: polars-frame
+  - matches: polars-element

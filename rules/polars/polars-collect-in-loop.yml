@@ -1,0 +1,21 @@
+id: polars-collect-in-loop
+language: python
+severity: info
+message: Collect inside a loop can execute a separate query on each iteration. Build the queries first
+  and use collect_all when they are independent.
+rule:
+  all:
+  - pattern: $R.collect($$$ARGS)
+  - inside:
+      stopBy:
+        kind: function_definition
+      any:
+      - kind: for_statement
+      - kind: while_statement
+      - kind: list_comprehension
+      - kind: set_comprehension
+      - kind: dictionary_comprehension
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe

@@ -1,0 +1,75 @@
+id: skfolio-cost-periodicity
+language: python
+severity: info
+message: skfolio applies management fees on each return observation. Confirm that management_fees uses the same
+  period as the data.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - regex: (^|\.)(?:Portfolio|MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR)$
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:management_fees)$'}}
+            - has:
+                field: value
+                all:
+                  - any:
+                      - {kind: float}
+                      - {kind: integer}
+                      - {kind: dictionary}
+                      - {kind: list}
+                      - {kind: tuple}
+                  - {not: {regex: '^(?:None|[+-]?0(?:\.0*)?)$'}}
+metadata:
+  since: 1.14.4
+  holds:
+    F:
+      regex: (^|\.)(?:Portfolio|MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR)$
+---
+id: skfolio-cost-periodicity
+language: python
+severity: info
+message: Set previous_weights if your skfolio portfolio already holds assets. A 1% transaction cost charged 0.01
+  with omitted holdings and 0 with identical holdings.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - regex: (^|\.)(?:Portfolio|MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR)$
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:transaction_costs)$'}}
+            - {has: {field: value, not: {regex: '^(?:None|[+-]?0(?:\.0*)?)$'}}}
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:previous_weights)$'}}]}
+    - any:
+        - {not: {has: {field: function, regex: '(^|\.)(?:Portfolio)$'}}}
+        - not:
+            has:
+              field: arguments
+              has:
+                all:
+                  - {nthChild: 3}
+                  - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                  - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+metadata:
+  since: 1.14.4
+  holds:
+    F:
+      regex: (^|\.)(?:Portfolio|MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR)$

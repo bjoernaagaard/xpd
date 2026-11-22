@@ -1,0 +1,35 @@
+id: polars-when-without-otherwise
+language: python
+severity: info
+message: Polars returns null for unmatched rows when then has no otherwise. Supply otherwise if those
+  rows need a value.
+rule:
+  all:
+  - pattern: $F($$$PREDICATE).then($$$THEN)
+  - has:
+      field: function
+      has:
+        field: object
+        has:
+          field: function
+          matches:
+            polars-member:
+              MEMBER:
+                regex: ^(when)$
+  - not:
+      inside:
+        stopBy: end
+        any:
+        - kind: attribute
+          all:
+          - has:
+              field: object
+              regex: \.then\s*\(
+          - has:
+              field: attribute
+              regex: ^(otherwise|when)$
+        - kind: assignment
+metadata:
+  holds:
+    F:
+      matches: polars-member-any

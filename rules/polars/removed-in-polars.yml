@@ -1,0 +1,801 @@
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for melt. Use unpivot with index and on.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(melt)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for with_row_count. Use with_row_index and supply name="row_nr"
+  to keep the old default name.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(with_row_count)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for approx_n_unique. Select an approx_n_unique expression
+  for each column.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(approx_n_unique)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for fetch. Use head and collect to limit the output.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(fetch)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for profile. Use explain to inspect the plan and time
+  collect separately.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(profile)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for with_context. Use horizontal concat and check that
+  the inputs have equal heights.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(with_context)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for __dataframe__. Use to_arrow or to_pandas for interchange.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(__dataframe__)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for agg_groups. Add a row index and aggregate that
+  column per group.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(agg_groups)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-expr
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for flatten. Use list.explode and choose how to handle
+  null and empty lists.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(flatten)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-expr
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for rechunk. Call rechunk on the collected DataFrame.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(rechunk)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-expr
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for where. Use filter on the expression.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(where)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.filter
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-expr
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for shrink_dtype. Call shrink_dtype on a Series after
+  collecting.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(shrink_dtype)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-expr
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for register_plugin. Use polars.plugins.register_plugin_function.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(register_plugin)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-expr
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for width. Read size on the array dtype.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(width)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-array
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for union. Construct an Enum from the combined category
+  lists and keep each label once.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(union)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-enum
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for datetime. Use dt.replace_time_zone(None).
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(dt)$
+    - has:
+        field: attribute
+        regex: ^(datetime)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for with_time_unit. Cast to Int64 and then to a Datetime
+  with the desired unit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(dt)$
+    - has:
+        field: attribute
+        regex: ^(with_time_unit)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for explode. Use str.split("").explode() and check how empty
+  strings are handled.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(str)$
+    - has:
+        field: attribute
+        regex: ^(explode)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for get_categories. Use unique for observed labels
+  or dtype.categories for the full Enum.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(cat)$
+    - has:
+        field: attribute
+        regex: ^(get_categories)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for is_local. Polars now shares categorical mappings
+  by category identity.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(cat)$
+    - has:
+        field: attribute
+        regex: ^(is_local)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for to_local. Use explicit Categories when you need
+  separate category identities.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(cat)$
+    - has:
+        field: attribute
+        regex: ^(to_local)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for uses_lexical_ordering. Categorical ordering is
+  lexical.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(cat)$
+    - has:
+        field: attribute
+        regex: ^(uses_lexical_ordering)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for groups. Add a row index and aggregate the index
+  per group.
+rule:
+  all:
+  - all:
+    - pattern: $F
+    - matches:
+        polars-member:
+          MEMBER:
+            regex: ^(groups)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for read_csv_batched. Use scan_csv followed by collect_batches.
+rule:
+  all:
+  - all:
+    - pattern: $F
+    - matches:
+        polars-member:
+          MEMBER:
+            regex: ^(read_csv_batched)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for threadpool_size. Use thread_pool_size.
+rule:
+  all:
+  - all:
+    - pattern: $F
+    - matches:
+        polars-member:
+          MEMBER:
+            regex: ^(threadpool_size)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for set_auto_structify. Wrap multiple outputs with
+  pl.struct.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: attribute
+        all:
+        - has:
+            field: object
+            pattern: $R
+        - has:
+            field: attribute
+            regex: ^(Config)$
+    - has:
+        field: attribute
+        regex: ^(set_auto_structify)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-module
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for GroupBy.count. Use len and name the output count
+  if you need the old column name.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        kind: call
+        all:
+        - has:
+            field: function
+            kind: attribute
+            all:
+            - has:
+                field: object
+                pattern: $R
+            - has:
+                field: attribute
+                regex: ^(group_by|group_by_dynamic|rolling)$
+    - has:
+        field: attribute
+        regex: ^(count)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for count with zero arguments. Use len to count all rows.
+rule:
+  all:
+  - all:
+    - pattern: $F()
+    - has:
+        field: function
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(count)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for the union operator on two Enum dtypes. Construct an Enum from
+  the combined categories.
+rule:
+  all:
+  - pattern: $L | $R
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+  holds:
+    L:
+      matches: polars-enum
+    R:
+      matches: polars-enum
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises ModuleNotFoundError for this interchange submodule. Use the Arrow or pandas
+  conversion APIs.
+rule:
+  all:
+  - any:
+    - kind: import_statement
+      has:
+        stopBy: end
+        regex: ^(polars\.interchange\.(buffer|column|dataframe|from_dataframe))$
+    - kind: import_from_statement
+      has:
+        field: module_name
+        regex: ^(polars\.interchange\.(buffer|column|dataframe|from_dataframe))$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises ImportError for this interchange protocol name. Use the Arrow or pandas conversion
+  APIs.
+rule:
+  all:
+  - all:
+    - kind: import_from_statement
+    - has:
+        field: module_name
+        regex: ^(polars\.interchange\.protocol)$
+    - has:
+        field: name
+        any:
+        - regex: ^(DlpackDeviceType|DtypeKind|ColumnNullType|ColumnBuffers|CategoricalDescription|Buffer|Column|DataFrame|SupportsInterchange|Endianness|CopyNotAllowedError)$
+        - kind: aliased_import
+          has:
+            field: name
+            regex: ^(DlpackDeviceType|DtypeKind|ColumnNullType|ColumnBuffers|CategoricalDescription|Buffer|Column|DataFrame|SupportsInterchange|Endianness|CopyNotAllowedError)$
+  - not:
+      matches: polars-compatibility-guard
+metadata:
+  since: '2.0'
+---
+id: removed-in-polars
+language: python
+severity: info
+message: Polars 2.1.0 ignores POLARS_AUTO_STRUCTIFY. Wrap multiple outputs explicitly with pl.struct.
+rule:
+  any:
+  - all:
+    - pattern: $OS.environ[$KEY] = $V
+    - has:
+        field: left
+        kind: subscript
+  - pattern: $OS.putenv($KEY, $V)
+constraints:
+  KEY:
+    kind: string
+    regex: ^["']POLARS_AUTO_STRUCTIFY["']$
+  OS:
+    regex: ^(os)$
+metadata:
+  since: '2.0'
+---
+id: removed-in-polars
+language: python
+severity: info
+message: Polars 2.1.0 ignores POLARS_STREAMING_CHUNK_SIZE. Set POLARS_IDEAL_MORSEL_SIZE or call Config.set_streaming_chunk_size.
+rule:
+  any:
+  - all:
+    - pattern: $OS.environ[$KEY] = $V
+    - has:
+        field: left
+        kind: subscript
+  - pattern: $OS.putenv($KEY, $V)
+constraints:
+  KEY:
+    kind: string
+    regex: ^["']POLARS_STREAMING_CHUNK_SIZE["']$
+  OS:
+    regex: ^(os)$
+metadata:
+  since: '2.0'

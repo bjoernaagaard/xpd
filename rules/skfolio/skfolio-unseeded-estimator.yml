@@ -1,0 +1,216 @@
+id: skfolio-unseeded-estimator
+language: python
+severity: info
+message: Set random_state= explicitly to reproduce this skfolio estimator's random draws.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:VineCopula)$'}]}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:random_state)$'}}
+                - {has: {field: value, regex: ^None$}}
+        - all:
+            - not:
+                has:
+                  field: arguments
+                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:random_state)$'}}]}
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    all:
+                      - {nthChild: 12}
+                      - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                      - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    - not:
+        inside:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:default)$'}}
+            - inside:
+                all:
+                  - {kind: argument_list}
+                  - inside: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:check_estimator)$'}}]}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:VineCopula)$'}}}
+---
+id: skfolio-unseeded-estimator
+language: python
+severity: info
+message: Set random_state= explicitly to reproduce this skfolio estimator's random draws.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MultipleRandomizedCV)$'}]}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:random_state)$'}}
+                - {has: {field: value, regex: ^None$}}
+        - all:
+            - not:
+                has:
+                  field: arguments
+                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:random_state)$'}}]}
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    all:
+                      - {nthChild: 5}
+                      - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                      - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    - not:
+        inside:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:default)$'}}
+            - inside:
+                all:
+                  - {kind: argument_list}
+                  - inside: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:check_estimator)$'}}]}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MultipleRandomizedCV)$'}}}
+---
+id: skfolio-unseeded-estimator
+language: python
+severity: info
+message: Set random_state= explicitly to reproduce this skfolio estimator's random draws.
+rule:
+  all:
+    - {kind: call}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:OnlineRandomizedSearch)$'}]}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:random_state)$'}}
+                - {has: {field: value, regex: ^None$}}
+        - not:
+            has:
+              field: arguments
+              has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:random_state)$'}}]}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    - not:
+        inside:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:default)$'}}
+            - inside:
+                all:
+                  - {kind: argument_list}
+                  - inside: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:check_estimator)$'}}]}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:OnlineRandomizedSearch)$'}}}
+---
+id: skfolio-unseeded-estimator
+language: python
+severity: info
+message: Set seed= explicitly to reproduce this skfolio estimator's random draws.
+rule:
+  all:
+    - {kind: call}
+    - has:
+        field: function
+        all:
+          - {pattern: $F}
+          - {regex: '(^|\.)(?:BootstrapMuUncertaintySet|BootstrapCovarianceUncertaintySet)$'}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:seed)$'}}
+                - {has: {field: value, regex: ^None$}}
+        - all:
+            - not:
+                has:
+                  field: arguments
+                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:seed)$'}}]}
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    all:
+                      - {nthChild: 6}
+                      - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                      - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    - not:
+        inside:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:default)$'}}
+            - inside:
+                all:
+                  - {kind: argument_list}
+                  - inside: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:check_estimator)$'}}]}
+metadata:
+  since: 1.14.4
+  holds: {F: {regex: '(^|\.)(?:BootstrapMuUncertaintySet|BootstrapCovarianceUncertaintySet)$'}}
+---
+id: skfolio-unseeded-estimator
+language: python
+severity: info
+message: For reproducible skfolio SyntheticData, pass a distribution_estimator configured with a seed.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:SyntheticData)$'}]}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:distribution_estimator)$'}}
+                - {has: {field: value, regex: ^None$}}
+        - all:
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    all:
+                      - {kind: keyword_argument}
+                      - {has: {field: name, regex: '^(?:distribution_estimator)$'}}
+            - not:
+                has:
+                  field: arguments
+                  has:
+                    all:
+                      - {nthChild: 1}
+                      - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                      - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:SyntheticData)$'}}}
+---
+id: skfolio-unseeded-estimator
+language: python
+severity: info
+message: skfolio Random uses NumPy's global random state. For reproducibility, seed that state before fit or supply
+  deterministic portfolio weights.
+rule:
+  all:
+    - {kind: call}
+    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:Random)$'}]}}
+    - not:
+        inside:
+          stopBy: end
+          all:
+            - {kind: module}
+            - has:
+                stopBy: end
+                all:
+                  - {kind: call}
+                  - {has: {field: function, regex: \brandom\.seed$}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Random)$'}}}

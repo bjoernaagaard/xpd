@@ -154,9 +154,10 @@ The first two groups are where real bugs live.
 
 **Library habits**
 
-- For pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels,
-  arch, pymoo, plotly and Hamilton code, report what `xpd check` finds, and use `xpd profile`
-  and `xpd equiv` when a finding depends on the data or a rewrite has to give the same result.
+- For pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders,
+  linearmodels, arch, skfolio, pymoo, plotly and Hamilton code, report what `xpd check` finds, and
+  use `xpd profile` and `xpd equiv` when a finding depends on the data or a rewrite has to give the
+  same result.
 
 **Proof**
 
