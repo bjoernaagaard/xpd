@@ -1,6 +1,8 @@
 pre-commit:
   parallel: true
   jobs:
+    - name: comments
+      run: uv run tools/comments.py lint
     - name: cargo fmt
       glob: "*.rs"
       run: cargo fmt

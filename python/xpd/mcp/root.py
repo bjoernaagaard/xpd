@@ -99,7 +99,6 @@ class Project:
             listed = responses[ROOTS]
         if not isinstance(listed, ListRootsResult):
             raise ToolError(NO_ROOTS)
-        # The first root that is a folder on this machine is the project.
         for root in listed.roots:
             if folder := local_folder(str(root.uri)):
                 return Root.at(folder)
@@ -111,7 +110,5 @@ def local_folder(uri: str) -> Path | None:
     parsed = urlparse(uri)
     if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
         return None
-    # Some clients write the colon of a Windows drive as %3A, which url2pathname does not read
-    # as a drive.
     path = Path(url2pathname(parsed.path.replace("%3A", ":").replace("%3a", ":")))
     return path if path.is_dir() else None

@@ -121,8 +121,6 @@ jobs:
     strategy:
       matrix:
         platform:
-          # No Windows on Arm wheel: cryptography and pydantic-monty, which FastMCP needs, have
-          # none on PyPI, so xpd could not be installed there.
           - runner: windows-latest
             target: x64
     steps:

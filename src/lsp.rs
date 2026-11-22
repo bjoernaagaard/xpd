@@ -90,8 +90,6 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
     let (id, params) = connection
         .initialize_start()
         .context("the client sent no initialize request")?;
-    // The protocol names the client's support for a refresh `workspace.diagnostics`, and
-    // lsp-types 0.97 reads `workspace.diagnostic`, so this one answer comes from the JSON.
     let refresh = match params
         .pointer("/capabilities/workspace/diagnostics/refreshSupport")
         .and_then(Value::as_bool)
@@ -170,8 +168,6 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
                 return Ok(ExitCode::FAILURE);
             }
             Message::Notification(notification) => server.notification(notification),
-            // The only request the server sends asks the client to pull again, and its answer
-            // says nothing.
             Message::Response(_) => {}
         }
     }
@@ -1020,7 +1016,6 @@ impl<'c> Server<'c> {
             let name = found.id().to_string();
             let link = url.map_or_else(|| name.clone(), |url| format!("[{name}]({url})"));
             let section = format!("{}\n\n{link}", doc.trim_end());
-            // Two matches of one rule at the cursor share one section.
             if !sections.contains(&section) {
                 sections.push(section);
             }
@@ -1092,7 +1087,6 @@ impl<'c> Server<'c> {
             }
         }
         let allowed = self.settings.allowed();
-        // Without an issue that has a fix of the allowed level, the pass below changes nothing.
         let fixable = |found: &Found| found.fix.as_ref().is_some_and(|fix| fix.level <= allowed);
         if wants(only, &FIX_ALL) && linted.analysis.found.iter().any(fixable) {
             let disk = document.place.disk();

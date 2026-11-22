@@ -210,8 +210,6 @@ impl RunArgs {
             "--format json never writes files, so it cannot be combined with --interactive or \
              --update-all"
         );
-        // ast-grep takes its arguments as text and exits with 1 for a path it cannot open,
-        // which is the code of a search that matched nothing.
         if !self.stdin {
             for path in &self.paths {
                 anyhow::ensure!(

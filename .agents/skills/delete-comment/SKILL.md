@@ -1,0 +1,13 @@
+---
+name: delete-comment
+description: Audit code comments in xpd and retire legacy allowances when removing or migrating a batch.
+---
+
+In Codex on this host, invoke `$xpd:delete-comment`. Run from the repository root. Use the named paths, or the whole repository when no paths are given.
+
+1. Run `uv run tools/comments.py files` and `uv run tools/comments.py scan` before editing. The JSON lines give the original file, line, text, protected consumer and physical comment-only lines. Count distinct file and line pairs. A comment beside code saves zero lines. Report exclusions, including embedded languages and new source formats.
+2. For each occurrence record the evidence, category and action. The original ledger is in `docs/comment-audit.tsv`. Preserve Rust documentation attributes, fixture expectations, tool directives and license notices. Check the consumer and split any attached rationale. Trace a safety or ordering warning to its enforcement before removing it. Keep uncertain cases and name the missing evidence.
+3. Delete tautologies and verified obsolete text. Preserve a requirement when the code violates it. For a workaround search open and closed issues in `bjoernaagaard/xpd`. Reuse the issue or file one with its trigger, impact and retirement condition. If filing is unavailable, keep the comment and draft the issue. For a decision find its topic under `docs/decisions/`, record the reason and consequences once, then remove the migrated text.
+4. Run `uv run tools/comments.py retire` after removal. It only subtracts reviewed occurrences. The range file names original lines at revision 8f1403b. Git maps unchanged lines across edits. Changing a comment requires reviewing it. Keep the old baseline for comparison and never regenerate it from the current tree. Run `lefthook run pre-commit --all-files --force --no-auto-install`. An unchanged pass should produce no changes, issues or decision records.
+
+The scanner covers Rust, Python, JavaScript, TypeScript, TOML, YAML, SVG and Git ignore files. It skips generated rule snapshots, legal texts, dependency locks, indexes, plain data, Markdown and MDX documentation. Embedded program strings and fenced examples belong to their host documents. The two generated SciPy YAML rules are inventoried and ratcheted; change their generator before retiring their comments. JSON does not have a comment production.

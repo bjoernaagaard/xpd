@@ -5,10 +5,6 @@ all-features = true
 
 [advisories]
 yanked = "deny"
-# ast-grep 0.51.3 uses ansi_term for terminal colors. This advisory reports discontinued
-# maintenance, not a vulnerability; the upstream CLI has no feature to remove the dependency.
-# libcst 1.9.0 builds its node types with the paste macro. The advisory reports discontinued
-# maintenance, not a vulnerability, and paste runs only at compile time.
 ignore = [
     { id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmaintained-only advisory" },
     { id = "RUSTSEC-2024-0436", reason = "libcst compile-time macro; unmaintained-only advisory" },

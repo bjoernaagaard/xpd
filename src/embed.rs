@@ -110,7 +110,6 @@ impl Model {
             .map(|text| {
                 let mut tokens = vocab.tokenize(text.as_bytes(), true, false);
                 if tokens.len() > limit {
-                    // Keep the closing token that the tokenizer adds.
                     let last = tokens[tokens.len() - 1];
                     tokens.truncate(limit - 1);
                     tokens.push(last);

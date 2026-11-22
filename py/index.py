@@ -530,7 +530,6 @@ def main() -> None:
         root /= package
     elif (root / "src" / package).is_dir():
         root /= f"src/{package}"
-    # Griffe follows directory links and does not stop at one that points back up.
     for folder, names, _files in os.walk(root):
         for name in names:
             if (Path(folder) / name).is_symlink():

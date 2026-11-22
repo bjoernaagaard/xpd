@@ -147,7 +147,6 @@ class Catalogs:
         root = await self.project.root(ctx)
         if isinstance(root, InputRequiredResult):
             return self.fallback
-        # The files are stamped before the run, so an edit during the run shows on the next call.
         stamps = inputs(root.path)
         cached = self.read.get(root.path)
         if cached is not None and cached[0] == stamps:

@@ -200,7 +200,6 @@ pub(crate) fn missing(
         .and_then(|path| fs::read_to_string(&path).ok().map(|text| (path, text)));
     let configured = pyproject.as_ref().map(|(_, text)| configured_tools(text));
     let configured = configured.as_deref().unwrap_or_default();
-    // The issue points at the file where the dependency is added, or else at the venv.
     let file = pyproject.as_ref().map_or(venv.root(), |(path, _)| path);
     let file = shown(file, project);
     packs

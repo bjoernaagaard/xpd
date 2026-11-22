@@ -435,7 +435,6 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
     }
     parsed.validate(found.iter_mut().map(|finding| &mut finding.fix));
     if matches!(edits, Edits::Report) {
-        // A stable sort keeps pack and rule order for findings at the same position.
         found.sort_by_key(|found| found.issue.position);
     }
     Linted { found, calls }

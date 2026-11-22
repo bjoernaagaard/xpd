@@ -117,8 +117,6 @@ function sameNames(what, folder, listed, files) {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Commands
 
 // Why the page of a command or a tool runs no example of it.
 const NO_EXAMPLE = {
@@ -335,8 +333,6 @@ for (const [slug, command] of bySlug) {
   );
 }
 
-// ---------------------------------------------------------------------------------------------
-// MCP server
 
 /** A JSON schema's type in words, such as `list of string` or `"error", "warning" or null`. */
 function typeOf(schema) {

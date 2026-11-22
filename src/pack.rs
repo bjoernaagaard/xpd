@@ -248,8 +248,6 @@ impl TryFrom<&PackSource> for Pack {
     fn try_from(source: &PackSource) -> Result<Self> {
         let utils = source.utils.iter();
         let globals = global_utils(utils.map(|file| (Path::new(file.path), file.yaml)))?;
-        // Compiling the rules is most of the time xpd takes to start, so the files compile on
-        // all cores. The rules stay in file order, which is the order a scan reports them in.
         let per_file: Vec<Vec<Rule>> = source
             .rules
             .par_iter()

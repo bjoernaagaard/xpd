@@ -884,7 +884,6 @@ impl<'r, 'a> Reader<'r, 'a> {
             self.assigned_twice(line, &mut found);
             found.findings.extend(self.chains_read_before(&body));
         }
-        // One formula per column name is enough to compare steps.
         let mut kept: BTreeSet<(String, String)> = BTreeSet::new();
         found
             .formulas

@@ -506,7 +506,6 @@ pub(crate) fn find(
     if let Some(meaning) = meaning {
         ranked = fuse(&ranked, &meaning_ranking(&meaning, passes));
     }
-    // Select within each kind before decoding the embedded entries.
     let mut counts = [0; 3];
     Matches::collect(
         ranked
@@ -689,7 +688,6 @@ pub(crate) fn write_vectors(path: &Path) -> Result<()> {
             .context("every missing record was embedded")?;
         let largest = vector.iter().fold(f32::EPSILON, |m, v| m.max(v.abs()));
         data.extend(vector.iter().map(|v| {
-            // The value is rounded and within -127..=127, so the cast loses nothing.
             #[expect(
                 clippy::cast_possible_truncation,
                 clippy::as_conversions,

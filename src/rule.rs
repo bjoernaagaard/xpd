@@ -386,7 +386,6 @@ impl Rule {
                 (found.get_env().get_match(variable)).is_none_or(|usage| frames.holds(usage, *role))
             })
         };
-        // The first statement of the script that the module is, found for the first match.
         let script = std::cell::OnceCell::new();
         let starts_script = |found: &NodeMatch<'r, StrDoc<SupportLang>>| {
             self.frame_script.is_none_or(|least| {
