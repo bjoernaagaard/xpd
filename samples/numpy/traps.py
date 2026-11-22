@@ -324,7 +324,7 @@ def iterators_in_numpy():
         np.any(v > 100 for v in y),  # xpd: iterator-to-array
         np.array([v * 2 for v in y]),  # xpd: per-value-comprehension
         np.array(list(map(float, y))),
-        np.fromiter((v * 2 for v in y), float),
+        np.fromiter((v * 2 for v in y), float),  # xpd: comprehension-among-arguments
         np.array(range(3)),  # xpd: array-construction
         np.array(sorted({1, 2, 3})),
         np.max([v for v in y]),

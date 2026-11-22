@@ -172,7 +172,7 @@ def sum_on_a_rebound_name():
     return total(ndi, np.arange(4.0))
 
 
-def read_harwell_boeing(path):
+def read_harwell_boeing(path):  # xpd: pass-through-function
     return hb_read(path)  # xpd: default-that-warns
 
 
@@ -286,7 +286,7 @@ def current_entry_points():
     x = np.linspace(0.0, 1.0, 11)
     y = np.sin(3 * x)
     return (
-        optimize.minimize(lambda v: float((v[0] - 1) ** 2), [0.0], method="Nelder-Mead").x,
+        optimize.minimize(lambda v: float((v[0] - 1) ** 2), [0.0], method="Nelder-Mead").x,  # xpd: float-around-number
         optimize.minimize_scalar(lambda v: (v - 1) ** 2, method="brent").x,
         optimize.least_squares(lambda v: v - 1.0, [0.0]).x,
         integrate.solve_ivp(lambda t, v: -v, (0.0, 1.0), [1.0]).y[:, -1],

@@ -39,7 +39,7 @@ def groupby_lambda(df):
         g["b"].transform(lambda v: v.sum()),  # xpd: groupby-lambda
         g[["a", "b"]].agg(np.sum),  # xpd: groupby-lambda
         g.agg({"b": lambda v: v.max()}),  # xpd: groupby-lambda
-        g.agg(low=("b", lambda v: v.min())),  # xpd: groupby-lambda
+        g.agg(low=("b", lambda v: v.min())),  # xpd: groupby-lambda, named-agg-lambda
         df.pivot_table(index="k", columns="s", values="b", aggfunc=np.mean),  # xpd: groupby-lambda
     )
 
@@ -180,7 +180,7 @@ def summary(df: pd.DataFrame) -> pd.DataFrame:
 def models(df: pd.DataFrame) -> list[np.ndarray]:
     fitted = []
     for _, part in df.groupby("region"):
-        fitted.append(np.polyfit(part["hour"], part["load"], 1))
+        fitted.append(np.polyfit(part["hour"], part["load"], 1))  # xpd: legacy-polynomial
     return fitted
 
 

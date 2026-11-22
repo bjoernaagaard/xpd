@@ -63,7 +63,7 @@ def random_against_fixed():
     def hausman(fe, re):  # xpd: hand-written-hausman
         b = fe.params - re.params
         v = fe.cov - re.cov
-        return float(b @ np.linalg.inv(v) @ b)
+        return float(b @ np.linalg.inv(v) @ b)  # xpd: float-around-number
 
     def difference(fe, re):
         return fe.params - re.params

@@ -40,7 +40,7 @@ def uk_clean(uk: pd.Series) -> pd.Series:
     return uk
 
 
-def labels(raw: pd.DataFrame, target: str) -> pd.Series:
+def labels(raw: pd.DataFrame, target: str) -> pd.Series:  # xpd: pass-through-function
     return raw.pop(target)  # xpd: node-mutates-input
 
 
@@ -88,7 +88,7 @@ def settings_new(defaults: dict) -> dict:
     return {**defaults, "checked": True}
 
 
-def next_state(state: dict, row: dict) -> dict:
+def next_state(state: dict, row: dict) -> dict:  # xpd: pass-through-function
     return state.update(row)
 
 

@@ -131,7 +131,7 @@ def frame(*, fig):
     return fig.update_xaxes(showline=True, mirror=True)  # xpd: boxed-axis-frame
 
 
-def outer(first):
+def outer(first):  # xpd: pass-through-function
     return inner(first)
 
 

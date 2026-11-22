@@ -18,7 +18,7 @@ PRICE = "unit_price"
 def totals(orders: pd.DataFrame) -> pd.DataFrame:
     gross = orders["quantity"] * orders[PRICE]
     return orders.join(
-        pd.DataFrame(index=orders.index).assign(
+        pd.DataFrame(index=orders.index).assign(  # xpd: multi-line-call-argument
             gross_amount=gross,
             net_amount=gross - orders["discount"],
         )
@@ -34,7 +34,7 @@ def discounts(orders: pd.DataFrame) -> pd.DataFrame:
     # warning: the formula of the column gross_amount, written out again
     before_discount = orders[PRICE] * orders["quantity"]
     # warning: writes to the frame it was given
-    orders["discount_share"] = orders["discount"] / before_discount
+    orders["discount_share"] = orders["discount"] / before_discount  # xpd: frame-column-write
     return orders
 
 

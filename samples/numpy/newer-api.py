@@ -59,7 +59,7 @@ def generator_forms():
 
 def generator_per_pass():
     draws = []
-    for _ in range(3):
+    for _ in range(3):  # xpd: random-draw-loop
         rng = np.random.default_rng()  # xpd: rng-in-loop
         draws.append(rng.random())
     draws += [np.random.default_rng().random() for _ in range(3)]  # xpd: rng-in-loop
@@ -73,7 +73,7 @@ def generator_per_seed():
     for value in np.random.default_rng(5).random(3):
         out.append(value)
     rng = np.random.default_rng(7)
-    for _ in range(3):
+    for _ in range(3):  # xpd: random-draw-loop
         out.append(rng.random())
     return per_seed, out
 

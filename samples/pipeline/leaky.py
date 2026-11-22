@@ -106,7 +106,7 @@ contract = {
             "args": {"n_splits": FOLDS, "shuffle": True, "random_state": SEED},
         },
         "cv_scores": cv_scores.tolist(),
-        "test_score": float(test_score),
+        "test_score": float(test_score),  # xpd: float-around-number
     },
     "model": {
         "file": MODEL.as_posix(),

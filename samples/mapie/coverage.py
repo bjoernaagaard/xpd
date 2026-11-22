@@ -35,7 +35,7 @@ def three_parts(seed=0, n=900, classes=False):
 
 
 def coverage(y, intervals):
-    return float(regression_coverage_score(y, intervals)[0])
+    return float(regression_coverage_score(y, intervals)[0])  # xpd: float-around-number
 
 
 @case
@@ -148,7 +148,7 @@ def coverage_on_seen_rows():
     on_seen = regression_coverage_score(y_train, seen)[0], regression_coverage_score(y_train, fitted)[0], regression_coverage_score(y_conf, conformalized[:, :, 0])[0]
     inline = regression_coverage_score(y_train, cross.predict_interval(X_train)[1])[0]  # xpd: coverage-on-seen-rows
     on_new = regression_coverage_score(y_test, unseen)[0], regression_coverage_score(y_test, held_out)[0]
-    return [float(score) for score in (*on_seen, inline, *on_new)]
+    return [float(score) for score in (*on_seen, inline, *on_new)]  # xpd: float-around-number
 
 
 @case
@@ -159,7 +159,7 @@ def sets_on_seen_rows():
     learner.conformalize(X_conf, y_conf)
     _, seen = learner.predict_set(X_train)  # xpd: coverage-on-seen-rows
     _, held_out = learner.predict_set(X_test)
-    return float(classification_coverage_score(y_train, seen)[0]), float(classification_coverage_score(y_test, held_out)[0])
+    return float(classification_coverage_score(y_train, seen)[0]), float(classification_coverage_score(y_test, held_out)[0])  # xpd: float-around-number, float-around-number
 
 
 @case
@@ -169,7 +169,7 @@ def seen_rows_that_are_not_scored():
     cross.fit_conformalize(X_train, y_train)
     _, drawn = cross.predict_interval(X_train)
     _, scored = cross.predict_interval(X_test)
-    return drawn.shape, float(regression_coverage_score(y_test, scored)[0])
+    return drawn.shape, float(regression_coverage_score(y_test, scored)[0])  # xpd: float-around-number
 
 
 @case
