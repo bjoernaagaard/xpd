@@ -24,7 +24,7 @@ def returns(rows=1000):
     return 100 * sp500.load()["Adj Close"].pct_change().dropna().iloc[-rows:]
 
 
-def draws(n=300, seed=0):
+def draws(n=300, seed=0):  # xpd: pass-through-function
     return np.random.default_rng(seed).standard_normal(n)
 
 
@@ -105,7 +105,7 @@ def seed_keyword():
     dist = Normal(seed=rs)
     state = bs.state
     bs.state = state
-    return bs.apply(np.mean, 5).ravel().tolist(), block.apply(np.mean, 5).ravel().tolist(), float(dist.simulate([])(1)[0]), type(bs.generator).__name__
+    return bs.apply(np.mean, 5).ravel().tolist(), block.apply(np.mean, 5).ravel().tolist(), float(dist.simulate([])(1)[0]), type(bs.generator).__name__  # xpd: float-around-number
 
 
 @case

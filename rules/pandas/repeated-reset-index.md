@@ -11,7 +11,9 @@ A function that calls `reset_index` three times or more keeps moving keys betwee
 
 ## What the rule reports
 
-The rule reports a function that calls `reset_index` three times or more.
+The rule reports a function that calls `reset_index` three times or more, including calls in
+nested blocks. It leaves a tuple of independent results alone when each result resets its index
+at most once and the function does not reset indexes elsewhere.
 
 ## How to fix it
 

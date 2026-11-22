@@ -64,7 +64,7 @@ def element_loops():
 def meant_loops():
     a = np.arange(8.0)
     acc = np.zeros(8)
-    for i in range(1, 8):
+    for i in range(1, 8):  # xpd: recurrence-loop
         acc[i] = acc[i - 1] + a[i]
     labels = np.empty(8, dtype=object)
     for i in range(8):

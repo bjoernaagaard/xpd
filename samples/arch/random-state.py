@@ -21,7 +21,7 @@ def returns(rows=1000):
     return 100 * sp500.load()["Adj Close"].pct_change().dropna().iloc[-rows:]
 
 
-def draws(n=300, seed=0):
+def draws(n=300, seed=0):  # xpd: pass-through-function
     return np.random.default_rng(seed).standard_normal(n)
 
 

@@ -125,7 +125,7 @@ def date_method_that_stays(df):
 @case
 def apply_parse_date(df):
     return (
-        df["raw"].apply(lambda v: datetime.strptime(v, "%Y-%m-%d")),  # xpd: apply-parse-date
+        df["raw"].apply(lambda v: datetime.strptime(v, "%Y-%m-%d")),  # xpd: apply-parse-date, strptime-without-fromisoformat
         df["raw"].apply(lambda v: pd.to_datetime(v)),  # xpd: apply-parse-date
         df["raw"].map(lambda v: pd.to_datetime(v, format="%Y-%m-%d")),  # xpd: apply-parse-date
         df["raw"].map(pd.Timestamp),  # xpd: apply-parse-date

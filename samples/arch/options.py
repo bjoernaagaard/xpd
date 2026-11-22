@@ -110,7 +110,7 @@ def numbers_arch_takes():
     adf = ADF(prices(), lags=5)
     steps = shifted.forecast(horizon=5)
     interval = IIDBootstrap(y.to_numpy(), seed=0).conf_int(np.mean, reps=100, size=0.95)
-    return arch_only.params.tolist(), shifted.params.tolist(), process.num_params, float(adf.stat), steps.variance.shape, interval.ravel().tolist()
+    return arch_only.params.tolist(), shifted.params.tolist(), process.num_params, float(adf.stat), steps.variance.shape, interval.ravel().tolist()  # xpd: float-around-number
 
 
 @case
@@ -127,7 +127,7 @@ def options_arch_has():
     mcs.compute()
     bs = IIDBootstrap(losses[:, 0], seed=0)
     interval = bs.conf_int(np.mean, 100, method="bca", tail="upper")
-    return gjr.params.tolist(), float(adf.stat), float(kpss.stat), float(pp.stat), forecast.variance.values.tolist(), mcs.pvalues.values.ravel().tolist(), interval.ravel().tolist()
+    return gjr.params.tolist(), float(adf.stat), float(kpss.stat), float(pp.stat), forecast.variance.values.tolist(), mcs.pvalues.values.ravel().tolist(), interval.ravel().tolist()  # xpd: float-around-number, float-around-number, float-around-number
 
 
 @case
@@ -166,7 +166,7 @@ def lag_search_arguments(lags=4):
     positional = ZivotAndrews(p, 4, method="t-stat")  # xpd: arch-ignored-argument
     searched = ADF(p, method="bic", max_lags=12)
     from_variable = ADF(p, lags=lags, method="bic")
-    return float(fixed.stat), float(capped.stat), float(positional.stat), float(searched.stat), float(from_variable.stat)
+    return float(fixed.stat), float(capped.stat), float(positional.stat), float(searched.stat), float(from_variable.stat)  # xpd: float-around-number, float-around-number, float-around-number, float-around-number, float-around-number
 
 
 @case

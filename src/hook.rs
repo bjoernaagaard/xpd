@@ -255,13 +255,16 @@ fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> 
     let session = Session::open(Path::new(""), session)?;
     session.forget_old_sessions();
     let records = session.records()?;
-    let began = (records.iter()).any(|record| matches!(record, Record::Start(_)));
+    let began =
+        (records.iter()).any(|record| matches!(record, Record::Start(_) | Record::Opened { .. }));
     // A resumed session begins again, because the files that changed while it was closed are
     // not its own. A compaction happens inside a session, so the first record stays.
     if source == Source::Opened || !began {
-        let commit = repository(cwd).and_then(|top| checked_out(&top));
-        session.append(&Record::Start(commit))?;
-        session.append(&Record::Began(now()))?;
+        let at = now();
+        let git = repository(cwd)
+            .map(|top| GitBaseline::capture(top, at))
+            .transpose()?;
+        session.append(&Record::Opened { at, git })?;
     }
     let cwd = project_root(cwd)?;
     let files = project_files(&cwd, MOST_FILES);
@@ -598,7 +601,7 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
     let last = (records.iter().rev())
         .find_map(|record| match record {
             Record::Held(lines) => Some(lines.as_slice()),
-            Record::Start(_) | Record::Began(_) | Record::Edited(_) => None,
+            Record::Opened { .. } | Record::Start(_) | Record::Began(_) | Record::Edited(_) => None,
         })
         .unwrap_or_default();
     // The agent saw this list when the hook held the turn, and it stopped again with the same
@@ -643,15 +646,27 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
 }
 
 /// The Python files that the session changed. With git, they are the files that differ from
-/// the commit the session began on and the untracked files, when they were written after the
-/// session began, so an edit through the shell and a committed edit both count. A file that
+/// the commit the session began on and the untracked files, when their contents differ from the
+/// opening baseline, so an edit through the shell and a committed edit both count. A file that
 /// only a pull, a merge or a checkout changed is left out. Without git, they are the files that
 /// `PostToolUse` recorded.
 fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
     let mut files: Vec<PathBuf> = if let Some(top) = repository(here) {
-        let began = records.iter().rev().find_map(|record| match record {
-            Record::Start(commit) => commit.as_deref(),
-            Record::Began(_) | Record::Edited(_) | Record::Held(_) => None,
+        let start = records
+            .iter()
+            .rposition(|record| matches!(record, Record::Start(_) | Record::Opened { .. }));
+        let records = &records[start.unwrap_or(0)..];
+        let baseline = match records.first() {
+            Some(Record::Opened { git, .. }) => git.as_ref().filter(|baseline| baseline.top == top),
+            _ => None,
+        };
+        let began = match records.first() {
+            Some(Record::Start(commit)) => commit.as_deref(),
+            _ => baseline.map(|baseline| baseline.commit.as_str()),
+        };
+        let since = records.iter().rev().find_map(|record| match record {
+            Record::Began(at) | Record::Opened { at, .. } => Some(*at),
+            _ => None,
         });
         // The recorded commit is not in this repository when the agent moved to another one,
         // and no commit is recorded when the hook was added to a running session. Then the
@@ -663,35 +678,41 @@ fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
             .map(str::to_owned)
             .or_else(|| checked_out(&top))
             .context("git names no commit to compare the files with")?;
-        let differing = git(
-            &top,
-            &["diff", "--name-only", "-z", "--diff-filter=d", &base, "--"],
-        )
-        .context("git diff failed")?;
-        let untracked = git(&top, &["ls-files", "--others", "--exclude-standard", "-z"])
-            .context("git ls-files failed")?;
-        // A file that was already changed or untracked when the session began is not the
-        // session's own, so only a file that was written since then counts.
-        let since = records.iter().rev().find_map(|record| match record {
-            Record::Began(seconds) => Some(*seconds),
-            Record::Start(_) | Record::Edited(_) | Record::Held(_) => None,
-        });
-        // A commit that a pull, a merge or a checkout brought also changes files after the
-        // session began, and they are not the session's own either.
-        let own = since.and_then(|since| own_files(&top, since));
+        let (differing, untracked) = git_changes(&top, &base)?;
+        let own = since.and_then(|since| own_files(&top, since, baseline));
         let differing = differing
             .split('\0')
             .filter(|name| own.as_ref().is_none_or(|own| own.contains(*name)));
-        (differing.chain(untracked.split('\0')))
-            .filter(|name| !name.is_empty())
-            .map(|name| top.join(name))
-            .filter(|file| since.is_none_or(|since| written(file) >= since))
-            .collect()
+        let candidates = differing
+            .chain(untracked.split('\0'))
+            .filter(|name| !name.is_empty());
+        if let Some(baseline) = baseline {
+            let dirty = &baseline.dirty;
+            let current = blob_ids(
+                &top,
+                candidates.clone().filter(|name| dirty.contains_key(*name)),
+            )?;
+            candidates
+                .filter(|name| {
+                    current
+                        .get(*name)
+                        .is_none_or(|id| dirty.get(*name) != Some(id))
+                })
+                .map(|name| top.join(name))
+                .collect()
+        } else {
+            candidates
+                .map(|name| top.join(name))
+                .filter(|file| since.is_none_or(|since| written(file) >= since))
+                .collect()
+        }
     } else {
         (records.iter())
             .filter_map(|record| match record {
                 Record::Edited(file) => Some(file.clone()),
-                Record::Start(_) | Record::Began(_) | Record::Held(_) => None,
+                Record::Opened { .. } | Record::Start(_) | Record::Began(_) | Record::Held(_) => {
+                    None
+                }
             })
             .collect()
     };
@@ -709,37 +730,78 @@ fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
         .collect())
 }
 
+/// Tracked differences from `base` and untracked paths, both NUL-delimited.
+fn git_changes(top: &Path, base: &str) -> Result<(String, String)> {
+    let tracked = git(
+        top,
+        &["diff", "--name-only", "-z", "--diff-filter=d", base, "--"],
+    )
+    .context("git diff failed")?;
+    let untracked = git(top, &["ls-files", "--others", "--exclude-standard", "-z"])
+        .context("git ls-files failed")?;
+    Ok((tracked, untracked))
+}
+
+/// Content identities of existing Python files. Hashing without `-w` leaves Git's
+/// object database alone. Bound the argument list for large dirty worktrees.
+fn blob_ids<'a>(
+    top: &Path,
+    names: impl Iterator<Item = &'a str>,
+) -> Result<BTreeMap<String, String>> {
+    let names: Vec<_> = names
+        .filter(|name| source::is_python(Path::new(name)) && top.join(name).is_file())
+        .collect();
+    let mut ids = BTreeMap::new();
+    for batch in names.chunks(64) {
+        let mut args = vec!["hash-object", "--no-filters", "--"];
+        args.extend_from_slice(batch);
+        let hashes = git(top, &args).context("git hash-object failed")?;
+        ids.extend(
+            batch
+                .iter()
+                .zip(hashes.lines())
+                .map(|(&name, id)| (name.to_owned(), id.to_owned())),
+        );
+    }
+    Ok(ids)
+}
+
+/// Commits made in this checkout, newest first. Git applies `--since` to the reflog
+/// timestamps, which can differ from the dates of the commits themselves.
+fn local_commits(top: &Path, since: u64) -> Option<Vec<String>> {
+    let log = git(
+        top,
+        &[
+            "reflog",
+            "show",
+            &format!("--since=@{since}"),
+            "--format=%H%x09%gs",
+            "HEAD",
+        ],
+    )?;
+    Some(
+        log.lines()
+            .filter_map(|line| {
+                let (commit, action) = line.split_once('\t')?;
+                ["commit", "cherry-pick", "revert"]
+                    .iter()
+                    .any(|verb| action.starts_with(verb))
+                    .then(|| commit.to_owned())
+            })
+            .collect(),
+    )
+}
+
 /// The files in the repository at `top` that the session itself changed since it began at
 /// `since`, in seconds since 1970: the files that differ from the commit checked out now, and
 /// the files of each commit that was made in this checkout since then. git logs how each
 /// commit was checked out, so a commit that a pull, a merge, a rebase or a checkout brought is
 /// told from one that `git commit`, `git cherry-pick` or `git revert` made here. `None` when
 /// git keeps no such log, and then every file that differs counts.
-fn own_files(top: &Path, since: u64) -> Option<HashSet<String>> {
-    let log = git(
-        top,
-        &[
-            "reflog",
-            "show",
-            "--date=unix",
-            "--format=%H%x09%gd%x09%gs",
-            "HEAD",
-        ],
-    )?;
-    let made_here = log.lines().filter_map(|line| {
-        let mut fields = line.splitn(3, '\t');
-        let (commit, selector, action) = (fields.next()?, fields.next()?, fields.next()?);
-        let at: u64 = selector
-            .split_once('{')?
-            .1
-            .strip_suffix('}')?
-            .parse()
-            .ok()?;
-        let made = ["commit", "cherry-pick", "revert"]
-            .iter()
-            .any(|verb| action.starts_with(verb));
-        (at >= since && made).then_some(commit)
-    });
+fn own_files(top: &Path, since: u64, baseline: Option<&GitBaseline>) -> Option<HashSet<String>> {
+    let commits = local_commits(top, since)?;
+    let prior = baseline.map_or(&[][..], |baseline| baseline.prior_commits.as_slice());
+    let made_here = commits.strip_suffix(prior).unwrap_or(&commits);
     let mut own: HashSet<String> = HashSet::new();
     let mut add = |names: String| {
         own.extend(
@@ -809,10 +871,36 @@ fn written(file: &Path) -> u64 {
         .map_or_else(now, |since| since.as_secs())
 }
 
+/// Git evidence at the opening of this session in this worktree.
+#[derive(Serialize, Deserialize)]
+struct GitBaseline {
+    top: PathBuf,
+    commit: String,
+    dirty: BTreeMap<String, String>,
+    prior_commits: Vec<String>,
+}
+
+impl GitBaseline {
+    fn capture(top: PathBuf, at: u64) -> Result<Self> {
+        let commit = checked_out(&top).context("git names no commit to compare the files with")?;
+        let (tracked, untracked) = git_changes(&top, &commit)?;
+        let dirty = blob_ids(&top, tracked.split('\0').chain(untracked.split('\0')))?;
+        let prior_commits = local_commits(&top, at).unwrap_or_default();
+        Ok(Self {
+            top,
+            commit,
+            dirty,
+            prior_commits,
+        })
+    }
+}
+
 /// One line of a session file.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Record {
+    /// One baseline per opening. Older session files have separate Start and Began lines.
+    Opened { at: u64, git: Option<GitBaseline> },
     /// The commit that was checked out when the session began. `None` without git.
     Start(Option<String>),
     /// When the session began, in seconds since 1970.

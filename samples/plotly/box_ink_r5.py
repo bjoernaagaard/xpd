@@ -47,7 +47,7 @@ def deliberate_boxes():
 def quartile_drawing():
     # The endpoints are min/max here, so the drawing is for that statistic only.
     low, q1, median, q3, high = 1, 2.5, 4, 5.5, 7
-    return go.Figure(go.Scatter(
+    return go.Figure(go.Scatter(  # xpd: multi-line-call-argument
         x=[0, 0, None, 0.03, 0.03, None, 0.03, 0.03, None, 0, 0, None],
         y=[low, q1, None, q1, median - 0.05, None, median + 0.05, q3, None, q3, high, None],
         mode="lines",

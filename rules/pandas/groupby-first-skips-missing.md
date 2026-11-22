@@ -7,7 +7,10 @@
 
 ## What the rule reports
 
-The rule reports `df.groupby("k").first()` and `last()`, which skip missing values per column, so one result row can mix values from different rows. The rule leaves `df.groupby("k")["b"].last()` alone, because one column can't mix rows.
+The rule reports `df.groupby("k").first()` and `last()`, which skip missing values per column, so
+one result row can mix values from different rows. It leaves
+`df.groupby("k")["b"].last()` and a list with one explicit column, such as
+`df.groupby("k")[["b"]].last()`, alone because one column can't mix rows.
 
 ## How to fix it
 

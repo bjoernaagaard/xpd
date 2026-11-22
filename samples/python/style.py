@@ -69,7 +69,7 @@ def prices(item: dict) -> dict:
 
 
 def rows(items: list[dict]) -> dict:
-    return {  # xpd: comprehension-merges-dicts
+    return {  # xpd: comprehension-merges-dicts, comprehension-multi-line
         item["id"]: {"name": item["name"], **prices(item)} for item in items
     }
 

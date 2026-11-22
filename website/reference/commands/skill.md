@@ -5,9 +5,13 @@ agent skill, `SKILL.md`. With `--json`, it prints the three skills that ship wit
 
 ## Examples
 
+List the bundled skill names.
+
 ```console
-$ xpd skill --json | jq -c 'map({name, files: (.files | length)})'
-[{"name":"python-best-practices","files":1},{"name":"python-review","files":2},{"name":"xpd","files":1}]
+$ xpd skill --json | jq -r '.[].name'
+python-best-practices
+python-review
+xpd
 ```
 
 ## Exit status

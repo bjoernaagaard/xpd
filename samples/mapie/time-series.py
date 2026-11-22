@@ -43,7 +43,7 @@ def shuffled_split():
     series = TimeSeriesRegressor(RandomForestRegressor(n_estimators=10, random_state=0), random_state=0)
     series.fit(X_train, y_train)
     _, y_intervals = series.predict(X_test, confidence_level=0.9, ensemble=True)
-    return float(regression_coverage_score(y_test, y_intervals)[0])
+    return float(regression_coverage_score(y_test, y_intervals)[0])  # xpd: float-around-number
 
 
 @case
@@ -55,7 +55,7 @@ def shuffled_three_parts():
     series.fit(X_past, y_past)
     _, y_intervals = series.predict(X_new, confidence_level=0.9, ensemble=True)
     X_a, X_b, y_a, y_b = train_test_split(X_conf, y_conf, test_size=0.5, random_state=0)
-    return float(regression_coverage_score(y_new, y_intervals)[0]), len(X_a), len(X_b), len(y_a), len(y_b)
+    return float(regression_coverage_score(y_new, y_intervals)[0]), len(X_a), len(X_b), len(y_a), len(y_b)  # xpd: float-around-number
 
 
 @case
@@ -66,7 +66,7 @@ def split_in_time_order():
     series.fit(X_early, y_early)
     _, y_intervals = series.predict(X_late, confidence_level=0.9, ensemble=True)
     parts = train_conformalize_test_split(X, y, train_size=0.6, conformalize_size=0.2, test_size=0.2, shuffle=False)
-    return float(regression_coverage_score(y_late, y_intervals)[0]), [len(part) for part in parts]
+    return float(regression_coverage_score(y_late, y_intervals)[0]), [len(part) for part in parts]  # xpd: float-around-number
 
 
 def removed_time_series_methods():

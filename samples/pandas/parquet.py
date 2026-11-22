@@ -126,7 +126,7 @@ def rows_that_stay():
 def chunks_joined_again():
     path = csv_file("chunks.csv")
     joined = pd.concat(pd.read_csv(path, chunksize=500))  # xpd: chunked-csv-concat
-    as_list = pd.concat([part for part in pd.read_csv(path, chunksize=500)], ignore_index=True)  # xpd: chunked-csv-concat
+    as_list = pd.concat([part for part in pd.read_csv(path, chunksize=500)], ignore_index=True)  # xpd: chunked-csv-concat, comprehension-among-arguments
     return joined, as_list
 
 

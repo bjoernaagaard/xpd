@@ -81,4 +81,4 @@ def bandwidth_passed_back():
     same = Bartlett(y, bandwidth=first.bandwidth)
     spectral = QuadraticSpectral(y)
     spectral_again = QuadraticSpectral(y, bandwidth=spectral.opt_bandwidth)
-    return [float(np.asarray(e.cov.long_run).ravel()[0]) for e in (first, again, parzen, parzen_again, same, spectral, spectral_again)]
+    return [float(np.asarray(e.cov.long_run).ravel()[0]) for e in (first, again, parzen, parzen_again, same, spectral, spectral_again)]  # xpd: float-around-number

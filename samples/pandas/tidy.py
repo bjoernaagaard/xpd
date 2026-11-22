@@ -24,7 +24,7 @@ def wide(n=50, seed=0):
 @case
 def column_loop_to_long():
     df = wide()
-    in_a_list = pd.concat([df[["id", year]].rename(columns={year: "sales"}).assign(year=year) for year in YEARS], ignore_index=True)  # xpd: column-loop-to-long
+    in_a_list = pd.concat([df[["id", year]].rename(columns={year: "sales"}).assign(year=year) for year in YEARS], ignore_index=True)  # xpd: column-loop-to-long, comprehension-among-arguments
     named = [df[["id", year]].rename(columns={year: "sales"}).assign(year=year) for year in YEARS]  # xpd: column-loop-to-long
     from_name = pd.concat(named, ignore_index=True)
     parts = []
@@ -42,7 +42,7 @@ def loops_that_stay():
     frames = [wide(seed=seed).assign(run=seed) for seed in range(3)]
     stacked = pd.concat([frame[["id", "city"]] for frame in frames])
     totals = []
-    for year in YEARS:
+    for year in YEARS:  # xpd: column-loop
         totals.append(wide()[year].sum())
     return stacked, totals
 
