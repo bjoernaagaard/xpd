@@ -1,0 +1,82 @@
+id: mintrace-without-insample
+language: python
+severity: error
+message: This MinTrace method needs in-sample residuals to estimate forecast error covariance. Pass Y_df with the observed targets and the fitted values of the base models.
+rule:
+  kind: call
+  all:
+    - has:
+        field: arguments
+        not:
+          has:
+            any:
+              - kind: list_splat
+              - kind: dictionary_splat
+              - all:
+                  - nthChild: { position: 4, ofRule: { not: { kind: comment } } }
+                  - not: { kind: keyword_argument }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^Y_df$' }
+                  - not: { has: { field: value, kind: none } }
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^temporal$' }
+                  - not: { has: { field: value, kind: 'false' } }
+    - any:
+        - has:
+            field: function
+            kind: attribute
+            all:
+              - has: { field: attribute, regex: '^reconcile$' }
+              - has: { field: object, matches: shrinkage-reconciler }
+        - has: { field: function, pattern: $RECONCILER.reconcile }
+          inside:
+            any: [{ kind: expression_statement }, { kind: return_statement }]
+            stopBy: { not: { kind: assignment } }
+            follows:
+              stopBy: { not: { kind: comment } }
+              kind: expression_statement
+              has:
+                kind: assignment
+                all:
+                  - has: { field: left, pattern: $RECONCILER }
+                  - has: { field: right, matches: shrinkage-reconciler }
+utils:
+  shrinkage-reconciler:
+    kind: call
+    all:
+      - has: { field: function, pattern: $RECONCILIATION }
+      - has:
+          field: arguments
+          has:
+            any:
+              - nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+                matches: reconcilers-list
+              - kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^reconcilers$' }
+                  - has: { field: value, matches: reconcilers-list }
+  reconcilers-list:
+    any: [{ kind: list }, { kind: tuple }]
+    has:
+      kind: call
+      all:
+        - has: { field: function, pattern: $MINTRACE, regex: '(^|\.)MinTrace$' }
+        - has:
+            field: arguments
+            has:
+              any:
+                - nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+                  matches: shrinkage-method
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^method$' }
+                    - has: { field: value, matches: shrinkage-method }
+  shrinkage-method:
+    kind: string
+    regex: '^("mint_shrink"|''mint_shrink'')$'
+metadata:
+  holds:
+    RECONCILIATION: { regex: '(^|\.)HierarchicalReconciliation$' }
+    MINTRACE: { regex: '(^|\.)MinTrace$' }

@@ -263,6 +263,10 @@
     "expected": "xpd/recipe/plotly-chart"
   },
   {
+    "query": "reconcile a Nixtla hierarchy and score the forecasts",
+    "expected": "xpd/recipe/nixtla-forecasting"
+  },
+  {
     "open": true,
     "query": "I need to try a diverse set of linear models that doesn't require data to be scaled first. Which ones?",
     "answer": "This is perhaps the most ambiguous one, but it is basically a model that does need scaling. The ambiguous part is that implied in the symbol of the data or code."

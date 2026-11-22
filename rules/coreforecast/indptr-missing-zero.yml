@@ -1,0 +1,36 @@
+id: indptr-missing-zero
+language: python
+severity: warning
+message: GroupedArray offsets must start at zero. A first offset above zero leaves those observations outside any series. Prepend 0 if these offsets are cumulative series lengths.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $CONSTRUCTOR }
+    - has:
+        field: arguments
+        all:
+          - not: { has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+          - has:
+              any:
+                - kind: keyword_argument
+                  has: { field: name, regex: '^indptr$' }
+                  all: [{ has: { field: value, matches: bad-offsets } }]
+                - nthChild: { position: 2, ofRule: { not: { kind: comment } } }
+                  matches: bad-offsets
+utils:
+  bad-offsets:
+    kind: call
+    all:
+      - has: { field: function, regex: '^(np|numpy)\.array$' }
+      - has:
+          field: arguments
+          has:
+            nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+            any: [{ kind: list }, { kind: tuple }]
+            has:
+              nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+              kind: integer
+              regex: '^[1-9][0-9_]*$'
+metadata:
+  holds:
+    CONSTRUCTOR: { regex: '(^|\.)GroupedArray$' }

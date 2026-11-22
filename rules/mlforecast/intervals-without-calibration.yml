@@ -1,0 +1,56 @@
+id: intervals-without-calibration
+language: python
+severity: warning
+message: This MLForecast fit did not calibrate prediction intervals. predict(level=...) warns and returns point forecasts without interval columns. Fit with prediction_intervals=PredictionIntervals(...) before requesting levels.
+rule:
+  kind: call
+  all:
+    - has:
+        field: function
+        all:
+          - kind: attribute
+          - has: { field: object, kind: identifier, pattern: $MODEL }
+          - has: { field: attribute, regex: '^predict$' }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - has: { field: name, regex: '^level$' }
+            - has:
+                field: value
+                any: [{ kind: list }, { kind: tuple }]
+                has:
+                  nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+                  any: [{ kind: integer }, { kind: float }]
+    - inside:
+        any: [{ kind: expression_statement }, { kind: return_statement }]
+        stopBy: { not: { kind: assignment } }
+        follows:
+          stopBy: { not: { kind: comment } }
+          kind: expression_statement
+          has: { matches: uncalibrated-fit }
+utils:
+  uncalibrated-fit:
+    kind: call
+    all:
+      - has: { field: function, pattern: $MODEL.fit }
+      - has:
+          field: arguments
+          not:
+            has:
+              any:
+                - kind: list_splat
+                - kind: dictionary_splat
+                - all:
+                    - nthChild: { position: 2, ofRule: { not: { kind: comment } } }
+                    - not: { kind: keyword_argument }
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^prediction_intervals$' }
+                    - not: { has: { field: value, kind: none } }
+metadata:
+  holds:
+    MODEL:
+      kind: call
+      has: { field: function, regex: '(^|\.)MLForecast$' }

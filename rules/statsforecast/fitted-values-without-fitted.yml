@@ -1,0 +1,55 @@
+id: fitted-values-without-fitted
+language: python
+severity: error
+message: StatsForecast did not store fitted values in this forecast call. Pass fitted=True to forecast before calling forecast_fitted_values().
+rule:
+  kind: call
+  all:
+    - pattern: $MODEL.forecast_fitted_values()
+    - inside:
+        any: [{ kind: expression_statement }, { kind: return_statement }]
+        stopBy: { not: { kind: assignment } }
+        follows:
+          stopBy: { not: { kind: comment } }
+          kind: expression_statement
+          all:
+            - has:
+                any:
+                  - matches: forecast-without-fitted
+                  - kind: assignment
+                    all:
+                      - has: { field: left, kind: identifier, not: { pattern: $MODEL } }
+                      - has: { field: right, matches: forecast-without-fitted }
+            - follows:
+                stopBy: { not: { kind: comment } }
+                kind: expression_statement
+                has:
+                  kind: assignment
+                  all:
+                    - has: { field: left, pattern: $MODEL }
+                    - has:
+                        field: right
+                        kind: call
+                        has: { field: function, pattern: $CONSTRUCTOR }
+utils:
+  forecast-without-fitted:
+    kind: call
+    all:
+      - has: { field: function, pattern: $MODEL.forecast }
+      - has:
+          field: arguments
+          not:
+            has:
+              any:
+                - kind: list_splat
+                - kind: dictionary_splat
+                - all:
+                    - nthChild: { position: 3, ofRule: { not: { kind: comment } } }
+                    - not: { kind: keyword_argument }
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^fitted$' }
+                    - not: { has: { field: value, kind: 'false' } }
+metadata:
+  holds:
+    CONSTRUCTOR: { regex: '(^|\.)StatsForecast$' }

@@ -1,0 +1,75 @@
+id: mase-without-train-df
+language: python
+severity: error
+message: UtilsForecast needs training history to compute the seasonal scale for MASE. Pass the pre-forecast observations as train_df and bind the metric's seasonality if needed.
+rule:
+  kind: call
+  all:
+    - has: { field: function, pattern: $EVALUATE }
+    - has:
+        field: arguments
+        all:
+          - not:
+              has:
+                any:
+                  - kind: list_splat
+                  - kind: dictionary_splat
+                  - all:
+                      - nthChild: { position: 4, ofRule: { not: { kind: comment } } }
+                      - matches: positional
+                  - kind: keyword_argument
+                    all:
+                      - has: { field: name, regex: '^train_df$' }
+                      - not: { has: { field: value, kind: none } }
+          - has:
+              any:
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^metrics$' }
+                    - has: { field: value, matches: metrics-with-mase }
+                - nthChild: { position: 2, ofRule: { not: { kind: comment } } }
+                  matches: metrics-with-mase
+utils:
+  positional:
+    not: { any: [{ kind: keyword_argument }, { kind: comment }, { regex: '^[(),]$' }] }
+  metrics-with-mase:
+    any: [{ kind: list }, { kind: tuple }]
+    has:
+      any:
+        - matches: mase-ref
+        - kind: call
+          all:
+            - has: { field: function, matches: functools-partial }
+            - has:
+                field: arguments
+                has:
+                  nthChild: { position: 1, ofRule: { not: { kind: comment } } }
+                  matches: mase-ref
+  mase-ref:
+    any: [{ kind: identifier }, { kind: attribute }]
+    pattern: $MASE
+    regex: '(^|\.)mase$'
+  functools-partial:
+    any:
+      - regex: '^partial$'
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_from_statement
+            all:
+              - has: { field: module_name, regex: '^functools$' }
+              - has: { kind: dotted_name, regex: '^partial$' }
+      - regex: '^functools\.partial$'
+        inside:
+          kind: module
+          stopBy: end
+          has:
+            stopBy: end
+            kind: import_statement
+            has: { kind: dotted_name, regex: '^functools$' }
+metadata:
+  holds:
+    EVALUATE: { regex: '(^|\.)evaluate$' }
+    MASE: { regex: '(^|\.)mase$' }
