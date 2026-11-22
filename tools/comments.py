@@ -129,18 +129,6 @@ def protection(path, text, kind, row, source):
     ):
         return "interpreter directive"
     if path.suffix == ".py":
-        if row <= 2:
-            header = source.split(b"\n", 2)
-            cookie = re.match(rb"^[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+", header[row - 1])
-            if cookie and (row == 1 or re.match(rb"^[ \t\f]*(?:#|\r?$)", header[0])):
-                return "Python source encoding declaration"
-        if re.fullmatch(
-            r"# (?:(?:(?:ruff|flake8): )?noqa(?:: [A-Z]+\d+(?:, *[A-Z]+\d+)*)?"
-            r"|fmt: (?:off|on|skip)|(?:type|pyright|ty): ignore(?:\[[\w, -]+\])?"
-            r"|pragma: no (?:cover|branch)|mypy: ignore-errors)",
-            text,
-        ):
-            return "Python tool directive"
         if path.parts[0] == "samples" and re.fullmatch(r"# xpd: [\w-]+(?:, *[\w-]+)*", text):
             return "expected diagnostic read by the sample validators"
     if path.parts[0] == ".github" and re.fullmatch(
@@ -156,6 +144,24 @@ def protection(path, text, kind, row, source):
     if path.suffix == ".toml" and re.fullmatch(r"#:schema https?://\S+", text):
         return "TOML schema directive"
     return ""
+
+
+def python_directive(text, row, source):
+    if row <= 2:
+        header = source.split(b"\n", 2)
+        if header[row - 1].lstrip().startswith(b"#") and (
+            row == 1 or re.match(rb"^[ \t\f]*(?:#|\r?$)", header[0])
+        ):
+            cookie = re.match(r"#.*?coding[:=][ \t]*[-\w.]+(?:[ \t]+-\*-|:)?", text)
+            if cookie:
+                return cookie[0], "Python source encoding declaration"
+    directive = re.match(
+        r"# (?:(?:(?:ruff|flake8): )?noqa(?:: [A-Z]+\d+(?:, *[A-Z]+\d+)*)?"
+        r"|fmt: (?:off|on|skip)|(?:type|pyright|ty): ignore(?:\[[\w, -]+\])?"
+        r"|pragma: no (?:cover|branch)|mypy: ignore-errors)(?=\s|$)",
+        text,
+    )
+    return (directive[0], "Python tool directive") if directive else ("", "")
 
 
 def metadata_lines(data, offsets):
@@ -198,21 +204,27 @@ def inventory(path, data):
         last = bisect_left(ends, max(start, end - 1))
         text = data[start:end].decode()
         only = [i + 1 for i in range(first, last + 1) if not lines[i].strip()]
-        mixed = (
-            re.fullmatch(r"(# noqa: [A-Z]+\d+(?:, *[A-Z]+\d+)*)  +(.*)", text)
-            if path.suffix == ".py"
-            else None
+        directive, consumer = (
+            python_directive(text, first + 1, data) if path.suffix == ".py" else ("", "")
         )
+        rationale = text[len(directive) :].strip() if directive else ""
+        reason = protection(path, text, kind, first + 1, data)
+        if first + 1 in metadata:
+            reason = "PEP 723 script metadata"
+        elif directive:
+            reason = "" if rationale else consumer
         yield dict(
             path=str(path),
             line=first + 1,
             text=text,
             only=only,
             column=start - (ends[first - 1] + 1 if first else 0),
-            protected="PEP 723 script metadata"
-            if first + 1 in metadata
-            else protection(path, text, kind, first + 1, data),
-            **({"directive": mixed[1], "rationale": mixed[2]} if mixed else {}),
+            protected=reason,
+            **(
+                {"directive": directive, "rationale": rationale, "consumer": consumer}
+                if rationale
+                else {}
+            ),
         )
 
 
