@@ -68,7 +68,6 @@ utils:
   figure-type:
     kind: type
     has: { kind: attribute, all: [{ has: { field: attribute, regex: '^Figure(Widget)?$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
       - matches: { new-figure: { PX: { matches: { px: { ALIAS: { pattern: $PX } } } }, GO: { matches: { go: { ALIAS: { pattern: $GO } } } } } }

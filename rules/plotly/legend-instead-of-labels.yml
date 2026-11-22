@@ -93,7 +93,6 @@ utils:
   other-add:
     not: { matches: line-add }
     has: { stopBy: end, kind: call, has: { field: function, kind: attribute, all: [{ has: { field: object, pattern: $FIG } }, { has: { field: attribute, regex: '^add_', not: { regex: '^add_(annotation|shape|layout_image|vline|hline|vrect|hrect)$' } } }] } }
-  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
       - matches: new-empty-figure

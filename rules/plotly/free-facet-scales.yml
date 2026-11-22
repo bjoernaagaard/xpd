@@ -27,7 +27,6 @@ utils:
     all:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area|bar|box|choropleth|density_contour|density_heatmap|ecdf|funnel|histogram|imshow|line|line_geo|pie|scatter|scatter_geo|strip|timeline|violin)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
       - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(facet_col|facet_row|facet_col_wrap)$' } } }
-  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
       - matches: new-faceted-figure
@@ -109,7 +108,6 @@ utils:
       - has: { field: function, regex: '(^|\.)make_subplots$' }
       - inside: { stopBy: end, kind: module, has: { stopBy: end, any: [{ kind: import_statement }, { kind: import_from_statement }], regex: 'plotly\.(subplots|tools)|from plotly import [^\n]*(subplots|tools)' } }
       - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^shared_yaxes$' } } } }
-  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
       - matches: new-subplots-without-shared-y

@@ -79,7 +79,6 @@ utils:
                 - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Scatter|Scattergl)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
                 - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(fill)$' } }, { has: { field: value, regex: '^["'']tozeroy["'']$' } }] } }
                 - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
-  # The figure, with any of its own methods called on it, as in px.bar(...).update_traces(...).
   figure-expr:
     any:
       - matches: new-area-figure
