@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.11,<3.15"
 # dependencies = [
+#   "packaging==26.3",
 #   "tree-sitter==0.25.2", "tree-sitter-rust==0.24.2", "tree-sitter-python==0.25.0",
 #   "tree-sitter-javascript==0.25.0", "tree-sitter-typescript==0.23.2",
 #   "tree-sitter-toml==0.7.0", "tree-sitter-yaml==0.7.2", "tree-sitter-xml==0.7.0",
@@ -10,12 +11,16 @@ import argparse
 import json
 import re
 import subprocess
+import tokenize
 from bisect import bisect_left
+from difflib import SequenceMatcher
 from functools import cache
 from importlib import import_module
+from io import BytesIO
 from itertools import groupby
 from pathlib import Path
 
+from packaging.licenses import InvalidLicenseExpression, canonicalize_license_expression
 from tree_sitter import Language, Parser
 
 LANGUAGES = {
@@ -84,10 +89,19 @@ def tokens(path, data):
 def protection(path, text, kind, row, source):
     if kind == "exported_jsdoc":
         return "JSDoc on an exported declaration"
+    notice = re.fullmatch(r"(?:#|//|/\*|<!--) SPDX-License-Identifier: (.+?)(?: \*/| -->)?", text)
+    if notice:
+        try:
+            canonicalize_license_expression(notice[1])
+        except InvalidLicenseExpression:
+            return ""
+        return "SPDX source license expression"
     if re.fullmatch(
-        r"(?:#|//|/\*) SPDX-License-Identifier: (?:MIT|Apache-2\.0|BSD-3-Clause)(?: \*/)?", text
+        r"(?:#|//|/\*|<!--) (?:SPDX-FileCopyrightText: |Copyright (?:\(c\) |© )?)"
+        r"[0-9]{4}(?:[-, ]+[0-9]{4})* [^\n]+",
+        text,
     ):
-        return "machine-readable source license"
+        return "source copyright notice"
     if kind == "rustdoc":
         return "Rust documentation attribute (rustdoc or derive macro input)"
     if kind in {"hash_bang_line", "shebang"} or (
@@ -107,6 +121,11 @@ def protection(path, text, kind, row, source):
     ):
         return "uv script metadata"
     if path.suffix == ".py":
+        if row <= 2:
+            header = source.split(b"\n", 2)
+            cookie = re.match(rb"^[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+", header[row - 1])
+            if cookie and (row == 1 or re.match(rb"^[ \t\f]*(?:#|\r?$)", header[0])):
+                return "Python source encoding declaration"
         if re.fullmatch(
             r"# (?:noqa(?:: [A-Z]+\d+(?:, *[A-Z]+\d+)*)?|(?:fmt|ruff): (?:off|on|skip)|type: ignore(?:\[[\w,-]+\])?)",
             text,
@@ -130,6 +149,9 @@ def protection(path, text, kind, row, source):
 
 
 def inventory(path, data):
+    if path.suffix == ".py":
+        encoding, _ = tokenize.detect_encoding(BytesIO(data).readline)
+        data = data.decode(encoding).encode("utf-8")
     ends = [m.start() for m in re.finditer(b"\n", data)]
     spans = list(tokens(path, data))
     code = bytearray(data)
@@ -141,6 +163,11 @@ def inventory(path, data):
         last = bisect_left(ends, max(start, end - 1))
         text = data[start:end].decode()
         only = [i + 1 for i in range(first, last + 1) if not lines[i].strip()]
+        mixed = (
+            re.fullmatch(r"(# noqa: [A-Z]+\d+(?:, *[A-Z]+\d+)*)  +(.*)", text)
+            if path.suffix == ".py"
+            else None
+        )
         yield dict(
             path=str(path),
             line=first + 1,
@@ -148,6 +175,7 @@ def inventory(path, data):
             only=only,
             column=start - (ends[first - 1] + 1 if first else 0),
             protected=protection(path, text, kind, first + 1, data),
+            **({"directive": mixed[1], "rationale": mixed[2]} if mixed else {}),
         )
 
 
@@ -192,6 +220,22 @@ def unchanged_lines(path, line_count):
     return mapping
 
 
+def code_lines(data, comments):
+    only = {line for row in comments for line in row["only"]}
+    return [
+        (n, text) for n, text in enumerate(data.splitlines(), 1) if text.strip() and n not in only
+    ]
+
+
+def matched_code(before, after):
+    matcher = SequenceMatcher(None, [text for _, text in before], [text for _, text in after])
+    old, new = [], []
+    for a, b, size in matcher.get_matching_blocks():
+        old.extend(n for n, _ in before[a : a + size])
+        new.extend(n for n, _ in after[b : b + size])
+    return old, new
+
+
 def ranges(lines):
     parts = []
     for _, run in groupby(enumerate(sorted(lines)), lambda item: item[1] - item[0]):
@@ -226,12 +270,20 @@ def check(retire):
         data = path.read_bytes()
         allowed = expand(baseline[name]) if name in baseline else set()
         kept = set()
+        rows = list(inventory(path, data))
         mapping = original = None
         if name in modified and allowed:
             mapping = unchanged_lines(path, data.count(b"\n") + 1)
             before = subprocess.check_output(["git", "show", f"{REVISION}:{name}"])
-            original = {(r["line"], r["column"], r["text"]) for r in inventory(path, before)}
-        for row in inventory(path, data):
+            previous = list(inventory(path, before))
+            old_code, new_code = matched_code(code_lines(before, previous), code_lines(data, rows))
+            mapping = {
+                new: old
+                for new, old in mapping.items()
+                if bisect_left(old_code, old) == bisect_left(new_code, new)
+            }
+            original = {(r["line"], r["column"], r["text"]) for r in previous}
+        for row in rows:
             if row["protected"]:
                 continue
             line = row["line"]
@@ -243,9 +295,12 @@ def check(retire):
             ):
                 kept.add(old)
             else:
-                errors.append(
-                    f"{path}:{line}: ordinary comment: remove it or document its required consumer"
+                fix = (
+                    f"keep {row['directive']} and remove or migrate its rationale"
+                    if "directive" in row
+                    else "remove it or document its required consumer"
                 )
+                errors.append(f"{path}:{line}: ordinary comment: {fix}")
         if kept:
             retained[name] = ranges(kept)
             total += len(kept)
