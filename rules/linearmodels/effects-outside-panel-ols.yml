@@ -8,7 +8,7 @@
 id: effects-outside-panel-ols
 language: python
 severity: error
-message: Only PanelOLS reads EntityEffects, FixedEffects and TimeEffects in a formula, and this model drops the term in $F without an error. On the wage panel PooledOLS, RandomEffects, BetweenOLS, FamaMacBeth and FirstDifferenceOLS each returned the same coefficients with the term as without it. Use PanelOLS.from_formula for the effects, or take the term out.
+message: In linearmodels, only PanelOLS reads EntityEffects, FixedEffects and TimeEffects in a formula, and this model drops the term in $F without an error. On the wage panel PooledOLS, RandomEffects, BetweenOLS, FamaMacBeth and FirstDifferenceOLS each returned the same coefficients with the term as without it. Use PanelOLS.from_formula for the effects, or take the term out.
 rule:
   kind: string
   pattern: $F

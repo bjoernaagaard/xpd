@@ -1,4 +1,4 @@
-Fitting a second regression on the fitted values of a first one is two stage least squares by hand, and its standard errors come from the wrong residuals. Use `IV2SLS`.
+Using linearmodels to fit a second regression on the fitted values of a first one is two stage least squares by hand, and its standard errors come from the wrong residuals. Use `IV2SLS`.
 
 ```diff lang="python"
 -first = OLS(data.educ, data[["const", "exper", "fatheduc", "motheduc"]]).fit()

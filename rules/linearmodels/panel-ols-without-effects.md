@@ -1,4 +1,4 @@
-`PanelOLS` without effects fits pooled OLS, despite its name. Pass `entity_effects=True` or `time_effects=True` for fixed effects.
+In linearmodels, `PanelOLS` without effects fits pooled OLS, despite its name. Pass `entity_effects=True` or `time_effects=True` for fixed effects.
 
 ```diff lang="python"
 -fixed = PanelOLS(y, X).fit()

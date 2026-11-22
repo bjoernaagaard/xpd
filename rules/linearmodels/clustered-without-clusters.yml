@@ -13,7 +13,7 @@
 id: clustered-without-clusters
 language: python
 severity: error
-message: cov_type="clustered" with no cluster_entity, cluster_time or clusters puts each observation in a cluster of its own, which is the robust covariance. PanelOLS on the wage panel gave the standard error 0.0413, the same as cov_type="robust", against 0.0494 with cluster_entity=True. Add cluster_entity=True to cluster by entity.
+message: For linearmodels PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS, cov_type="clustered" with no cluster_entity, cluster_time or clusters puts each observation in a cluster of its own, which is the robust covariance. PanelOLS on the wage panel gave the standard error 0.0413, the same as cov_type="robust", against 0.0494 with cluster_entity=True. Add cluster_entity=True to cluster by entity.
 rule:
   kind: call
   all:
@@ -32,7 +32,7 @@ utils:
 id: clustered-without-clusters
 language: python
 severity: error
-message: cov_type="clustered" with no clusters puts each observation in a cluster of its own, which is the robust covariance. IV2SLS on the mroz data gave the standard error 0.4277, the same as cov_type="robust". Pass clusters= with the group of each observation.
+message: For linearmodels OLS, IV2SLS, IVLIML, AbsorbingLS, SUR and IV3SLS, cov_type="clustered" with no clusters puts each observation in a cluster of its own, which is the robust covariance. IV2SLS on the mroz data gave the standard error 0.4277, the same as cov_type="robust". Pass clusters= with the group of each observation.
 rule:
   kind: call
   all:
@@ -51,7 +51,7 @@ utils:
 id: clustered-without-clusters
 language: python
 severity: error
-message: cov_type="clustered" needs clusters on this model, and without them fit raises TypeError. Pass clusters= with the group of each observation.
+message: In linearmodels, IVGMM, IVGMMCUE and IVJIVE require clusters for cov_type="clustered", and without them fit raises TypeError. Pass clusters= with the group of each observation.
 rule:
   kind: call
   all:

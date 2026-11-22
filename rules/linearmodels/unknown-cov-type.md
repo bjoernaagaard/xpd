@@ -1,4 +1,4 @@
-The model does not take this `cov_type`, such as the statsmodels names `"HC1"` or `"cluster"`, so fit raises. Use a name the model takes, such as `"robust"` or `"clustered"`.
+Each linearmodels estimator accepts its own covariance names. For example, a `PanelOLS` fit accepts `cov_type="robust"` and raises an error for the statsmodels name `"HC1"`.
 
 ```diff lang="python"
 -result = PanelOLS(y, X, entity_effects=True).fit(cov_type="HC1")

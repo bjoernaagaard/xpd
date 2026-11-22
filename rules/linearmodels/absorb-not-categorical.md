@@ -1,4 +1,4 @@
-`AbsorbingLS` absorbs a column as fixed effects only when its dtype is categorical, so a numeric id becomes one continuous regressor. Cast the column to `category` before you pass it.
+In linearmodels, `AbsorbingLS` absorbs a column as fixed effects only when its dtype is categorical, so a numeric id becomes one continuous regressor. Cast the column to `category` before you pass it.
 
 ```diff lang="python"
 -model = AbsorbingLS(data.y, data[["x"]], absorb=data[["firm"]])

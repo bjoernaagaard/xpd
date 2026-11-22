@@ -10,7 +10,7 @@
 id: invalid-compare-precision
 language: python
 severity: error
-message: compare takes "tstats", "std_errors" or "pvalues" for precision, and $P raises ValueError with "Unknown precision value." Write the name that compare takes for the same number, such as precision="std_errors" for "se".
+message: In linearmodels, compare takes "tstats", "std_errors" or "pvalues" for precision, and $P raises ValueError with "Unknown precision value." Write the name that compare takes for the same number, such as precision="std_errors" for "se".
 rule:
   kind: call
   all:
@@ -32,7 +32,7 @@ utils:
 id: invalid-compare-precision
 language: python
 severity: error
-message: compare takes "tstats", "std_errors" or "pvalues" for precision, and $P raises ValueError with "Unknown precision value." Write precision="std_errors" for standard errors under the coefficients.
+message: In linearmodels, compare takes "tstats", "std_errors" or "pvalues" for precision, and $P raises ValueError with "Unknown precision value." Write precision="std_errors" for standard errors under the coefficients.
 rule:
   kind: call
   all:

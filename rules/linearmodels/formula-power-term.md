@@ -1,4 +1,4 @@
-A formula reads `**` as a power of interactions, so `exper**2` is just `exper`, with no error. Write `I(exper**2)` for the squared values.
+A linearmodels formula reads `**` as a power of interactions, so `exper**2` is just `exper`, with no error. Write `I(exper**2)` for the squared values.
 
 ```diff lang="python"
 -model = IV2SLS.from_formula("lwage ~ 1 + exper + exper**2", data)

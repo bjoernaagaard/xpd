@@ -1,4 +1,4 @@
-`PanelOLS` takes at most two effects, so three raise ValueError. Use `AbsorbingLS`, which absorbs any number of categorical variables.
+In linearmodels, `PanelOLS` takes at most two effects, so three raise ValueError. Use `AbsorbingLS`, which absorbs any number of categorical variables.
 
 ```diff lang="python"
 -model = PanelOLS(y, X, entity_effects=True, time_effects=True, other_effects=data.occupation)

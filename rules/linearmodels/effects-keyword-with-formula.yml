@@ -7,7 +7,7 @@
 id: effects-keyword-with-formula
 language: python
 severity: error
-message: PanelOLS.from_formula has no entity_effects argument and raises TypeError, because the formula holds the effects. Write EntityEffects as a term of the formula in place of entity_effects=True, as in "y ~ 1 + x + EntityEffects".
+message: In linearmodels, PanelOLS.from_formula has no entity_effects argument and raises TypeError, because the formula holds the effects. Write EntityEffects as a term of the formula in place of entity_effects=True, as in "y ~ 1 + x + EntityEffects".
 rule:
   kind: call
   all:
@@ -45,7 +45,7 @@ utils:
 id: effects-keyword-with-formula
 language: python
 severity: error
-message: PanelOLS.from_formula has no time_effects argument and raises TypeError, because the formula holds the effects. Write TimeEffects as a term of the formula in place of time_effects=True, as in "y ~ 1 + x + TimeEffects".
+message: In linearmodels, PanelOLS.from_formula has no time_effects argument and raises TypeError, because the formula holds the effects. Write TimeEffects as a term of the formula in place of time_effects=True, as in "y ~ 1 + x + TimeEffects".
 rule:
   kind: call
   all:
@@ -84,7 +84,7 @@ utils:
 id: effects-keyword-with-formula
 language: python
 severity: error
-message: PanelOLS.from_formula has no $K argument and raises TypeError. The formula holds the effects, so write EntityEffects or TimeEffects as a term, as in "y ~ 1 + x + EntityEffects".
+message: In linearmodels, PanelOLS.from_formula has no $K argument and raises TypeError. The formula holds the effects, so write EntityEffects or TimeEffects as a term, as in "y ~ 1 + x + EntityEffects".
 rule:
   kind: call
   all:

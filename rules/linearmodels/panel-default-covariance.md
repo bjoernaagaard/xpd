@@ -1,4 +1,4 @@
-`fit` without `cov_type` assumes the errors of one entity are unrelated over time, so it rejects true hypotheses far too often when they are related. Pass `cov_type="clustered", cluster_entity=True`.
+In linearmodels, `PanelOLS`, `PooledOLS`, `RandomEffects` and `FirstDifferenceOLS` default to unadjusted covariance. When errors within an entity are correlated over time, pass `cov_type="clustered", cluster_entity=True`.
 
 ```diff lang="python"
 -result = PanelOLS(y, X, entity_effects=True).fit()

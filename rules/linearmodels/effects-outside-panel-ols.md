@@ -1,4 +1,4 @@
-Only `PanelOLS` reads effect terms in a formula, and the other panel models drop them without an error. Use `PanelOLS` when you want fixed effects.
+In linearmodels, only `PanelOLS` reads effect terms in a formula, and the other panel models drop them without an error. Use `PanelOLS` when you want fixed effects.
 
 ```diff lang="python"
 -model = RandomEffects.from_formula("lwage ~ 1 + hours + EntityEffects", data)

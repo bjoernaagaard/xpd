@@ -9,7 +9,7 @@
 id: iv-arguments-swapped
 language: python
 severity: warning
-message: $C takes exog before endog, and $A and $B are named the other way round. The model then instruments the exogenous regressors and treats the endogenous one as exogenous. On the mroz data the coefficient on educ was 0.2021 that way, against 0.0664 in the right order. Write $C($Y, $B, $A, ...).
+message: In linearmodels, $C takes exog before endog, and $A and $B are named the other way round. The model then instruments the exogenous regressors and treats the endogenous one as exogenous. On the mroz data the coefficient on educ was 0.2021 that way, against 0.0664 in the right order. Write $C($Y, $B, $A, ...).
 rule:
   kind: call
   all:

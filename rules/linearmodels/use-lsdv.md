@@ -1,4 +1,4 @@
-`use_lsdv=True` builds a dummy column for each entity, which was up to 1,508 times slower and gave the same coefficients. Drop the option.
+On linearmodels PanelOLS, `use_lsdv=True` builds a dummy column for each entity, which was up to 1,508 times slower and gave the same coefficients. Drop the option.
 
 ```diff lang="python"
 -result = PanelOLS(y, X, entity_effects=True).fit(use_lsdv=True)

@@ -1,4 +1,4 @@
-A cluster or kernel option in a `fit` call without the matching `cov_type` raises an error instead of clustering. Add `cov_type="clustered"` or the kernel covariance it belongs to.
+In linearmodels, a fit can reject or ignore a covariance option when the selected covariance does not use it. For example, pass `cov_type="clustered"` when clustering a `PanelOLS` fit, or `cov_type="kernel"` when setting the bandwidth for `FamaMacBeth`.
 
 ```diff lang="python"
 -result = PanelOLS(y, X, entity_effects=True).fit(cluster_entity=True)

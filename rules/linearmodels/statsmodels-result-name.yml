@@ -101,7 +101,7 @@ metadata: { fix: unsafe }
 id: statsmodels-result-name
 language: python
 severity: error
-message: $A is a name of a statsmodels result, and a linearmodels result has none of that name and raises AttributeError. Write the linearmodels name, which is resid_ss for ssr, s2 for mse_resid, f_statistic.stat for fvalue and f_statistic.pval for f_pvalue.
+message: This linearmodels result raises AttributeError for $A, a statsmodels result name. Write the linearmodels name, which is resid_ss for ssr, s2 for mse_resid, f_statistic.stat for fvalue and f_statistic.pval for f_pvalue.
 rule:
   kind: attribute
   all:
@@ -124,7 +124,7 @@ utils:
 id: statsmodels-result-name
 language: python
 severity: error
-message: $A is a name of a statsmodels result, and a linearmodels result has none of that name and raises AttributeError. linearmodels has cov for cov_params(), f_statistic.stat and f_statistic.pval for fvalue and f_pvalue, resid_ss for ssr, s2 for mse_resid, loglik on the panel results for llf, wald_test on the panel and instrument results for t_test and f_test, and a new fit(cov_type=...) for get_robustcov_results. It has no aic and no bic.
+message: This linearmodels result raises AttributeError for $A, a statsmodels result name. Read cov for the covariance matrix. For llf, panel results provide loglik. For t_test or f_test, panel and instrument results provide wald_test. To change the covariance estimator, fit the model again with cov_type. There is no aic or bic.
 rule:
   kind: attribute
   all:
@@ -140,7 +140,7 @@ utils:
 id: statsmodels-result-name
 language: python
 severity: error
-message: $A is a name of a statsmodels result, and a linearmodels result has none of that name and raises AttributeError. linearmodels has cov for cov_params(), f_statistic.stat and f_statistic.pval for fvalue and f_pvalue, resid_ss for ssr, s2 for mse_resid, loglik on the panel results for llf, wald_test on the panel and instrument results for t_test and f_test, and a new fit(cov_type=...) for get_robustcov_results. It has no aic and no bic.
+message: This linearmodels result raises AttributeError for $A, a statsmodels result name. System and factor results expose neither s2 nor f_statistic. For ssr on a system result, read resid_ss. Factor results have no resid_ss.
 rule:
   kind: attribute
   all:

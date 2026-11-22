@@ -16,7 +16,7 @@
 id: time-before-entity-index
 language: python
 severity: warning
-message: The panel models read the first level of the index as the entity and the second as the time, and $A is named like a time. With year first, PanelOLS read the wage panel as 8 entities over 545 periods, and entity_effects=True gave married 0.1622, the estimate with year effects, where the worker effects give 0.2483. Put the entity first, as in [$B, $A].
+message: The linearmodels panel models read the first level of the index as the entity and the second as the time, and $A is named like a time. With year first, PanelOLS read the wage panel as 8 entities over 545 periods, and entity_effects=True gave married 0.1622, the estimate with year effects, where the worker effects give 0.2483. Put the entity first, as in [$B, $A].
 rule:
   kind: list
   pattern: '[$A, $B]'
@@ -66,7 +66,7 @@ metadata: { fix: unsafe }
 id: time-before-entity-index
 language: python
 severity: warning
-message: The panel models read the first level of the index as the entity and the second as the time, and $A is named like a time. With year first, PanelOLS read the wage panel as 8 entities over 545 periods, and entity_effects=True gave married 0.1622, the estimate with year effects, where the worker effects give 0.2483. Put the entity first, as in [$B, $A].
+message: The linearmodels panel models read the first level of the index as the entity and the second as the time, and $A is named like a time. With year first, PanelOLS read the wage panel as 8 entities over 545 periods, and entity_effects=True gave married 0.1622, the estimate with year effects, where the worker effects give 0.2483. Put the entity first, as in [$B, $A].
 rule:
   kind: list
   pattern: '[$A, $B]'

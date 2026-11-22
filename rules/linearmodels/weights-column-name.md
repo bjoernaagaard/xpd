@@ -1,4 +1,4 @@
-`weights` takes the values and not the name of a column, so a name raises. Pass the column itself, as in `weights=df["w"]`.
+In linearmodels, `weights` takes the values and not the name of a column, so a name raises. Pass the column itself, as in `weights=df["w"]`.
 
 ```diff lang="python"
 -model = PooledOLS.from_formula("lwage ~ 1 + exper", data, weights="hours")

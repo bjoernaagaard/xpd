@@ -111,7 +111,7 @@ utils:
 id: cov-option-without-cov-type
 language: python
 severity: error
-message: FamaMacBeth reads $K only with cov_type="kernel", and without it the keyword does nothing. The standard error on the wage panel was 0.2037 with and without bandwidth=3, against 0.3002 with cov_type="kernel", bandwidth=3. Add cov_type="kernel".
+message: In linearmodels, FamaMacBeth reads $K only with cov_type="kernel", and without it the keyword does nothing. The standard error on the wage panel was 0.2037 with and without bandwidth=3, against 0.3002 with cov_type="kernel", bandwidth=3. Add cov_type="kernel".
 rule:
   kind: call
   all:
@@ -139,7 +139,7 @@ utils:
 id: cov-option-without-cov-type
 language: python
 severity: error
-message: FamaMacBeth reads $K only with cov_type="kernel", and without it the keyword does nothing. The standard error on the wage panel was 0.2037 with and without bandwidth=3, against 0.3002 with cov_type="kernel", bandwidth=3. Write cov_type="kernel" in place of the other cov_type, or take $K out.
+message: In linearmodels, FamaMacBeth reads $K only with cov_type="kernel", and without it the keyword does nothing. The standard error on the wage panel was 0.2037 with and without bandwidth=3, against 0.3002 with cov_type="kernel", bandwidth=3. Write cov_type="kernel" in place of the other cov_type, or take $K out.
 rule:
   kind: call
   all:

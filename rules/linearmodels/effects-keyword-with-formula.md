@@ -1,4 +1,4 @@
-`PanelOLS.from_formula` has no `entity_effects` argument and raises TypeError, because the formula holds the effects. Write `EntityEffects` or `TimeEffects` as a term of the formula.
+In linearmodels, `PanelOLS.from_formula` has no `entity_effects` argument and raises TypeError, because the formula holds the effects. Write `EntityEffects` or `TimeEffects` as a term of the formula.
 
 ```diff lang="python"
 -model = PanelOLS.from_formula("lwage ~ 1 + exper", data, entity_effects=True)

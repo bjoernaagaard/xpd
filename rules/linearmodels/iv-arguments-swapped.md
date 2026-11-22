@@ -1,4 +1,4 @@
-The instrument models take `exog` before `endog`, and these arguments are named the other way round, so the model instruments the wrong variables. Swap them.
+The linearmodels instrument models take `exog` before `endog`, and these arguments are named the other way round, so the model instruments the wrong variables. Swap them.
 
 ```diff lang="python"
 -model = IV2SLS(dependent, endog, exog, instruments)
