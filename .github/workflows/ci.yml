@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/build-setup
       - run: lefthook run pre-commit --all-files --force --no-auto-install
+      - run: node examples/verify_stop_ownership.mjs
       # The formatters fix and stage files, so any change from HEAD means a file was not formatted.
       - run: git diff --exit-code HEAD
       - run: lefthook run pre-push --force --no-auto-install

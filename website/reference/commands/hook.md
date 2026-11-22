@@ -15,8 +15,9 @@ them only in a project with a Python file, and keeps each response short.
 
 ## When a session starts
 
-On `SessionStart`, xpd first records the commit that is checked out, which the `Stop` check
-compares the files with. It then reads the Python files of the project and prints a brief.
+On `SessionStart`, xpd records the checked-out commit and the Git blob IDs of Python files
+with uncommitted changes, including untracked files. It then reads the Python files of the project
+and prints a brief.
 
 ```console
 $ mkdir -p brief && cp samples/graph/steps.py brief/
@@ -95,12 +96,11 @@ pipeline of steps, it also reports the errors and warnings of [`xpd graph`](../g
 ## When the agent wants to stop
 
 On `Stop`, xpd lints every Python file that differs from the commit that `SessionStart` recorded,
-and every untracked Python file, when the file was written after the session began. A file that
-was already changed or untracked before the session is not the session's own, so xpd leaves it
-out. This also covers a file that the agent changed through the shell
-and a file that it committed. A file that only a pull, a merge, a rebase or a checkout changed is
-not the session's own either, so xpd leaves it out. xpd reads this from git's reflog, which says
-how each commit was checked out. In a project without git, xpd lints the Python files that the
+and every untracked Python file, subject to two ownership checks. First, xpd leaves out a file
+whose contents match the uncommitted contents recorded when the session began. Shell edits and local
+commits count even when a copied file retains an earlier modification time. Second, xpd leaves
+out a file that only a pull, merge, rebase or checkout changed. Git's reflog records how each
+commit was checked out. In a project without git, xpd lints the Python files that the
 `PostToolUse` events of the session named.
 
 While a file has an error or a warning, xpd prints `{"decision": "block", "reason": ...}` on
