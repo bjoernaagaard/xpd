@@ -13,7 +13,7 @@ The text content of the result is the report of `graph`. The first step of its o
 shown without its columns, and `"..."` stands for the other steps.
 
 ```json
-{"pipelines":[{"name":"features","file":"samples/graph/steps.py","line":51,"steps":[{"name":"totals","kind":"function","line":18},"..."]}]}
+{"pipelines":[{"name":"features","file":"samples/graph/steps.py","line":50,"steps":[{"name":"totals","kind":"function","line":18},"..."]}]}
 ```
 
 ## Errors

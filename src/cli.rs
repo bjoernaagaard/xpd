@@ -8,6 +8,7 @@ use std::process::{Command, ExitCode};
 use crate::severity::Severity;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::Generator;
 use serde_json::Value;
 
 use crate::author;
@@ -418,8 +419,12 @@ pub fn run() -> ExitCode {
         Cmd::Lsp => lsp::run(),
         Cmd::Test(options) => command_result(crate::cases::run(&options)),
         Cmd::Completions { shell } => {
-            clap_complete::generate(shell, &mut Cli::command(), "xpd", &mut io::stdout());
-            ExitCode::SUCCESS
+            let mut command = Cli::command().bin_name("xpd");
+            command.build();
+            match shell.try_generate(&command, &mut io::stdout().lock()) {
+                Err(error) if error.kind() == io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
+                result => unit_result(result.map_err(Into::into)),
+            }
         }
         Cmd::New(args) => command_result(author::run(args)),
         Cmd::Commands => print_out(&format!("{}\n", crate::commands::to_json(Cli::command()))),

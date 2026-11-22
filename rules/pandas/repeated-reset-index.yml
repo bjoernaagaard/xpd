@@ -14,11 +14,21 @@ rule:
       - has:
           field: body
           all:
-            - has: { matches: independent-tuple-return }
+            - has:
+                stopBy: { kind: function_definition }
+                matches: independent-tuple-return
             - not:
                 has:
-                  regex: '\.reset_index\('
-                  not: { matches: independent-tuple-return }
+                  stopBy: { kind: function_definition }
+                  kind: call
+                  has:
+                    field: function
+                    kind: attribute
+                    has: { field: attribute, regex: '^reset_index$' }
+                  not:
+                    inside:
+                      stopBy: { kind: function_definition }
+                      matches: independent-tuple-return
 utils:
   independent-tuple-return:
     kind: return_statement

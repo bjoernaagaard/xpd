@@ -17,9 +17,9 @@ samples/graph/steps.py
       variable: orders
 33: def discounts(orders: pd.DataFrame) -> pd.DataFrame
       variable: orders
-41: def flags(orders: pd.DataFrame) -> pd.DataFrame
+40: def flags(orders: pd.DataFrame) -> pd.DataFrame
       variable: orders
-51: def features(orders: pd.DataFrame) -> pd.DataFrame
+50: def features(orders: pd.DataFrame) -> pd.DataFrame
       variable: orders
 ```
 
@@ -30,7 +30,7 @@ A folder gets a shorter view, with the public names of each file grouped by kind
 $ xpd outline samples/graph --type function --match '^(totals|flags)' --view signatures --format text
 samples/graph/steps.py
 18: def totals(orders: pd.DataFrame) -> pd.DataFrame
-41: def flags(orders: pd.DataFrame) -> pd.DataFrame
+40: def flags(orders: pd.DataFrame) -> pd.DataFrame
 ```
 
 `--globs` keeps or drops paths by a glob, and `--follow` follows symbolic links when it walks

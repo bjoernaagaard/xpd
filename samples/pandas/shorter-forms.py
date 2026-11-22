@@ -81,6 +81,13 @@ def reset_index_that_stays(df):
 
 
 @case
+def nested_index_resets_that_stay(df):
+    if len(df) >= 3:
+        return df.head(3).reset_index(), df.tail(3).reset_index(), df[["a", "k"]].reset_index()
+    return ()
+
+
+@case
 def set_index_then_resample(df):
     return (
         df.set_index("d").resample("D")["b"].sum(),  # xpd: set-index-then-resample
