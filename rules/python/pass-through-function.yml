@@ -15,7 +15,11 @@ rule:
     all:
       - has:
           kind: return_statement
-          has: { matches: passes-names }
+          has:
+            any:
+              - matches: only-names
+              - pattern: $WRAPPER($INNER)
+                has: { field: arguments, has: { matches: only-names } }
           # A chain of two or more pipe calls names the steps of a pipeline in the order they
           # run, which is what xpd graph reads, so the function does more than rename one call.
           not: { has: { pattern: $FRAME.pipe($$$FIRST).pipe($$$NEXT) } }
@@ -31,7 +35,7 @@ rule:
                     - kind: expression_statement
                       has: { kind: string }
 utils:
-  # A call whose arguments are all plain names, with at least one of them.
+  # A call whose arguments are all parameter names, with at least one argument.
   only-names:
     kind: call
     has:
@@ -45,25 +49,26 @@ utils:
         has:
           not:
             any:
-              - kind: identifier
+              - matches: parameter-name
               - regex: ^[(),]$
-  # The same, where an argument may also be one more call of plain names.
-  passes-names:
-    kind: call
-    has:
-      field: arguments
-      kind: argument_list
+  parameter-name:
+    kind: identifier
+    pattern: $ARG
+    inside:
+      stopBy: { kind: function_definition }
+      kind: function_definition
       has:
-        any:
-          - kind: identifier
-          - matches: only-names
-    not:
-      has:
-        field: arguments
-        kind: argument_list
+        field: parameters
         has:
-          not:
-            any:
-              - kind: identifier
-              - regex: ^[(),]$
-              - matches: only-names
+          any:
+            - { kind: identifier, pattern: $ARG }
+            - { has: { field: name, pattern: $ARG } }
+            - kind: typed_parameter
+              has:
+                any:
+                  - { kind: identifier, pattern: $ARG }
+                  - { matches: splat-parameter }
+            - matches: splat-parameter
+  splat-parameter:
+    any: [{ kind: list_splat_pattern }, { kind: dictionary_splat_pattern }]
+    has: { kind: identifier, pattern: $ARG }
