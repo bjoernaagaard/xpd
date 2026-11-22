@@ -1,0 +1,82 @@
+{
+  "questions": {
+    "financial-backtest": [
+      ["My arch optimizer struggles with returns stored as small decimals.", "arch/unscaled-returns"],
+      ["The skfolio sample data contains index price levels, and I want to feed it to a portfolio optimizer.", "skfolio/skfolio-prices-not-returns"],
+      ["I need scikit-lego lookback features that never copy a value from the future.", "sklego/add-lags-positive"]
+    ],
+    "panel-preparation": [
+      ["I want to attach each group's total to every row of a pandas frame without building a second frame.", "pandas/aggregate-then-merge-back"],
+      ["AbsorbingLS is treating my numeric employer IDs like a continuous regressor.", "linearmodels/absorb-not-categorical"],
+      ["I need a Plotly comparison where a given height means the same thing in each facet.", "plotly/free-facet-scales"]
+    ],
+    "category-model": [
+      ["My category_encoders target encoding seems to reveal the answers from the test rows.", "category_encoders/encode-before-split"],
+      ["I run scikit-learn cross_val_score again for each metric and it keeps fitting the same model.", "sklearn/cross-val-score-per-metric"],
+      ["My MAPIE intervals get calibrated on the same rows used to fit the model and turn out too narrow.", "mapie/calibrate-on-training-rows"]
+    ],
+    "sensor-pipeline": [
+      ["A Hamilton node edits the frame it was handed, and sibling output changes depending on what I request.", "hamilton/node-mutates-input"],
+      ["My Polars pipeline forces each lazy input batch into memory before combining them.", "polars/polars-collect-in-loop"],
+      ["In a downstream NumPy buffer, cells contain garbage if I read them before a row was written.", "numpy/read-uninitialized"]
+    ],
+    "calibration-notebook": [
+      ["A SciPy right-tail probability becomes zero when I subtract the CDF from one.", "scipy/cdf-complement"],
+      ["My MAPIE confidence level of 0.1 produces much narrower intervals than the 90 percent coverage I wanted.", "mapie/alpha-as-confidence-level"],
+      ["I put a termination keyword in the wrong place and pymoo ignores my stopping rule.", "pymoo/minimize-ignored-keyword"]
+    ],
+    "reproducible-simulation": [
+      ["I need arch simulation forecasts to use a repeatable source of random numbers.", "arch/arch-unseeded-draws"],
+      ["My NumPy jobs use timestamps as seeds and jobs launched together draw the same samples.", "numpy/clock-seed"],
+      ["My skfolio optimizer uses an estimator with random starts and selects different portfolios on unchanged data.", "skfolio/skfolio-unseeded-estimator"]
+    ],
+    "time-ordered-validation": [
+      ["My MAPIE time series calibrator sees shuffled folds and makes future intervals look too good.", "mapie/shuffled-time-series-split"],
+      ["A scikit-lego DecayEstimator gives higher weight to recent rows, but my training split scrambles time order.", "sklego/decay-on-shuffled-rows"],
+      ["In skfolio asset selection on the full history is choosing my universe before each train and test split.", "skfolio/skfolio-preselection-before-split"]
+    ],
+    "clustered-analysis": [
+      ["My linearmodels panel fit needs standard errors clustered by company and currently gives each row its own cluster.", "linearmodels/clustered-without-clusters"],
+      ["My Polars as-of join is wrong because observations are sorted inconsistently.", "polars/polars-join-asof-unsorted"],
+      ["A Plotly area chart exaggerates changes because the vertical axis starts far above zero.", "plotly/area-axis-without-zero"]
+    ],
+    "wide-features": [
+      ["A pandas statistic uses a Python function on each row of a wide frame and takes ages.", "pandas/apply-axis-1"],
+      ["A category_encoders hashing encoder produces only eight columns and too many categories collide.", "category_encoders/hashing-default-components"],
+      ["My scikit-learn categorical preprocessing learns from all labels before the cross-validation folds are made.", "sklearn/cross-val-on-fitted-data"]
+    ],
+    "optimization-budget": [
+      ["I multiply by a matrix inverse to solve a NumPy system and want a faster and more accurate approach.", "numpy/inv-then-multiply"],
+      ["My SciPy pairwise distance routine calls a Python Euclidean distance callback for each pair.", "scipy/callable-metric"],
+      ["I set pymoo mutation probability thinking it was a rate per variable, but far fewer variables change.", "pymoo/mutation-prob-per-individual"]
+    ],
+    "derived-features": [
+      ["One Hamilton feature writes directly into an array shared by several other nodes.", "hamilton/node-mutates-input"],
+      ["My Polars expression maps a Python lambda over each cell even though the operation could run on the whole column.", "polars/polars-map-elements-native"],
+      ["The category_encoders step asks for column names but receives a NumPy array from the preceding step.", "category_encoders/named-cols-after-array-step"]
+    ],
+    "forecast-report": [
+      ["I enabled automatic rescaling in arch and need to report the resulting variance forecasts in the original units.", "arch/rescaled-units"],
+      ["I need a constant in a linearmodels regression formula and expected it to be added automatically.", "linearmodels/formula-without-constant"],
+      ["I need to compare Plotly animation frames side by side so changes are visible without waiting.", "plotly/animation-frame"]
+    ],
+    "xpd-control": [
+      ["What should I do with an ast-grep-ignore comment that hides no warning anymore?", "xpd/unused-suppression"]
+    ],
+    "python-control": [
+      ["My Python type annotation says dict[str, Any] but each key in the record has a known type.", "python/dict-str-any"]
+    ]
+  },
+  "upcoming": {
+    "nixtla-reconciliation": [
+      ["My StatsForecast forecast ran with fitted=False, and now I need forecast_fitted_values for the reconciliation step.", "statsforecast/fitted-values-without-fitted"],
+      ["My HierarchicalForecast call uses MinTrace with mint_shrink but I only passed forecasts and the summing matrix.", "hierarchicalforecast/mintrace-without-insample"],
+      ["I evaluate functools.partial(mase, seasonality=7) in UtilsForecast and only supply the holdout predictions.", "utilsforecast/mase-without-train-df"]
+    ],
+    "nixtla-lag-model": [
+      ["I am building a CoreForecast GroupedArray from two series and the indptr starts with the end of the first series.", "coreforecast/indptr-missing-zero"],
+      ["I called fit on MLForecast without predicting intervals, and now predict fails when I request a confidence level.", "mlforecast/intervals-without-calibration"],
+      ["My scikit-lego lookback feature copies a later observation when I give add_lags a positive lag.", "sklego/add-lags-positive"]
+    ]
+  }
+}
