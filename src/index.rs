@@ -402,7 +402,21 @@ impl Library {
                         .iter()
                         .any(|record| record.kind == Kind::Rule && record.name == entry.name)
                 {
-                    BTreeSet::from([self.package_default(categories, &entry.package)])
+                    let mut linked = self
+                        .local
+                        .iter()
+                        .flatten()
+                        .filter(|symbol| {
+                            symbol.kind == Kind::Symbol && symbol.rules.contains(&entry.name)
+                        })
+                        .map(|symbol| {
+                            self.module_category(categories, &symbol.package, symbol.module())
+                        })
+                        .collect::<BTreeSet<_>>();
+                    if linked.is_empty() {
+                        linked.insert(self.package_default(categories, &entry.package));
+                    }
+                    linked
                 } else {
                     categories.bundled_rule(&entry.package, &entry.name)
                 }
