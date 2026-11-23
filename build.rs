@@ -44,10 +44,9 @@ const PLUGIN: &str = ".claude-plugin/plugin.json";
 const PLUGIN_MCP: &str = "mcp.json";
 /// The vector of each index record, by the record's name. `xpd find --write-vectors` writes it.
 const VECTORS: &str = "indexes/vectors.bin";
-/// The start of `VECTORS`. Each record follows as its name's length (u16 LE), its name, the
-/// hash of its text (u64 LE, as `text_hash` gives it), and `DIMENSIONS` signed bytes.
-const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
-const DIMENSIONS: usize = 256;
+use search::{
+    DIMENSIONS, TAG_ARRAY, TAG_FALSE, TAG_NULL, TAG_OBJECT, TAG_STRING, TAG_TRUE, VECTORS_HEADER,
+};
 /// Fails the build when the plugin names another version than the crate, so a release
 /// cannot ship skills under an old version or start an old xpd.
 fn plugin_version() -> Result<()> {
@@ -631,22 +630,22 @@ fn encode(
 ) -> Result<()> {
     use serde_json::Value;
     match value {
-        Value::Null => data.push(0),
-        Value::Bool(false) => data.push(1),
-        Value::Bool(true) => data.push(2),
+        Value::Null => data.push(TAG_NULL),
+        Value::Bool(false) => data.push(TAG_FALSE),
+        Value::Bool(true) => data.push(TAG_TRUE),
         Value::String(text) => {
-            data.push(3);
+            data.push(TAG_STRING);
             intern(text, strings, data)?;
         }
         Value::Array(items) => {
-            data.push(4);
+            data.push(TAG_ARRAY);
             data.extend(u16::try_from(items.len())?.to_le_bytes());
             for item in items {
                 encode(item, strings, data)?;
             }
         }
         Value::Object(fields) => {
-            data.push(5);
+            data.push(TAG_OBJECT);
             data.extend(u16::try_from(fields.len())?.to_le_bytes());
             for (key, value) in fields {
                 intern(key, strings, data)?;

@@ -671,7 +671,7 @@ fn print_entries(entries: &[index::Entry], format: Format, detail: Detail) -> Re
         Format::Text => {
             for entry in entries {
                 let signature = if entry.kind != Kind::Symbol
-                    || entry.callable.as_deref() == Some("property")
+                    || entry.callable == Some(index::CallableKind::Property)
                 {
                     String::new()
                 } else {
@@ -697,14 +697,14 @@ fn print_entries(entries: &[index::Entry], format: Format, detail: Detail) -> Re
                 println!(
                     "{}{signature} [{}]\n{}",
                     entry.name,
-                    entry
-                        .callable
-                        .as_deref()
-                        .unwrap_or(if entry.kind == Kind::Recipe {
+                    entry.callable.map_or(
+                        if entry.kind == Kind::Recipe {
                             "recipe"
                         } else {
                             "rule"
-                        }),
+                        },
+                        index::CallableKind::as_str,
+                    ),
                     entry.summary
                 );
                 if matches!(detail, Detail::Full)
@@ -804,7 +804,7 @@ fn check_ranking(index: Option<&std::path::Path>, path: &std::path::Path) -> Res
     let (open, questions): (Vec<_>, Vec<_>) = questions
         .into_iter()
         .partition(|question| question["open"] == true);
-    let has_model = with_model.has_model();
+    let has_model = with_model.ensure_model();
     let mut asked = [0; 2];
     let mut failed = [0; 2];
     for question in &questions {

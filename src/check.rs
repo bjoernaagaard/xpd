@@ -41,7 +41,7 @@ impl Workspace {
             }
         };
         let mut issues = scanned.issues;
-        issues.extend(self.package_issues(&scanned.calls));
+        issues.extend(self.package_issues(&scanned.calls)?);
         for path in &scanned.pass_limit {
             eprintln!(
                 "xpd: {}: stopped fixing after reaching the pass limit; some fixable issues may remain",

@@ -195,14 +195,19 @@ pub(crate) fn missing(
     installed: &Distributions,
     project: &Path,
     calls: &Calls,
-) -> Vec<Issue> {
+) -> Result<Vec<Issue>> {
     let pyproject = nearest_pyproject(project)
-        .and_then(|path| fs::read_to_string(&path).ok().map(|text| (path, text)));
+        .map(|path| {
+            let text = fs::read_to_string(&path)
+                .with_context(|| format!("cannot read {}", path.display()))?;
+            Ok::<_, anyhow::Error>((path, text))
+        })
+        .transpose()?;
     let configured = pyproject.as_ref().map(|(_, text)| configured_tools(text));
     let configured = configured.as_deref().unwrap_or_default();
     let file = pyproject.as_ref().map_or(venv.root(), |(path, _)| path);
     let file = shown(file, project);
-    packs
+    Ok(packs
         .iter()
         .filter(|pack| installed.version(&pack.module).is_some())
         .flat_map(|pack| pack.package_checks.iter().map(move |check| (pack, check)))
@@ -218,7 +223,7 @@ pub(crate) fn missing(
                 help: pack.page(&check.id),
             })
         })
-        .collect()
+        .collect())
 }
 
 /// The nearest `pyproject.toml` in or above `project`, where the search for the venv also

@@ -954,7 +954,7 @@ impl<'c> Server<'c> {
             .workspace
             .get_or_load_project(root)?
             .workspace
-            .package_issues(&calls);
+            .package_issues(&calls)?;
         // Without a `pyproject.toml`, `xpd check` names the venv's folder, and an editor
         // cannot show an issue on a folder.
         let file = issues

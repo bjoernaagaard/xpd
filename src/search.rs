@@ -1,3 +1,15 @@
+/// The values that `indexes/vectors.bin` keeps of each vector.
+pub(crate) const DIMENSIONS: usize = 256;
+/// The start of `indexes/vectors.bin`, shared between build.rs and runtime.
+pub(crate) const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
+/// Encoded value tags shared between build.rs and the embedded index decoder.
+pub(crate) const TAG_NULL: u8 = 0;
+pub(crate) const TAG_FALSE: u8 = 1;
+pub(crate) const TAG_TRUE: u8 = 2;
+pub(crate) const TAG_STRING: u8 = 3;
+pub(crate) const TAG_ARRAY: u8 = 4;
+pub(crate) const TAG_OBJECT: u8 = 5;
+
 pub(crate) fn tokens(text: &str) -> Vec<String> {
     let mut split = String::new();
     let mut previous = false;

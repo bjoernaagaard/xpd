@@ -6,9 +6,33 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
-use crate::embed::{DIMENSIONS, Model};
+use crate::embed::Model;
 use crate::outline::{self, Callable, ParameterText};
+use crate::search::{
+    DIMENSIONS, TAG_ARRAY, TAG_FALSE, TAG_NULL, TAG_OBJECT, TAG_STRING, TAG_TRUE, VECTORS_HEADER,
+    tokens,
+};
 use crate::{pack, venv};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum CallableKind {
+    Class,
+    Function,
+    Method,
+    Property,
+}
+
+impl CallableKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Class => "class",
+            Self::Function => "function",
+            Self::Method => "method",
+            Self::Property => "property",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "snake_case")]
@@ -49,7 +73,7 @@ pub(crate) struct Entry {
     pub(crate) name: String,
     /// `class` or `function` for a symbol, and `method` or `property` for a member of a class
     /// that `api` was asked for.
-    pub(crate) callable: Option<String>,
+    pub(crate) callable: Option<CallableKind>,
     pub(crate) parameters: Vec<String>,
     /// The parameter list as the source writes it: each parameter with its type annotation and
     /// its default, and a `*` or `/` that stands alone between parameters. Empty for a function
@@ -115,7 +139,7 @@ struct Resolved {
     kind: Kind,
     package: String,
     name: String,
-    callable: Option<String>,
+    callable: Option<CallableKind>,
     definitions: Vec<Definition>,
     summary: String,
     keywords: Vec<String>,
@@ -299,7 +323,8 @@ impl Library {
         self.model.get_or_init(Model::open).as_ref()
     }
 
-    pub(crate) fn has_model(&self) -> bool {
+    /// Opens or downloads the embedding model and reports whether semantic search is available.
+    pub(crate) fn ensure_model(&self) -> bool {
         self.model().is_some()
     }
 }
@@ -313,6 +338,20 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
             path.display(),
             index.schema_version
         );
+        for entry in &index.entries {
+            let valid_callable = match entry.kind {
+                Kind::Symbol => entry.callable.is_some(),
+                Kind::Rule | Kind::Recipe => entry.callable.is_none(),
+            };
+            ensure!(
+                valid_callable,
+                "{}: entry {} has invalid callable {:?} for kind {:?}",
+                path.display(),
+                entry.name,
+                entry.callable,
+                entry.kind
+            );
+        }
         let mut entries = RECORDS
             .iter()
             .filter(|e| e.package != index.package || e.kind == Kind::Rule)
@@ -340,15 +379,15 @@ impl Entry {
     fn member(self, name: &str) -> Option<Self> {
         let member = self.members.into_iter().find(|m| m.name == name)?;
         let callable = if member.property {
-            "property"
+            CallableKind::Property
         } else {
-            "method"
+            CallableKind::Method
         };
         Some(Self {
             kind: Kind::Symbol,
             package: self.package,
             name: format!("{}.{}", self.name, member.name),
-            callable: Some(callable.to_owned()),
+            callable: Some(callable),
             parameters: member.parameters,
             parameters_written: member.parameters_written,
             summary: member.summary,
@@ -380,8 +419,6 @@ pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
     };
     Ok(entry(class)?.and_then(|class| class.member(member)))
 }
-
-use crate::search::tokens;
 
 #[derive(Debug)]
 struct Stored {
@@ -424,12 +461,12 @@ fn decode(data: &mut &[u8]) -> serde_json::Value {
     let tag = data[0];
     *data = &data[1..];
     match tag {
-        0 => Value::Null,
-        1 => Value::Bool(false),
-        2 => Value::Bool(true),
-        3 => Value::String(STRINGS[integer(data)].to_owned()),
-        4 => Value::Array((0..integer(data)).map(|_| decode(data)).collect()),
-        5 => Value::Object(
+        TAG_NULL => Value::Null,
+        TAG_FALSE => Value::Bool(false),
+        TAG_TRUE => Value::Bool(true),
+        TAG_STRING => Value::String(STRINGS[integer(data)].to_owned()),
+        TAG_ARRAY => Value::Array((0..integer(data)).map(|_| decode(data)).collect()),
+        TAG_OBJECT => Value::Object(
             (0..integer(data))
                 .map(|_| {
                     let key = STRINGS[integer(data)].to_owned();
@@ -447,8 +484,6 @@ const RECORDS: &[Stored] = include!(concat!(env!("OUT_DIR"), "/records.rs"));
 /// `DIMENSIONS` signed bytes for each of `RECORDS`, all zero for a record that has no vector
 /// of its current text.
 const VECTORS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/vectors.bin"));
-/// The start of `indexes/vectors.bin`, which build.rs reads.
-const VECTORS_HEADER: &[u8] = b"xpd vectors 256 with text hashes\n";
 /// Reciprocal rank fusion adds `weight / (FUSION_K + rank)` from each ranking.
 const FUSION_K: f64 = 60.0;
 

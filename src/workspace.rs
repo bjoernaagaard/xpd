@@ -93,12 +93,13 @@ impl Workspace {
         scan::fix_source(file, source, &self.catalog.packs, allowed)
     }
 
-    pub(crate) fn package_issues(&self, calls: &Calls) -> Vec<Issue> {
-        self.environment
-            .as_ref()
-            .map_or_else(Vec::new, |(venv, installed)| {
+    pub(crate) fn package_issues(&self, calls: &Calls) -> Result<Vec<Issue>> {
+        self.environment.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |(venv, installed)| {
                 package_check::missing(&self.catalog.packs, venv, installed, &self.root, calls)
-            })
+            },
+        )
     }
 }
 

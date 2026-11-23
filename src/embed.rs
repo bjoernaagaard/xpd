@@ -19,10 +19,9 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::params::LlamaModelParams;
 
+use crate::search::DIMENSIONS;
 use crate::venv;
 
-/// The values that `indexes/vectors.bin` keeps of each vector.
-pub(crate) const DIMENSIONS: usize = 256;
 const FILE: &str = "embeddinggemma-300M-Q8_0.gguf";
 /// Pinned to a revision, because `indexes/vectors.bin` holds this file's vectors.
 const URL: &str = "https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF/resolve/0f741b5a6585bd53aeb15cd1372c56f2a0f65e12/embeddinggemma-300M-Q8_0.gguf";
