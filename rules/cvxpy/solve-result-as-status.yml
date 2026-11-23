@@ -1,0 +1,27 @@
+id: solve-result-as-status
+language: python
+severity: warning
+message: CVXPY Problem.solve() returns an objective value. Call it once, then check Problem.status for an acceptable solver status.
+rule:
+  kind: call
+  all:
+    - {pattern: '$PROBLEM.solve($$$ARGS)'}
+    - any:
+        - {matches: cvxpy-test-condition}
+        - inside:
+            stopBy: {not: {any: [{kind: parenthesized_expression}, {kind: not_operator}]}}
+            matches: cvxpy-test-condition
+metadata:
+  holds:
+    PROBLEM:
+      kind: call
+      has: {field: function, regex: '(^|\.)Problem$'}
+utils:
+  cvxpy-test-condition:
+    any:
+      - {inside: {kind: if_statement, field: condition}}
+      - {inside: {kind: elif_clause, field: condition}}
+      - {inside: {kind: while_statement, field: condition}}
+      - all:
+          - {nthChild: 1}
+          - {inside: {kind: assert_statement}}

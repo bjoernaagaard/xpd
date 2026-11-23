@@ -1,0 +1,9 @@
+defaultCategory: optimization
+categoryPrefixes:
+  cvxpy.atoms: numerics
+  cvxpy.constraints: models
+  cvxpy.expressions: models
+
+aliases: {}
+members: {}
+packages: []

@@ -1,0 +1,19 @@
+id: mutate-problem-constraints
+language: python
+severity: error
+message: CVXPY Problem.constraints returns a list copy. Include the new constraints when constructing a Problem.
+rule:
+  kind: call
+  all:
+    - inside: {kind: expression_statement}
+    - has:
+        field: function
+        all:
+          - {kind: attribute}
+          - {has: {field: attribute, regex: '^(append|extend|insert)$'}}
+          - {has: {field: object, pattern: $PROBLEM.constraints}}
+metadata:
+  holds:
+    PROBLEM:
+      kind: call
+      has: {field: function, regex: '(^|\.)Problem$'}

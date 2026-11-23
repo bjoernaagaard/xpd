@@ -1,0 +1,25 @@
+id: star-matmul
+language: python
+severity: warning
+message: CVXPY uses * between these non-scalar expressions for matrix multiplication. Use @ for matrix multiplication or cvxpy.multiply for elementwise multiplication.
+rule:
+  kind: binary_operator
+  pattern: $LEFT * $RIGHT
+metadata:
+  since: "1.1"
+  holds:
+    LEFT: {matches: cvxpy-non-scalar-leaf}
+    RIGHT: {matches: cvxpy-non-scalar-leaf}
+utils:
+  cvxpy-non-scalar-leaf:
+    kind: call
+    all:
+      - {has: {field: function, regex: '(^|\.)(Variable|Parameter)$'}}
+      - has:
+          field: arguments
+          has:
+            all:
+              - {nthChild: 1}
+              - any:
+                  - {kind: integer, regex: '^(?:[2-9]|[1-9][0-9]+)$'}
+                  - {kind: tuple, regex: '^\(\s*(?:[2-9]|[1-9][0-9]+)(?:\s*,\s*(?:[2-9]|[1-9][0-9]+))*\s*,?\s*\)$'}

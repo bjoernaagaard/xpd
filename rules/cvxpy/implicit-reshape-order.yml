@@ -1,0 +1,178 @@
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY reshape. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  kind: call
+  all:
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+              - {kind: comment}
+              - {kind: line_continuation}
+              - {kind: list_splat}
+              - {kind: dictionary_splat}
+    - any:
+        - all:
+            - {pattern: $OMITTED}
+            - {pattern: '$F($EXPR, $SHAPE)'}
+            - not:
+                has: {field: arguments, has: {kind: keyword_argument, has: {field: name, regex: '^order$'}}}
+        - all:
+            - {pattern: $DEFAULT}
+            - any:
+                - {pattern: '$F($EXPR, $SHAPE, None)'}
+                - {pattern: '$F($EXPR, $SHAPE, order=None)'}
+transform:
+  INSERTED:
+    replace: {source: $OMITTED, replace: ',?(\s*\))$', by: ', order="F"$1'}
+  EXPLICIT:
+    replace: {source: $DEFAULT, replace: '\bNone(\s*,?\s*\))$', by: '"F"$1'}
+fix: $INSERTED$EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    F:
+      any:
+        - {kind: attribute, regex: '\.reshape$'}
+        - kind: identifier
+          pattern: $NAME
+          inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              kind: import_from_statement
+              all:
+                - {has: {field: module_name, regex: '^cvxpy(\.|$)'}}
+                - any:
+                    - all:
+                        - has:
+                            kind: dotted_name
+                            regex: '^reshape$'
+                            has: {kind: identifier, pattern: $NAME}
+                        - not:
+                            inside:
+                              stopBy: end
+                              kind: module
+                              has:
+                                stopBy: end
+                                kind: aliased_import
+                                has: {field: alias, pattern: $NAME}
+                    - has:
+                        kind: aliased_import
+                        all:
+                          - {has: {field: name, regex: '^reshape$'}}
+                          - {has: {field: alias, pattern: $NAME}}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY vec. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  kind: call
+  all:
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+              - {kind: comment}
+              - {kind: line_continuation}
+              - {kind: list_splat}
+              - {kind: dictionary_splat}
+    - any:
+        - all:
+            - {pattern: $OMITTED}
+            - {pattern: '$F($EXPR)'}
+            - not:
+                has: {field: arguments, has: {kind: keyword_argument, has: {field: name, regex: '^order$'}}}
+        - all:
+            - {pattern: $DEFAULT}
+            - any:
+                - {pattern: '$F($EXPR, None)'}
+                - {pattern: '$F($EXPR, order=None)'}
+transform:
+  INSERTED:
+    replace: {source: $OMITTED, replace: ',?(\s*\))$', by: ', order="F"$1'}
+  EXPLICIT:
+    replace: {source: $DEFAULT, replace: '\bNone(\s*,?\s*\))$', by: '"F"$1'}
+fix: $INSERTED$EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    F:
+      any:
+        - {kind: attribute, regex: '\.vec$'}
+        - kind: identifier
+          pattern: $NAME
+          inside:
+            stopBy: end
+            kind: module
+            has:
+              stopBy: end
+              kind: import_from_statement
+              all:
+                - {has: {field: module_name, regex: '^cvxpy(\.|$)'}}
+                - any:
+                    - all:
+                        - has:
+                            kind: dotted_name
+                            regex: '^vec$'
+                            has: {kind: identifier, pattern: $NAME}
+                        - not:
+                            inside:
+                              stopBy: end
+                              kind: module
+                              has:
+                                stopBy: end
+                                kind: aliased_import
+                                has: {field: alias, pattern: $NAME}
+                    - has:
+                        kind: aliased_import
+                        all:
+                          - {has: {field: name, regex: '^vec$'}}
+                          - {has: {field: alias, pattern: $NAME}}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY flatten. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  kind: call
+  all:
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+              - {kind: comment}
+              - {kind: line_continuation}
+              - {kind: list_splat}
+              - {kind: dictionary_splat}
+    - any:
+        - all:
+            - {pattern: $OMITTED}
+            - {pattern: '$EXPR.flatten()'}
+        - all:
+            - {pattern: $DEFAULT}
+            - any:
+                - {pattern: '$EXPR.flatten(None)'}
+                - {pattern: '$EXPR.flatten(order=None)'}
+transform:
+  INSERTED:
+    replace: {source: $OMITTED, replace: '(\s*\))$', by: 'order="F"$1'}
+  EXPLICIT:
+    replace: {source: $DEFAULT, replace: '\bNone(\s*,?\s*\))$', by: '"F"$1'}
+fix: $INSERTED$EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    EXPR:
+      kind: call
+      has: {field: function, regex: '(^|\.)(Variable|Parameter|Constant)$'}
