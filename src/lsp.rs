@@ -8,6 +8,7 @@ mod uri;
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
+use std::io::ErrorKind;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -973,15 +974,25 @@ impl<'c> Server<'c> {
         let document = if let Some(document) = self.documents.get_mut(uri.as_str()) {
             Some(document)
         } else {
-            on_disk = uri::to_path(&uri)
-                .and_then(|path| fs::read_to_string(path).ok())
-                .map(|text| Document {
-                    place: self.workspace.place(&uri),
-                    uri,
-                    version: None,
-                    text,
-                    linted: None,
-                });
+            let text = if let Some(path) = uri::to_path(&uri) {
+                match fs::read_to_string(&path) {
+                    Ok(text) => Some(text),
+                    Err(error) if error.kind() == ErrorKind::NotFound => None,
+                    Err(error) => {
+                        return Err(error)
+                            .with_context(|| format!("cannot read {}", path.display()));
+                    }
+                }
+            } else {
+                None
+            };
+            on_disk = text.map(|text| Document {
+                place: self.workspace.place(&uri),
+                uri,
+                version: None,
+                text,
+                linted: None,
+            });
             on_disk.as_mut()
         };
         let items = match document {

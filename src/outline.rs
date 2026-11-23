@@ -582,15 +582,18 @@ impl OutlineArgs {
             );
         }
         let extractors = Extractors::compile(rules, &options)?;
-        let files = if self.stdin {
+        let (files, read_failed) = if self.stdin {
             let language = self.lang.expect("clap requires --lang with --stdin");
             let source = io::read_to_string(io::stdin()).context("cannot read stdin")?;
             let root = language.ast_grep(source);
-            vec![File {
-                path: "STDIN".to_owned(),
-                language: language.to_string(),
-                items: extractors.items(language, &root),
-            }]
+            (
+                vec![File {
+                    path: "STDIN".to_owned(),
+                    language: language.to_string(),
+                    items: extractors.items(language, &root),
+                }],
+                false,
+            )
         } else {
             self.read_files(&extractors)?
         };
@@ -609,7 +612,11 @@ impl OutlineArgs {
         if matches!(json, Some(JsonStyle::Pretty | JsonStyle::Compact)) {
             writeln!(out)?;
         }
-        Ok(ExitCode::SUCCESS)
+        Ok(if read_failed {
+            ExitCode::from(2)
+        } else {
+            ExitCode::SUCCESS
+        })
     }
 
     /// Whether a directory is among the paths, which changes what `auto` lists and shows.
@@ -619,7 +626,7 @@ impl OutlineArgs {
 
     /// The outlines of the files under the paths, in path order. A file with no items is left
     /// out when a directory was given.
-    fn read_files(&self, extractors: &Extractors) -> Result<Vec<File>> {
+    fn read_files(&self, extractors: &Extractors) -> Result<(Vec<File>, bool)> {
         let directories = self.reads_directories();
         let read = |(path, language): &(PathBuf, SupportLang)| -> Result<File> {
             let source = fs::read_to_string(path)
@@ -633,14 +640,18 @@ impl OutlineArgs {
         };
         let files: Vec<Result<File>> = self.files(extractors)?.par_iter().map(read).collect();
         let mut read_files = Vec::new();
+        let mut read_failed = false;
         for file in files {
             match file {
                 Ok(file) if directories && file.items.is_empty() => {}
                 Ok(file) => read_files.push(file),
-                Err(e) => eprintln!("xpd: {e:#}"),
+                Err(e) => {
+                    eprintln!("xpd: {e:#}");
+                    read_failed = true;
+                }
             }
         }
-        Ok(read_files)
+        Ok((read_files, read_failed))
     }
 
     /// The files under the paths that a rule reads, each with its language.
