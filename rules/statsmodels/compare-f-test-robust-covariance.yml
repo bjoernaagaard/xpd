@@ -1,0 +1,44 @@
+id: compare-f-test-robust-covariance
+language: python
+severity: warning
+message: Statsmodels compare_f_test uses residual sums of squares and still returns a classical p-value with robust covariance. Use a Wald test on the full model for the intended restrictions.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $FULL.compare_f_test}}
+    - has:
+        field: arguments
+        has:
+          any:
+            - {kind: keyword_argument, all: [{has: {field: name, regex: '^restricted$'}}, {has: {field: value, pattern: $RESTRICTED}}]}
+            - {pattern: $RESTRICTED, not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: list_splat}, {kind: dictionary_splat}]}}
+utils:
+  ols-fit:
+    kind: call
+    has:
+      field: function
+      kind: attribute
+      all:
+        - {has: {field: attribute, regex: '^fit$'}}
+        - has:
+            field: object
+            kind: call
+            has: {field: function, regex: '(^|\.)(OLS(?:\.from_formula)?|ols)$'}
+  without-robust-keyword:
+    all:
+      - {matches: ols-fit}
+      - not:
+          has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              all:
+                - {has: {field: name, regex: '^cov_type$'}}
+                - {has: {field: value, regex: '(?i)^["''](?:hc[0-3]|hac|cluster|hac-panel|hac-groupsum)["'']$'}}
+metadata:
+  holds:
+    FULL: {matches: ols-fit}
+    RESTRICTED: {matches: ols-fit}
+  unlessHolds:
+    FULL: {matches: without-robust-keyword}
+    RESTRICTED: {matches: without-robust-keyword}

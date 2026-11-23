@@ -1,0 +1,51 @@
+id: removed-tsa-arguments
+language: python
+severity: error
+message: Statsmodels 0.15 removed old_names from AutoReg and ar_select_order. Drop the keyword and update any code that reads the old parameter labels.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, regex: '^old_names$'}}
+metadata:
+  since: '0.15'
+  holds:
+    F: {regex: '(^|\.)(AutoReg|ar_select_order)$'}
+---
+id: removed-tsa-arguments
+language: python
+severity: error
+message: Statsmodels 0.15 removed verbose from grangercausalitytests. Drop the keyword and read the returned dictionary for test results.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, regex: '^verbose$'}}
+metadata:
+  since: '0.15'
+  holds:
+    F: {regex: '(^|\.)grangercausalitytests$'}
+---
+id: removed-tsa-arguments
+language: python
+severity: error
+message: Statsmodels 0.15 rejects nlags=None in kpss. Use nlags="auto" for the automatic lag selection previously used for None.
+rule:
+  kind: none
+  inside:
+    kind: keyword_argument
+    all:
+      - {has: {field: name, regex: '^nlags$'}}
+      - inside:
+          kind: argument_list
+          inside: {kind: call, has: {field: function, pattern: $F}}
+fix: '"auto"'
+metadata:
+  since: '0.15'
+  fix: unsafe
+  holds:
+    F: {regex: '(^|\.)kpss$'}

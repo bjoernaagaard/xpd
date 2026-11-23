@@ -1,0 +1,52 @@
+id: glm-logged-exposure
+language: python
+severity: warning
+message: Statsmodels GLM takes the natural log of exposure. Pass positive exposure on its original scale or use offset for values already on the log scale.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - {has: {field: name, regex: '^exposure$'}}
+            - has:
+                field: value
+                kind: call
+                has: {field: function, matches: imported-log}
+utils:
+  imported-log:
+    any:
+      - all:
+          - {pattern: $LOG_MODULE.log}
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                    - {has: {field: name, regex: '^(numpy|math)$'}}
+                    - {has: {field: alias, pattern: $LOG_MODULE}}
+      - all:
+          - {kind: identifier, pattern: $LOG}
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - {has: {field: module_name, regex: '^(numpy|math)$'}}
+                  - has:
+                      kind: aliased_import
+                      all:
+                        - {has: {field: name, regex: '^log$'}}
+                        - {has: {field: alias, pattern: $LOG}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(GLM(?:\.from_formula)?|glm)$'}

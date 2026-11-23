@@ -1,0 +1,14 @@
+id: ols-ignored-weights
+language: python
+severity: error
+message: Statsmodels OLS ignores weights. Use WLS with inverse-variance weights for a weighted fit, or remove weights for an unweighted fit.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, regex: '^weights$'}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(OLS(?:\.from_formula)?|ols)$'}

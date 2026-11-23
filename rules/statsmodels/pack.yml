@@ -1,0 +1,13 @@
+defaultCategory: models
+categoryPrefixes:
+  statsmodels.datasets: data
+  statsmodels.distributions: statistics
+  statsmodels.graphics: visualization
+  statsmodels.iolib: workflow
+  statsmodels.stats: statistics
+  statsmodels.tools: numerics
+  statsmodels.tsa.stattools: statistics
+  statsmodels.tsa.vector_ar.irf: statistics
+
+aliases: {}
+packages: []

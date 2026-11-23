@@ -1,0 +1,31 @@
+id: statsmodels-formula-power-term
+language: python
+severity: warning
+message: In a statsmodels OLS formula, x**2 expands interactions and does not square x. Write I(x**2) for a quadratic term.
+rule:
+  kind: string
+  pattern: $FORMULA
+  all:
+    - regex: '^["''][ \t]*[A-Za-z_]\w*[ \t]*~[ \t]*(?:[01]|[A-Za-z_]\w*(?:[ \t]*\*\*[ \t]*(?:[2-9]|[1-9][0-9]+))?)(?:[ \t]*\+[ \t]*(?:[01]|[A-Za-z_]\w*(?:[ \t]*\*\*[ \t]*(?:[2-9]|[1-9][0-9]+))?))*[ \t]*["'']$'
+    - regex: '\b[A-Za-z_]\w*[ \t]*\*\*[ \t]*(?:[2-9]|[1-9][0-9]+)\b'
+    - any:
+        - all:
+            - nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}
+            - inside: &formula-arguments
+                kind: argument_list
+                inside: {kind: call, has: {field: function, pattern: $F}}
+        - inside:
+            kind: keyword_argument
+            has: {field: name, regex: '^formula$'}
+            inside: *formula-arguments
+transform:
+  NUMERIC:
+    replace:
+      source: $FORMULA
+      replace: '\b([A-Za-z_]\w*[ \t]*\*\*[ \t]*(?:[2-9]|[1-9][0-9]+))\b'
+      by: 'I($1)'
+fix: $NUMERIC
+metadata:
+  fix: unsafe
+  holds:
+    F: {regex: '(^|\.)(OLS\.from_formula|ols)$'}
