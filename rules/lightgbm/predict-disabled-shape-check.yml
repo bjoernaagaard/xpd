@@ -1,0 +1,28 @@
+id: predict-disabled-shape-check
+language: python
+severity: warning
+message: predict_disable_shape_check=True bypasses LightGBM's feature-count check in the prediction engine. Keep the check enabled and pass features in training order.
+rule:
+  all:
+    - any:
+        - {pattern: $MODEL.predict($$$ARGS)}
+        - {pattern: $CLASSIFIER.predict_proba($$$ARGS)}
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - {has: {field: name, regex: '^predict_disable_shape_check$'}}
+            - {has: {field: value, kind: 'true'}}
+metadata:
+  holds:
+    MODEL:
+      any:
+        - kind: call
+          has: {field: function, regex: '(^|\.)(Booster|train|LGBM(Classifier|Model|Ranker|Regressor))$'}
+        - {kind: type, regex: '(^|\.)(Booster|LGBM(Classifier|Model|Ranker|Regressor))$'}
+    CLASSIFIER:
+      any:
+        - kind: call
+          has: {field: function, regex: '(^|\.)LGBMClassifier$'}
+        - {kind: type, regex: '(^|\.)LGBMClassifier$'}

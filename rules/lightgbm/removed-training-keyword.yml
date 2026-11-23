@@ -1,0 +1,100 @@
+id: removed-training-keyword
+language: python
+severity: error
+message: LightGBM 4.0 removed the $KEY keyword from train() and cv(). Use callbacks for early stopping or logging, and params["objective"] for a custom objective.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, pattern: $KEY, regex: '^(early_stopping_rounds|verbose_eval|fobj)$'}}
+    - {not: {matches: compatibility-check}}
+utils:
+  compatibility-check:
+    inside:
+      stopBy: end
+      any:
+        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
+        - {kind: try_statement, has: {kind: except_clause}}
+        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+metadata:
+  since: '4.0'
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}
+---
+id: removed-training-keyword
+language: python
+severity: error
+message: LightGBM 4.0 removed evals_result from train(). Pass record_evaluation(evals_result) in callbacks.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, regex: '^evals_result$'}}
+    - {not: {matches: compatibility-check}}
+utils:
+  compatibility-check:
+    inside:
+      stopBy: end
+      any:
+        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
+        - {kind: try_statement, has: {kind: except_clause}}
+        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+metadata:
+  since: '4.0'
+  holds:
+    F: {regex: '(^|\.)train$'}
+---
+id: removed-training-keyword
+language: python
+severity: error
+message: LightGBM 4.0 removed early_stopping_rounds from estimator fit(). Pass early_stopping(...) in callbacks and supply validation data.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  all:
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, regex: '^early_stopping_rounds$'}}
+    - {not: {matches: compatibility-check}}
+utils:
+  compatibility-check:
+    inside:
+      stopBy: end
+      any:
+        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
+        - {kind: try_statement, has: {kind: except_clause}}
+        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+metadata:
+  since: '4.0'
+  holds:
+    MODEL:
+      kind: call
+      has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}
+---
+id: removed-training-keyword
+language: python
+severity: error
+message: LightGBM 4.6 removed the $KEY keyword from train() and cv(). Set it when constructing the Dataset.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        has: {kind: keyword_argument, has: {field: name, pattern: $KEY, regex: '^(feature_name|categorical_feature)$'}}
+    - {not: {matches: compatibility-check}}
+utils:
+  compatibility-check:
+    inside:
+      stopBy: end
+      any:
+        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
+        - {kind: try_statement, has: {kind: except_clause}}
+        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+metadata:
+  since: '4.6'
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}

@@ -1,0 +1,8 @@
+defaultCategory: models
+categoryPrefixes:
+  lightgbm.callback: evaluation
+  lightgbm.plotting: visualization
+
+aliases: {}
+members: {}
+packages: []

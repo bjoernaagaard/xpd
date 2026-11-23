@@ -1,0 +1,84 @@
+id: dart-early-stopping
+language: python
+severity: warning
+message: LightGBM early stopping is unavailable in DART mode. Choose GBDT to use early stopping, or choose the DART round count with separate validation.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        all:
+          - not: {has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}
+          - has:
+              any:
+                - {nthChild: 1, pattern: $PARAMS, matches: dart-params}
+                - kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^params$'}}
+                    - {has: {field: value, pattern: $PARAMS, matches: dart-params}}
+          - any:
+              - has:
+                  any:
+                    - {nthChild: 1, pattern: $PARAMS, matches: stopping-params}
+                    - kind: keyword_argument
+                      all:
+                        - {has: {field: name, regex: '^params$'}}
+                        - {has: {field: value, pattern: $PARAMS, matches: stopping-params}}
+              - has:
+                  kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^callbacks$'}}
+                    - has:
+                        field: value
+                        kind: list
+                        has:
+                          kind: call
+                          all:
+                            - {has: {field: function, pattern: $STOP, regex: '(^|\.)early_stopping$'}}
+                            - has:
+                                field: arguments
+                                has:
+                                  any:
+                                    - {nthChild: 1, kind: integer, regex: '^[1-9][0-9]*$'}
+                                    - kind: keyword_argument
+                                      all:
+                                        - {has: {field: name, regex: '^stopping_rounds$'}}
+                                        - {has: {field: value, kind: integer, regex: '^[1-9][0-9]*$'}}
+utils:
+  dart-params:
+    kind: dictionary
+    all:
+      - has:
+          kind: pair
+          all:
+            - {has: {field: key, regex: '^["''](boost|boosting(_type)?)["'']$'}}
+            - {has: {field: value, regex: '^["'']dart["'']$'}}
+      - not:
+          has:
+            any:
+              - {kind: dictionary_splat}
+              - kind: pair
+                has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
+              - kind: pair
+                all:
+                  - {has: {field: key, regex: '^["''](boost|boosting(_type)?)["'']$'}}
+                  - {has: {field: value, not: {regex: '^["'']dart["'']$'}}}
+  stopping-params:
+    kind: dictionary
+    all:
+      - has:
+          kind: pair
+          all:
+            - {has: {field: key, regex: '^["''](early_stopping_rounds?|early_stopping|n_iter_no_change)["'']$'}}
+            - {has: {field: value, kind: integer, regex: '^[1-9][0-9]*$'}}
+      - not:
+          has:
+            kind: pair
+            all:
+              - {has: {field: key, regex: '^["''](early_stopping_rounds?|early_stopping|n_iter_no_change)["'']$'}}
+              - {has: {field: value, not: {regex: '^[1-9][0-9]*$'}}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}
+    STOP: {regex: '(^|\.)early_stopping$'}

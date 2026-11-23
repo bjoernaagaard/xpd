@@ -1,0 +1,85 @@
+id: bagging-without-frequency
+language: python
+severity: warning
+message: LightGBM leaves row bagging off when subsample_freq is zero or omitted. Set a positive subsample_freq to use subsample, or omit subsample to train on all rows.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $MODEL}}
+    - has:
+        field: arguments
+        all:
+          - has:
+              kind: keyword_argument
+              all:
+                - {has: {field: name, regex: '^subsample$'}}
+                - {has: {field: value, kind: float, regex: '^0?\.0*[1-9][0-9]*$'}}
+          - not:
+              has:
+                any:
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+                  - kind: keyword_argument
+                    has:
+                      field: name
+                      regex: '^(bagging_fraction|sub_row|bagging|bagging_freq|(pos|neg)_(bagging_fraction|sub_row|subsample|bagging)|data_sample_strategy|boosting|boost|boosting_type|bagging_by_query)$'
+                  - kind: keyword_argument
+                    all:
+                      - {has: {field: name, regex: '^subsample_freq$'}}
+                      - {has: {field: value, not: {regex: '^0$'}}}
+metadata:
+  holds:
+    MODEL: {regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}
+---
+id: bagging-without-frequency
+language: python
+severity: warning
+message: LightGBM leaves row bagging off when bagging_freq is zero or omitted. Set a positive bagging_freq to use bagging_fraction, or omit bagging_fraction to train on all rows.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        all:
+          - not: {has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}
+          - has:
+              any:
+                - {nthChild: 1, matches: bagging-params}
+                - kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^params$'}}
+                    - {has: {field: value, matches: bagging-params}}
+utils:
+  bagging-params:
+    kind: dictionary
+    all:
+      - has:
+          kind: pair
+          all:
+            - {has: {field: key, regex: '^["'']bagging_fraction["'']$'}}
+            - {has: {field: value, kind: float, regex: '^0?\.0*[1-9][0-9]*$'}}
+      - not:
+          has:
+            any:
+              - {kind: dictionary_splat}
+              - kind: pair
+                has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
+              - kind: pair
+                has:
+                  field: key
+                  regex: '^["''](sub_row|subsample|bagging|subsample_freq|(pos|neg)_(bagging_fraction|sub_row|subsample|bagging)|data_sample_strategy|boosting|boost|boosting_type|bagging_by_query)["'']$'
+              - kind: pair
+                all:
+                  - {has: {field: key, regex: '^["'']bagging_(freq|fraction)["'']$'}}
+                  - not:
+                      any:
+                        - all:
+                            - {has: {field: key, regex: '^["'']bagging_freq["'']$'}}
+                            - {has: {field: value, regex: '^0$'}}
+                        - all:
+                            - {has: {field: key, regex: '^["'']bagging_fraction["'']$'}}
+                            - {has: {field: value, kind: float, regex: '^0?\.0*[1-9][0-9]*$'}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}

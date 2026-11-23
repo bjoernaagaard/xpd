@@ -1,0 +1,26 @@
+id: deprecated-eval-set
+language: python
+severity: warning
+message: LightGBM 4.7 deprecated eval_set on estimator fit(). Pass both eval_X and eval_y, using parallel tuples for multiple validation sets.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  all:
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - {has: {field: name, regex: '^eval_set$'}}
+            - {has: {field: value, not: {regex: '^\(*\s*None\s*\)*$'}}}
+    - not:
+        inside:
+          stopBy: end
+          any:
+            - {kind: with_statement, regex: '^with [^\n]*(?:assertWarns|pytest\.warns)'}
+            - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+metadata:
+  since: '4.7'
+  holds:
+    MODEL:
+      kind: call
+      has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}

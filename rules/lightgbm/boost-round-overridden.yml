@@ -1,0 +1,56 @@
+id: boost-round-overridden
+language: python
+severity: warning
+message: LightGBM uses $ROUNDS from params instead of the num_boost_round argument $LIMIT. Keep the intended round count in one place.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        all:
+          - not: {has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}
+          - has:
+              kind: keyword_argument
+              all:
+                - {has: {field: name, regex: '^num_boost_round$'}}
+                - {has: {field: value, pattern: $LIMIT}}
+          - has:
+              any:
+                - {nthChild: 1, matches: round-params}
+                - kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^params$'}}
+                    - {has: {field: value, matches: round-params}}
+constraints:
+  LIMIT: {kind: integer, regex: '^[1-9][0-9]*$'}
+  ROUNDS: {kind: integer, regex: '^[1-9][0-9]*$'}
+utils:
+  iteration-key:
+    kind: pair
+    has:
+      field: key
+      regex: '^["''](num_iterations?|n_iter|num_trees?|num_rounds?|nrounds|num_boost_round|n_estimators|max_iter)["'']$'
+  round-params:
+    kind: dictionary
+    all:
+      - not:
+          has:
+            any:
+              - {kind: dictionary_splat}
+              - kind: pair
+                has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
+      - not:
+          has:
+            all:
+              - {matches: iteration-key}
+              - {has: {field: value, pattern: $LIMIT}}
+      - has:
+          all:
+            - {matches: iteration-key}
+            - {has: {field: value, pattern: $ROUNDS}}
+            - {not: {follows: {stopBy: end, matches: iteration-key}}}
+            - {not: {precedes: {stopBy: end, matches: iteration-key}}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}
