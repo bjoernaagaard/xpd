@@ -846,12 +846,16 @@ impl<'r, 'a> Reader<'r, 'a> {
         if !through_indexer {
             return None;
         }
-        // frame.loc[rows, column]: the column is the last of the two indexes.
-        subscript.field_children("subscript").last()
+        let mut axes = subscript.field_children("subscript");
+        axes.next()?;
+        axes.last()
     }
 
     /// Whether an index picks rows, as a mask or a slice does, and so names no column.
-    fn selects_rows(&self, index: &Syntax<'r>) -> bool {
+    fn selects_rows(&self, index: &Syntax<'r>, depth: usize) -> bool {
+        if depth > DEEPEST_NAME {
+            return false;
+        }
         match index.kind().as_ref() {
             "slice"
             | "comparison_operator"
@@ -864,11 +868,11 @@ impl<'r, 'a> Reader<'r, 'a> {
             "identifier" => self
                 .locals
                 .get(index.text().as_ref())
-                .is_some_and(|value| self.selects_rows(value)),
+                .is_some_and(|value| self.selects_rows(value, depth + 1)),
             "parenthesized_expression" => index
                 .children()
                 .find(Node::is_named)
-                .is_some_and(|inner| self.selects_rows(&inner)),
+                .is_some_and(|inner| self.selects_rows(&inner, depth + 1)),
             _ => false,
         }
     }
@@ -877,7 +881,7 @@ impl<'r, 'a> Reader<'r, 'a> {
         let line = Self::line(self.function);
         let mut found = Found::default();
         if let Some(body) = self.function.field("body") {
-            let targets = self.writes_in_place(&body, &mut found);
+            let targets = self.record_subscript_assignments(&body, &mut found);
             self.column_reads(&body, &targets, &mut found);
             let joined = self.returned_columns(&body, &mut found);
             self.unjoined_columns(&body, &joined, &mut found);
@@ -1010,7 +1014,11 @@ impl<'r, 'a> Reader<'r, 'a> {
 
     /// Records `frame["name"] = value` and `frame.loc[rows, "name"] = value`, and returns where
     /// those targets start, so that they are not read as reads.
-    fn writes_in_place(&self, body: &Syntax<'r>, found: &mut Found) -> BTreeSet<usize> {
+    fn record_subscript_assignments(
+        &self,
+        body: &Syntax<'r>,
+        found: &mut Found,
+    ) -> BTreeSet<usize> {
         let mut targets: BTreeSet<usize> = BTreeSet::new();
         let mut warned = false;
         for assignment in body
@@ -1074,7 +1082,7 @@ impl<'r, 'a> Reader<'r, 'a> {
             };
             match self.names(&index, 0) {
                 Some(names) => found.reads.extend(names),
-                None => found.computed |= !self.selects_rows(&index),
+                None => found.computed |= !self.selects_rows(&index, 0),
             }
         }
         // pd.col("name") reads a column of the frame the expression is evaluated on.

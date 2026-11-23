@@ -304,8 +304,16 @@ fn installed(
             return None;
         }
     };
-    let rules: BTreeMap<String, Level> = serde_json::from_str::<Vec<serde_json::Value>>(&json)
-        .ok()?
+    let decoded = match serde_json::from_str::<Vec<serde_json::Value>>(&json) {
+        Ok(decoded) => decoded,
+        Err(error) => {
+            notes.push(format!(
+                "ty explain rule returned invalid JSON, so the installed rules are unknown: {error}"
+            ));
+            return None;
+        }
+    };
+    let rules: BTreeMap<String, Level> = decoded
         .iter()
         .filter_map(|rule| {
             Some((

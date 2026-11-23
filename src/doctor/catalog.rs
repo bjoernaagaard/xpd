@@ -694,14 +694,14 @@ impl Catalog {
     }
 
     /// The record whose own decision applies to `record`: itself, or the end of its chain of
-    /// inheritance.
+    /// inheritance. `record` may come from outside this catalog.
     ///
     /// # Errors
     ///
     /// Returns an error if a canonical link is missing or forms a cycle.
     pub fn resolve<'a>(&'a self, record: &'a Record) -> Result<&'a Record> {
         let mut current = record;
-        for _ in 0..self.records.len() {
+        for _ in 0..=self.records.len() {
             match &current.decision {
                 Decision::Inherit(parent) => {
                     current = self.get(parent).with_context(|| {
@@ -733,12 +733,14 @@ impl Catalog {
         })
     }
 
-    /// The selector a Ruff redirect maps `selector` to, or `selector` itself.
-    pub fn redirect<'a>(&'a self, selector: &'a str) -> &'a str {
+    /// The selector a Ruff redirect maps `selector` to, `Some(selector)` when no redirect
+    /// applies, or `None` when the pinned release rejects the redirected selector.
+    pub fn redirect<'a>(&'a self, selector: &'a str) -> Option<&'a str> {
         let key = Key::pinned(Tool::Ruff, Surface::Rules, Kind::Redirect, selector);
-        self.get(&key)
-            .and_then(|record| record.target.as_deref())
-            .unwrap_or(selector)
+        match self.get(&key) {
+            Some(record) => record.target.as_deref(),
+            None => Some(selector),
+        }
     }
 
     /// The current ty rule that `name` spells, which is `name` itself or a historical alias.

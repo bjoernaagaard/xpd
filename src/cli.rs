@@ -361,7 +361,7 @@ pub fn run() -> ExitCode {
             } else {
                 FixMode::Apply(fix.then_some(allowed))
             };
-            check(
+            command_result(check(
                 &paths,
                 format,
                 fixes,
@@ -369,7 +369,7 @@ pub fn run() -> ExitCode {
                 &Filters { rules, severity },
                 fail_on,
                 config.as_deref(),
-            )
+            ))
         }
         Cmd::Find {
             query,
@@ -405,29 +405,33 @@ pub fn run() -> ExitCode {
         })()),
         Cmd::Index(args) => unit_result(refresh_index(args)),
         Cmd::Hook => crate::hook::run(),
-        Cmd::Graph { paths, format } => graph(&paths, format.unwrap_or(default_format)),
+        Cmd::Graph { paths, format } => {
+            command_result(graph(&paths, format.unwrap_or(default_format)))
+        }
         Cmd::Run(args) => command_result(args.run()),
         Cmd::Outline(args) => command_result(args.run()),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
         Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
-        Cmd::Rules(options) => rules(options, default_format),
+        Cmd::Rules(options) => command_result(rules(options, default_format)),
         Cmd::Doctor { format } => unit_result(crate::doctor::run(format.unwrap_or(default_format))),
         Cmd::Skill { json: false } => print_out(SKILL),
         Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
         Cmd::Test(options) => command_result(crate::cases::run(&options)),
-        Cmd::Completions { shell } => {
-            let mut command = Cli::command().bin_name("xpd");
-            command.build();
-            match shell.try_generate(&command, &mut io::stdout().lock()) {
-                Err(error) if error.kind() == io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
-                result => unit_result(result.map_err(Into::into)),
-            }
-        }
+        Cmd::Completions { shell } => run_completions(shell),
         Cmd::New(args) => command_result(author::run(args)),
         Cmd::Commands => print_out(&format!("{}\n", crate::commands::to_json(Cli::command()))),
+    }
+}
+
+fn run_completions(shell: clap_complete::Shell) -> ExitCode {
+    let mut command = Cli::command().bin_name("xpd");
+    command.build();
+    match shell.try_generate(&command, &mut io::stdout().lock()) {
+        Err(error) if error.kind() == io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
+        result => unit_result(result.map_err(Into::into)),
     }
 }
 
@@ -538,7 +542,7 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
     Ok(())
 }
 
-fn rules(options: RulesOptions, default: Format) -> ExitCode {
+fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
     let RulesOptions {
         format,
         builtin,
@@ -550,28 +554,17 @@ fn rules(options: RulesOptions, default: Format) -> ExitCode {
     let filters = Filters { rules, severity };
     // Without a working directory there is no project folder, so only the embedded rules.
     let project = std::env::current_dir().unwrap_or_default();
-    // The rules that ship with xpd are listed as they are without a settings file.
-    let load = if builtin {
-        Catalog::embedded(None, Style::Default)
+    let mut catalog = if builtin {
+        Catalog::embedded(None, Style::Default)?
     } else {
-        Settings::find(&project).and_then(|settings| {
-            Catalog::load(
-                Catalog::config(&project, config.as_deref())?.as_deref(),
-                None,
-                settings.style,
-            )
-        })
+        let settings = Settings::find(&project)?;
+        Catalog::load(
+            Catalog::config(&project, config.as_deref())?.as_deref(),
+            None,
+            settings.style,
+        )?
     };
-    let catalog = match load.and_then(|mut catalog| {
-        catalog.select(&filters)?;
-        Ok(catalog)
-    }) {
-        Ok(catalog) => catalog,
-        Err(e) => {
-            eprintln!("xpd: {e:#}");
-            return ExitCode::from(CHECK_FAILED);
-        }
-    };
+    catalog.select(&filters)?;
     let entries = catalog.entries();
     match format {
         Format::Json => {
@@ -584,7 +577,7 @@ fn rules(options: RulesOptions, default: Format) -> ExitCode {
             }
         }
     }
-    ExitCode::SUCCESS
+    Ok(ExitCode::SUCCESS)
 }
 
 /// `allowed` is the fix level that `[*]` and the summary count as fixable.
@@ -596,14 +589,8 @@ fn check(
     filters: &Filters,
     fail_on: Severity,
     config: Option<&Path>,
-) -> ExitCode {
-    let report = match lint(paths, fixes, filters, config) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("xpd: {e:#}");
-            return ExitCode::from(CHECK_FAILED);
-        }
-    };
+) -> Result<ExitCode> {
+    let report = lint(paths, fixes, filters, config)?;
     match format {
         CheckFormat::Json => println!("{}", report.to_json(allowed)),
         CheckFormat::Sarif => println!("{}", report.sarif()),
@@ -620,23 +607,18 @@ fn check(
         }
     }
     if report.skipped > 0 {
-        ExitCode::from(CHECK_FAILED)
+        Ok(ExitCode::from(CHECK_FAILED))
     } else if report.has_issues_from(fail_on) {
-        ExitCode::FAILURE
+        Ok(ExitCode::FAILURE)
     } else {
-        ExitCode::SUCCESS
+        Ok(ExitCode::SUCCESS)
     }
 }
 
 /// Prints the dataflow of the files under `paths`.
-fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
-    let graph = match source::python_files(paths).map(|files| Graph::read(Path::new(""), &files)) {
-        Ok(graph) => graph,
-        Err(e) => {
-            eprintln!("xpd: {e:#}");
-            return ExitCode::from(CHECK_FAILED);
-        }
-    };
+fn graph(paths: &[PathBuf], format: Format) -> Result<ExitCode> {
+    let files = source::python_files(paths)?;
+    let graph = Graph::read(Path::new(""), &files);
     match format {
         Format::Json => println!("{}", graph.to_json()),
         Format::Text => {
@@ -645,11 +627,11 @@ fn graph(paths: &[PathBuf], format: Format) -> ExitCode {
         }
     }
     if graph.skipped() > 0 {
-        ExitCode::from(CHECK_FAILED)
+        Ok(ExitCode::from(CHECK_FAILED))
     } else if graph.has_errors() {
-        ExitCode::FAILURE
+        Ok(ExitCode::FAILURE)
     } else {
-        ExitCode::SUCCESS
+        Ok(ExitCode::SUCCESS)
     }
 }
 

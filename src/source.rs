@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use ast_grep_core::Language;
 use ast_grep_language::SupportLang;
 
@@ -83,6 +83,12 @@ pub(crate) fn read_source(file: File<'_>) -> Option<String> {
 
 /// The Python files under `paths`, each once. Folders respect `.gitignore`.
 pub(crate) fn python_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    for path in paths {
+        let meta = fs::metadata(path).with_context(|| cannot_read(path))?;
+        if meta.is_file() && !is_python(path) {
+            bail!("{} is not a Python file", path.display());
+        }
+    }
     files_under(Path::new(""), paths, is_python)
 }
 

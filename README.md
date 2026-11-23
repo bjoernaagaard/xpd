@@ -153,7 +153,8 @@ xpd
 
 `profile`, `equiv` and `refit` run the project's Python, so they need pandas in the project's
 environment. `index` runs Python with Griffe, and the first `find` downloads a 333 MB search model
-once. Every other command only reads files.
+once. `check --fix`, `run --update-all`, `new`, and `test -U` write project files when invoked in
+those modes, and `hook` records session state in xpd's cache folder.
 
 ## Use xpd with an agent or an editor
 

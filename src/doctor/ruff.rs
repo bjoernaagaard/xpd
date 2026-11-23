@@ -298,7 +298,9 @@ fn selection(
         }
         entries.sort_by_key(|(specificity, ignore, _, _)| (*specificity, *ignore));
         for (_, ignore, selector, location) in entries {
-            let selector = catalog.redirect(&selector);
+            let Some(selector) = catalog.redirect(&selector) else {
+                continue;
+            };
             for rule in &rules {
                 let exact = rule.key.id == selector;
                 if !selects(selector, rule) || (rule.is_preview() && preview.explicit && !exact) {
@@ -438,7 +440,9 @@ fn per_file_ignores(catalog: &Catalog, layers: &[Layer]) -> BTreeMap<String, Vec
                     .flatten()
                     .filter_map(|value| value.as_str());
                 for selector in selectors {
-                    let selector = catalog.redirect(selector);
+                    let Some(selector) = catalog.redirect(selector) else {
+                        continue;
+                    };
                     for rule in catalog.ruff_rules().filter(|rule| selects(selector, rule)) {
                         let text = format!("{} \"{pattern}\" = [\"{selector}\"]", path.join("."));
                         ignored

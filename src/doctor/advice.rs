@@ -222,6 +222,11 @@ pub(crate) fn evaluate(
         policies: Vec::new(),
         notes: Vec::new(),
     };
+    for checker in [&ruff.checker, &ty.checker] {
+        if let Some(error) = &checker.probe_error {
+            report.note(checker.tool, error.clone());
+        }
+    }
     let mut unsupported = BTreeSet::new();
     for scope in &ruff.scopes {
         let state = match &scope.state {

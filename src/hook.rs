@@ -732,13 +732,11 @@ fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
 
 /// Tracked differences from `base` and untracked paths, both NUL-delimited.
 fn git_changes(top: &Path, base: &str) -> Result<(String, String)> {
-    let tracked = git(
+    let tracked = git_checked(
         top,
         &["diff", "--name-only", "-z", "--diff-filter=d", base, "--"],
-    )
-    .context("git diff failed")?;
-    let untracked = git(top, &["ls-files", "--others", "--exclude-standard", "-z"])
-        .context("git ls-files failed")?;
+    )?;
+    let untracked = git_checked(top, &["ls-files", "--others", "--exclude-standard", "-z"])?;
     Ok((tracked, untracked))
 }
 
@@ -755,7 +753,7 @@ fn blob_ids<'a>(
     for batch in names.chunks(64) {
         let mut args = vec!["hash-object", "--no-filters", "--"];
         args.extend_from_slice(batch);
-        let hashes = git(top, &args).context("git hash-object failed")?;
+        let hashes = git_checked(top, &args)?;
         ids.extend(
             batch
                 .iter()
@@ -810,7 +808,7 @@ fn own_files(top: &Path, since: u64, baseline: Option<&GitBaseline>) -> Option<H
                 .map(str::to_owned),
         );
     };
-    add(git(top, &["diff", "--name-only", "-z", "HEAD", "--"]).unwrap_or_default());
+    add(git(top, &["diff", "--name-only", "-z", "HEAD", "--"])?);
     for commit in made_here {
         let args = [
             "diff-tree",
@@ -842,16 +840,30 @@ fn checked_out(top: &Path) -> Option<String> {
         .map(|name| name.trim().to_owned())
 }
 
-/// What `git` prints for `args` in `folder`. `None` when git cannot start or the command
-/// fails.
-fn git(folder: &Path, args: &[&str]) -> Option<String> {
+/// What `git` prints for `args` in `folder`, preserving spawn, status, and stderr details.
+fn git_checked(folder: &Path, args: &[&str]) -> Result<String> {
     let output = Command::new("git")
         .current_dir(folder)
         .args(args)
         .stdin(Stdio::null())
         .output()
-        .ok()?;
-    (output.status.success()).then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+        .with_context(|| format!("failed to run git {}", args.first().copied().unwrap_or("")))?;
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    let subcommand = args.first().copied().unwrap_or("");
+    if stderr.is_empty() {
+        anyhow::bail!("git {subcommand} failed ({})", output.status);
+    }
+    anyhow::bail!("git {subcommand} failed ({}): {stderr}", output.status)
+}
+
+/// What `git` prints for `args` in `folder`. `None` when git cannot start or the command
+/// fails.
+fn git(folder: &Path, args: &[&str]) -> Option<String> {
+    git_checked(folder, args).ok()
 }
 
 /// The time now, in seconds since 1970.

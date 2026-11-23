@@ -21,21 +21,64 @@ pub(crate) struct Installed {
 pub(crate) struct Checker {
     pub(crate) tool: Tool,
     pub(crate) installed: Option<Installed>,
+    pub(crate) probe_error: Option<String>,
 }
 
 impl Checker {
     /// The checker in the venv of `root`, or else on `PATH`.
     pub(crate) fn find(tool: Tool, root: &Path) -> Self {
-        let installed = executable(tool.name(), root).and_then(|path| {
-            let output = Command::new(&path).arg("--version").output().ok()?;
-            let text = String::from_utf8_lossy(&output.stdout);
-            let version = text.split_whitespace().nth(1)?.to_owned();
-            output
-                .status
-                .success()
-                .then_some(Installed { path, version })
-        });
-        Self { tool, installed }
+        let Some(path) = executable(tool.name(), root) else {
+            return Self {
+                tool,
+                installed: None,
+                probe_error: None,
+            };
+        };
+        let (installed, probe_error) = match Command::new(&path).arg("--version").output() {
+            Ok(output) if output.status.success() => {
+                let text = String::from_utf8_lossy(&output.stdout);
+                if let Some(version) = text.split_whitespace().nth(1) {
+                    (
+                        Some(Installed {
+                            path,
+                            version: version.to_owned(),
+                        }),
+                        None,
+                    )
+                } else {
+                    (
+                        None,
+                        Some(format!(
+                            "{} --version produced unrecognized output: {}",
+                            path.display(),
+                            text.trim()
+                        )),
+                    )
+                }
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stderr = stderr.trim();
+                let detail = if stderr.is_empty() {
+                    format!("exited with {}", output.status)
+                } else {
+                    format!("exited with {}: {stderr}", output.status)
+                };
+                (
+                    None,
+                    Some(format!("{} --version failed ({detail})", path.display())),
+                )
+            }
+            Err(error) => (
+                None,
+                Some(format!("{} --version failed: {error}", path.display())),
+            ),
+        };
+        Self {
+            tool,
+            installed,
+            probe_error,
+        }
     }
 
     /// Whether the installed release is the one the decisions were reviewed for.
@@ -60,7 +103,15 @@ impl Checker {
             Ok(output) if output.status.success() => {
                 Ok(String::from_utf8_lossy(&output.stdout).into_owned())
             }
-            Ok(output) => Err(String::from_utf8_lossy(&output.stderr).trim().to_owned()),
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stderr = stderr.trim();
+                if stderr.is_empty() {
+                    Err(format!("exited with {}", output.status))
+                } else {
+                    Err(format!("exited with {}: {stderr}", output.status))
+                }
+            }
             Err(error) => Err(error.to_string()),
         })
     }
