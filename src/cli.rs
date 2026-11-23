@@ -273,7 +273,7 @@ enum Cmd {
         #[arg(long)]
         contract: Option<PathBuf>,
     },
-    /// Plan a pandas pipeline's native Polars reimplementation without running Python.
+    /// Plan a pandas-to-Polars or eager-to-lazy Polars rewrite without running Python.
     Map(MapArgs),
     /// Trace a pipeline column or transformation to outputs and callers without running Python.
     Impact(ImpactArgs),

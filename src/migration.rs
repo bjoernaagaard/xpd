@@ -1,5 +1,6 @@
 mod contract;
 mod evidence;
+mod lazy;
 mod skfolio;
 
 use std::collections::BTreeSet;
@@ -23,6 +24,7 @@ use evidence::{Evidence, Observations};
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum Source {
     Pandas,
+    Polars,
     Skfolio,
 }
 
@@ -55,14 +57,21 @@ pub(crate) struct MapArgs {
 impl MapArgs {
     pub(crate) fn run(&self, default: Format) -> Result<ExitCode> {
         ensure!(
-            !matches!(self.from, Source::Skfolio) || self.contract.is_none(),
-            "--contract is only supported for pandas to polars",
+            matches!(self.from, Source::Pandas) || self.contract.is_none(),
+            "--contract is only supported for pandas to Polars"
         );
         let contract = self.contract.as_deref().map(Contract::read).transpose()?;
-        let to = match self.to {
-            Target::Polars => "polars",
+        let report = match (self.from, self.to) {
+            (Source::Pandas, Target::Polars) => plan(
+                &self.file,
+                &self.entry,
+                "pandas",
+                "polars",
+                contract.as_ref(),
+            )?,
+            (Source::Polars, Target::Polars) => lazy::plan(&self.file, &self.entry)?,
+            (Source::Skfolio, Target::Polars) => plan_skfolio(&self.file, &self.entry)?,
         };
-        let report = plan(&self.file, &self.entry, self.from, to, contract.as_ref())?;
         match self.format.unwrap_or(default) {
             Format::Json => println!("{}", serde_json::to_string_pretty(&report)?),
             Format::Text => print!("{}", report.text()?),
@@ -157,13 +166,7 @@ impl Report<'_> {
     }
 }
 
-fn plan<'a>(
-    file: &'a Path,
-    entry: &'a str,
-    from: Source,
-    to: &'a str,
-    contract: Option<&'a Contract>,
-) -> Result<Report<'a>> {
+fn read_python(file: &Path) -> Result<syntax::Root> {
     let source =
         fs::read_to_string(file).with_context(|| format!("cannot read {}", file.display()))?;
     let root = syntax::parse(&source);
@@ -178,26 +181,38 @@ fn plan<'a>(
             error.start_pos().line() + 1
         );
     }
-    if matches!(from, Source::Skfolio) {
-        let (line, observations) = skfolio::observe(&root, entry).with_context(|| {
-            format!("{}: no top-level function named {entry:?}", file.display())
-        })?;
-        return Ok(Report {
-            file,
-            entry,
-            line,
-            from: "skfolio",
-            to,
-            status: "partial",
-            input_columns_observed: Vec::new(),
-            contract: None,
-            stages: Vec::new(),
-            dependencies: Vec::new(),
-            observed: observations.observed,
-            proposed: observations.proposed,
-            unresolved: observations.unresolved,
-        });
-    }
+    Ok(root)
+}
+
+fn plan_skfolio<'a>(file: &'a Path, entry: &'a str) -> Result<Report<'a>> {
+    let root = read_python(file)?;
+    let (line, observations) = skfolio::observe(&root, entry)
+        .with_context(|| format!("{}: no top-level function named {entry:?}", file.display()))?;
+    Ok(Report {
+        file,
+        entry,
+        line,
+        from: "skfolio",
+        to: "polars",
+        status: "partial",
+        input_columns_observed: Vec::new(),
+        contract: None,
+        stages: Vec::new(),
+        dependencies: Vec::new(),
+        observed: observations.observed,
+        proposed: observations.proposed,
+        unresolved: observations.unresolved,
+    })
+}
+
+fn plan<'a>(
+    file: &'a Path,
+    entry: &'a str,
+    from: &'a str,
+    to: &'a str,
+    contract: Option<&'a Contract>,
+) -> Result<Report<'a>> {
+    let root = read_python(file)?;
     let pipeline = steps::read_entry(&root, entry)
         .with_context(|| format!("{}: no top-level function named {entry:?}", file.display()))?;
     let observations = observe(&root, &pipeline, contract)?;
@@ -205,7 +220,7 @@ fn plan<'a>(
         file,
         entry,
         line: pipeline.line,
-        from: "pandas",
+        from,
         to,
         status: if observations.unresolved.is_empty() {
             "complete"

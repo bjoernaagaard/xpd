@@ -1,5 +1,6 @@
 Use `xpd map` to plan a native Polars reimplementation of a named pandas
-pipeline. It reads the Python source without importing or running it.
+pipeline or to plan an eager-to-lazy rewrite of a Polars pipeline. It reads
+the Python source without importing or running it.
 
 The plan lists observed column reads, writes and dependencies by stage.
 It proposes native expressions, windows and lazy scans where they fit.
@@ -40,6 +41,99 @@ The example uses skfolio's packaged S&P 500 and factor data. Its walk-forward
 caller consumes the returns and compares dates, daily returns, wealth and ending
 weights with the original caller. The replay runs the migrated command in a
 separate Python environment and requires both skfolio and pandas to be absent.
+
+## Eager to lazy Polars
+
+Use `--from polars --to polars` for a function that reads one Parquet file
+and applies native filters or literal column selections in a chain or
+through local frame assignments. For a file path, the plan proposes
+`scan_parquet` so Polars can push predicates and projections into the scan.
+The report marks the return, existing collection or DataFrame consumer
+where the pipeline needs materialized data. It flags dynamic expressions,
+read options and calls it cannot trace. The `--contract` option belongs to
+the pandas-to-Polars planner.
+
+```python title="readings.py"
+import polars as pl
+
+
+def eager(path):
+    readings = pl.read_parquet(path)
+    return readings.filter(pl.col("keep")).select("row_id", "reading")
+
+
+def dynamic_projection(path, columns):
+    readings = pl.read_parquet(path)
+    return readings.filter(pl.col("keep")).select(columns)
+```
+
+```console
+$ xpd map readings.py --entry eager --from polars --to polars --format text
+readings.py:4: eager (polars to polars, complete)
+...
+6: proposed [materialization] Collect once at the return to preserve the DataFrame result.
+...
+$ xpd map readings.py --entry dynamic_projection --from polars --to polars --format json
+...
+  "status": "partial",
+...
+      "code": "expression",
+...
+```
+
+The second command exits with status 1 because it cannot resolve the
+columns chosen at runtime.
+
+### Reproduce the comparison
+
+Run from the repository root on Linux with uv and GNU time. The example
+generates a Parquet file containing 1,000,000 rows and 15 columns, with
+50,000 rows per group. Both implementations materialize a DataFrame with
+10,000 rows and the ordered Int64 columns `row_id` and `reading`. The
+comparison checks exact values, dtypes, column order and row order.
+
+```sh
+(
+  set -e
+  file=$(mktemp --suffix=.parquet)
+  trap 'rm -f "$file"' EXIT
+  export POLARS_MAX_THREADS=1
+  example=examples/polars-lazy/compare.py
+  run() { uv run --no-project --python 3.13 --no-build --with polars==2.1.0 -- "$@"; }
+  run python "$example" generate "$file"
+  run python "$example" verify "$file"
+  run python "$example" eager "$file"
+  run python "$example" lazy "$file"
+  for mode in eager lazy lazy eager eager lazy lazy eager eager lazy; do
+    run /usr/bin/time -f 'peak RSS: %M KiB' python "$example" "$mode" "$file"
+  done
+)
+```
+
+The eager pipeline reads all 15 columns before filtering. The optimized
+lazy plan includes the predicate and reads only the three columns needed
+for the predicate and output.
+
+```text
+simple π 2/2 ["row_id", "reading"]
+  Parquet SCAN [<file>]
+  PROJECT 3/15 COLUMNS
+  SELECTION: col("keep")
+  ESTIMATED ROWS: 1000000
+```
+
+On Linux x86-64 with an Intel Core i9-13900KF, Python 3.13.18 and Polars
+2.1.0, the generated file was 21,079,624 bytes. Polars used one worker
+thread and the lazy run collected with the in-memory engine. The table
+shows medians from five interleaved runs per implementation in fresh
+processes after warming the file cache. Wall time starts after imports
+and ends at the materialized result. Peak RSS covers the whole Python
+process.
+
+| Pipeline | Wall time | Peak RSS |
+| --- | ---: | ---: |
+| Eager read | 112.3 ms | 179,032 KiB |
+| Lazy scan | 2.8 ms | 64,964 KiB |
 
 ## Exit status
 
