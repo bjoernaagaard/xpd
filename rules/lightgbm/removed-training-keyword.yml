@@ -9,14 +9,15 @@ rule:
     - inside:
         kind: argument_list
         inside: {kind: call, has: {field: function, pattern: $F}}
-    - {not: {matches: lgb-expected-type-error}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+    - {not: {matches: lgb-removed-keyword-error}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["'']3\.["'']$'}}}
 fix:
   template: ""
   expandEnd: {regex: '^,$'}
 metadata:
   since: '4.0'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   fix: unsafe
   holds:
     F: {regex: '(^|\.)(train|cv)$'}
@@ -36,11 +37,12 @@ rule:
           all:
             - {has: {field: name, pattern: $KEY, regex: '^(early_stopping_rounds|verbose_eval|fobj)$'}}
             - not: {all: [{matches: lgb-noop-native-keyword}, {matches: lgb-removable-argument}]}
-    - {not: {matches: lgb-expected-type-error}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+            - {not: {matches: lgb-removed-keyword-error}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["'']3\.["'']$'}}}
 metadata:
   since: '4.0'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     F: {regex: '(^|\.)(train|cv)$'}
 ---
@@ -54,12 +56,15 @@ rule:
     - {has: {field: function, pattern: $F}}
     - has:
         field: arguments
-        has: {kind: keyword_argument, has: {field: name, regex: '^evals_result$'}}
-    - {not: {matches: lgb-expected-type-error}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+        has:
+          kind: keyword_argument
+          has: {field: name, regex: '^evals_result$'}
+          not: {matches: lgb-removed-keyword-error}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["'']3\.["'']$'}}}
 metadata:
   since: '4.0'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     F: {regex: '(^|\.)train$'}
 ---
@@ -81,11 +86,12 @@ rule:
                   - {has: {field: name, regex: '^verbose$'}}
                   - {has: {field: value, kind: 'false'}}
                   - {matches: lgb-removable-argument}
-    - {not: {matches: lgb-expected-type-error}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+            - {not: {matches: lgb-removed-keyword-error}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["'']3\.["'']$'}}}
 metadata:
   since: '4.0'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     MODEL: {matches: lgb-estimator}
 ---
@@ -99,12 +105,15 @@ rule:
     - {has: {field: function, pattern: $F}}
     - has:
         field: arguments
-        has: {kind: keyword_argument, has: {field: name, pattern: $KEY, regex: '^(feature_name|categorical_feature)$'}}
-    - {not: {matches: lgb-expected-type-error}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-5]\.)["'']$'}}}
+        has:
+          kind: keyword_argument
+          has: {field: name, pattern: $KEY, regex: '^(feature_name|categorical_feature)$'}
+          not: {matches: lgb-removed-keyword-error}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["''](3\.|4\.[0-5]\.)["'']$'}}}
 metadata:
   since: '4.6'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     F: {regex: '(^|\.)(train|cv)$'}
 ---
@@ -121,14 +130,15 @@ rule:
     - inside:
         kind: argument_list
         inside: {pattern: $MODEL.fit($$$ARGS)}
-    - {not: {matches: lgb-expected-type-error}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+    - {not: {matches: lgb-removed-keyword-error}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["'']3\.["'']$'}}}
 fix:
   template: ""
   expandEnd: {regex: '^,$'}
 metadata:
   since: '4.0'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   fix: unsafe
   holds:
     MODEL: {matches: lgb-estimator}

@@ -1,0 +1,32 @@
+id: lgb-removed-keyword-error
+language: python
+utils:
+  keyword-message:
+    regex: '^(?:\.\*)?(?:(?:got an |an )?unexpected keyword argument(?: | ?\.\*))?(?:\\?'')?[a-z_]+(?:\\?'')?(?:\.\*)?$'
+rule:
+  kind: keyword_argument
+  any:
+    - matches:
+        lgb-expected-type-error:
+          MESSAGE: {regex: '^(?:\.\*)?(?:(?:got an |an )?unexpected keyword(?: argument)?|keyword argument)(?: ?\.\*)?$'}
+    - all:
+        - {has: {field: name, regex: '^early_stopping_rounds$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bearly_stopping_rounds\b'}]}}}
+    - all:
+        - {has: {field: name, regex: '^verbose_eval$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bverbose_eval\b'}]}}}
+    - all:
+        - {has: {field: name, regex: '^fobj$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bfobj\b'}]}}}
+    - all:
+        - {has: {field: name, regex: '^evals_result$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bevals_result\b'}]}}}
+    - all:
+        - {has: {field: name, regex: '^verbose$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bverbose\b'}]}}}
+    - all:
+        - {has: {field: name, regex: '^feature_name$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bfeature_name\b'}]}}}
+    - all:
+        - {has: {field: name, regex: '^categorical_feature$'}}
+        - matches: {lgb-expected-type-error: {MESSAGE: {all: [{matches: keyword-message}, {regex: '\bcategorical_feature\b'}]}}}

@@ -1,11 +1,31 @@
 id: lgb-expected-type-error
 language: python
+arguments: [MESSAGE]
+utils:
+  literal-message:
+    kind: string
+    all:
+      - {has: {kind: string_start, regex: '(?i)^[ru]?["'']{1,3}$'}}
+      - {has: {kind: string_content, matches: MESSAGE}}
+  message:
+    any:
+      - {matches: literal-message}
+      - pattern: re.compile($_)
+        has: {field: arguments, has: {matches: literal-message}}
+  message-expression:
+    any:
+      - {matches: message}
+      - kind: parenthesized_expression
+        has:
+          stopBy: {not: {kind: parenthesized_expression}}
+          matches: message
 rule:
   inside:
     stopBy: end
     kind: block
     inside:
       kind: with_statement
+      field: body
       has:
         kind: with_clause
         has:
@@ -14,6 +34,10 @@ rule:
             field: value
             any:
               - {pattern: pytest.raises(TypeError)}
-              - {pattern: "pytest.raises(TypeError, $$$OPTIONS)"}
               - {pattern: $TEST.assertRaises(TypeError)}
-              - {pattern: "$TEST.assertRaisesRegex(TypeError, $MESSAGE)"}
+              - pattern: pytest.raises(TypeError, match=$REGEX)
+                has:
+                  field: arguments
+                  has: {kind: keyword_argument, has: {field: value, matches: message-expression}}
+              - pattern: $TEST.assertRaisesRegex(TypeError, $REGEX)
+                has: {field: arguments, has: {matches: message-expression}}

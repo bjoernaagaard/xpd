@@ -1,6 +1,9 @@
 """Supported LightGBM calls and nearby patterns that should stay quiet."""
 
+import re
+
 import lightgbm as lgb
+import pytest
 from lightgbm import LGBMRegressor, cv
 from numpy.typing import NDArray
 from pandas import DataFrame
@@ -60,6 +63,19 @@ def compatibility(train_set: lgb.Dataset, features: NDArray, labels: NDArray) ->
     model = LGBMRegressor()
     if lgb.__version__.startswith("4.6."):
         model.fit(features, labels, eval_set=[(features, labels)])
+
+
+def rejected_keywords(train_set: lgb.Dataset, model: LGBMRegressor, data: NDArray) -> None:
+    with pytest.raises(TypeError):
+        lgb.train({}, train_set, evals_result={})
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        cv({}, train_set, categorical_feature=["sector"])
+    with pytest.raises(TypeError, match=r"unexpected keyword argument.*'fobj'"):
+        cv({}, train_set, fobj=None)
+    with pytest.raises(TypeError, match=re.compile("verbose_eval")):
+        cv({}, train_set, verbose_eval=5)
+    with pytest.raises(TypeError, match="verbose"):
+        model.fit(data, data, verbose=False)
 
 
 def manual_lookalikes(train_set: lgb.Dataset, data: NDArray, labels: NDArray) -> None:

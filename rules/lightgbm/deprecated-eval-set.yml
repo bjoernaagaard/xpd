@@ -11,8 +11,7 @@ rule:
         all:
           - {not: {has: {matches: manual-migration}}}
           - inside: {pattern: $MODEL.fit($$$ARGS)}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
 utils:
   manual-migration:
     any:
@@ -24,6 +23,8 @@ utils:
 fix: 'eval_X=($X,), eval_y=($Y,)'
 metadata:
   since: '4.7'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   fix: unsafe
   holds:
     MODEL: {matches: lgb-estimator}
@@ -46,8 +47,7 @@ rule:
           - any:
               - {not: {has: {matches: {lgb-simple-eval-set: {DATA: {pattern: '[($X, $Y)]'}}}}}}
               - {has: {matches: manual-migration}}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
 utils:
   manual-migration:
     any:
@@ -58,6 +58,8 @@ utils:
         not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: line_continuation}]}
 metadata:
   since: '4.7'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     MODEL: {matches: lgb-estimator}
 ---
@@ -81,10 +83,11 @@ rule:
                   - {kind: comment}
                   - {kind: line_continuation}
                   - {regex: '^\(*\s*None\s*\)*$'}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
 metadata:
   since: '4.7'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     MODEL:
       any:
@@ -112,10 +115,11 @@ rule:
                   - {kind: comment}
                   - {kind: line_continuation}
                   - {regex: '^\(*\s*None\s*\)*$'}
-    - not:
-        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+    - matches: {lgb-before-api: {RECEIVER: {pattern: $VERSION_RECEIVER}, VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
 metadata:
   since: '4.7'
+  unlessHolds:
+    VERSION_RECEIVER: {kind: identifier}
   holds:
     MODEL:
       any:
