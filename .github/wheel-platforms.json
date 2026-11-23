@@ -1,4 +1,1 @@
-[
-  {"target": "x86_64", "macos": "macos-15-intel", "deployment": "10.15"},
-  {"target": "aarch64", "macos": "macos-latest", "deployment": "11.0"}
-]
+["x86_64", "aarch64"]

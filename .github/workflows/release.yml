@@ -71,7 +71,7 @@ jobs:
         # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
         with:
-          target: ${{ matrix.platform.target }}
+          target: ${{ matrix.platform }}
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           # zig builds on the runner, which has cmake and libclang for llama.cpp. The manylinux
           # containers have no libclang that bindgen can use.
@@ -79,11 +79,11 @@ jobs:
           sccache: 'true'
           manylinux: auto
       - uses: ./.github/actions/smoke
-        if: matrix.platform.target == 'x86_64'
+        if: matrix.platform == 'x86_64'
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: wheels-linux-${{ matrix.platform.target }}
+          name: wheels-linux-${{ matrix.platform }}
           path: dist
 
   musllinux:
@@ -100,7 +100,7 @@ jobs:
         # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
         with:
-          target: ${{ matrix.platform.target }}
+          target: ${{ matrix.platform }}
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           # zig builds on the runner, which has cmake and libclang for llama.cpp. The manylinux
           # containers have no libclang that bindgen can use.
@@ -110,7 +110,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: wheels-musllinux-${{ matrix.platform.target }}
+          name: wheels-musllinux-${{ matrix.platform }}
           path: dist
 
   windows:
@@ -143,20 +143,17 @@ jobs:
   macos:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ${{ matrix.platform.macos }}
+    runs-on: macos-latest
     timeout-minutes: 30
-    strategy:
-      matrix:
-        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
         # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
         env:
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.platform.deployment }}
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         with:
-          target: ${{ matrix.platform.target }}
+          target: aarch64
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
           args: --release --out dist
           sccache: 'true'
@@ -164,7 +161,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: wheels-macos-${{ matrix.platform.target }}
+          name: wheels-macos-aarch64
           path: dist
 
   sdist:

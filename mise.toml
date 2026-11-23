@@ -32,7 +32,7 @@ npm run build
 [tasks.wheels]
 description = "Build the sdist and the Linux wheels into dist/, and the macOS wheels on a Mac"
 run = """
-architectures="{{ [p.target for p in read_json(path=".github/wheel-platforms.json")] | join(sep=" ") }}"
+architectures="{{ read_json(path=".github/wheel-platforms.json") | join(sep=" ") }}"
 for arch in $architectures; do
   rustup target add "$arch-unknown-linux-gnu" "$arch-unknown-linux-musl"
 done
@@ -46,10 +46,8 @@ for arch in $architectures; do
   build --compatibility musllinux_1_2 --target "$arch-unknown-linux-musl"
 done
 if [ "$(uname)" = Darwin ]; then
-  for arch in $architectures; do
-    rustup target add "$arch-apple-darwin"
-    build --target "$arch-apple-darwin"
-  done
+  rustup target add aarch64-apple-darwin
+  build --target aarch64-apple-darwin
 fi
 ls dist
 """
