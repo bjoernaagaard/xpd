@@ -382,12 +382,13 @@ impl Pack {
             .any(|rule| rule.config.language == language)
     }
 
-    /// Whether the pack's rules can run on `src`, a file of `language`, from its text alone. A
-    /// file that never names the module cannot import it, so it needs no parse for this pack.
+    /// Whether the pack's rules can run on `src` before parsing. An `alsoOn` rule can match
+    /// independently of the pack's module name.
     pub(crate) fn may_apply(&self, src: &str, language: SupportLang) -> bool {
         match &self.gate {
-            Gate::Import { .. } => {
-                language == SupportLang::Python && src.contains(self.module.as_str())
+            Gate::Import { also, .. } => {
+                language == SupportLang::Python
+                    && (also.is_some() || src.contains(self.module.as_str()))
             }
             Gate::EveryFile => self.has_rules_for(language),
             Gate::Suppressions => false,
@@ -400,8 +401,9 @@ impl Pack {
     pub(crate) fn applies(&self, root: &Root, src: &str, language: SupportLang) -> bool {
         match &self.gate {
             Gate::Import { import, .. } => {
-                self.may_apply(src, language)
-                    && (root.root().find(&import.matcher).is_some()
+                language == SupportLang::Python
+                    && ((src.contains(self.module.as_str())
+                        && root.root().find(&import.matcher).is_some())
                         || self.stand_in(root).is_some())
             }
             Gate::EveryFile => true,
