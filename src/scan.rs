@@ -607,7 +607,6 @@ fn import_insertion_offset(root: &Root, src: &str) -> Option<usize> {
     };
     let mut after_preamble = if src.starts_with('\u{feff}') { 3 } else { 0 };
     let mut after_imports: Option<usize> = None;
-    let mut saw_docstring = false;
     let mut saw_non_comment = false;
     for child in root.root().children() {
         let kind = child.kind();
@@ -622,15 +621,7 @@ fn import_insertion_offset(root: &Root, src: &str) -> Option<usize> {
                     }
                 }
             }
-            "expression_statement"
-                if !saw_non_comment
-                    && !saw_docstring
-                    && child.children().count() == 1
-                    && child.child(0).is_some_and(|c| {
-                        matches!(&*c.kind(), "string" | "concatenated_string")
-                    }) =>
-            {
-                saw_docstring = true;
+            "expression_statement" if !saw_non_comment && docstring(&child) => {
                 saw_non_comment = true;
                 after_preamble = clean_line_end(child.range().end)?;
             }
@@ -649,6 +640,19 @@ fn import_insertion_offset(root: &Root, src: &str) -> Option<usize> {
         }
     }
     Some(after_imports.unwrap_or(after_preamble))
+}
+
+fn docstring(statement: &Node<'_>) -> bool {
+    let Some(mut value) = statement.named_children().next() else {
+        return false;
+    };
+    while value.kind() == "parenthesized_expression" {
+        let Some(inside) = value.named_children().find(|node| node.kind() != "comment") else {
+            return false;
+        };
+        value = inside;
+    }
+    matches!(&*value.kind(), "string" | "concatenated_string")
 }
 
 fn import_replacement(src: &str, offset: usize, lines: &[&str]) -> Replacement {
@@ -905,6 +909,9 @@ impl FixContext<'_> {
                 module,
                 binding,
             };
+            if !name.written_in(&edit.inserted_text) {
+                continue;
+            }
             let root = matched.root();
             if requires_import(root, &name, range.start)? {
                 import_offset = (*self

@@ -75,6 +75,10 @@ library versions that its `since` and `until` name. A project rule gets an unsaf
 `metadata.fix` says `safe`. xpd warns when `sgconfig.yml` sets `languageGlobs` or
 `languageInjections`, and it skips the rules of `customLanguages`.
 
+An unsafe Python pack fix can list the names it needs in `metadata.fixImports`. Define each
+name under `aliases` or `members` in the pack. xpd can reuse a direct module import or add one
+when the name is unused. If the name conflicts with code in the file, xpd skips the fix.
+
 ## House style
 
 Some rules state a preference about code that works, such as one method chain where the code

@@ -14,7 +14,8 @@ reads a date. It is therefore right only on rows in time order.
 
 ## How to fix it
 
-With `--unsafe-fixes`, xpd sets `shuffle=False`. Sort the rows by time before splitting them.
+With `--unsafe-fixes`, xpd sets `shuffle=False` when the split does not stratify.
+Sort the rows by time before splitting them.
 
 On 2,000 rows whose slope changed from 1 to 3 at row 1,000, the model was fitted on the first
 1,500 rows and scored on the last 500:

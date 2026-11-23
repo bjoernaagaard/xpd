@@ -15,4 +15,4 @@ The rule reports `np.set_printoptions(**saved)`, which restores options that the
 
 ## How to fix it
 
-xpd has no automatic fix. Because the code between the two calls has to move into the `with` block. Make the change by hand.
+With `--unsafe-fixes`, xpd uses `with np.printoptions(...)` when the only intervening statement stores a `repr()` result.

@@ -17,4 +17,4 @@ The rule reports `df = pd.read_parquet(path)` followed directly by `df = df[df["
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd moves a literal integer lower bound into the Parquet read when the filter immediately follows a plain `read_parquet(path)` call. It selects PyArrow for row filtering.

@@ -5,8 +5,27 @@
 # On one row group, where nothing can be skipped, it was 1.3 to 1.5 times faster. The values were
 # equal each time. A frame without a stored index came back numbered from 0 with filters=, where the
 # mask kept the old labels, and a frame with a named index was equal both ways
-# (research/modern-pandas/probes/storage.txt). The rule has no fix, because the filter moves into
-# the read_parquet call, which is another statement than the one reported.
+id: read-parquet-then-filter
+language: python
+severity: info
+message: This reads every row of the file and then keeps the rows where $C passes the test. Pass the test to read_parquet so PyArrow can skip row groups. The rows come back numbered from 0 when the file stores no index, where the mask kept their old labels.
+rule:
+  kind: expression_statement
+  has: { pattern: "$DF = $DF[$DF[$C] >= $V]" }
+  follows:
+    kind: expression_statement
+    has: { pattern: $DF = $PD.read_parquet($PATH) }
+constraints:
+  PD: { regex: '^(pd|pandas)$' }
+  C: { kind: string }
+  V: { kind: integer }
+fix:
+  template: $DF = $PD.read_parquet($PATH, engine="pyarrow", filters=[($C, ">=", $V)])
+  expandStart:
+    kind: expression_statement
+    has: { pattern: $DF = $PD.read_parquet($PATH) }
+metadata: { fix: unsafe }
+---
 id: read-parquet-then-filter
 language: python
 severity: info
@@ -27,6 +46,14 @@ rule:
     has:
       pattern: $DF = $PD.read_parquet($$$A)
       not: { has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: ^filters$ } } }
+  not:
+    all:
+      - follows:
+          kind: expression_statement
+          has: { pattern: $DF = $PD.read_parquet($PATH) }
+      - has:
+          pattern: $DF = $DF[$DF[$C] >= $V]
+          has: { field: right, has: { field: subscript, kind: comparison_operator, has: { kind: integer } } }
 constraints:
   PD: { regex: '^(pd|pandas)$' }
   C: { kind: string }

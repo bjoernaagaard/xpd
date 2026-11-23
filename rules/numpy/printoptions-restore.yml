@@ -1,11 +1,55 @@
 # The set_printoptions docs say "Use printoptions as a context manager to set the values
 # temporarily": https://numpy.org/doc/stable/reference/generated/numpy.set_printoptions.html
-# A call that passes back a saved dict restores options that were set for a while. No fix,
-# because the code between the two calls has to move into the with block.
+id: printoptions-restore
+language: python
+severity: info
+message: This restores the previous print options. Use $NP.printoptions(...) as a context manager so an exception also restores them.
+rule:
+  kind: expression_statement
+  has: { pattern: $NP.set_printoptions(**$OLD) }
+  follows:
+    kind: expression_statement
+    has: { pattern: $TEXT = repr($VALUE) }
+    follows:
+      kind: expression_statement
+      has: { pattern: $NP.set_printoptions($$$OPTIONS) }
+      follows:
+        kind: expression_statement
+        has: { pattern: $OLD = $NP.get_printoptions() }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  TEXT: { kind: identifier }
+  OLD: { kind: identifier }
+fix:
+  template: |-
+    with $NP.printoptions($$$OPTIONS):
+        $TEXT = repr($VALUE)
+  expandStart:
+    stopBy: end
+    kind: expression_statement
+    has: { pattern: $NP.set_printoptions($$$OPTIONS) }
+metadata: { fix: unsafe }
+---
 id: printoptions-restore
 language: python
 severity: info
 message: This restores print options that were changed for a while, and NumPy's docs say to use the context manager for that. Wrap the code in with $NP.printoptions(...) instead, which also restores the options when an error is raised.
-rule: { pattern: $NP.set_printoptions(**$OLD) }
+rule:
+  pattern: $NP.set_printoptions(**$OLD)
+  not:
+    inside:
+      kind: expression_statement
+      follows:
+        kind: expression_statement
+        has:
+          kind: assignment
+          has: { field: left, kind: identifier }
+          pattern: $TEXT = repr($VALUE)
+        follows:
+          kind: expression_statement
+          has: { pattern: $NP.set_printoptions($$$OPTIONS) }
+          follows:
+            kind: expression_statement
+            has: { pattern: $OLD = $NP.get_printoptions() }
 constraints:
   NP: { regex: '^(np|numpy)$' }
