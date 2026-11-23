@@ -8,5 +8,24 @@ severity: error
 message: to_csv with mode="a" writes the header again on every call, so the file holds header rows among the data. Pass header=False, or header=not os.path.exists(path) for the first write.
 rule:
   pattern: $DF.to_csv($$$A)
-  has: { field: arguments, has: { kind: keyword_argument, regex: '^mode\s*=\s*["'']a\+?["'']$' } }
-  not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^header$' } } } }
+  has:
+    field: arguments
+    all:
+      - has: { kind: keyword_argument, regex: '^mode\s*=\s*["'']a\+?["'']$' }
+      - not: { has: { kind: keyword_argument, has: { field: name, regex: '^header$' } } }
+      - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } }
+fix: $DF.to_csv($$$A, header=False)
+metadata: { fix: unsafe }
+---
+id: to-csv-append-header
+language: python
+severity: error
+message: to_csv with mode="a" writes the header again on every call, so the file holds header rows among the data. Pass header=False, or header=not os.path.exists(path) for the first write.
+rule:
+  pattern: $DF.to_csv($$$A)
+  has:
+    field: arguments
+    all:
+      - has: { kind: keyword_argument, regex: '^mode\s*=\s*["'']a\+?["'']$' }
+      - not: { has: { kind: keyword_argument, has: { field: name, regex: '^header$' } } }
+      - has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] }

@@ -11,6 +11,6 @@ The rule reports `[v.upper() for v in df["s"]]`, and a `for` loop over a column 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites simple string-method comprehensions (`[v.upper() for v in df["s"]]`) to `df["s"].str.upper().tolist()`. Other comprehensions and `for` loops remain manual.
 
 The result is a Series with row labels instead of a Python list. Call `tolist` only where the next step needs a list.

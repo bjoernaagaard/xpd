@@ -13,5 +13,23 @@ rule:
     all:
       - has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^format$ } }, { has: { field: value, kind: string, regex: '%z' } }] }
       - not: { has: { kind: keyword_argument, has: { field: name, regex: ^utc$ } } }
+      - not: { has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } }
+constraints:
+  F: { regex: '^(pd|pandas)\.to_datetime$' }
+fix: $F($$$A, utc=True)
+metadata: { fix: unsafe }
+---
+id: mixed-offsets-without-utc
+language: python
+severity: warning
+message: This format reads a UTC offset, and on pandas 3 to_datetime raises ValueError when the offsets differ, as local times do across a daylight saving change. Pass utc=True, then convert with dt.tz_convert.
+rule:
+  pattern: $F($$$A)
+  has:
+    field: arguments
+    all:
+      - has: { kind: keyword_argument, all: [{ has: { field: name, regex: ^format$ } }, { has: { field: value, kind: string, regex: '%z' } }] }
+      - not: { has: { kind: keyword_argument, has: { field: name, regex: ^utc$ } } }
+      - has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] }
 constraints:
   F: { regex: '^(pd|pandas)\.to_datetime$' }

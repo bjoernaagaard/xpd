@@ -8,13 +8,107 @@ severity: warning
 message: This reads a date part and compares it once per value in Python. Compare the whole column through .dt, as in $S.dt.weekday >= 5.
 rule:
   any:
+    - pattern: "$S.apply(lambda $X: $LHS in $RHS)"
+    - pattern: "$S.map(lambda $X: $LHS in $RHS)"
+constraints:
+  LHS:
+    matches: fixable-date-part
+utils:
+  fixable-date-part:
+    any:
+      - matches: fixable-part-attr
+      - kind: call
+        has: { field: function, matches: fixable-part-attr }
+        not: { has: { field: arguments, has: { regex: '^[^(),]' } } }
+  fixable-part-attr:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $X }
+      - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
+rewriters:
+  - id: part-call
+    rule:
+      kind: call
+      pattern: $X.$P()
+      has: { field: function, has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' } }
+    fix: $S.dt.$P
+  - id: part-attr
+    rule:
+      kind: attribute
+      pattern: $X.$P
+      has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
+    fix: $S.dt.$P
+transform:
+  FIXED_LHS: { rewrite: { source: $LHS, rewriters: [part-call, part-attr] } }
+fix: $FIXED_LHS.isin($RHS)
+metadata: { fix: unsafe }
+---
+id: apply-date-expression
+language: python
+severity: warning
+message: This reads a date part and compares it once per value in Python. Compare the whole column through .dt, as in $S.dt.weekday >= 5.
+rule:
+  any:
     - pattern: "$S.apply(lambda $X: $BODY)"
     - pattern: "$S.map(lambda $X: $BODY)"
 constraints:
   BODY:
     kind: comparison_operator
-    has:
-      matches: date-part
+    all:
+      - has: { matches: fixable-date-part }
+      - not: { has: { regex: '^(in|not in|is|is not)$' } }
+      - not: { has: { stopBy: end, kind: identifier, pattern: $X, not: { inside: { matches: fixable-part-attr } } } }
+      - not: { has: { stopBy: end, kind: attribute, all: [{ has: { field: object, pattern: $X } }, { has: { field: attribute, regex: '^isoweekday$' } }] } }
+utils:
+  fixable-date-part:
+    any:
+      - matches: fixable-part-attr
+      - kind: call
+        has: { field: function, matches: fixable-part-attr }
+        not: { has: { field: arguments, has: { regex: '^[^(),]' } } }
+  fixable-part-attr:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $X }
+      - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
+rewriters:
+  - id: part-call
+    rule:
+      kind: call
+      pattern: $X.$P()
+      has: { field: function, has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' } }
+    fix: $S.dt.$P
+  - id: part-attr
+    rule:
+      kind: attribute
+      pattern: $X.$P
+      has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
+    fix: $S.dt.$P
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [part-call, part-attr] } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+id: apply-date-expression
+language: python
+severity: warning
+message: This reads a date part and compares it once per value in Python. Compare the whole column through .dt, as in $S.dt.weekday >= 5.
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: $BODY)"
+    - pattern: "$S.map(lambda $X: $BODY)"
+constraints:
+  BODY:
+    kind: comparison_operator
+    all:
+      - has: { matches: date-part }
+      - any:
+          - has: { regex: '^(not in|is|is not)$' }
+          - has: { stopBy: end, kind: identifier, pattern: $X, not: { inside: { matches: fixable-part-attr } } }
+          - has: { stopBy: end, kind: attribute, all: [{ has: { field: object, pattern: $X } }, { has: { field: attribute, regex: '^isoweekday$' } }] }
+          - all:
+              - has: { regex: '^in$' }
+              - not: { pattern: '$LHS in $RHS', has: { nthChild: 1, matches: fixable-date-part } }
 utils:
   # t.year or t.weekday(), read from the lambda's own argument.
   date-part:
@@ -28,9 +122,18 @@ utils:
     all:
       - has: { field: object, pattern: $X }
       - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|isoweekday|days_in_month)$' }
+  fixable-date-part:
+    any:
+      - matches: fixable-part-attr
+      - kind: call
+        has: { field: function, matches: fixable-part-attr }
+        not: { has: { field: arguments, has: { regex: '^[^(),]' } } }
+  fixable-part-attr:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $X }
+      - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
 ---
-# No fix, because the message gives an example, and the lambda's name would have to be replaced by
-# $S.dt in its body.
 id: apply-date-expression
 language: python
 severity: warning
@@ -42,9 +145,58 @@ rule:
 constraints:
   BODY:
     kind: binary_operator
-    has:
-      stopBy: end
-      matches: date-part
+    all:
+      - has: { stopBy: end, matches: fixable-date-part }
+      - not: { has: { stopBy: end, kind: identifier, pattern: $X, not: { inside: { matches: fixable-part-attr } } } }
+      - not: { has: { stopBy: end, kind: attribute, all: [{ has: { field: object, pattern: $X } }, { has: { field: attribute, regex: '^isoweekday$' } }] } }
+      - not: { has: { stopBy: end, kind: call, not: { matches: fixable-date-part } } }
+utils:
+  fixable-date-part:
+    any:
+      - matches: fixable-part-attr
+      - kind: call
+        has: { field: function, matches: fixable-part-attr }
+        not: { has: { field: arguments, has: { regex: '^[^(),]' } } }
+  fixable-part-attr:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $X }
+      - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
+rewriters:
+  - id: part-call
+    rule:
+      kind: call
+      pattern: $X.$P()
+      has: { field: function, has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' } }
+    fix: $S.dt.$P
+  - id: part-attr
+    rule:
+      kind: attribute
+      pattern: $X.$P
+      has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }
+    fix: $S.dt.$P
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [part-call, part-attr] } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+id: apply-date-expression
+language: python
+severity: warning
+message: This computes with date parts once per value in Python. Compute on whole columns through .dt, as in $S.dt.hour * 60 + $S.dt.minute.
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: $BODY)"
+    - pattern: "$S.map(lambda $X: $BODY)"
+constraints:
+  BODY:
+    kind: binary_operator
+    all:
+      - has: { stopBy: end, matches: date-part }
+      - any:
+          - has: { stopBy: end, kind: identifier, pattern: $X, not: { inside: { matches: fixable-part-attr } } }
+          - has: { stopBy: end, kind: attribute, all: [{ has: { field: object, pattern: $X } }, { has: { field: attribute, regex: '^isoweekday$' } }] }
+          - has: { stopBy: end, kind: call, not: { matches: fixable-date-part } }
 utils:
   # t.year or t.weekday(), read from the lambda's own argument.
   date-part:
@@ -58,3 +210,14 @@ utils:
     all:
       - has: { field: object, pattern: $X }
       - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|isoweekday|days_in_month)$' }
+  fixable-date-part:
+    any:
+      - matches: fixable-part-attr
+      - kind: call
+        has: { field: function, matches: fixable-part-attr }
+        not: { has: { field: arguments, has: { regex: '^[^(),]' } } }
+  fixable-part-attr:
+    kind: attribute
+    all:
+      - has: { field: object, pattern: $X }
+      - has: { field: attribute, regex: '^(year|month|day|hour|minute|second|microsecond|quarter|dayofweek|day_of_week|dayofyear|day_of_year|weekday|days_in_month)$' }

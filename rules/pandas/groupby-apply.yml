@@ -7,8 +7,43 @@ language: python
 severity: warning
 message: groupby.apply runs a Python function once per group. Use agg or transform with named methods, df.loc[df.groupby(key)[col].idxmax()] for the row with the largest value, or sums of products for weighted means.
 rule:
+  pattern: '$G.apply(lambda $X: $X.$M())'
+  has: { field: function, regex: '\.groupby\(' }
+constraints:
+  X: { regex: '^[A-Za-z_]\w*$' }
+  M: { regex: '^(sum|mean|median|min|max|std|var|count|nunique|first|last|size|prod)$' }
+fix: $G.$M()
+metadata: { fix: unsafe }
+---
+id: groupby-apply
+language: python
+severity: warning
+message: groupby.apply runs a Python function once per group. Use agg or transform with named methods, df.loc[df.groupby(key)[col].idxmax()] for the row with the largest value, or sums of products for weighted means.
+rule:
+  pattern: '$G.apply(lambda $X: $X[$C].$M())'
+  has: { field: function, regex: '\.groupby\(' }
+constraints:
+  X: { regex: '^[A-Za-z_]\w*$' }
+  C: { kind: string }
+  M: { regex: '^(sum|mean|median|min|max|std|var|count|nunique|first|last|size|prod)$' }
+fix: '$G[$C].$M()'
+metadata: { fix: unsafe }
+---
+id: groupby-apply
+language: python
+severity: warning
+message: groupby.apply runs a Python function once per group. Use agg or transform with named methods, df.loc[df.groupby(key)[col].idxmax()] for the row with the largest value, or sums of products for weighted means.
+rule:
   pattern: $G.apply($$$A)
   all:
     - has: { field: arguments, has: { kind: lambda } }
     - has: { field: function, regex: '\.groupby\(' }
     - not: { has: { field: arguments, has: { kind: lambda, has: { stopBy: end, kind: call, has: { field: function, regex: '\.(sort_values|to_dict|tolist|to_list|join)$' } } } } }
+    - not:
+        any:
+          - all:
+              - pattern: '$G.apply(lambda $X: $X.$M())'
+              - has: { field: arguments, has: { kind: lambda, has: { field: body, has: { field: function, has: { field: attribute, regex: '^(sum|mean|median|min|max|std|var|count|nunique|first|last|size|prod)$' } } } } }
+          - all:
+              - pattern: '$G.apply(lambda $X: $X[$C].$M())'
+              - has: { field: arguments, has: { kind: lambda, has: { field: body, all: [{ has: { field: function, has: { field: attribute, regex: '^(sum|mean|median|min|max|std|var|count|nunique|first|last|size|prod)$' } } }, { has: { field: function, has: { field: object, has: { field: subscript, kind: string } } } }] } } }

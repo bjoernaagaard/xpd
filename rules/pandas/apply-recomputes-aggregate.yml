@@ -12,11 +12,49 @@ rule:
   has:
     stopBy: end
     kind: lambda
-    has:
-      stopBy: end
-      pattern: $O.$A()
-      # v["scores"].mean() reads the row's own value, which is another matter
-      not: { has: { stopBy: end, pattern: $X } }
+    all:
+      - has:
+          field: body
+          any: [{ kind: binary_operator }, { kind: comparison_operator }]
+          not: { has: { stopBy: end, any: [{ kind: conditional_expression }, { kind: boolean_operator }, { kind: lambda }] } }
+      - has:
+          stopBy: end
+          pattern: $O.$A()
+          not: { has: { stopBy: end, pattern: $X } }
+constraints:
+  X: { regex: '^[A-Za-z_]\w*$' }
+  O: { kind: subscript, has: { field: subscript, kind: string } }
+  A: { regex: '^(mean|median|sum|min|max|std|var|count|nunique)$' }
+rewriters:
+  - id: parameter
+    rule: { kind: identifier, pattern: $X }
+    fix: $S
+transform:
+  NEW: { rewrite: { source: $BODY, rewriters: [parameter] } }
+fix: $NEW
+metadata: { fix: unsafe }
+---
+id: apply-recomputes-aggregate
+language: python
+severity: warning
+message: This lambda computes $O.$A() again for every row. Compute it once and use it on the whole column, as in $S - $O.$A().
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: $BODY)"
+    - pattern: "$S.map(lambda $X: $BODY)"
+  has:
+    stopBy: end
+    kind: lambda
+    all:
+      - not:
+          has:
+            field: body
+            any: [{ kind: binary_operator }, { kind: comparison_operator }]
+            not: { has: { stopBy: end, any: [{ kind: conditional_expression }, { kind: boolean_operator }, { kind: lambda }] } }
+      - has:
+          stopBy: end
+          pattern: $O.$A()
+          not: { has: { stopBy: end, pattern: $X } }
 constraints:
   O: { kind: subscript, has: { field: subscript, kind: string } }
   A: { regex: '^(mean|median|sum|min|max|std|var|count|nunique)$' }

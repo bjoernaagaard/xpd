@@ -11,4 +11,4 @@ The rule reports `df.apply(f, axis=1)`, and `agg` and `transform` with `axis=1` 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites simple arithmetic lambdas such as `df.apply(lambda r: r["a"] + r["b"], axis=1)` to `df["a"] + df["b"]`. Complex lambdas, `agg`, and `transform` forms remain manual.

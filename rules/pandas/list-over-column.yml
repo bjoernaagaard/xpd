@@ -11,9 +11,34 @@ ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
 message: A list comprehension over a column runs Python once per value. Use a column method such as .str.upper() instead.
 rule:
   kind: list_comprehension
+  pattern: '[$X.$M() for $X in $DF[$C]]'
+  all:
+    - not: { has: { kind: if_clause } }
+    - not: { has: { kind: for_in_clause, nthChild: 3 } }
+constraints:
+  X: { kind: identifier }
+  M: { regex: '^(upper|lower|strip|lstrip|rstrip|title|capitalize|swapcase|casefold|isdigit|isalpha|isalnum|isspace|islower|isupper|istitle)$' }
+  C: { kind: string }
+  DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }
+fix: '$DF[$C].str.$M().tolist()'
+metadata: { fix: unsafe }
+---
+id: list-over-column
+language: python
+severity: warning
+ignores: ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/conftest.py"]
+message: A list comprehension over a column runs Python once per value. Use a column method such as .str.upper() instead.
+rule:
+  kind: list_comprehension
   has:
     kind: for_in_clause
     has: { field: right, pattern: "$DF[$C]" }
+  not:
+    all:
+      - pattern: '[$X.$M() for $X in $DF[$C]]'
+      - has: { field: body, has: { field: function, has: { field: attribute, regex: '^(upper|lower|strip|lstrip|rstrip|title|capitalize|swapcase|casefold|isdigit|isalpha|isalnum|isspace|islower|isupper|istitle)$' } } }
+      - not: { has: { kind: if_clause } }
+      - not: { has: { kind: for_in_clause, nthChild: 3 } }
 constraints:
   C: { kind: string }
   DF: { regex: '(?i)(^|_)(df|frame)(_|\d|$)' }

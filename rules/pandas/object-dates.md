@@ -11,6 +11,6 @@ The rule reports `df["d"].dt.date` and `dt.time`, which turn a datetime64 column
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `.dt.date` (outside comparison operators) to `.dt.normalize()`. It is unsafe because `.dt.normalize()` returns `datetime64` timestamps at midnight rather than Python `date` objects; `.dt.time` remains manual.
 
 `normalize` returns timestamps at midnight and not Python dates, so keep `dt.date` when another library needs Python dates. For `dt.time`, `normalize` drops the time of day, so keep the time as the time since midnight, `df["time"] - df["time"].dt.normalize()`.

@@ -11,4 +11,4 @@ The rule reports `df["a"].values[0] = 9`, which raises ValueError, because the a
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites single-index column writes (`df["a"].values[i]` or `df["a"].to_numpy()[i]`) to `df.loc[df.index[i], "a"]`. Slices, masks, and non-column expressions remain manual.

@@ -6,6 +6,29 @@ severity: error
 message: The array behind a column is read-only under copy-on-write, so this write raises ValueError. Assign with .loc instead, as in df.loc[df.index[0], "a"] = value.
 rule:
   any:
+    - pattern: '$DF[$C].values[$I]'
+    - pattern: '$DF[$C].to_numpy()[$I]'
+  matches: assignment-target
+constraints:
+  DF: { any: [{ kind: identifier }, { kind: attribute }] }
+  C: { kind: string }
+  I: { any: [{ kind: integer }, { kind: unary_operator, has: { field: argument, kind: integer } }, { kind: identifier }] }
+fix: '$DF.loc[$DF.index[$I], $C]'
+metadata: { fix: unsafe }
+---
+id: write-through-values
+language: python
+severity: error
+message: The array behind a column is read-only under copy-on-write, so this write raises ValueError. Assign with .loc instead, as in df.loc[df.index[0], "a"] = value.
+rule:
+  any:
     - pattern: $X.values[$$$I]
     - pattern: $X.to_numpy()[$$$I]
   matches: assignment-target
+  not:
+    all:
+      - any:
+          - pattern: '$DF[$C].values[$I]'
+          - pattern: '$DF[$C].to_numpy()[$I]'
+      - has: { field: subscript, any: [{ kind: integer }, { kind: unary_operator, has: { field: argument, kind: integer } }, { kind: identifier }] }
+      - has: { field: value, has: { stopBy: end, kind: subscript, all: [{ has: { field: value, any: [{ kind: identifier }, { kind: attribute }] } }, { has: { field: subscript, kind: string } }] } }

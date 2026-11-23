@@ -8,6 +8,41 @@ language: python
 severity: error
 message: DataFrame.append and Series.append were removed and raise AttributeError on pandas 3. Collect the parts in a list and call pd.concat once.
 rule:
+  pattern: $OBJ.append($OTHER)
+  all:
+    - any:
+        - inside: { kind: assignment, field: right }
+        - inside: { kind: return_statement }
+        - inside: { kind: expression_list }
+        - inside: { kind: tuple }
+        - inside: { kind: argument_list }
+        - inside: { kind: attribute, field: object }
+        - inside: { kind: subscript, field: value }
+    - not: { inside: { stopBy: { kind: function_definition }, any: [{ kind: for_statement }, { kind: while_statement }] } }
+constraints:
+  OBJ: { not: { regex: '(^\w*(np|numpy)$|\.(index|columns)$)' } }
+  OTHER: { not: { any: [{ kind: dictionary }, { kind: list }, { kind: list_splat }, { kind: dictionary_splat }, { kind: keyword_argument }] } }
+fix: pd.concat([$OBJ, $OTHER])
+metadata: { fix: unsafe }
+---
+id: frame-append
+language: python
+severity: error
+message: DataFrame.append and Series.append were removed and raise AttributeError on pandas 3. Collect the parts in a list and call pd.concat once.
+rule:
+  pattern: $OBJ.append($OTHER, ignore_index=$IGN)
+  not: { inside: { stopBy: { kind: function_definition }, any: [{ kind: for_statement }, { kind: while_statement }] } }
+constraints:
+  OBJ: { not: { regex: '(^\w*(np|numpy)$|\.(index|columns)$)' } }
+  OTHER: { not: { any: [{ kind: dictionary }, { kind: list }, { kind: list_splat }, { kind: dictionary_splat }, { kind: keyword_argument }] } }
+fix: pd.concat([$OBJ, $OTHER], ignore_index=$IGN)
+metadata: { fix: unsafe }
+---
+id: frame-append
+language: python
+severity: error
+message: DataFrame.append and Series.append were removed and raise AttributeError on pandas 3. Collect the parts in a list and call pd.concat once.
+rule:
   pattern: $OBJ.append($$$ARGS)
   any:
     - inside: { kind: assignment, field: right }
@@ -18,5 +53,15 @@ rule:
     - inside: { kind: attribute, field: object }
     - inside: { kind: subscript, field: value }
     - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: ^(ignore_index|verify_integrity|sort)$ } } }
+  not:
+    all:
+      - not: { inside: { stopBy: { kind: function_definition }, any: [{ kind: for_statement }, { kind: while_statement }] } }
+      - any:
+          - all:
+              - pattern: $OBJ.append($OTHER)
+              - has: { field: arguments, has: { nthChild: 1, not: { any: [{ kind: dictionary }, { kind: list }, { kind: list_splat }, { kind: dictionary_splat }, { kind: keyword_argument }] } } }
+          - all:
+              - pattern: $OBJ.append($OTHER, ignore_index=$IGN)
+              - has: { field: arguments, has: { nthChild: 1, not: { any: [{ kind: dictionary }, { kind: list }, { kind: list_splat }, { kind: dictionary_splat }, { kind: keyword_argument }] } } }
 constraints:
   OBJ: { not: { regex: '(^\w*(np|numpy)$|\.(index|columns)$)' } }

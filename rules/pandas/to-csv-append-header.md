@@ -12,6 +12,6 @@ The rule reports `df.to_csv(path, mode="a")` without `header=`, which writes the
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `header=False` to `to_csv(..., mode="a")` calls so appending does not repeat headers. It is unsafe because the first write to a new file may instead need `header=not os.path.exists(path)`.
 
 The repeated header rows are read back as data, so every number in the file comes back as text.

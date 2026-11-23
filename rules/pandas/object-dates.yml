@@ -10,4 +10,16 @@ rule:
   pattern: $X.dt.$P
   not: { inside: { kind: comparison_operator } }
 constraints:
-  P: { regex: ^(date|time)$ }
+  P: { regex: ^date$ }
+fix: $X.dt.normalize()
+metadata: { fix: unsafe }
+---
+id: object-dates
+language: python
+severity: warning
+message: dt.$P makes a column of Python objects. Use dt.normalize() or dt.floor("D") to keep datetime64, and compare the result with a pd.Timestamp, not a date.
+rule:
+  pattern: $X.dt.$P
+  not: { inside: { kind: comparison_operator } }
+constraints:
+  P: { regex: ^time$ }

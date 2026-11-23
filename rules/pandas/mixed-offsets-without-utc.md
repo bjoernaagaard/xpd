@@ -16,6 +16,4 @@ The rule reports `pd.to_datetime(s, format="%Y-%m-%d %H:%M%z")` without `utc=`, 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
-
-xpd doesn't apply the replacement, because the zone that `dt.tz_convert` needs is not in the file. On a column that holds one offset, `utc=True` alone changes the result from the offset to UTC.
+`xpd check --fix --unsafe-fixes` adds `utc=True` to `pd.to_datetime(...)` so pandas 3 parses mixed offsets without raising `ValueError`. It is unsafe because on a column with a single offset `utc=True` changes the resulting time zone to UTC, and you may still want `.dt.tz_convert(...)` for local wall times.

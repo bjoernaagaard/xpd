@@ -11,4 +11,4 @@ The rule reports `df["b"].apply(lambda v: v - df["b"].mean())`, which computes t
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` replaces the lambda parameter with the column expression in arithmetic and comparison bodies, computing the aggregate once on the whole column. Conditional and multi-step lambdas remain manual.

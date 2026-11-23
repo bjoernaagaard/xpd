@@ -11,6 +11,6 @@ The rule reports any `groupby(...).apply` with a lambda, which runs Python once 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites single-reduction lambdas (`lambda g: g.sum()` and `lambda g: g["a"].sum()`) to the named groupby method (`g.sum()` or `g["a"].sum()`). Other lambdas remain manual.
 
 The named reduction can change the name of the index, the dtype and the floating point rounding, so check the result before you replace `apply`.

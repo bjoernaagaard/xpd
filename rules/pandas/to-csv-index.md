@@ -11,4 +11,4 @@ The rule reports `df.to_csv(path)` without `index=`, which writes the index as a
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `index=False` to `to_csv(...)` calls that omit `index=`. It is unsafe because you should pass `index=True` instead when the index holds meaningful data.

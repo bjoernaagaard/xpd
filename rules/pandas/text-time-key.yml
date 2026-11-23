@@ -9,3 +9,42 @@ rule:
     stopBy: end
     kind: argument_list
     inside: { kind: call, has: { field: function, regex: '\.groupby$' } }
+constraints:
+  F: { regex: '^["''](%Y|%Y-%m)["'']$' }
+transform:
+  T1: { replace: { source: $F, replace: '^["'']%Y["'']$', by: '"Y"' } }
+  FREQ: { replace: { source: $T1, replace: '^["'']%Y-%m["'']$', by: '"M"' } }
+fix: $X.dt.to_period($FREQ)
+metadata: { fix: unsafe }
+---
+id: text-time-key
+language: python
+severity: warning
+message: Grouping on formatted text is slow. Group on dt.to_period("M") or dt.floor("h") instead. On a column with a time zone to_period drops the zone and warns, so group on pd.Grouper(key=..., freq="MS") there.
+rule:
+  pattern: $X.dt.strftime($F)
+  inside:
+    stopBy: end
+    kind: argument_list
+    inside: { kind: call, has: { field: function, regex: '\.groupby$' } }
+constraints:
+  F: { regex: '^["''](%Y-%m-%d|%Y-%m-%d %H|%Y-%m-%d %H:00|%Y-%m-%d %H:%M)["'']$' }
+transform:
+  T1: { replace: { source: $F, replace: '^["'']%Y-%m-%d["'']$', by: '"D"' } }
+  T2: { replace: { source: $T1, replace: '^["'']%Y-%m-%d %H(:00)?["'']$', by: '"h"' } }
+  FREQ: { replace: { source: $T2, replace: '^["'']%Y-%m-%d %H:%M["'']$', by: '"min"' } }
+fix: $X.dt.floor($FREQ)
+metadata: { fix: unsafe }
+---
+id: text-time-key
+language: python
+severity: warning
+message: Grouping on formatted text is slow. Group on dt.to_period("M") or dt.floor("h") instead. On a column with a time zone to_period drops the zone and warns, so group on pd.Grouper(key=..., freq="MS") there.
+rule:
+  pattern: $X.dt.strftime($F)
+  inside:
+    stopBy: end
+    kind: argument_list
+    inside: { kind: call, has: { field: function, regex: '\.groupby$' } }
+constraints:
+  F: { not: { regex: '^["''](%Y|%Y-%m|%Y-%m-%d|%Y-%m-%d %H|%Y-%m-%d %H:00|%Y-%m-%d %H:%M)["'']$' } }

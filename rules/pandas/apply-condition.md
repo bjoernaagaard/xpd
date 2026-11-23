@@ -11,6 +11,6 @@ The rule reports `df["a"].apply(lambda v: 1 if v > 50 else 0)` and `lambda v: mi
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `min`/`max` lambdas to `.clip(upper=...)`/`.clip(lower=...)`, and rewrites simple comparison conditionals to `pd.Series(np.where(...), index=...)` when `numpy` is imported as `np`. Other forms remain manual.
 
 `pd.Series(..., index=df.index)` keeps the row labels. Check the name, the dtype and the missing values of the result.

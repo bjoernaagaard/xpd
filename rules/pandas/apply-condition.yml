@@ -8,12 +8,110 @@ severity: warning
 message: A condition per value runs in Python. Use np.where(condition, a, b) on the whole column, or clip for min and max.
 rule:
   any:
+    - pattern: "$S.apply(lambda $X: min($X, $HI))"
+    - pattern: "$S.apply(lambda $X: min($HI, $X))"
+    - pattern: "$S.map(lambda $X: min($X, $HI))"
+    - pattern: "$S.map(lambda $X: min($HI, $X))"
+constraints:
+  X: { regex: '^[A-Za-z_]\w*$' }
+  HI: { not: { has: { stopBy: end, kind: identifier, pattern: $X } } }
+fix: $S.clip(upper=$HI)
+metadata: { fix: unsafe }
+---
+id: apply-condition
+language: python
+severity: warning
+message: A condition per value runs in Python. Use np.where(condition, a, b) on the whole column, or clip for min and max.
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: max($X, $LO))"
+    - pattern: "$S.apply(lambda $X: max($LO, $X))"
+    - pattern: "$S.map(lambda $X: max($X, $LO))"
+    - pattern: "$S.map(lambda $X: max($LO, $X))"
+constraints:
+  X: { regex: '^[A-Za-z_]\w*$' }
+  LO: { not: { has: { stopBy: end, kind: identifier, pattern: $X } } }
+fix: $S.clip(lower=$LO)
+metadata: { fix: unsafe }
+---
+id: apply-condition
+language: python
+severity: warning
+message: A condition per value runs in Python. Use np.where(condition, a, b) on the whole column, or clip for min and max.
+rule:
+  any:
+    - pattern: "$S.apply(lambda $X: $A if $C else $B)"
+    - pattern: "$S.map(lambda $X: $A if $C else $B)"
+  all:
+    - not: { has: { field: arguments, has: { kind: keyword_argument } } }
+    - not: { has: { field: arguments, has: { stopBy: end, kind: call, has: { field: function, regex: '\.(all|any|sum|mean|fillna|nunique)$' } } } }
+    - has:
+        field: arguments
+        has:
+          kind: lambda
+          has:
+            field: body
+            kind: conditional_expression
+            all:
+              - has: { nthChild: 2, kind: comparison_operator, all: [{ has: { stopBy: end, kind: identifier, pattern: $X } }, { not: { has: { regex: '^(in|not in|is|is not)$' } } }] }
+              - not: { has: { nthChild: 1, any: [{ kind: identifier, pattern: $X }, { has: { stopBy: end, kind: identifier, pattern: $X } }] } }
+              - not: { has: { nthChild: 3, any: [{ kind: identifier, pattern: $X }, { has: { stopBy: end, kind: identifier, pattern: $X } }] } }
+    - inside:
+        stopBy: end
+        kind: module
+        has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^numpy$' } }, { has: { field: alias, regex: '^np$' } }] } }
+constraints:
+  X: { regex: '^[A-Za-z_]\w*$' }
+rewriters:
+  - id: parameter
+    rule: { kind: identifier, pattern: $X }
+    fix: $S
+transform:
+  COND: { rewrite: { source: $C, rewriters: [parameter] } }
+fix: pd.Series(np.where($COND, $A, $B), index=$S.index)
+metadata: { fix: unsafe }
+---
+id: apply-condition
+language: python
+severity: warning
+message: A condition per value runs in Python. Use np.where(condition, a, b) on the whole column, or clip for min and max.
+rule:
+  any:
     - pattern: "$S.apply(lambda $X: $A if $C else $B)"
     - pattern: "$S.map(lambda $X: $A if $C else $B)"
     - pattern: "$S.apply(lambda $X: $F($$$ARGS))"
   all:
     - not: { has: { field: arguments, has: { kind: keyword_argument } } }
     - not: { has: { field: arguments, has: { stopBy: end, kind: call, has: { field: function, regex: '\.(all|any|sum|mean|fillna|nunique)$' } } } }
+    - not:
+        any:
+          - pattern: "$S.apply(lambda $X: min($X, $HI))"
+          - pattern: "$S.apply(lambda $X: min($HI, $X))"
+          - pattern: "$S.map(lambda $X: min($X, $HI))"
+          - pattern: "$S.map(lambda $X: min($HI, $X))"
+          - pattern: "$S.apply(lambda $X: max($X, $LO))"
+          - pattern: "$S.apply(lambda $X: max($LO, $X))"
+          - pattern: "$S.map(lambda $X: max($X, $LO))"
+          - pattern: "$S.map(lambda $X: max($LO, $X))"
+          - all:
+              - any:
+                  - pattern: "$S.apply(lambda $X: $A if $C else $B)"
+                  - pattern: "$S.map(lambda $X: $A if $C else $B)"
+              - has:
+                  field: arguments
+                  has:
+                    kind: lambda
+                    has:
+                      field: body
+                      kind: conditional_expression
+                      all:
+                        - has: { nthChild: 2, kind: comparison_operator, all: [{ has: { stopBy: end, kind: identifier, pattern: $X } }, { not: { has: { regex: '^(in|not in|is|is not)$' } } }] }
+                        - not: { has: { nthChild: 1, has: { stopBy: end, kind: identifier, pattern: $X } } }
+                        - not: { has: { nthChild: 3, has: { stopBy: end, kind: identifier, pattern: $X } } }
+              - inside:
+                  stopBy: end
+                  kind: module
+                  has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^numpy$' } }, { has: { field: alias, regex: '^np$' } }] } }
     - any:
         - has: { field: arguments, has: { kind: lambda, has: { field: body, kind: conditional_expression } } }
         - has:

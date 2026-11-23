@@ -13,7 +13,7 @@ The rule reports `df = df.append(row)` and `df.append(row, ignore_index=True)`, 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites non-loop `df.append(other)` and `df.append(other, ignore_index=...)` calls to `pd.concat([df, other], ...)`. Calls inside loops or with dict literals remain manual so you can collect parts in a list and call `pd.concat` once.
 
 The replacement assumes that `parts` is not empty. For single rows, collect the rows in a list and build the frame once.
 

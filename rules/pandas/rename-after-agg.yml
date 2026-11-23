@@ -5,10 +5,63 @@ language: python
 severity: warning
 message: Name the result columns in agg itself, as in agg(b_mean=("b", "mean")), instead of renaming them afterwards.
 rule:
+  pattern: '$G.$AGG({$C1: $F1}).rename(columns={$C1: $N1})'
+constraints:
+  AGG: { regex: ^(agg|aggregate)$ }
+  C1: { kind: string }
+  F1: { kind: string }
+  N1:
+    kind: string
+    regex: '^["''][A-Za-z_][A-Za-z0-9_]*["'']$'
+    not: { regex: '^["''](and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield)["'']$' }
+transform:
+  ID1: { replace: { source: $N1, replace: '^["''](.+)["'']$', by: '$1' } }
+fix: '$G.$AGG($ID1=($C1, $F1))'
+metadata: { fix: unsafe }
+---
+id: rename-after-agg
+language: python
+severity: warning
+message: Name the result columns in agg itself, as in agg(b_mean=("b", "mean")), instead of renaming them afterwards.
+rule:
+  pattern: '$G.$AGG({$C1: $F1, $C2: $F2}).rename(columns={$C1: $N1, $C2: $N2})'
+constraints:
+  AGG: { regex: ^(agg|aggregate)$ }
+  C1: { kind: string }
+  C2: { kind: string }
+  F1: { kind: string }
+  F2: { kind: string }
+  N1:
+    kind: string
+    regex: '^["''][A-Za-z_][A-Za-z0-9_]*["'']$'
+    not: { regex: '^["''](and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield)["'']$' }
+  N2:
+    kind: string
+    regex: '^["''][A-Za-z_][A-Za-z0-9_]*["'']$'
+    not: { regex: '^["''](and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield)["'']$' }
+transform:
+  ID1: { replace: { source: $N1, replace: '^["''](.+)["'']$', by: '$1' } }
+  ID2: { replace: { source: $N2, replace: '^["''](.+)["'']$', by: '$1' } }
+fix: '$G.$AGG($ID1=($C1, $F1), $ID2=($C2, $F2))'
+metadata: { fix: unsafe }
+---
+id: rename-after-agg
+language: python
+severity: warning
+message: Name the result columns in agg itself, as in agg(b_mean=("b", "mean")), instead of renaming them afterwards.
+rule:
   pattern: $G.$AGG($D).rename($$$R)
   has:
     field: arguments
     has: { kind: keyword_argument, has: { field: name, regex: ^columns$ } }
+  not:
+    any:
+      - all:
+          - pattern: '$G.$AGG({$C1: $F1}).rename(columns={$C1: $N1})'
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: value, has: { kind: pair, has: { field: value, kind: string, regex: '^["''][A-Za-z_][A-Za-z0-9_]*["'']$' } } } } }
+      - all:
+          - pattern: '$G.$AGG({$C1: $F1, $C2: $F2}).rename(columns={$C1: $N1, $C2: $N2})'
+          - has: { field: arguments, has: { kind: keyword_argument, has: { field: value, not: { has: { kind: pair, has: { field: value, not: { kind: string, regex: '^["''][A-Za-z_][A-Za-z0-9_]*["'']$' } } } } } } }
 constraints:
   AGG: { regex: ^(agg|aggregate)$ }
   D: { kind: dictionary }

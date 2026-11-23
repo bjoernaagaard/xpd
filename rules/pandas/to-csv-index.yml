@@ -17,3 +17,31 @@ rule:
             any:
               - { kind: keyword_argument, has: { field: name, regex: ^index$ } }
               - kind: dictionary_splat
+              - kind: list_splat
+              - kind: comment
+              - kind: line_continuation
+fix: $X.to_csv($$$ARGS, index=False)
+metadata: { fix: unsafe }
+---
+id: to-csv-index
+language: python
+severity: warning
+message: 'to_csv writes the index as a first column, and when the index has no name read_csv returns it as "Unnamed: 0". Pass index=False, or index=True if the index holds data.'
+rule:
+  pattern: $X.to_csv($$$ARGS)
+  all:
+    - has: { field: arguments, has: { not: { regex: '^[(),]$' } } }
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+              - { kind: keyword_argument, has: { field: name, regex: ^index$ } }
+              - kind: dictionary_splat
+    - has:
+        field: arguments
+        has:
+          any:
+            - kind: list_splat
+            - kind: comment
+            - kind: line_continuation

@@ -11,6 +11,6 @@ The rule reports `df.groupby(df["d"].dt.strftime("%Y-%m"))`, which turns every d
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites common `dt.strftime(...)` groupby keys (`"%Y"`, `"%Y-%m"` to `dt.to_period(...)`, and `"%Y-%m-%d"`, `"%Y-%m-%d %H"`, `"%Y-%m-%d %H:%M"` to `dt.floor(...)`). Other formats remain manual.
 
 The result has a PeriodIndex instead of text labels. On a column with a time zone, `to_period` drops the zone and gives a UserWarning, so group on `pd.Grouper(key="time", freq="MS")` instead.
