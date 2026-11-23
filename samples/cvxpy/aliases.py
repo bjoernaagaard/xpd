@@ -77,6 +77,20 @@ def incompatible_product() -> cp.Expression:
     return Coefficients((2, 2)) * Decision(3)
 
 
+def initialized_product() -> cp.Expression:
+    coefficients = Coefficients((3, 2))
+    x = Decision(2)
+    x.value = [1.0, 2.0]
+    return coefficients * x  # xpd: star-matmul
+
+
+def unpacked_product() -> cp.Expression:
+    coefficients = Coefficients((3, 2))
+    x = Decision(2)
+    x, _ = 2.0, 0
+    return coefficients * x
+
+
 def rebound_coefficient() -> cp.Expression:
     coefficients = Coefficients((2, 2))
     coefficients = Coefficients((2, 3))

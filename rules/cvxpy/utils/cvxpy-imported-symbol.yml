@@ -4,65 +4,35 @@ arguments: [MODULE, SYMBOL, BINDING]
 rule:
   any:
     - kind: identifier
-      pattern: $NAME
-      all:
-        - {not: {matches: shadowed-member}}
-        - inside:
-            stopBy: end
-            kind: module
-            has:
-              stopBy: end
-              kind: import_from_statement
-              all:
-                - {has: {field: module_name, matches: MODULE}}
-                - any:
-                    - has:
-                        kind: dotted_name
-                        matches: SYMBOL
-                        has: {kind: identifier, pattern: $NAME}
-                    - has:
-                        kind: aliased_import
-                        all:
-                          - {has: {field: name, matches: SYMBOL}}
-                          - {has: {field: alias, all: [{pattern: $NAME}, {matches: BINDING}]}}
+      matches:
+        cvxpy-name-binding:
+          REQUIRED: {matches: member-import}
+          CONFLICT: {not: {matches: member-import}}
     - kind: attribute
       all:
         - {has: {field: attribute, matches: SYMBOL}}
         - has:
             field: object
-            kind: identifier
-            pattern: $NAME
-            not: {matches: shadowed-module}
-        - inside:
-            stopBy: end
-            kind: module
-            has:
-              stopBy: end
-              kind: import_statement
-              any:
-                - has:
-                    kind: dotted_name
-                    matches: MODULE
-                    has: {kind: identifier, pattern: $NAME}
-                - has:
-                    kind: aliased_import
-                    all:
-                      - {has: {field: name, matches: MODULE}}
-                      - {has: {field: alias, all: [{pattern: $NAME}, {matches: BINDING}]}}
+            matches:
+              cvxpy-name-binding:
+                REQUIRED: {matches: module-import}
+                CONFLICT: {not: {matches: module-import}}
 utils:
-  shadowed-member:
-    matches: {cvxpy-shadowed-name: {ALLOWED_IMPORT: {matches: member-import}}}
-  shadowed-module:
-    matches: {cvxpy-shadowed-name: {ALLOWED_IMPORT: {matches: module-import}}}
   member-import:
     all:
       - {inside: {kind: import_from_statement, has: {field: module_name, matches: MODULE}}}
       - any:
           - {kind: dotted_name, matches: SYMBOL}
-          - {kind: aliased_import, has: {field: name, matches: SYMBOL}}
+          - kind: aliased_import
+            all:
+              - {has: {field: name, matches: SYMBOL}}
+              - {has: {field: alias, matches: BINDING}}
   module-import:
     all:
       - {inside: {kind: import_statement}}
       - any:
           - {kind: dotted_name, matches: MODULE}
-          - {kind: aliased_import, has: {field: name, matches: MODULE}}
+          - kind: aliased_import
+            all:
+              - {has: {field: name, matches: MODULE}}
+              - {has: {field: alias, matches: BINDING}}

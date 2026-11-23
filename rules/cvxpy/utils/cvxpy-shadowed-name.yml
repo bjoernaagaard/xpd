@@ -2,50 +2,7 @@ id: cvxpy-shadowed-name
 language: python
 arguments: [ALLOWED_IMPORT]
 rule:
-  kind: identifier
-  pattern: $NAME
-  inside:
-    stopBy: end
-    any:
-      - {kind: module}
-      - {matches: nested-scope}
-    has:
-      stopBy: {matches: nested-scope}
-      matches: binds-name
-utils:
-  nested-scope:
-    any:
-      - {kind: function_definition}
-      - {kind: class_definition}
-      - {kind: lambda}
-  binds-name:
-    any:
-      - all:
-          - {any: [{kind: assignment}, {kind: augmented_assignment}, {kind: for_statement}, {kind: for_in_clause}]}
-          - has:
-              field: left
-              any:
-                - {kind: identifier, pattern: $NAME}
-                - all:
-                    - {any: [{kind: pattern_list}, {kind: tuple_pattern}, {kind: list_pattern}]}
-                    - {has: {stopBy: end, kind: identifier, pattern: $NAME}}
-      - all:
-          - {any: [{kind: function_definition}, {kind: class_definition}, {kind: named_expression}]}
-          - {has: {field: name, pattern: $NAME}}
-      - all:
-          - {any: [{kind: parameters}, {kind: lambda_parameters}, {kind: as_pattern_target}]}
-          - has:
-              any:
-                - {kind: identifier, pattern: $NAME}
-                - {any: [{kind: default_parameter}, {kind: typed_default_parameter}], has: {field: name, pattern: $NAME}}
-                - {any: [{kind: typed_parameter}, {kind: list_splat_pattern}, {kind: dictionary_splat_pattern}], has: {nthChild: 1, pattern: $NAME}}
-      - kind: aliased_import
-        all:
-          - {has: {field: alias, pattern: $NAME}}
-          - {not: {matches: ALLOWED_IMPORT}}
-      - kind: dotted_name
-        all:
-          - {has: {nthChild: 1, pattern: $NAME}}
-          - {inside: {any: [{kind: import_statement}, {kind: import_from_statement}]}}
-          - {not: {inside: {kind: import_from_statement, field: module_name}}}
-          - {not: {matches: ALLOWED_IMPORT}}
+  matches:
+    cvxpy-name-binding:
+      REQUIRED: {not: {matches: ALLOWED_IMPORT}}
+      CONFLICT: {regex: '^$'}

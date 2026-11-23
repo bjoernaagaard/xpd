@@ -1,0 +1,8 @@
+id: cvxpy-assignment-pattern
+language: python
+rule:
+  any:
+    - {kind: pattern_list}
+    - {kind: tuple_pattern}
+    - {kind: list_pattern}
+    - {kind: list_splat_pattern}

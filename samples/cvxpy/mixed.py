@@ -5,6 +5,7 @@ from types import ModuleType
 import cvxpy as cp
 import numpy as np
 from cvxpy import sum as vec
+from numpy import reshape as array_reshape
 from scipy.optimize import OptimizeResult
 
 
@@ -17,7 +18,31 @@ def shadowed_identity(np: ModuleType) -> cp.Expression:
 
 
 def numpy_vector() -> np.ndarray:
-    return np.reshape(np.ones((2, 3)), (6,))
+    return array_reshape(np.ones((2, 3)), (6,))
+
+
+def locally_imported_reshape() -> tuple[cp.Expression, cp.Expression, np.ndarray]:
+    from cvxpy import reshape as array_reshape
+
+    def inherited_reshape() -> cp.Expression:
+        return array_reshape(cp.Variable((2, 3)), (6,))  # xpd: implicit-reshape-order
+
+    def shadowed_reshape() -> np.ndarray:
+        from numpy import reshape as array_reshape
+
+        return array_reshape(np.ones((2, 3)), (6,))
+
+    return (
+        array_reshape(cp.Variable((2, 3)), (6,)),  # xpd: implicit-reshape-order
+        inherited_reshape(),
+        shadowed_reshape(),
+    )
+
+
+def locally_imported_module() -> cp.Expression:
+    import cvxpy as np
+
+    return np.reshape(np.Variable((2, 3)), (6,))  # xpd: implicit-reshape-order
 
 
 def unrelated_solve(problem: OptimizeResult) -> bool:

@@ -28,8 +28,17 @@ utils:
   assigns-local:
     kind: expression_statement
     has:
-      any:
-        - all:
-            - {any: [{kind: assignment}, {kind: augmented_assignment}]}
-            - {has: {field: left, pattern: $LOCAL}}
-        - {kind: assignment, has: {field: left, has: {stopBy: end, kind: identifier, pattern: $LOCAL}}}
+      stopBy: {not: {kind: assignment}}
+      all:
+        - {any: [{kind: assignment}, {kind: augmented_assignment}]}
+        - {has: {field: right, regex: '.'}}
+        - has:
+            field: left
+            any:
+              - {kind: identifier, pattern: $LOCAL}
+              - all:
+                  - {matches: cvxpy-assignment-pattern}
+                  - has:
+                      stopBy: {not: {matches: cvxpy-assignment-pattern}}
+                      kind: identifier
+                      pattern: $LOCAL
