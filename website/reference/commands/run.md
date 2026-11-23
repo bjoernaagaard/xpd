@@ -46,4 +46,4 @@ matches less than you expect.
 | --- | --- |
 | 0 | Something matched |
 | 1 | Nothing matched |
-| 2 | xpd could not run |
+| 2 | xpd could not run or could not read an explicitly named input path |

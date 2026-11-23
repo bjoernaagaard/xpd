@@ -3,11 +3,12 @@
 //! The flags are declared here, so `xpd run --help` and the shell completions show them, and
 //! clap checks them before ast-grep reads them again through `ast_grep::main_with_args`.
 
-use std::io::IsTerminal;
+use std::fs;
+use std::io::{ErrorKind, IsTerminal};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ast_grep_language::SupportLang;
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 use clap::{ArgGroup, ValueEnum};
@@ -217,7 +218,23 @@ impl RunArgs {
                     "{} is not a UTF-8 path, which xpd run cannot search",
                     path.display()
                 );
-                anyhow::ensure!(path.exists(), "{} does not exist", path.display());
+                let kind = match fs::metadata(path) {
+                    Ok(metadata) => metadata.file_type(),
+                    Err(error) if error.kind() == ErrorKind::NotFound => {
+                        anyhow::bail!("{} does not exist", path.display())
+                    }
+                    Err(error) => {
+                        return Err(error)
+                            .with_context(|| format!("cannot access {}", path.display()));
+                    }
+                };
+                if kind.is_dir() {
+                    fs::read_dir(path)
+                        .with_context(|| format!("cannot read {}", path.display()))?;
+                } else if kind.is_file() {
+                    fs::File::open(path)
+                        .with_context(|| format!("cannot read {}", path.display()))?;
+                }
             }
         }
         ast_grep::main_with_args(self.into_args().into_iter())
