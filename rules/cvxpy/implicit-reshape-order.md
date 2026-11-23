@@ -9,9 +9,12 @@ these calls emit a FutureWarning. NumPy defaults to row-major order.
 
 ## What the rule reports
 
-Direct calls to CVXPY's `reshape` and `vec`, and `flatten` on a locally
-resolved CVXPY variable, parameter, or constant. The rule skips argument
-unpacking and comments between arguments.
+The rule checks CVXPY's `reshape` and `vec` functions and the `reshape`
+and `flatten` methods of locally resolved variables, parameters, and
+constants. It finds `order=None` in any keyword position and through
+parentheses. Argument unpacking is outside the rule. The omitted-order fix
+checks calls without comments between arguments so the edit can preserve
+their layout.
 
 ## How to fix it
 

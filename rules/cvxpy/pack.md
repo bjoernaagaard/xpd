@@ -24,8 +24,8 @@ syntax. The examples were verified with CVXPY 1.9.3.
 | [star-matmul](star-matmul.md) | A 3 by 3 parameter times a length-3 variable gave the same length-3 result as `@`. The elementwise product was 3 by 3. | None |
 | [dense-identity-quad-form](dense-identity-quad-form.md) | Both identity constructors gave a scalar of 14 for `[1, 2, 3]`, as did `sum_squares`. | None |
 
-Rules use imports and local bindings to resolve CVXPY calls. They leave
-dynamic shapes, data flow across files, and solver availability to the
-application.
+Rules use imports and local bindings to resolve CVXPY calls, including
+renamed imports. Shape checks use literal dimensions in direct calls and
+unambiguous assignments in the same block.
 
 [CVXPY API reference](https://www.cvxpy.org/api_reference/cvxpy.html)

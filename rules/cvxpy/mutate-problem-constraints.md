@@ -8,9 +8,9 @@ to that copy leaves the next solve unaware of the added constraint.
 
 ## What the rule reports
 
-Standalone `append`, `extend`, and `insert` calls on the constraints of a
-locally resolved CVXPY problem. A list saved to a variable can be edited and
-passed to a new problem.
+The rule checks standalone list mutators such as `append` and `clear`,
+and writes or deletions through an index or slice of `problem.constraints`.
+A list saved to a variable can be edited and passed to a new problem.
 
 ## How to fix it
 

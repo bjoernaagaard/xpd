@@ -9,9 +9,11 @@ matrix to express the sum of the squares of a real vector.
 
 ## What the rule reports
 
-A default real `Variable` with a literal vector length and an equally
-sized `numpy.eye` or `numpy.identity` call with one argument. The variable
-must be constructed in the call or bound in the preceding statement.
+The rule checks a default real CVXPY `Variable` with a literal vector
+length and an equally sized NumPy `eye` or `identity` call with one
+argument. It resolves qualified and renamed imports of all three symbols.
+The variable can be constructed in the call or bound in an unambiguous
+earlier assignment in the same block.
 
 ## How to fix it
 

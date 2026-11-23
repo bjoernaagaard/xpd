@@ -22,3 +22,21 @@ def numpy_vector() -> np.ndarray:
 
 def unrelated_solve(problem: OptimizeResult) -> bool:
     return bool(problem.success)
+
+
+def parameter_named_variable() -> cp.Expression:
+    from cvxpy import Parameter as Variable
+
+    x = Variable(2)
+    return cp.quad_form(x, np.eye(2))
+
+
+def shadowed_bool(bool) -> None:
+    problem = cp.Problem(cp.Minimize(0))
+    bool(problem.solve())
+
+
+def shadowed_reshape() -> np.ndarray:
+    from numpy import reshape
+
+    return reshape(np.ones((2, 3)), (6,))

@@ -1,0 +1,29 @@
+id: cvxpy-default-order
+language: python
+arguments: [CALL, POSITION]
+rule:
+  kind: none
+  any:
+    - {matches: order-argument}
+    - inside:
+        stopBy: {not: {kind: parenthesized_expression}}
+        all:
+          - {kind: parenthesized_expression}
+          - {matches: order-argument}
+utils:
+  order-argument:
+    any:
+      - inside:
+          field: value
+          kind: keyword_argument
+          all:
+            - {has: {field: name, regex: '^order$'}}
+            - {inside: {matches: order-arguments}}
+      - all:
+          - {matches: POSITION}
+          - {inside: {matches: order-arguments}}
+  order-arguments:
+    kind: argument_list
+    all:
+      - {not: {has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+      - {inside: {matches: CALL}}

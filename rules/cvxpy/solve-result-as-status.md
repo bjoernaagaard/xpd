@@ -11,9 +11,10 @@ unbounded problem is true.
 
 ## What the rule reports
 
-Direct truth tests of a solve call in an `if`, `elif`, `while`, or
-`assert`, including negated and parenthesized tests. Numeric comparisons
-with the objective are valid.
+The rule checks direct truth tests in `if`, `elif`, `while`, `assert`,
+conditional expressions, and calls to the built-in `bool`. It follows
+parentheses and negation. Numeric comparisons and direct uses as assert
+messages are outside these truth tests.
 
 ## How to fix it
 

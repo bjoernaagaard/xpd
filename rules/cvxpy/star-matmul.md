@@ -8,9 +8,11 @@ multiplication. This use of the operator has been deprecated since 1.1.
 
 ## What the rule reports
 
-A product of two CVXPY variables or parameters with literal shapes whose
-dimensions are all at least two. The rule leaves scalar, singleton, and
-unknown shapes alone.
+The rule checks pairs of CVXPY vectors and matrices with compatible
+literal dimensions from a call or an unambiguous local assignment. It
+reads shapes passed by position or as `shape=`. For matrix multiplication,
+the last left dimension must equal the first right dimension. The rule
+leaves scalar, singleton, incompatible, and unknown shapes alone.
 
 ## How to fix it
 

@@ -5,36 +5,37 @@ message: CVXPY quad_form with a dense identity allocates a square matrix for a s
 rule:
   kind: call
   all:
-    - {pattern: '$Q($X, $NP.$IDENTITY($N))'}
-    - {has: {field: arguments, has: {nthChild: 1, pattern: $VECTOR}}}
-    - inside:
-        stopBy: end
-        kind: module
+    - {pattern: '$Q($X, $E($N))'}
+    - has:
+        field: arguments
+        all:
+          - {has: {nthChild: 1, pattern: $VECTOR}}
+          - has:
+              kind: call
+              nthChild: 2
+              has:
+                field: function
+                matches:
+                  cvxpy-imported-symbol:
+                    MODULE: {regex: '^numpy$'}
+                    SYMBOL: {regex: '^(eye|identity)$'}
+                    BINDING: {pattern: $NUMPY_IMPORT}
+    - has:
+        field: arguments
         has:
-          stopBy: end
-          kind: import_statement
-          any:
-            - {has: {kind: dotted_name, pattern: $NP, regex: '^numpy$'}}
-            - has:
-                kind: aliased_import
-                all:
-                  - {has: {field: name, regex: '^numpy$'}}
-                  - {has: {field: alias, pattern: $NP}}
-    - any:
-        - {has: {field: arguments, has: {pattern: '$V($N)', nthChild: 1}}}
-        - inside:
-            stopBy: {any: [{kind: block}, {kind: module}]}
-            all:
-              - {any: [{kind: expression_statement}, {kind: return_statement}]}
-              - follows:
-                  kind: expression_statement
-                  has: {kind: assignment, pattern: '$X = $V($N)'}
-              - {not: {inside: {kind: lambda, stopBy: end}}}
+          nthChild: 1
+          matches: {cvxpy-local-value: {VALUE: {kind: call, pattern: '$V($N)'}}}
 constraints:
-  IDENTITY: {regex: '^(eye|identity)$'}
   N: {kind: integer, regex: '^[1-9][0-9]*$'}
-  V: {regex: '(^|\.)Variable$'}
 metadata:
   holds:
-    Q: {regex: '(^|\.)quad_form$'}
-    VECTOR: {kind: call, pattern: '$VARIABLE($DIM)', has: {field: function, regex: '(^|\.)Variable$'}}
+    Q:
+      matches:
+        cvxpy-imported-symbol:
+          MODULE: {regex: '^cvxpy(?:\.atoms(?:\.quad_form)?)?$'}
+          SYMBOL: {regex: '^quad_form$'}
+          BINDING: {pattern: $QUAD_IMPORT}
+    VECTOR:
+      all:
+        - {pattern: '$VARIABLE($DIM)'}
+        - matches: {cvxpy-leaf: {SYMBOL: {regex: '^Variable$'}, BINDING: {pattern: $VARIABLE_IMPORT}}}

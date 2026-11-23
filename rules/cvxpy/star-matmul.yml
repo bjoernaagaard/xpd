@@ -4,22 +4,30 @@ severity: warning
 message: CVXPY uses * between these non-scalar expressions for matrix multiplication. Use @ for matrix multiplication or cvxpy.multiply for elementwise multiplication.
 rule:
   kind: binary_operator
-  pattern: $LEFT * $RIGHT
+  all:
+    - {pattern: $LEFT * $RIGHT}
+    - has:
+        field: left
+        matches:
+          cvxpy-local-value:
+            VALUE:
+              matches:
+                cvxpy-matmul-dimension:
+                  AXIS: {nthChild: {position: 1, reverse: true}}
+                  INNER: {pattern: $INNER}
+    - has:
+        field: right
+        matches:
+          cvxpy-local-value:
+            VALUE:
+              matches:
+                cvxpy-matmul-dimension:
+                  AXIS: {nthChild: 1}
+                  INNER: {pattern: $INNER}
 metadata:
   since: "1.1"
   holds:
-    LEFT: {matches: cvxpy-non-scalar-leaf}
-    RIGHT: {matches: cvxpy-non-scalar-leaf}
-utils:
-  cvxpy-non-scalar-leaf:
-    kind: call
-    all:
-      - {has: {field: function, regex: '(^|\.)(Variable|Parameter)$'}}
-      - has:
-          field: arguments
-          has:
-            all:
-              - {nthChild: 1}
-              - any:
-                  - {kind: integer, regex: '^(?:[2-9]|[1-9][0-9]+)$'}
-                  - {kind: tuple, regex: '^\(\s*(?:[2-9]|[1-9][0-9]+)(?:\s*,\s*(?:[2-9]|[1-9][0-9]+))*\s*,?\s*\)$'}
+    LEFT:
+      matches: {cvxpy-leaf: {SYMBOL: {regex: '^(Variable|Parameter)$'}, BINDING: {pattern: $LEAF_IMPORT}}}
+    RIGHT:
+      matches: {cvxpy-leaf: {SYMBOL: {regex: '^(Variable|Parameter)$'}, BINDING: {pattern: $LEAF_IMPORT}}}

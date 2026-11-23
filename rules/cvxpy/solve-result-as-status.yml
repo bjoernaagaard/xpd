@@ -10,12 +10,12 @@ rule:
         - {matches: cvxpy-test-condition}
         - inside:
             stopBy: {not: {any: [{kind: parenthesized_expression}, {kind: not_operator}]}}
-            matches: cvxpy-test-condition
+            all:
+              - {any: [{kind: parenthesized_expression}, {kind: not_operator}]}
+              - {matches: cvxpy-test-condition}
 metadata:
   holds:
-    PROBLEM:
-      kind: call
-      has: {field: function, regex: '(^|\.)Problem$'}
+    PROBLEM: {matches: cvxpy-problem}
 utils:
   cvxpy-test-condition:
     any:
@@ -23,5 +23,19 @@ utils:
       - {inside: {kind: elif_clause, field: condition}}
       - {inside: {kind: while_statement, field: condition}}
       - all:
-          - {nthChild: 1}
+          - {nthChild: {position: 2, ofRule: {not: {kind: comment}}}}
+          - {inside: {kind: conditional_expression}}
+      - all:
+          - {nthChild: {position: 1, ofRule: {not: {kind: comment}}}}
           - {inside: {kind: assert_statement}}
+      - inside:
+          kind: argument_list
+          all:
+            - {not: {has: {nthChild: {position: 2, ofRule: {not: {kind: comment}}}}}}
+            - inside:
+                kind: call
+                has: {field: function, kind: identifier, regex: '^bool$', not: {matches: shadowed-bool}}
+  shadowed-bool:
+    matches:
+      cvxpy-shadowed-name:
+        ALLOWED_IMPORT: {regex: '^$'}
