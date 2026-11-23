@@ -28,6 +28,9 @@ A folder gets a shorter view, with the public names of each file grouped by kind
 
 ```console
 $ xpd outline samples/graph --type function --match '^(totals|flags)' --view signatures --format text
+samples/graph/impact.py
+6: def totals(orders: pd.DataFrame) -> pd.DataFrame
+
 samples/graph/steps.py
 18: def totals(orders: pd.DataFrame) -> pd.DataFrame
 40: def flags(orders: pd.DataFrame) -> pd.DataFrame

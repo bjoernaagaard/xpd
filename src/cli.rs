@@ -17,6 +17,7 @@ use crate::category::{Categories, Category};
 use crate::check::FixMode;
 use crate::fix_safety::Applicability;
 use crate::graph::Graph;
+use crate::impact::ImpactArgs;
 use crate::index::{self, Kind};
 use crate::lsp;
 use crate::mcp;
@@ -272,8 +273,10 @@ enum Cmd {
         #[arg(long)]
         contract: Option<PathBuf>,
     },
-    /// Plan a pandas pipeline's native Polars reimplementation without running Python.
+    /// Plan a pandas-to-Polars or eager-to-lazy Polars rewrite without running Python.
     Map(MapArgs),
+    /// Trace a pipeline column or transformation to outputs and callers without running Python.
+    Impact(ImpactArgs),
     /// Preview and render editable Manim animations.
     #[command(subcommand)]
     Animate(crate::animate::Animation),
@@ -404,6 +407,7 @@ pub fn run() -> ExitCode {
             run_py(EQUIV_PY, &paths)
         }
         Cmd::Map(args) => command_result(args.run(default_format)),
+        Cmd::Impact(args) => unit_result(args.run(default_format)),
         Cmd::Animate(command) => command_result(command.run()),
         Cmd::Rules(options) => command_result(rules(options, default_format)),
         Cmd::Doctor { format } => unit_result(crate::doctor::run(format.unwrap_or(default_format))),
