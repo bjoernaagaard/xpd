@@ -11,4 +11,4 @@ PolarsInefficientMapWarning under -W error.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to replace the `map_elements` addition lambda with direct expression addition.

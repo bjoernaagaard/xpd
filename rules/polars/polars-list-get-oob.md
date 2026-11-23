@@ -11,4 +11,4 @@ Index 1 raised ComputeError for a one-item list. null_on_oob=True returned [None
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to add `null_on_oob=True` to the `list.get` call.

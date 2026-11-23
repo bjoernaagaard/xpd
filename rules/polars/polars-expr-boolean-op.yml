@@ -4,7 +4,139 @@ severity: error
 message: Polars 2.1.0 raises TypeError when a Python boolean operator tests a Polars expression or Series.
   Use parenthesized masks with &, | or ~.
 rule:
-  any:
+  all:
+  - pattern: $L and $RHS
+  - has:
+      field: left
+      any:
+      - all:
+        - pattern: $R
+        - any:
+          - kind: identifier
+          - kind: call
+      - kind: parenthesized_expression
+        has:
+          all:
+          - kind: comparison_operator
+          - has:
+              field: operators
+              regex: '^(==|!=|<=?|>=?)$'
+          - has:
+              all:
+              - pattern: $R
+              - any:
+                - kind: identifier
+                - kind: call
+  - has:
+      field: left
+      any:
+      - kind: parenthesized_expression
+      - kind: identifier
+      - kind: call
+  - has:
+      field: right
+      any:
+      - kind: parenthesized_expression
+      - kind: identifier
+      - kind: call
+fix: $L & $RHS
+metadata:
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: polars-expr-boolean-op
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError when a Python boolean operator tests a Polars expression or Series.
+  Use parenthesized masks with &, | or ~.
+rule:
+  all:
+  - pattern: $L or $RHS
+  - has:
+      field: left
+      any:
+      - all:
+        - pattern: $R
+        - any:
+          - kind: identifier
+          - kind: call
+      - kind: parenthesized_expression
+        has:
+          all:
+          - kind: comparison_operator
+          - has:
+              field: operators
+              regex: '^(==|!=|<=?|>=?)$'
+          - has:
+              all:
+              - pattern: $R
+              - any:
+                - kind: identifier
+                - kind: call
+  - has:
+      field: left
+      any:
+      - kind: parenthesized_expression
+      - kind: identifier
+      - kind: call
+  - has:
+      field: right
+      any:
+      - kind: parenthesized_expression
+      - kind: identifier
+      - kind: call
+fix: $L | $RHS
+metadata:
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: polars-expr-boolean-op
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError when a Python boolean operator tests a Polars expression or Series.
+  Use parenthesized masks with &, | or ~.
+rule:
+  all:
+  - pattern: not $ARG
+  - has:
+      field: argument
+      any:
+      - all:
+        - pattern: $R
+        - any:
+          - kind: identifier
+          - kind: call
+      - kind: parenthesized_expression
+        has:
+          all:
+          - kind: comparison_operator
+          - has:
+              field: operators
+              regex: '^(==|!=|<=?|>=?)$'
+          - has:
+              all:
+              - pattern: $R
+              - any:
+                - kind: identifier
+                - kind: call
+fix: ~$ARG
+metadata:
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: polars-expr-boolean-op
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError when a Python boolean operator tests a Polars expression or Series.
+  Use parenthesized masks with &, | or ~.
+rule:
+  all:
   - kind: boolean_operator
     has:
       field: left
@@ -27,28 +159,13 @@ rule:
               - any:
                 - kind: identifier
                 - kind: call
-  - kind: not_operator
-    has:
-      field: argument
-      any:
-      - all:
-        - pattern: $R
-        - any:
-          - kind: identifier
-          - kind: call
-      - kind: parenthesized_expression
-        has:
-          all:
-          - kind: comparison_operator
-          - has:
-              field: operators
-              regex: '^(==|!=|<=?|>=?)$'
-          - has:
-              all:
-              - pattern: $R
-              - any:
-                - kind: identifier
-                - kind: call
+  - not:
+      has:
+        field: right
+        any:
+        - kind: parenthesized_expression
+        - kind: identifier
+        - kind: call
 metadata:
   holds:
     R:

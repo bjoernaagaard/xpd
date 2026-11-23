@@ -11,4 +11,4 @@ Independent expressions gave equal frames.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to combine chained `with_columns` calls when the second call does not depend on columns created in the first.

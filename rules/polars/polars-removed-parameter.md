@@ -33,4 +33,4 @@ Polars 2.0 removed several keyword arguments. Update each call using the replace
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix` for safe removals such as `ordering="lexical"`, and `xpd check --fix --unsafe-fixes` for parameter renames and boolean mappings. Edit forms without a rewrite using their replacement examples.

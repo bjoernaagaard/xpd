@@ -11,4 +11,4 @@ TypeError from ambiguous truth value.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to replace `and`, `or`, and `not` with `&`, `|`, and `~`.

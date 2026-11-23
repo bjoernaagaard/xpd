@@ -1,6 +1,156 @@
 id: polars-pandas-api-name
 language: python
 severity: error
+message: Polars 2.1.0 raises AttributeError for groupby. Use group_by instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(groupby)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.group_by
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series
+  fix: unsafe
+---
+id: polars-pandas-api-name
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for fillna. Use fill_null instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(fillna)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.fill_null
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series
+  fix: unsafe
+---
+id: polars-pandas-api-name
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for dropna. Use drop_nulls instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(dropna)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.drop_nulls
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series
+  fix: unsafe
+---
+id: polars-pandas-api-name
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for sort_values. Use sort instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(sort_values)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.sort
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series
+  fix: unsafe
+---
+id: polars-pandas-api-name
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for isna. Use is_null instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(isna)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.is_null
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series
+  fix: unsafe
+---
+id: polars-pandas-api-name
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for notna. Use is_not_null instead.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(notna)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.is_not_null
+metadata:
+  holds:
+    R:
+      any:
+      - matches: polars-frame
+      - matches: polars-series
+  fix: unsafe
+---
+id: polars-pandas-api-name
+language: python
+severity: error
 message: Polars 2.1.0 raises AttributeError for this pandas API name. Use Polars equivalents such as
   group_by, join, fill_null, drop_nulls, sort, is_null, is_not_null, or Polars expressions instead.
 rule:
@@ -12,7 +162,7 @@ rule:
         pattern: $R
     - has:
         field: attribute
-        regex: ^(groupby|merge|apply|loc|iloc|iterrows|fillna|dropna|sort_values|reset_index|set_index|isna|notna)$
+        regex: ^(merge|apply|loc|iloc|iterrows|reset_index|set_index)$
   - not:
       matches: polars-compatibility-guard
 metadata:

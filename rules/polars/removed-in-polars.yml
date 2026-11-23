@@ -4,6 +4,99 @@ severity: error
 message: Polars 2.1.0 raises AttributeRemovedError for melt. Use unpivot with index and on.
 rule:
   all:
+  - pattern: $R.melt()
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.unpivot()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for melt. Use unpivot with index and on.
+rule:
+  all:
+  - pattern: $R.melt($$$ARGS)
+  - not:
+      pattern: $R.melt()
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: dictionary_splat
+          - not:
+              any:
+              - regex: ^[(),]$
+              - kind: keyword_argument
+                has:
+                  field: name
+                  regex: ^(id_vars|value_vars|variable_name|value_name)$
+  - not:
+      matches: polars-compatibility-guard
+rewriters:
+  - id: rename-id-vars
+    rule:
+      kind: keyword_argument
+      all:
+      - has: { field: name, regex: ^(id_vars)$ }
+      - has: { field: value, pattern: $V }
+    fix: "index=$V, "
+  - id: rename-value-vars
+    rule:
+      kind: keyword_argument
+      all:
+      - has: { field: name, regex: ^(value_vars)$ }
+      - has: { field: value, pattern: $V }
+    fix: "on=$V, "
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(id_vars|value_vars)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [rename-id-vars, rename-value-vars, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $R.unpivot($REST)
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for melt. Use unpivot with index and on.
+rule:
+  all:
   - kind: attribute
     all:
     - has:
@@ -13,12 +106,95 @@ rule:
         field: attribute
         regex: ^(melt)$
   - not:
+      inside:
+        kind: call
+        field: function
+        any:
+        - pattern: $R.melt()
+        - all:
+          - has:
+              field: arguments
+              has:
+                kind: keyword_argument
+          - not:
+              has:
+                field: arguments
+                has:
+                  any:
+                  - kind: comment
+                  - kind: line_continuation
+                  - kind: dictionary_splat
+                  - not:
+                      any:
+                      - regex: ^[(),]$
+                      - kind: keyword_argument
+                        has:
+                          field: name
+                          regex: ^(id_vars|value_vars|variable_name|value_name)$
+  - not:
       matches: polars-compatibility-guard
 metadata:
   since: '2.0'
   holds:
     R:
       matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for with_row_count. Use with_row_index and supply name="row_nr"
+  to keep the old default name.
+rule:
+  all:
+  - pattern: $R.with_row_count()
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.with_row_index(name="row_nr")
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for with_row_count. Use with_row_index and supply name="row_nr"
+  to keep the old default name.
+rule:
+  all:
+  - pattern: $R.with_row_count($$$ARGS)
+  - not:
+      pattern: $R.with_row_count()
+  - any:
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(name)$
+    - has:
+        field: arguments
+        has:
+          not:
+            any:
+            - kind: keyword_argument
+            - kind: list_splat
+            - kind: dictionary_splat
+            - kind: comment
+            - kind: line_continuation
+            - regex: ^[(),]$
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.with_row_index($$$ARGS)
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
 ---
 id: removed-in-polars
 language: python
@@ -36,12 +212,54 @@ rule:
         field: attribute
         regex: ^(with_row_count)$
   - not:
+      inside:
+        kind: call
+        field: function
+        any:
+        - pattern: $R.with_row_count()
+        - has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(name)$
+        - has:
+            field: arguments
+            has:
+              not:
+                any:
+                - kind: keyword_argument
+                - kind: list_splat
+                - kind: dictionary_splat
+                - kind: comment
+                - kind: line_continuation
+                - regex: ^[(),]$
+  - not:
       matches: polars-compatibility-guard
 metadata:
   since: '2.0'
   holds:
     R:
       matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for approx_n_unique. Select an approx_n_unique expression
+  for each column.
+rule:
+  all:
+  - pattern: $R.approx_n_unique()
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.select(pl.all().approx_n_unique())
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
 ---
 id: removed-in-polars
 language: python
@@ -59,12 +277,42 @@ rule:
         field: attribute
         regex: ^(approx_n_unique)$
   - not:
+      inside:
+        kind: call
+        field: function
+        pattern: $R.approx_n_unique()
+  - not:
       matches: polars-compatibility-guard
 metadata:
   since: '2.0'
   holds:
     R:
       matches: polars-frame
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for fetch. Use head and collect to limit the output.
+rule:
+  all:
+  - pattern: $R.fetch($N)
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+          - kind: list_splat
+          - kind: dictionary_splat
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.head($N).collect()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
 ---
 id: removed-in-polars
 language: python
@@ -80,6 +328,20 @@ rule:
     - has:
         field: attribute
         regex: ^(fetch)$
+  - not:
+      inside:
+        kind: call
+        field: function
+        all:
+        - pattern: $R.fetch($N)
+        - not:
+            has:
+              field: arguments
+              has:
+                any:
+                - kind: keyword_argument
+                - kind: list_splat
+                - kind: dictionary_splat
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -309,11 +571,13 @@ rule:
         regex: ^(width)$
   - not:
       matches: polars-compatibility-guard
+fix: $R.size
 metadata:
   since: '2.0'
   holds:
     R:
       matches: polars-array
+  fix: safe
 ---
 id: removed-in-polars
 language: python
@@ -344,6 +608,23 @@ severity: error
 message: Polars 2.1.0 raises AttributeRemovedError for datetime. Use dt.replace_time_zone(None).
 rule:
   all:
+  - pattern: $R.dt.datetime()
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.dt.replace_time_zone(None)
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for datetime. Use dt.replace_time_zone(None).
+rule:
+  all:
   - kind: attribute
     all:
     - has:
@@ -359,6 +640,11 @@ rule:
     - has:
         field: attribute
         regex: ^(datetime)$
+  - not:
+      inside:
+        kind: call
+        field: function
+        pattern: $R.dt.datetime()
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -404,6 +690,24 @@ message: Polars 2.1.0 raises AttributeError for explode. Use str.split("").explo
   strings are handled.
 rule:
   all:
+  - pattern: $R.str.explode()
+  - not:
+      matches: polars-compatibility-guard
+fix: $R.str.split("").explode()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeError for explode. Use str.split("").explode() and check how empty
+  strings are handled.
+rule:
+  all:
   - kind: attribute
     all:
     - has:
@@ -419,6 +723,11 @@ rule:
     - has:
         field: attribute
         regex: ^(explode)$
+  - not:
+      inside:
+        kind: call
+        field: function
+        pattern: $R.str.explode()
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -594,8 +903,39 @@ severity: error
 message: Polars 2.1.0 raises AttributeRemovedError for threadpool_size. Use thread_pool_size.
 rule:
   all:
+  - kind: attribute
+    all:
+    - pattern: $F
+    - has:
+        field: object
+        pattern: $M
+    - has:
+        field: attribute
+        regex: ^(threadpool_size)$
+    - matches:
+        polars-member:
+          MEMBER:
+            regex: ^(threadpool_size)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $M.thread_pool_size
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: safe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for threadpool_size. Use thread_pool_size.
+rule:
+  all:
   - all:
     - pattern: $F
+    - not:
+        kind: attribute
     - matches:
         polars-member:
           MEMBER:
@@ -645,6 +985,27 @@ message: Polars 2.1.0 raises AttributeRemovedError for GroupBy.count. Use len an
   if you need the old column name.
 rule:
   all:
+  - pattern: $R.$GB($$$ARGS).count()
+  - not:
+      matches: polars-compatibility-guard
+constraints:
+  GB:
+    regex: ^(group_by|group_by_dynamic|rolling)$
+fix: $R.$GB($$$ARGS).len(name="count")
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises AttributeRemovedError for GroupBy.count. Use len and name the output count
+  if you need the old column name.
+rule:
+  all:
   - kind: attribute
     all:
     - has:
@@ -665,6 +1026,11 @@ rule:
         field: attribute
         regex: ^(count)$
   - not:
+      inside:
+        kind: call
+        field: function
+        pattern: $R.$GB($$$ARGS).count()
+  - not:
       matches: polars-compatibility-guard
 metadata:
   since: '2.0'
@@ -678,14 +1044,42 @@ severity: error
 message: Polars 2.1.0 raises TypeError for count with zero arguments. Use len to count all rows.
 rule:
   all:
+  - pattern: $M.count()
+  - has:
+      field: function
+      all:
+      - pattern: $F
+      - matches:
+          polars-member:
+            MEMBER:
+              regex: ^(count)$
+  - not:
+      matches: polars-compatibility-guard
+fix: $M.len()
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: safe
+---
+id: removed-in-polars
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for count with zero arguments. Use len to count all rows.
+rule:
+  all:
   - all:
     - pattern: $F()
     - has:
         field: function
-        matches:
-          polars-member:
-            MEMBER:
-              regex: ^(count)$
+        all:
+        - not:
+            kind: attribute
+        - matches:
+            polars-member:
+              MEMBER:
+                regex: ^(count)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -784,18 +1178,35 @@ language: python
 severity: info
 message: Polars 2.1.0 ignores POLARS_STREAMING_CHUNK_SIZE. Set POLARS_IDEAL_MORSEL_SIZE or call Config.set_streaming_chunk_size.
 rule:
-  any:
-  - all:
-    - pattern: $OS.environ[$KEY] = $V
-    - has:
-        field: left
-        kind: subscript
-  - pattern: $OS.putenv($KEY, $V)
+  all:
+  - pattern: $OS.environ[$KEY] = $V
+  - has:
+      field: left
+      kind: subscript
 constraints:
   KEY:
     kind: string
     regex: ^["']POLARS_STREAMING_CHUNK_SIZE["']$
   OS:
     regex: ^(os)$
+fix: $OS.environ["POLARS_IDEAL_MORSEL_SIZE"] = $V
 metadata:
   since: '2.0'
+  fix: unsafe
+---
+id: removed-in-polars
+language: python
+severity: info
+message: Polars 2.1.0 ignores POLARS_STREAMING_CHUNK_SIZE. Set POLARS_IDEAL_MORSEL_SIZE or call Config.set_streaming_chunk_size.
+rule:
+  pattern: $OS.putenv($KEY, $V)
+constraints:
+  KEY:
+    kind: string
+    regex: ^["']POLARS_STREAMING_CHUNK_SIZE["']$
+  OS:
+    regex: ^(os)$
+fix: $OS.putenv("POLARS_IDEAL_MORSEL_SIZE", $V)
+metadata:
+  since: '2.0'
+  fix: unsafe

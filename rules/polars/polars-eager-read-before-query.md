@@ -11,4 +11,4 @@ Start this lazy query with a scan to enable projection and predicate pushdown. O
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to replace `read_*.lazy()` with the matching `scan_*` call.

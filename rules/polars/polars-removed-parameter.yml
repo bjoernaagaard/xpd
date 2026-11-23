@@ -4,24 +4,74 @@ severity: error
 message: Polars 2.1.0 raises ArgumentRemovedError for dtypes on this call. Pass schema_overrides.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        all:
-        - pattern: $F
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(read_csv|scan_csv)$
+        field: name
+        regex: ^(dtypes)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        pattern: $V
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(schema_overrides)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_csv|scan_csv)$
+  - not:
+      matches: polars-compatibility-guard
+fix: schema_overrides=$V
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for dtypes on this call. Pass schema_overrides.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(dtypes)$
+    - inside:
+        kind: argument_list
+        all:
+        - has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(dtypes)$
+              regex: ^(schema_overrides)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_csv|scan_csv)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -33,28 +83,129 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises TypeError for missing_utf8_is_empty_string on this call. Pass empty_string_is_null
-  with the boolean inverted.
+message: Polars 2.1.0 raises TypeError for missing_utf8_is_empty_string on this call. Pass empty_string_is_null with the boolean inverted.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        all:
-        - pattern: $F
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(read_csv|scan_csv)$
+        field: name
+        regex: ^(missing_utf8_is_empty_string)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(empty_string_is_null)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_csv|scan_csv)$
+  - not:
+      matches: polars-compatibility-guard
+fix: empty_string_is_null=False
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for missing_utf8_is_empty_string on this call. Pass empty_string_is_null with the boolean inverted.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(missing_utf8_is_empty_string)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(empty_string_is_null)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_csv|scan_csv)$
+  - not:
+      matches: polars-compatibility-guard
+fix: empty_string_is_null=True
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for missing_utf8_is_empty_string on this call. Pass empty_string_is_null with the boolean inverted.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(missing_utf8_is_empty_string)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(missing_utf8_is_empty_string)$
+              regex: ^(empty_string_is_null)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_csv|scan_csv)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -66,28 +217,129 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises ArgumentRemovedError for allow_missing_columns on this call. Pass missing_columns="insert"
-  for True or "raise" for False.
+message: Polars 2.1.0 raises ArgumentRemovedError for allow_missing_columns on this call. Pass missing_columns="insert" for True or "raise" for False.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        all:
-        - pattern: $F
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(read_parquet|scan_parquet)$
+        field: name
+        regex: ^(allow_missing_columns)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(missing_columns)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_parquet|scan_parquet)$
+  - not:
+      matches: polars-compatibility-guard
+fix: missing_columns="insert"
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for allow_missing_columns on this call. Pass missing_columns="insert" for True or "raise" for False.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(allow_missing_columns)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(missing_columns)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_parquet|scan_parquet)$
+  - not:
+      matches: polars-compatibility-guard
+fix: missing_columns="raise"
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for allow_missing_columns on this call. Pass missing_columns="insert" for True or "raise" for False.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(allow_missing_columns)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(allow_missing_columns)$
+              regex: ^(missing_columns)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(read_parquet|scan_parquet)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -95,6 +347,152 @@ metadata:
   holds:
     F:
       matches: polars-member-any
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for rechunk on this call. Call rechunk on the resulting
+  DataFrame when you need contiguous chunks.
+rule:
+  all:
+  - pattern: $F($$$ARGS)
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(read_csv|read_parquet|read_ipc|read_ndjson|read_ipc_stream)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(rechunk)$
+        - has:
+            field: value
+            kind: 'true'
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+  - not:
+      matches: polars-compatibility-guard
+rewriters:
+  - id: drop-rechunk
+    rule:
+      kind: keyword_argument
+      has:
+        field: name
+        regex: ^(rechunk)$
+    fix: ""
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(rechunk)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [drop-rechunk, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $F($REST).rechunk()
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for rechunk on this call. Call rechunk on the resulting
+  DataFrame when you need contiguous chunks.
+rule:
+  all:
+  - pattern: $F($$$ARGS)
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(read_csv|read_parquet|read_ipc|read_ndjson|scan_csv|scan_parquet|scan_ipc|scan_ndjson|read_ipc_stream)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(rechunk)$
+        - has:
+            field: value
+            kind: 'false'
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+  - not:
+      matches: polars-compatibility-guard
+rewriters:
+  - id: drop-rechunk
+    rule:
+      kind: keyword_argument
+      has:
+        field: name
+        regex: ^(rechunk)$
+    fix: ""
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(rechunk)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [drop-rechunk, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $F($REST)
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
 ---
 id: polars-removed-parameter
 language: python
@@ -117,10 +515,55 @@ rule:
         field: arguments
         has:
           kind: keyword_argument
-          all:
-          - has:
-              field: name
-              regex: ^(rechunk)$
+          has:
+            field: name
+            regex: ^(rechunk)$
+  - not:
+      all:
+      - has:
+          field: function
+          matches:
+            polars-member:
+              MEMBER:
+                regex: ^(read_csv|read_parquet|read_ipc|read_ndjson|read_ipc_stream)$
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(rechunk)$
+            - has:
+                field: value
+                kind: 'true'
+      - not:
+          has:
+            field: arguments
+            has:
+              any:
+              - kind: comment
+              - kind: line_continuation
+  - not:
+      all:
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(rechunk)$
+            - has:
+                field: value
+                kind: 'false'
+      - not:
+          has:
+            field: arguments
+            has:
+              any:
+              - kind: comment
+              - kind: line_continuation
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -135,26 +578,78 @@ severity: error
 message: Polars 2.1.0 raises ArgumentRemovedError for join_nulls on this call. Pass nulls_equal.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
+        field: name
+        regex: ^(join_nulls)$
+    - has:
+        field: value
+        pattern: $V
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(nulls_equal)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(join)$
+  - not:
+      matches: polars-compatibility-guard
+fix: nulls_equal=$V
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for join_nulls on this call. Pass nulls_equal.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(join_nulls)$
+    - inside:
+        kind: argument_list
         all:
         - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(join)$
-    - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(join_nulls)$
+              regex: ^(nulls_equal)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(join)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -169,26 +664,78 @@ severity: error
 message: Polars 2.1.0 raises ArgumentRemovedError for columns on this call. Pass on for the pivot key.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
+        field: name
+        regex: ^(columns)$
+    - has:
+        field: value
+        pattern: $V
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(on)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(pivot)$
+  - not:
+      matches: polars-compatibility-guard
+fix: on=$V
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for columns on this call. Pass on for the pivot key.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(columns)$
+    - inside:
+        kind: argument_list
         all:
         - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(pivot)$
-    - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(columns)$
+              regex: ^(on)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(pivot)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -203,26 +750,78 @@ severity: error
 message: Polars 2.1.0 raises ArgumentRemovedError for descending on this call. Pass reverse.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
+        field: name
+        regex: ^(descending)$
+    - has:
+        field: value
+        pattern: $V
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(reverse)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(top_k|bottom_k)$
+  - not:
+      matches: polars-compatibility-guard
+fix: reverse=$V
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for descending on this call. Pass reverse.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(descending)$
+    - inside:
+        kind: argument_list
         all:
         - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(top_k|bottom_k)$
-    - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(descending)$
+              regex: ^(reverse)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(top_k|bottom_k)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -237,26 +836,78 @@ severity: error
 message: Polars 2.1.0 raises ArgumentRemovedError for by on this call. Pass group_by.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
+        field: name
+        regex: ^(by)$
+    - has:
+        field: value
+        pattern: $V
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(group_by)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(rolling|group_by_dynamic|upsample)$
+  - not:
+      matches: polars-compatibility-guard
+fix: group_by=$V
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for by on this call. Pass group_by.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(by)$
+    - inside:
+        kind: argument_list
         all:
         - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(rolling|group_by_dynamic|upsample)$
-    - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(by)$
+              regex: ^(group_by)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(rolling|group_by_dynamic|upsample)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -268,30 +919,135 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming"
-  to request streaming or engine="in-memory" to request in-memory execution.
+message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming" to request streaming or engine="in-memory" to request in-memory execution.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
-        all:
-        - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(collect|collect_async|explain|show_graph)$
+        field: name
+        regex: ^(streaming)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(engine)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(collect|collect_async|explain|show_graph)$
+  - not:
+      matches: polars-compatibility-guard
+fix: engine="streaming"
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming" to request streaming or engine="in-memory" to request in-memory execution.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(streaming)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(engine)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(collect|collect_async|explain|show_graph)$
+  - not:
+      matches: polars-compatibility-guard
+fix: engine="in-memory"
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming" to request streaming or engine="in-memory" to request in-memory execution.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(streaming)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(streaming)$
+              regex: ^(engine)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(collect|collect_async|explain|show_graph)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -303,28 +1059,129 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming"
-  to request streaming or engine="in-memory" to request in-memory execution.
+message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming" to request streaming or engine="in-memory" to request in-memory execution.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        all:
-        - pattern: $F
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(collect_all|collect_all_async)$
+        field: name
+        regex: ^(streaming)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(engine)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(collect_all|collect_all_async)$
+  - not:
+      matches: polars-compatibility-guard
+fix: engine="streaming"
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming" to request streaming or engine="in-memory" to request in-memory execution.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(streaming)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(engine)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(collect_all|collect_all_async)$
+  - not:
+      matches: polars-compatibility-guard
+fix: engine="in-memory"
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for streaming on this call. Pass engine="streaming" to request streaming or engine="in-memory" to request in-memory execution.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(streaming)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(streaming)$
+              regex: ^(engine)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(collect_all|collect_all_async)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -336,30 +1193,135 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises ArgumentRemovedError for tree_format on this call. Pass format="tree" for
-  True or format="plain" for False.
+message: Polars 2.1.0 raises ArgumentRemovedError for tree_format on this call. Pass format="tree" for True or format="plain" for False.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
-        all:
-        - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(explain)$
+        field: name
+        regex: ^(tree_format)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(format)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(explain)$
+  - not:
+      matches: polars-compatibility-guard
+fix: format="tree"
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for tree_format on this call. Pass format="tree" for True or format="plain" for False.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(tree_format)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(format)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(explain)$
+  - not:
+      matches: polars-compatibility-guard
+fix: format="plain"
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for tree_format on this call. Pass format="tree" for True or format="plain" for False.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(tree_format)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(tree_format)$
+              regex: ^(format)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(explain)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -445,6 +1407,153 @@ message: Polars 2.1.0 raises TypeError for ordering on this call. Omit ordering 
   is lexical.
 rule:
   all:
+  - pattern: $F($$$ARGS)
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(Categorical)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(ordering)$
+        - has:
+            field: value
+            regex: ^["']lexical["']$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+  - not:
+      matches: polars-compatibility-guard
+rewriters:
+  - id: drop-ordering
+    rule:
+      kind: keyword_argument
+      has:
+        field: name
+        regex: ^(ordering)$
+    fix: ""
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(ordering)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [drop-ordering, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $F($REST)
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: safe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for ordering on this call. Omit ordering because categorical sorting
+  is lexical.
+rule:
+  all:
+  - pattern: $F($$$ARGS)
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(Categorical)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(ordering)$
+        - not:
+            has:
+              field: value
+              regex: ^["']lexical["']$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+  - not:
+      matches: polars-compatibility-guard
+rewriters:
+  - id: drop-ordering
+    rule:
+      kind: keyword_argument
+      has:
+        field: name
+        regex: ^(ordering)$
+    fix: ""
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(ordering)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [drop-ordering, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $F($REST)
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for ordering on this call. Omit ordering because categorical sorting
+  is lexical.
+rule:
+  all:
   - kind: call
     all:
     - has:
@@ -459,10 +1568,15 @@ rule:
         field: arguments
         has:
           kind: keyword_argument
-          all:
-          - has:
-              field: name
-              regex: ^(ordering)$
+          has:
+            field: name
+            regex: ^(ordering)$
+    - has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -477,24 +1591,74 @@ severity: error
 message: Polars 2.1.0 raises ArgumentRemovedError for width on this call. Pass shape.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        all:
-        - pattern: $F
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(Array)$
+        field: name
+        regex: ^(width)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        pattern: $V
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(shape)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(Array)$
+  - not:
+      matches: polars-compatibility-guard
+fix: shape=$V
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for width on this call. Pass shape.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(width)$
+    - inside:
+        kind: argument_list
+        all:
+        - has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(width)$
+              regex: ^(shape)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(Array)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -502,6 +1666,75 @@ metadata:
   holds:
     F:
       matches: polars-member-any
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises TypeError for ddof on this call. Omit ddof because it did not affect the
+  result.
+rule:
+  all:
+  - pattern: $F($$$ARGS)
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(corr)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        has:
+          field: name
+          regex: ^(ddof)$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+  - not:
+      matches: polars-compatibility-guard
+rewriters:
+  - id: drop-ddof
+    rule:
+      kind: keyword_argument
+      has:
+        field: name
+        regex: ^(ddof)$
+    fix: ""
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(ddof)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [drop-ddof, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $F($REST)
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
 ---
 id: polars-removed-parameter
 language: python
@@ -524,10 +1757,15 @@ rule:
         field: arguments
         has:
           kind: keyword_argument
-          all:
-          - has:
-              field: name
-              regex: ^(ddof)$
+          has:
+            field: name
+            regex: ^(ddof)$
+    - has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -539,30 +1777,135 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises ArgumentRemovedError for return_as_string on this call. Pass return_type="string"
-  if you need the returned text.
+message: Polars 2.1.0 raises ArgumentRemovedError for return_as_string on this call. Pass return_type="string" if you need the returned text.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
-        all:
-        - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(glimpse)$
+        field: name
+        regex: ^(return_as_string)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(return_type)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(glimpse)$
+  - not:
+      matches: polars-compatibility-guard
+fix: return_type="string"
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for return_as_string on this call. Pass return_type="string" if you need the returned text.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(return_as_string)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(return_type)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(glimpse)$
+  - not:
+      matches: polars-compatibility-guard
+fix: return_type="inline"
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for return_as_string on this call. Pass return_type="string" if you need the returned text.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(return_as_string)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(return_as_string)$
+              regex: ^(return_type)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(glimpse)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -574,30 +1917,135 @@ metadata:
 id: polars-removed-parameter
 language: python
 severity: error
-message: Polars 2.1.0 raises ArgumentRemovedError for future on this call. Pass a CompatLevel through
-  compat_level.
+message: Polars 2.1.0 raises ArgumentRemovedError for future on this call. Pass a CompatLevel through compat_level.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
-        all:
-        - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(to_arrow|write_ipc|write_ipc_stream)$
+        field: name
+        regex: ^(future)$
     - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-          - has:
+        field: value
+        kind: 'true'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(compat_level)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(to_arrow|write_ipc|write_ipc_stream)$
+  - not:
+      matches: polars-compatibility-guard
+fix: compat_level=pl.CompatLevel.newest()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for future on this call. Pass a CompatLevel through compat_level.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(future)$
+    - has:
+        field: value
+        kind: 'false'
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(compat_level)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(to_arrow|write_ipc|write_ipc_stream)$
+  - not:
+      matches: polars-compatibility-guard
+fix: compat_level=pl.CompatLevel.oldest()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-dataframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for future on this call. Pass a CompatLevel through compat_level.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        regex: ^(future)$
+    - any:
+      - not:
+          has:
+            field: value
+            any:
+            - kind: 'true'
+            - kind: 'false'
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
               field: name
-              regex: ^(future)$
+              regex: ^(compat_level)$
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(to_arrow|write_ipc|write_ipc_stream)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -613,28 +2061,176 @@ message: Polars 2.1.0 raises ArgumentRemovedError for $KEY on this call. Pass op
   to configure query optimization.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
-        kind: attribute
+        field: name
         all:
-        - has:
-            field: object
-            pattern: $R
-        - has:
-            field: attribute
-            regex: ^(collect|explain|show_graph)$
+        - pattern: $KEY
+        - regex: ^(type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
     - has:
-        field: arguments
-        has:
+        field: value
+        pattern: $V
+    - not:
+        follows:
           kind: keyword_argument
-          all:
-          - has:
-              field: name
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - not:
+        precedes:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(optimizations)$
+        - inside:
+              kind: call
               all:
-              - pattern: $KEY
-              - regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(collect|explain|show_graph)$
+  - not:
+      matches: polars-compatibility-guard
+fix: optimizations=pl.QueryOptFlags($KEY=$V)
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for $KEY on this call. Pass optimizations=pl.QueryOptFlags(...)
+  to configure query optimization.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        all:
+        - pattern: $KEY
+        - regex: ^(no_optimization)$
+    - has:
+        field: value
+        kind: 'true'
+    - not:
+        follows:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - not:
+        precedes:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(optimizations)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(collect|explain|show_graph)$
+  - not:
+      matches: polars-compatibility-guard
+fix: optimizations=pl.QueryOptFlags.none()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for $KEY on this call. Pass optimizations=pl.QueryOptFlags(...)
+  to configure query optimization.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        all:
+        - pattern: $KEY
+        - regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - any:
+      - follows:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+      - precedes:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
+              field: name
+              regex: ^(optimizations)$
+      - all:
+        - has:
+            field: name
+            regex: ^(no_optimization)$
+        - not:
+            has:
+              field: value
+              kind: 'true'
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  kind: attribute
+                  all:
+                  - has:
+                      field: object
+                      pattern: $R
+                  - has:
+                      field: attribute
+                      regex: ^(collect|explain|show_graph)$
   - not:
       matches: polars-compatibility-guard
 metadata:
@@ -650,26 +2246,170 @@ message: Polars 2.1.0 raises ArgumentRemovedError for $KEY on this call. Pass op
   to configure query optimization.
 rule:
   all:
-  - kind: call
+  - kind: keyword_argument
     all:
     - has:
-        field: function
+        field: name
         all:
-        - pattern: $F
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(collect_all)$
+        - pattern: $KEY
+        - regex: ^(type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
     - has:
-        field: arguments
-        has:
+        field: value
+        pattern: $V
+    - not:
+        follows:
           kind: keyword_argument
-          all:
-          - has:
-              field: name
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - not:
+        precedes:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(optimizations)$
+        - inside:
+              kind: call
               all:
-              - pattern: $KEY
-              - regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(collect_all)$
+  - not:
+      matches: polars-compatibility-guard
+fix: optimizations=pl.QueryOptFlags($KEY=$V)
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for $KEY on this call. Pass optimizations=pl.QueryOptFlags(...)
+  to configure query optimization.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        all:
+        - pattern: $KEY
+        - regex: ^(no_optimization)$
+    - has:
+        field: value
+        kind: 'true'
+    - not:
+        follows:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - not:
+        precedes:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - inside:
+        kind: argument_list
+        all:
+        - not:
+            has:
+              kind: keyword_argument
+              has:
+                field: name
+                regex: ^(optimizations)$
+        - inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(collect_all)$
+  - not:
+      matches: polars-compatibility-guard
+fix: optimizations=pl.QueryOptFlags.none()
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: unsafe
+---
+id: polars-removed-parameter
+language: python
+severity: error
+message: Polars 2.1.0 raises ArgumentRemovedError for $KEY on this call. Pass optimizations=pl.QueryOptFlags(...)
+  to configure query optimization.
+rule:
+  all:
+  - kind: keyword_argument
+    all:
+    - has:
+        field: name
+        all:
+        - pattern: $KEY
+        - regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+    - any:
+      - follows:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+      - precedes:
+          kind: keyword_argument
+          has:
+            field: name
+            regex: ^(no_optimization|type_coercion|predicate_pushdown|projection_pushdown|simplify_expression|slice_pushdown|comm_subplan_elim|comm_subexpr_elim|cluster_with_columns|collapse_joins|_eager|_type_check|_check_order)$
+      - inside:
+          kind: argument_list
+          has:
+            kind: keyword_argument
+            has:
+              field: name
+              regex: ^(optimizations)$
+      - all:
+        - has:
+            field: name
+            regex: ^(no_optimization)$
+        - not:
+            has:
+              field: value
+              kind: 'true'
+    - inside:
+        kind: argument_list
+        inside:
+              kind: call
+              all:
+              - has:
+                  field: function
+                  all:
+                  - pattern: $F
+                  - matches:
+                      polars-member:
+                        MEMBER:
+                          regex: ^(collect_all)$
   - not:
       matches: polars-compatibility-guard
 metadata:

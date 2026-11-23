@@ -138,6 +138,39 @@ rule:
       inside:
         kind: assignment
         field: left
+  - not:
+      inside:
+        kind: interpolation
+        stopBy: end
+        has:
+          regex: '^=$'
+fix: len($R.collect_schema())
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: safe
+---
+id: polars-lazy-schema-property
+language: python
+severity: warning
+message: Polars 2.1.0 emits PerformanceWarning when code reads LazyFrame.width. Use collect_schema to
+  make schema resolution explicit.
+rule:
+  all:
+  - kind: attribute
+    all:
+    - has:
+        field: object
+        pattern: $R
+    - has:
+        field: attribute
+        regex: ^(width)$
+  - inside:
+      kind: interpolation
+      stopBy: end
+      has:
+        regex: '^=$'
 metadata:
   holds:
     R:

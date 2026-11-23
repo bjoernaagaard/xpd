@@ -24,6 +24,88 @@ severity: warning
 message: Polars 2.1.0 emits DeprecationWarning for strict=True with how="horizontal". Omit strict because
   horizontal concatenation already requires equal heights.
 rule:
+  all:
+  - pattern: $F($$$ARGS)
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(concat|union)$
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(strict)$
+        - has:
+            field: value
+            kind: 'true'
+  - has:
+      field: arguments
+      has:
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(how)$
+        - has:
+            field: value
+            regex: ^["']horizontal["']$
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+rewriters:
+  - id: drop-strict
+    rule:
+      kind: keyword_argument
+      has:
+        field: name
+        regex: ^(strict)$
+    fix: ""
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+        - kind: comment
+        - kind: line_continuation
+        - kind: keyword_argument
+          has:
+            field: name
+            regex: ^(strict)$
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite:
+      source: $$$ARGS
+      rewriters: [drop-strict, keep-arg]
+      joinBy: ""
+  REST:
+    replace:
+      source: $KEPT
+      replace: ", $"
+      by: ""
+fix: $F($REST)
+metadata:
+  since: '2.0'
+  holds:
+    F:
+      matches: polars-member-any
+  fix: safe
+---
+id: deprecated-in-polars
+language: python
+severity: warning
+message: Polars 2.1.0 emits DeprecationWarning for strict=True with how="horizontal". Omit strict because
+  horizontal concatenation already requires equal heights.
+rule:
   kind: call
   all:
   - has:
@@ -56,6 +138,12 @@ rule:
         - has:
             field: value
             regex: ^["']horizontal["']$
+  - has:
+      field: arguments
+      has:
+        any:
+        - kind: comment
+        - kind: line_continuation
 metadata:
   since: '2.0'
   holds:

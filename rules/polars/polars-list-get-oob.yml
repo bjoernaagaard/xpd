@@ -4,6 +4,33 @@ severity: info
 message: Polars raises ComputeError for an out-of-bounds list offset by default. Pass null_on_oob=True
   when shorter lists are expected.
 rule:
+  all:
+  - pattern: $R.list.get($$$ARGS)
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+            all:
+            - has:
+                field: name
+                regex: ^(null_on_oob)$
+          - kind: dictionary_splat
+          - kind: comment
+fix: $R.list.get($$$ARGS, null_on_oob=True)
+metadata:
+  holds:
+    R:
+      matches: polars-element
+  fix: unsafe
+---
+id: polars-list-get-oob
+language: python
+severity: info
+message: Polars raises ComputeError for an out-of-bounds list offset by default. Pass null_on_oob=True
+  when shorter lists are expected.
+rule:
   kind: call
   all:
   - has:
@@ -23,6 +50,10 @@ rule:
       - has:
           field: attribute
           regex: ^(get)$
+  - has:
+      field: arguments
+      has:
+        kind: comment
   - not:
       has:
         field: arguments

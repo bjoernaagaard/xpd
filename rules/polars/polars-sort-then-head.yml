@@ -4,7 +4,78 @@ severity: info
 message: For a small number of rows, top_k or bottom_k can avoid a full sort. Sort the small result if
   its output order matters.
 rule:
-  pattern: $R.sort($$$SORT).head($$$HEAD)
+  pattern: $R.sort($COL, descending=True).head($N)
+constraints:
+  COL:
+    any:
+    - kind: string
+    - kind: list
+  N:
+    not:
+      kind: unary_operator
+fix: $R.top_k($N, by=$COL)
+metadata:
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: polars-sort-then-head
+language: python
+severity: info
+message: For a small number of rows, top_k or bottom_k can avoid a full sort. Sort the small result if
+  its output order matters.
+rule:
+  pattern: $R.sort($COL).head($N)
+constraints:
+  COL:
+    any:
+    - kind: string
+    - kind: list
+  N:
+    not:
+      kind: unary_operator
+fix: $R.bottom_k($N, by=$COL)
+metadata:
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: polars-sort-then-head
+language: python
+severity: info
+message: For a small number of rows, top_k or bottom_k can avoid a full sort. Sort the small result if
+  its output order matters.
+rule:
+  all:
+  - pattern: $R.sort($$$SORT).head($$$HEAD)
+  - not:
+      any:
+      - all:
+        - pattern: $R.sort($COL, descending=True).head($N)
+        - has:
+            field: function
+            has:
+              field: object
+              has:
+                field: arguments
+                has:
+                  any:
+                  - kind: string
+                  - kind: list
+      - all:
+        - pattern: $R.sort($COL).head($N)
+        - has:
+            field: function
+            has:
+              field: object
+              has:
+                field: arguments
+                has:
+                  any:
+                  - kind: string
+                  - kind: list
 metadata:
   holds:
     R:

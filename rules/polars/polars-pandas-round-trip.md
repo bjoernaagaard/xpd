@@ -11,4 +11,4 @@ The integer-only round trip matched the original frame on 50,000 and 500,000 row
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to remove the `pl.from_pandas(df.to_pandas())` round trip.

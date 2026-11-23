@@ -11,4 +11,4 @@ TypeError from chained comparison truth testing.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to parenthesize each comparison around `&`, `|`, or `^`.

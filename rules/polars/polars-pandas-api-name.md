@@ -11,4 +11,4 @@ Thirteen AttributeError results on Polars DataFrame, LazyFrame, and Series (`gro
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to rename direct one-to-one pandas names (`groupby`, `fillna`, `dropna`, `sort_values`, `isna`, `notna`) to their Polars equivalents. Edit other forms by hand.

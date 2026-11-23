@@ -11,4 +11,4 @@ equals returned True. assert_frame_equal raised AssertionError for Int32 against
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to rewrite `assert df.equals(other)` to `pl.testing.assert_frame_equal(df, other)` after checking the intended result.

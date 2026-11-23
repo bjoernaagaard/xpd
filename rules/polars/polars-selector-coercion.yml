@@ -4,70 +4,106 @@ severity: info
 message: A selector combined with col by &, | or ^ becomes a value expression in Polars 2.1.0. Use selectors.by_name
   to combine column selections.
 rule:
-  kind: binary_operator
   all:
+  - pattern: $R
+  - pattern: $COL_FN($$$COL_ARGS)
   - has:
-      field: operator
-      regex: ^[&|^]$
-  - any:
-    - all:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(col)$
+  - has:
+      field: arguments
+      has:
+        kind: string
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: keyword_argument
+          - kind: dictionary_splat
+          - kind: comment
+  - inside:
+      kind: binary_operator
+      all:
       - has:
-          field: left
+          field: operator
+          regex: ^[&|^]$
+      - has:
+          all:
+          - pattern: $S
+          - pattern: $MOD.$SEL($$$SEL_ARGS)
+          - has:
+              field: function
+              kind: attribute
+              all:
+              - has:
+                  field: object
+                  matches: polars-selectors-module
+              - has:
+                  field: attribute
+                  regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$
+fix: $MOD.by_name($$$COL_ARGS)
+metadata:
+  since: '2.0'
+  holds:
+    S:
+      matches: polars-selector
+    R:
+      matches: polars-expr
+  fix: unsafe
+---
+id: polars-selector-coercion
+language: python
+severity: info
+message: A selector combined with col by &, | or ^ becomes a value expression in Polars 2.1.0. Use selectors.by_name
+  to combine column selections.
+rule:
+  all:
+  - pattern: $R
+  - kind: call
+  - has:
+      field: function
+      matches:
+        polars-member:
+          MEMBER:
+            regex: ^(col)$
+  - not:
+      all:
+      - has:
+          field: arguments
+          has:
+            kind: string
+      - not:
+          has:
+            field: arguments
+            has:
+              any:
+              - kind: keyword_argument
+              - kind: dictionary_splat
+              - kind: comment
+  - inside:
+      kind: binary_operator
+      all:
+      - has:
+          field: operator
+          regex: ^[&|^]$
+      - has:
           all:
           - pattern: $S
           - kind: call
-            all:
-            - has:
-                field: function
-                kind: attribute
-                all:
-                - has:
-                    field: object
-                    matches: polars-selectors-module
-                - has:
-                    field: attribute
-                    regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$
-      - has:
-          field: right
-          all:
-          - pattern: $R
-          - kind: call
-            all:
-            - has:
-                field: function
-                matches:
-                  polars-member:
-                    MEMBER:
-                      regex: ^(col)$
-    - all:
-      - has:
-          field: right
-          all:
-          - pattern: $S
-          - kind: call
-            all:
-            - has:
-                field: function
-                kind: attribute
-                all:
-                - has:
-                    field: object
-                    matches: polars-selectors-module
-                - has:
-                    field: attribute
-                    regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$
-      - has:
-          field: left
-          all:
-          - pattern: $R
-          - kind: call
-            all:
-            - has:
-                field: function
-                matches:
-                  polars-member:
-                    MEMBER:
-                      regex: ^(col)$
+          - has:
+              field: function
+              kind: attribute
+              all:
+              - has:
+                  field: object
+                  matches: polars-selectors-module
+              - has:
+                  field: attribute
+                  regex: ^(all|numeric|integer|float|string|by_name|by_dtype|starts_with|ends_with|matches)$
 metadata:
   since: '2.0'
   holds:

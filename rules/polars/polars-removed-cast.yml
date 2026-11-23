@@ -1,6 +1,240 @@
 id: polars-removed-cast
 language: python
 severity: error
+message: Polars 2.1.0 raises InvalidOperationError for this cast. Parse strings with str.to_date.
+rule:
+  all:
+  - pattern: $R.cast($T)
+  - has:
+      field: function
+      kind: attribute
+      has:
+        field: object
+        kind: call
+        all:
+        - has:
+            field: function
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Series)$
+        - has:
+            field: arguments
+            has:
+              kind: list
+              all:
+              - has:
+                  kind: string
+              - not:
+                  has:
+                    all:
+                    - not:
+                        kind: string
+                    - regex: ^[^\s\[\],#]
+              nthChild:
+                position: 1
+                ofRule:
+                  not:
+                    any:
+                    - kind: comment
+                    - kind: line_continuation
+        - not:
+            has:
+              field: arguments
+              has:
+                any:
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(dtype)$
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(values)$
+                - kind: dictionary_splat
+  - has:
+      field: arguments
+      has:
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Date)$
+        nthChild:
+          position: 1
+          ofRule:
+            not:
+              any:
+              - kind: comment
+              - kind: line_continuation
+fix: $R.str.to_date()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-series
+  fix: unsafe
+---
+id: polars-removed-cast
+language: python
+severity: error
+message: Polars 2.1.0 raises InvalidOperationError for this cast. Parse strings with str.to_time.
+rule:
+  all:
+  - pattern: $R.cast($T)
+  - has:
+      field: function
+      kind: attribute
+      has:
+        field: object
+        kind: call
+        all:
+        - has:
+            field: function
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Series)$
+        - has:
+            field: arguments
+            has:
+              kind: list
+              all:
+              - has:
+                  kind: string
+              - not:
+                  has:
+                    all:
+                    - not:
+                        kind: string
+                    - regex: ^[^\s\[\],#]
+              nthChild:
+                position: 1
+                ofRule:
+                  not:
+                    any:
+                    - kind: comment
+                    - kind: line_continuation
+        - not:
+            has:
+              field: arguments
+              has:
+                any:
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(dtype)$
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(values)$
+                - kind: dictionary_splat
+  - has:
+      field: arguments
+      has:
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Time)$
+        nthChild:
+          position: 1
+          ofRule:
+            not:
+              any:
+              - kind: comment
+              - kind: line_continuation
+fix: $R.str.to_time()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-series
+  fix: unsafe
+---
+id: polars-removed-cast
+language: python
+severity: error
+message: Polars 2.1.0 raises InvalidOperationError for this cast. Parse strings with str.to_datetime.
+rule:
+  all:
+  - pattern: $R.cast($T)
+  - has:
+      field: function
+      kind: attribute
+      has:
+        field: object
+        kind: call
+        all:
+        - has:
+            field: function
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Series)$
+        - has:
+            field: arguments
+            has:
+              kind: list
+              all:
+              - has:
+                  kind: string
+              - not:
+                  has:
+                    all:
+                    - not:
+                        kind: string
+                    - regex: ^[^\s\[\],#]
+              nthChild:
+                position: 1
+                ofRule:
+                  not:
+                    any:
+                    - kind: comment
+                    - kind: line_continuation
+        - not:
+            has:
+              field: arguments
+              has:
+                any:
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(dtype)$
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(values)$
+                - kind: dictionary_splat
+  - has:
+      field: arguments
+      has:
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Datetime)$
+        nthChild:
+          position: 1
+          ofRule:
+            not:
+              any:
+              - kind: comment
+              - kind: line_continuation
+fix: $R.str.to_datetime()
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-series
+  fix: unsafe
+---
+id: polars-removed-cast
+language: python
+severity: error
 message: Polars 2.1.0 raises InvalidOperationError for this cast. Parse strings with str.to_date, str.to_time
   or str.to_datetime.
 rule:
@@ -65,19 +299,14 @@ rule:
       field: arguments
       has:
         any:
-        - any:
-          - matches:
-              polars-member:
-                MEMBER:
-                  regex: ^(Date|Time|Datetime)$
-          - kind: call
-            all:
-            - has:
-                field: function
-                matches:
-                  polars-member:
-                    MEMBER:
-                      regex: ^(Datetime)$
+        - kind: call
+          all:
+          - has:
+              field: function
+              matches:
+                polars-member:
+                  MEMBER:
+                    regex: ^(Datetime)$
           nthChild:
             position: 1
             ofRule:
@@ -105,11 +334,98 @@ rule:
                       polars-member:
                         MEMBER:
                           regex: ^(Datetime)$
+  - not:
+      pattern: $R.cast($T)
+      has:
+        field: arguments
+        has:
+          matches:
+            polars-member:
+              MEMBER:
+                regex: ^(Date|Time|Datetime)$
 metadata:
   since: '2.0'
   holds:
     R:
       matches: polars-series
+---
+id: polars-removed-cast
+language: python
+severity: error
+message: Polars 2.1.0 raises ComputeError for this cast. Convert integers to string labels before casting.
+rule:
+  all:
+  - pattern: $R.cast($CAT)
+  - has:
+      field: function
+      kind: attribute
+      has:
+        field: object
+        kind: call
+        all:
+        - has:
+            field: function
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Series)$
+        - has:
+            field: arguments
+            has:
+              kind: list
+              all:
+              - has:
+                  kind: integer
+              - not:
+                  has:
+                    all:
+                    - not:
+                        kind: integer
+                    - regex: ^[^\s\[\],#]
+              nthChild:
+                position: 1
+                ofRule:
+                  not:
+                    any:
+                    - kind: comment
+                    - kind: line_continuation
+        - not:
+            has:
+              field: arguments
+              has:
+                any:
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(dtype)$
+                - kind: keyword_argument
+                  all:
+                  - has:
+                      field: name
+                      regex: ^(values)$
+                - kind: dictionary_splat
+  - has:
+      field: arguments
+      has:
+        matches:
+          polars-member:
+            MEMBER:
+              regex: ^(Categorical)$
+        nthChild:
+          position: 1
+          ofRule:
+            not:
+              any:
+              - kind: comment
+              - kind: line_continuation
+fix: $R.cast(pl.String).cast($CAT)
+metadata:
+  since: '2.0'
+  holds:
+    R:
+      matches: polars-series
+  fix: unsafe
 ---
 id: polars-removed-cast
 language: python
@@ -176,29 +492,17 @@ rule:
   - has:
       field: arguments
       has:
-        any:
-        - matches:
-            polars-member:
-              MEMBER:
-                regex: ^(Categorical)$
-          nthChild:
-            position: 1
-            ofRule:
-              not:
-                any:
-                - kind: comment
-                - kind: line_continuation
-        - kind: keyword_argument
-          all:
-          - has:
-              field: name
-              regex: ^(dtype)$
-          - has:
-              field: value
-              matches:
-                polars-member:
-                  MEMBER:
-                    regex: ^(Categorical)$
+        kind: keyword_argument
+        all:
+        - has:
+            field: name
+            regex: ^(dtype)$
+        - has:
+            field: value
+            matches:
+              polars-member:
+                MEMBER:
+                  regex: ^(Categorical)$
 metadata:
   since: '2.0'
   holds:

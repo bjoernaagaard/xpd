@@ -11,4 +11,4 @@ Taking the union of numeric columns and a string column as a value expression ra
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to rewrite `pl.col(...)` with string column names to `by_name(...)` on the selector module.

@@ -19,7 +19,29 @@ rule:
         - kind: identifier
         - kind: call
   - regex: (?:[<>]=?|==|!=)[^\n]*[&|^][^\n]*(?:[<>]=?|==|!=)
+  - pattern: $CMP
+rewriters:
+  - id: split-and
+    rule:
+      pattern: $L & $R
+      inside: { kind: comparison_operator }
+    fix: $L) & ($R
+  - id: split-or
+    rule:
+      pattern: $L | $R
+      inside: { kind: comparison_operator }
+    fix: $L) | ($R
+  - id: split-xor
+    rule:
+      pattern: $L ^ $R
+      inside: { kind: comparison_operator }
+    fix: $L) ^ ($R
+transform:
+  SPLIT:
+    rewrite: { source: $CMP, rewriters: [split-and, split-or, split-xor] }
+fix: ($SPLIT)
 metadata:
   holds:
     R:
       matches: polars-element
+  fix: unsafe

@@ -4,7 +4,24 @@ severity: info
 message: Collect executes this query before lazy starts a new plan. Keep the operations in one plan when
   they can run together.
 rule:
-  pattern: $R.collect($$$COLLECT).lazy()
+  pattern: $R.collect().lazy()
+fix: $R
+metadata:
+  holds:
+    R:
+      matches: polars-lazyframe
+  fix: unsafe
+---
+id: polars-collect-then-lazy
+language: python
+severity: info
+message: Collect executes this query before lazy starts a new plan. Keep the operations in one plan when
+  they can run together.
+rule:
+  all:
+  - pattern: $R.collect($$$COLLECT).lazy()
+  - not:
+      pattern: $R.collect().lazy()
 metadata:
   holds:
     R:

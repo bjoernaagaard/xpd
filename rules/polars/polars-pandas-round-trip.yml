@@ -12,9 +12,11 @@ rule:
         polars-member:
           MEMBER:
             regex: ^(from_pandas)$
+fix: $R
 metadata:
   holds:
     F:
       matches: polars-member-any
     R:
       matches: polars-dataframe
+  fix: unsafe

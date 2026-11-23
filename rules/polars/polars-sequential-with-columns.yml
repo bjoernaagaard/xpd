@@ -4,7 +4,58 @@ severity: info
 message: Chained with_columns calls may split work into separate steps. Combine independent expressions
   and keep later calls for expressions that use newly created columns.
 rule:
-  pattern: $R.with_columns($$$ONE).with_columns($$$TWO)
+  all:
+  - pattern: $R.with_columns($$$ONE).with_columns($$$TWO)
+  - not:
+      has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+  - not:
+      has:
+        field: function
+        has:
+          field: object
+          has:
+            field: arguments
+            has:
+              any:
+              - kind: comment
+              - kind: line_continuation
+fix: $R.with_columns($$$ONE, $$$TWO)
+metadata:
+  holds:
+    R:
+      matches: polars-frame
+  fix: unsafe
+---
+id: polars-sequential-with-columns
+language: python
+severity: info
+message: Chained with_columns calls may split work into separate steps. Combine independent expressions
+  and keep later calls for expressions that use newly created columns.
+rule:
+  all:
+  - pattern: $R.with_columns($$$ONE).with_columns($$$TWO)
+  - any:
+    - has:
+        field: arguments
+        has:
+          any:
+          - kind: comment
+          - kind: line_continuation
+    - has:
+        field: function
+        has:
+          field: object
+          has:
+            field: arguments
+            has:
+              any:
+              - kind: comment
+              - kind: line_continuation
 metadata:
   holds:
     R:

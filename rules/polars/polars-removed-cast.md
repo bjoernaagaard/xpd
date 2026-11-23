@@ -16,4 +16,4 @@ Polars 2.0 removed several casts that need an explicit conversion. Parse tempora
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to rewrite supported temporal and categorical casts. Edit other forms using their replacement examples.

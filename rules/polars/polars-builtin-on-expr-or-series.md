@@ -11,4 +11,4 @@ Five TypeError results on Expr. All five builtins worked on Series.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to replace the Python builtin with the matching Polars expression method.

@@ -11,4 +11,4 @@ Top-k was 2.51x and 3.96x faster on shuffled keys, and slower on already sorted 
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to rewrite `sort(...).head(...)` to `top_k` or `bottom_k` when output order does not matter.

@@ -11,4 +11,4 @@ The collect call produced a DataFrame and lazy returned a new LazyFrame.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+Use `xpd check --fix --unsafe-fixes` to drop `.collect().lazy()` when `collect` takes no arguments.
