@@ -67,12 +67,35 @@ def unrelated_fit_guard(X, y):
         return None
 
 
+def deferred_fit(X, y):
+    try:
+
+        def fit_later():
+            return XGBRegressor().fit(X, y, eval_metric="rmse")  # xpd: removed-fit-keywords
+    except TypeError:
+        return None
+    return fit_later
+
+
 def effective_tree_method(data):
     xgb.train({r"tree_method": r"gpu_hist"}, data)  # xpd: removed-gpu-hist
     try:
         cv({"tree_method": "hist", r"tree_method": r"gpu_hist"}, data)  # xpd: removed-gpu-hist
     except OSError:
         return None
+
+
+def concatenated_tree_method(data):
+    xgb.XGBRegressor(tree_method="gpu_" "hist")  # xpd: removed-gpu-hist
+    xgb.train({("tree_" "method"): "gpu_" "hist"}, data)  # xpd: removed-gpu-hist
+    cv({"tree_method": "gpu_hist", "n-jobs": 2}, data)  # xpd: removed-gpu-hist
+
+
+def tree_predictions(data, batches):
+    params = {"booster": "gblinear", "booster": "gbtree"}
+    model = xgb.train(params, data)
+    for batch in batches:
+        yield model.predict(DMatrix(batch))  # xpd: dmatrix-rebuilt-for-predict
 
 
 def inline_training_matrix(X, y):

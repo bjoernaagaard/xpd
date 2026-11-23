@@ -30,33 +30,87 @@ utils:
   gpu-hist-value:
     has: { field: value, matches: gpu-hist-string }
   gpu-hist-string:
-    kind: string
     all:
-      - { has: { kind: string_start, regex: '^[rRuU]?["'']' } }
-      - { has: { kind: string_content, regex: '^gpu_hist$' } }
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          g(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          p(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          u(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          _(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          h(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          i(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          s(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  token-string-literal:
+    all:
+      - { matches: plain-string-literal }
+      - { not: { has: { stopBy: end, kind: string_content, regex: '[^a-z_]' } } }
+  plain-string-literal:
+    any:
+      - { matches: string-without-escapes }
+      - kind: parenthesized_expression
+        has:
+          stopBy: { not: { kind: parenthesized_expression } }
+          matches: string-without-escapes
+  string-without-escapes:
+    all:
+      - any: [{ kind: string }, { kind: concatenated_string }]
+      - not:
+          has:
+            stopBy: end
+            any:
+              - { kind: string_start, not: { regex: '^[rRuU]?["'']' } }
+              - { kind: string_content, regex: '\\' }
   gblinear-value:
-    has:
-      field: value
-      kind: string
-      all:
-        - { has: { kind: string_start, regex: '^[rRuU]?["'']' } }
-        - { has: { kind: string_content, regex: '^gblinear$' } }
+    has: { field: value, matches: gblinear-string }
   tree-method-key:
     kind: pair
-    has:
-      field: key
-      kind: string
-      all:
-        - { has: { kind: string_start, regex: '^[rRuU]?["'']' } }
-        - { has: { kind: string_content, regex: '^tree_method$' } }
+    has: { field: key, matches: tree-method-string }
   booster-key:
     kind: pair
-    has:
-      field: key
-      kind: string
-      all:
-        - { has: { kind: string_start, regex: '^[rRuU]?["'']' } }
-        - { has: { kind: string_content, regex: '^booster$' } }
+    has: { field: key, matches: booster-string }
+  gblinear-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          g(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          b(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          l(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          i(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          n(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          a(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          r(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  tree-method-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          r(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          _(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          m(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          h(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          o(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          d(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  booster-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          b(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          o(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          o(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          s(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          r(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
   gpu-hist-params:
     kind: dictionary
     all:
@@ -73,7 +127,7 @@ utils:
                     - kind: pair
                       has:
                         field: key
-                        not: { kind: string, regex: '^[rRuU]?["'']{1,3}[A-Za-z0-9_]+["'']{1,3}$' }
+                        not: { matches: plain-string-literal }
       - not:
           has:
             all:
@@ -139,10 +193,38 @@ utils:
   gpu-hist-value:
     has: { field: value, matches: gpu-hist-string }
   gpu-hist-string:
-    kind: string
     all:
-      - { has: { kind: string_start, regex: '^[rRuU]?["'']' } }
-      - { has: { kind: string_content, regex: '^gpu_hist$' } }
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          g(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          p(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          u(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          _(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          h(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          i(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          s(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  token-string-literal:
+    all:
+      - { matches: plain-string-literal }
+      - { not: { has: { stopBy: end, kind: string_content, regex: '[^a-z_]' } } }
+  plain-string-literal:
+    any:
+      - { matches: string-without-escapes }
+      - kind: parenthesized_expression
+        has:
+          stopBy: { not: { kind: parenthesized_expression } }
+          matches: string-without-escapes
+  string-without-escapes:
+    all:
+      - any: [{ kind: string }, { kind: concatenated_string }]
+      - not:
+          has:
+            stopBy: end
+            any:
+              - { kind: string_start, not: { regex: '^[rRuU]?["'']' } }
+              - { kind: string_content, regex: '\\' }
   expected-failure:
     any:
       - inside:

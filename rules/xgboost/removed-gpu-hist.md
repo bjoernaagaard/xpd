@@ -9,9 +9,15 @@ that value raises an error.
 ## What the rule reports
 
 The rule checks literal `gpu_hist` values on XGBoost estimator constructors
-and in dictionaries passed directly as `params` to `train` or `cv`. For
-duplicate keys, the last value takes effect. Raw and Unicode string prefixes
-are accepted on literal keys and values.
+and in dictionaries passed directly as `params` to `train` or `cv`. It
+recognizes adjacent string literals such as `"tree_" "method"` and
+`"gpu_" "hist"`, including raw and Unicode prefixes. A later literal
+`tree_method` key overrides the earlier value. A later unrelated plain
+string key leaves it in effect.
+
+The matcher reads source text. It cannot decode Python escapes such as
+`\x5f` into underscores. An escaped key, a computed key, or a dictionary
+unpack after `tree_method` can make the effective value uncertain.
 
 ## How to fix it
 

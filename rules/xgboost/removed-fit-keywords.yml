@@ -16,26 +16,32 @@ metadata:
       kind: call
       has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' }
 utils:
+  deferred-body:
+    inside:
+      field: body
+      any: [{ kind: function_definition }, { kind: lambda }]
   expected-failure:
-    any:
-      - inside:
-          stopBy: end
-          kind: block
-          inside:
-            field: body
-            kind: try_statement
-            has:
-              kind: except_clause
-              has:
-                field: value
-                any:
-                  - { regex: '^(TypeError)$' }
-                  - { kind: tuple, has: { regex: '^(TypeError)$' } }
-                  - { kind: as_pattern, has: { regex: '^(TypeError)$' } }
-      - inside:
-          stopBy: end
-          kind: with_statement
-          regex: '^with [^\n]*(?:pytest\.raises|assertRaises)\(\s*(?:TypeError)\s*[,)]'
+    all:
+      - not: { matches: deferred-body }
+      - any:
+          - inside:
+              stopBy: { matches: deferred-body }
+              kind: block
+              inside:
+                field: body
+                kind: try_statement
+                has:
+                  kind: except_clause
+                  has:
+                    field: value
+                    any:
+                      - { regex: '^(TypeError)$' }
+                      - { kind: tuple, has: { regex: '^(TypeError)$' } }
+                      - { kind: as_pattern, has: { regex: '^(TypeError)$' } }
+          - inside:
+              stopBy: { matches: deferred-body }
+              kind: with_statement
+              regex: '^with [^\n]*(?:pytest\.raises|assertRaises)\(\s*(?:TypeError)\s*[,)]'
   xgboost-version-guard:
     inside:
       stopBy: end

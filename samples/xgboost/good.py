@@ -76,6 +76,10 @@ def raw_overridden_option(data):
     return xgb.train({r"tree_method": r"gpu_hist", "tree_method": "hist"}, data)
 
 
+def concatenated_overridden_option(data):
+    return xgb.train({"tree_method": "gpu_hist", "tree_" "method": "hist"}, data)
+
+
 def parentheses_around_default(features):
     return QuantileDMatrix(features, max_quantile_batches=(None))
 
@@ -102,6 +106,13 @@ def equivalent_matrix_reference(features, labels):
 
 def linear_predictions(train, batches):
     model = xgb.train(params={"booster": "gblinear"}, dtrain=train)
+    for batch in batches:
+        yield model.predict(DMatrix(batch))
+
+
+def linear_predictions_with_params(data, batches):
+    params = {"booster": "gblinear"}
+    model = xgb.train(params, data)
     for batch in batches:
         yield model.predict(DMatrix(batch))
 

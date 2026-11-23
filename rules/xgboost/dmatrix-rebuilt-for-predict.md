@@ -12,6 +12,8 @@ allocating a new `DMatrix` for each batch.
 The rule checks a native booster that calls `predict(DMatrix(batch))` in
 the body of the loop that binds `batch`. It looks for a single positional
 argument in both calls and skips boosters with a known `gblinear` setting.
+It recognizes a literal parameter dictionary passed inline or assigned to
+the argument name directly before the booster assignment.
 
 ## How to fix it
 
