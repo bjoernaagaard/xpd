@@ -1,5 +1,6 @@
 mod contract;
 mod evidence;
+mod skfolio;
 
 use std::collections::BTreeSet;
 use std::fmt::Write;
@@ -22,6 +23,7 @@ use evidence::{Evidence, Observations};
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum Source {
     Pandas,
+    Skfolio,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -52,11 +54,15 @@ pub(crate) struct MapArgs {
 
 impl MapArgs {
     pub(crate) fn run(&self, default: Format) -> Result<ExitCode> {
+        ensure!(
+            !matches!(self.from, Source::Skfolio) || self.contract.is_none(),
+            "--contract is only supported for pandas to polars",
+        );
         let contract = self.contract.as_deref().map(Contract::read).transpose()?;
-        let (from, to) = match (self.from, self.to) {
-            (Source::Pandas, Target::Polars) => ("pandas", "polars"),
+        let to = match self.to {
+            Target::Polars => "polars",
         };
-        let report = plan(&self.file, &self.entry, from, to, contract.as_ref())?;
+        let report = plan(&self.file, &self.entry, self.from, to, contract.as_ref())?;
         match self.format.unwrap_or(default) {
             Format::Json => println!("{}", serde_json::to_string_pretty(&report)?),
             Format::Text => print!("{}", report.text()?),
@@ -154,7 +160,7 @@ impl Report<'_> {
 fn plan<'a>(
     file: &'a Path,
     entry: &'a str,
-    from: &'a str,
+    from: Source,
     to: &'a str,
     contract: Option<&'a Contract>,
 ) -> Result<Report<'a>> {
@@ -172,6 +178,26 @@ fn plan<'a>(
             error.start_pos().line() + 1
         );
     }
+    if matches!(from, Source::Skfolio) {
+        let (line, observations) = skfolio::observe(&root, entry).with_context(|| {
+            format!("{}: no top-level function named {entry:?}", file.display())
+        })?;
+        return Ok(Report {
+            file,
+            entry,
+            line,
+            from: "skfolio",
+            to,
+            status: "partial",
+            input_columns_observed: Vec::new(),
+            contract: None,
+            stages: Vec::new(),
+            dependencies: Vec::new(),
+            observed: observations.observed,
+            proposed: observations.proposed,
+            unresolved: observations.unresolved,
+        });
+    }
     let pipeline = steps::read_entry(&root, entry)
         .with_context(|| format!("{}: no top-level function named {entry:?}", file.display()))?;
     let observations = observe(&root, &pipeline, contract)?;
@@ -179,7 +205,7 @@ fn plan<'a>(
         file,
         entry,
         line: pipeline.line,
-        from,
+        from: "pandas",
         to,
         status: if observations.unresolved.is_empty() {
             "complete"
