@@ -135,7 +135,8 @@ xpd
 ├── read and rewrite code
 │   ├── run [paths]            find a code pattern, and preview or apply a rewrite
 │   ├── outline [paths]        show imports, definitions and members with line numbers
-│   └── graph <files>          print the dataflow of step code or Hamilton modules
+│   ├── graph <files>          print the dataflow of step code or Hamilton modules
+│   └── map <file>             plan a pandas pipeline reimplementation in native Polars
 ├── run the project's Python
 │   ├── profile <data file>    print dtypes, nulls, unique counts and memory per column
 │   ├── equiv old.py new.py    run two scripts and compare the `result` each one leaves
@@ -155,6 +156,23 @@ xpd
 environment. `index` runs Python with Griffe, and the first `find` downloads a 333 MB search model
 once. `check --fix`, `run --update-all`, `new`, and `test -U` write project files when invoked in
 those modes, and `hook` records session state in xpd's cache folder.
+
+### Plan a pandas migration
+
+`xpd map features.py --entry add_features --from pandas --to polars` reads the
+source and proposes native Polars operations. It shows the stages, observed
+columns and behavior that needs more evidence. Use `--format json` for a
+structured report. Exit 0 means the plan has no unresolved items, 1 means
+the report is partial, and 2 means xpd could not read or analyze the request.
+
+Pass `--contract migration.json` to declare ordered input and output schemas,
+positional row identity and the caller's materialization boundary.
+Use the same contract with `xpd equiv old.py new.py --contract migration.json`
+to compare results from the two scripts. Both scripts must read the same
+inputs and assign their tables to `result`. The Polars script returns a
+materialized DataFrame in the proof even if the production consumer takes
+a LazyFrame. The [equiv reference](https://bjoernaagaard.github.io/xpd/commands/equiv/)
+shows the contract fields and exit codes.
 
 ## Use xpd with an agent or an editor
 

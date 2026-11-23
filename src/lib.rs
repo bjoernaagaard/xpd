@@ -19,6 +19,7 @@ mod imports;
 mod index;
 mod lsp;
 mod mcp;
+mod migration;
 mod names;
 mod nodes;
 mod outline;

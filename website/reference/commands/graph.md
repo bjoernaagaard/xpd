@@ -17,7 +17,7 @@ samples/graph/steps.py:18:   (source columns) -> totals  [2 columns]
 samples/graph/steps.py:28:   totals -> shares  [1 column]
 samples/graph/steps.py:33:   (source columns) -> discounts  [1 column]
 samples/graph/steps.py:40:   totals + discounts -> flags  [3 columns]
-samples/graph/steps.py:50:   reads from its source: columns=["discount","quantity","unit_price"]
+samples/graph/steps.py:50:   reads from its source: columns=["customer","discount","quantity","unit_price"]
 samples/graph/steps.py:35: warning: discounts() computes before_discount with the formula of the column gross_amount from totals(). Read the column gross_amount there.
 samples/graph/steps.py:36: warning: discounts() writes to the frame it was given. Called as discounts(orders), it changes the caller's frame too. Return orders.assign(...) or write to orders.copy().
 samples/graph/steps.py:44: warning: The column over_limit from flags() has the same formula as is_large from flags(), so the result holds one column twice. Keep one of them.

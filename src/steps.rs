@@ -92,6 +92,7 @@ pub(crate) struct Step {
     pub(crate) writes: Vec<String>,
     /// The step also reads or adds columns whose names the file computes.
     pub(crate) computed: bool,
+    pub(crate) mutates_input: bool,
     /// Names read as `frame.name`, which are columns when another step adds them.
     attributes: Vec<String>,
 }
@@ -138,7 +139,7 @@ enum StepRef<'r> {
 }
 
 /// A step that reads columns an earlier step adds.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub(crate) struct Link {
     pub(crate) from: String,
     pub(crate) to: String,
@@ -226,7 +227,7 @@ pub(crate) fn read(src: &str) -> Vec<Pipeline> {
         .iter()
         .filter_map(|(name, function)| {
             let body = function.definition.field("body")?;
-            let order = step_order(&body, Some(name), &functions);
+            let order = step_order(&body, Some(name), &functions, MIN_STEPS);
             Some((name.as_str(), function, order))
         })
         .collect();
@@ -235,7 +236,7 @@ pub(crate) fn read(src: &str) -> Vec<Pipeline> {
         .children()
         .filter(|statement| statement.kind() == "expression_statement")
         .map(|statement| {
-            let order = step_order(&statement, None, &functions);
+            let order = step_order(&statement, None, &functions, MIN_STEPS);
             (statement, order)
         })
         .filter(|(_, order)| {
@@ -295,6 +296,36 @@ pub(crate) fn read(src: &str) -> Vec<Pipeline> {
     pipelines
 }
 
+pub(crate) fn read_entry(root: &syntax::Root, entry: &str) -> Option<Pipeline> {
+    let outline::Module {
+        functions,
+        assignments,
+    } = outline::python_module(root);
+    let functions: BTreeMap<_, _> = functions.into_iter().map(|f| (f.name.clone(), f)).collect();
+    let function = functions.get(entry)?;
+    let constants = assignments.into_iter().collect();
+    let body = function.definition.field("body")?;
+    let mut order = step_order(&body, Some(entry), &functions, 1);
+    if order.iter().all(|step| matches!(step, StepRef::Link(_)))
+        && (order.len() <= 1
+            || body.dfs().any(|node| {
+                node.kind() == "assignment"
+                    && node
+                        .field("left")
+                        .is_some_and(|left| left.kind() == "subscript")
+            }))
+    {
+        order = vec![StepRef::Function(entry.to_owned())];
+    }
+    Some(pipeline(
+        entry,
+        Reader::line(&function.definition),
+        &order,
+        &functions,
+        &constants,
+    ))
+}
+
 /// `name = value` as a statement of its own.
 fn simple_assignment<'r>(statement: &Syntax<'r>) -> Option<(String, Syntax<'r>)> {
     if statement.kind() != "expression_statement" {
@@ -336,6 +367,7 @@ fn step_order<'r>(
     body: &Syntax<'r>,
     own: Option<&str>,
     functions: &BTreeMap<String, Function<'r>>,
+    minimum_chain_steps: usize,
 ) -> Vec<StepRef<'r>> {
     let is_step = |name: &str| functions.contains_key(name) && own != Some(name);
     let mut found: Vec<(usize, String)> = Vec::new();
@@ -347,7 +379,7 @@ fn step_order<'r>(
             let steps = (chain.iter())
                 .filter(|c| is_link(c) || piped_step(c).is_some_and(|step| is_step(&step.text())))
                 .count();
-            if steps >= MIN_STEPS {
+            if steps >= minimum_chain_steps {
                 links.extend(chain.into_iter().filter(|c| is_link(c)).filter_map(|c| {
                     let at = c.field("arguments")?.range().start;
                     Some((at, c))
@@ -705,8 +737,8 @@ struct Reader<'r, 'a> {
     frames: BTreeSet<String>,
     /// Local names with one assignment, and their values.
     locals: BTreeMap<String, Syntax<'r>>,
-    /// The step gives the frame parameter a new value, so later writes go to that value.
-    rebinds_frame: bool,
+    first_frame_rebind: Option<usize>,
+    aliases_of_input: BTreeSet<String>,
 }
 
 impl<'r, 'a> Reader<'r, 'a> {
@@ -721,17 +753,21 @@ impl<'r, 'a> Reader<'r, 'a> {
         let function = &step.definition;
         let body = function.field("body")?;
         let mut assigned: BTreeMap<String, Vec<Syntax<'r>>> = BTreeMap::new();
+        let mut first_frame_rebind = None;
         for assignment in body.dfs().filter(|n| n.kind() == "assignment") {
             if let (Some(left), Some(right)) = (assignment.field("left"), assignment.field("right"))
                 && left.kind() == "identifier"
             {
+                if left.text() == frame && right.text() != frame && first_frame_rebind.is_none() {
+                    first_frame_rebind = Some(assignment.range().end);
+                }
                 assigned
                     .entry(left.text().into_owned())
                     .or_default()
                     .push(right);
             }
         }
-        let rebinds_frame = assigned.contains_key(&frame);
+        let mut aliases_of_input = BTreeSet::new();
         let mut frames = BTreeSet::from([frame.clone()]);
         frames.extend(
             body.dfs()
@@ -745,6 +781,9 @@ impl<'r, 'a> Reader<'r, 'a> {
             };
             let text = value.text();
             if local != frame && (text == frame || text == format!("{frame}.copy()")) {
+                if text == frame {
+                    aliases_of_input.insert(local.clone());
+                }
                 frames.insert(local);
             } else if local != frame {
                 locals.insert(local, value);
@@ -758,7 +797,8 @@ impl<'r, 'a> Reader<'r, 'a> {
             frame,
             frames,
             locals,
-            rebinds_frame,
+            first_frame_rebind,
+            aliases_of_input,
         })
     }
 
@@ -781,7 +821,8 @@ impl<'r, 'a> Reader<'r, 'a> {
             frame: start.unwrap_or_default(),
             frames,
             locals: BTreeMap::new(),
-            rebinds_frame: false,
+            first_frame_rebind: None,
+            aliases_of_input: BTreeSet::new(),
         }
     }
 
@@ -834,6 +875,11 @@ impl<'r, 'a> Reader<'r, 'a> {
         let value = subscript.field("value")?;
         let index = subscript.field("subscript")?;
         if value.kind() == "identifier" && self.frames.contains(value.text().as_ref()) {
+            return Some(index);
+        }
+        if is_method_call(&value, "groupby")
+            && receiver(&value).is_some_and(|object| self.frames.contains(object.text().as_ref()))
+        {
             return Some(index);
         }
         let through_indexer = value.kind() == "attribute"
@@ -910,6 +956,7 @@ impl<'r, 'a> Reader<'r, 'a> {
                 reads: found.reads.into_iter().collect(),
                 writes: names,
                 computed: found.computed,
+                mutates_input: found.writes.iter().any(|write| write.way == Way::InPlace),
                 attributes: self.attributes(),
             },
             writes: found.writes,
@@ -975,6 +1022,7 @@ impl<'r, 'a> Reader<'r, 'a> {
                 writes: found.writes.iter().map(|w| w.name.clone()).collect(),
                 computed: found.computed,
                 attributes: Vec::new(),
+                mutates_input: false,
             },
             writes: found.writes,
             formulas: found.formulas,
@@ -1035,8 +1083,13 @@ impl<'r, 'a> Reader<'r, 'a> {
             let on_given = left
                 .dfs()
                 .find(|n| n.kind() == "identifier")
-                .is_some_and(|n| n.text() == self.frame.as_str())
-                && !self.rebinds_frame;
+                .is_some_and(|n| {
+                    self.aliases_of_input.contains(n.text().as_ref())
+                        || (n.text() == self.frame.as_str()
+                            && self
+                                .first_frame_rebind
+                                .is_none_or(|at| assignment.range().start < at))
+                });
             if on_given && !warned {
                 warned = true;
                 found.findings.push(Finding {
@@ -1091,6 +1144,25 @@ impl<'r, 'a> Reader<'r, 'a> {
                 Some(name) => {
                     found.reads.insert(name);
                 }
+                None => found.computed = true,
+            }
+        }
+        for call in body.dfs().filter(|node| is_method_call(node, "groupby")) {
+            if !receiver(&call).is_some_and(|object| self.frames.contains(object.text().as_ref())) {
+                continue;
+            }
+            let options = keywords(&call);
+            let group = options
+                .iter()
+                .find(|(name, _)| name == "by")
+                .map(|(_, value)| value.clone())
+                .or_else(|| {
+                    call.field("arguments")?
+                        .children()
+                        .find(|arg| arg.is_named() && arg.kind() != "keyword_argument")
+                });
+            match group.and_then(|key| self.names(&key, 0)) {
+                Some(names) => found.reads.extend(names),
                 None => found.computed = true,
             }
         }

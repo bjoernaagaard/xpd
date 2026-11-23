@@ -19,6 +19,7 @@ use crate::graph::Graph;
 use crate::index::{self, Kind};
 use crate::lsp;
 use crate::mcp;
+use crate::migration::MapArgs;
 use crate::outline::OutlineArgs;
 use crate::output::Format;
 use crate::query::RunArgs;
@@ -235,7 +236,12 @@ enum Cmd {
         old: PathBuf,
         /// The script after the change. It must assign its output to `result`.
         new: PathBuf,
+        /// Compare a pandas and native Polars table using this migration contract.
+        #[arg(long)]
+        contract: Option<PathBuf>,
     },
+    /// Plan a pandas pipeline's native Polars reimplementation without running Python.
+    Map(MapArgs),
     /// Refit a saved Pipeline on raw training rows and compare its outputs and scores.
     Refit {
         /// The contract JSON that the training script saved beside its model.
@@ -412,7 +418,12 @@ pub fn run() -> ExitCode {
         Cmd::Outline(args) => command_result(args.run()),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
-        Cmd::Equiv { old, new } => run_py(EQUIV_PY, &[old, new]),
+        Cmd::Equiv { old, new, contract } => {
+            let mut paths = vec![old, new];
+            paths.extend(contract);
+            run_py(EQUIV_PY, &paths)
+        }
+        Cmd::Map(args) => command_result(args.run(default_format)),
         Cmd::Rules(options) => command_result(rules(options, default_format)),
         Cmd::Doctor { format } => unit_result(crate::doctor::run(format.unwrap_or(default_format))),
         Cmd::Skill { json: false } => print_out(SKILL),
