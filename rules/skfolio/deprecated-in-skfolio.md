@@ -12,3 +12,7 @@ skfolio plans to remove its deprecated hierarchical import paths, `annualized_fa
 ## What the rule reports
 
 The keyword fix keeps the annualization value and type. On ImpliedCovariance, the old name is also an estimator parameter. Code that inspects the constructor or relies on warning capture needs separate review.
+
+## How to fix it
+
+Use `xpd check --fix` to apply safe fixes for hierarchical imports, `annualized_factor`, and `non_denominated_sort`.

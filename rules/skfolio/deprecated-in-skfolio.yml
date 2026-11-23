@@ -4,6 +4,45 @@ severity: warning
 message: The old hierarchical skfolio export raises FutureWarning. Import the optimizer from skfolio.optimization.hierarchical.
 rule:
   all:
+    - {kind: import_from_statement, pattern: $STMT}
+    - {has: {field: module_name, regex: '^skfolio\.optimization\.cluster(?:\.hierarchical)?$'}}
+    - has:
+        any:
+          - all:
+              - {kind: dotted_name}
+              - regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+          - all:
+              - {kind: aliased_import}
+              - has:
+                  field: name
+                  regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+    - not:
+        has:
+          any:
+            - all:
+                - {kind: dotted_name}
+                - regex: (^|\.)BaseHierarchicalOptimization$
+            - all:
+                - {kind: aliased_import}
+                - has:
+                    field: name
+                    regex: (^|\.)BaseHierarchicalOptimization$
+    - {not: {matches: skfolio-expected-exception}}
+transform:
+  FIXED:
+    replace:
+      source: $STMT
+      replace: 'skfolio\.optimization\.cluster(?:\.hierarchical)?'
+      by: skfolio.optimization.hierarchical
+fix: $FIXED
+metadata: {since: 1.14.4, fix: safe}
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: The old hierarchical skfolio export raises FutureWarning. Import the optimizer from skfolio.optimization.hierarchical.
+rule:
+  all:
     - {kind: import_from_statement}
     - {has: {field: module_name, regex: '^skfolio\.optimization\.cluster(?:\.hierarchical)?$'}}
     - has:
@@ -16,6 +55,16 @@ rule:
               - has:
                   field: name
                   regex: (^|\.)(?:HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization)$
+    - has:
+        any:
+          - all:
+              - {kind: dotted_name}
+              - regex: (^|\.)BaseHierarchicalOptimization$
+          - all:
+              - {kind: aliased_import}
+              - has:
+                  field: name
+                  regex: (^|\.)BaseHierarchicalOptimization$
     - {not: {matches: skfolio-expected-exception}}
 metadata: {since: 1.14.4}
 ---
@@ -172,8 +221,10 @@ rule:
     - {has: {field: object, pattern: $MODEL}}
     - {has: {field: attribute, regex: '^(?:annualized_factor)$'}}
     - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.annualization_factor
 metadata:
   since: 1.14.4
+  fix: safe
   holds:
     MODEL:
       all:
@@ -186,13 +237,20 @@ severity: warning
 message: skfolio's non_denominated_sort raises FutureWarning. Call non_dominated_sort.
 rule:
   all:
+    - {pattern: '$MOD.non_denominated_sort($$$ARGS)'}
+    - has: {field: function, all: [{pattern: $F}, {has: {field: object, regex: '(^|\.)(?:sorting)$'}}]}
+    - {not: {matches: skfolio-expected-exception}}
+fix: $MOD.non_dominated_sort($$$ARGS)
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:non_denominated_sort)$'}}, fix: safe}
+---
+id: deprecated-in-skfolio
+language: python
+severity: warning
+message: skfolio's non_denominated_sort raises FutureWarning. Call non_dominated_sort.
+rule:
+  all:
     - {kind: call}
-    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:non_denominated_sort)$'}]}
-    - has:
-        field: function
-        any:
-          - {kind: identifier}
-          - {has: {field: object, regex: '(^|\.)(?:sorting)$'}}
+    - has: {field: function, all: [{kind: identifier}, {pattern: $F}, {regex: '^(?:non_denominated_sort)$'}]}
     - {not: {matches: skfolio-expected-exception}}
 metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:non_denominated_sort)$'}}}
 ---
@@ -202,15 +260,11 @@ severity: warning
 message: skfolio's Population.non_denominated_sort raises FutureWarning. Call non_dominated_sort.
 rule:
   all:
-    - {kind: call}
-    - has:
-        field: function
-        all:
-          - {kind: attribute}
-          - {has: {field: object, pattern: $MODEL}}
-          - {has: {field: attribute, regex: '^(?:non_denominated_sort)$'}}
+    - {pattern: '$MODEL.non_denominated_sort($$$ARGS)'}
     - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.non_dominated_sort($$$ARGS)
 metadata:
   since: 1.14.4
+  fix: safe
   holds:
     MODEL: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:Population)$'}}]}

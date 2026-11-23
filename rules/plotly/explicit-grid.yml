@@ -95,41 +95,43 @@ language: python
 severity: info
 message: gridcolor=$V draws the grid in black. Tufte calls dark grid lines chartjunk, because they carry no data and compete with it. Use a pale gridcolor such as "#eee", or leave the grid out.
 rule:
-  any:
-    - kind: keyword_argument
-      all:
-        - has: { field: name, regex: '^(gridcolor)$' }
-        - has: { field: value, pattern: $V, kind: string, regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$' }
-        - inside:
-            kind: argument_list
-            inside:
-              kind: call
-              any:
-                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_[xy]axes$' } }, { has: { field: object, matches: figure } }] }
-                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^[XY]Axis$' } }, { has: { field: object, kind: attribute, has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } } }] }
-        - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
-    - kind: keyword_argument
-      all:
-        - has: { field: name, regex: '^[xy]axis[0-9]*_(gridcolor)$' }
-        - has: { field: value, pattern: $V, kind: string, regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$' }
-        - inside:
-            kind: argument_list
-            inside:
-              kind: call
-              any:
-                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
-                - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Layout$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-        - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
-    - any: [{ kind: keyword_argument, has: { field: name, regex: '^(gridcolor)$' } }, { kind: pair, has: { field: key, regex: '^["''](gridcolor)["'']$' } }]
-      all:
-        - has: { field: value, pattern: $V, kind: string, regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$' }
-        - inside:
-            any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
-            inside:
-              stopBy: { kind: argument_list }
-              any: [{ kind: keyword_argument, has: { field: name, regex: '^[xy]axis[0-9]*$' } }, { kind: pair, has: { field: key, regex: '^["''][xy]axis[0-9]*["'']$' } }]
-              inside: { stopBy: end, matches: layout-call }
-        - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
+  kind: string
+  pattern: $V
+  regex: '^["''](?i:black|#000|#000000|rgb\(0, ?0, ?0\))["'']$'
+  inside:
+    field: value
+    any:
+      - kind: keyword_argument
+        all:
+          - has: { field: name, regex: '^(gridcolor)$' }
+          - inside:
+              kind: argument_list
+              inside:
+                kind: call
+                any:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_[xy]axes$' } }, { has: { field: object, matches: figure } }] }
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^[XY]Axis$' } }, { has: { field: object, kind: attribute, has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } } }] }
+          - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
+      - kind: keyword_argument
+        all:
+          - has: { field: name, regex: '^[xy]axis[0-9]*_(gridcolor)$' }
+          - inside:
+              kind: argument_list
+              inside:
+                kind: call
+                any:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^Layout$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
+          - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
+      - any: [{ kind: keyword_argument, has: { field: name, regex: '^(gridcolor)$' } }, { kind: pair, has: { field: key, regex: '^["''](gridcolor)["'']$' } }]
+        all:
+          - inside:
+              any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+              inside:
+                stopBy: { kind: argument_list }
+                any: [{ kind: keyword_argument, has: { field: name, regex: '^[xy]axis[0-9]*$' } }, { kind: pair, has: { field: key, regex: '^["''][xy]axis[0-9]*["'']$' } }]
+                inside: { stopBy: end, matches: layout-call }
+          - not: { inside: { any: [{ kind: argument_list }, { kind: dictionary }], has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '(^|_)(showgrid)$' } }, { has: { field: value, kind: 'false' } }] }, { kind: pair, all: [{ has: { field: key, regex: '^["''](showgrid)["'']$' } }, { has: { field: value, kind: 'false' } }] }] } } }
 utils:
   # An annotation that names the class of a plotly figure, as in `fig: go.Figure`.
   figure-type:
@@ -142,20 +144,14 @@ utils:
         all:
           - has: { field: function, kind: attribute, has: { field: attribute, regex: '^(update_|add_|for_each_)' } }
           - has: { stopBy: { not: { any: [{ kind: call }, { kind: attribute }] } }, matches: { new-figure: { PX: { matches: { px: { ALIAS: { pattern: $PX } } } }, GO: { matches: { go: { ALIAS: { pattern: $GO } } } } } } }
-  # What a method is called on: the figure itself, or a variable. xpd keeps a match on a
-  # variable only when `holds` in the metadata of this document proves what it holds: the
-  # nearest earlier statement that binds $FIG is `$FIG = <figure>`, however far back, or $FIG is
-  # a parameter and every call of its function in the file passes a figure. Any other binding
-  # of the name on the way, such as a loop variable, a `with ... as` or an import, ends the
-  # proof, so the rule is silent there.
   figure:
     any:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
-  # A call that sets layout: update_layout on a plotly figure, go.Layout or go.Figure.
   layout-call:
     kind: call
     any:
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] }
       - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Layout|Figure|FigureWidget)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
-metadata: { style: house, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+fix: '"#eee"'
+metadata: { style: house, fix: unsafe, holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }

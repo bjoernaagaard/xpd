@@ -5,29 +5,29 @@ message: skfolio HRP and Schur raise FutureWarning at fit for hierarchical_clust
   estimator inside HierarchicalSeriation.
 rule:
   all:
-    - {kind: call}
-    - has:
-        field: function
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:hierarchical_clustering_estimator)$'}}
+    - {has: {field: value, all: [{pattern: $CLUSTER}, {not: {regex: ^None$}}]}}
+    - inside:
         all:
-          - {pattern: $F}
-          - {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}
-    - has:
-        field: arguments
-        has:
-          all:
-            - {kind: keyword_argument}
-            - {has: {field: name, regex: '^(?:hierarchical_clustering_estimator)$'}}
-            - {has: {field: value, not: {regex: ^None$}}}
-    - not:
-        has:
-          field: arguments
-          has:
-            all:
-              - {kind: keyword_argument}
-              - {has: {field: name, regex: '^(?:seriation_estimator)$'}}
-              - {has: {field: value, not: {regex: ^None$}}}
+          - {kind: argument_list}
+          - not:
+              has:
+                all:
+                  - {kind: keyword_argument}
+                  - {has: {field: name, regex: '^(?:seriation_estimator)$'}}
+                  - {has: {field: value, not: {regex: ^None$}}}
+          - inside:
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    all:
+                      - {pattern: $F}
+                      - {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}
     - {not: {matches: skfolio-expected-exception}}
-metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}}}
+fix: seriation_estimator=HierarchicalSeriation(hierarchical_clustering_estimator=$CLUSTER)
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:HierarchicalRiskParity|SchurComplementary)$'}}, fix: unsafe}
 ---
 id: skfolio-hierarchical-seriation
 language: python
@@ -69,8 +69,10 @@ rule:
     - {has: {field: object, pattern: $MODEL}}
     - {has: {field: attribute, regex: '^(?:hierarchical_clustering_estimator_)$'}}
     - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.seriation_estimator_.hierarchical_clustering_estimator_
 metadata:
   since: 1.14.4
+  fix: safe
   holds:
     MODEL:
       any:

@@ -13,7 +13,7 @@ and string dtypes and passes every other column through.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `cols="all"` to category_encoders-only estimators inside a `ColumnTransformer`. Edit `OneHotEncoder`, `OrdinalEncoder`, and `TargetEncoder` calls by hand.
 
 Inside a `ColumnTransformer` the columns are already chosen, so a numeric column that was chosen
 on purpose comes back as it went in. On a whole-number column of 5 values, the steps gave the following output:

@@ -8,3 +8,7 @@ skfolio weight drift changes holdings and period returns. Compounding controls h
 ## What the rule reports
 
 Two periods with returns of 10% and 10.9091% end with cumulative simple return of 0.2091 or wealth of 1.22 from starting wealth of 1. Set `compounded=True` separately on a `MultiPeriodPortfolio` when you want compounded wealth across child portfolios.
+
+## How to fix it
+
+Use `xpd check --fix --unsafe-fixes` to add or set `compounded=True` when `weight_drift=True`.

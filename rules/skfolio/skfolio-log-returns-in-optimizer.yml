@@ -5,6 +5,63 @@ message: A skfolio optimizer averages linear asset returns. In a 59-row example,
   from log returns and 0.0003062 from linear returns. Use prices_to_returns with log_returns=False.
 rule:
   all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:log_returns)$'}}
+    - {has: {field: value, regex: ^True$}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - {pattern: $DATA}
+                - {has: {field: function, regex: '(^|\.)(?:prices_to_returns)$'}}
+                - any:
+                    - all:
+                        - {nthChild: 1}
+                        - inside:
+                            all:
+                              - {kind: argument_list}
+                              - inside:
+                                  all:
+                                    - {kind: call}
+                                    - has:
+                                        field: function
+                                        all:
+                                          - {kind: attribute}
+                                          - {has: {field: object, pattern: $MODEL}}
+                                          - {has: {field: attribute, regex: '^(?:fit|partial_fit|predict)$'}}
+                    - inside:
+                        kind: keyword_argument
+                        field: value
+                        all:
+                          - {has: {field: name, regex: '^(?:X)$'}}
+                          - inside:
+                              all:
+                                - {kind: argument_list}
+                                - inside:
+                                    all:
+                                      - {kind: call}
+                                      - has:
+                                          field: function
+                                          all:
+                                            - {kind: attribute}
+                                            - {has: {field: object, pattern: $MODEL}}
+                                            - {has: {field: attribute, regex: '^(?:fit|partial_fit|predict)$'}}
+fix: log_returns=False
+metadata:
+  since: 1.14.4
+  fix: unsafe
+  holds:
+    MODEL: {matches: skfolio-optimizer}
+---
+id: skfolio-log-returns-in-optimizer
+language: python
+severity: warning
+message: A skfolio optimizer averages linear asset returns. In a 59-row example, the portfolio mean was 0.0002523
+  from log returns and 0.0003062 from linear returns. Use prices_to_returns with log_returns=False.
+rule:
+  all:
     - {kind: call}
     - has:
         field: function
@@ -19,6 +76,7 @@ rule:
               all:
                 - {nthChild: 1}
                 - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {not: {kind: call}}
                 - {pattern: $DATA}
         - has:
             field: arguments
@@ -26,7 +84,7 @@ rule:
               all:
                 - {kind: keyword_argument}
                 - {has: {field: name, regex: '^(?:X)$'}}
-                - {has: {field: value, pattern: $DATA}}
+                - {has: {field: value, all: [{not: {kind: call}}, {pattern: $DATA}]}}
 metadata:
   since: 1.14.4
   holds:

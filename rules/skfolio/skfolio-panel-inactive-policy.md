@@ -8,3 +8,7 @@ skfolio AssetPanel distinguishes inactive pairs from missing values for active a
 ## What the rule reports
 
 Reserve -1 for missing categorical codes. For numeric fields, use NaN under MISSING, explicitly construct a field with ZERO when zero is meaningful, or use IGNORE when intentionally retaining inactive values. CharacteristicsFactorModel expects the panel as its characteristics input.
+
+## How to fix it
+
+Use `xpd check --fix --unsafe-fixes` to switch `InactivePolicy.ZERO` on `FieldCategorical` to `InactivePolicy.MISSING` and to convert string `inactive_policy` values to `InactivePolicy` enum members.

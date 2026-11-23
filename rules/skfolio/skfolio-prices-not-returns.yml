@@ -5,30 +5,45 @@ message: The skfolio dataset loader supplies prices. In a 59-row example of conv
   portfolio mean was 0.0003062 compared with 101.7354 when fed levels. Convert prices to returns first.
 rule:
   all:
-    - {kind: call}
-    - has:
-        field: function
-        all:
-          - {kind: attribute}
-          - {has: {field: object, pattern: $MODEL}}
-          - {has: {field: attribute, regex: '^(?:fit|partial_fit|predict)$'}}
+    - any: [{kind: identifier}, {kind: call}, {kind: attribute}, {kind: subscript}]
+    - {pattern: $DATA}
     - any:
-        - has:
-            field: arguments
-            has:
-              all:
-                - {nthChild: 1}
-                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
-                - {pattern: $DATA}
-        - has:
-            field: arguments
-            has:
-              all:
-                - {kind: keyword_argument}
-                - {has: {field: name, regex: '^(?:X)$'}}
-                - {has: {field: value, pattern: $DATA}}
+        - all:
+            - {nthChild: 1}
+            - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+            - inside:
+                all:
+                  - {kind: argument_list}
+                  - inside:
+                      all:
+                        - {kind: call}
+                        - has:
+                            field: function
+                            all:
+                              - {kind: attribute}
+                              - {has: {field: object, pattern: $MODEL}}
+                              - {has: {field: attribute, regex: '^(?:fit|partial_fit|predict)$'}}
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - {has: {field: name, regex: '^(?:X)$'}}
+              - inside:
+                  all:
+                    - {kind: argument_list}
+                    - inside:
+                        all:
+                          - {kind: call}
+                          - has:
+                              field: function
+                              all:
+                                - {kind: attribute}
+                                - {has: {field: object, pattern: $MODEL}}
+                                - {has: {field: attribute, regex: '^(?:fit|partial_fit|predict)$'}}
+fix: prices_to_returns($DATA)
 metadata:
   since: 1.14.4
+  fix: unsafe
   holds:
     MODEL: {matches: skfolio-optimizer}
     DATA:

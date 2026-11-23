@@ -56,10 +56,48 @@ severity: info
 message: The marker color $C repeats the values or categories used for coordinate $A. Color can repeat a bar length or a category position. Tufte asks to erase redundant data-ink within reason. Use one color unless the category colors serve another purpose, such as matching another chart.
 rule:
   kind: call
+  pattern: $FN($$$ARGS)
+  all:
+    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_color)$' } }, { has: { field: value, pattern: $C } }] } }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, pattern: $A, regex: '^[xy]$' } }, { has: { field: value, pattern: $C } }] } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: comment }, { kind: line_continuation }] } } }
+constraints:
+  C: { not: { any: [{ kind: string }, { kind: integer }, { kind: float }, { kind: none }, { kind: 'true' }, { kind: 'false' }] } }
+rewriters:
+  - id: drop
+    rule: { kind: keyword_argument, has: { field: name, regex: ^marker_color$ } }
+    fix: ""
+  - id: keep
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - kind: comment
+          - kind: line_continuation
+          - kind: keyword_argument
+            has: { field: name, regex: ^marker_color$ }
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: { source: $$$ARGS, rewriters: [drop, keep], joinBy: "" }
+  REST:
+    replace: { source: $KEPT, replace: ", $", by: "" }
+fix: $FN($REST)
+metadata: { style: house, fix: unsafe }
+---
+id: redundant-color
+language: python
+severity: info
+message: The marker color $C repeats the values or categories used for coordinate $A. Color can repeat a bar length or a category position. Tufte asks to erase redundant data-ink within reason. Use one color unless the category colors serve another purpose, such as matching another chart.
+rule:
+  kind: call
   all:
     - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(Bar)$' } }, { has: { field: object, matches: { go: { ALIAS: { pattern: $GO } } } } }] }
     - any:
-        - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_color)$' } }, { has: { field: value, pattern: $C } }] } }
+        - all:
+            - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(marker_color)$' } }, { has: { field: value, pattern: $C } }] } }
+            - has: { field: arguments, has: { any: [{ kind: comment }, { kind: line_continuation }] } }
         - has:
             field: arguments
             has:

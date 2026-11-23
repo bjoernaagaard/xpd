@@ -14,7 +14,7 @@ takes no `sample_weight`, such as `KNeighborsRegressor`, `GaussianProcessRegress
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` moves `DecayEstimator` around the last step of a two-step `make_pipeline` or `make_debug_pipeline`. Edit other pipeline layouts and unweighted models by hand.
 
 The pipeline raised ValueError "Pipeline.fit does not accept the sample_weight parameter", and
 `KNeighborsRegressor` raised TypeError "Model KNeighborsRegressor.fit() does not have

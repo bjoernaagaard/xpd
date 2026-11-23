@@ -5,25 +5,86 @@ message: skfolio FieldCategorical raises ValueError for InactivePolicy.ZERO beca
   and encode inactive entries as -1.
 rule:
   all:
-    - {kind: call}
-    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:FieldCategorical)$'}]}}
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:inactive_policy)$'}}
     - has:
-        field: arguments
-        has:
-          all:
-            - {kind: keyword_argument}
-            - {has: {field: name, regex: '^(?:inactive_policy)$'}}
-            - has:
-                field: value
-                all:
-                  - {pattern: $POLICY}
-                  - {kind: attribute}
-                  - {has: {field: object, pattern: $ENUM}}
-                  - {has: {field: attribute, regex: '^(?:ZERO)$'}}
+        field: value
+        all:
+          - {pattern: $POLICY}
+          - {kind: attribute}
+          - {has: {field: object, pattern: $ENUM}}
+          - {has: {field: attribute, regex: '^(?:ZERO)$'}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:FieldCategorical)$'}]}}
     - {not: {matches: skfolio-expected-exception}}
+fix: inactive_policy=$ENUM.MISSING
 metadata:
   since: 1.14.4
+  fix: unsafe
   holds: {F: {regex: '(^|\.)(?:FieldCategorical)$'}, ENUM: {regex: '(^|\.)(?:InactivePolicy)$'}}
+---
+id: skfolio-panel-inactive-policy
+language: python
+severity: error
+message: skfolio panel fields raise TypeError for string inactive_policy values. Pass an InactivePolicy member.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:inactive_policy)$'}}
+    - {has: {field: value, all: [{kind: string}, {pattern: $VAL}, {regex: '^[''"](zero|missing|ignore)[''"]$'}, {not: {has: {kind: interpolation}}}]}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    all:
+                      - {pattern: $F}
+                      - {regex: '(^|\.)(?:Field2D|Field3D)$'}
+    - {not: {matches: skfolio-expected-exception}}
+transform:
+  BARE:
+    replace: {source: $VAL, replace: "^[\"']|[\"']$", by: ""}
+  UPPER:
+    convert: {source: $BARE, toCase: upperCase}
+fix: inactive_policy=InactivePolicy.$UPPER
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Field2D|Field3D)$'}}, fix: unsafe}
+---
+id: skfolio-panel-inactive-policy
+language: python
+severity: error
+message: skfolio panel fields raise TypeError for string inactive_policy values. Pass an InactivePolicy member.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:inactive_policy)$'}}
+    - {has: {field: value, all: [{kind: string}, {pattern: $VAL}, {regex: '^[''"](missing|ignore)[''"]$'}, {not: {has: {kind: interpolation}}}]}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    all:
+                      - {pattern: $F}
+                      - {regex: '(^|\.)(?:FieldCategorical)$'}
+    - {not: {matches: skfolio-expected-exception}}
+transform:
+  BARE:
+    replace: {source: $VAL, replace: "^[\"']|[\"']$", by: ""}
+  UPPER:
+    convert: {source: $BARE, toCase: upperCase}
+fix: inactive_policy=InactivePolicy.$UPPER
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:FieldCategorical)$'}}, fix: unsafe}
 ---
 id: skfolio-panel-inactive-policy
 language: python
@@ -44,6 +105,26 @@ rule:
             - {kind: keyword_argument}
             - {has: {field: name, regex: '^(?:inactive_policy)$'}}
             - {has: {field: value, all: [{kind: string}, {not: {has: {kind: interpolation}}}]}}
+    - not:
+        any:
+          - all:
+              - has: {field: function, regex: '(^|\.)(?:Field2D|Field3D)$'}
+              - has:
+                  field: arguments
+                  has:
+                    all:
+                      - {kind: keyword_argument}
+                      - {has: {field: name, regex: '^(?:inactive_policy)$'}}
+                      - {has: {field: value, regex: '^[''"](zero|missing|ignore)[''"]$'}}
+          - all:
+              - has: {field: function, regex: '(^|\.)(?:FieldCategorical)$'}
+              - has:
+                  field: arguments
+                  has:
+                    all:
+                      - {kind: keyword_argument}
+                      - {has: {field: name, regex: '^(?:inactive_policy)$'}}
+                      - {has: {field: value, regex: '^[''"](missing|ignore)[''"]$'}}
     - {not: {matches: skfolio-expected-exception}}
 metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Field2D|Field3D|FieldCategorical)$'}}}
 ---

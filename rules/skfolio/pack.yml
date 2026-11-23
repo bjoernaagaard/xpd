@@ -1,3 +1,12 @@
 aliases: {}
-members: {}
+members:
+  BaseOptimization: skfolio.optimization
+  EmpiricalPrior: skfolio.prior
+  HierarchicalSeriation: skfolio.seriation
+  InactivePolicy: skfolio.containers
+  ObjectiveFunction: skfolio.optimization
+  RiskMeasure: skfolio.measures
+  TimeSeriesFactorModel: skfolio.prior
+  cross_val_predict: skfolio.model_selection
+  prices_to_returns: skfolio.preprocessing
 packages: []

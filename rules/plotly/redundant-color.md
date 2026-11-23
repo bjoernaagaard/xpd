@@ -13,7 +13,7 @@ The rule reports a px call whose `color` is the same column name as its `x` or i
 
 `xpd check --fix --unsafe-fixes` applies the fixes of this rule. Check the result, because an unsafe fix can change what the code does.
 
-unsafe for px: drops `color`, so the chart draws one color and no legend, and drops comments inside the parentheses. None for `go.Bar`, where the one color to use is not in the code.
+unsafe for px: drops `color`, so the chart draws one color and no legend. unsafe for `go.Bar(..., marker_color=...)`: drops `marker_color` when it repeats `x` or `y`.
 
 "Erase redundant data-ink, within reason" (page 100). `px.bar(x="day", y="tip")` drew one trace
 and no legend. With `color="day"` it drew four traces and a legend with the entries Fri, Sat,

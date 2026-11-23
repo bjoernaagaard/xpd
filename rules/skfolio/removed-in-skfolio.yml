@@ -78,11 +78,70 @@ severity: error
 message: UncertaintySet raises TypeError for k or sigma. Pass radius, geometry and norm.
 rule:
   all:
+    - {pattern: '$F($$$ARGS)'}
+    - {has: {field: function, regex: '(^|\.)(?:UncertaintySet)$'}}
+    - has:
+        field: arguments
+        has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:k|sigma)$'}}]}
+    - not:
+        has:
+          field: arguments
+          has:
+            any:
+              - {kind: comment}
+              - {kind: line_continuation}
+              - {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:radius|geometry)$'}}]}
+    - {not: {matches: skfolio-expected-exception}}
+rewriters:
+  - id: rename-k
+    rule:
+      kind: keyword_argument
+      all:
+        - {has: {field: name, regex: '^k$'}}
+        - {has: {field: value, pattern: $V}}
+    fix: "radius=$V, "
+  - id: rename-sigma
+    rule:
+      kind: keyword_argument
+      all:
+        - {has: {field: name, regex: '^sigma$'}}
+        - {has: {field: value, pattern: $V}}
+    fix: "geometry=$V, "
+  - id: keep-arg
+    rule:
+      pattern: $ARG
+      not:
+        any:
+          - {kind: comment}
+          - {kind: line_continuation}
+          - {kind: keyword_argument, has: {field: name, regex: '^(?:k|sigma)$'}}
+    fix: "$ARG, "
+transform:
+  KEPT:
+    rewrite: {source: $$$ARGS, rewriters: [rename-k, rename-sigma, keep-arg], joinBy: ""}
+  REST:
+    replace: {source: $KEPT, replace: ", $", by: ""}
+fix: $F($REST)
+metadata: {since: '1.0', holds: {F: {regex: '(^|\.)(?:UncertaintySet)$'}}, fix: unsafe}
+---
+id: removed-in-skfolio
+language: python
+severity: error
+message: UncertaintySet raises TypeError for k or sigma. Pass radius, geometry and norm.
+rule:
+  all:
     - {kind: call}
     - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:UncertaintySet)$'}]}}
     - has:
         field: arguments
         has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:k|sigma)$'}}]}
+    - has:
+        field: arguments
+        has:
+          any:
+            - {kind: comment}
+            - {kind: line_continuation}
+            - {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:radius|geometry)$'}}]}
     - {not: {matches: skfolio-expected-exception}}
 metadata: {since: '1.0', holds: {F: {regex: '(^|\.)(?:UncertaintySet)$'}}}
 ---
@@ -94,9 +153,28 @@ rule:
   all:
     - {kind: attribute}
     - {has: {field: object, pattern: $MODEL}}
-    - {has: {field: attribute, regex: '^(?:k|sigma)$'}}
+    - {has: {field: attribute, regex: '^(?:k)$'}}
     - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.radius
 metadata:
   since: '1.0'
+  fix: unsafe
+  holds:
+    MODEL: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:UncertaintySet)$'}}]}
+---
+id: removed-in-skfolio
+language: python
+severity: error
+message: UncertaintySet raises AttributeError for k or sigma. Read radius and geometry and account for the set norm.
+rule:
+  all:
+    - {kind: attribute}
+    - {has: {field: object, pattern: $MODEL}}
+    - {has: {field: attribute, regex: '^(?:sigma)$'}}
+    - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.geometry
+metadata:
+  since: '1.0'
+  fix: unsafe
   holds:
     MODEL: {all: [{kind: call}, {has: {field: function, regex: '(^|\.)(?:UncertaintySet)$'}}]}

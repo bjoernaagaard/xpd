@@ -13,7 +13,7 @@ fractions cap every value at a percentile below 1.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` scales literal fractions in `[0, 1]` by 100 into percentages. Check the result, because an unsafe fix changes what the code does.
 
 | `quantile_range` | Values changed, of 10,000 normal values | Values after capping |
 | --- | --- | --- |

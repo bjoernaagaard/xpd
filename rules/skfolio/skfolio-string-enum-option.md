@@ -8,3 +8,7 @@ skfolio expects enum members for risk measures and objectives. It uses methods a
 ## What the rule reports
 
 Import RiskMeasure from skfolio.measures and ObjectiveFunction from skfolio.optimization.
+
+## How to fix it
+
+Use `xpd check --fix --unsafe-fixes` to convert string `risk_measure` and `objective_function` values to `RiskMeasure` and `ObjectiveFunction` enum members when those enums are imported.

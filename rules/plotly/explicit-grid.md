@@ -22,7 +22,7 @@ drawn with `"simple_white"`.
 
 `xpd check --fix --unsafe-fixes` applies the fixes of this rule. Check the result, because an unsafe fix can change what the code does.
 
-unsafe for `showgrid=True`: `showgrid=False`. None for a black grid.
+unsafe for `showgrid=True`: `showgrid=False`. unsafe for a black grid: `"#eee"`.
 
 "The grid should usually be muted or completely suppressed so that its presence is only
 implicit" (page 112), and "dark grid lines are chartjunk" (page 113). `showgrid=True` either

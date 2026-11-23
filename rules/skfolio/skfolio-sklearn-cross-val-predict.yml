@@ -5,7 +5,7 @@ message: scikit-learn cross_val_predict raises ValueError with WalkForward, Comb
   in skfolio. Use skfolio.model_selection.cross_val_predict.
 rule:
   all:
-    - {kind: call}
+    - {pattern: '$FN($$$ARGS)'}
     - has:
         field: function
         matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:cross_val_predict)$'}}}
@@ -34,8 +34,10 @@ rule:
             - {has: {field: name, regex: '^(?:cv)$'}}
             - {has: {field: value, pattern: $CV}}
     - {not: {matches: skfolio-expected-exception}}
+fix: cross_val_predict($$$ARGS)
 metadata:
   since: 1.14.4
+  fix: unsafe
   holds:
     CV:
       all:
@@ -49,7 +51,7 @@ message: scikit-learn cross_val_predict converts a skfolio portfolio prediction 
   a partitioning splitter. Use skfolio.model_selection.cross_val_predict to preserve portfolio objects.
 rule:
   all:
-    - {kind: call}
+    - {pattern: '$FN($$$ARGS)'}
     - has:
         field: function
         matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:cross_val_predict)$'}}}
@@ -109,8 +111,10 @@ rule:
               - {has: {field: name, regex: '^(?:method)$'}}
               - {has: {field: value, not: {regex: '^[''"]predict[''"]$'}}}
     - {not: {matches: skfolio-expected-exception}}
+fix: cross_val_predict($$$ARGS)
 metadata:
   since: 1.14.4
+  fix: unsafe
   holds:
     MODEL: {matches: skfolio-optimizer}
   unlessHolds:

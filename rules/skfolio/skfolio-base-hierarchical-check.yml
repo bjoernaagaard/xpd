@@ -43,8 +43,14 @@ message: BaseHierarchicalOptimization is deprecated in skfolio. Inherit from Bas
   to set weights_.
 rule:
   all:
-    - {kind: class_definition}
-    - has:
-        field: superclasses
-        has: {all: [{pattern: $BASE}, {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}]}
-metadata: {since: 1.14.4, holds: {BASE: {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}}}
+    - any: [{kind: identifier}, {kind: attribute}]
+    - {pattern: $BASE}
+    - {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              kind: class_definition
+              field: superclasses
+fix: BaseOptimization
+metadata: {since: 1.14.4, holds: {BASE: {regex: '(^|\.)(?:BaseHierarchicalOptimization)$'}}, fix: unsafe}

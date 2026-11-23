@@ -13,7 +13,7 @@ value is zero, and the regressor comes second.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites a two-argument call whose positional regressor and classifier are swapped to explicit `classifier=` and `regressor=` keywords. Fix calls with only one wrong argument by hand.
 
 `fit` raised ValueError "`classifier` has to be a classifier", and with a classifier in second
 place it raised "`regressor` has to be a regressor". The rule reads the class names, and it knows

@@ -6,7 +6,24 @@
 # classifier and regressor of sklearn.utils.all_estimators() on scikit-learn 1.9.1 that takes
 # no argument to build and whose fit raised that TypeError inside a DecayEstimator, 22 in all.
 
-# No fix, because the advice is another layout of the pipeline.
+id: decay-without-sample-weight
+language: python
+severity: error
+message: DecayEstimator passes sample_weight to the model's fit, and a Pipeline raises ValueError "Pipeline.fit does not accept the sample_weight parameter". Put the DecayEstimator around the last step, inside the pipeline.
+rule:
+  pattern: $F($PIPE($FIRST, $LAST))
+  all:
+    - has: { field: function, regex: '(^|\.)DecayEstimator$' }
+    - has:
+        field: arguments
+        has:
+          nthChild: 1
+          all:
+            - has: { field: function, regex: '(^|\.)(make_pipeline|make_debug_pipeline)$' }
+            - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { kind: comment }] } } }
+fix: $PIPE($FIRST, $F($LAST))
+metadata: { fix: unsafe }
+---
 id: decay-without-sample-weight
 language: python
 severity: error
@@ -20,6 +37,16 @@ rule:
         any:
           - has: { nthChild: 1, matches: pipeline }
           - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^model$' } }, { has: { field: value, matches: pipeline } }] }
+    - not:
+        all:
+          - pattern: $F($PIPE($FIRST, $LAST))
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                all:
+                  - has: { field: function, regex: '(^|\.)(make_pipeline|make_debug_pipeline)$' }
+                  - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument }, { kind: list_splat }, { kind: dictionary_splat }, { kind: comment }] } } }
 utils:
   pipeline:
     kind: call

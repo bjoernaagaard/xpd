@@ -5,6 +5,64 @@ message: skfolio weight drift changes period returns. Set compounded=True if you
   periods ended at 1.22 with compounding.
 rule:
   all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:compounded)$'}}
+    - {has: {field: value, regex: ^False$}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:weight_drift)$'}}
+                - {has: {field: value, regex: ^True$}}
+          - not: {has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}
+          - inside:
+              all:
+                - {kind: call}
+                - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:Portfolio)$'}]}}
+fix: compounded=True
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Portfolio)$'}}, fix: unsafe}
+---
+id: skfolio-weight-drift-uncompounded
+language: python
+severity: info
+message: skfolio weight drift changes period returns. Set compounded=True if you want accumulated wealth. Two drifted
+  periods ended at 1.22 with compounding.
+rule:
+  all:
+    - {pattern: '$F($$$ARGS)'}
+    - {has: {field: function, regex: '(^|\.)(?:Portfolio)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {kind: keyword_argument}
+            - {has: {field: name, regex: '^(?:weight_drift)$'}}
+            - {has: {field: value, regex: ^True$}}
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:compounded)$'}}]}
+    - not:
+        has:
+          field: arguments
+          has:
+            all:
+              - {nthChild: 11}
+              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+              - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}}}
+fix: $F($$$ARGS, compounded=True)
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Portfolio)$'}}, fix: unsafe}
+---
+id: skfolio-weight-drift-uncompounded
+language: python
+severity: info
+message: skfolio weight drift changes period returns. Set compounded=True if you want accumulated wealth. Two drifted
+  periods ended at 1.22 with compounding.
+rule:
+  all:
     - {kind: call}
     - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:Portfolio)$'}]}}
     - has:
@@ -14,29 +72,155 @@ rule:
             - {kind: keyword_argument}
             - {has: {field: name, regex: '^(?:weight_drift)$'}}
             - {has: {field: value, regex: ^True$}}
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:compounded)$'}}]}
+    - not:
+        has:
+          field: arguments
+          has:
+            all:
+              - {nthChild: 11}
+              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+              - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    - has: {field: arguments, has: {any: [{kind: comment}, {kind: line_continuation}]}}
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Portfolio)$'}}}
+---
+id: skfolio-weight-drift-uncompounded
+language: python
+severity: info
+message: skfolio weight drift changes period returns. Set compounded=True if you want accumulated wealth. Two drifted
+  periods ended at 1.22 with compounding.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:compounded)$'}}
+    - {has: {field: value, regex: ^False$}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - any:
+              - has:
+                  all:
+                    - {nthChild: 1}
+                    - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                    - {kind: list}
+                    - has:
+                        all:
+                          - {pattern: $CHILD}
+                          - &id001 {kind: call}
+                          - &id002 {has: {field: function, regex: '(^|\.)(?:Portfolio)$'}}
+                          - &id003
+                            has:
+                              field: arguments
+                              has:
+                                all:
+                                  - {kind: keyword_argument}
+                                  - {has: {field: name, regex: '^(?:weight_drift)$'}}
+                                  - {has: {field: value, regex: ^True$}}
+              - has:
+                  all:
+                    - {kind: keyword_argument}
+                    - {has: {field: name, regex: '^(?:portfolios)$'}}
+                    - has:
+                        field: value
+                        all:
+                          - {kind: list}
+                          - has:
+                              all:
+                                - {pattern: $CHILD}
+                                - *id001
+                                - *id002
+                                - *id003
+          - not: {has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}
+          - inside:
+              all:
+                - {kind: call}
+                - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MultiPeriodPortfolio)$'}]}
+fix: compounded=True
+metadata:
+  since: 1.14.4
+  fix: unsafe
+  holds:
+    F: {regex: '(^|\.)(?:MultiPeriodPortfolio)$'}
+    CHILD:
+      all:
+        - *id001
+        - *id002
+        - *id003
+---
+id: skfolio-weight-drift-uncompounded
+language: python
+severity: info
+message: skfolio weight drift changes period returns. Set compounded=True if you want accumulated wealth. Two drifted
+  periods ended at 1.22 with compounding.
+rule:
+  all:
+    - {pattern: '$F($$$ARGS)'}
+    - has: {field: function, regex: '(^|\.)(?:MultiPeriodPortfolio)$'}
     - any:
         - has:
             field: arguments
             has:
               all:
-                - {kind: keyword_argument}
-                - {has: {field: name, regex: '^(?:compounded)$'}}
-                - {has: {field: value, regex: ^False$}}
-        - all:
-            - not:
-                has:
-                  field: arguments
-                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:compounded)$'}}]}
-            - not:
-                has:
-                  field: arguments
-                  has:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {kind: list}
+                - has:
                     all:
-                      - {nthChild: 11}
-                      - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
-                      - {regex: '(?s)^'}
-    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
-metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:Portfolio)$'}}}
+                      - {pattern: $CHILD}
+                      - &id004 {kind: call}
+                      - &id005 {has: {field: function, regex: '(^|\.)(?:Portfolio)$'}}
+                      - &id006
+                        has:
+                          field: arguments
+                          has:
+                            all:
+                              - {kind: keyword_argument}
+                              - {has: {field: name, regex: '^(?:weight_drift)$'}}
+                              - {has: {field: value, regex: ^True$}}
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:portfolios)$'}}
+                - has:
+                    field: value
+                    all:
+                      - {kind: list}
+                      - has:
+                          all:
+                            - {pattern: $CHILD}
+                            - *id004
+                            - *id005
+                            - *id006
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:compounded)$'}}]}
+    - not:
+        has:
+          field: arguments
+          has:
+            all:
+              - {nthChild: 7}
+              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+              - {regex: '(?s)^'}
+    - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}}}
+fix: $F($$$ARGS, compounded=True)
+metadata:
+  since: 1.14.4
+  fix: unsafe
+  holds:
+    F: {regex: '(^|\.)(?:MultiPeriodPortfolio)$'}
+    CHILD:
+      all:
+        - *id004
+        - *id005
+        - *id006
 ---
 id: skfolio-weight-drift-uncompounded
 language: python
@@ -58,9 +242,9 @@ rule:
                 - has:
                     all:
                       - {pattern: $CHILD}
-                      - &id001 {kind: call}
-                      - &id002 {has: {field: function, regex: '(^|\.)(?:Portfolio)$'}}
-                      - &id003
+                      - &id007 {kind: call}
+                      - &id008 {has: {field: function, regex: '(^|\.)(?:Portfolio)$'}}
+                      - &id009
                         has:
                           field: arguments
                           has:
@@ -81,37 +265,29 @@ rule:
                       - has:
                           all:
                             - {pattern: $CHILD}
-                            - *id001
-                            - *id002
-                            - *id003
-    - any:
-        - has:
-            field: arguments
-            has:
-              all:
-                - {kind: keyword_argument}
-                - {has: {field: name, regex: '^(?:compounded)$'}}
-                - {has: {field: value, regex: ^False$}}
-        - all:
-            - not:
-                has:
-                  field: arguments
-                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:compounded)$'}}]}
-            - not:
-                has:
-                  field: arguments
-                  has:
-                    all:
-                      - {nthChild: 7}
-                      - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
-                      - {regex: '(?s)^'}
+                            - *id007
+                            - *id008
+                            - *id009
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:compounded)$'}}]}
+    - not:
+        has:
+          field: arguments
+          has:
+            all:
+              - {nthChild: 7}
+              - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+              - {regex: '(?s)^'}
     - not: {has: {field: arguments, has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+    - has: {field: arguments, has: {any: [{kind: comment}, {kind: line_continuation}]}}
 metadata:
   since: 1.14.4
   holds:
     F: {regex: '(^|\.)(?:MultiPeriodPortfolio)$'}
     CHILD:
       all:
-        - *id001
-        - *id002
-        - *id003
+        - *id007
+        - *id008
+        - *id009

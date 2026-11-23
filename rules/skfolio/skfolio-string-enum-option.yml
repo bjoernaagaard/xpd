@@ -4,6 +4,31 @@ severity: error
 message: A string risk_measure such as 'variance' raises AttributeError during skfolio fit. Pass a RiskMeasure member.
 rule:
   all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:risk_measure)$'}}
+    - {has: {field: value, all: [{kind: string}, {pattern: $VAL}, {regex: '(?i)^[''"](variance|semi_variance|standard_deviation|semi_deviation|mean_absolute_deviation|first_lower_partial_moment|cvar|evar|worst_realization|cdar|maximum_drawdown|average_drawdown|edar|ulcer_index|gini_mean_difference|value_at_risk|drawdown_at_risk|entropic_risk_measure|fourth_central_moment|fourth_lower_partial_moment|annualized_variance|annualized_semi_variance|annualized_standard_deviation|annualized_semi_deviation)[''"]$'}, {not: {has: {kind: interpolation}}}]}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
+    - {not: {matches: skfolio-expected-exception}}
+transform:
+  BARE:
+    replace: {source: $VAL, replace: "^[\"']|[\"']$", by: ""}
+  UPPER:
+    convert: {source: $BARE, toCase: upperCase}
+fix: risk_measure=RiskMeasure.$UPPER
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}, fix: unsafe}
+---
+id: skfolio-string-enum-option
+language: python
+severity: error
+message: A string risk_measure such as 'variance' raises AttributeError during skfolio fit. Pass a RiskMeasure member.
+rule:
+  all:
     - {kind: call}
     - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}]}
     - has:
@@ -12,7 +37,7 @@ rule:
           all:
             - {kind: keyword_argument}
             - {has: {field: name, regex: '^(?:risk_measure)$'}}
-            - {has: {field: value, all: [{kind: string}, {not: {has: {kind: interpolation}}}]}}
+            - {has: {field: value, all: [{kind: string}, {not: {regex: '(?i)^[''"](variance|semi_variance|standard_deviation|semi_deviation|mean_absolute_deviation|first_lower_partial_moment|cvar|evar|worst_realization|cdar|maximum_drawdown|average_drawdown|edar|ulcer_index|gini_mean_difference|value_at_risk|drawdown_at_risk|entropic_risk_measure|fourth_central_moment|fourth_lower_partial_moment|annualized_variance|annualized_semi_variance|annualized_standard_deviation|annualized_semi_deviation)[''"]$'}}, {not: {has: {kind: interpolation}}}]}}
     - {not: {matches: skfolio-expected-exception}}
 metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk|RiskBudgeting)$'}}}
 ---
@@ -23,14 +48,40 @@ message: A string objective_function such as 'minimize_risk' raises TypeError du
   an ObjectiveFunction member.
 rule:
   all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:objective_function)$'}}
+    - {has: {field: value, all: [{kind: string}, {pattern: $VAL}, {regex: '(?i)^[''"](minimize_risk|maximize_return|maximize_utility|maximize_ratio)[''"]$'}, {not: {has: {kind: interpolation}}}]}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk)$'}]}
+    - {not: {matches: skfolio-expected-exception}}
+transform:
+  BARE:
+    replace: {source: $VAL, replace: "^[\"']|[\"']$", by: ""}
+  UPPER:
+    convert: {source: $BARE, toCase: upperCase}
+fix: objective_function=ObjectiveFunction.$UPPER
+metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk)$'}}, fix: unsafe}
+---
+id: skfolio-string-enum-option
+language: python
+severity: error
+message: A string objective_function such as 'minimize_risk' raises TypeError during skfolio MeanRisk fit. Pass
+  an ObjectiveFunction member.
+rule:
+  all:
     - {kind: call}
-    - {has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk)$'}]}}
+    - has: {field: function, all: [{pattern: $F}, {regex: '(^|\.)(?:MeanRisk)$'}]}
     - has:
         field: arguments
         has:
           all:
             - {kind: keyword_argument}
             - {has: {field: name, regex: '^(?:objective_function)$'}}
-            - {has: {field: value, all: [{kind: string}, {not: {has: {kind: interpolation}}}]}}
+            - {has: {field: value, all: [{kind: string}, {not: {regex: '(?i)^[''"](minimize_risk|maximize_return|maximize_utility|maximize_ratio)[''"]$'}}, {not: {has: {kind: interpolation}}}]}}
     - {not: {matches: skfolio-expected-exception}}
 metadata: {since: 1.14.4, holds: {F: {regex: '(^|\.)(?:MeanRisk)$'}}}

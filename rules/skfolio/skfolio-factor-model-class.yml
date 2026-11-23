@@ -10,7 +10,43 @@ rule:
     - has:
         field: value
         all:
+          - {pattern: '$CONTAINER()'}
+          - {has: {field: function, regex: '(^|\.)(?:FactorModel)$'}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - inside:
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    all:
+                      - {pattern: $F}
+                      - regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$
+    - {not: {matches: skfolio-expected-exception}}
+fix: prior_estimator=TimeSeriesFactorModel()
+metadata:
+  since: 1.14.4
+  fix: unsafe
+  holds:
+    F:
+      regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$
+    CONTAINER: {regex: '(^|\.)(?:FactorModel)$'}
+---
+id: skfolio-factor-model-class
+language: python
+severity: error
+message: FactorModel is a fitted skfolio container with 13 required inputs. Use TimeSeriesFactorModel as the prior
+  estimator.
+rule:
+  all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:prior_estimator)$'}}
+    - has:
+        field: value
+        all:
           - {kind: call}
+          - {not: {pattern: '$CONTAINER()'}}
           - {has: {field: function, all: [{pattern: $CONTAINER}, {regex: '(^|\.)(?:FactorModel)$'}]}}
     - inside:
         all:
@@ -37,6 +73,28 @@ severity: error
 message: TimeSeriesFactorModel.fit raises TypeError when the factor matrix is only positional. Pass it as factors=.
 rule:
   all:
+    - {pattern: '$MODEL.fit($X, $FACTORS)'}
+    - not:
+        has:
+          field: arguments
+          has: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}, {kind: comment}]}
+    - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.fit($X, factors=$FACTORS)
+metadata:
+  since: 1.14.4
+  fix: unsafe
+  holds:
+    MODEL:
+      all:
+        - {kind: call}
+        - {has: {field: function, regex: '(^|\.)(?:TimeSeriesFactorModel)$'}}
+---
+id: skfolio-factor-model-class
+language: python
+severity: error
+message: TimeSeriesFactorModel.fit raises TypeError when the factor matrix is only positional. Pass it as factors=.
+rule:
+  all:
     - {kind: call}
     - has:
         field: function
@@ -56,6 +114,13 @@ rule:
           field: arguments
           has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:factors)$'}}]}
     - {not: {has: {field: arguments, has: {kind: dictionary_splat}}}}
+    - not:
+        all:
+          - {pattern: '$MODEL.fit($X, $FACTORS)'}
+          - not:
+              has:
+                field: arguments
+                has: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}, {kind: comment}]}
     - {not: {matches: skfolio-expected-exception}}
 metadata:
   since: 1.14.4
@@ -64,6 +129,48 @@ metadata:
       all:
         - {kind: call}
         - {has: {field: function, regex: '(^|\.)(?:TimeSeriesFactorModel)$'}}
+---
+id: skfolio-factor-model-class
+language: python
+severity: error
+message: A skfolio optimizer with this time-series factor prior needs factors as keyword metadata. A positional
+  factor matrix leaves the required factors argument unset.
+rule:
+  all:
+    - {pattern: '$MODEL.fit($X, $FACTORS)'}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {nthChild: 2}
+            - {not: {regex: ^None$}}
+    - not:
+        has:
+          field: arguments
+          has: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}, {kind: comment}]}
+    - {not: {matches: skfolio-expected-exception}}
+fix: $MODEL.fit($X, factors=$FACTORS)
+metadata:
+  since: 1.14.4
+  fix: unsafe
+  holds:
+    MODEL:
+      all:
+        - {kind: call}
+        - has:
+            field: function
+            regex: (^|\.)(?:MeanRisk|RiskBudgeting|MaximumDiversification|BenchmarkTracker|DistributionallyRobustCVaR|HierarchicalRiskParity|SchurComplementary|HierarchicalEqualRiskContribution|NestedClustersOptimization|StackingOptimization|EqualWeighted|InverseVolatility|Random)$
+        - has:
+            field: arguments
+            has:
+              all:
+                - {kind: keyword_argument}
+                - {has: {field: name, regex: '^(?:prior_estimator)$'}}
+                - has:
+                    field: value
+                    all:
+                      - {kind: call}
+                      - {has: {field: function, regex: '(^|\.)(?:TimeSeriesFactorModel)$'}}
 ---
 id: skfolio-factor-model-class
 language: python
@@ -91,6 +198,13 @@ rule:
           field: arguments
           has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:factors)$'}}]}
     - {not: {has: {field: arguments, has: {kind: dictionary_splat}}}}
+    - not:
+        all:
+          - {pattern: '$MODEL.fit($X, $FACTORS)'}
+          - not:
+              has:
+                field: arguments
+                has: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}, {kind: comment}]}
     - {not: {matches: skfolio-expected-exception}}
 metadata:
   since: 1.14.4

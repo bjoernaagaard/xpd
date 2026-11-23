@@ -105,7 +105,7 @@ def decayed_models():
 def zero_inflated():
     X, y = data()
     y = np.maximum(y, 0)
-    swapped = attempt(lambda: ZeroInflatedRegressor(LinearRegression(), LogisticRegression()).fit(X, y))  # xpd: zero-inflated-roles, zero-inflated-roles
+    swapped = attempt(lambda: ZeroInflatedRegressor(LinearRegression(), LogisticRegression()).fit(X, y))  # xpd: zero-inflated-roles
     two_regressors = attempt(lambda: ZeroInflatedRegressor(classifier=RandomForestRegressor(n_estimators=5, random_state=0), regressor=Ridge()).fit(X, y))  # xpd: zero-inflated-roles
     two_classifiers = attempt(lambda: ZeroInflatedRegressor(LogisticRegression(), regressor=RandomForestClassifier(n_estimators=5, random_state=0)).fit(X, y))  # xpd: zero-inflated-roles
     right = ZeroInflatedRegressor(LogisticRegression(), LinearRegression()).fit(X, y)

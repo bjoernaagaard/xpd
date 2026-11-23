@@ -10,3 +10,7 @@ scikit-learn's `cross_val_predict` can reject skfolio financial splitters or con
 ## What the rule reports
 
 skfolio returns a `MultiPeriodPortfolio` for WalkForward and a `Population` for combinatorial or randomized portfolio backtests. Check downstream code when changing the return type.
+
+## How to fix it
+
+Use `xpd check --fix --unsafe-fixes` to call `cross_val_predict` from `skfolio.model_selection` when it is imported.

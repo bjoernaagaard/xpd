@@ -8,3 +8,7 @@ skfolio portfolio weights combine asset returns linearly. Averaging asset log re
 ## What the rule reports
 
 The rule follows a conversion with the explicit log option into a skfolio optimizer.
+
+## How to fix it
+
+Use `xpd check --fix --unsafe-fixes` when `prices_to_returns(..., log_returns=True)` is passed inline to switch `log_returns=False`.

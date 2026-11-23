@@ -3,21 +3,74 @@
 # 10,000 normal values (0.05, 0.95) changed 9,910 of them and left 92 distinct values between
 # -3.272 and -2.379, where (5, 95) changed 1,000 and kept the range -1.628 to 1.640.
 
-# No fix, because the new numbers have to be computed, and a transform cannot multiply a number.
 id: column-capper-fraction
 language: python
 severity: error
 message: ColumnCapper reads quantile_range in percent, so this range caps at percentiles below 1. On 10,000 normal values (0.05, 0.95) changed 9,910 of them, where (5, 95) changed 1,000. Multiply both numbers by 100.
 rule:
-  pattern: $F($$$A)
   all:
-    - has: { field: function, regex: '(^|\.)ColumnCapper$' }
-    - has:
-        field: arguments
-        any:
-          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^quantile_range$' } }, { has: { field: value, matches: fractions } }] }
-          - has: { nthChild: 1, matches: fractions }
-utils:
-  fractions:
-    any: [{ kind: tuple }, { kind: list }]
-    regex: '^[\(\[]\s*(0|0?\.\d+)\s*,\s*(0?\.\d+|1|1\.0*)\s*,?\s*[\)\]]$'
+    - any: [{ kind: tuple }, { kind: list }]
+    - pattern: $RANGE
+    - regex: '^[\(\[]\s*(0|0?\.\d+)\s*,\s*(0?\.\d+|1|1\.0*)\s*,?\s*[\)\]]$'
+    - any:
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^quantile_range$' }
+              - inside:
+                  kind: argument_list
+                  inside:
+                    kind: call
+                    has: { field: function, regex: '(^|\.)ColumnCapper$' }
+        - all:
+            - nthChild: 1
+            - inside:
+                kind: argument_list
+                inside:
+                  kind: call
+                  has: { field: function, regex: '(^|\.)ColumnCapper$' }
+rewriters:
+  - id: scale-one
+    rule: { any: [{ kind: integer }, { kind: float }], regex: '^1(\.0*)?$' }
+    fix: "100"
+  - id: scale-zero
+    rule: { any: [{ kind: integer }, { kind: float }], regex: '^0(\.0*)?$' }
+    fix: "0"
+  - id: scale-single-digit
+    rule: { kind: float, pattern: $N, regex: '^0?\.[1-9]$' }
+    transform:
+      PCT: { replace: { source: $N, replace: '^0?\.([1-9])$', by: '${1}0' } }
+    fix: $PCT
+  - id: scale-cent-leading-zero
+    rule: { kind: float, pattern: $N, regex: '^0?\.0[1-9]$' }
+    transform:
+      PCT: { replace: { source: $N, replace: '^0?\.0([1-9])$', by: '$1' } }
+    fix: $PCT
+  - id: scale-two-digits
+    rule: { kind: float, pattern: $N, regex: '^0?\.[1-9][0-9]$' }
+    transform:
+      PCT: { replace: { source: $N, replace: '^0?\.([1-9][0-9])$', by: '$1' } }
+    fix: $PCT
+  - id: scale-sub-percent
+    rule: { kind: float, pattern: $N, regex: '^0?\.00[0-9]+$' }
+    transform:
+      PCT: { replace: { source: $N, replace: '^0?\.00([0-9]+)$', by: '0.$1' } }
+    fix: $PCT
+  - id: scale-sub-ten
+    rule: { kind: float, pattern: $N, regex: '^0?\.0[1-9][0-9]+$' }
+    transform:
+      PCT: { replace: { source: $N, replace: '^0?\.0([1-9])([0-9]+)$', by: '$1.$2' } }
+    fix: $PCT
+  - id: scale-multi-digits
+    rule: { kind: float, pattern: $N, regex: '^0?\.[1-9][0-9][0-9]+$' }
+    transform:
+      PCT: { replace: { source: $N, replace: '^0?\.([1-9][0-9])([0-9]+)$', by: '$1.$2' } }
+    fix: $PCT
+transform:
+  FIXED:
+    rewrite:
+      source: $RANGE
+      rewriters: [scale-one, scale-zero, scale-single-digit, scale-cent-leading-zero, scale-two-digits, scale-sub-percent, scale-sub-ten, scale-multi-digits]
+fix: $FIXED
+metadata: { fix: unsafe }

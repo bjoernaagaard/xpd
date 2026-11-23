@@ -5,6 +5,96 @@ message: Shuffling skfolio asset returns can train on future observations. In a 
   row 19 and testing included row 0. Split in observation order.
 rule:
   all:
+    - {kind: keyword_argument}
+    - {has: {field: name, regex: '^(?:shuffle)$'}}
+    - {has: {field: value, regex: ^True$}}
+    - inside:
+        all:
+          - {kind: argument_list}
+          - has:
+              all:
+                - {nthChild: 1}
+                - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+                - {pattern: $DATA}
+          - inside:
+              all:
+                - {kind: call}
+                - has:
+                    field: function
+                    matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:train_test_split)$'}}}
+                - any:
+                    - {has: {field: function, regex: '(^|\.)(?:train_test_split)$'}}
+                    - has:
+                        field: function
+                        all:
+                          - {kind: identifier}
+                          - {pattern: $SK_ALIAS}
+                          - inside:
+                              stopBy: end
+                              all:
+                                - {kind: module}
+                                - has:
+                                    stopBy: end
+                                    all:
+                                      - {kind: aliased_import}
+                                      - {has: {field: alias, pattern: $SK_ALIAS}}
+                                      - {has: {field: name, regex: '(^|\.)(?:train_test_split)$'}}
+fix: shuffle=False
+metadata: {since: 1.14.4, holds: {DATA: {matches: skfolio-return-conversion}}, fix: unsafe}
+---
+id: skfolio-shuffled-returns-split
+language: python
+severity: warning
+message: Shuffling skfolio asset returns can train on future observations. In a 20-row split, training included
+  row 19 and testing included row 0. Split in observation order.
+rule:
+  all:
+    - {pattern: '$FN($$$ARGS)'}
+    - has:
+        field: function
+        matches: {skfolio-sklearn-model-selection: {NAME: {regex: '^(?:train_test_split)$'}}}
+    - any:
+        - {has: {field: function, regex: '(^|\.)(?:train_test_split)$'}}
+        - has:
+            field: function
+            all:
+              - {kind: identifier}
+              - {pattern: $SK_ALIAS}
+              - inside:
+                  stopBy: end
+                  all:
+                    - {kind: module}
+                    - has:
+                        stopBy: end
+                        all:
+                          - {kind: aliased_import}
+                          - {has: {field: alias, pattern: $SK_ALIAS}}
+                          - {has: {field: name, regex: '(^|\.)(?:train_test_split)$'}}
+    - has:
+        field: arguments
+        has:
+          all:
+            - {nthChild: 1}
+            - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
+            - {pattern: $DATA}
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:shuffle)$'}}]}
+    - not:
+        has:
+          field: arguments
+          has: {any: [{kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}
+fix: $FN($$$ARGS, shuffle=False)
+metadata: {since: 1.14.4, holds: {DATA: {matches: skfolio-return-conversion}}, fix: unsafe}
+---
+id: skfolio-shuffled-returns-split
+language: python
+severity: warning
+message: Shuffling skfolio asset returns can train on future observations. In a 20-row split, training included
+  row 19 and testing included row 0. Split in observation order.
+rule:
+  all:
     - {kind: call}
     - has:
         field: function
@@ -33,20 +123,14 @@ rule:
             - {nthChild: 1}
             - {not: {any: [{kind: keyword_argument}, {kind: list_splat}, {kind: dictionary_splat}]}}
             - {pattern: $DATA}
-    - any:
-        - has:
-            field: arguments
-            has:
-              all:
-                - {kind: keyword_argument}
-                - {has: {field: name, regex: '^(?:shuffle)$'}}
-                - {has: {field: value, regex: ^True$}}
-        - all:
-            - not:
-                has:
-                  field: arguments
-                  has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:shuffle)$'}}]}
-            - {not: {has: {field: arguments, has: {kind: dictionary_splat}}}}
+    - not:
+        has:
+          field: arguments
+          has: {all: [{kind: keyword_argument}, {has: {field: name, regex: '^(?:shuffle)$'}}]}
+    - {not: {has: {field: arguments, has: {kind: dictionary_splat}}}}
+    - has:
+        field: arguments
+        has: {any: [{kind: comment}, {kind: line_continuation}]}
 metadata: {since: 1.14.4, holds: {DATA: {matches: skfolio-return-conversion}}}
 ---
 id: skfolio-shuffled-returns-split
