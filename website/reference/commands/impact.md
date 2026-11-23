@@ -26,6 +26,26 @@ samples/graph/impact.py:27: uses share
 samples/graph/impact.py:26: unresolved [dynamic-lookup] Resolve how result[[column]] uses the pipeline result.
 ```
 
+## Inline rename
+
+A rename can carry a dependency between two assignments in the same chain.
+For this fixture, set `gross_amount` to 30 and change `discount` from 5 to 20
+on one row. The dashboard's `share` goes from 50 to 20. The audit reads only
+`order_id`, which stays the same. The report infers which inputs to vary and
+which reads may change. Run the callers to check the actual values.
+
+```console
+$ xpd impact samples/graph/impact.py --entry inline_features --column net_amount --format text
+samples/graph/impact.py:34: impact of column "net_amount" in inline_features()
+samples/graph/impact.py:36: producer .assign(net_amount) [net_amount]
+Output "renamed": .assign(net_amount) [net_amount] (samples/graph/impact.py:36) -> .rename [renamed] (samples/graph/impact.py:37)
+Output "share": .assign(net_amount) [net_amount] (samples/graph/impact.py:36) -> .rename [renamed] (samples/graph/impact.py:37) -> .assign(share) [share] (samples/graph/impact.py:38)
+samples/graph/impact.py:43: inline_dashboard calls inline_features(orders)
+samples/graph/impact.py:43: uses share
+  Verify: Inferred input candidates: "discount", "gross_amount". Change one of these columns to a different valid value in one row of orders, keeping all other input values fixed. Run inline_dashboard on both inputs and compare "share" at the listed reads, matching the same rows. Inferred: the caller can observe a change if the producer changes. Exact values and direction are unknown.
+samples/graph/impact.py:34: unresolved [external-callers] Look for imports and callers outside this file.
+```
+
 ## Exit status
 
 | Exit code | Meaning |

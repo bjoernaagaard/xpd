@@ -82,6 +82,7 @@ impl Pipeline {
 /// One step of a pipeline.
 #[derive(Debug)]
 pub(crate) struct Step {
+    pub(crate) call_offset: usize,
     /// The name of the function, or the call of a chain link, as in `.assign(gross)`.
     pub(crate) name: String,
     pub(crate) kind: StepKind,
@@ -101,6 +102,7 @@ pub(crate) struct Step {
 /// The expression inputs and source line of a named column write.
 #[derive(Debug)]
 pub(crate) struct ColumnWrite {
+    pub(crate) offset: usize,
     pub(crate) name: String,
     pub(crate) line: usize,
     pub(crate) reads: BTreeSet<String>,
@@ -143,7 +145,7 @@ impl StepKind {
 /// One step as the code of a pipeline names it.
 enum StepRef<'r> {
     /// A function of the module, by name.
-    Function(String),
+    Function(String, usize),
     /// One `.assign(...)` call of a method chain.
     Link(Syntax<'r>),
 }
@@ -261,13 +263,13 @@ pub(crate) fn read(src: &str) -> Vec<Pipeline> {
         .flat_map(|(_, _, order)| order)
         .chain(statements.iter().flat_map(|(_, order)| order))
         .filter_map(|step| match step {
-            StepRef::Function(name) => Some(name.clone()),
+            StepRef::Function(name, _) => Some(name.clone()),
             StepRef::Link(_) => None,
         })
         .collect();
     for (name, _, order) in &mut orders {
         if run_as_step.contains(*name) {
-            order.retain(|step| matches!(step, StepRef::Function(_)));
+            order.retain(|step| matches!(step, StepRef::Function(..)));
         }
     }
     let mut pipelines: Vec<Pipeline> = orders
@@ -326,7 +328,7 @@ pub(crate) fn read_entry(root: &syntax::Root, entry: &str) -> Option<Pipeline> {
                         .is_some_and(|left| left.kind() == "subscript")
             }))
     {
-        order = vec![StepRef::Function(entry.to_owned())];
+        order = vec![StepRef::Function(entry.to_owned(), 0)];
     }
     Some(pipeline(
         entry,
@@ -429,7 +431,7 @@ fn step_order<'r>(
     let mut order: Vec<(usize, StepRef<'r>)> = found
         .into_iter()
         .filter(|(_, name)| seen.insert(name.clone()))
-        .map(|(at, name)| (at, StepRef::Function(name)))
+        .map(|(at, name)| (at, StepRef::Function(name, at)))
         .collect();
     order.extend(
         links
@@ -497,8 +499,10 @@ fn pipeline<'r>(
     let mut bodies: Vec<StepBody> = order
         .iter()
         .filter_map(|step| match step {
-            StepRef::Function(step) => {
-                Reader::new(step, functions.get(step)?, constants).map(Reader::read)
+            StepRef::Function(step, at) => {
+                let mut body = Reader::new(step, functions.get(step)?, constants)?.read();
+                body.step.call_offset = *at;
+                Some(body)
             }
             StepRef::Link(call) => Some(Reader::for_link(call, constants).read_link()),
         })
@@ -961,6 +965,7 @@ impl<'r, 'a> Reader<'r, 'a> {
         }
         StepBody {
             step: Step {
+                call_offset: 0,
                 name: self.name.clone(),
                 kind: self.kind,
                 line,
@@ -1003,8 +1008,9 @@ impl<'r, 'a> Reader<'r, 'a> {
     /// chain starts at.
     fn read_link(self) -> StepBody {
         let call = self.function;
-        let line = (call.field("function").and_then(|f| f.field("attribute")))
-            .map_or_else(|| Self::line(call), |method| Self::line(&method));
+        let method = call.field("function").and_then(|f| f.field("attribute"));
+        let method = method.as_ref().unwrap_or(call);
+        let line = Self::line(method);
         let mut found = Found::default();
         let mut start_reads = Vec::new();
         for (name, value) in keywords(call) {
@@ -1023,6 +1029,7 @@ impl<'r, 'a> Reader<'r, 'a> {
         found.formulas.retain(|f| is_computation(&f.text));
         StepBody {
             step: Step {
+                call_offset: method.range().start,
                 name: self.name.clone(),
                 kind: self.kind,
                 line,
@@ -1420,10 +1427,12 @@ impl<'r, 'a> Reader<'r, 'a> {
             );
         }
         found.column_writes.push(ColumnWrite {
+            offset: value.range().start,
             name: name.clone(),
             line,
             reads: inputs.reads,
             reads_current_frame: value.kind() == "lambda"
+                || value.dfs().any(|node| is_col_call(&node))
                 || (followed.is_empty()
                     && (value.kind() == "augmented_assignment"
                         || value

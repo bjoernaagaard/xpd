@@ -29,3 +29,19 @@ def dashboard(orders: pd.DataFrame, column: str | None = None) -> pd.DataFrame:
 
 def audit(orders: pd.DataFrame) -> pd.DataFrame:
     return features(orders)[["order_id"]]
+
+
+def inline_features(orders: pd.DataFrame) -> pd.DataFrame:
+    return (
+        orders.assign(net_amount=orders["gross_amount"] - orders["discount"])
+        .rename(columns={"net_amount": "renamed"})
+        .assign(share=pd.col("renamed") * 2)
+    )
+
+
+def inline_dashboard(orders: pd.DataFrame) -> pd.DataFrame:
+    return inline_features(orders)[["share"]]
+
+
+def inline_audit(orders: pd.DataFrame) -> pd.DataFrame:
+    return inline_features(orders)[["order_id"]]

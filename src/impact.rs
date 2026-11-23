@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::graph_diagnostic::Level;
 use crate::outline;
 use crate::output::Format;
-use crate::steps::{self, Pipeline};
+use crate::steps::{self, Pipeline, Step};
 use crate::syntax::{self, Node, string_literal};
 
 #[derive(Debug, Args)]
@@ -190,7 +190,12 @@ fn report<'a>(
         "Look for imports and callers outside this file.",
     )]);
     let shapes = return_shapes(&pipeline, &module);
-    let (outputs, producers) = lineage(&pipeline, &shapes, change, &mut unresolved)?;
+    let trace = lineage(&pipeline, &shapes, change, &mut unresolved)?;
+    let outputs = trace
+        .frame
+        .into_iter()
+        .filter_map(|(name, column)| column.path.map(|path| (name, path)))
+        .collect();
     let mut callers = callers::find(
         root,
         &module,
@@ -200,34 +205,48 @@ fn report<'a>(
         &mut unresolved,
     );
     for caller in &mut callers {
-        let columns: BTreeSet<_> = caller.uses.values().flatten().collect();
-        let names: Vec<_> = columns.iter().map(|column| format!("{column:?}")).collect();
-        let changed = match change {
-            Change::Column(column) => format!("column {column:?}"),
-            Change::Transformation(step) => format!("step {step:?}"),
-        };
-        let site = if caller.name == "(module)" {
-            "the module"
-        } else {
-            &caller.name
-        };
-        caller.verification = format!(
-            "Run {site} before and after the change. For {}, use the same {} rows that exercise the change to {changed}. Compare {} at the listed reads by row.",
-            caller.call,
-            caller.input,
-            names.join(", "),
-        );
+        caller.verification = verification(caller, &trace.verification_inputs);
     }
     Ok(Report {
         file,
         entry,
         line: pipeline.line,
         change,
-        producers,
+        producers: trace.producers,
         outputs,
         callers,
         unresolved,
     })
+}
+
+fn verification(caller: &callers::Caller, inputs: &BTreeSet<String>) -> String {
+    let columns: BTreeSet<_> = caller.uses.values().flatten().collect();
+    let names: Vec<_> = columns.iter().map(|column| format!("{column:?}")).collect();
+    let site = if caller.name == "(module)" {
+        "the module"
+    } else {
+        &caller.name
+    };
+    let perturbation = if inputs.is_empty() {
+        "Unknown input to perturb. Find an input row that changes the producer, or compare the old and new producer on the same rows.".to_owned()
+    } else {
+        let names: Vec<_> = inputs.iter().map(|column| format!("{column:?}")).collect();
+        format!(
+            "Inferred input candidates: {}. Change one of these columns to a different valid value in one row of {}, keeping all other input values fixed.",
+            names.join(", "),
+            caller.input
+        )
+    };
+    format!(
+        "{perturbation} Run {site} on both inputs and compare {} at the listed reads, matching the same rows. Inferred: the caller can observe a change if the producer changes. Exact values and direction are unknown.",
+        names.join(", "),
+    )
+}
+
+#[derive(Debug)]
+struct ShapeAt {
+    offset: usize,
+    shape: Shape,
 }
 
 #[derive(Debug)]
@@ -246,7 +265,7 @@ enum Shape {
 fn return_shapes(
     pipeline: &Pipeline,
     module: &outline::Module<'_>,
-) -> BTreeMap<String, Vec<Shape>> {
+) -> BTreeMap<String, Vec<ShapeAt>> {
     let mut shapes = BTreeMap::new();
     for function in &module.functions {
         if function.name != pipeline.name && !pipeline.steps.iter().any(|s| s.name == function.name)
@@ -260,7 +279,7 @@ fn return_shapes(
     shapes
 }
 
-fn return_shape(body: &Node<'_>) -> Vec<Shape> {
+fn return_shape(body: &Node<'_>) -> Vec<ShapeAt> {
     let mut returns = body.dfs().filter(|n| n.kind() == "return_statement");
     let Some(mut value) = returns.next().and_then(|n| n.named_children().next()) else {
         return Vec::new();
@@ -275,17 +294,49 @@ fn return_shape(body: &Node<'_>) -> Vec<Shape> {
             if let Some(columns) = value.field("subscript").and_then(|n| literal_columns(&n))
                 && let Some(frame) = value.field("value")
             {
-                shapes.push(Shape::Project(columns));
+                shapes.push(ShapeAt {
+                    offset: frame.range().end,
+                    shape: Shape::Project(columns),
+                });
                 value = frame;
                 continue;
             }
-            shapes.push(unknown_shape(&value));
-            break;
-        } else if let Some((frame, columns)) = literal_rename(&value) {
-            shapes.push(Shape::Rename {
-                line: line(&value),
-                columns,
+            let Some(frame) = value.field("value") else {
+                break;
+            };
+            shapes.push(ShapeAt {
+                offset: frame.range().end,
+                shape: unknown_shape(&value, line(&value)),
             });
+            value = frame;
+        } else if value.kind() == "call" {
+            let Some(target) = value.field("function") else {
+                break;
+            };
+            let Some(method) = target.field("attribute") else {
+                break;
+            };
+            let Some(frame) = target.field("object") else {
+                break;
+            };
+            let shape = match method.text().as_ref() {
+                "rename" => Some(literal_rename(&value).map_or_else(
+                    || unknown_shape(&value, line(&method)),
+                    |columns| Shape::Rename {
+                        line: line(&method),
+                        columns,
+                    },
+                )),
+                "drop" | "set_axis" | "filter" => Some(unknown_shape(&value, line(&method))),
+                "assign" | "pipe" | "join" | "copy" => None,
+                _ => break,
+            };
+            if let Some(shape) = shape {
+                shapes.push(ShapeAt {
+                    offset: method.range().start,
+                    shape,
+                });
+            }
             value = frame;
         } else if value.kind() == "parenthesized_expression" {
             let Some(inner) = value.named_children().next() else {
@@ -300,19 +351,6 @@ fn return_shape(body: &Node<'_>) -> Vec<Shape> {
         {
             value = assigned;
         } else {
-            if value.kind() == "call"
-                && value
-                    .field("function")
-                    .and_then(|f| f.field("attribute"))
-                    .is_some_and(|method| {
-                        matches!(
-                            method.text().as_ref(),
-                            "rename" | "drop" | "set_axis" | "filter"
-                        )
-                    })
-            {
-                shapes.push(unknown_shape(&value));
-            }
             break;
         }
     }
@@ -320,21 +358,14 @@ fn return_shape(body: &Node<'_>) -> Vec<Shape> {
     shapes
 }
 
-fn unknown_shape(value: &Node<'_>) -> Shape {
+fn unknown_shape(value: &Node<'_>, line: usize) -> Shape {
     Shape::Unresolved {
-        line: line(value),
+        line,
         expression: value.text().into_owned(),
     }
 }
 
-fn literal_rename<'r>(value: &Node<'r>) -> Option<(Node<'r>, Vec<(String, String)>)> {
-    if value.kind() != "call" {
-        return None;
-    }
-    let target = value.field("function")?;
-    if target.field("attribute")?.text() != "rename" {
-        return None;
-    }
+fn literal_rename(value: &Node<'_>) -> Option<Vec<(String, String)>> {
     let args = value.field("arguments")?;
     let mut args = args.named_children().filter(|n| n.kind() != "comment");
     let columns = args.next()?;
@@ -345,7 +376,7 @@ fn literal_rename<'r>(value: &Node<'r>) -> Option<(Node<'r>, Vec<(String, String
     if dictionary.kind() != "dictionary" {
         return None;
     }
-    let pairs: Option<Vec<_>> = dictionary
+    dictionary
         .named_children()
         .filter(|n| n.kind() != "comment")
         .map(|pair| {
@@ -354,8 +385,7 @@ fn literal_rename<'r>(value: &Node<'r>) -> Option<(Node<'r>, Vec<(String, String
                 string_literal(&pair.field("value")?)?,
             ))
         })
-        .collect();
-    Some((target.field("object")?, pairs?))
+        .collect()
 }
 
 fn literal_columns(node: &Node<'_>) -> Option<Vec<String>> {
@@ -370,60 +400,47 @@ fn literal_columns(node: &Node<'_>) -> Option<Vec<String>> {
     }
 }
 
-fn lineage(
+fn lineage<'a>(
     pipeline: &Pipeline,
-    shapes: &BTreeMap<String, Vec<Shape>>,
-    change: Change<'_>,
+    shapes: &BTreeMap<String, Vec<ShapeAt>>,
+    change: Change<'a>,
     unresolved: &mut BTreeSet<Boundary>,
-) -> Result<(Paths, Vec<Hop>)> {
+) -> Result<Trace<'a>> {
     let mut trace = Trace {
         change,
-        paths: BTreeMap::new(),
+        frame: pipeline
+            .source
+            .iter()
+            .map(|name| (name.clone(), Column::source(name)))
+            .collect(),
         producers: Vec::new(),
+        verification_inputs: BTreeSet::new(),
     };
     if let Change::Column(name) = change
-        && !pipeline.steps.iter().any(|s| s.writes.iter().any(|w| w == name))
-        && !shapes.values().flatten().any(|shape| matches!(shape,
-            Shape::Rename { columns, .. } if columns.iter().any(|(_, to)| to == name)))
-        && (pipeline.source.iter().any(|source| source == name)
-            || shapes.values().flatten().any(|shape| matches!(shape,
-                Shape::Project(columns) if columns.iter().any(|column| column == name))
-                || matches!(shape, Shape::Rename { columns, .. } if columns.iter().any(|(from, _)| from == name))))
+        && is_source_column(name, pipeline, shapes)
     {
-        trace.record(Hop { transformation: "pipeline input".to_owned(), column: name.to_owned(), line: pipeline.line }, None);
+        trace.record(
+            Hop {
+                transformation: "pipeline input".to_owned(),
+                column: name.to_owned(),
+                line: pipeline.line,
+            },
+            Column::source(name),
+        );
     }
+    let has_entry_step = pipeline.steps.iter().any(|step| step.name == pipeline.name);
+    let entry_shapes = if has_entry_step {
+        &[][..]
+    } else {
+        shape_list(shapes, &pipeline.name)
+    };
+    let mut entry_shapes = entry_shapes.iter().peekable();
     for step in &pipeline.steps {
-        let inputs = trace.paths.clone();
-        for write in &step.column_writes {
-            let reads = if write.reads_current_frame {
-                &trace.paths
-            } else {
-                &inputs
-            };
-            let parent = write.reads.iter().find_map(|name| reads.get(name)).cloned();
-            trace.record(
-                Hop {
-                    transformation: step.name.clone(),
-                    column: write.name.clone(),
-                    line: write.line,
-                },
-                parent,
-            );
-        }
-        trace.shape(&step.name, shapes, unresolved);
-        if step.computed {
-            unresolved.insert(Boundary::new(
-                step.line,
-                "computed-columns",
-                format!(
-                    "Resolve the runtime column names or return shape in {}.",
-                    step.name
-                ),
-            ));
-        }
+        trace.shapes_before(&mut entry_shapes, step.call_offset, ".rename", unresolved);
+        trace.step(step, shape_list(shapes, &step.name), unresolved);
     }
-    if !pipeline.steps.iter().any(|step| step.name == pipeline.name) {
-        trace.shape(&pipeline.name, shapes, unresolved);
+    for shape in entry_shapes {
+        trace.shape(".rename", &shape.shape, unresolved);
     }
     for finding in pipeline.findings.iter().filter(|f| f.level == Level::Error) {
         unresolved.insert(Boundary::new(finding.line, "dataflow", &finding.message));
@@ -455,67 +472,161 @@ fn lineage(
             }
         }
     }
-    Ok((trace.paths, trace.producers))
+    Ok(trace)
+}
+
+fn is_source_column(
+    name: &str,
+    pipeline: &Pipeline,
+    shapes: &BTreeMap<String, Vec<ShapeAt>>,
+) -> bool {
+    let mut observed = pipeline.source.iter().any(|source| source == name);
+    if pipeline
+        .steps
+        .iter()
+        .flat_map(|step| &step.writes)
+        .any(|write| write == name)
+    {
+        return false;
+    }
+    for at in shapes.values().flatten() {
+        match &at.shape {
+            Shape::Rename { columns, .. } => {
+                if columns.iter().any(|(_, to)| to == name) {
+                    return false;
+                }
+                observed |= columns.iter().any(|(from, _)| from == name);
+            }
+            Shape::Project(columns) => observed |= columns.iter().any(|column| column == name),
+            Shape::Unresolved { .. } => {}
+        }
+    }
+    observed
+}
+
+fn shape_list<'a>(shapes: &'a BTreeMap<String, Vec<ShapeAt>>, name: &str) -> &'a [ShapeAt] {
+    shapes.get(name).map_or(&[], Vec::as_slice)
+}
+
+#[derive(Clone, Default)]
+struct Column {
+    path: Option<Vec<Hop>>,
+    sources: BTreeSet<String>,
+}
+
+impl Column {
+    fn source(name: &str) -> Self {
+        Self {
+            path: None,
+            sources: BTreeSet::from([name.to_owned()]),
+        }
+    }
 }
 
 struct Trace<'a> {
     change: Change<'a>,
-    paths: Paths,
+    frame: BTreeMap<String, Column>,
     producers: Vec<Hop>,
+    verification_inputs: BTreeSet<String>,
 }
 
 impl Trace<'_> {
-    fn record(&mut self, hop: Hop, parent: Option<Vec<Hop>>) {
+    fn record(&mut self, hop: Hop, mut column: Column) {
         let changed = match self.change {
             Change::Column(name) => name == hop.column,
             Change::Transformation(name) => name == hop.transformation,
         };
-        let mut path = if changed {
+        if changed {
             self.producers.push(hop.clone());
-            Vec::new()
-        } else if let Some(parent) = parent {
-            parent
-        } else {
-            self.paths.remove(&hop.column);
-            return;
-        };
-        let column = hop.column.clone();
-        path.push(hop);
-        self.paths.insert(column, path);
+            self.verification_inputs
+                .extend(column.sources.iter().cloned());
+            column.path = Some(Vec::new());
+        }
+        let name = hop.column.clone();
+        if let Some(path) = &mut column.path {
+            path.push(hop);
+        }
+        self.frame.insert(name, column);
     }
 
-    fn shape(
+    fn step(&mut self, step: &Step, shapes: &[ShapeAt], unresolved: &mut BTreeSet<Boundary>) {
+        let mut shapes = shapes.iter().peekable();
+        let inputs = self.frame.clone();
+        for write in &step.column_writes {
+            self.shapes_before(&mut shapes, write.offset, &step.name, unresolved);
+            let reads = if write.reads_current_frame {
+                &self.frame
+            } else {
+                &inputs
+            };
+            let dependencies = write.reads.iter().filter_map(|name| reads.get(name));
+            let column = Column {
+                path: dependencies.clone().find_map(|column| column.path.clone()),
+                sources: dependencies
+                    .flat_map(|column| column.sources.iter().cloned())
+                    .collect(),
+            };
+            self.record(
+                Hop {
+                    transformation: step.name.clone(),
+                    column: write.name.clone(),
+                    line: write.line,
+                },
+                column,
+            );
+        }
+        for shape in shapes {
+            self.shape(&step.name, &shape.shape, unresolved);
+        }
+        if step.computed {
+            unresolved.insert(Boundary::new(
+                step.line,
+                "computed-columns",
+                format!(
+                    "Resolve the runtime column names or return shape in {}.",
+                    step.name
+                ),
+            ));
+        }
+    }
+
+    fn shapes_before(
         &mut self,
+        shapes: &mut std::iter::Peekable<std::slice::Iter<'_, ShapeAt>>,
+        offset: usize,
         step: &str,
-        shapes: &BTreeMap<String, Vec<Shape>>,
         unresolved: &mut BTreeSet<Boundary>,
     ) {
-        for shape in shapes.get(step).into_iter().flatten() {
-            match shape {
-                Shape::Project(columns) => self.paths.retain(|column, _| columns.contains(column)),
-                Shape::Unresolved { line, expression } => {
-                    self.paths.clear();
-                    unresolved.insert(Boundary::new(
-                        *line,
-                        "output-shape",
-                        format!("Resolve which columns {expression} returns."),
-                    ));
-                }
-                Shape::Rename { line, columns } => {
-                    let before: Vec<_> = columns
-                        .iter()
-                        .map(|(from, to)| (to, self.paths.remove(from)))
-                        .collect();
-                    for (to, parent) in before {
-                        self.record(
-                            Hop {
-                                transformation: step.to_owned(),
-                                column: to.clone(),
-                                line: *line,
-                            },
-                            parent,
-                        );
-                    }
+        while let Some(at) = shapes.next_if(|at| at.offset < offset) {
+            self.shape(step, &at.shape, unresolved);
+        }
+    }
+
+    fn shape(&mut self, step: &str, shape: &Shape, unresolved: &mut BTreeSet<Boundary>) {
+        match shape {
+            Shape::Project(columns) => self.frame.retain(|column, _| columns.contains(column)),
+            Shape::Unresolved { line, expression } => {
+                self.frame.clear();
+                unresolved.insert(Boundary::new(
+                    *line,
+                    "output-shape",
+                    format!("Resolve which columns {expression} returns."),
+                ));
+            }
+            Shape::Rename { line, columns } => {
+                let before: Vec<_> = columns
+                    .iter()
+                    .map(|(from, to)| (to, self.frame.remove(from)))
+                    .collect();
+                for (to, column) in before {
+                    self.record(
+                        Hop {
+                            transformation: step.to_owned(),
+                            column: to.clone(),
+                            line: *line,
+                        },
+                        column.unwrap_or_default(),
+                    );
                 }
             }
         }
