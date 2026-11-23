@@ -90,15 +90,24 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
     let (id, params) = connection
         .initialize_start()
         .context("the client sent no initialize request")?;
-    let refresh = match params
+    let refresh = params
         .pointer("/capabilities/workspace/diagnostics/refreshSupport")
-        .and_then(Value::as_bool)
-    {
-        Some(true) => Refresh::Supported,
-        _ => Refresh::Unsupported,
-    };
+        .and_then(Value::as_bool);
     let params: InitializeParams =
         serde_json::from_value(params).context("the initialize request has invalid params")?;
+    let refresh = refresh.or_else(|| {
+        params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.diagnostic.as_ref())
+            .and_then(|diagnostic| diagnostic.refresh_support)
+    });
+    let refresh = if refresh == Some(true) {
+        Refresh::Supported
+    } else {
+        Refresh::Unsupported
+    };
     let mut server = Server::new(connection, &params, refresh);
     let watches = params
         .capabilities
