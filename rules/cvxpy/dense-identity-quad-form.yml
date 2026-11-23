@@ -1,0 +1,41 @@
+id: dense-identity-quad-form
+language: python
+severity: info
+message: CVXPY quad_form with a dense identity allocates a square matrix for a sum of squares. Use cvxpy.sum_squares(x).
+rule:
+  kind: call
+  all:
+    - {pattern: '$Q($X, $E($N))'}
+    - has:
+        field: arguments
+        all:
+          - {has: {nthChild: 1, pattern: $VECTOR}}
+          - has:
+              kind: call
+              nthChild: 2
+              has:
+                field: function
+                matches:
+                  cvxpy-imported-symbol:
+                    MODULE: {regex: '^numpy$'}
+                    SYMBOL: {regex: '^(eye|identity)$'}
+                    BINDING: {pattern: $NUMPY_IMPORT}
+    - has:
+        field: arguments
+        has:
+          nthChild: 1
+          matches: {cvxpy-local-value: {VALUE: {kind: call, pattern: '$V($N)'}}}
+constraints:
+  N: {kind: integer, regex: '^[1-9][0-9]*$'}
+metadata:
+  holds:
+    Q:
+      matches:
+        cvxpy-imported-symbol:
+          MODULE: {regex: '^cvxpy(?:\.atoms(?:\.quad_form)?)?$'}
+          SYMBOL: {regex: '^quad_form$'}
+          BINDING: {pattern: $QUAD_IMPORT}
+    VECTOR:
+      all:
+        - {pattern: '$VARIABLE($DIM)'}
+        - matches: {cvxpy-leaf: {SYMBOL: {regex: '^Variable$'}, BINDING: {pattern: $VARIABLE_IMPORT}}}

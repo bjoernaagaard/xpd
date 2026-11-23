@@ -1,0 +1,27 @@
+id: mutate-problem-constraints
+language: python
+severity: error
+message: CVXPY Problem.constraints returns a list copy. Include the updated constraints when constructing a Problem.
+rule:
+  any:
+    - kind: call
+      all:
+        - {inside: {kind: expression_statement}}
+        - has:
+            field: function
+            all:
+              - {kind: attribute}
+              - {has: {field: attribute, regex: '^(append|clear|extend|insert|pop|remove|reverse|sort)$'}}
+              - {has: {field: object, pattern: $PROBLEM.constraints}}
+    - all:
+        - {any: [{kind: assignment}, {kind: augmented_assignment}]}
+        - has: {field: left, matches: constraint-item}
+    - kind: delete_statement
+      has: {matches: constraint-item}
+metadata:
+  holds:
+    PROBLEM: {matches: cvxpy-problem}
+utils:
+  constraint-item:
+    kind: subscript
+    has: {field: value, pattern: $PROBLEM.constraints}

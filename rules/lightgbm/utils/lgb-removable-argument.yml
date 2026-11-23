@@ -1,0 +1,6 @@
+id: lgb-removable-argument
+language: python
+rule:
+  all:
+    - {precedes: {regex: '^[,)]$'}}
+    - not: {has: {stopBy: end, kind: comment}}

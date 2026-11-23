@@ -1,0 +1,85 @@
+id: ineffective-max-quantile-batches
+language: python
+severity: warning
+message: XGBoost 3.3 deprecated max_quantile_batches. This setting no longer limits the number of GPU quantile batches.
+rule:
+  kind: keyword_argument
+  all:
+    - { has: { field: name, regex: '^max_quantile_batches$' } }
+    - { has: { field: value, not: { matches: literal-none } } }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has: { field: function, pattern: $MATRIX }
+    - not: { matches: xgboost-version-guard }
+    - { not: { matches: fixable-batch-limit } }
+metadata:
+  since: '3.3.0'
+  holds:
+    MATRIX: { regex: '(^|\.)(ExtMem)?QuantileDMatrix$' }
+utils:
+  literal-none:
+    any:
+      - { kind: none }
+      - { kind: parenthesized_expression, has: { stopBy: { not: { kind: parenthesized_expression } }, kind: none } }
+  fixable-batch-limit:
+    all:
+      - { has: { field: value, kind: integer } }
+      - { follows: { regex: '^,$' } }
+      - inside:
+          kind: argument_list
+          not: { has: { any: [{ kind: comment }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  xgboost-version-guard:
+    inside:
+      stopBy: end
+      kind: block
+      inside:
+        field: consequence
+        kind: if_statement
+        has: { field: condition, regex: '^\s*(?:[\w.]+\(\s*)?(?:xgboost|xgb)\s*\.\s*__version__\s*\)?\s*<\s*(?:[\w.]+\(\s*)?["'']3\.3(?:\.0)?["'']\s*\)?\s*$' }
+---
+id: ineffective-max-quantile-batches
+language: python
+severity: warning
+message: XGBoost 3.3 deprecated max_quantile_batches. This setting no longer limits the number of GPU quantile batches.
+rule:
+  kind: keyword_argument
+  all:
+    - { has: { field: name, regex: '^max_quantile_batches$' } }
+    - { has: { field: value, not: { matches: literal-none } } }
+    - inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has: { field: function, pattern: $MATRIX }
+    - not: { matches: xgboost-version-guard }
+    - { matches: fixable-batch-limit }
+fix:
+  template: ''
+  expandStart: { regex: '^,$' }
+metadata:
+  fix: safe
+  since: '3.3.0'
+  holds:
+    MATRIX: { regex: '(^|\.)(ExtMem)?QuantileDMatrix$' }
+utils:
+  literal-none:
+    any:
+      - { kind: none }
+      - { kind: parenthesized_expression, has: { stopBy: { not: { kind: parenthesized_expression } }, kind: none } }
+  fixable-batch-limit:
+    all:
+      - { has: { field: value, kind: integer } }
+      - { follows: { regex: '^,$' } }
+      - inside:
+          kind: argument_list
+          not: { has: { any: [{ kind: comment }, { kind: list_splat }, { kind: dictionary_splat }] } }
+  xgboost-version-guard:
+    inside:
+      stopBy: end
+      kind: block
+      inside:
+        field: consequence
+        kind: if_statement
+        has: { field: condition, regex: '^\s*(?:[\w.]+\(\s*)?(?:xgboost|xgb)\s*\.\s*__version__\s*\)?\s*<\s*(?:[\w.]+\(\s*)?["'']3\.3(?:\.0)?["'']\s*\)?\s*$' }

@@ -1,0 +1,44 @@
+id: cvxpy-local-value
+language: python
+arguments: [VALUE]
+rule:
+  any:
+    - {matches: VALUE}
+    - kind: identifier
+      pattern: $LOCAL
+      inside:
+        stopBy: {any: [{kind: block}, {kind: module}]}
+        all:
+          - {inside: {any: [{kind: block}, {kind: module}]}}
+          - follows:
+              stopBy: end
+              kind: expression_statement
+              has:
+                kind: assignment
+                all:
+                  - {has: {field: left, pattern: $LOCAL}}
+                  - {has: {field: right, matches: VALUE}}
+          - not:
+              follows:
+                stopBy: end
+                all:
+                  - {matches: assigns-local}
+                  - {follows: {stopBy: end, matches: assigns-local}}
+utils:
+  assigns-local:
+    kind: expression_statement
+    has:
+      stopBy: {not: {kind: assignment}}
+      all:
+        - {any: [{kind: assignment}, {kind: augmented_assignment}]}
+        - {has: {field: right, regex: '.'}}
+        - has:
+            field: left
+            any:
+              - {kind: identifier, pattern: $LOCAL}
+              - all:
+                  - {matches: cvxpy-assignment-pattern}
+                  - has:
+                      stopBy: {not: {matches: cvxpy-assignment-pattern}}
+                      kind: identifier
+                      pattern: $LOCAL

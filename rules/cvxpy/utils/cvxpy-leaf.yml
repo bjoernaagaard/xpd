@@ -1,0 +1,13 @@
+id: cvxpy-leaf
+language: python
+arguments: [SYMBOL, BINDING]
+rule:
+  kind: call
+  has: {field: function, matches: leaf-constructor}
+utils:
+  leaf-constructor:
+    matches:
+      cvxpy-imported-symbol:
+        MODULE: {regex: '^cvxpy(?:\.expressions\.(?:variable|constants(?:\.(?:parameter|constant))?))?$'}
+        SYMBOL: {matches: SYMBOL}
+        BINDING: {matches: BINDING}

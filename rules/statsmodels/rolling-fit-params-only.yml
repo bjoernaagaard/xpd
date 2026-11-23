@@ -1,0 +1,19 @@
+id: rolling-fit-params-only
+language: python
+severity: info
+message: This statsmodels rolling fit only reads params. Pass params_only=True to skip computing inference statistics.
+rule:
+  kind: argument_list
+  regex: '^\(\s*\)$'
+  inside:
+    kind: call
+    all:
+      - {has: {field: function, pattern: $MODEL.fit}}
+      - inside: {kind: attribute, has: {field: attribute, regex: '^params$'}}
+fix: (params_only=True)
+metadata:
+  fix: unsafe
+  holds:
+    MODEL:
+      kind: call
+      has: {field: function, regex: '(^|\.)(RollingOLS|RollingWLS)(\.from_formula)?$'}

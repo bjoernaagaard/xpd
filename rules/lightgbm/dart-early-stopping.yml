@@ -1,0 +1,86 @@
+id: dart-early-stopping
+language: python
+severity: warning
+message: LightGBM cannot stop early in DART mode. For early stopping, use GBDT with validation data and a metric. To keep DART, choose its round count separately.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - has:
+        field: arguments
+        all:
+          - not: {has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}
+          - has:
+              any:
+                - {nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}, pattern: $PARAMS, matches: dart-params}
+                - kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^params$'}}
+                    - {has: {field: value, pattern: $PARAMS, matches: dart-params}}
+          - any:
+              - has:
+                  any:
+                    - {nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}, pattern: $PARAMS, matches: stopping-params}
+                    - kind: keyword_argument
+                      all:
+                        - {has: {field: name, regex: '^params$'}}
+                        - {has: {field: value, pattern: $PARAMS, matches: stopping-params}}
+              - {has: {matches: {lgb-stopping-callback: {FUNCTION: {pattern: $STOP}}}}}
+utils:
+  dart-params:
+    kind: dictionary
+    all:
+      - any:
+          - {matches: {lgb-dart-parameter: {KEY: {regex: '^["'']boosting["'']$'}}}}
+          - {matches: {lgb-dart-parameter: {KEY: {regex: '^["'']boosting_type["'']$'}}}}
+          - {matches: {lgb-dart-parameter: {KEY: {regex: '^["'']boost["'']$'}}}}
+      - not:
+          has:
+            any:
+              - {kind: dictionary_splat}
+              - kind: pair
+                has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
+  stopping-params:
+    kind: dictionary
+    all:
+      - has:
+          kind: pair
+          all:
+            - {has: {field: key, regex: '^["''](early_stopping_rounds?|early_stopping|n_iter_no_change)["'']$'}}
+            - {has: {field: value, kind: integer, regex: '^[1-9][0-9]*$'}}
+      - not:
+          has:
+            kind: pair
+            all:
+              - {has: {field: key, regex: '^["''](early_stopping_rounds?|early_stopping|n_iter_no_change)["'']$'}}
+              - {has: {field: value, not: {regex: '^[1-9][0-9]*$'}}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}
+    STOP: {regex: '(^|\.)early_stopping$'}
+---
+id: dart-early-stopping
+language: python
+severity: warning
+message: LightGBM cannot stop early in DART mode. For early stopping, use GBDT with validation data and a metric. To keep DART, choose its round count separately.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  has:
+    field: arguments
+    has: {matches: {lgb-stopping-callback: {FUNCTION: {pattern: $STOP}}}}
+metadata:
+  holds:
+    STOP: {regex: '(^|\.)early_stopping$'}
+    MODEL:
+      kind: call
+      all:
+        - {has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}}
+        - has:
+            field: arguments
+            all:
+              - {not: {has: {kind: dictionary_splat}}}
+              - has:
+                  kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^(boosting|boost|boosting_type)$'}}
+                    - {has: {field: value, regex: '^["'']dart["'']$'}}

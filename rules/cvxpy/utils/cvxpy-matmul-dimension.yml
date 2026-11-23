@@ -1,0 +1,30 @@
+id: cvxpy-matmul-dimension
+language: python
+arguments: [AXIS, INNER]
+rule:
+  kind: call
+  has:
+    field: arguments
+    has:
+      any:
+        - all:
+            - {nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}}
+            - {matches: literal-shape}
+        - kind: keyword_argument
+          all:
+            - {has: {field: name, regex: '^shape$'}}
+            - {has: {field: value, matches: literal-shape}}
+utils:
+  literal-shape:
+    any:
+      - all:
+          - {kind: integer, regex: '^(?:[2-9]|[1-9][0-9]+)$'}
+          - {matches: INNER}
+      - kind: tuple
+        all:
+          - {regex: '^\(\s*(?:[2-9]|[1-9][0-9]+)(?:\s*,\s*(?:[2-9]|[1-9][0-9]+))?\s*,?\s*\)$'}
+          - has:
+              kind: integer
+              all:
+                - {matches: AXIS}
+                - {matches: INNER}

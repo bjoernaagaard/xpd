@@ -1,0 +1,224 @@
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY reshape. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  all:
+    - {kind: call, has: {field: function, pattern: $FUNCTION}}
+    - {pattern: $CALL}
+    - has:
+        field: arguments
+        all:
+          - not:
+              has:
+                any:
+                  - {kind: comment}
+                  - {kind: line_continuation}
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+                  - kind: keyword_argument
+                    has: {field: name, not: {regex: '^(expr|shape)$'}}
+          - {has: {nthChild: 2}}
+          - {not: {has: {nthChild: 3}}}
+transform:
+  EXPLICIT:
+    replace: {source: $CALL, replace: ',?(\s*\))$', by: ', order="F"$1'}
+fix: $EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    FUNCTION:
+      matches:
+        cvxpy-imported-symbol:
+          MODULE: {regex: '^cvxpy(?:\.atoms(?:\.affine(?:\.reshape)?)?)?$'}
+          SYMBOL: {regex: '^reshape$'}
+          BINDING: {pattern: $ATOM_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY reshape. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  matches:
+    cvxpy-default-order:
+      CALL: {kind: call, has: {field: function, pattern: $FUNCTION}}
+      POSITION: {nthChild: {position: 3, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}}
+fix: '"F"'
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    FUNCTION:
+      matches:
+        cvxpy-imported-symbol:
+          MODULE: {regex: '^cvxpy(?:\.atoms(?:\.affine(?:\.reshape)?)?)?$'}
+          SYMBOL: {regex: '^reshape$'}
+          BINDING: {pattern: $ATOM_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY vec. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  all:
+    - {kind: call, has: {field: function, pattern: $FUNCTION}}
+    - {pattern: $CALL}
+    - has:
+        field: arguments
+        all:
+          - not:
+              has:
+                any:
+                  - {kind: comment}
+                  - {kind: line_continuation}
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+                  - kind: keyword_argument
+                    has: {field: name, not: {regex: '^(X)$'}}
+          - {has: {nthChild: 1}}
+          - {not: {has: {nthChild: 2}}}
+transform:
+  EXPLICIT:
+    replace: {source: $CALL, replace: ',?(\s*\))$', by: ', order="F"$1'}
+fix: $EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    FUNCTION:
+      matches:
+        cvxpy-imported-symbol:
+          MODULE: {regex: '^cvxpy(?:\.atoms(?:\.affine(?:\.vec)?)?)?$'}
+          SYMBOL: {regex: '^vec$'}
+          BINDING: {pattern: $ATOM_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY vec. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  matches:
+    cvxpy-default-order:
+      CALL: {kind: call, has: {field: function, pattern: $FUNCTION}}
+      POSITION: {nthChild: {position: 2, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}}
+fix: '"F"'
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    FUNCTION:
+      matches:
+        cvxpy-imported-symbol:
+          MODULE: {regex: '^cvxpy(?:\.atoms(?:\.affine(?:\.vec)?)?)?$'}
+          SYMBOL: {regex: '^vec$'}
+          BINDING: {pattern: $ATOM_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY reshape. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  all:
+    - {kind: call, pattern: '$RECEIVER.reshape($$$ARGS)'}
+    - {pattern: $CALL}
+    - has:
+        field: arguments
+        all:
+          - not:
+              has:
+                any:
+                  - {kind: comment}
+                  - {kind: line_continuation}
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+                  - kind: keyword_argument
+                    has: {field: name, not: {regex: '^(shape)$'}}
+          - {has: {nthChild: 1}}
+          - {not: {has: {nthChild: 2}}}
+transform:
+  EXPLICIT:
+    replace: {source: $CALL, replace: ',?(\s*\))$', by: ', order="F"$1'}
+fix: $EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    RECEIVER:
+      matches:
+        cvxpy-leaf:
+          SYMBOL: {regex: '^(Variable|Parameter|Constant)$'}
+          BINDING: {pattern: $LEAF_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY reshape. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  matches:
+    cvxpy-default-order:
+      CALL: {kind: call, pattern: '$RECEIVER.reshape($$$ARGS)'}
+      POSITION: {nthChild: {position: 2, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}}
+fix: '"F"'
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    RECEIVER:
+      matches:
+        cvxpy-leaf:
+          SYMBOL: {regex: '^(Variable|Parameter|Constant)$'}
+          BINDING: {pattern: $LEAF_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY flatten. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  all:
+    - {kind: call, pattern: '$RECEIVER.flatten($$$ARGS)'}
+    - {pattern: $CALL}
+    - has:
+        field: arguments
+        all:
+          - not:
+              has:
+                any:
+                  - {kind: comment}
+                  - {kind: line_continuation}
+                  - {kind: list_splat}
+                  - {kind: dictionary_splat}
+          - {not: {has: {nthChild: 1}}}
+transform:
+  EXPLICIT:
+    replace: {source: $CALL, replace: '(\s*\))$', by: 'order="F"$1'}
+fix: $EXPLICIT
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    RECEIVER:
+      matches:
+        cvxpy-leaf:
+          SYMBOL: {regex: '^(Variable|Parameter|Constant)$'}
+          BINDING: {pattern: $LEAF_IMPORT}
+---
+id: implicit-reshape-order
+language: python
+severity: warning
+message: Specify order for CVXPY flatten. Use order="F" for column-major order or order="C" for row-major order.
+rule:
+  matches:
+    cvxpy-default-order:
+      CALL: {kind: call, pattern: '$RECEIVER.flatten($$$ARGS)'}
+      POSITION: {nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}}
+fix: '"F"'
+metadata:
+  since: "1.6"
+  fix: safe
+  holds:
+    RECEIVER:
+      matches:
+        cvxpy-leaf:
+          SYMBOL: {regex: '^(Variable|Parameter|Constant)$'}
+          BINDING: {pattern: $LEAF_IMPORT}

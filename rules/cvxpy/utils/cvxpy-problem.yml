@@ -1,0 +1,12 @@
+id: cvxpy-problem
+language: python
+rule:
+  kind: call
+  has: {field: function, matches: problem-constructor}
+utils:
+  problem-constructor:
+    matches:
+      cvxpy-imported-symbol:
+        MODULE: {regex: '^cvxpy(?:\.problems\.problem)?$'}
+        SYMBOL: {regex: '^Problem$'}
+        BINDING: {pattern: $PROBLEM_IMPORT}

@@ -1,0 +1,255 @@
+id: removed-gpu-hist
+language: python
+severity: error
+message: XGBoost 3.1 removed tree_method="gpu_hist". Use tree_method="hist" and set device to "cuda" or the intended CUDA device ordinal.
+rule:
+  all:
+    - { pattern: '$FN($$$ARGS)' }
+    - any:
+        - all:
+            - has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' }
+            - has:
+                field: arguments
+                all:
+                  - has: { kind: keyword_argument, has: { field: name, regex: '^tree_method$' }, matches: gpu-hist-value }
+                  - not: { has: { kind: keyword_argument, has: { field: name, regex: '^booster$' }, matches: gblinear-value } }
+        - all:
+            - has: { field: function, regex: '(^|\.)(train|cv)$' }
+            - has:
+                field: arguments
+                has:
+                  any:
+                    - { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, matches: gpu-hist-params }
+                    - { kind: keyword_argument, all: [{ has: { field: name, regex: '^params$' } }, { has: { field: value, matches: gpu-hist-params } }] }
+    - not: { any: [{ matches: expected-failure }, { matches: xgboost-version-guard }, { matches: simple-migration }] }
+metadata:
+  since: '3.1.0'
+  holds:
+    FN: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  gpu-hist-value:
+    has: { field: value, matches: gpu-hist-string }
+  gpu-hist-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          g(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          p(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          u(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          _(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          h(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          i(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          s(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  token-string-literal:
+    all:
+      - { matches: plain-string-literal }
+      - { not: { has: { stopBy: end, kind: string_content, regex: '[^a-z_]' } } }
+  plain-string-literal:
+    any:
+      - { matches: string-without-escapes }
+      - kind: parenthesized_expression
+        has:
+          stopBy: { not: { kind: parenthesized_expression } }
+          matches: string-without-escapes
+  string-without-escapes:
+    all:
+      - any: [{ kind: string }, { kind: concatenated_string }]
+      - not:
+          has:
+            stopBy: end
+            any:
+              - { kind: string_start, not: { regex: '^[rRuU]?["'']' } }
+              - { kind: string_content, regex: '\\' }
+  gblinear-value:
+    has: { field: value, matches: gblinear-string }
+  tree-method-key:
+    kind: pair
+    has: { field: key, matches: tree-method-string }
+  booster-key:
+    kind: pair
+    has: { field: key, matches: booster-string }
+  gblinear-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          g(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          b(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          l(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          i(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          n(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          a(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          r(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  tree-method-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          r(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          _(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          m(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          h(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          o(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          d(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  booster-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          b(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          o(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          o(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          s(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          e(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          r(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  gpu-hist-params:
+    kind: dictionary
+    all:
+      - has:
+          all:
+            - { matches: tree-method-key }
+            - { matches: gpu-hist-value }
+            - not:
+                precedes:
+                  stopBy: end
+                  any:
+                    - { matches: tree-method-key }
+                    - { kind: dictionary_splat }
+                    - kind: pair
+                      has:
+                        field: key
+                        not: { matches: plain-string-literal }
+      - not:
+          has:
+            all:
+              - { matches: booster-key }
+              - { matches: gblinear-value }
+              - { not: { precedes: { stopBy: end, matches: booster-key } } }
+  simple-migration:
+    all:
+      - { pattern: '$FN(tree_method=$OLD)' }
+      - { has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' } }
+      - { has: { field: arguments, has: { kind: keyword_argument, matches: gpu-hist-value } } }
+      - { not: { has: { stopBy: end, kind: comment } } }
+  expected-failure:
+    any:
+      - inside:
+          stopBy: end
+          kind: block
+          inside:
+            field: body
+            kind: try_statement
+            has:
+              kind: except_clause
+              has:
+                field: value
+                any:
+                  - { regex: '^((?:\w+\.)*XGBoostError)$' }
+                  - { kind: tuple, has: { regex: '^((?:\w+\.)*XGBoostError)$' } }
+                  - { kind: as_pattern, has: { regex: '^((?:\w+\.)*XGBoostError)$' } }
+      - inside:
+          stopBy: end
+          kind: with_statement
+          regex: '^with [^\n]*(?:pytest\.raises|assertRaises)\(\s*(?:(?:\w+\.)*XGBoostError)\s*[,)]'
+  xgboost-version-guard:
+    inside:
+      stopBy: end
+      kind: block
+      inside:
+        field: consequence
+        kind: if_statement
+        has: { field: condition, regex: '^\s*(?:[\w.]+\(\s*)?(?:xgboost|xgb)\s*\.\s*__version__\s*\)?\s*<\s*(?:[\w.]+\(\s*)?["'']3\.1(?:\.0)?["'']\s*\)?\s*$' }
+---
+id: removed-gpu-hist
+language: python
+severity: error
+message: XGBoost 3.1 removed tree_method="gpu_hist". Use tree_method="hist" and set device to "cuda" or the intended CUDA device ordinal.
+rule:
+  all:
+    - { matches: simple-migration }
+    - { not: { any: [{ matches: expected-failure }, { matches: xgboost-version-guard }] } }
+fix: $FN(tree_method="hist", device="cuda")
+metadata:
+  since: '3.1.0'
+  fix: unsafe
+  holds:
+    FN: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  simple-migration:
+    all:
+      - { pattern: '$FN(tree_method=$OLD)' }
+      - { has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' } }
+      - { has: { field: arguments, has: { kind: keyword_argument, matches: gpu-hist-value } } }
+      - { not: { has: { stopBy: end, kind: comment } } }
+  gpu-hist-value:
+    has: { field: value, matches: gpu-hist-string }
+  gpu-hist-string:
+    all:
+      - { matches: token-string-literal }
+      - regex: >-
+          (?x) ^ (?:\((?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*)* [rRuU]?['"]{1,3}(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          g(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          p(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          u(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          _(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          h(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          i(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          s(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*
+          t(?:['"]{1,3}(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*[rRuU]?['"]{1,3})*['"]{1,3} (?:(?:\s|\#[^\r\n]*\r?\n|\\\r?\n)*\))* $
+  token-string-literal:
+    all:
+      - { matches: plain-string-literal }
+      - { not: { has: { stopBy: end, kind: string_content, regex: '[^a-z_]' } } }
+  plain-string-literal:
+    any:
+      - { matches: string-without-escapes }
+      - kind: parenthesized_expression
+        has:
+          stopBy: { not: { kind: parenthesized_expression } }
+          matches: string-without-escapes
+  string-without-escapes:
+    all:
+      - any: [{ kind: string }, { kind: concatenated_string }]
+      - not:
+          has:
+            stopBy: end
+            any:
+              - { kind: string_start, not: { regex: '^[rRuU]?["'']' } }
+              - { kind: string_content, regex: '\\' }
+  expected-failure:
+    any:
+      - inside:
+          stopBy: end
+          kind: block
+          inside:
+            field: body
+            kind: try_statement
+            has:
+              kind: except_clause
+              has:
+                field: value
+                any:
+                  - { regex: '^((?:\w+\.)*XGBoostError)$' }
+                  - { kind: tuple, has: { regex: '^((?:\w+\.)*XGBoostError)$' } }
+                  - { kind: as_pattern, has: { regex: '^((?:\w+\.)*XGBoostError)$' } }
+      - inside:
+          stopBy: end
+          kind: with_statement
+          regex: '^with [^\n]*(?:pytest\.raises|assertRaises)\(\s*(?:(?:\w+\.)*XGBoostError)\s*[,)]'
+  xgboost-version-guard:
+    inside:
+      stopBy: end
+      kind: block
+      inside:
+        field: consequence
+        kind: if_statement
+        has: { field: condition, regex: '^\s*(?:[\w.]+\(\s*)?(?:xgboost|xgb)\s*\.\s*__version__\s*\)?\s*<\s*(?:[\w.]+\(\s*)?["'']3\.1(?:\.0)?["'']\s*\)?\s*$' }

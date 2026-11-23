@@ -1,0 +1,11 @@
+id: lgb-later-positional
+language: python
+utils:
+  positional:
+    not: {any: [{kind: keyword_argument}, {kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}
+rule:
+  inside:
+    kind: argument_list
+    has:
+      nthChild: {position: 4, ofRule: {matches: positional}}
+      matches: positional

@@ -119,6 +119,10 @@ instead and whether xpd can fix it, such as
 | SciPy | `removed-keyword` | `tol=` on the sparse iterative solvers was removed and raises `TypeError` |
 | scikit-learn | `fit-on-test` | A fit on the test rows scored 0.997 AUC on data with no signal |
 | MAPIE | `calibrate-on-training-rows` | `conformalize` on the training rows covered 0.468 of the test rows where 0.9 was asked |
+| statsmodels | `ols-ignored-weights` | OLS ignores `weights=` |
+| LightGBM | `dart-early-stopping` | Early stopping has no effect with DART boosting |
+| CVXPY | `solve-result-as-status` | `Problem.solve()` returns the objective value, and the solver status is stored on `problem.status` |
+| XGBoost | `native-predict-after-early-stopping` | Native booster prediction can use trees beyond the best iteration |
 | plotly | `marker-size-diameter` | A marker's `size` is its diameter, so markers of size 10 and 20 had areas of 78.5 and 314.2 square pixels |
 | Python | `dict-str-any` | `dict[str, Any]` in a signature hides the keys the function uses |
 

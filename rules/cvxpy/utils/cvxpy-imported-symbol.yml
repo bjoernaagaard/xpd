@@ -1,0 +1,38 @@
+id: cvxpy-imported-symbol
+language: python
+arguments: [MODULE, SYMBOL, BINDING]
+rule:
+  any:
+    - kind: identifier
+      matches:
+        cvxpy-name-binding:
+          REQUIRED: {matches: member-import}
+          CONFLICT: {not: {matches: member-import}}
+    - kind: attribute
+      all:
+        - {has: {field: attribute, matches: SYMBOL}}
+        - has:
+            field: object
+            matches:
+              cvxpy-name-binding:
+                REQUIRED: {matches: module-import}
+                CONFLICT: {not: {matches: module-import}}
+utils:
+  member-import:
+    all:
+      - {inside: {kind: import_from_statement, has: {field: module_name, matches: MODULE}}}
+      - any:
+          - {kind: dotted_name, matches: SYMBOL}
+          - kind: aliased_import
+            all:
+              - {has: {field: name, matches: SYMBOL}}
+              - {has: {field: alias, matches: BINDING}}
+  module-import:
+    all:
+      - {inside: {kind: import_statement}}
+      - any:
+          - {kind: dotted_name, matches: MODULE}
+          - kind: aliased_import
+            all:
+              - {has: {field: name, matches: MODULE}}
+              - {has: {field: alias, matches: BINDING}}

@@ -1,0 +1,8 @@
+id: cvxpy-shadowed-name
+language: python
+arguments: [ALLOWED_IMPORT]
+rule:
+  matches:
+    cvxpy-name-binding:
+      REQUIRED: {not: {matches: ALLOWED_IMPORT}}
+      CONFLICT: {regex: '^$'}

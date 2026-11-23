@@ -1,0 +1,128 @@
+id: glm-logged-exposure
+language: python
+severity: warning
+message: Statsmodels GLM takes the natural log of exposure. Pass positive exposure on its original scale or use offset for values already on the log scale.
+rule:
+  kind: call
+  all:
+    - {has: {field: function, pattern: $F}}
+    - any:
+        - has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              all:
+                - {has: {field: name, regex: '^exposure$'}}
+                - {has: {field: value, matches: log-call}}
+        - all:
+            - {has: {field: function, regex: '(^|\.)GLM$'}}
+            - has:
+                field: arguments
+                all:
+                  - {not: {has: {kind: list_splat}}}
+                  - has:
+                      matches: log-call
+                      nthChild: {position: 5, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}
+utils:
+  log-call:
+    kind: call
+    has:
+      field: function
+      any:
+        - {matches: aliased-log}
+        - {matches: unaliased-log}
+  aliased-log:
+    any:
+      - all:
+          - {pattern: $LOG_MODULE.log}
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_statement
+                has:
+                  kind: aliased_import
+                  all:
+                    - {has: {field: name, regex: '^(numpy|math)$'}}
+                    - {has: {field: alias, pattern: $LOG_MODULE}}
+      - all:
+          - {kind: identifier, pattern: $LOG}
+          - inside:
+              kind: module
+              stopBy: end
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - {has: {field: module_name, regex: '^(numpy|math)$'}}
+                  - has:
+                      kind: aliased_import
+                      all:
+                        - {has: {field: name, regex: '^log$'}}
+                        - {has: {field: alias, pattern: $LOG}}
+  unaliased-log:
+    all:
+      - any:
+          - {kind: identifier, pattern: $PLAIN, regex: '^log$'}
+          - all:
+              - {pattern: $PLAIN.log}
+              - {has: {field: object, regex: '^(numpy|math)$'}}
+      - inside:
+          stopBy: end
+          all:
+            - {inside: {kind: module}}
+            - {follows: {stopBy: end, matches: plain-log-import}}
+      - not:
+          inside:
+            kind: module
+            stopBy: end
+            has:
+              stopBy: end
+              any:
+                - {kind: wildcard_import}
+                - {matches: other-binding}
+  plain-log-import:
+    any:
+      - kind: import_statement
+        has: {kind: dotted_name, regex: '^(numpy|math)$', has: {pattern: $PLAIN}}
+      - kind: import_from_statement
+        all:
+          - {has: {field: module_name, regex: '^(numpy|math)$'}}
+          - {has: {field: name, kind: dotted_name, regex: '^log$', has: {pattern: $PLAIN}}}
+  bound-name:
+    any:
+      - {pattern: $PLAIN}
+      - {has: {stopBy: end, kind: identifier, pattern: $PLAIN}}
+  other-binding:
+    any:
+      - kind: identifier
+        pattern: $PLAIN
+        inside:
+          stopBy: end
+          any:
+            - {kind: parameters}
+            - {kind: lambda_parameters}
+            - {kind: as_pattern_target}
+            - {kind: case_pattern}
+      - all:
+          - {any: [{kind: assignment}, {kind: augmented_assignment}, {kind: for_statement}, {kind: for_in_clause}]}
+          - {has: {field: left, matches: bound-name}}
+      - all:
+          - {any: [{kind: function_definition}, {kind: class_definition}, {kind: named_expression}]}
+          - {has: {field: name, pattern: $PLAIN}}
+      - {kind: aliased_import, has: {field: alias, pattern: $PLAIN}}
+      - kind: dotted_name
+        regex: '^(?:log|numpy|math)(?:\.|$)'
+        has: {kind: identifier, pattern: $PLAIN, nthChild: 1}
+        inside:
+          any:
+            - {kind: import_statement, not: {matches: plain-log-import}}
+            - kind: import_from_statement
+              all:
+                - {not: {matches: plain-log-import}}
+                - {has: {field: name, matches: bound-name}}
+      - {kind: delete_statement, matches: bound-name}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(GLM(?:\.from_formula)?|glm)$'}

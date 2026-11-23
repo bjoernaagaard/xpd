@@ -1,0 +1,58 @@
+id: deprecated-var-seed
+language: python
+severity: warning
+message: Statsmodels 0.15 deprecated seed on VAR results. Pass the same value as rng.
+rule:
+  kind: keyword_argument
+  pattern: $KEYWORD
+  has: {field: name, regex: '^seed$'}
+  inside:
+    kind: argument_list
+    all:
+      - not:
+          has:
+            any:
+              - {kind: keyword_argument, has: {field: name, regex: '^rng$'}}
+              - {kind: list_splat}
+              - {kind: dictionary_splat}
+      - inside:
+          kind: call
+          any:
+            - all:
+                - {has: {field: function, pattern: $RESULT.simulate_var}}
+                - not:
+                    has:
+                      field: arguments
+                      has:
+                        nthChild: {position: 3, ofRule: {matches: positional}}
+                        matches: positional
+            - all:
+                - {has: {field: function, pattern: $RESULT.irf_errband_mc}}
+                - not:
+                    has:
+                      field: arguments
+                      has:
+                        nthChild: {position: 5, ofRule: {matches: positional}}
+                        matches: positional
+utils:
+  positional:
+    not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: line_continuation}]}
+transform:
+  RENAMED:
+    replace: {source: $KEYWORD, replace: '^seed\b', by: rng}
+fix: $RENAMED
+metadata:
+  since: '0.15'
+  fix: safe
+  holds:
+    RESULT:
+      kind: call
+      has:
+        field: function
+        kind: attribute
+        all:
+          - {has: {field: attribute, regex: '^fit$'}}
+          - has:
+              field: object
+              kind: call
+              has: {field: function, regex: '(^|\.)VAR$'}

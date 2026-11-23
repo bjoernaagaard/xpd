@@ -1,0 +1,24 @@
+id: lgb-before-api
+language: python
+arguments: [RECEIVER, VERSION]
+rule:
+  any:
+    - inside:
+        stopBy: end
+        kind: block
+        inside:
+          kind: if_statement
+          field: consequence
+          has:
+            field: condition
+            pattern: $MODULE.__version__.startswith($PREFIX)
+            all:
+              - has:
+                  field: arguments
+                  has: {matches: VERSION}
+              - has:
+                  field: function
+                  has:
+                    field: object
+                    has: {field: object, kind: identifier, matches: RECEIVER}
+    - matches: RECEIVER

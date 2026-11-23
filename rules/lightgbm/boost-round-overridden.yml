@@ -1,0 +1,49 @@
+id: boost-round-overridden
+language: python
+severity: warning
+message: LightGBM uses $ROUNDS from params instead of the num_boost_round argument $LIMIT. Keep the effective round count in params.
+rule:
+  all:
+    - matches:
+        lgb-round-override:
+          FUNCTION: {pattern: $F}
+          ROUND_ARGUMENT: {pattern: $LIMIT}
+          ROUND_PARAM: {pattern: $ROUNDS, not: {pattern: $LIMIT}}
+    - {matches: removable-round}
+utils:
+  removable-round:
+    all:
+      - {matches: lgb-removable-argument}
+      - any:
+          - {kind: keyword_argument}
+          - {not: {matches: lgb-later-positional}}
+fix:
+  template: ""
+  expandEnd: {regex: '^,$'}
+metadata:
+  fix: safe
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}
+---
+id: boost-round-overridden
+language: python
+severity: warning
+message: LightGBM uses $ROUNDS from params instead of the num_boost_round argument $LIMIT. Remove the ignored argument by hand, passing any later positional arguments by keyword.
+rule:
+  all:
+    - matches:
+        lgb-round-override:
+          FUNCTION: {pattern: $F}
+          ROUND_ARGUMENT: {pattern: $LIMIT}
+          ROUND_PARAM: {pattern: $ROUNDS, not: {pattern: $LIMIT}}
+    - not: {matches: removable-round}
+utils:
+  removable-round:
+    all:
+      - {matches: lgb-removable-argument}
+      - any:
+          - {kind: keyword_argument}
+          - {not: {matches: lgb-later-positional}}
+metadata:
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}

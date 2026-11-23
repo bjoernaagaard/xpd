@@ -1,0 +1,33 @@
+id: star-matmul
+language: python
+severity: warning
+message: CVXPY uses * between these non-scalar expressions for matrix multiplication. Use @ for matrix multiplication or cvxpy.multiply for elementwise multiplication.
+rule:
+  kind: binary_operator
+  all:
+    - {pattern: $LEFT * $RIGHT}
+    - has:
+        field: left
+        matches:
+          cvxpy-local-value:
+            VALUE:
+              matches:
+                cvxpy-matmul-dimension:
+                  AXIS: {nthChild: {position: 1, reverse: true}}
+                  INNER: {pattern: $INNER}
+    - has:
+        field: right
+        matches:
+          cvxpy-local-value:
+            VALUE:
+              matches:
+                cvxpy-matmul-dimension:
+                  AXIS: {nthChild: 1}
+                  INNER: {pattern: $INNER}
+metadata:
+  since: "1.1"
+  holds:
+    LEFT:
+      matches: {cvxpy-leaf: {SYMBOL: {regex: '^(Variable|Parameter)$'}, BINDING: {pattern: $LEAF_IMPORT}}}
+    RIGHT:
+      matches: {cvxpy-leaf: {SYMBOL: {regex: '^(Variable|Parameter)$'}, BINDING: {pattern: $LEAF_IMPORT}}}
