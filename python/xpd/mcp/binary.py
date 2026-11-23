@@ -107,6 +107,7 @@ class Xpd:
         paths: Sequence[str],
         *flags: str,
         project_root: Path | None = None,
+        stdin: bytes | None = None,
     ) -> T:
         """Runs in `cwd`, the project root, so the binary finds the project's venv as a user's
         run does."""
@@ -118,12 +119,12 @@ class Xpd:
             *args,
             cwd=cwd,
             env=env,
-            stdin=asyncio.subprocess.DEVNULL,
+            stdin=asyncio.subprocess.DEVNULL if stdin is None else asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout, stderr = await process.communicate()
+            stdout, stderr = await process.communicate(stdin)
         except asyncio.CancelledError:
             if process.returncode is None:
                 with contextlib.suppress(ProcessLookupError):

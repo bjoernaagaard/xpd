@@ -9,7 +9,7 @@ from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
-from xpd.mcp import catalog, discovery, pipeline, prompts, structure, tools, views
+from xpd.mcp import animation, catalog, discovery, pipeline, prompts, structure, tools, views
 from xpd.mcp.binary import BUILTIN_RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project, Root
@@ -27,7 +27,15 @@ HTTP_RESTRICTED_TOOLS = frozenset(
 )
 
 
-def instructions(skill_uris: dict[str, str]) -> str:
+def instructions(skill_uris: dict[str, str], *, local: bool) -> str:
+    animate = (
+        f"- When asked to animate a concept as a video, call `{ToolName.ANIMATE_GUIDE}`. "
+        f"Use `{ToolName.ANIMATE_STATUS}` to check the renderer, "
+        f"`{ToolName.ANIMATE_RENDER}` to preview the scene, and "
+        f"`{ToolName.ANIMATE_ARTIFACT}` to inspect the contact sheet before the final render.\n"
+        if local
+        else ""
+    )
     return f"""\
 xpd lints Python for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn, scikit-lego, \
 MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Apache Hamilton, reads the \
@@ -65,7 +73,7 @@ when it says `equivalent: true`.
 `{ToolName.GATES}` returns `passed: true` for the results of `{ToolName.PROFILE}`, \
 `{ToolName.CHECK}`, `{ToolName.GRAPH}`, `{ToolName.EQUIV}`, \
 `{ToolName.REFIT}` and `{ToolName.CONTRACT}`. With code mode on, one `execute` call chains them.
-- The show_ tools draw the same results as tables and charts in hosts that render apps.
+{animate}- The show_ tools draw the same results as tables and charts in hosts that render apps.
 - {skill_uris["xpd"]}, {skill_uris["python-best-practices"]} and \
 {skill_uris["python-review"]} hold the style a linter cannot check."""
 
@@ -89,7 +97,7 @@ def build(settings: Settings) -> FastMCP:
     skill_uris = {skill.name: str(skill.to_mcp_skill().uri) for skill in skills}
     mcp = FastMCP(
         "xpd",
-        instructions=instructions(skill_uris),
+        instructions=instructions(skill_uris, local=transport == "stdio"),
         version=xpd.version(),
         website_url="https://bjoernaagaard.github.io/xpd/",
         auth=auth,
@@ -103,6 +111,7 @@ def build(settings: Settings) -> FastMCP:
     catalog.register(mcp, fallback_rules, xpd, project)
     pipeline.register(mcp, project, fallback_rules)
     prompts.register(mcp, skill_uris["python-review"])
+    animation.register(mcp, xpd, project, local=transport == "stdio")
 
     @mcp.resource(
         "xpd://version",

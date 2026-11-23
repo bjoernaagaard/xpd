@@ -8,6 +8,8 @@ description: "Python library habits: run xpd to lint code for slow or wrong use 
 Use `xpd` whenever you write or change Python code.
 `xpd <command> -h` lists the current flags.
 
+- `xpd animate guide` or MCP `animate_guide`: start an editable Manim explanation from a
+  brief or project concept. Check a low-cost preview before rendering the final video.
 - `xpd check <paths…> --format json`: lint. Fix every `error`. Fix `warning`s
   unless you can state why the pattern is right here. Don't silence rules.
   In a test file, `python/test-skip`, `python/test-rerun`, `python/test-sleep` and

@@ -86,6 +86,24 @@ doubled values into `df`. `xpd check` exits with 0 when it finds no error, with 
 one, and with 2 when it can't run. The
 [Get started](https://bjoernaagaard.github.io/xpd/) page explains each part of an issue.
 
+## Animate a concept
+
+Ask an agent with the xpd plugin to animate a concept from the project, or render a
+Manim scene directly. The first setup pulls the pinned Cairo renderer into rootless
+Podman on x86-64 Linux. Later sessions can use the same renderer and load the guide offline.
+
+```sh
+xpd animate setup
+xpd animate guide sequence > cache_miss.py
+xpd animate render cache_miss.py CacheMiss --profile preview
+xpd animate render cache_miss.py CacheMiss --profile final
+```
+
+The render result includes a contact sheet, editable source, and saved settings for a revision.
+An agent connected over local MCP can use `animate_guide`, `animate_render`,
+`animate_artifact`, and `animate_source`. The
+[animation guide](skills/xpd-animate/SKILL.md) lists recipes and explains local assets.
+
 ## Rules
 
 Each library has a pack of rules, and a pack runs only on a file that imports its library. The
@@ -141,6 +159,7 @@ xpd
 │   ├── profile <data file>    print dtypes, nulls, unique counts and memory per column
 │   ├── equiv old.py new.py    run two scripts and compare the `result` each one leaves
 │   └── refit <contract>       refit a saved Pipeline on raw training rows and compare
+├── animate                    render and revise an editable Manim scene
 ├── write your own rules
 │   ├── new                    create a rule project, a rule, a test case or a utility
 │   └── test                   check rule examples and compare snapshots
@@ -230,6 +249,7 @@ that ship with xpd keep the licenses in the table.
 | --- | --- | --- |
 | xpd's own code and its playbooks | MIT or Apache-2.0, as you choose | `LICENSE-MIT` and `LICENSE-APACHE` |
 | Recipes, which are examples taken from library documentation | The license of the library, which is MIT, BSD-3-Clause, Apache-2.0 or NCSA | `licenses/`, one file per library. `xpd api <recipe>` prints the license name and the source link with the code |
+| The Manim Community API index | MIT | [Manim Community](licenses/manim-community-MIT) and [3Blue1Brown](licenses/manim-MIT) |
 | `option-ext`, a dependency shipped unmodified | MPL-2.0 | `licenses/option-ext-LICENSE.txt`, with the complete source in `licenses/option-ext-0.2.0-source.tar.gz` and at <https://crates.io/api/v1/crates/option-ext/0.2.0/download> |
 | `libcst`, the parser that checks a fixed file | MIT, with parts of CPython under PSF-2.0 | `licenses/libcst-LICENSE` |
 | EmbeddingGemma, the model that `find` downloads | The Gemma Terms of Use at <https://ai.google.dev/gemma/terms> | Not shipped with xpd |

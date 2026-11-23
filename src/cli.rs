@@ -1,7 +1,7 @@
 //! The command line: its arguments, and what each command prints and exits with.
 
 use std::ffi::OsString;
-use std::io;
+use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
@@ -242,6 +242,9 @@ enum Cmd {
     },
     /// Plan a pandas pipeline's native Polars reimplementation without running Python.
     Map(MapArgs),
+    /// Preview and render editable Manim animations.
+    #[command(subcommand)]
+    Animate(crate::animate::Animation),
     /// Refit a saved Pipeline on raw training rows and compare its outputs and scores.
     Refit {
         /// The contract JSON that the training script saved beside its model.
@@ -334,13 +337,7 @@ enum Cmd {
 /// Runs the command the arguments name.
 /// Runs the xpd command line and returns its exit code.
 pub fn run() -> ExitCode {
-    use std::io::IsTerminal;
-
-    let default_format = if io::stdout().is_terminal() {
-        Format::Text
-    } else {
-        Format::Json
-    };
+    let default_format = terminal_format();
     match Cli::parse().cmd {
         Cmd::Check {
             paths,
@@ -392,7 +389,7 @@ pub fn run() -> ExitCode {
             } else if let Some(path) = check {
                 check_ranking(index.as_deref(), &path)
             } else {
-                let entries = index::load(index.as_deref())?;
+                let entries = index::load_for(index.as_deref(), package.as_deref())?;
                 let query = query.context("provide a task query or --check")?;
                 let found = index::find(&entries, &query, package.as_deref(), kind, limit);
                 print_matches(found, kind, format)
@@ -403,7 +400,8 @@ pub fn run() -> ExitCode {
             format,
             index,
         } => unit_result((|| {
-            let entries = index::load(index.as_deref())?;
+            let package = name.split_once('.').map(|(package, _)| package);
+            let entries = index::load_for(index.as_deref(), package)?;
             let mut entry =
                 index::api(&entries, &name)?.with_context(|| format!("no entry named {name}"))?;
             entry.keywords.clear();
@@ -424,6 +422,7 @@ pub fn run() -> ExitCode {
             run_py(EQUIV_PY, &paths)
         }
         Cmd::Map(args) => command_result(args.run(default_format)),
+        Cmd::Animate(command) => command_result(command.run()),
         Cmd::Rules(options) => command_result(rules(options, default_format)),
         Cmd::Doctor { format } => unit_result(crate::doctor::run(format.unwrap_or(default_format))),
         Cmd::Skill { json: false } => print_out(SKILL),
@@ -437,6 +436,14 @@ pub fn run() -> ExitCode {
     }
 }
 
+fn terminal_format() -> Format {
+    if io::stdout().is_terminal() {
+        Format::Text
+    } else {
+        Format::Json
+    }
+}
+
 fn run_completions(shell: clap_complete::Shell) -> ExitCode {
     let mut command = Cli::command().bin_name("xpd");
     command.build();
@@ -447,7 +454,7 @@ fn run_completions(shell: clap_complete::Shell) -> ExitCode {
 }
 
 /// Prints `text` as it is, for a command that cannot fail.
-fn print_out(text: &str) -> ExitCode {
+pub(crate) fn print_out(text: &str) -> ExitCode {
     print!("{text}");
     ExitCode::SUCCESS
 }

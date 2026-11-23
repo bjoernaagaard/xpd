@@ -429,10 +429,18 @@ fn placed(read: &[(&PathBuf, Census)], count: impl Fn(&Census) -> usize) -> Stri
     )
 }
 
-/// Answers a prompt in a project with a Python file. A prompt that a playbook answers gets
-/// the playbook, a prompt that asks what to make or improve gets the open issues of the
-/// project, and any other prompt gets nothing.
+/// Offers the offline animation guide even before a project has Python files.
+/// In Python projects, also routes other playbooks and requests for open issues.
 fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
+    if animation_prompt(prompt) {
+        print_context(
+            "For this animation, start with the offline guide: run \
+             `xpd animate guide` or call the xpd MCP tool `animate_guide`. \
+             Use the conversation and relevant project code to identify what the animation \
+             should show. Render a preview and check its intermediate frames before the final.",
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
     let cwd = project_root(cwd)?;
     if project_files(&cwd, 1).is_empty() {
         return Ok(ExitCode::SUCCESS);
@@ -450,6 +458,55 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
         print_context(&text.join("\n"));
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn animation_prompt(prompt: &str) -> bool {
+    let lowered = prompt.to_lowercase();
+    let words: Vec<&str> = lowered
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let normalized = words.join(" ");
+    let contains = |phrases: &[&str]| phrases.iter().any(|phrase| normalized.contains(phrase));
+    if contains(&["do not animate", "don t animate", "without animation"]) {
+        return false;
+    }
+
+    let motion = words
+        .iter()
+        .any(|word| matches!(*word, "animate" | "animated" | "animation"));
+    if (motion || words.contains(&"render")) && words.contains(&"manim") {
+        return true;
+    }
+    if !motion {
+        return false;
+    }
+    if words.contains(&"mp4") || contains(&["explainer video", "animated video"]) {
+        return true;
+    }
+    if contains(&[
+        "on hover",
+        "on click",
+        "css transition",
+        "framer motion",
+        "when it opens",
+        "when it closes",
+    ]) {
+        return false;
+    }
+    contains(&[
+        "animate this concept",
+        "animate the concept",
+        "animate this behavior",
+        "animate this workflow",
+        "animate the algorithm",
+        "animate how ",
+        "sequence diagram",
+        "animation of how ",
+        "animated explainer",
+        "animation explaining",
+        "animation that explains",
+    ])
 }
 
 /// What the agent needs to follow `playbook`: its name, where to read its code, its commands

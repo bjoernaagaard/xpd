@@ -368,6 +368,21 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
     })
 }
 
+pub(crate) fn load_for(extra: Option<&Path>, package: Option<&str>) -> Result<Library> {
+    if extra.is_some() || package != Some("manim") {
+        return load(extra);
+    }
+    let index: Index = serde_json::from_str(include_str!("../indexes/specialized/manim.json"))?;
+    ensure!(
+        index.schema_version == INDEX_SCHEMA,
+        "rebuild the bundled Manim index for schema {INDEX_SCHEMA}"
+    );
+    Ok(Library {
+        local: Some(index.entries),
+        model: OnceCell::new(),
+    })
+}
+
 impl Entry {
     /// Whether this is one of xpd's own recipes, which state the house style for a kind of
     /// task.

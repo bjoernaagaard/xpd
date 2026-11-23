@@ -22,3 +22,8 @@ class ToolName(StrEnum):
     GATES = auto()
     REFIT = auto()
     CONTRACT = auto()
+    ANIMATE_GUIDE = auto()
+    ANIMATE_STATUS = auto()
+    ANIMATE_RENDER = auto()
+    ANIMATE_ARTIFACT = auto()
+    ANIMATE_SOURCE = auto()
