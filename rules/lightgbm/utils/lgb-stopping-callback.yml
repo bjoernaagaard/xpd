@@ -1,0 +1,25 @@
+id: lgb-stopping-callback
+language: python
+arguments: [FUNCTION]
+rule:
+  kind: keyword_argument
+  all:
+    - {has: {field: name, regex: '^callbacks$'}}
+    - has:
+        field: value
+        kind: list
+        has:
+          kind: call
+          all:
+            - {has: {field: function, matches: FUNCTION, regex: '(^|\.)early_stopping$'}}
+            - has:
+                field: arguments
+                has:
+                  any:
+                    - nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}
+                      kind: integer
+                      regex: '^[1-9][0-9]*$'
+                    - kind: keyword_argument
+                      all:
+                        - {has: {field: name, regex: '^stopping_rounds$'}}
+                        - {has: {field: value, kind: integer, regex: '^[1-9][0-9]*$'}}

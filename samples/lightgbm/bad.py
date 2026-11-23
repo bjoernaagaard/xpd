@@ -56,3 +56,46 @@ def prediction(train_set: lgb.Dataset, features: NDArray) -> None:
     model.predict_proba(
         features, predict_disable_shape_check=True
     )  # xpd: predict-disabled-shape-check
+
+
+def unrelated_guards(
+    train_set: lgb.Dataset, model: lgb.LGBMRegressor, data: NDArray, labels: NDArray
+) -> None:
+    try:
+        lgb.train({}, train_set, verbose_eval=5)  # xpd: removed-training-keyword
+    except OSError:
+        return
+    if hasattr(train_set, "num_data"):
+        lgb.train({}, train_set, fobj=None)  # xpd: removed-training-keyword
+        model.fit(data, labels, eval_set=[(data, labels)], eval_X=None)  # xpd: deprecated-eval-set
+    model.fit(data, labels, verbose=False)  # xpd: removed-training-keyword
+
+
+def positional_validation(
+    data: NDArray, labels: NDArray, valid: NDArray, valid_labels: NDArray
+) -> None:
+    lgb.LGBMRegressor().fit(
+        data, labels, None, None, [(valid, valid_labels)]
+    )  # xpd: deprecated-eval-set
+    lgb.LGBMRanker().fit(
+        data, labels, None, None, [5, 5], [(valid, valid_labels)]
+    )  # xpd: deprecated-eval-set
+
+
+def aliased_bagging(train_set: lgb.Dataset) -> None:
+    LGBMRegressor(bagging_fraction=0.8)  # xpd: bagging-without-frequency
+    lgb.train({"subsample": 0.8}, train_set)  # xpd: bagging-without-frequency
+    LGBMRegressor(subsample=0.8, boosting_type="gbdt")  # xpd: bagging-without-frequency
+
+
+def dart_with_callbacks(train_set: lgb.Dataset, data: NDArray, labels: NDArray) -> None:
+    lgb.train(
+        {"boosting": "dart", "boosting_type": "gbdt"}, train_set, callbacks=[lgb.early_stopping(3)]
+    )  # xpd: dart-early-stopping
+    lgb.LGBMRegressor(boosting_type="dart").fit(
+        data, labels, callbacks=[lgb.early_stopping(3)]
+    )  # xpd: dart-early-stopping
+
+
+def later_positional(train_set: lgb.Dataset, valid_set: lgb.Dataset) -> None:
+    lgb.train({"num_iterations": 50}, train_set, 200, [valid_set])  # xpd: boost-round-overridden

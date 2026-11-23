@@ -9,11 +9,16 @@ applies when `train()` or `cv()` creates the callback from a positive
 
 ## How to fix it
 
-Choose GBDT if you need LightGBM's early stopping. To keep DART, choose an
-iteration count using separate validation.
+Choose GBDT and supply held-out validation data and a metric if you need
+early stopping. A callback with no evaluation results raises `ValueError`
+before it checks for DART. To keep DART, choose the iteration count using
+separate validation and omit the early stopping callback.
 
-The rule checks literal native parameters and explicit LightGBM
-`early_stopping()` calls with positive literal patience in a callback list.
+The rule checks native parameters and explicit LightGBM callbacks on
+estimators built with a literal DART setting. The callback checks all
+boosting aliases for `"dart"`, even when another alias says `"gbdt"`.
+Make the change by hand because selecting a boosting strategy changes the
+model.
 
 [Early stopping API](https://lightgbm.readthedocs.io/en/v4.7.0/pythonapi/lightgbm.early_stopping.html) |
 [Training engine](https://lightgbm.readthedocs.io/en/v4.7.0/_modules/lightgbm/engine.html)

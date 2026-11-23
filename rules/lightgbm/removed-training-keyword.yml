@@ -1,6 +1,29 @@
 id: removed-training-keyword
 language: python
 severity: error
+message: LightGBM 4.0 removed this keyword from train() and cv(). Omit fobj=None or verbose_eval=False on the current API.
+rule:
+  all:
+    - {matches: lgb-noop-native-keyword}
+    - {matches: lgb-removable-argument}
+    - inside:
+        kind: argument_list
+        inside: {kind: call, has: {field: function, pattern: $F}}
+    - {not: {matches: lgb-expected-type-error}}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+fix:
+  template: ""
+  expandEnd: {regex: '^,$'}
+metadata:
+  since: '4.0'
+  fix: unsafe
+  holds:
+    F: {regex: '(^|\.)(train|cv)$'}
+---
+id: removed-training-keyword
+language: python
+severity: error
 message: LightGBM 4.0 removed the $KEY keyword from train() and cv(). Use callbacks for early stopping or logging, and params["objective"] for a custom objective.
 rule:
   kind: call
@@ -8,16 +31,14 @@ rule:
     - {has: {field: function, pattern: $F}}
     - has:
         field: arguments
-        has: {kind: keyword_argument, has: {field: name, pattern: $KEY, regex: '^(early_stopping_rounds|verbose_eval|fobj)$'}}
-    - {not: {matches: compatibility-check}}
-utils:
-  compatibility-check:
-    inside:
-      stopBy: end
-      any:
-        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
-        - {kind: try_statement, has: {kind: except_clause}}
-        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+        has:
+          kind: keyword_argument
+          all:
+            - {has: {field: name, pattern: $KEY, regex: '^(early_stopping_rounds|verbose_eval|fobj)$'}}
+            - not: {all: [{matches: lgb-noop-native-keyword}, {matches: lgb-removable-argument}]}
+    - {not: {matches: lgb-expected-type-error}}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
 metadata:
   since: '4.0'
   holds:
@@ -34,15 +55,9 @@ rule:
     - has:
         field: arguments
         has: {kind: keyword_argument, has: {field: name, regex: '^evals_result$'}}
-    - {not: {matches: compatibility-check}}
-utils:
-  compatibility-check:
-    inside:
-      stopBy: end
-      any:
-        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
-        - {kind: try_statement, has: {kind: except_clause}}
-        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+    - {not: {matches: lgb-expected-type-error}}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
 metadata:
   since: '4.0'
   holds:
@@ -51,28 +66,28 @@ metadata:
 id: removed-training-keyword
 language: python
 severity: error
-message: LightGBM 4.0 removed early_stopping_rounds from estimator fit(). Pass early_stopping(...) in callbacks and supply validation data.
+message: LightGBM 4.0 removed $KEY from estimator fit(). Use early_stopping(...) with validation data or log_evaluation(...) in callbacks as needed.
 rule:
   pattern: $MODEL.fit($$$ARGS)
   all:
     - has:
         field: arguments
-        has: {kind: keyword_argument, has: {field: name, regex: '^early_stopping_rounds$'}}
-    - {not: {matches: compatibility-check}}
-utils:
-  compatibility-check:
-    inside:
-      stopBy: end
-      any:
-        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
-        - {kind: try_statement, has: {kind: except_clause}}
-        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+        has:
+          kind: keyword_argument
+          all:
+            - {has: {field: name, pattern: $KEY, regex: '^(early_stopping_rounds|verbose)$'}}
+            - not:
+                all:
+                  - {has: {field: name, regex: '^verbose$'}}
+                  - {has: {field: value, kind: 'false'}}
+                  - {matches: lgb-removable-argument}
+    - {not: {matches: lgb-expected-type-error}}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
 metadata:
   since: '4.0'
   holds:
-    MODEL:
-      kind: call
-      has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}
+    MODEL: {matches: lgb-estimator}
 ---
 id: removed-training-keyword
 language: python
@@ -85,16 +100,35 @@ rule:
     - has:
         field: arguments
         has: {kind: keyword_argument, has: {field: name, pattern: $KEY, regex: '^(feature_name|categorical_feature)$'}}
-    - {not: {matches: compatibility-check}}
-utils:
-  compatibility-check:
-    inside:
-      stopBy: end
-      any:
-        - {kind: with_statement, regex: '^with [^\n]*(?:assertRaises|pytest\.(?:raises|warns))'}
-        - {kind: try_statement, has: {kind: except_clause}}
-        - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+    - {not: {matches: lgb-expected-type-error}}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-5]\.)["'']$'}}}
 metadata:
   since: '4.6'
   holds:
     F: {regex: '(^|\.)(train|cv)$'}
+---
+id: removed-training-keyword
+language: python
+severity: error
+message: LightGBM 4.0 removed verbose from estimator fit(). Omit verbose=False to keep evaluation logging off.
+rule:
+  kind: keyword_argument
+  all:
+    - {has: {field: name, regex: '^verbose$'}}
+    - {has: {field: value, kind: 'false'}}
+    - {matches: lgb-removable-argument}
+    - inside:
+        kind: argument_list
+        inside: {pattern: $MODEL.fit($$$ARGS)}
+    - {not: {matches: lgb-expected-type-error}}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["'']3\.["'']$'}}}
+fix:
+  template: ""
+  expandEnd: {regex: '^,$'}
+metadata:
+  since: '4.0'
+  fix: unsafe
+  holds:
+    MODEL: {matches: lgb-estimator}

@@ -1,0 +1,17 @@
+id: lgb-simple-eval-set
+language: python
+arguments: [DATA]
+rule:
+  kind: keyword_argument
+  all:
+    - {has: {field: name, regex: '^eval_set$'}}
+    - has:
+        field: value
+        matches: DATA
+        kind: list
+        has:
+          kind: tuple
+          all:
+            - {has: {nthChild: 1, kind: identifier}}
+            - {has: {nthChild: 2, kind: identifier}}
+    - not: {has: {stopBy: end, kind: comment}}

@@ -1,9 +1,9 @@
 """Supported LightGBM calls and nearby patterns that should stay quiet."""
 
 import lightgbm as lgb
-from pandas import DataFrame
 from lightgbm import LGBMRegressor, cv
 from numpy.typing import NDArray
+from pandas import DataFrame
 
 
 def native(train_set: lgb.Dataset, valid_set: lgb.Dataset) -> None:
@@ -37,7 +37,7 @@ def dart(train_set: lgb.Dataset, stop_factory: object) -> None:
 def rounds(train_set: lgb.Dataset, settings: dict[str, int]) -> None:
     lgb.train({}, train_set, num_boost_round=50)
     lgb.train({"n_estimators": 50}, train_set, num_boost_round=50)
-    cv({"num_iterations": 50, "n_estimators": 50}, train_set, num_boost_round=200)
+    cv({"num_iterations": 50, "n_estimators": 50}, train_set, num_boost_round=50)
     lgb.train({"n_estimators": 50, **settings}, train_set, num_boost_round=50)
 
 
@@ -60,3 +60,15 @@ def compatibility(train_set: lgb.Dataset, features: NDArray, labels: NDArray) ->
     model = LGBMRegressor()
     if lgb.__version__.startswith("4.6."):
         model.fit(features, labels, eval_set=[(features, labels)])
+
+
+def manual_lookalikes(train_set: lgb.Dataset, data: NDArray, labels: NDArray) -> None:
+    LGBMRegressor(subsample=0.8, boosting_type="goss")
+    LGBMRegressor(subsample=0.8, bagging_fraction=1.0)
+    cv({"subsample": 0.8, "bagging_freq": 1}, train_set)
+    cv({"subsample": 0.8, "data_sample_strategy": "goss"}, train_set)
+    cv({"boosting": "dart", "boosting": "gbdt"}, train_set, callbacks=[lgb.early_stopping(3)])
+    lgb.LGBMRegressor(boosting_type="gbdt").fit(data, labels, callbacks=[lgb.early_stopping(3)])
+    lgb.LGBMRegressor().fit(data, labels, None, None, None)
+    lgb.LGBMRanker().fit(data, labels, None, None, [5, 5])
+    lgb.train({"num_iterations": 50, "n_estimators": 200}, train_set, 50)

@@ -14,5 +14,9 @@ Supply the features in training order and keep the count check enabled.
 For a pandas DataFrame, `validate_features=True` also checks the feature
 names against training. The example assumes a pandas DataFrame.
 
+The unsafe fix sets the flag to `False`. This restores the check for a
+Booster, an estimator, or a CVBooster. Calls that relied on mismatched
+inputs may then raise until you fix their feature schema.
+
 [Prediction parameters](https://lightgbm.readthedocs.io/en/v4.7.0/Parameters.html#predict_disable_shape_check) |
 [Booster prediction API](https://lightgbm.readthedocs.io/en/v4.7.0/pythonapi/lightgbm.Booster.html#lightgbm.Booster.predict)

@@ -1,0 +1,25 @@
+id: lgb-before-api
+language: python
+arguments: [VERSION]
+rule:
+  inside:
+    stopBy: end
+    kind: block
+    inside:
+      kind: if_statement
+      field: consequence
+      has:
+        field: condition
+        pattern: $LIB.__version__.startswith($VERSION)
+        inside:
+          stopBy: end
+          kind: module
+          has:
+            kind: import_statement
+            any:
+              - has: {kind: dotted_name, regex: '^lightgbm$', pattern: $LIB}
+              - has:
+                  kind: aliased_import
+                  all:
+                    - {has: {field: name, regex: '^lightgbm$'}}
+                    - {has: {field: alias, pattern: $LIB}}

@@ -1,0 +1,13 @@
+id: lgb-dart-parameter
+language: python
+arguments: [KEY]
+utils:
+  boosting-key:
+    kind: pair
+    has: {field: key, matches: KEY}
+rule:
+  has:
+    all:
+      - {matches: boosting-key}
+      - {has: {field: value, regex: '^["'']dart["'']$'}}
+      - {not: {precedes: {stopBy: end, matches: boosting-key}}}

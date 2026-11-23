@@ -1,0 +1,11 @@
+id: lgb-noop-native-keyword
+language: python
+rule:
+  kind: keyword_argument
+  any:
+    - all:
+        - {has: {field: name, regex: '^fobj$'}}
+        - {has: {field: value, kind: 'none'}}
+    - all:
+        - {has: {field: name, regex: '^verbose_eval$'}}
+        - {has: {field: value, kind: 'false'}}

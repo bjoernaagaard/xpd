@@ -1,7 +1,7 @@
 id: bagging-without-frequency
 language: python
 severity: warning
-message: LightGBM leaves row bagging off when subsample_freq is zero or omitted. Set a positive subsample_freq to use subsample, or omit subsample to train on all rows.
+message: LightGBM leaves row bagging off at frequency zero. Set a positive subsample_freq to use the row fraction, or remove the fraction to train on all rows.
 rule:
   kind: call
   all:
@@ -10,10 +10,11 @@ rule:
         field: arguments
         all:
           - has:
-              kind: keyword_argument
               all:
-                - {has: {field: name, regex: '^subsample$'}}
+                - {matches: fraction}
                 - {has: {field: value, kind: float, regex: '^0?\.0*[1-9][0-9]*$'}}
+                - {not: {follows: {stopBy: end, matches: fraction}}}
+                - {not: {precedes: {stopBy: end, matches: fraction}}}
           - not:
               has:
                 any:
@@ -22,11 +23,23 @@ rule:
                   - kind: keyword_argument
                     has:
                       field: name
-                      regex: '^(bagging_fraction|sub_row|bagging|bagging_freq|(pos|neg)_(bagging_fraction|sub_row|subsample|bagging)|data_sample_strategy|boosting|boost|boosting_type|bagging_by_query)$'
+                      regex: '^((pos|neg)_(bagging_fraction|sub_row|subsample|bagging)|bagging_by_query)$'
                   - kind: keyword_argument
                     all:
-                      - {has: {field: name, regex: '^subsample_freq$'}}
+                      - {has: {field: name, regex: '^(bagging_freq|subsample_freq)$'}}
                       - {has: {field: value, not: {regex: '^0$'}}}
+                  - kind: keyword_argument
+                    all:
+                      - {has: {field: name, regex: '^(boosting|boost|boosting_type)$'}}
+                      - {has: {field: value, not: {regex: '^["''](gbdt|gbrt)["'']$'}}}
+                  - kind: keyword_argument
+                    all:
+                      - {has: {field: name, regex: '^data_sample_strategy$'}}
+                      - {has: {field: value, not: {regex: '^["'']bagging["'']$'}}}
+utils:
+  fraction:
+    kind: keyword_argument
+    has: {field: name, regex: '^(bagging_fraction|sub_row|subsample|bagging)$'}
 metadata:
   holds:
     MODEL: {regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}
@@ -34,7 +47,7 @@ metadata:
 id: bagging-without-frequency
 language: python
 severity: warning
-message: LightGBM leaves row bagging off when bagging_freq is zero or omitted. Set a positive bagging_freq to use bagging_fraction, or omit bagging_fraction to train on all rows.
+message: LightGBM leaves row bagging off at frequency zero. Set a positive bagging_freq to use the row fraction, or remove the fraction to train on all rows.
 rule:
   kind: call
   all:
@@ -45,20 +58,25 @@ rule:
           - not: {has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}
           - has:
               any:
-                - {nthChild: 1, matches: bagging-params}
+                - nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}
+                  matches: bagging-params
                 - kind: keyword_argument
                   all:
                     - {has: {field: name, regex: '^params$'}}
                     - {has: {field: value, matches: bagging-params}}
 utils:
+  fraction:
+    kind: pair
+    has: {field: key, regex: '^["''](bagging_fraction|sub_row|subsample|bagging)["'']$'}
   bagging-params:
     kind: dictionary
     all:
       - has:
-          kind: pair
           all:
-            - {has: {field: key, regex: '^["'']bagging_fraction["'']$'}}
+            - {matches: fraction}
             - {has: {field: value, kind: float, regex: '^0?\.0*[1-9][0-9]*$'}}
+            - {not: {follows: {stopBy: end, matches: fraction}}}
+            - {not: {precedes: {stopBy: end, matches: fraction}}}
       - not:
           has:
             any:
@@ -66,20 +84,19 @@ utils:
               - kind: pair
                 has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
               - kind: pair
-                has:
-                  field: key
-                  regex: '^["''](sub_row|subsample|bagging|subsample_freq|(pos|neg)_(bagging_fraction|sub_row|subsample|bagging)|data_sample_strategy|boosting|boost|boosting_type|bagging_by_query)["'']$'
+                has: {field: key, regex: '^["'']((pos|neg)_(bagging_fraction|sub_row|subsample|bagging)|bagging_by_query)["'']$'}
               - kind: pair
                 all:
-                  - {has: {field: key, regex: '^["'']bagging_(freq|fraction)["'']$'}}
-                  - not:
-                      any:
-                        - all:
-                            - {has: {field: key, regex: '^["'']bagging_freq["'']$'}}
-                            - {has: {field: value, regex: '^0$'}}
-                        - all:
-                            - {has: {field: key, regex: '^["'']bagging_fraction["'']$'}}
-                            - {has: {field: value, kind: float, regex: '^0?\.0*[1-9][0-9]*$'}}
+                  - {has: {field: key, regex: '^["''](bagging_freq|subsample_freq)["'']$'}}
+                  - {has: {field: value, not: {regex: '^0$'}}}
+              - kind: pair
+                all:
+                  - {has: {field: key, regex: '^["''](boosting|boost|boosting_type)["'']$'}}
+                  - {has: {field: value, not: {regex: '^["''](gbdt|gbrt)["'']$'}}}
+              - kind: pair
+                all:
+                  - {has: {field: key, regex: '^["'']data_sample_strategy["'']$'}}
+                  - {has: {field: value, not: {regex: '^["'']bagging["'']$'}}}
 metadata:
   holds:
     F: {regex: '(^|\.)(train|cv)$'}

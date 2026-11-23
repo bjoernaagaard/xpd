@@ -3,24 +3,122 @@ language: python
 severity: warning
 message: LightGBM 4.7 deprecated eval_set on estimator fit(). Pass both eval_X and eval_y, using parallel tuples for multiple validation sets.
 rule:
+  kind: keyword_argument
+  all:
+    - {matches: {lgb-simple-eval-set: {DATA: {pattern: '[($X, $Y)]'}}}}
+    - inside:
+        kind: argument_list
+        all:
+          - {not: {has: {matches: manual-migration}}}
+          - inside: {pattern: $MODEL.fit($$$ARGS)}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+utils:
+  manual-migration:
+    any:
+      - {kind: dictionary_splat}
+      - {kind: list_splat}
+      - {kind: keyword_argument, has: {field: name, regex: '^eval_[Xy]$'}}
+      - nthChild: {position: 5, ofRule: {not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: line_continuation}]}}}
+        not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: line_continuation}]}
+fix: 'eval_X=($X,), eval_y=($Y,)'
+metadata:
+  since: '4.7'
+  fix: unsafe
+  holds:
+    MODEL: {matches: lgb-estimator}
+---
+id: deprecated-eval-set
+language: python
+severity: warning
+message: LightGBM 4.7 deprecated eval_set on estimator fit(). Pass both eval_X and eval_y, using parallel tuples for multiple validation sets.
+rule:
   pattern: $MODEL.fit($$$ARGS)
   all:
     - has:
         field: arguments
-        has:
-          kind: keyword_argument
-          all:
-            - {has: {field: name, regex: '^eval_set$'}}
-            - {has: {field: value, not: {regex: '^\(*\s*None\s*\)*$'}}}
+        all:
+          - has:
+              kind: keyword_argument
+              all:
+                - {has: {field: name, regex: '^eval_set$'}}
+                - {has: {field: value, not: {regex: '^\(*\s*None\s*\)*$'}}}
+          - any:
+              - {not: {has: {matches: {lgb-simple-eval-set: {DATA: {pattern: '[($X, $Y)]'}}}}}}
+              - {has: {matches: manual-migration}}
     - not:
-        inside:
-          stopBy: end
-          any:
-            - {kind: with_statement, regex: '^with [^\n]*(?:assertWarns|pytest\.warns)'}
-            - {kind: if_statement, has: {field: condition, regex: '\b(?:__version__|hasattr)\b'}}
+        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+utils:
+  manual-migration:
+    any:
+      - {kind: dictionary_splat}
+      - {kind: list_splat}
+      - {kind: keyword_argument, has: {field: name, regex: '^eval_[Xy]$'}}
+      - nthChild: {position: 5, ofRule: {not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: line_continuation}]}}}
+        not: {any: [{kind: keyword_argument}, {kind: comment}, {kind: line_continuation}]}
+metadata:
+  since: '4.7'
+  holds:
+    MODEL: {matches: lgb-estimator}
+---
+id: deprecated-eval-set
+language: python
+severity: warning
+message: LightGBM 4.7 deprecated the positional eval_set argument on estimator fit(). Use eval_X and eval_y by keyword.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  all:
+    - has:
+        field: arguments
+        all:
+          - not: {has: {kind: list_splat}}
+          - has:
+              nthChild: {position: 5, ofRule: {not: {any: [{kind: keyword_argument}, {kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}}}
+              not:
+                any:
+                  - {kind: keyword_argument}
+                  - {kind: dictionary_splat}
+                  - {kind: comment}
+                  - {kind: line_continuation}
+                  - {regex: '^\(*\s*None\s*\)*$'}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
 metadata:
   since: '4.7'
   holds:
     MODEL:
-      kind: call
-      has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}
+      any:
+        - kind: call
+          has: {field: function, regex: '(^|\.)LGBM(Classifier|Regressor)$'}
+        - {kind: type, regex: '(^|\.)LGBM(Classifier|Regressor)$'}
+---
+id: deprecated-eval-set
+language: python
+severity: warning
+message: LightGBM 4.7 deprecated the positional eval_set argument on estimator fit(). Use eval_X and eval_y by keyword.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  all:
+    - has:
+        field: arguments
+        all:
+          - not: {has: {kind: list_splat}}
+          - has:
+              nthChild: {position: 6, ofRule: {not: {any: [{kind: keyword_argument}, {kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}}}
+              not:
+                any:
+                  - {kind: keyword_argument}
+                  - {kind: dictionary_splat}
+                  - {kind: comment}
+                  - {kind: line_continuation}
+                  - {regex: '^\(*\s*None\s*\)*$'}
+    - not:
+        matches: {lgb-before-api: {VERSION: {regex: '^["''](3\.|4\.[0-6]\.)["'']$'}}}
+metadata:
+  since: '4.7'
+  holds:
+    MODEL:
+      any:
+        - kind: call
+          has: {field: function, regex: '(^|\.)LGBM(Model|Ranker)$'}
+        - {kind: type, regex: '(^|\.)LGBM(Model|Ranker)$'}

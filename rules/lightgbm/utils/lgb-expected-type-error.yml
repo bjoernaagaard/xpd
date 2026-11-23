@@ -1,0 +1,19 @@
+id: lgb-expected-type-error
+language: python
+rule:
+  inside:
+    stopBy: end
+    kind: block
+    inside:
+      kind: with_statement
+      has:
+        kind: with_clause
+        has:
+          kind: with_item
+          has:
+            field: value
+            any:
+              - {pattern: pytest.raises(TypeError)}
+              - {pattern: "pytest.raises(TypeError, $$$OPTIONS)"}
+              - {pattern: $TEST.assertRaises(TypeError)}
+              - {pattern: "$TEST.assertRaisesRegex(TypeError, $MESSAGE)"}

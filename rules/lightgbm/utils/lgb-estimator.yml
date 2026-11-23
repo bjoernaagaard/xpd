@@ -1,0 +1,14 @@
+id: lgb-estimator
+language: python
+rule:
+  any:
+    - kind: call
+      has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}
+    - kind: type
+      regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'
+    - pattern: $CONSTRUCTOR($$$INIT).fit($$$FIT)
+      has:
+        field: function
+        has:
+          field: object
+          has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}

@@ -1,28 +1,58 @@
 id: predict-disabled-shape-check
 language: python
 severity: warning
-message: predict_disable_shape_check=True bypasses LightGBM's feature-count check in the prediction engine. Keep the check enabled and pass features in training order.
+message: This flag bypasses LightGBM's feature-count check in the prediction engine. Keep the check enabled and pass features in training order.
 rule:
   all:
-    - any:
-        - {pattern: $MODEL.predict($$$ARGS)}
-        - {pattern: $CLASSIFIER.predict_proba($$$ARGS)}
-    - has:
-        field: arguments
-        has:
-          kind: keyword_argument
-          all:
-            - {has: {field: name, regex: '^predict_disable_shape_check$'}}
-            - {has: {field: value, kind: 'true'}}
+    - {any: [{kind: "true"}, {kind: string}, {kind: parenthesized_expression}]}
+    - matches: enabled-shape-bypass
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: {field: name, regex: '^predict_disable_shape_check$'}
+        inside:
+          kind: argument_list
+          inside:
+            any:
+              - {pattern: '$ESTIMATOR.booster_.predict($$$ARGS)'}
+              - {pattern: '$RESULT["cvbooster"].predict($$$ARGS)'}
+              - {pattern: '$CLASSIFIER.predict_proba($$$ARGS)'}
+              - {pattern: '$MODEL.predict($$$ARGS)'}
+utils:
+  enabled-shape-bypass:
+    all:
+      - {regex: '^\(*\s*(True|["'']true["''])\s*\)*$'}
+      - not: {has: {stopBy: end, kind: comment}}
+fix: 'False'
 metadata:
+  fix: unsafe
   holds:
+    ESTIMATOR: {matches: lgb-estimator}
+    RESULT:
+      kind: call
+      all:
+        - {has: {field: function, regex: '(^|\.)cv$'}}
+        - has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              all:
+                - {has: {field: name, regex: '^return_cvbooster$'}}
+                - {has: {field: value, kind: 'true'}}
     MODEL:
       any:
         - kind: call
-          has: {field: function, regex: '(^|\.)(Booster|train|LGBM(Classifier|Model|Ranker|Regressor))$'}
-        - {kind: type, regex: '(^|\.)(Booster|LGBM(Classifier|Model|Ranker|Regressor))$'}
+          has: {field: function, regex: '(^|\.)(Booster|CVBooster|train)$'}
+        - {kind: type, regex: '(^|\.)(Booster|CVBooster)$'}
+        - {matches: lgb-estimator}
     CLASSIFIER:
       any:
         - kind: call
           has: {field: function, regex: '(^|\.)LGBMClassifier$'}
         - {kind: type, regex: '(^|\.)LGBMClassifier$'}
+        - pattern: $CONSTRUCTOR($$$INIT).fit($$$FIT)
+          has:
+            field: function
+            has:
+              field: object
+              has: {field: function, regex: '(^|\.)LGBMClassifier$'}

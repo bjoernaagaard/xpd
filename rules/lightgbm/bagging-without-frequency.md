@@ -14,7 +14,9 @@ native `train()` or `cv()` parameters. A frequency of one samples rows
 on every boosting round. If you meant to use all rows, remove the fraction.
 
 The rule checks simple decimal fractions and a zero or omitted frequency.
-It skips competing aliases, explicit sampling or boosting strategies and
-settings unpacked from another object.
+It recognizes a lone `bagging_fraction`, `subsample`, `sub_row` or
+`bagging` with default boosting or explicit GBDT. It skips competing
+fraction aliases, settings unpacked from another object, and strategies
+such as GOSS. Choose the intended sampling behavior by hand.
 
 [Bagging parameters](https://lightgbm.readthedocs.io/en/v4.7.0/Parameters.html#bagging_freq)

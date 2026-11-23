@@ -1,7 +1,7 @@
 id: dart-early-stopping
 language: python
 severity: warning
-message: LightGBM early stopping is unavailable in DART mode. Choose GBDT to use early stopping, or choose the DART round count with separate validation.
+message: LightGBM cannot stop early in DART mode. For early stopping, use GBDT with validation data and a metric. To keep DART, choose its round count separately.
 rule:
   kind: call
   all:
@@ -12,7 +12,7 @@ rule:
           - not: {has: {any: [{kind: dictionary_splat}, {kind: list_splat}]}}
           - has:
               any:
-                - {nthChild: 1, pattern: $PARAMS, matches: dart-params}
+                - {nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}, pattern: $PARAMS, matches: dart-params}
                 - kind: keyword_argument
                   all:
                     - {has: {field: name, regex: '^params$'}}
@@ -20,50 +20,26 @@ rule:
           - any:
               - has:
                   any:
-                    - {nthChild: 1, pattern: $PARAMS, matches: stopping-params}
+                    - {nthChild: {position: 1, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}, pattern: $PARAMS, matches: stopping-params}
                     - kind: keyword_argument
                       all:
                         - {has: {field: name, regex: '^params$'}}
                         - {has: {field: value, pattern: $PARAMS, matches: stopping-params}}
-              - has:
-                  kind: keyword_argument
-                  all:
-                    - {has: {field: name, regex: '^callbacks$'}}
-                    - has:
-                        field: value
-                        kind: list
-                        has:
-                          kind: call
-                          all:
-                            - {has: {field: function, pattern: $STOP, regex: '(^|\.)early_stopping$'}}
-                            - has:
-                                field: arguments
-                                has:
-                                  any:
-                                    - {nthChild: 1, kind: integer, regex: '^[1-9][0-9]*$'}
-                                    - kind: keyword_argument
-                                      all:
-                                        - {has: {field: name, regex: '^stopping_rounds$'}}
-                                        - {has: {field: value, kind: integer, regex: '^[1-9][0-9]*$'}}
+              - {has: {matches: {lgb-stopping-callback: {FUNCTION: {pattern: $STOP}}}}}
 utils:
   dart-params:
     kind: dictionary
     all:
-      - has:
-          kind: pair
-          all:
-            - {has: {field: key, regex: '^["''](boost|boosting(_type)?)["'']$'}}
-            - {has: {field: value, regex: '^["'']dart["'']$'}}
+      - any:
+          - {matches: {lgb-dart-parameter: {KEY: {regex: '^["'']boosting["'']$'}}}}
+          - {matches: {lgb-dart-parameter: {KEY: {regex: '^["'']boosting_type["'']$'}}}}
+          - {matches: {lgb-dart-parameter: {KEY: {regex: '^["'']boost["'']$'}}}}
       - not:
           has:
             any:
               - {kind: dictionary_splat}
               - kind: pair
                 has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
-              - kind: pair
-                all:
-                  - {has: {field: key, regex: '^["''](boost|boosting(_type)?)["'']$'}}
-                  - {has: {field: value, not: {regex: '^["'']dart["'']$'}}}
   stopping-params:
     kind: dictionary
     all:
@@ -82,3 +58,29 @@ metadata:
   holds:
     F: {regex: '(^|\.)(train|cv)$'}
     STOP: {regex: '(^|\.)early_stopping$'}
+---
+id: dart-early-stopping
+language: python
+severity: warning
+message: LightGBM cannot stop early in DART mode. For early stopping, use GBDT with validation data and a metric. To keep DART, choose its round count separately.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  has:
+    field: arguments
+    has: {matches: {lgb-stopping-callback: {FUNCTION: {pattern: $STOP}}}}
+metadata:
+  holds:
+    STOP: {regex: '(^|\.)early_stopping$'}
+    MODEL:
+      kind: call
+      all:
+        - {has: {field: function, regex: '(^|\.)LGBM(Classifier|Model|Ranker|Regressor)$'}}
+        - has:
+            field: arguments
+            all:
+              - {not: {has: {kind: dictionary_splat}}}
+              - has:
+                  kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^(boosting|boost|boosting_type)$'}}
+                    - {has: {field: value, regex: '^["'']dart["'']$'}}

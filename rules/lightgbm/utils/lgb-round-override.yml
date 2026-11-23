@@ -1,0 +1,67 @@
+id: lgb-round-override
+language: python
+arguments: [FUNCTION, ROUND_ARGUMENT, ROUND_PARAM]
+utils:
+  positional:
+    not: {any: [{kind: keyword_argument}, {kind: dictionary_splat}, {kind: comment}, {kind: line_continuation}]}
+  positive-int:
+    kind: integer
+    regex: '^[1-9][0-9]*$'
+  primary:
+    kind: pair
+    has: {field: key, regex: '^["'']num_iterations["'']$'}
+  iteration-key:
+    kind: pair
+    has:
+      field: key
+      regex: '^["''](num_iterations?|n_iter|num_trees?|num_rounds?|nrounds|num_boost_round|n_estimators|max_iter)["'']$'
+  override-value:
+    all:
+      - {matches: positive-int}
+      - {matches: ROUND_PARAM}
+  round-params:
+    kind: dictionary
+    all:
+      - not:
+          has:
+            any:
+              - {kind: dictionary_splat}
+              - kind: pair
+                has: {field: key, not: {regex: '^("[a-zA-Z0-9_]+"|''[a-zA-Z0-9_]+'')$'}}
+      - has:
+          any:
+            - all:
+                - {matches: primary}
+                - {has: {field: value, matches: override-value}}
+                - {not: {follows: {stopBy: end, matches: primary}}}
+                - {not: {precedes: {stopBy: end, matches: primary}}}
+            - all:
+                - {matches: iteration-key}
+                - {has: {field: value, matches: override-value}}
+                - {not: {follows: {stopBy: end, matches: iteration-key}}}
+                - {not: {precedes: {stopBy: end, matches: iteration-key}}}
+rule:
+  all:
+    - any:
+        - kind: keyword_argument
+          all:
+            - {has: {field: name, regex: '^num_boost_round$'}}
+            - {has: {field: value, all: [{matches: positive-int}, {matches: ROUND_ARGUMENT}]}}
+        - all:
+            - {matches: positional}
+            - {matches: positive-int}
+            - {matches: ROUND_ARGUMENT}
+            - nthChild: {position: 3, ofRule: {matches: positional}}
+    - inside:
+        kind: argument_list
+        all:
+          - {not: {has: {any: [{kind: list_splat}, {kind: dictionary_splat}]}}}
+          - has:
+              any:
+                - nthChild: {position: 1, ofRule: {matches: positional}}
+                  matches: round-params
+                - kind: keyword_argument
+                  all:
+                    - {has: {field: name, regex: '^params$'}}
+                    - {has: {field: value, matches: round-params}}
+          - inside: {kind: call, has: {field: function, matches: FUNCTION}}
