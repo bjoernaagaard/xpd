@@ -215,6 +215,7 @@ pub(crate) fn missing(
             let message = check.report(installed, configured, calls.get(pack, check))?;
             Some(Issue {
                 id: RuleId::qualified(&pack.module, &check.id),
+                category: crate::category::RuleCategory::Default(pack.default_category),
                 file: file.clone(),
                 position: None,
                 severity: SEVERITY,

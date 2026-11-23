@@ -1,3 +1,18 @@
+defaultCategory: models
+categoryPrefixes:
+  linearmodels.datasets: data
+  linearmodels.iv.covariance: statistics
+  linearmodels.iv.data: data
+  linearmodels.iv.gmm: statistics
+  linearmodels.panel.covariance: statistics
+  linearmodels.panel.data: data
+  linearmodels.shared.covariance: statistics
+  linearmodels.shared.hypotheses: statistics
+  linearmodels.shared.io: data
+  linearmodels.shared.linalg: numerics
+  linearmodels.system.covariance: statistics
+  linearmodels.system.gmm: statistics
+
 # The linearmodels pack, for files that import linearmodels. Every other .yml file in this
 # folder is a rule.
 

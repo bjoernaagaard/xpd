@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
 use ast_grep_config::UNUSED_SUPPRESSION_ID;
-use pack_names::{OWN_PACK, is_module_name};
+use pack_names::{OWN_PACK, is_module_name, public_module};
 use serde_json::Value;
 
 #[path = "src/pack_names.rs"]
@@ -376,6 +376,7 @@ fn discovery_source(out: &Path, docs: &BTreeMap<String, BTreeMap<String, String>
                 .cloned(),
         );
     }
+    write(&out.join("rule_modules.rs"), &rule_modules(&entries)?)?;
     entries.extend(playbooks(docs)?);
     for (package, sections) in docs {
         for (id, doc) in sections {
@@ -424,6 +425,27 @@ fn discovery_source(out: &Path, docs: &BTreeMap<String, BTreeMap<String, String>
     write(&out.join("records.rs"), &records)?;
     vectors_source(out, &entries)?;
     search_source(out, &entries)
+}
+
+/// Keep the reverse links available to rule commands without decoding the API catalog.
+fn rule_modules(entries: &[serde_json::Value]) -> Result<String> {
+    let mut links = BTreeMap::<&str, BTreeSet<(&str, &str)>>::new();
+    for entry in entries.iter().filter(|entry| entry["kind"] == "symbol") {
+        let package = entry["package"].as_str().context("entry package")?;
+        let symbol = entry["name"].as_str().context("entry name")?;
+        let module = public_module(package, symbol);
+        for rule in entry["rules"].as_array().into_iter().flatten() {
+            let id = rule.as_str().context("qualified guard rule ID")?;
+            links.entry(id).or_default().insert((package, module));
+        }
+    }
+    let mut source = String::from("&[\n");
+    for (id, modules) in links {
+        let modules: Vec<_> = modules.into_iter().collect();
+        writeln!(source, "({id:?}, &{modules:?}),")?;
+    }
+    source.push(']');
+    Ok(source)
 }
 
 /// The playbooks under `rules/xpd/playbooks`, each as a recipe of the `xpd` package named

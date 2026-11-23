@@ -1,3 +1,10 @@
+defaultCategory: data
+categoryPrefixes:
+  polars.config: workflow
+  polars.ml.torch: workflow
+  polars.plugins: workflow
+  polars.testing: evaluation
+
 aliases:
   pl: polars
 packages: []

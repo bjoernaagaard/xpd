@@ -5,6 +5,7 @@ mod animate;
 mod author;
 mod cases;
 mod catalog;
+mod category;
 mod check;
 mod cli;
 mod commands;

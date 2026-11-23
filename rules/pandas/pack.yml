@@ -1,3 +1,12 @@
+defaultCategory: data
+categoryPrefixes:
+  pandas.compat: workflow
+  pandas.core.config_init: workflow
+  pandas.core.nanops: statistics
+  pandas.core.window: statistics
+  pandas.plotting: visualization
+  pandas.testing: evaluation
+
 # The pandas pack. Every other .yml file in this folder is a rule.
 
 # Short names a fix may write, each with the module it must be imported as. A fix that writes

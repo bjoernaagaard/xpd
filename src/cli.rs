@@ -12,8 +12,9 @@ use clap_complete::Generator;
 use serde_json::Value;
 
 use crate::author;
-use crate::catalog::{self, Catalog, Filters};
-use crate::check::{FixMode, lint};
+use crate::catalog::{Catalog, Filters};
+use crate::category::{Categories, Category};
+use crate::check::FixMode;
 use crate::fix_safety::Applicability;
 use crate::graph::Graph;
 use crate::index::{self, Kind};
@@ -28,6 +29,7 @@ use crate::skills;
 use crate::source;
 use crate::style::Style;
 use crate::venv;
+use crate::workspace::Workspace;
 
 /// The agent skill that `xpd skill` prints.
 const SKILL: &str = include_str!("../skills/xpd/SKILL.md");
@@ -80,6 +82,9 @@ struct IndexArgs {
     /// The source's license file, which names the license of each recipe.
     #[arg(long, requires = "examples")]
     license: Option<PathBuf>,
+    /// Report each public module's category and source on stderr.
+    #[arg(long)]
+    category_report: bool,
 }
 
 #[derive(Debug, clap::Args)]
@@ -97,9 +102,89 @@ struct RulesOptions {
     /// List only the rules of this severity and above: error, warning, info or hint.
     #[arg(long, value_parser = Severity::parse)]
     severity: Option<Severity>,
+    /// List only rules in this category, and show their categories.
+    #[arg(long, value_enum)]
+    category: Option<Category>,
+    /// Show the categories of each rule.
+    #[arg(long)]
+    categories: bool,
     /// Output format. Default: text on a terminal, json otherwise.
     #[arg(long, value_enum)]
     format: Option<Format>,
+}
+
+#[derive(Debug, clap::Args)]
+struct FindArgs {
+    /// The task, in your own words, such as "grouped regression".
+    query: Option<String>,
+    /// Search only this library, by its Python import name, such as `sklearn`.
+    #[arg(long)]
+    package: Option<String>,
+    /// Search only symbols, rules or recipes.
+    #[arg(long, value_enum)]
+    kind: Option<Kind>,
+    /// Search only this category.
+    #[arg(long, value_enum, conflicts_with_all = ["check", "write_vectors"])]
+    category: Option<Category>,
+    /// Maximum results per kind (defaults to 5 symbols, 3 rules and 3 recipes).
+    #[arg(long)]
+    limit: Option<usize>,
+    /// Print text, or JSON with `symbols`, `rules` and `recipes`.
+    #[arg(long, value_enum, default_value = "text")]
+    format: Format,
+    /// Additional index generated from local source.
+    #[arg(long)]
+    index: Option<PathBuf>,
+    /// Run real discovery questions and fail if an expected entry misses the top five.
+    #[arg(long, conflicts_with = "query")]
+    check: Option<PathBuf>,
+    /// Embed the index records that are new or whose text changed, and write all vectors to
+    /// this file, which is indexes/vectors.bin in the repository. Remove the file and build
+    /// again to embed every record.
+    #[arg(long, hide = true, conflicts_with_all = ["query", "check", "index"])]
+    write_vectors: Option<PathBuf>,
+}
+
+#[derive(Debug, clap::Args)]
+struct CheckArgs {
+    /// Files or directories (directories respect .gitignore).
+    #[arg(default_value = ".")]
+    paths: Vec<PathBuf>,
+    /// Output format. Default: text on a terminal, json otherwise.
+    #[arg(long, value_enum)]
+    format: Option<CheckFormat>,
+    #[command(flatten)]
+    fixes: FixArgs,
+    /// Run only this package or rule, as `pandas`, `chained-assignment` or
+    /// `pandas/chained-assignment`. Repeat it to name several.
+    #[arg(long = "rule", value_name = "NAME")]
+    rules: Vec<String>,
+    /// Run only the rules of this severity and above: error, warning, info or hint.
+    #[arg(long, value_parser = Severity::parse)]
+    severity: Option<Severity>,
+    /// Exit 1 when an issue of this severity or above is left: error, warning, info or hint.
+    #[arg(long, value_parser = Severity::parse, default_value = "error")]
+    fail_on: Severity,
+    /// Count remaining issues by category on stderr. An issue can count in several categories.
+    #[arg(long)]
+    category_summary: bool,
+    /// The project file to read instead of the nearest sgconfig.yml.
+    #[arg(short, long)]
+    config: Option<PathBuf>,
+}
+
+#[derive(Debug, clap::Args)]
+struct FixArgs {
+    /// Apply safe fixes, and report what is left.
+    #[arg(long)]
+    fix: bool,
+    /// Review each proposed fix before writing it.
+    #[arg(long, short = 'i', requires = "fix")]
+    review: bool,
+    /// Also count unsafe fixes, which may change behavior: apply them with --fix, or mark
+    /// them as fixable without it.
+    #[arg(long)]
+    unsafe_fixes: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -107,33 +192,7 @@ enum Cmd {
     /// Check rule examples and review diagnostic and fix snapshots.
     Test(crate::cases::Options),
     /// Find libraries and rules for a task, without importing Python.
-    Find {
-        /// The task, in your own words, such as "grouped regression".
-        query: Option<String>,
-        /// Search only this library, by its Python import name, such as `sklearn`.
-        #[arg(long)]
-        package: Option<String>,
-        /// Search only symbols, rules or recipes.
-        #[arg(long, value_enum)]
-        kind: Option<Kind>,
-        /// Maximum results per kind (defaults to 5 symbols, 3 rules and 3 recipes).
-        #[arg(long)]
-        limit: Option<usize>,
-        /// Print text, or JSON with `symbols`, `rules` and `recipes`.
-        #[arg(long, value_enum, default_value = "text")]
-        format: Format,
-        /// Additional index generated from local source.
-        #[arg(long)]
-        index: Option<PathBuf>,
-        /// Run real discovery questions and fail if an expected entry misses the top five.
-        #[arg(long, conflicts_with = "query")]
-        check: Option<PathBuf>,
-        /// Embed the index records that are new or whose text changed, and write all vectors to
-        /// this file, which is indexes/vectors.bin in the repository. Remove the file and build
-        /// again to embed every record.
-        #[arg(long, hide = true, conflicts_with_all = ["query", "check", "index"])]
-        write_vectors: Option<PathBuf>,
-    },
+    Find(FindArgs),
     /// Show a public symbol's parameters as the source writes them, with its summary, members
     /// and guarding rules.
     ///
@@ -147,6 +206,9 @@ enum Cmd {
     Api {
         /// A dotted name, such as `pandas.DataFrame` or `pandas.DataFrame.merge`.
         name: String,
+        /// Show the entry's categories.
+        #[arg(long)]
+        categories: bool,
         /// Print text, or JSON with the entry's parameters, members and rules.
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
@@ -170,37 +232,7 @@ enum Cmd {
   xpd check . --fix
   xpd check . --fix --unsafe-fixes")]
     #[command(visible_alias = "scan")]
-    Check {
-        /// Files or directories (directories respect .gitignore).
-        #[arg(default_value = ".")]
-        paths: Vec<PathBuf>,
-        /// Output format. Default: text on a terminal, json otherwise.
-        #[arg(long, value_enum)]
-        format: Option<CheckFormat>,
-        /// Apply safe fixes, and report what is left.
-        #[arg(long)]
-        fix: bool,
-        /// Review each proposed fix before writing it.
-        #[arg(long, short = 'i', requires = "fix")]
-        review: bool,
-        /// Also count unsafe fixes, which may change behavior: apply them with --fix, or mark
-        /// them as fixable without it.
-        #[arg(long)]
-        unsafe_fixes: bool,
-        /// Run only this package or rule, as `pandas`, `chained-assignment` or
-        /// `pandas/chained-assignment`. Repeat it to name several.
-        #[arg(long = "rule", value_name = "NAME")]
-        rules: Vec<String>,
-        /// Run only the rules of this severity and above: error, warning, info or hint.
-        #[arg(long, value_parser = Severity::parse)]
-        severity: Option<Severity>,
-        /// Exit 1 when an issue of this severity or above is left: error, warning, info or hint.
-        #[arg(long, value_parser = Severity::parse, default_value = "error")]
-        fail_on: Severity,
-        /// The project file to read instead of the nearest sgconfig.yml.
-        #[arg(short, long)]
-        config: Option<PathBuf>,
-    },
+    Check(CheckArgs),
     /// Agent hook: reads an event's JSON on stdin, lints the files an edit changed, and holds a
     /// turn that leaves errors or warnings.
     ///
@@ -339,72 +371,22 @@ enum Cmd {
 pub fn run() -> ExitCode {
     let default_format = terminal_format();
     match Cli::parse().cmd {
-        Cmd::Check {
-            paths,
-            format,
-            fix,
-            review,
-            unsafe_fixes,
-            rules,
-            severity,
-            fail_on,
-            config,
-        } => {
-            let format = format.unwrap_or(match default_format {
-                Format::Text => CheckFormat::Text,
-                Format::Json => CheckFormat::Json,
-            });
-            let allowed = if unsafe_fixes {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-            let fixes = if review {
-                FixMode::Review(allowed)
-            } else {
-                FixMode::Apply(fix.then_some(allowed))
-            };
-            command_result(check(
-                &paths,
-                format,
-                fixes,
-                allowed,
-                &Filters { rules, severity },
-                fail_on,
-                config.as_deref(),
-            ))
-        }
-        Cmd::Find {
-            query,
-            package,
-            kind,
-            limit,
-            format,
-            index,
-            check,
-            write_vectors,
-        } => unit_result((|| {
-            if let Some(path) = write_vectors {
-                index::write_vectors(&path)
-            } else if let Some(path) = check {
-                check_ranking(index.as_deref(), &path)
-            } else {
-                let entries = index::load_for(index.as_deref(), package.as_deref())?;
-                let query = query.context("provide a task query or --check")?;
-                let found = index::find(&entries, &query, package.as_deref(), kind, limit);
-                print_matches(found, kind, format)
-            }
-        })()),
+        Cmd::Check(args) => command_result(check(args, default_format)),
+        Cmd::Find(args) => unit_result(find(args)),
         Cmd::Api {
             name,
             format,
             index,
+            categories,
         } => unit_result((|| {
             let package = name.split_once('.').map(|(package, _)| package);
             let entries = index::load_for(index.as_deref(), package)?;
             let mut entry =
                 index::api(&entries, &name)?.with_context(|| format!("no entry named {name}"))?;
             entry.keywords.clear();
+            if categories {
+                entry.categories = entries.entry_categories(&Categories::current()?, &entry);
+            }
             print_entries(&[entry], format, Detail::Full)
         })()),
         Cmd::Index(args) => unit_result(refresh_index(args)),
@@ -434,6 +416,38 @@ pub fn run() -> ExitCode {
         Cmd::New(args) => command_result(author::run(args)),
         Cmd::Commands => print_out(&format!("{}\n", crate::commands::to_json(Cli::command()))),
     }
+}
+
+fn find(args: FindArgs) -> Result<()> {
+    let FindArgs {
+        query,
+        package,
+        kind,
+        category,
+        limit,
+        format,
+        index,
+        check,
+        write_vectors,
+    } = args;
+    if let Some(path) = write_vectors {
+        return index::write_vectors(&path);
+    }
+    if let Some(path) = check {
+        return check_ranking(index.as_deref(), &path);
+    }
+    let entries = index::load_for(index.as_deref(), package.as_deref())?;
+    let query = query.context("provide a task query or --check")?;
+    let policy = category.map(|_| Categories::current()).transpose()?;
+    let found = index::find_in_category(
+        &entries,
+        &query,
+        package.as_deref(),
+        kind,
+        limit,
+        policy.as_ref().zip(category),
+    );
+    print_matches(found, kind, format)
 }
 
 fn terminal_format() -> Format {
@@ -510,10 +524,13 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
         examples,
         source_url: url,
         license,
+        category_report,
     } = args;
     let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
     let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
+    let categories = Categories::current()?;
     let mut index = index::generate(&source, &package, &version)?;
+    index.classify(&categories);
     if let (Some(root), Some(url), Some(license)) =
         (examples.as_deref(), url.as_deref(), license.as_deref())
     {
@@ -552,6 +569,20 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
         }
     }
     std::fs::write(&output, serde_json::to_vec(&index)?)?;
+    if category_report {
+        let mut counts = std::collections::BTreeMap::new();
+        for (module, classification) in &index.categories.module_categories {
+            eprintln!("{module}: {classification}");
+            *counts.entry(classification.category).or_insert(0) += 1;
+        }
+        eprintln!(
+            "xpd: {} public modules",
+            index.categories.module_categories.len()
+        );
+        for (category, count) in counts {
+            eprintln!("  {category}: {count}");
+        }
+    }
     println!(
         "{package} {version}: {} entries written to {}",
         index.entries.len(),
@@ -567,6 +598,8 @@ fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
         config,
         rules,
         severity,
+        category,
+        categories,
     } = options;
     let format = format.unwrap_or(default);
     let filters = Filters { rules, severity };
@@ -583,32 +616,97 @@ fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
         )?
     };
     catalog.select(&filters)?;
+    let project = catalog
+        .project
+        .as_ref()
+        .map(|project| project.config.as_path());
+    let policy = (categories || category.is_some())
+        .then(|| Categories::load(project))
+        .transpose()?;
     let entries = catalog.entries();
+    let selected = entries.iter().filter_map(|entry| {
+        let labels = policy.as_ref().map(|policy| entry.categories(policy));
+        category
+            .is_none_or(|wanted| {
+                labels
+                    .as_ref()
+                    .is_some_and(|labels| labels.contains(&wanted))
+            })
+            .then_some((entry, labels))
+    });
     match format {
         Format::Json => {
-            let rules: Vec<Value> = entries.iter().map(catalog::Entry::to_json).collect();
+            let rules = selected
+                .map(|(entry, labels)| {
+                    let mut value = entry.to_json();
+                    if let Some(labels) = labels {
+                        value["categories"] = serde_json::json!(labels);
+                    }
+                    value
+                })
+                .collect();
             println!("{}", Value::Array(rules));
         }
         Format::Text => {
-            for entry in &entries {
-                println!("{}", entry.line());
+            for (entry, labels) in selected {
+                let line = entry.line();
+                if let Some(labels) = labels {
+                    println!("{line} [{}]", category_list(&labels));
+                } else {
+                    println!("{line}");
+                }
             }
         }
     }
     Ok(ExitCode::SUCCESS)
 }
 
-/// `allowed` is the fix level that `[*]` and the summary count as fixable.
-fn check(
-    paths: &[PathBuf],
-    format: CheckFormat,
-    fixes: FixMode,
-    allowed: Applicability,
-    filters: &Filters,
-    fail_on: Severity,
-    config: Option<&Path>,
-) -> Result<ExitCode> {
-    let report = lint(paths, fixes, filters, config)?;
+fn check(args: CheckArgs, default_format: Format) -> Result<ExitCode> {
+    let CheckArgs {
+        paths,
+        format,
+        fixes: FixArgs {
+            fix,
+            review,
+            unsafe_fixes,
+        },
+        rules,
+        severity,
+        fail_on,
+        config,
+        category_summary,
+    } = args;
+    let format = format.unwrap_or(match default_format {
+        Format::Text => CheckFormat::Text,
+        Format::Json => CheckFormat::Json,
+    });
+    let allowed = if unsafe_fixes {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+    let fixes = if review {
+        FixMode::Review(allowed)
+    } else {
+        FixMode::Apply(fix.then_some(allowed))
+    };
+    let workspace = Workspace::open(
+        std::env::current_dir()?,
+        config.as_deref(),
+        &Filters { rules, severity },
+    )?;
+    let policy = category_summary
+        .then(|| {
+            Categories::load(
+                workspace
+                    .catalog
+                    .project
+                    .as_ref()
+                    .map(|project| project.config.as_path()),
+            )
+        })
+        .transpose()?;
+    let report = workspace.check(&paths, fixes)?;
     match format {
         CheckFormat::Json => println!("{}", report.to_json(allowed)),
         CheckFormat::Sarif => println!("{}", report.sarif()),
@@ -622,6 +720,21 @@ fn check(
                 println!("{}", i.line(allowed));
             }
             eprintln!("xpd: {}", report.summary(allowed));
+        }
+    }
+    if let Some(policy) = policy {
+        let mut counts = std::collections::BTreeMap::new();
+        for issue in &report.issues {
+            for category in issue.category.resolve(&policy, &issue.id) {
+                *counts.entry(category).or_insert(0) += 1;
+            }
+        }
+        eprintln!(
+            "xpd: {} remaining issues by category (categories can overlap)",
+            report.issues.len()
+        );
+        for (category, count) in counts {
+            eprintln!("  {category}: {count}");
         }
     }
     if report.skipped > 0 {
@@ -683,6 +796,14 @@ fn first_paragraph(summary: &str) -> String {
     summary.split("\n\n").next().unwrap_or_default().to_owned()
 }
 
+fn category_list(categories: &std::collections::BTreeSet<Category>) -> String {
+    categories
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn print_entries(entries: &[index::Entry], format: Format, detail: Detail) -> Result<()> {
     match format {
         Format::Json => println!("{}", serde_json::to_string(entries)?),
@@ -725,6 +846,9 @@ fn print_entries(entries: &[index::Entry], format: Format, detail: Detail) -> Re
                     ),
                     entry.summary
                 );
+                if !entry.categories.is_empty() {
+                    println!("Categories: {}", category_list(&entry.categories));
+                }
                 if matches!(detail, Detail::Full)
                     && let Some(recipe) = &entry.recipe
                 {

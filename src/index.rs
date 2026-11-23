@@ -6,8 +6,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
+use crate::category::{Categories, Category, IndexCategories};
 use crate::embed::Model;
 use crate::outline::{self, Callable, ParameterText};
+use crate::pack_names::public_module;
 use crate::search::{
     DIMENSIONS, TAG_ARRAY, TAG_FALSE, TAG_NULL, TAG_OBJECT, TAG_STRING, TAG_TRUE, VECTORS_HEADER,
     tokens,
@@ -87,6 +89,12 @@ pub(crate) struct Entry {
     pub(crate) rules: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) recipe: Option<crate::recipe::Recipe>,
+    #[serde(
+        default,
+        skip_deserializing,
+        skip_serializing_if = "BTreeSet::is_empty"
+    )]
+    pub(crate) categories: BTreeSet<Category>,
 }
 
 /// The version of an index file. Version 2 records which members of a class are properties, so
@@ -101,6 +109,8 @@ pub(crate) struct Index {
     pub(crate) entries: Vec<Entry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) recipes: Option<crate::recipe::Stats>,
+    #[serde(flatten)]
+    pub(crate) categories: IndexCategories,
 }
 
 /// A function or method whose parameters an entry takes. `receiver` says that Python binds its
@@ -276,6 +286,7 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
             members,
             rules: entry.rules,
             recipe: None,
+            categories: BTreeSet::new(),
         });
     }
     let mut index = Index {
@@ -284,15 +295,34 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         version: resolved.version,
         entries,
         recipes: None,
+        categories: IndexCategories::default(),
     };
     ensure!(!index.entries.is_empty(), "Griffe found no public symbols");
     attach_rules(&mut index.entries, &[package])?;
     Ok(index)
 }
 
+impl Index {
+    pub(crate) fn classify(&mut self, categories: &Categories) {
+        self.categories.default_category = categories.default_for(&self.package);
+        for entry in self
+            .entries
+            .iter()
+            .filter(|entry| entry.kind == Kind::Symbol)
+        {
+            let module = entry.module();
+            self.categories
+                .module_categories
+                .entry(module.to_owned())
+                .or_insert_with(|| categories.module(&self.package, module));
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Library {
     local: Option<Vec<Entry>>,
+    overlay: Option<(String, IndexCategories)>,
     /// Loaded on the first search, so `api` never loads it. `None` inside when it is absent.
     model: OnceCell<Option<Model>>,
 }
@@ -329,8 +359,87 @@ impl Library {
     }
 }
 
+impl Library {
+    fn portable_policy(&self, categories: &Categories, package: &str) -> Option<&IndexCategories> {
+        self.overlay
+            .as_ref()
+            .filter(|(name, _)| name == package && !categories.has_policy(package))
+            .map(|(_, policy)| policy)
+    }
+
+    fn module_category(&self, categories: &Categories, package: &str, module: &str) -> Category {
+        if let Some(policy) = self.portable_policy(categories, package) {
+            return policy.module_categories.get(module).map_or_else(
+                || policy.default_category.unwrap_or_default(),
+                |row| row.category,
+            );
+        }
+        categories.module(package, module).category
+    }
+
+    fn package_default(&self, categories: &Categories, package: &str) -> Category {
+        self.portable_policy(categories, package)
+            .and_then(|policy| policy.default_category)
+            .or_else(|| categories.default_for(package))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn entry_categories(
+        &self,
+        categories: &Categories,
+        entry: &Entry,
+    ) -> BTreeSet<Category> {
+        match entry.kind {
+            Kind::Symbol => {
+                BTreeSet::from([self.module_category(categories, &entry.package, entry.module())])
+            }
+            Kind::Rule => {
+                if self
+                    .overlay
+                    .as_ref()
+                    .is_some_and(|(package, _)| package == &entry.package)
+                    && !RECORDS
+                        .iter()
+                        .any(|record| record.kind == Kind::Rule && record.name == entry.name)
+                {
+                    BTreeSet::from([self.package_default(categories, &entry.package)])
+                } else {
+                    categories.bundled_rule(&entry.package, &entry.name)
+                }
+            }
+            Kind::Recipe => {
+                let mut found = BTreeSet::new();
+                if let Some(recipe) = &entry.recipe {
+                    for name in &recipe.symbols {
+                        if let Ok(Some(symbol)) = api(self, name)
+                            && symbol.kind == Kind::Symbol
+                        {
+                            found.insert(self.module_category(
+                                categories,
+                                &symbol.package,
+                                symbol.module(),
+                            ));
+                        }
+                    }
+                    if recipe.is_playbook() {
+                        for id in &entry.rules {
+                            if let Some((package, _)) = id.split_once('/') {
+                                found.extend(categories.bundled_rule(package, id));
+                            }
+                        }
+                    }
+                }
+                if found.is_empty() {
+                    found.insert(self.package_default(categories, &entry.package));
+                }
+                found
+            }
+        }
+    }
+}
+
 pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
-    let local = if let Some(path) = extra {
+    let (local, overlay) = if let Some(path) = extra {
         let index: Index = serde_json::from_str(&std::fs::read_to_string(path)?)?;
         ensure!(
             index.schema_version == INDEX_SCHEMA,
@@ -358,12 +467,13 @@ pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
             .map(Stored::entry)
             .collect::<std::result::Result<Vec<Entry>, _>>()?;
         entries.extend(index.entries);
-        Some(entries)
+        (Some(entries), Some((index.package, index.categories)))
     } else {
-        None
+        (None, None)
     };
     Ok(Library {
         local,
+        overlay,
         model: OnceCell::new(),
     })
 }
@@ -379,11 +489,26 @@ pub(crate) fn load_for(extra: Option<&Path>, package: Option<&str>) -> Result<Li
     );
     Ok(Library {
         local: Some(index.entries),
+        overlay: None,
         model: OnceCell::new(),
     })
 }
 
 impl Entry {
+    fn module(&self) -> &str {
+        let owner = if matches!(
+            self.callable,
+            Some(CallableKind::Method | CallableKind::Property)
+        ) {
+            self.name
+                .rsplit_once('.')
+                .map_or(self.name.as_str(), |(class, _)| class)
+        } else {
+            &self.name
+        };
+        public_module(&self.package, owner)
+    }
+
     /// Whether this is one of xpd's own recipes, which state the house style for a kind of
     /// task.
     pub(crate) fn is_playbook(&self) -> bool {
@@ -410,6 +535,7 @@ impl Entry {
             members: Vec::new(),
             rules: Vec::new(),
             recipe: None,
+            categories: BTreeSet::new(),
         })
     }
 }
@@ -534,10 +660,26 @@ pub(crate) fn find(
     kind: Option<Kind>,
     limit: Option<usize>,
 ) -> Matches {
+    find_in_category(library, query, package, kind, limit, None)
+}
+
+pub(crate) fn find_in_category(
+    library: &Library,
+    query: &str,
+    package: Option<&str>,
+    kind: Option<Kind>,
+    limit: Option<usize>,
+    category: Option<(&Categories, Category)>,
+) -> Matches {
     if let Some(entries) = &library.local {
         return Matches::collect(
             find_dynamic(entries, query, package, kind)
                 .into_iter()
+                .filter(|e| {
+                    category.is_none_or(|(policy, value)| {
+                        library.entry_categories(policy, e).contains(&value)
+                    })
+                })
                 .cloned(),
             limit,
         );
@@ -563,7 +705,26 @@ pub(crate) fn find(
         ranked
             .into_iter()
             .filter(|(i, _)| {
-                let (slot, default) = RECORDS[*i].kind.group();
+                let record = &RECORDS[*i];
+                if let Some((policy, wanted)) = category {
+                    let matches = match record.kind {
+                        Kind::Symbol => {
+                            let module = public_module(record.package, record.name);
+                            library.module_category(policy, record.package, module) == wanted
+                        }
+                        Kind::Rule => policy
+                            .bundled_rule(record.package, record.name)
+                            .contains(&wanted),
+                        Kind::Recipe => {
+                            let recipe = record.entry().expect("build validated recipe");
+                            library.entry_categories(policy, &recipe).contains(&wanted)
+                        }
+                    };
+                    if !matches {
+                        return false;
+                    }
+                }
+                let (slot, default) = record.kind.group();
                 counts[slot] += 1;
                 counts[slot] <= limit.unwrap_or(default)
             })

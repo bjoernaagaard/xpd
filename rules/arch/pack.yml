@@ -1,3 +1,9 @@
+defaultCategory: statistics
+categoryPrefixes:
+  arch.bootstrap.multiple_comparison: evaluation
+  arch.data: data
+  arch.univariate: models
+
 # The arch pack, for files that import arch. Every other .yml file in this folder is a rule.
 
 # No fix in this pack writes a short name such as `np.`, so the pack lists no alias.

@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::catalog::{self, Filters};
+use crate::catalog;
 use crate::fix_safety::Applicability;
 use crate::report::Report;
 use crate::workspace::Workspace;
@@ -12,18 +12,6 @@ use crate::workspace::Workspace;
 pub(crate) enum FixMode {
     Apply(Option<Applicability>),
     Review(Applicability),
-}
-
-/// The issues of the files under `paths`, with the rules and the settings of the project in the
-/// working directory.
-pub(crate) fn lint(
-    paths: &[PathBuf],
-    mode: FixMode,
-    filters: &Filters,
-    config: Option<&Path>,
-) -> Result<Report> {
-    let workspace = Workspace::open(std::env::current_dir()?, config, filters)?;
-    workspace.check(paths, mode)
 }
 
 impl Workspace {

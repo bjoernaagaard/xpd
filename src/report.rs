@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::severity::Severity;
 use serde_json::{Value, json};
 
+use crate::category::RuleCategory;
 use crate::fix_safety::Applicability;
 use crate::rule_id::RuleId;
 
@@ -20,6 +21,7 @@ pub(crate) struct Position {
 #[derive(Debug, Clone)]
 pub(crate) struct Issue {
     pub(crate) id: RuleId,
+    pub(crate) category: RuleCategory,
     pub(crate) file: PathBuf,
     /// `None` for an issue about the project as a whole, such as a missing package.
     pub(crate) position: Option<Position>,

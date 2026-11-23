@@ -283,6 +283,7 @@ impl Found {
             labels: Vec::new(),
             issue: Issue {
                 id: RuleId::qualified(OWN_PACK, "invalid-rule"),
+                category: crate::category::RuleCategory::Bundled,
                 file,
                 position: Some(Position { line: 1, column: 1 }),
                 severity: Severity::Error,
@@ -486,6 +487,7 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
             let fix = level.and_then(|level| context.build(rule, &m, pack, &unbound, level));
             let issue = Issue {
                 id: rule.id.clone(),
+                category: pack.rule_category(),
                 file: file.path.to_path_buf(),
                 position: Some(Position {
                     line: start.line() + 1,

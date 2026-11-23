@@ -10,13 +10,14 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::LazyLock;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use ast_grep_language::SupportLang;
 use clap::builder::PossibleValue;
 use clap::{Subcommand, ValueEnum};
 use inquire::validator::Validation;
 use serde::Serialize;
 
+use crate::category::Category;
 use crate::fix_safety::Applicability;
 use crate::output::Format;
 use crate::rule_id::RuleId;
@@ -92,6 +93,9 @@ struct ProjectArgs {
     /// A rule pack to declare, named after the module its rules are about.
     #[arg(long = "pack", value_name = "MODULE", value_parser = document::module)]
     packs: Vec<String>,
+    /// Default category for each pack created by this command.
+    #[arg(long, value_enum, requires = "packs")]
+    category: Option<Category>,
     /// Run the new packs' rules on every Python file, not only on files that import the module.
     #[arg(long)]
     every_file: bool,
@@ -104,6 +108,9 @@ struct RuleArgs {
     /// The pack the rule belongs to. A pack that xpd.yml lacks is added to it.
     #[arg(long, value_name = "MODULE", value_parser = document::module)]
     pack: Option<String>,
+    /// Default category for a pack this command creates.
+    #[arg(long, value_enum)]
+    category: Option<Category>,
     /// Run a pack this command adds on every Python file.
     #[arg(long)]
     every_file: bool,
@@ -333,11 +340,13 @@ fn choose_item() -> Result<Item> {
     Ok(match kind {
         "project" => Item::Project(ProjectArgs {
             packs: Vec::new(),
+            category: None,
             every_file: false,
         }),
         "rule" => Item::Rule(Box::new(RuleArgs {
             name: None,
             pack: None,
+            category: None,
             every_file: false,
             language: None,
             pattern: None,
@@ -402,10 +411,14 @@ fn new_project(args: ProjectArgs, directory: Option<&Path>, mode: Mode) -> Resul
             packs.push(module);
         }
     }
-    let packs: Vec<Pack> = packs
+    let packs = packs
         .into_iter()
-        .map(|module| Pack::new(module, gate))
-        .collect();
+        .map(|module| {
+            let mut pack = Pack::new(module, gate);
+            pack.classify(args.category)?;
+            Ok(pack)
+        })
+        .collect::<Result<Vec<_>>>()?;
     Outcome::of("project", None, Project::create(&dir, &packs)?)
 }
 
@@ -449,11 +462,16 @@ fn new_rule(args: RuleArgs, project: &Project, mode: Mode) -> Result<Outcome> {
             ask_text("Rule name:", |text| text.parse::<Name>().map(drop))
         })?
         .parse()?;
-    let pack = match (pack, mode) {
+    let mut pack = match (pack, mode) {
         (Some(module), _) => Some(project.pack_or_new(&module, Gate::from(args.every_file))),
         (None, Mode::FlagsOnly) => None,
         (None, Mode::Ask) => choose_pack(project)?,
     };
+    if let Some(pack) = &mut pack {
+        pack.classify(args.category)?;
+    } else {
+        ensure!(args.category.is_none(), "--category requires a new pack");
+    }
     let language = match (&pack, args.language) {
         (Some(_), Some(language)) if language != Lang::PYTHON => {
             bail!("a pack's rules are Python. Leave out --pack for a {language} rule")

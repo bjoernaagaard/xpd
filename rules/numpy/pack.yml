@@ -1,3 +1,14 @@
+defaultCategory: numerics
+categoryPrefixes:
+  numpy.ctypeslib: workflow
+  numpy.f2py: workflow
+  numpy.lib.format: data
+  numpy.lib.npyio: data
+  numpy.ma.testutils: evaluation
+  numpy.random: statistics
+  numpy.testing: evaluation
+  numpy.typing: workflow
+
 # The NumPy pack. Every other .yml file in this folder is a rule.
 
 # A fix that writes `np.` applies only in a file with `import numpy as np`. Elsewhere the issue

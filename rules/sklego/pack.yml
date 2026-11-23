@@ -1,3 +1,15 @@
+defaultCategory: models
+categoryPrefixes:
+  sklego.datasets: data
+  sklego.decomposition: features
+  sklego.feature_selection: features
+  sklego.metrics: evaluation
+  sklego.model_selection: evaluation
+  sklego.pandas_utils: data
+  sklego.pipeline: workflow
+  sklego.preprocessing: features
+  sklego.testing: evaluation
+
 # The scikit-lego pack, for files that import sklego. Every other .yml file in this folder is a
 # rule.
 

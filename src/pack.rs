@@ -16,6 +16,7 @@ use ast_grep_language::SupportLang;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
+use crate::category::{Category, Policy, Prefixes, RuleCategory};
 use crate::pack_names::OWN_PACK;
 use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
@@ -75,6 +76,9 @@ const OWN_DOCS: &[DocSource] = include!(concat!(env!("OUT_DIR"), "/own_docs.rs")
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Manifest {
+    pub(crate) default_category: Option<Category>,
+    #[serde(default)]
+    pub(crate) category_prefixes: Prefixes,
     #[serde(default)]
     pub(crate) aliases: BTreeMap<String, String>,
     #[serde(default)]
@@ -171,6 +175,7 @@ pub(crate) enum Gate {
 /// One package's rules: a library's, a project's own, or xpd's.
 pub(crate) struct Pack {
     pub(crate) style: Style,
+    pub(crate) default_category: Category,
     /// The name issues are reported under. For a library's pack it is the name the library is
     /// imported by, such as `pandas`. Two packs can share it, as a project's own pandas rules
     /// do with the embedded ones.
@@ -280,6 +285,11 @@ impl Pack {
         globals: &GlobalRules,
         root: Option<PathBuf>,
     ) -> Result<Self> {
+        let policy = Policy {
+            default_category: manifest.default_category,
+            category_prefixes: manifest.category_prefixes,
+        };
+        policy.validate(module)?;
         for rule in &rules {
             for name in &rule.fix_imports {
                 ensure!(
@@ -322,6 +332,7 @@ impl Pack {
             .context("packages")?;
         Ok(Self {
             style: Style::Default,
+            default_category: policy.default_category.unwrap_or_default(),
             module: module.to_owned(),
             gate,
             rules,
@@ -339,6 +350,7 @@ impl Pack {
     pub(crate) fn structural(package: String, rules: Vec<Rule>, root: PathBuf) -> Self {
         Self {
             style: Style::Default,
+            default_category: Category::Workflow,
             module: package,
             gate: Gate::EveryFile,
             rules,
@@ -364,6 +376,7 @@ impl Pack {
         let rule = Rule::new(config, Origin::Structural, Some(OWN_PACK), source, 1)?;
         Ok(Self {
             style: Style::Default,
+            default_category: Category::Workflow,
             module: OWN_PACK.to_owned(),
             gate: Gate::Suppressions,
             rules: vec![rule],
@@ -461,6 +474,14 @@ impl Pack {
             .map(|doc| doc.text)
     }
 
+    pub(crate) fn rule_category(&self) -> RuleCategory {
+        if self.root.is_none() {
+            RuleCategory::Bundled
+        } else {
+            RuleCategory::Default(self.default_category)
+        }
+    }
+
     /// The published page of the rule or package check `id`, for a pack that ships with xpd and
     /// so has its Markdown in the binary. A project's own pack has no page.
     pub(crate) fn page(&self, id: &str) -> Option<String> {
@@ -494,6 +515,30 @@ impl fmt::Debug for Pack {
             .field("package_checks", &self.package_checks)
             .finish_non_exhaustive()
     }
+}
+
+/// Read category policy without compiling rule files for discovery commands.
+pub(crate) fn category_policies() -> Result<BTreeMap<String, Policy>> {
+    let mut policies = BTreeMap::new();
+    for source in SOURCES {
+        if let Some(yaml) = source.manifest {
+            let manifest: Manifest = ast_grep_config::from_str(yaml)
+                .with_context(|| format!("rules/{}/pack.yml", source.module))?;
+            let policy = Policy {
+                default_category: manifest.default_category,
+                category_prefixes: manifest.category_prefixes,
+            };
+            policy.validate(source.module)?;
+            if policy.default_category.is_some() || !policy.category_prefixes.is_empty() {
+                policies.insert(source.module.to_owned(), policy);
+            }
+        }
+    }
+    let manim: Policy =
+        ast_grep_config::from_str(include_str!("../indexes/specialized/manim.yml"))?;
+    manim.validate("manim")?;
+    policies.insert("manim".to_owned(), manim);
+    Ok(policies)
 }
 
 /// Every pack that ships with xpd, each with all of its rules.

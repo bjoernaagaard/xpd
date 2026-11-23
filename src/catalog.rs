@@ -4,7 +4,7 @@
 
 mod local;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use crate::severity::Severity;
@@ -12,6 +12,7 @@ use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 
 pub(crate) use self::local::LocalProject;
+use crate::category::{Categories, Category, RuleCategory};
 use crate::fix_safety::Applicability;
 use crate::pack::{self, Pack};
 use crate::package_check;
@@ -237,6 +238,7 @@ impl Catalog {
 #[derive(Debug)]
 pub(crate) struct Entry<'a> {
     id: RuleId,
+    category: RuleCategory,
     /// The severity that the catalog's run reports the rule with.
     severity: Severity,
     /// What `metadata.style` marks the rule as. `None` for a rule that is not about style.
@@ -254,6 +256,10 @@ pub(crate) struct Entry<'a> {
 }
 
 impl Entry<'_> {
+    pub(crate) fn categories(&self, policy: &Categories) -> BTreeSet<Category> {
+        self.category.resolve(policy, &self.id)
+    }
+
     /// One line per rule, such as
     /// `error [pandas/chained-assignment] (unsafe fix) Chained assignment writes to a copy ...`.
     pub(crate) fn line(&self) -> String {
@@ -318,6 +324,7 @@ impl Catalog {
                     }
                     None => entries.push(Entry {
                         id: rule.id.clone(),
+                        category: pack.rule_category(),
                         severity: effective,
                         style: rule.style,
                         by_style,
@@ -331,6 +338,7 @@ impl Catalog {
             }
             entries.extend(pack.package_checks.iter().map(|check| Entry {
                 id: RuleId::qualified(&pack.module, &check.id),
+                category: RuleCategory::Default(pack.default_category),
                 severity: package_check::SEVERITY,
                 style: None,
                 by_style: [package_check::SEVERITY, package_check::SEVERITY],

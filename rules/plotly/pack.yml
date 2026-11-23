@@ -1,3 +1,9 @@
+defaultCategory: visualization
+categoryPrefixes:
+  plotly.callbacks: workflow
+  plotly.data: data
+  plotly.express.trendline_functions: models
+
 # The plotly pack. Every other .yml file in this folder is a rule, and utils/ holds the utility
 # rules that the rules share.
 #

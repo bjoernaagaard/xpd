@@ -1,3 +1,24 @@
+defaultCategory: optimization
+categoryPrefixes:
+  skfolio.attribution: evaluation
+  skfolio.cluster: models
+  skfolio.containers: data
+  skfolio.datasets: data
+  skfolio.distribution: statistics
+  skfolio.factor_exposure: features
+  skfolio.linear_model: models
+  skfolio.measures: evaluation
+  skfolio.metrics: evaluation
+  skfolio.model_selection: evaluation
+  skfolio.moments: statistics
+  skfolio.portfolio: data
+  skfolio.pre_selection: features
+  skfolio.preprocessing: features
+  skfolio.prior: models
+  skfolio.utils.bootstrap: statistics
+  skfolio.utils.figure: visualization
+  skfolio.utils.stats: statistics
+
 aliases: {}
 members:
   BaseOptimization: skfolio.optimization

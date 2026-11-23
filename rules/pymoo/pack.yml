@@ -1,3 +1,11 @@
+defaultCategory: optimization
+categoryPrefixes:
+  pymoo.gradient: numerics
+  pymoo.indicators: evaluation
+  pymoo.operators.survival.rank_and_crowding.metrics: evaluation
+  pymoo.util.ref_dirs.performance: evaluation
+  pymoo.visualization: visualization
+
 # The pymoo pack. Every other .yml file in this folder is a rule.
 
 # A fix that writes `np.` applies only in a file with `import numpy as np`. Elsewhere the issue

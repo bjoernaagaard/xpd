@@ -1,3 +1,7 @@
+defaultCategory: features
+categoryPrefixes:
+  category_encoders.datasets: data
+
 # The Category Encoders pack. Every other .yml file in this folder is a rule.
 
 # The short name the library's documentation imports it by. A fix that writes `ce.` applies

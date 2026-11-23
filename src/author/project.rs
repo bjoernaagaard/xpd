@@ -14,6 +14,7 @@ use serde::de::IgnoredAny;
 use serde_json::{Value, json};
 
 use super::document::{self, Name, RuleDoc};
+use crate::category::{Categories, Category};
 use crate::project::{
     self, PROJECT_FILES, PackList, RuleFolders, SGCONFIG, TestFolder, XPD_CONFIG, pack_entry,
 };
@@ -49,6 +50,7 @@ struct PackEntry<'a> {
     module: &'a str,
     rule_dirs: &'a [String],
     every_file: bool,
+    default_category: Category,
     aliases: BTreeMap<String, String>,
     members: BTreeMap<String, String>,
     packages: Vec<Value>,
@@ -93,6 +95,7 @@ pub(in crate::author) struct Pack {
     pub(in crate::author) module: String,
     rule_dirs: Vec<String>,
     gate: Gate,
+    default_category: Category,
     /// Whether `xpd.yml` already lists the pack.
     declared: bool,
 }
@@ -105,7 +108,26 @@ impl Pack {
             module,
             gate,
             declared: false,
+            default_category: Category::Workflow,
         }
+    }
+
+    pub(in crate::author) fn classify(&mut self, category: Option<Category>) -> Result<()> {
+        ensure!(
+            !self.declared || category.is_none(),
+            "--category applies when creating a pack. {} is already declared in {XPD_CONFIG}",
+            self.module
+        );
+        if !self.declared {
+            self.default_category = if let Some(category) = category {
+                category
+            } else {
+                Categories::load(None)?
+                    .default_for(&self.module)
+                    .unwrap_or_default()
+            };
+        }
+        Ok(())
     }
 
     fn entry(&self) -> PackEntry<'_> {
@@ -113,6 +135,7 @@ impl Pack {
             module: &self.module,
             rule_dirs: &self.rule_dirs,
             every_file: self.gate == Gate::EveryFile,
+            default_category: self.default_category,
             aliases: BTreeMap::new(),
             members: BTreeMap::new(),
             packages: Vec::new(),
@@ -231,6 +254,7 @@ impl Project {
                 rule_dirs: pack.rule_dirs,
                 gate: Gate::from(pack.every_file),
                 declared: true,
+                default_category: Category::Workflow,
             })
             .collect();
         Ok(Self {
@@ -311,6 +335,7 @@ impl Project {
             rule_dirs: vec![format!("{}/{module}", base.trim_end_matches('/'))],
             gate,
             declared: false,
+            default_category: Category::Workflow,
         }
     }
 

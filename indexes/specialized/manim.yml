@@ -1,0 +1,12 @@
+defaultCategory: visualization
+categoryPrefixes:
+  manim.cli: workflow
+  manim.utils.bezier: numerics
+  manim.utils.caching: workflow
+  manim.utils.docbuild: workflow
+  manim.utils.file_ops: workflow
+  manim.utils.module_ops: workflow
+  manim.utils.qhull: numerics
+  manim.utils.rate_functions: numerics
+  manim.utils.space_ops: numerics
+  manim.utils.testing: evaluation

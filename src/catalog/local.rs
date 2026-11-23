@@ -25,6 +25,7 @@ use ast_grep_config::GlobalRules;
 use ast_grep_language::config_file_type;
 use serde::Deserialize;
 
+use crate::category::{Category, Policy, Prefixes};
 use crate::pack::{self, AlsoOnSource, Manifest, Pack};
 use crate::pack_names::is_module_name;
 use crate::package_check::PackageCheckSource;
@@ -124,6 +125,9 @@ pack_entry! {
         #[serde(default)]
         packages: Vec<PackageCheckSource>,
         also_on: Option<AlsoOnSource>,
+        default_category: Option<Category>,
+        #[serde(default)]
+        category_prefixes: Prefixes,
     }
 }
 
@@ -338,6 +342,26 @@ impl LocalProject {
         Ok(None)
     }
 
+    pub(crate) fn category_policies(config: &Path) -> Result<Vec<(String, Policy)>> {
+        let boundary = project::boundary();
+        let config = ensure_within(config, boundary.as_deref())?;
+        let root = config.parent().context("a file is in a folder")?;
+        let (_, entries) = load_manifest_packs(root, boundary.as_deref())?;
+        entries
+            .into_iter()
+            .map(|entry| {
+                let policy = Policy {
+                    default_category: entry.default_category,
+                    category_prefixes: entry.category_prefixes,
+                };
+                policy
+                    .validate(&entry.module)
+                    .with_context(|| root.join(XPD_CONFIG).display().to_string())?;
+                Ok((entry.module, policy))
+            })
+            .collect()
+    }
+
     /// Reads the project of the project file `config`, with every rule file it has. Returns
     /// the project with its packs: those of `xpd.yml` in the order of the file, then one for
     /// each package of the rules that no pack holds, in name order.
@@ -417,6 +441,8 @@ impl LocalProject {
                     packages: entry.packages,
                     every_file: entry.every_file,
                     also_on: entry.also_on,
+                    default_category: entry.default_category,
+                    category_prefixes: entry.category_prefixes,
                 },
                 rules: Vec::new(),
             });

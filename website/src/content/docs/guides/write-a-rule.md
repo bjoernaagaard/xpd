@@ -124,6 +124,33 @@ files that import `mylib`, and `--fix` gives `xpd check --fix` the rewrite. `--s
 environment. [`xpd new rule`](../../commands/new/rule/) lists every option, and
 [`xpd check`](../../commands/check/#project-rules) says how xpd finds the project's rules.
 
+## Set a pack's categories
+
+Use `xpd new project --pack mylib --category features` to record a default when you
+create a project. You can also pass `--category` to `xpd new rule` when it creates a pack.
+In `xpd.yml`, add module prefixes under the pack entry. Built-in packs use the same
+fields at the top level of `rules/<module>/pack.yml`.
+
+```yaml
+defaultCategory: features
+categoryPrefixes:
+  mylib.datasets: data
+  mylib.datasets.metrics: evaluation
+```
+
+The longest matching dotted prefix wins. A project prefix overrides the same bundled
+prefix. If several project entries share an import name, the first entry supplies the
+project's API policy. Each entry supplies the default for the rules it owns.
+A module with no matching prefix uses the pack default, or `workflow` if no default
+is declared. Class members use the category of their public class's module.
+
+`xpd index --category-report` shows the source of each assignment. Use `--category`
+with `xpd find` or `xpd rules` to filter, and `--categories` with `xpd api` or
+`xpd rules` to show labels. A rule can belong to several categories through its
+shipped symbol links. Rules without those links and package checks use their pack
+default. `xpd check --category-summary` counts each remaining issue in each of its
+categories and prints the counts on stderr.
+
 ## Add a rule to xpd
 
 A rule that helps every user of a library belongs in one of xpd's packs. Each pack is a folder

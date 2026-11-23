@@ -1,3 +1,29 @@
+defaultCategory: models
+categoryPrefixes:
+  sklearn.calibration: evaluation
+  sklearn.callback: workflow
+  sklearn.compose: features
+  sklearn.covariance: statistics
+  sklearn.cross_decomposition: features
+  sklearn.datasets: data
+  sklearn.decomposition: features
+  sklearn.feature_extraction: features
+  sklearn.feature_selection: features
+  sklearn.frozen: workflow
+  sklearn.impute: features
+  sklearn.inspection: evaluation
+  sklearn.kernel_approximation: features
+  sklearn.manifold: features
+  sklearn.metrics: evaluation
+  sklearn.model_selection: evaluation
+  sklearn.pipeline: workflow
+  sklearn.preprocessing: features
+  sklearn.random_projection: features
+  sklearn.utils.estimator_checks: evaluation
+  sklearn.utils.extmath: numerics
+  sklearn.utils.metadata_routing: workflow
+  sklearn.utils.sparsefuncs: numerics
+
 # The scikit-learn pack. Every other .yml file in this folder is a rule.
 
 # A fix that writes `np.` applies only in a file with `import numpy as np`.

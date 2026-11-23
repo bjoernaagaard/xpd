@@ -610,6 +610,7 @@ pub(crate) fn harvest(
                 keywords: vec![fixed],
                 members: Vec::new(),
                 rules: Vec::new(),
+                categories: BTreeSet::new(),
                 recipe: Some(recipe),
             });
         }

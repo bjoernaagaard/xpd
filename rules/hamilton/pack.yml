@@ -1,0 +1,4 @@
+defaultCategory: workflow
+categoryPrefixes:
+  hamilton.data_quality: evaluation
+  hamilton.io: data
