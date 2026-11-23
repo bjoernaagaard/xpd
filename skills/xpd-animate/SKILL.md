@@ -35,6 +35,12 @@ xpd animate render cache_miss.py CacheMiss --profile preview --json
 xpd animate render cache_miss.py CacheMiss --profile final --json
 ```
 
+The `preview` profile uses Manim's `-qh` (1080p60), and `final` uses `-qk`
+(4K60). The `still` profile uses `-qm -s` for the last frame at 720p.
+Bundle a `manim.cfg` with `--asset` to set scene defaults. xpd reads the
+bundled config beside the scene, falling back to the bundled project-root
+config, and sets the managed output paths and preset.
+
 The result gives the video or still, a contact sheet for video inspection, the editable sources,
 the saved render settings, and the render log. To revise, recover the scene and inputs from the
 source bundle. For example, change `CACHE_MISS_HOLD_SECONDS` in `cache_miss.py` from `1.0`

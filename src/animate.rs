@@ -46,6 +46,7 @@ pub(crate) enum Animation {
     Render {
         file: PathBuf,
         scene: String,
+        /// Preview at 1080p60, final at 4K60, or a 720p still.
         #[arg(long, value_enum, default_value = "preview")]
         profile: Profile,
         /// Include an additional project-relative file, such as a helper, image or data file.

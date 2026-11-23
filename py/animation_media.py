@@ -8,6 +8,7 @@ from typing import TypedDict
 
 from av import open as open_media
 from av.video.frame import VideoFrame
+from manim.constants import QUALITIES
 from PIL import Image, ImageDraw
 
 SAMPLES = (0.1, 0.5, 0.9)
@@ -82,8 +83,9 @@ def contact_sheet(path: Path, width: int, height: int, fps: int) -> MediaStats:
 
 
 def main() -> None:
-    name, raw_width, raw_height, raw_fps = sys.argv[1:]
-    width, height, fps = int(raw_width), int(raw_height), int(raw_fps)
+    name, flag = sys.argv[1:]
+    quality = next(spec for spec in QUALITIES.values() if spec["flag"] == flag.removeprefix("-q"))
+    width, height, fps = quality["pixel_width"], quality["pixel_height"], quality["frame_rate"]
     path = Path("/media") / name
     if path.suffix == ".png":
         with Image.open(path) as image:

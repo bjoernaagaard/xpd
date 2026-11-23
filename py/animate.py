@@ -16,6 +16,8 @@ import sys
 import tarfile
 import tempfile
 import time
+from configparser import ConfigParser
+from configparser import Error as ConfigError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
@@ -39,18 +41,29 @@ LOG_LIMIT = 128 * 1024
 MAX_FILES = 128
 SEGMENT = re.compile(r"[0-9a-f]{64}\.mp4")
 JOB_ID = re.compile(r"[0-9a-f]{32}")
-CACHE_SCHEMA = "2"
+CACHE_SCHEMA = "3"
 SEQUENCE_HOLD = re.compile(rb"(?m)^CACHE_MISS_HOLD_SECONDS = [0-9]+(?:\.[0-9]+)?$")
 CONFIG = """[CLI]
+input_file =
 media_dir = /tmp/media
 video_dir = /tmp/output/{scene_name}
 images_dir = /tmp/output/{scene_name}
 partial_movie_dir = /tmp/segments/{scene_name}
+sections_dir = /tmp/output/{scene_name}/sections
+tex_dir = /tmp/media/Tex
+text_dir = /tmp/media/texts
+log_dir = /tmp/media/logs
+write_all = False
+dry_run = False
+preview = False
+live_preview = False
+show_in_file_browser = False
+save_sections = False
 """
 PROFILES = {
-    "preview": (854, 480, 15, "mp4"),
-    "final": (1280, 720, 30, "mp4"),
-    "still": (1280, 720, 30, "png"),
+    "preview": ("-qh", "mp4"),
+    "final": ("-qk", "mp4"),
+    "still": ("-qm", "png"),
 }
 
 
@@ -499,10 +512,27 @@ def stage_source(scene: Scene, folder: Path) -> None:
         path.write_bytes(data)
 
 
+def stage_config(scene: Scene, destination: Path) -> None:
+    config = ConfigParser(interpolation=None)
+    path = scene.entry.with_name("manim.cfg")
+    if path not in scene.files:
+        path = Path("manim.cfg")
+    if path in scene.files:
+        try:
+            config.read_string(scene.files[path].decode("utf-8"), source=path.as_posix())
+        except (ConfigError, UnicodeError) as error:
+            msg = f"Invalid bundled Manim config {path}: {error}"
+            raise AnimationError(msg) from error
+    config.remove_section("CLI_CTX")
+    config.read_string(CONFIG)
+    with destination.open("w", encoding="utf-8") as stream:
+        config.write(stream)
+
+
 def unpack_result(
     task: Path, output: Path, entry: str, profile: str
 ) -> tuple[MediaStats, dict[str, bytes]]:
-    width, height, fps, format_name = PROFILES[profile]
+    quality, format_name = PROFILES[profile]
     inspection = task / "inspection"
     inspection.mkdir()
     media = "artifact.png" if format_name == "png" else "artifact.mp4"
@@ -519,9 +549,7 @@ def unpack_result(
         "-c",
         sys.argv[1],
         media,
-        str(width),
-        str(height),
-        str(fps),
+        quality,
     ]
     process = subprocess.Popen(  # noqa: S603
         command,
@@ -552,7 +580,7 @@ def run_scene(
     source = task / "source"
     stage_source(scene, source)
     configuration = task / "manim.cfg"
-    configuration.write_text(CONFIG, encoding="utf-8")
+    stage_config(scene, configuration)
     shim = task / "animation_worker.py"
     shim.write_text(sys.argv[2], encoding="utf-8")
     output = task / "output"
@@ -563,7 +591,7 @@ def run_scene(
         copy_segments(partial_cache, seed)
     segments = task / "segments"
     segments.mkdir()
-    width, height, fps, format_name = PROFILES[profile]
+    quality, format_name = PROFILES[profile]
     name = f"xpd-animate-{uuid4().hex}"
     command = [
         *worker(
@@ -578,8 +606,7 @@ def run_scene(
         "/xpd-animation-worker.py",
         scene.entry.as_posix(),
         scene.name,
-        f"{width},{height}",
-        str(fps),
+        quality,
         format_name,
         str(PNG_LIMIT if format_name == "png" else VIDEO_LIMIT),
         str(SEGMENT_LIMIT),

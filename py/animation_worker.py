@@ -38,9 +38,11 @@ def add_segments(archive: tarfile.TarFile, folder: Path, byte_limit: int, file_l
 
 
 def main() -> int:
-    entry, scene, size, fps, media_format, media_limit, segment_limit, file_limit = sys.argv[1:]
+    entry, scene, quality, media_format, media_limit, segment_limit, file_limit = sys.argv[1:]
     scratch = Path("/tmp")  # noqa: S108
     source = shutil.copytree("/source", scratch / "scene")
+    configuration = source / "manim.cfg"
+    shutil.copyfile("/xpd-manim.cfg", configuration)
     segments = scratch / "segments"
     shutil.copytree("/seed", segments / scene)
 
@@ -53,17 +55,13 @@ def main() -> int:
             "render",
             "--silent",
             "--config_file",
-            "/xpd-manim.cfg",
+            str(configuration),
             "--renderer",
             "cairo",
-            "--format",
-            media_format,
+            quality,
+            *(["-s"] if media_format == "png" else ["--format", media_format]),
             "--progress_bar",
             "none",
-            "--resolution",
-            size,
-            "--fps",
-            fps,
             "--seed",
             "0",
             "--output_file",
