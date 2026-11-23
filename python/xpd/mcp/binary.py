@@ -90,7 +90,7 @@ def find_binary() -> Path:
     ]
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
-            return Path(candidate)
+            return Path(candidate).absolute()
     msg = "cannot find the xpd binary. Set XPD_BIN, or install xpd in this environment."
     raise RuntimeError(msg)
 
