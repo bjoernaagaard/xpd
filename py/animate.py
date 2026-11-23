@@ -18,9 +18,8 @@ import tempfile
 import time
 from configparser import ConfigParser
 from configparser import Error as ConfigError
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import NamedTuple, TypedDict
 from uuid import uuid4
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
@@ -98,8 +97,7 @@ class RenderReport(MediaStats):
     artifact_hashes: dict[str, str]
 
 
-@dataclass(frozen=True)
-class Scene:
+class Scene(NamedTuple):
     entry: Path
     name: str
     files: dict[Path, bytes]
@@ -130,8 +128,7 @@ class Scene:
         return self.fingerprint(profile)
 
 
-@dataclass(frozen=True)
-class Render:
+class Render(NamedTuple):
     scene: Scene
     profile: str
     job_id: str
@@ -211,11 +208,10 @@ def inline_files(root: Path) -> tuple[Path, dict[Path, bytes]]:
     if not isinstance(entry, str) or not isinstance(files, dict):
         msg = "Expected a string entry and a files object with text contents."
         raise AnimationError(msg)
-    staged = {
-        positive_path(path): content.encode()
-        for path, content in files.items()
-        if isinstance(content, str)
-    }
+    staged = {}
+    for path, content in files.items():
+        if isinstance(content, str):
+            staged[positive_path(path)] = content.encode()
     scene_path = positive_path(entry)
     if len(staged) != len(files):
         msg = "Every inline path must be unique and contain text."
