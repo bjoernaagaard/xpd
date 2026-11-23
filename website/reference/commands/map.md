@@ -35,11 +35,31 @@ where the pipeline needs materialized data. It flags dynamic expressions,
 read options and calls it cannot trace. The `--contract` option belongs to
 the pandas-to-Polars planner.
 
+```python title="readings.py"
+import polars as pl
+
+
+def eager(path):
+    readings = pl.read_parquet(path)
+    return readings.filter(pl.col("keep")).select("row_id", "reading")
+
+
+def dynamic_projection(path, columns):
+    readings = pl.read_parquet(path)
+    return readings.filter(pl.col("keep")).select(columns)
+```
+
 ```console
-$ xpd map examples/polars-lazy/compare.py --entry eager --from polars --to polars --format text
+$ xpd map readings.py --entry eager --from polars --to polars --format text
+readings.py:4: eager (polars to polars, complete)
 ...
-proposed [materialization] Collect once at the return to preserve the DataFrame result.
-$ xpd map examples/polars-lazy/compare.py --entry dynamic_projection --from polars --to polars --format json
+6: proposed [materialization] Collect once at the return to preserve the DataFrame result.
+...
+$ xpd map readings.py --entry dynamic_projection --from polars --to polars --format json
+...
+  "status": "partial",
+...
+      "code": "expression",
 ...
 ```
 
