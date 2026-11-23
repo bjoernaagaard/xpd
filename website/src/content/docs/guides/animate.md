@@ -50,6 +50,18 @@ example, change `CACHE_MISS_HOLD_SECONDS` from `1.0` to `3.0` in
 `cache_miss.py` and render another preview. For an exact repeat, xpd can reuse
 the verified result. Add `--no-cache` to render again from scratch.
 
+## Run a trusted scene directly
+
+For a scene and imports you explicitly trust, use
+[a local Manim installation](https://docs.manim.community/en/stable/installation.html).
+Direct Manim runs the scene with your account's permissions.
+
+```sh
+manim checkhealth
+xpd animate guide sequence > cache_miss.py
+manim render --renderer cairo --format mp4 --resolution 854,480 --fps 15 --seed 0 cache_miss.py CacheMiss
+```
+
 ## Use local MCP
 
 Start the installed xpd server with your project root.
