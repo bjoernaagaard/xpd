@@ -80,7 +80,7 @@ def power_terms():
     spaced = IV2SLS.from_formula("lwage ~ 1 + exper ** 2 + educ", data).fit()  # xpd: formula-power-term
     squared = IV2SLS.from_formula("lwage ~ 1 + exper + I(exper**2)", data).fit()
     crossed = IV2SLS.from_formula("lwage ~ 1 + (exper + educ)**2", data).fit()
-    patsy = smf.ols("lwage ~ exper + exper**2", data=data).fit()
+    patsy = smf.ols("lwage ~ exper + exper**2", data=data).fit()  # xpd: statsmodels-formula-power-term
     return [list(r.params.index) for r in (interaction, spaced, squared, crossed)], patsy.params
 
 

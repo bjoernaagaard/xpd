@@ -9,6 +9,22 @@
     "expected": "plotly/free-facet-scales"
   },
   {
+    "query": "why does statsmodels OLS ignore weights",
+    "expected": "statsmodels/ols-ignored-weights"
+  },
+  {
+    "query": "why does LightGBM early stopping have no effect with DART boosting",
+    "expected": "lightgbm/dart-early-stopping"
+  },
+  {
+    "query": "why is the CVXPY solve result a number instead of solver status",
+    "expected": "cvxpy/solve-result-as-status"
+  },
+  {
+    "query": "why does native XGBoost booster predict use trees past the best iteration after early stopping",
+    "expected": "xgboost/native-predict-after-early-stopping"
+  },
+  {
     "query": "read a CSV file into a dataframe",
     "expected": "pandas.read_csv"
   },
