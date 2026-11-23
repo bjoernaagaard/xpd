@@ -220,7 +220,7 @@ impl Planner {
                     native.then_some(columns)
                 };
                 let Some(columns) = columns.filter(|columns| !columns.is_empty()) else {
-                    self.evidence.block(at, "expression", "Resolve dynamic columns, row-aligned inputs or Python callbacks before moving this operation into the lazy plan.");
+                    self.evidence.block(at, "expression", "Resolve selectors, escaped column names, implicit string operands, dynamic inputs or Python callbacks before moving this operation into the lazy plan.");
                     return None;
                 };
                 self.pushdown = true;
@@ -314,7 +314,6 @@ fn native_expr<'tree>(
 ) -> bool {
     match node.kind().as_ref() {
         "integer" | "float" | "true" | "false" | "none" => true,
-        "string" => text_literal(node).is_some(),
         "comparison_operator"
         | "binary_operator"
         | "parenthesized_expression"
@@ -369,14 +368,20 @@ fn text_literal(node: &Node<'_>) -> Option<String> {
     let start = node
         .child(0)
         .filter(|child| child.kind() == "string_start")?;
-    if start.text().starts_with(['b', 'B']) {
+    if start
+        .text()
+        .trim_end_matches(['\'', '"'])
+        .contains(['b', 'B', 'f', 'F'])
+    {
         return None;
     }
     string_literal(node)
 }
 
 fn column_literal(node: &Node<'_>) -> Option<String> {
-    text_literal(node).filter(|name| !(name == "*" || name.starts_with('^') && name.ends_with('$')))
+    text_literal(node).filter(|name| {
+        !(name.contains('\\') || name == "*" || name.starts_with('^') && name.ends_with('$'))
+    })
 }
 
 fn projection_columns(args: &[Node<'_>]) -> Option<Vec<String>> {
