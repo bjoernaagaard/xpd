@@ -54,8 +54,7 @@ export function generateRules(xpd) {
   }
 
   const packs = orderedPacks(grouped.keys());
-  const byPack = new Map(packs.map((pack) => [pack, grouped.get(pack)]));
-  const ruleIdsByPack = new Map(packs.map((pack) => [pack, new Set(byPack.get(pack).map((r) => r.rule))]));
+  const ruleIdsByPack = new Map(packs.map((pack) => [pack, new Set(grouped.get(pack).map((r) => r.rule))]));
 
   /**
    * Turns relative links between rule/pack Markdown files into links between site pages,
@@ -79,7 +78,8 @@ export function generateRules(xpd) {
   rmSync(out, { recursive: true, force: true });
   const pages = new Map(packs.map((pack) => [pack, packPage(pack)]));
 
-  for (const [pack, rules] of byPack) {
+  for (const pack of packs) {
+    const rules = grouped.get(pack);
     const folder = join(out, pack);
     mkdirSync(folder, { recursive: true });
     const { title, body: packBody } = pages.get(pack);
@@ -164,7 +164,7 @@ export function generateRules(xpd) {
     '| Pack | Rules | Safe fix | Unsafe fix | No fix |',
     '| --- | ---: | ---: | ---: | ---: |',
     ...packs.map((pack) => {
-      const rules = byPack.get(pack);
+      const rules = grouped.get(pack);
       const count = (fix) => rules.filter((rule) => rule.fix === fix).length;
       return `| [${pages.get(pack).title}](./${pack}/) | ${rules.length} | ${count('safe')} | ${count('unsafe')} | ${count(null)} |`;
     }),
@@ -180,6 +180,13 @@ export function generateRules(xpd) {
       },
       `${overview.trim()}\n\n${table.join('\n')}`,
     ),
+  );
+
+  const navDir = join(website, '.astro');
+  mkdirSync(navDir, { recursive: true });
+  writeFileSync(
+    join(navDir, 'rule-packs.json'),
+    `${JSON.stringify(packs.map((pack) => ({ label: pages.get(pack).title, link: `/rules/${pack}/` })), null, 2)}\n`,
   );
 
   console.log(`rules.mjs: wrote ${catalog.length} rule pages and ${packs.length} pack pages`);

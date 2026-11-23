@@ -3,11 +3,19 @@ import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import mermaid from 'astro-mermaid';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { editUrl, REPO_URL } from './src/markdown.mjs';
 import { PACKS, packPage } from './src/packs.mjs';
+
+function rulePackSidebar() {
+  const generated = join(dirname(fileURLToPath(import.meta.url)), '.astro', 'rule-packs.json');
+  if (existsSync(generated)) {
+    return JSON.parse(readFileSync(generated, 'utf8'));
+  }
+  return PACKS.map((pack) => ({ label: packPage(pack).title, link: `/rules/${pack}/` }));
+}
 
 const CODE_MODE_SCRIPT_ID = 'virtual:xpd-code-mode-script';
 const RESOLVED_CODE_MODE_SCRIPT_ID = `\0${CODE_MODE_SCRIPT_ID}`;
@@ -74,7 +82,7 @@ export default defineConfig({
           label: 'Rules',
           items: [
             { label: 'All rules', link: '/rules/' },
-            ...PACKS.map((pack) => ({ label: packPage(pack).title, link: `/rules/${pack}/` })),
+            ...rulePackSidebar(),
           ],
         },
         // scripts/reference.mjs writes these pages from the CLI and the MCP server.

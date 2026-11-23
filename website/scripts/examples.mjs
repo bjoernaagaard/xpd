@@ -142,51 +142,68 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
   let sessions = 0;
   const shown = (root, value) => value.replaceAll(root, SHOWN_ROOT);
 
-  /** Runs one console block in a shell that starts in the session folder. */
-  function runConsole(root, env, cases) {
+  function runConsole(root, env, cases, where) {
     const mark = `xpd-example-${process.pid}`;
     const script = cases
       .map(({ command }, index) => `${command.replaceAll(SHOWN_ROOT, root)}\n__status=$?; printf '\\n${mark} ${index}\\n'; (exit $__status)`)
       .join('\n');
     const result = spawnSync('bash', ['-c', `exec 2>&1\n${script}`], { cwd: root, env, encoding: 'utf8', input: '', timeout: CONSOLE_TIMEOUT_MS, maxBuffer: MAX_BUFFER });
+    if (result.error) {
+      problems.push(`${where}: console block failed to run: ${result.error.message}`);
+      return null;
+    }
+    if (result.signal) {
+      problems.push(`${where}: console block terminated by signal ${result.signal}`);
+      return null;
+    }
     const parts = shown(root, result.stdout ?? '').split(new RegExp(`\\n${mark} \\d+\\n`));
+    if (parts.length !== cases.length + 1) {
+      problems.push(`${where}: console block ended after ${Math.max(0, parts.length - 1)} of ${cases.length} commands`);
+      return null;
+    }
     return cases.map((_, index) => trimmed((parts[index] ?? '').split('\n')));
   }
 
-  /** One long-lived MCP client/server process shared by every tool example in the build. */
   let mcpClient = null;
   function startMcp() {
     if (mcpClient) return mcpClient;
     const child = spawn(python, [join(scripts, 'mcp_examples.py')], {
       cwd: template,
       env: sessionEnv(join(work, 'mcp')),
-      stdio: ['pipe', 'pipe', 'ignore'],
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const stderrChunks = [];
+    child.stderr.on('data', (chunk) => {
+      if (stderrChunks.length < 32) stderrChunks.push(chunk.toString('utf8'));
     });
     const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
     const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
     process.on('exit', () => child.kill());
+    const stderrText = () => {
+      const text = stderrChunks.join('').trim();
+      return text ? `\n${text}` : '';
+    };
     mcpClient = {
       async call(request) {
         child.stdin.write(`${JSON.stringify(request)}\n`);
         const next = await lines.next();
         if (next.done) {
           const { code, signal } = await exited;
-          throw new Error(`mcp_examples.py exited before answering ${request.tool} (code ${code}, signal ${signal})`);
+          throw new Error(`mcp_examples.py exited before answering ${request.tool} (code ${code}, signal ${signal})${stderrText()}`);
         }
         return JSON.parse(next.value);
       },
       async close() {
         child.stdin.end();
-        await exited;
+        const { code, signal } = await exited;
+        if (code !== 0 || signal) {
+          throw new Error(`mcp_examples.py failed on exit (code ${code}, signal ${signal})${stderrText()}`);
+        }
       },
     };
     return mcpClient;
   }
 
-  /**
-   * Runs the examples of one page. `tool` names the MCP tool that a page of the tool reference
-   * is about. Returns how many examples ran.
-   */
   async function check(file, { tool } = {}) {
     const source = readFileSync(join(repository, file), 'utf8');
     const rewritten = source.split('\n');
@@ -195,6 +212,8 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
     cpSync(template, root, { recursive: true });
     const env = sessionEnv(root);
     let count = 0;
+    const pageCommands = [];
+    const pageTools = [];
     let pending = null;
     for (const block of parseMarkdown(source).blocks) {
       const where = `${file}:${block.line}`;
@@ -204,7 +223,8 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
         writeFileSync(join(root, title), `${block.lines.join('\n')}\n`);
       } else if (block.language === 'console') {
         const cases = consoleCases(block);
-        const real = runConsole(root, env, cases);
+        const real = runConsole(root, env, cases, where);
+        if (real === null) continue;
         if (write && !written.has(where) && cases.some((example, index) => !linesMatch(trimmed(example.shown), real[index]))) {
           written.add(where);
           rewritten.splice(block.line, block.lines.length, ...cases.flatMap((example, index) => [`$ ${example.command}`, ...real[index]]));
@@ -214,6 +234,7 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
         }
         for (const [index, example] of cases.entries()) {
           count += 1;
+          pageCommands.push(example.command);
           ran.commands.push(example.command);
           if (!linesMatch(trimmed(example.shown), real[index])) {
             problems.push(`${where}: $ ${example.command}\n  the page shows:\n${trimmed(example.shown).map((line) => `    ${line}`).join('\n')}\n  xpd prints:\n${real[index].map((line) => `    ${line}`).join('\n')}`);
@@ -226,17 +247,18 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
           continue;
         }
         count += 1;
+        pageTools.push(tool);
         ran.tools.push(tool);
         const call = pending;
         pending = null;
         let parsed;
         try {
-          parsed = { args: JSON.parse(call.text), result: JSON.parse(text) };
+          parsed = { args: JSON.parse(call.text.replaceAll(SHOWN_ROOT, root)), result: JSON.parse(text) };
         } catch (error) {
           problems.push(`${call.where}: the arguments or the result of the example are not JSON: ${error.message}`);
           continue;
         }
-        const answer = await startMcp().call({ root: call.root, tool, arguments: JSON.parse(call.text.replaceAll(SHOWN_ROOT, root)) });
+        const answer = await startMcp().call({ root: call.root, tool, arguments: parsed.args });
         const real = answerValue(shown(root, answer.text), answer.failed);
         if (!valueMatches(parsed.result, real)) {
           problems.push(`${where}: ${tool} ${call.text.trim()}\n  the page shows:\n    ${text.trim()}\n  the tool returns:\n    ${JSON.stringify(real)}`);
@@ -244,10 +266,9 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
       }
     }
     if (pending) problems.push(`${pending.where}: the example shows the arguments of a call and no result`);
-    return count;
+    return { count, commands: pageCommands, tools: pageTools };
   }
 
-  /** Fails when an example differed from its page. */
   async function finish() {
     if (mcpClient) await mcpClient.close();
     if (problems.length) {
@@ -256,5 +277,5 @@ export function exampleRunner({ repository, xpd, python, pythonPath }) {
     return ran;
   }
 
-  return { check, finish, ran, report: (problem) => problems.push(problem) };
+  return { check, finish, report: (problem) => problems.push(problem) };
 }

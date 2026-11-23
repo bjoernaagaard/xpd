@@ -554,7 +554,7 @@
   "src/workspace.rs": "79",
   "website/astro.config.mjs": "15,50,55-56,59-60,63,80",
   "website/ec.config.mjs": "4-5",
-  "website/scripts/examples.mjs": "1-21,40,57,73,76,88,105,109,114,123-124,135,145,156,186,250",
+  "website/scripts/examples.mjs": "1-21,40,57,73,76,88,105,109,114,123-124,135",
   "website/scripts/exec.mjs": "1",
   "website/scripts/generate.mjs": "1",
   "website/scripts/mcp_listing.py": "43",

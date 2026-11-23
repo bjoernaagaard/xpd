@@ -67,12 +67,11 @@ export async function generateReference(xpd) {
   const canonical = new Map(commands.flatMap((command) => [command.name, ...command.aliases.map((alias) => command.name.replace(/\S+$/, alias))].map((name) => [name, command.name])));
   async function runExamples(source, name, options) {
     const file = relative(repository, source);
-    const before = { commands: examples.ran.commands.length, tools: examples.ran.tools.length };
-    await examples.check(file, NO_EXAMPLE[name] ? {} : options);
+    const page = await examples.check(file, NO_EXAMPLE[name] ? {} : options);
     const spellings = [...canonical].filter(([, command]) => command === name).map(([spelling]) => new RegExp(`\\b${spelling}\\b`));
     const ranIt = options?.tool
-      ? examples.ran.tools.length > before.tools
-      : examples.ran.commands.slice(before.commands).some((command) => spellings.some((spelling) => spelling.test(command)));
+      ? page.tools.includes(options.tool)
+      : page.commands.some((command) => spellings.some((spelling) => spelling.test(command)));
     if (ranIt === Boolean(NO_EXAMPLE[name])) {
       examples.report(ranIt ? `${file} runs an example of ${name}, so take ${name} out of NO_EXAMPLE` : `${file} needs an example that runs ${name}`);
     }
