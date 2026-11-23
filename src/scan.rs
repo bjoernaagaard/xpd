@@ -83,6 +83,8 @@ pub(crate) struct Scanned {
     pub(crate) fixed: usize,
     /// Number of files that could not be read.
     pub(crate) skipped: usize,
+    /// Files where autofix stopped at the pass limit.
+    pub(crate) pass_limit: Vec<PathBuf>,
     /// What the `onlyWhere` shapes of the package checks matched.
     pub(crate) calls: Calls,
 }
@@ -100,7 +102,7 @@ pub(crate) fn scan(
 ) -> Result<Scanned> {
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-    let per_file: Vec<Option<(Linted, usize)>> = files
+    let per_file: Vec<Option<(Linted, usize, Option<PathBuf>)>> = files
         .par_iter()
         .map(|path| {
             let disk = root.join(path);
@@ -111,18 +113,33 @@ pub(crate) fn scan(
                 return Ok(None);
             };
             let mut fixed = 0;
+            let mut hit_limit = None;
             let file = File {
                 path,
                 disk: Some(&disk),
             };
             if let Some(allowed) = fix {
-                (src, fixed) = fix_source(file, src, packs, allowed).into_parts();
+                match fix_source(file, src, packs, allowed) {
+                    Fixed::Converged { source, count } => {
+                        src = source;
+                        fixed = count;
+                    }
+                    Fixed::PassLimit { source, count } => {
+                        src = source;
+                        fixed = count;
+                        hit_limit = Some(path.clone());
+                    }
+                }
                 if fixed > 0 {
                     fs::write(&disk, &src)
                         .with_context(|| format!("cannot write {}", path.display()))?;
                 }
             }
-            Ok(Some((analyze(file, &src, packs, Edits::Report), fixed)))
+            Ok(Some((
+                analyze(file, &src, packs, Edits::Report),
+                fixed,
+                hit_limit,
+            )))
         })
         .collect::<Result<_>>()?;
     let skipped = per_file.iter().filter(|file| file.is_none()).count();
@@ -130,15 +147,20 @@ pub(crate) fn scan(
         issues: Vec::new(),
         fixed: 0,
         skipped,
+        pass_limit: Vec::new(),
         calls: Calls::default(),
     };
-    for (linted, fixed) in per_file.into_iter().flatten() {
+    for (linted, fixed, hit_limit) in per_file.into_iter().flatten() {
         scanned.fixed += fixed;
+        if let Some(path) = hit_limit {
+            scanned.pass_limit.push(path);
+        }
         scanned
             .issues
             .extend(linted.found.into_iter().map(Found::into_issue));
         scanned.calls.merge(linted.calls);
     }
+    scanned.pass_limit.sort();
     (scanned.issues).sort_by(|a, b| (&a.file, a.position).cmp(&(&b.file, b.position)));
     Ok(scanned)
 }
@@ -289,14 +311,38 @@ pub(crate) enum Fixed {
     PassLimit { source: String, count: usize },
 }
 
-impl Fixed {
-    pub(crate) fn into_parts(self) -> (String, usize) {
-        match self {
-            Self::Converged { source, count } | Self::PassLimit { source, count } => {
-                (source, count)
-            }
+pub(crate) fn accepts_rewrite(path: &Path, before: &str, after: &str) -> bool {
+    let language = language_of(path);
+    let root = parse_as(before, language);
+    Parsed::new(before, language, &root).accepts(after)
+}
+
+fn validated_batch(
+    language: SupportLang,
+    source: &str,
+    proposals: &[&Replacement],
+) -> Option<(String, usize)> {
+    if proposals.is_empty() {
+        return None;
+    }
+    let root = parse_as(source, language);
+    let parsed = Parsed::new(source, language, &root);
+    let candidate = splice(source, proposals);
+    if parsed.accepts(&candidate) {
+        return Some((candidate, proposals.len()));
+    }
+    let mut kept = Vec::new();
+    let mut current = source.to_owned();
+    for &edit in proposals {
+        kept.push(edit);
+        let next = splice(source, &kept);
+        if parsed.accepts(&next) {
+            current = next;
+        } else {
+            kept.pop();
         }
     }
+    (!kept.is_empty()).then_some((current, kept.len()))
 }
 
 pub(crate) fn fix_source(
@@ -305,6 +351,7 @@ pub(crate) fn fix_source(
     packs: &[Pack],
     allowed: Applicability,
 ) -> Fixed {
+    let language = language_of(file.path);
     let mut count = 0;
     for _ in 0..MAX_FIX_PASSES {
         let analysis = analyze(file, &source, packs, Edits::Apply(allowed));
@@ -314,11 +361,11 @@ pub(crate) fn fix_source(
                 edits.push(edit);
             }
         }
-        if edits.is_empty() {
+        let Some((next, applied)) = validated_batch(language, &source, &edits.0) else {
             return Fixed::Converged { source, count };
-        }
-        count += edits.len();
-        source = edits.apply(&source);
+        };
+        count += applied;
+        source = next;
     }
     Fixed::PassLimit { source, count }
 }

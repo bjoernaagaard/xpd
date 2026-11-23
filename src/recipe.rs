@@ -509,9 +509,13 @@ fn validate(code: String, package: &str, workspace: &Workspace) -> Option<Verifi
         disk: None,
     };
     let clean = workspace.analyze(file, &code).found.is_empty();
-    let (code, fixes) = workspace
-        .fix(file, code, Applicability::Unsafe)
-        .into_parts();
+    let crate::scan::Fixed::Converged {
+        source: code,
+        count: fixes,
+    } = workspace.fix(file, code, Applicability::Unsafe)
+    else {
+        return None;
+    };
     if !complete(&code) || !workspace.analyze(file, &code).found.is_empty() {
         return None;
     }

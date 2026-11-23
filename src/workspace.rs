@@ -143,12 +143,14 @@ impl WorkspaceCache {
         let environment = inventory(Venv::find_from(root));
         let installed = distributions(&environment);
         let settings = Settings::find(root);
-        let config = Catalog::config(root, None)?;
-        let loaded = match (settings, config.as_deref()) {
-            (Err(error), _) => Err(error),
-            (Ok(settings), Some(config)) => Catalog::load(Some(config), installed, settings.style)
-                .map(|catalog| (Arc::new(catalog), settings, None)),
-            (Ok(settings), None) => {
+        let config = Catalog::config(root, None);
+        let loaded = match (settings, config) {
+            (Err(error), _) | (_, Err(error)) => Err(error),
+            (Ok(settings), Ok(Some(config))) => {
+                Catalog::load(Some(&config), installed, settings.style)
+                    .map(|catalog| (Arc::new(catalog), settings, None))
+            }
+            (Ok(settings), Ok(None)) => {
                 let key = EmbeddedRules {
                     versions: pack::installed_versions(installed),
                     style: settings.style,

@@ -75,8 +75,13 @@ pub(crate) fn apply(
             "{} changed during review; no reviewed edits were written to it",
             path.display()
         );
-        fs::write(&disk, accepted.apply(&source))
-            .with_context(|| format!("cannot write {}", path.display()))?;
+        let rewritten = accepted.apply(&source);
+        ensure!(
+            crate::scan::accepts_rewrite(path, &source, &rewritten),
+            "{} accepted fixes combine into invalid syntax; no reviewed edits were written to it",
+            path.display()
+        );
+        fs::write(&disk, rewritten).with_context(|| format!("cannot write {}", path.display()))?;
         fixed += accepted.len();
     }
     Ok(fixed)

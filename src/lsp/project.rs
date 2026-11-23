@@ -68,8 +68,8 @@ impl OpenProjects {
         }
     }
 
-    /// The project in `root`, read from its venv when the server has not seen it yet.
-    pub(crate) fn project(&mut self, root: &Path) -> Result<&LoadedWorkspace> {
+    /// Returns the cached workspace for `root`, loading and caching it on a miss.
+    pub(crate) fn get_or_load_project(&mut self, root: &Path) -> Result<&LoadedWorkspace> {
         if !self.projects.contains_key(root) {
             self.refresh(root)?;
         }
@@ -78,8 +78,8 @@ impl OpenProjects {
             .context("the project was not loaded")
     }
 
-    /// Reads the venv of the project in `root` again. Returns whether a project the server
-    /// already knew got other rules, which happens when a library in its venv changed version.
+    /// Reloads the workspace for `root`. Returns whether diagnostics should be invalidated
+    /// because the rules, settings, or catalog error state changed.
     pub(crate) fn refresh(&mut self, root: &Path) -> Result<bool> {
         let (loaded, changed) = self.cache.reload(root, self.projects.get(root))?;
         self.projects.insert(root.to_path_buf(), loaded);

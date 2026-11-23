@@ -60,6 +60,8 @@ use crate::workspace::Workspace;
 const SOURCE: &str = "xpd";
 /// The kind of the action that applies every fix, which an editor can run on save.
 const FIX_ALL: CodeActionKind = CodeActionKind::new("source.fixAll.xpd");
+/// Maximum incoming messages handled before giving pending diagnostics a turn.
+const MAX_MESSAGES_BEFORE_PUBLISH: usize = 16;
 
 /// Serves one client until it sends `exit`. The exit code is 0 when the client asked for
 /// `shutdown` first and 1 otherwise, as the protocol says.
@@ -153,12 +155,18 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
     // that was cancelled, and it lints a document only when nothing waits or a request needs
     // the issues. Ten changes that wait cost one lint.
     let mut waiting = VecDeque::new();
+    let mut handled_since_publish = 0usize;
     loop {
         for message in connection.receiver.try_iter() {
             server.queue(&mut waiting, message);
         }
+        if handled_since_publish >= MAX_MESSAGES_BEFORE_PUBLISH && server.publish_next() {
+            handled_since_publish = 0;
+            continue;
+        }
         let Some(message) = waiting.pop_front() else {
             if server.publish_next() {
+                handled_since_publish = 0;
                 continue;
             }
             match connection.receiver.recv() {
@@ -168,6 +176,7 @@ fn serve(connection: &Connection) -> Result<ExitCode> {
             }
             continue;
         };
+        handled_since_publish += 1;
         match message {
             Message::Request(request) if request.method == Shutdown::METHOD => {
                 server.send(Response::new_ok(request.id, ()).into());
@@ -372,7 +381,7 @@ fn lint<'d>(
     document: &'d mut Document,
 ) -> Result<(&'d Document, &'d Linted)> {
     if document.linted.is_none() {
-        let project = workspace.project(&document.place.root)?;
+        let project = workspace.get_or_load_project(&document.place.root)?;
         let workspace = Arc::clone(&project.workspace);
         let disk = document.place.disk();
         let file = source::File {
@@ -530,6 +539,8 @@ struct Server<'c> {
     /// The open documents whose issues the client does not have yet, when the server pushes
     /// them.
     unpublished: BTreeSet<String>,
+    /// Project roots whose package diagnostics need to be recomputed and published.
+    pending_packages: BTreeSet<PathBuf>,
     /// The number of requests the server has sent, which makes the next request's id.
     sent_requests: i32,
 }
@@ -556,6 +567,7 @@ impl<'c> Server<'c> {
             documents: HashMap::new(),
             package_files: HashMap::new(),
             unpublished: BTreeSet::new(),
+            pending_packages: BTreeSet::new(),
             sent_requests: 0,
         }
     }
@@ -649,15 +661,24 @@ impl<'c> Server<'c> {
         }
     }
 
-    /// Sends the issues of one document that waits for them, and returns whether one did.
+    /// Sends the issues of one pending document or project root, and returns whether any waited.
     fn publish_next(&mut self) -> bool {
-        let Some(key) = self.unpublished.pop_first() else {
-            return false;
-        };
-        if let Err(e) = self.publish(&key) {
-            self.show(MessageType::ERROR, format!("xpd: {e:#}"));
+        if let Some(key) = self.unpublished.pop_first() {
+            if let Err(e) = self.publish(&key) {
+                self.show(MessageType::ERROR, format!("xpd: {e:#}"));
+            }
+            return true;
         }
-        true
+        while let Some(root) = self.pending_packages.pop_first() {
+            if !self.roots().contains(&root) {
+                continue;
+            }
+            if let Err(e) = self.publish_package_issues(&root) {
+                self.show(MessageType::ERROR, format!("xpd: {e:#}"));
+            }
+            return true;
+        }
+        false
     }
 
     fn request(&mut self, request: Request) {
@@ -768,6 +789,10 @@ impl<'c> Server<'c> {
         self.refresh_project(&root, Reload::WithImports)
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "notification dispatch via Server::handle expects Result<()>"
+    )]
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<()> {
         let uri = params.text_document.uri;
         let Some(closed) = self.documents.remove(uri.as_str()) else {
@@ -780,11 +805,11 @@ impl<'c> Server<'c> {
         }
         let root = closed.place.root;
         if self.roots().contains(&root) {
-            self.publish_package_issues(&root)
+            self.pending_packages.insert(root);
         } else {
             self.close_project(&root);
-            Ok(())
         }
+        Ok(())
     }
 
     fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> Result<()> {
@@ -834,7 +859,8 @@ impl<'c> Server<'c> {
             self.close_project(root);
         }
         for root in &now {
-            self.refresh_project(root, Reload::Rules)?;
+            self.workspace.refresh(root)?;
+            self.pending_packages.insert(root.clone());
         }
         if self.client.delivery == Delivery::Pull(Refresh::Supported) {
             self.ask_to_pull_again();
@@ -856,7 +882,8 @@ impl<'c> Server<'c> {
         if self.workspace.refresh(root)? || matches!(reload, Reload::WithImports) {
             self.lint_again(root);
         }
-        self.publish_package_issues(root)
+        self.pending_packages.insert(root.to_path_buf());
+        Ok(())
     }
 
     /// Drops the issues of every open document of the project in `root`, and has the client
@@ -877,6 +904,7 @@ impl<'c> Server<'c> {
     /// Takes back the package warnings of the project in `root`, after its last document
     /// closed or moved to another project.
     fn close_project(&mut self, root: &Path) {
+        self.pending_packages.remove(root);
         if let Some(file) = self.package_files.remove(root) {
             self.notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(
                 file,
@@ -924,7 +952,7 @@ impl<'c> Server<'c> {
         }
         let issues = self
             .workspace
-            .project(root)?
+            .get_or_load_project(root)?
             .workspace
             .package_issues(&calls);
         // Without a `pyproject.toml`, `xpd check` names the venv's folder, and an editor
@@ -1114,20 +1142,26 @@ impl<'c> Server<'c> {
                 path: &document.place.path,
                 disk: Some(&disk),
             };
-            let (fixed, count) = linted
-                .workspace
-                .fix(file, document.text.clone(), allowed)
-                .into_parts();
+            let (fixed, count, hit_limit) =
+                match linted.workspace.fix(file, document.text.clone(), allowed) {
+                    scan::Fixed::Converged { source, count } => (source, count, false),
+                    scan::Fixed::PassLimit { source, count } => (source, count, true),
+                };
             if count > 0 {
                 let change = changed_part(&document.text, &fixed);
+                let base_title = match allowed {
+                    Applicability::Safe => "xpd: apply every safe fix",
+                    Applicability::Unsafe => {
+                        "xpd: apply every fix, also unsafe ones that may change behavior"
+                    }
+                };
+                let title = if hit_limit {
+                    format!("{base_title} (stopped at pass limit)")
+                } else {
+                    base_title.to_owned()
+                };
                 actions.push(CodeAction {
-                    title: match allowed {
-                        Applicability::Safe => "xpd: apply every safe fix".to_owned(),
-                        Applicability::Unsafe => {
-                            "xpd: apply every fix, also unsafe ones that may change behavior"
-                                .to_owned()
-                        }
-                    },
+                    title,
                     kind: Some(FIX_ALL),
                     edit: Some(edit(form, document, &lines, &change)),
                     ..CodeAction::default()
