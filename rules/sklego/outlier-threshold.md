@@ -15,7 +15,7 @@ or above 1, with `method="quantile"` written out or left as the default.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd interprets a small literal quantile threshold as the intended outlier share and subtracts it from 1.
 
 Without a threshold, `fit` of the PCA and UMAP detectors raised ValueError "The `threshold` value
 cannot be `None`." The mixture detectors keep the share `threshold` of the training rows as

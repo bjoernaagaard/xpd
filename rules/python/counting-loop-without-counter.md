@@ -22,7 +22,7 @@ a dict that the function takes as a parameter.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd replaces the loop with `Counter` when the previous statement initializes the counts. Review the change if later code uses the loop variable or relies on plain dict behavior.
 
 The Python documentation describes a
 [`Counter`](https://docs.python.org/3/library/collections.html#collections.Counter) as "a dict

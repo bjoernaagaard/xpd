@@ -1105,7 +1105,7 @@ impl<'c> Server<'c> {
         if wants(only, &CodeActionKind::QUICKFIX) {
             for found in &linted.analysis.found {
                 let marked = marked(found, &lines);
-                let Some(scan::Fix { level, replacement }) = &found.fix else {
+                let Some(fix) = &found.fix else {
                     continue;
                 };
                 // A cursor at either end of the mark counts as on it.
@@ -1113,8 +1113,9 @@ impl<'c> Server<'c> {
                     continue;
                 }
                 let name = found.id().to_string();
+                let changes = fix.edits(&document.text);
                 actions.push(CodeAction {
-                    title: match level {
+                    title: match fix.level {
                         Applicability::Safe => format!("xpd: fix {name}"),
                         Applicability::Unsafe => {
                             format!("xpd: fix {name} (unsafe fix, may change behavior)")
@@ -1126,10 +1127,8 @@ impl<'c> Server<'c> {
                         found,
                         lsp_range(&lines, &marked),
                     )]),
-                    edit: Some(edit(form, document, &lines, replacement)),
-                    // The editor applies a preferred fix on its "auto fix" key, so only a fix
-                    // that keeps what the code does is preferred.
-                    is_preferred: Some(*level == Applicability::Safe),
+                    edit: Some(edit(form, document, &lines, &changes)),
+                    is_preferred: Some(fix.level == Applicability::Safe),
                     ..CodeAction::default()
                 });
             }
@@ -1163,7 +1162,7 @@ impl<'c> Server<'c> {
                 actions.push(CodeAction {
                     title,
                     kind: Some(FIX_ALL),
-                    edit: Some(edit(form, document, &lines, &change)),
+                    edit: Some(edit(form, document, &lines, &[change])),
                     ..CodeAction::default()
                 });
             }
@@ -1172,17 +1171,20 @@ impl<'c> Server<'c> {
     }
 }
 
-/// An edit that writes `change` to `document`.
+/// An edit that writes `changes` to `document`.
 fn edit(
     form: EditForm,
     document: &Document,
     lines: &Lines<'_>,
-    change: &Replacement,
+    changes: &[Replacement],
 ) -> WorkspaceEdit {
-    let edit = TextEdit {
-        range: lsp_range(lines, &change.range),
-        new_text: change.text.clone(),
-    };
+    let edits: Vec<TextEdit> = changes
+        .iter()
+        .map(|change| TextEdit {
+            range: lsp_range(lines, &change.range),
+            new_text: change.text.clone(),
+        })
+        .collect();
     let uri = document.uri.clone();
     match form {
         EditForm::Versioned => WorkspaceEdit {
@@ -1191,12 +1193,12 @@ fn edit(
                     uri,
                     version: document.version,
                 },
-                edits: vec![OneOf::Left(edit)],
+                edits: edits.into_iter().map(OneOf::Left).collect(),
             }])),
             ..WorkspaceEdit::default()
         },
         EditForm::Plain => WorkspaceEdit {
-            changes: Some(HashMap::from([(uri, vec![edit])])),
+            changes: Some(HashMap::from([(uri, edits)])),
             ..WorkspaceEdit::default()
         },
     }

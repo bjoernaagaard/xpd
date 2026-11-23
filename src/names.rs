@@ -203,7 +203,7 @@ impl<'t> LibraryNames<'t> {
 
 /// Whether the identifier is the name of a parameter of a `def`, as `frame` is in
 /// `def f(frame: pd.DataFrame, *rest, **options)`, and `rest` and `options` are.
-fn is_parameter_name(identifier: &Node<'_>) -> bool {
+pub(crate) fn is_parameter_name(identifier: &Node<'_>) -> bool {
     let Some(parent) = identifier.parent() else {
         return false;
     };
@@ -228,7 +228,7 @@ fn is_parameter_name(identifier: &Node<'_>) -> bool {
 }
 
 /// The module or member an import binds to this identifier, including `from` imports.
-fn import_binding(bound: &Node<'_>) -> Option<String> {
+pub(crate) fn import_binding(bound: &Node<'_>) -> Option<String> {
     let item = bound.parent()?;
     let (name, import, aliased) = match &*item.kind() {
         "aliased_import" if field_is(&item, "alias", bound) => {
@@ -497,7 +497,7 @@ fn binds(statement: &Node<'_>, name: &str) -> bool {
 /// loop or of `as`, a name an import, a `def` or a `class` makes, a parameter of a lambda, a
 /// capture of a `case`, or a name of `global`, `nonlocal` or `del`. A parameter of a `def` is
 /// not counted, because it belongs to the function and not to the code around it.
-fn is_bound(identifier: &Node<'_>) -> bool {
+pub(crate) fn is_bound(identifier: &Node<'_>) -> bool {
     // A target can stand inside a tuple or a list of targets, as in `fig, ax = ...`.
     let mut target = identifier.clone();
     let parent = loop {

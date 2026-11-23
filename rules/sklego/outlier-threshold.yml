@@ -27,7 +27,6 @@ rule:
 constraints:
   C: { regex: '^(PCAOutlierDetection|UMAPOutlierDetection)$' }
 ---
-# No fix, because the new number has to be computed, and a transform cannot subtract.
 id: outlier-threshold
 language: python
 severity: error
@@ -38,12 +37,22 @@ rule:
     - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
     - has:
         field: arguments
-        any:
-          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: small-share } }] }
-          - has: { nthChild: 1, matches: small-share }
+        has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: small-share } }] }
     - matches: quantile-method
 constraints:
   C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
+rewriters:
+  - id: invert-threshold
+    rule:
+      kind: keyword_argument
+      all:
+        - has: { field: name, regex: '^threshold$' }
+        - has: { field: value, pattern: $V, matches: small-share }
+    fix: threshold=1 - $V
+transform:
+  FIXED: { rewrite: { source: $A, rewriters: [invert-threshold] } }
+fix: $F($FIXED)
+metadata: { fix: unsafe }
 utils:
   small-share: { kind: float, regex: '^0?\.[0-4]\d*$' }
   quantile-method:
@@ -56,6 +65,49 @@ utils:
             - { nthChild: 2, not: { any: [{ kind: keyword_argument }, { regex: '^["'']quantile["'']$' }] } }
             - { kind: dictionary_splat }
             - { kind: list_splat }
+---
+id: outlier-threshold
+language: python
+severity: error
+message: $C with method="quantile" keeps the share threshold of the training rows as inliers, so a threshold below 0.5 flags more than half of them. 0.05 flagged 380 of 400 training rows, where 0.95 flagged 20. Pass 1 minus the share of outliers.
+rule:
+  pattern: $F($V, $$$REST)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - has: { field: arguments, has: { nthChild: 1, matches: small-share } }
+    - matches: quantile-method
+constraints:
+  C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
+fix: $F(1 - $V, $$$REST)
+metadata: { fix: unsafe }
+utils:
+  small-share: { kind: float, regex: '^0?\.[0-4]\d*$' }
+  quantile-method:
+    has:
+      field: arguments
+      not:
+        has:
+          any:
+            - { kind: keyword_argument, all: [{ has: { field: name, regex: '^method$' } }, { not: { has: { field: value, regex: '^["'']quantile["'']$' } } }] }
+            - { nthChild: 2, not: { any: [{ kind: keyword_argument }, { regex: '^["'']quantile["'']$' }] } }
+            - { kind: dictionary_splat }
+            - { kind: list_splat }
+---
+id: outlier-threshold
+language: python
+severity: error
+message: $C with method="quantile" keeps the share threshold of the training rows as inliers, so a threshold below 0.5 flags more than half of them. 0.05 flagged 380 of 400 training rows, where 0.95 flagged 20. Pass 1 minus the share of outliers.
+rule:
+  pattern: $F($V)
+  all:
+    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+    - has: { field: arguments, has: { nthChild: 1, matches: small-share } }
+constraints:
+  C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
+fix: $F(1 - $V)
+metadata: { fix: unsafe }
+utils:
+  small-share: { kind: float, regex: '^0?\.[0-4]\d*$' }
 ---
 # No fix, because the message names two rewrites, and the share is not in the file.
 id: outlier-threshold

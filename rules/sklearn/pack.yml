@@ -18,3 +18,5 @@ members:
   r2_score: sklearn.metrics
   root_mean_squared_error: sklearn.metrics
   root_mean_squared_log_error: sklearn.metrics
+  StandardScaler: sklearn.preprocessing
+  MinMaxScaler: sklearn.preprocessing

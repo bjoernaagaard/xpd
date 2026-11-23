@@ -18,4 +18,4 @@ A call that also passes `elementwise=` or `**kwargs` is left alone. `StarmapPara
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd wraps a bare starmap and imports `StarmapParallelization` on pymoo 0.6.1.6 and later.

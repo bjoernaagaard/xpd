@@ -283,13 +283,8 @@ fn snapshot(found: scan::Found, source: &str) -> Value {
                 value
             }).collect();
     let mut result = json!({"labels": labels});
-    if let Some(scan::Fix {
-        replacement: edit, ..
-    }) = found.fix
-    {
-        let mut fixed = source.to_owned();
-        fixed.replace_range(edit.range, &edit.text);
-        result["fixed"] = Value::String(fixed);
+    if let Some(fix) = found.fix {
+        result["fixed"] = Value::String(fix.apply(source));
     }
     order_labels(&mut result);
     result

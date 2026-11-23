@@ -15,7 +15,7 @@ arguments. As a bare decorator it takes the decorated function as a log function
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd replaces an empty call with `log_step`.
 
 | Form | Result |
 | --- | --- |

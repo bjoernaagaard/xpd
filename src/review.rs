@@ -40,13 +40,12 @@ pub(crate) fn apply(
             &source,
         );
         let mut accepted = EditBatch::default();
-        for (found, edit) in analysis.proposals(allowed) {
-            if !accepted.fits(edit) {
+        for (found, fix) in analysis.proposals(allowed) {
+            if !accepted.fits(fix) {
                 continue;
             }
             if !accept_all {
-                let mut proposed = source.clone();
-                proposed.replace_range(edit.range.clone(), &edit.text);
+                let proposed = fix.apply(&source);
                 let name = path.to_string_lossy();
                 eprintln!("{}", found.issue().line(allowed));
                 eprint!(
@@ -65,7 +64,7 @@ pub(crate) fn apply(
                     Answer::Yes => {}
                 }
             }
-            accepted.push(edit);
+            accepted.push(fix);
         }
         if accepted.is_empty() {
             continue;

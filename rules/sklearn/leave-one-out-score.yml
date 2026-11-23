@@ -28,3 +28,5 @@ rule:
 constraints:
   F: { regex: '(^|\.)(cross_val_score|cross_validate|GridSearchCV|RandomizedSearchCV|validation_curve|learning_curve|permutation_test_score|RFECV)$' }
   M: { regex: '(^|\.)(\w*Regressor|LinearRegression|Ridge|RidgeCV|Lasso|LassoCV|ElasticNet|ElasticNetCV|Lars|LassoLars|BayesianRidge|ARDRegression|HuberRegressor|TheilSenRegressor|RANSACRegressor|PoissonRegressor|GammaRegressor|TweedieRegressor|QuantileRegressor|SVR|LinearSVR|NuSVR|KernelRidge|PLSRegression|GaussianProcessRegressor|IsotonicRegression|XGBRegressor|LGBMRegressor)$' }
+fix: $F($M($$$MA), $$$A, scoring="neg_mean_squared_error")
+metadata: { fix: unsafe }

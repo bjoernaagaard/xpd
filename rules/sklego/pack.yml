@@ -9,6 +9,7 @@ aliases: {}
 # `from sklearn.preprocessing import FunctionTransformer`.
 members:
   FunctionTransformer: sklearn.preprocessing
+  log_step: sklego.pandas_utils
 
 # The pack has no package checks. cvxpy, umap-learn and formulaic are extras that only some
 # estimators need, and a package check cannot see which estimators a project uses, so a check

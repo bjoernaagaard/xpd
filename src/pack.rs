@@ -7,7 +7,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Error, Result, bail};
+use anyhow::{Context, Error, Result, bail, ensure};
 use ast_grep_config::{
     CombinedScan, DeserializeEnv, GlobalRules, RuleConfig, SerializableGlobalRule,
     SerializableRule, Severity,
@@ -280,6 +280,16 @@ impl Pack {
         globals: &GlobalRules,
         root: Option<PathBuf>,
     ) -> Result<Self> {
+        for rule in &rules {
+            for name in &rule.fix_imports {
+                ensure!(
+                    manifest.aliases.contains_key(name) ^ manifest.members.contains_key(name),
+                    "{}: {} must name one alias or member in pack.yml",
+                    rule.id,
+                    name
+                );
+            }
+        }
         let gate = if manifest.every_file {
             Gate::EveryFile
         } else {

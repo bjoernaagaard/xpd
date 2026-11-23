@@ -8,7 +8,6 @@
 # The rule reports a train_test_split that may shuffle in a file that builds a DecayEstimator. A
 # pattern cannot see which rows the estimator is fitted on, so the rule is a warning.
 
-# No fix, because the message names two rewrites, and the code does not show which rows the estimator is fitted on.
 id: decay-on-shuffled-rows
 language: python
 severity: warning
@@ -17,5 +16,39 @@ rule:
   pattern: $F($$$A)
   all:
     - has: { field: function, regex: '(^|\.)train_test_split$' }
-    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, regex: '^shuffle\s*=\s*False$' }, { kind: dictionary_splat }] } } }
+    - has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)DecayEstimator$' } } }
+rewriters:
+  - id: disable-shuffle
+    rule: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' }
+    fix: shuffle=False
+transform:
+  FIXED: { rewrite: { source: $A, rewriters: [disable-shuffle] } }
+fix: $F($FIXED)
+metadata: { fix: unsafe }
+---
+id: decay-on-shuffled-rows
+language: python
+severity: warning
+message: DecayEstimator weights rows by position, the last row most, and train_test_split shuffles the rows. On data whose slope changed from 1 to 3, the model fitted on shuffled rows had the slope 1.62 as the mean of 30 shuffles, where the same rows in time order gave 3.03. Pass shuffle=False, or sort the training rows by time before the fit.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)train_test_split$' }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^shuffle$' } }, { kind: dictionary_splat }] } } }
+    - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)DecayEstimator$' } } }
+fix: $F($$$A, shuffle=False)
+metadata: { fix: unsafe }
+---
+id: decay-on-shuffled-rows
+language: python
+severity: warning
+message: DecayEstimator weights rows by position, the last row most, and train_test_split shuffles the rows. On data whose slope changed from 1 to 3, the model fitted on shuffled rows had the slope 1.62 as the mean of 30 shuffles, where the same rows in time order gave 3.03. Pass shuffle=False, or sort the training rows by time before the fit.
+rule:
+  pattern: $F($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)train_test_split$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { not: { regex: '^shuffle\s*=\s*(True|False)$' } }] } }
+    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
     - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)DecayEstimator$' } } }

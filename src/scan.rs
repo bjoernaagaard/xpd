@@ -1,7 +1,7 @@
 //! Walks paths, fixes and lints each file with the rule packs that apply to it.
 
 use std::cell::OnceCell;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -24,9 +24,9 @@ use crate::source::{File, files_under, is_python, language_of, read_source};
 use crate::syntax::{Node, Root, parse_as, parses_python_cells};
 
 /// How a file binds a name that it imports.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Binding {
-    /// `import <module> as <name>`, which a fix uses as the start of a dotted name.
+    /// `import <module> as <name>` (or `import <module>` when `name == module`), used as a dotted prefix.
     Alias,
     /// `from <module> import <name>`, which a fix uses bare.
     Member,
@@ -41,10 +41,21 @@ struct Import {
 }
 
 /// A name that a fix of a pack may write, which the file does not bind to its module.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Unbound<'p> {
     name: &'p str,
+    module: &'p str,
     binding: Binding,
+}
+
+impl Unbound<'_> {
+    fn import_statement(&self) -> String {
+        match self.binding {
+            Binding::Alias if self.name == self.module => format!("import {}", self.module),
+            Binding::Alias => format!("import {} as {}", self.module, self.name),
+            Binding::Member => format!("from {} import {}", self.module, self.name),
+        }
+    }
 }
 
 /// The number of syntax errors in a parsed file.
@@ -296,10 +307,33 @@ pub(crate) struct Label {
 pub(crate) struct Fix {
     pub(crate) level: Applicability,
     pub(crate) replacement: Replacement,
+    pub(crate) import_offset: usize,
+    imports: BTreeMap<String, String>,
+}
+
+impl Fix {
+    /// Every nonoverlapping edit that applies this fix to `src`, in source order.
+    pub(crate) fn edits(&self, src: &str) -> Vec<Replacement> {
+        let mut out = Vec::with_capacity(2);
+        if !self.imports.is_empty() {
+            let lines: Vec<&str> = self.imports.values().map(String::as_str).collect();
+            out.push(import_replacement(src, self.import_offset, &lines));
+        }
+        out.push(self.replacement.clone());
+        out.sort_by_key(|edit| (edit.range.start, edit.range.end));
+        out
+    }
+
+    /// `src` with this fix and any imports it needs applied.
+    pub(crate) fn apply(&self, src: &str) -> String {
+        let edits = self.edits(src);
+        let refs: Vec<&Replacement> = edits.iter().collect();
+        splice(src, &refs)
+    }
 }
 
 /// New text for a range of bytes of the source.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Replacement {
     pub(crate) range: Range<usize>,
     pub(crate) text: String,
@@ -320,22 +354,22 @@ pub(crate) fn accepts_rewrite(path: &Path, before: &str, after: &str) -> bool {
 fn validated_batch(
     language: SupportLang,
     source: &str,
-    proposals: &[&Replacement],
+    proposals: &[&Fix],
 ) -> Option<(String, usize)> {
     if proposals.is_empty() {
         return None;
     }
     let root = parse_as(source, language);
     let parsed = Parsed::new(source, language, &root);
-    let candidate = splice(source, proposals);
+    let candidate = apply_fixes(source, proposals);
     if parsed.accepts(&candidate) {
         return Some((candidate, proposals.len()));
     }
     let mut kept = Vec::new();
     let mut current = source.to_owned();
-    for &edit in proposals {
-        kept.push(edit);
-        let next = splice(source, &kept);
+    for &fix in proposals {
+        kept.push(fix);
+        let next = apply_fixes(source, &kept);
         if parsed.accepts(&next) {
             current = next;
         } else {
@@ -356,9 +390,9 @@ pub(crate) fn fix_source(
     for _ in 0..MAX_FIX_PASSES {
         let analysis = analyze(file, &source, packs, Edits::Apply(allowed));
         let mut edits = EditBatch::default();
-        for (_, edit) in analysis.proposals(allowed) {
-            if edits.fits(edit) {
-                edits.push(edit);
+        for (_, fix) in analysis.proposals(allowed) {
+            if edits.fits(fix) {
+                edits.push(fix);
             }
         }
         let Some((next, applied)) = validated_batch(language, &source, &edits.0) else {
@@ -380,16 +414,16 @@ pub(crate) struct Linted {
 }
 
 impl Linted {
-    pub(crate) fn proposals(&self, allowed: Applicability) -> Vec<(&Found, &Replacement)> {
+    pub(crate) fn proposals(&self, allowed: Applicability) -> Vec<(&Found, &Fix)> {
         let mut edits: Vec<_> = self
             .found
             .iter()
             .filter_map(|found| {
                 let fix = found.fix.as_ref().filter(|fix| fix.level <= allowed)?;
-                Some((found, &fix.replacement))
+                Some((found, fix))
             })
             .collect();
-        edits.sort_by_key(|(_, edit)| edit.range.start);
+        edits.sort_by_key(|(_, fix)| fix.replacement.range.start);
         edits
     }
 }
@@ -430,6 +464,10 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
         Edits::Apply(_) => Calls::default(),
     };
     let imports = imports(&root, language);
+    let context = FixContext {
+        source: src,
+        import_offset: OnceCell::new(),
+    };
     let parsed = Parsed::new(src, language, &root);
     let mut found = Vec::new();
     for MatchedRule {
@@ -445,10 +483,7 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
         let unbound = unbound_names(pack, imports.as_deref());
         for m in matches {
             let start = m.start_pos();
-            let fix = level.and_then(|level| {
-                let replacement = replacement(rule, &m, &unbound, src)?;
-                Some(Fix { level, replacement })
-            });
+            let fix = level.and_then(|level| context.build(rule, &m, pack, &unbound, level));
             let issue = Issue {
                 id: rule.id.clone(),
                 file: file.path.to_path_buf(),
@@ -501,7 +536,21 @@ fn imports(root: &Root, language: SupportLang) -> Option<Vec<Import>> {
                 .any(|outer| matches!(&*outer.kind(), "function_definition" | "class_definition"))
         };
         match &*node.kind() {
-            "aliased_import" | "import_from_statement" if local(&node) => {}
+            "import_statement" | "aliased_import" | "import_from_statement" if local(&node) => {}
+            "import_statement" => {
+                for child in node.field_children("name") {
+                    if child.kind() == "dotted_name" {
+                        let module = child.text().into_owned();
+                        if !module.contains('.') {
+                            imports.push(Import {
+                                name: module.clone(),
+                                module,
+                                binding: Binding::Alias,
+                            });
+                        }
+                    }
+                }
+            }
             "aliased_import" => {
                 let (Some(module), Some(alias)) = (node.field("name"), node.field("alias")) else {
                     continue;
@@ -539,9 +588,93 @@ fn imports(root: &Root, language: SupportLang) -> Option<Vec<Import>> {
     Some(imports)
 }
 
-/// The names of the pack that the file does not bind to their module. A fix that writes `pd.`
-/// applies only in a file with `import pandas as pd`, and a fix that writes `assert_allclose`
-/// only in a file with `from numpy.testing import assert_allclose`.
+/// Byte offset in a Python module where new module-level imports belong: immediately after the
+/// leading import block, or after any leading shebang, encoding comment, module docstring, and
+/// `from __future__` imports.
+fn import_insertion_offset(root: &Root, src: &str) -> Option<usize> {
+    let clean_line_end = |byte: usize| -> Option<usize> {
+        let next_nl = src[byte..].find('\n').map_or(src.len(), |d| byte + d);
+        let rest = src[byte..next_nl].trim_start();
+        if rest.is_empty() || rest.starts_with('#') {
+            Some(if next_nl < src.len() {
+                next_nl + 1
+            } else {
+                src.len()
+            })
+        } else {
+            None
+        }
+    };
+    let mut after_preamble = if src.starts_with('\u{feff}') { 3 } else { 0 };
+    let mut after_imports: Option<usize> = None;
+    let mut saw_docstring = false;
+    let mut saw_non_comment = false;
+    for child in root.root().children() {
+        let kind = child.kind();
+        match &*kind {
+            "comment" => {
+                if !saw_non_comment && after_imports.is_none() {
+                    let text = child.text();
+                    if (text.starts_with("#!") || text.contains("coding"))
+                        && let Some(end) = clean_line_end(child.range().end)
+                    {
+                        after_preamble = end;
+                    }
+                }
+            }
+            "expression_statement"
+                if !saw_non_comment
+                    && !saw_docstring
+                    && child.children().count() == 1
+                    && child.child(0).is_some_and(|c| {
+                        matches!(&*c.kind(), "string" | "concatenated_string")
+                    }) =>
+            {
+                saw_docstring = true;
+                saw_non_comment = true;
+                after_preamble = clean_line_end(child.range().end)?;
+            }
+            "future_import_statement" => {
+                saw_non_comment = true;
+                after_preamble = clean_line_end(child.range().end)?;
+            }
+            "import_statement" | "import_from_statement" => {
+                saw_non_comment = true;
+                let Some(end) = clean_line_end(child.range().end) else {
+                    break;
+                };
+                after_imports = Some(end);
+            }
+            _ => break,
+        }
+    }
+    Some(after_imports.unwrap_or(after_preamble))
+}
+
+fn import_replacement(src: &str, offset: usize, lines: &[&str]) -> Replacement {
+    let mut text = String::new();
+    let newline = if src
+        .split_once('\n')
+        .is_some_and(|(first, _)| first.ends_with('\r'))
+    {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    if !src[..offset].trim_start_matches('\u{feff}').is_empty() && !src[..offset].ends_with('\n') {
+        text.push_str(newline);
+    }
+    for line in lines {
+        text.push_str(line);
+        text.push_str(newline);
+    }
+    Replacement {
+        range: offset..offset,
+        text,
+    }
+}
+
+/// The names of the pack that the file does not bind to their module.
 fn unbound_names<'p>(pack: &'p Pack, imports: Option<&[Import]>) -> Vec<Unbound<'p>> {
     let Some(imports) = imports else {
         return Vec::new();
@@ -556,8 +689,9 @@ fn unbound_names<'p>(pack: &'p Pack, imports: Option<&[Import]>) -> Vec<Unbound<
                         && import.name == **name
                 })
             })
-            .map(move |(name, _)| Unbound {
+            .map(move |(name, module)| Unbound {
                 name,
+                module,
                 binding: binding(),
             })
     };
@@ -603,18 +737,14 @@ impl<'s> Parsed<'s> {
     fn validate<'f>(&self, fixes: impl Iterator<Item = &'f mut Option<Fix>>) {
         let mut ordered: Vec<_> = fixes.filter(|slot| slot.is_some()).collect();
         ordered.sort_by_key(|slot| {
-            (
-                edit_in(slot.as_ref()).range.start,
-                edit_in(slot.as_ref()).range.end,
-            )
+            let r = &fix_in(slot.as_ref()).replacement.range;
+            (r.start, r.end)
         });
         let mut layers: Vec<Vec<&mut Option<Fix>>> = Vec::new();
         for slot in ordered {
-            let start = edit_in(slot.as_ref()).range.start;
+            let fix = fix_in(slot.as_ref());
             let fits = |layer: &&mut Vec<&mut Option<Fix>>| {
-                layer
-                    .last()
-                    .is_none_or(|last| edit_in(last.as_ref()).range.end <= start)
+                fits_after(layer.iter().map(|prev| fix_in(prev.as_ref())), fix)
             };
             match layers.iter_mut().find(fits) {
                 Some(layer) => layer.push(slot),
@@ -627,8 +757,8 @@ impl<'s> Parsed<'s> {
     }
 
     fn validate_group(&self, group: &mut [&mut Option<Fix>]) {
-        let applied: Vec<_> = group.iter().map(|slot| edit_in(slot.as_ref())).collect();
-        if self.accepts(&splice(self.src, &applied)) {
+        let applied: Vec<_> = group.iter().map(|slot| fix_in(slot.as_ref())).collect();
+        if self.accepts(&apply_fixes(self.src, &applied)) {
             return;
         }
         if let [slot] = group {
@@ -641,22 +771,42 @@ impl<'s> Parsed<'s> {
     }
 }
 
-fn edit_in(slot: Option<&Fix>) -> &Replacement {
-    &slot.expect("validation groups contain edits").replacement
+fn fix_in(slot: Option<&Fix>) -> &Fix {
+    slot.expect("validation groups contain edits")
+}
+
+fn nonoverlapping(prev: &Fix, next: &Fix) -> bool {
+    if prev.replacement.range.end > next.replacement.range.start {
+        return false;
+    }
+    if !next.imports.is_empty()
+        && prev.replacement.range.start < next.import_offset
+        && next.import_offset < prev.replacement.range.end
+    {
+        return false;
+    }
+    prev.imports
+        .iter()
+        .all(|(name, line)| next.imports.get(name).is_none_or(|other| line == other))
+}
+
+fn fits_after<'a>(mut previous: impl DoubleEndedIterator<Item = &'a Fix>, next: &Fix) -> bool {
+    previous
+        .next_back()
+        .is_none_or(|last| nonoverlapping(last, next))
+        && (next.imports.is_empty() || previous.all(|fix| nonoverlapping(fix, next)))
 }
 
 #[derive(Default)]
-pub(crate) struct EditBatch<'s>(Vec<&'s Replacement>);
+pub(crate) struct EditBatch<'s>(Vec<&'s Fix>);
 
 impl<'s> EditBatch<'s> {
-    pub(crate) fn fits(&self, edit: &Replacement) -> bool {
-        self.0
-            .last()
-            .is_none_or(|last| last.range.end <= edit.range.start)
+    pub(crate) fn fits(&self, fix: &Fix) -> bool {
+        fits_after(self.0.iter().copied(), fix)
     }
 
-    pub(crate) fn push(&mut self, edit: &'s Replacement) {
-        self.0.push(edit);
+    pub(crate) fn push(&mut self, fix: &'s Fix) {
+        self.0.push(fix);
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -668,8 +818,35 @@ impl<'s> EditBatch<'s> {
     }
 
     pub(crate) fn apply(&self, source: &str) -> String {
-        splice(source, &self.0)
+        apply_fixes(source, &self.0)
     }
+}
+
+/// `src` with `fixes` and their deduplicated module-level imports applied.
+fn apply_fixes(src: &str, fixes: &[&Fix]) -> String {
+    let mut by_offset: BTreeMap<usize, BTreeSet<&str>> = BTreeMap::new();
+    for fix in fixes {
+        if !fix.imports.is_empty() {
+            let entry = by_offset.entry(fix.import_offset).or_default();
+            entry.extend(fix.imports.values().map(String::as_str));
+        }
+    }
+    let import_edits: Vec<Replacement> = by_offset
+        .into_iter()
+        .map(|(offset, lines)| {
+            let ordered: Vec<&str> = lines.into_iter().collect();
+            import_replacement(src, offset, &ordered)
+        })
+        .collect();
+    let mut all: Vec<&Replacement> = Vec::with_capacity(fixes.len() + import_edits.len());
+    for edit in &import_edits {
+        all.push(edit);
+    }
+    for fix in fixes {
+        all.push(&fix.replacement);
+    }
+    all.sort_by_key(|edit| (edit.range.start, edit.range.end));
+    splice(src, &all)
 }
 
 /// `src` with `fixes` applied, which do not overlap and are in the order of their positions.
@@ -685,44 +862,137 @@ fn splice(src: &str, fixes: &[&Replacement]) -> String {
     out
 }
 
-/// The replacement `rule` makes for `m`, or `None` when the rule has no fix, its fix writes one
-/// of the `unbound` names, or its fix leaves the text as it is. A fix is a text template, so it
-/// cannot know every form of the code around a match, such as an argument list that ends in a
-/// comment. [`Parsed::validate`] therefore checks the fixed file before a fix is offered.
-fn replacement(
-    rule: &Rule,
-    m: &NodeMatch<'_, StrDoc<SupportLang>>,
-    unbound: &[Unbound<'_>],
-    src: &str,
-) -> Option<Replacement> {
-    let fixer = rule.config.fixer.first()?;
-    let edit = m.make_edit(&rule.config.matcher, fixer);
-    let range = edit.position..edit.position + edit.deleted_length;
-    if edit.inserted_text == src.as_bytes()[range.clone()]
-        || unbound
-            .iter()
-            .any(|name| name.written_in(&edit.inserted_text))
-    {
-        return None;
+struct FixContext<'s> {
+    source: &'s str,
+    import_offset: OnceCell<Option<usize>>,
+}
+
+impl FixContext<'_> {
+    fn build(
+        &self,
+        rule: &Rule,
+        matched: &NodeMatch<'_, StrDoc<SupportLang>>,
+        pack: &Pack,
+        unbound: &[Unbound<'_>],
+        level: Applicability,
+    ) -> Option<Fix> {
+        let fixer = rule.config.fixer.first()?;
+        let edit = matched.make_edit(&rule.config.matcher, fixer);
+        let range = edit.position..edit.position + edit.deleted_length;
+        let original = &self.source.as_bytes()[range.clone()];
+        if edit.inserted_text == original {
+            return None;
+        }
+        if unbound.iter().any(|name| {
+            !rule
+                .fix_imports
+                .iter()
+                .any(|requested| name.name == requested)
+                && name.written_in(&edit.inserted_text)
+        }) {
+            return None;
+        }
+        let mut imports = BTreeMap::new();
+        let mut import_offset = 0;
+        for requested in &rule.fix_imports {
+            let (binding, module) = if let Some(module) = pack.members.get(requested) {
+                (Binding::Member, module)
+            } else {
+                (Binding::Alias, pack.aliases.get(requested)?)
+            };
+            let name = Unbound {
+                name: requested,
+                module,
+                binding,
+            };
+            let root = matched.root();
+            if requires_import(root, &name, range.start)? {
+                import_offset = (*self
+                    .import_offset
+                    .get_or_init(|| import_insertion_offset(root, self.source)))?;
+                if import_offset > range.start {
+                    return None;
+                }
+                imports.insert(requested.clone(), name.import_statement());
+            }
+        }
+        let text = String::from_utf8(edit.inserted_text).expect("a fix writes UTF-8 text");
+        Some(Fix {
+            level,
+            replacement: Replacement { range, text },
+            import_offset,
+            imports,
+        })
     }
-    let text = String::from_utf8(edit.inserted_text).expect("a fix writes UTF-8 text");
-    Some(Replacement { range, text })
+}
+
+/// Reuse a direct module import that precedes the fix and is the only binding of the name.
+/// Otherwise insert an import only when the name is unused throughout the file.
+fn requires_import(root: &Root, name: &Unbound<'_>, before: usize) -> Option<bool> {
+    let expected = match name.binding {
+        Binding::Alias => name.module.to_owned(),
+        Binding::Member => format!("{}.{}", name.module, name.name),
+    };
+    let mut imported = false;
+    let mut seen = false;
+    for node in root.root().dfs() {
+        if node.kind() == "wildcard_import" {
+            return None;
+        }
+        if node.kind() != "identifier" || node.text() != name.name {
+            continue;
+        }
+        seen = true;
+        if !crate::names::is_bound(&node) && !crate::names::is_parameter_name(&node) {
+            continue;
+        }
+        let import = node.ancestors().find(|parent| {
+            matches!(
+                &*parent.kind(),
+                "import_statement" | "import_from_statement"
+            )
+        });
+        if !import.is_some_and(|stmt| {
+            stmt.range().end <= before && stmt.parent().is_some_and(|p| p.kind() == "module")
+        }) || crate::names::import_binding(&node).as_deref() != Some(&expected)
+        {
+            return None;
+        }
+        imported = true;
+    }
+    if imported || !seen {
+        Some(!imported)
+    } else {
+        None
+    }
 }
 
 impl Unbound<'_> {
     /// Whether `text` uses the name: an alias as the start of a dotted name, such as `pd.col`,
-    /// and a member as a whole name that is not an attribute, such as `assert_allclose(`.
+    /// and a member as a whole name that is not an attribute or keyword label, such as
+    /// `assert_allclose(`.
     fn written_in(&self, text: &[u8]) -> bool {
         let part_of_name = |byte: &u8| byte.is_ascii_alphanumeric() || *byte == b'_';
         let name = self.name.as_bytes();
         text.windows(name.len()).enumerate().any(|(i, window)| {
             let before = i.checked_sub(1).map(|i| &text[i]);
-            let after = text.get(i + name.len());
+            let after_idx = i + name.len();
+            let after = text.get(after_idx);
             window == name
                 && !before.is_some_and(|byte| part_of_name(byte) || *byte == b'.')
                 && match self.binding {
                     Binding::Alias => after == Some(&b'.'),
-                    Binding::Member => !after.is_some_and(part_of_name),
+                    Binding::Member => {
+                        if after.is_some_and(part_of_name) {
+                            return false;
+                        }
+                        let rest = &text[after_idx..];
+                        let trimmed = rest
+                            .iter()
+                            .position(|b| !b.is_ascii_whitespace())
+                            .map_or(&[][..], |p| &rest[p..]);
+                        !trimmed.starts_with(b"=") || trimmed.starts_with(b"==")
+                    }
                 }
         })
     }

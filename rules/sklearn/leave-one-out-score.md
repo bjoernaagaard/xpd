@@ -12,7 +12,7 @@ or ROC AUC given as `scoring`, or the R2 that a regressor scores by default.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd sets `scoring="neg_mean_squared_error"` for regressor calls that rely on the default score.
 
 With one row per fold, each fold warns and scores nan, and a search over nan scores picks its first
 candidate. Under `python -W error` each warning is an `UndefinedMetricWarning` that raises.

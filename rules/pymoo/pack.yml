@@ -13,6 +13,7 @@ members:
   WeightedSum: pymoo.decomposition.weighted_sum
   ASF: pymoo.decomposition.asf
   PerpendicularDistance: pymoo.decomposition.perp_dist
+  StarmapParallelization: pymoo.parallelization
 # The pack has no package check. pymoo 0.6.2 installs what it needs to run, moocore and cma
 # among them, and its wheels hold the built functions. autograd, jax, dask, joblib, ray and
 # optuna each serve one module that most projects never import.

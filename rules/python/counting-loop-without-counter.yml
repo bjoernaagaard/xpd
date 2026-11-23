@@ -1,22 +1,13 @@
-# A loop whose only statement is counts[item] = counts.get(item, 0) + 1 counts the items, which
-# collections.Counter does in one call. The Python documentation describes a Counter as "a dict
-# subclass for counting hashable objects". On Python 3.15.2 on one machine, counting 100,000
-# items under 50 keys took 2.59 milliseconds with the loop and 1.79 with Counter(items). The
-# rule reports only a loop that holds that one statement and counts the loop variable itself,
-# on a dict that the same function starts as an empty dict. It leaves alone a loop that does
-# anything else, because a Counter that is filled with counts[key] += 1 in a loop took 4.43
-# milliseconds, and a loop that counts a part of each item, because Counter(item.kind for item
-# in items) took 4.12 milliseconds against 4.23 for the loop. It has no fix, because a Counter
-# returns 0 for a key that is missing.
 id: counting-loop-without-counter
 language: python
 severity: warning
-message: This loop only counts the items of $ITEMS. Write $D = collections.Counter($ITEMS) in place of the loop.
+message: This loop only counts the items of $ITEMS. Write $D = collections.Counter(iter($ITEMS)) in place of the loop.
 rule:
   kind: for_statement
   all:
     - has: { field: left, pattern: $KEY }
     - has: { field: right, pattern: $ITEMS }
+    - not: { has: { field: alternative, kind: else_clause } }
     - has:
         field: body
         kind: block
@@ -26,6 +17,52 @@ rule:
               has: { pattern: "$D[$KEY] = $D.get($KEY, 0) + 1" }
           - not:
               has: { nthChild: 2 }
+    - follows:
+        stopBy: { not: { kind: comment } }
+        kind: expression_statement
+        has:
+          kind: assignment
+          any:
+            - pattern: $D = {}
+            - pattern: "$D: $TYPE = {}"
+            - pattern: $D = dict()
+            - pattern: "$D: $TYPE = dict()"
+constraints:
+  D: { kind: identifier }
+  KEY: { kind: identifier }
+fix: $D = Counter(iter($ITEMS))
+metadata: { fix: unsafe, fixImports: [Counter] }
+---
+id: counting-loop-without-counter
+language: python
+severity: warning
+message: This loop only counts the items of $ITEMS. Write $D = collections.Counter(iter($ITEMS)) in place of the loop.
+rule:
+  kind: for_statement
+  all:
+    - has: { field: left, pattern: $KEY }
+    - has: { field: right, pattern: $ITEMS }
+    - not: { has: { field: alternative, kind: else_clause } }
+    - has:
+        field: body
+        kind: block
+        all:
+          - has:
+              kind: expression_statement
+              has: { pattern: "$D[$KEY] = $D.get($KEY, 0) + 1" }
+          - not:
+              has: { nthChild: 2 }
+    - not:
+        follows:
+          stopBy: { not: { kind: comment } }
+          kind: expression_statement
+          has:
+            kind: assignment
+            any:
+              - pattern: $D = {}
+              - pattern: "$D: $TYPE = {}"
+              - pattern: $D = dict()
+              - pattern: "$D: $TYPE = dict()"
     - inside:
         stopBy: { kind: function_definition }
         kind: function_definition

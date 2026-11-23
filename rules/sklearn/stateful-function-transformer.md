@@ -12,7 +12,7 @@ that takes statistics of the rows it gets. At predict time it then scales by the
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd replaces simple mean and standard deviation or min and max lambdas with the corresponding scaler.
 
 The rule is info, because on data with no signal it doesn't move a score. Predicted in batches of
 5 rows it scored 0.484 against 0.494 for `StandardScaler`. On data with signal, over 30 seeds,

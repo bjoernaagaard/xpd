@@ -99,6 +99,8 @@ macro_rules! metadata {
 
 metadata! {
     fix: Option<Applicability>,
+    #[serde(default)]
+    fix_imports: Vec<String> => "fixImports",
     /// Several documents can report under the same name while keeping distinct IDs in ast-grep.
     public_id: Option<String>,
     since: Option<Version> => "since",
@@ -159,6 +161,7 @@ pub(crate) struct Rule {
     pub(crate) config: RuleConfig<SupportLang>,
     /// `None` when the rule has no fix.
     pub(crate) fix: Option<Applicability>,
+    pub(crate) fix_imports: Vec<String>,
     /// The first library version the rule applies to.
     pub(crate) since: Option<Version>,
     /// The first library version the rule no longer applies to. A rule with `until` gives the
@@ -259,6 +262,11 @@ impl Rule {
             .resolve(config.fixer.len(), metadata.fix)?;
         let python_checks = origin != Origin::Structural && config.language == SupportLang::Python;
         ensure!(
+            metadata.fix_imports.is_empty()
+                || (python_checks && fix == Some(Applicability::Unsafe)),
+            "metadata.fixImports needs an unsafe fix in a Python rule pack"
+        );
+        ensure!(
             python_checks
                 || (metadata.holds.is_empty()
                     && metadata.unless_holds.is_empty()
@@ -305,6 +313,7 @@ impl Rule {
             declared_id,
             config,
             fix,
+            fix_imports: metadata.fix_imports,
             since: metadata.since,
             until: metadata.until,
             files,

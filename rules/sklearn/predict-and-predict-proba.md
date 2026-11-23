@@ -16,7 +16,7 @@ The rule reports `model.predict(X_test)` next to `model.predict_proba(X_test)` w
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd reuses probabilities saved in the immediately preceding statement. Check that the model has one output per row.
 
 The rule covers the classes whose `predict` takes the argmax of `predict_proba`. Deriving the
 labels from one `predict_proba` was 1.83 to 2.00 times faster for the three classes at 1,000 and
