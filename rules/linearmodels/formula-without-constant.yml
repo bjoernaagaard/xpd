@@ -35,6 +35,14 @@ rule:
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|BetweenOLS|FamaMacBeth|IV3SLS|IVSystemGMM)$' }, { all: [{ regex: '(^|\.)(SUR)$' }, { matches: from-linearmodels }] }] }
+transform:
+  FIXED:
+    replace:
+      source: $F
+      replace: '^([^~]+~)\s*'
+      by: '${1} 1 + '
+fix: $FIXED
+metadata: { fix: unsafe }
 ---
 # No fix, for the same reason as the first document.
 id: formula-without-constant
@@ -56,3 +64,11 @@ rule:
 utils:
   # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(IVLIML|IVGMMCUE|IVJIVE)$' }, { all: [{ regex: '(^|\.)(OLS|IV2SLS|IVGMM)$' }, { matches: from-linearmodels }] }] }
+transform:
+  FIXED:
+    replace:
+      source: $F
+      replace: '^([^~]+~)\s*'
+      by: '${1} 1 + '
+fix: $FIXED
+metadata: { fix: unsafe }

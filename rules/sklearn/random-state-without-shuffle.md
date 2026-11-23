@@ -12,7 +12,7 @@ ValueError.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `shuffle=True` when `random_state` is passed and `shuffle` is omitted. Calls that explicitly pass `shuffle=False` remain manual so you can decide whether to enable shuffling or drop `random_state`.
 
 The rule covers `KFold`, `StratifiedKFold` and `StratifiedGroupKFold`, and `GroupKFold` from
 scikit-learn 1.6, which added its `shuffle`. Each raises "Setting a random_state has no effect

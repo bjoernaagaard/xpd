@@ -13,4 +13,4 @@ With CoreForecast 0.0.20 and ten values, `[3, 10]` defined one series with seven
 
 ## How to fix it
 
-Use the cumulative series lengths with a leading zero and make sure the last offset equals the length of the values array. xpd has no automatic fix because the code may also need to change which values it passes.
+`xpd check --fix --unsafe-fixes` prepends `0` to literal list or tuple offsets inside `np.array(...)` or `numpy.array(...)`. It is unsafe because you should also confirm that the last offset matches the length of the values array.

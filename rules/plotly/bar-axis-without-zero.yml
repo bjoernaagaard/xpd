@@ -21,65 +21,105 @@ language: python
 severity: warning
 message: range_y=$R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 were drawn 163.6 and 327.3 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with px.scatter.
 rule:
-  kind: call
-  all:
-    - any:
-        - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
-        - all:
-            - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(histogram)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
-            - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } }
-            - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } } }
-    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(range_y)$' } }, { has: { field: value, pattern: $R, matches: cut-range } }] } }
-    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|log_y|base)$' } } } }
-    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  pattern: $R
+  matches: cut-range
+  inside:
+    kind: keyword_argument
+    field: value
+    all:
+      - has: { field: name, regex: '^(range_y)$' }
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            all:
+              - any:
+                  - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+                  - all:
+                      - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(histogram)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+                      - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(x)$' } } }
+                      - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(y)$' } } } }
+              - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|log_y|base)$' } } } }
+              - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
+metadata: { fix: unsafe }
 ---
-# The same cut on bars that lie down: orientation="h" with range_x. The bars for 95 and 100 were
-# drawn 245.4 and 490.9 pixels long with range_x=[90, 101].
 id: bar-axis-without-zero
 language: python
 severity: warning
 message: range_x=$R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 were drawn 245.4 and 490.9 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with px.scatter.
 rule:
-  kind: call
-  all:
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
-    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(orientation)$' } }, { has: { field: value, regex: '^["'']h["'']$'  } }] } }
-    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(range_x)$' } }, { has: { field: value, pattern: $R, matches: cut-range } }] } }
-    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(log_x|base)$' } } } }
-    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  pattern: $R
+  matches: cut-range
+  inside:
+    kind: keyword_argument
+    field: value
+    all:
+      - has: { field: name, regex: '^(range_x)$' }
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            all:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(bar)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+              - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(orientation)$' } }, { has: { field: value, regex: '^["'']h["'']$' } }] } }
+              - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(log_x|base)$' } } } }
+              - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
+metadata: { fix: unsafe }
 ---
-# The same cut set on the figure afterwards: update_yaxes(range=...), update_layout with
-# yaxis_range=... or with yaxis=dict(range=...). The figure must be one of upright bars, by the
-# call that made it, and a file that names a log axis anywhere is left alone.
 id: bar-axis-without-zero
 language: python
 severity: warning
 message: The range $R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 were drawn 163.6 and 327.3 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with px.scatter.
 rule:
   all:
+    - pattern: $R
+    - matches: cut-range
     - any:
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: figure } }] } } }
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^yaxis_range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
-        - any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
-          all:
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside:
-                any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
-                inside:
-                  stopBy: { kind: argument_list }
-                  kind: keyword_argument
-                  all:
-                    - has: { field: name, regex: '^yaxis$' }
-                    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^range$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: figure } }] } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^yaxis_range$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
+        - inside:
+            field: value
+            any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
+            inside:
+              any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+              inside:
+                stopBy: { kind: argument_list }
+                kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^yaxis$' }
+                  - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
     - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
 utils:
   # A figure of upright bars: px.bar or px.histogram without orientation, log_y and base, or a
   # go.Figure whose own arguments hold a go.Bar without orientation and base.
@@ -125,7 +165,7 @@ utils:
     any:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+metadata: { holds: { FIG: { matches: figure-expr } }, fix: unsafe }
 ---
 # The same cut on bars added after the figure is made: fig = go.Figure(), then
 # fig.add_trace(go.Bar(...)) or fig.add_bar(...), then a range set as in the third document. On
@@ -142,29 +182,40 @@ severity: warning
 message: The range $R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 added to a go.Figure were drawn 145.4 and 290.9 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with go.Scatter.
 rule:
   all:
+    - pattern: $R
+    - matches: cut-range
     - any:
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: bar-built } }] } } }
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^yaxis_range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: bar-built } }] } } }
-        - any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
-          all:
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside:
-                any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
-                inside:
-                  stopBy: { kind: argument_list }
-                  kind: keyword_argument
-                  all:
-                    - has: { field: name, regex: '^yaxis$' }
-                    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: bar-built } }] } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^range$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: bar-built } }] } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^yaxis_range$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: bar-built } }] } } }
+        - inside:
+            field: value
+            any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
+            inside:
+              any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+              inside:
+                stopBy: { kind: argument_list }
+                kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^yaxis$' }
+                  - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: bar-built } }] } } }
     - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
 utils:
   # A go.Figure that holds no go.Bar of its own, so its bars come from add_trace or add_bar.
   new-figure-without-bars:
@@ -243,7 +294,7 @@ utils:
       - { kind: as_pattern_target, has: { stopBy: end, pattern: $FIG } }
       - { kind: named_expression, has: { field: name, pattern: $FIG } }
   holds-binder: { any: [{ matches: binder }, { has: { stopBy: end, matches: binder } }] }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+metadata: { holds: { FIG: { matches: figure-expr } }, fix: unsafe }
 ---
 # The same cut written in the constructor: go.Figure(data=[go.Bar(...)], layout=...) with
 # yaxis=dict(range=...) in go.Layout, in dict or in a dictionary, or with layout_yaxis_range=....
@@ -255,27 +306,38 @@ severity: warning
 message: The range $R starts the bar axis above zero, so the length of a bar no longer follows its value. With [90, 101], bars for 95 and 100 were drawn 145.4 and 290.9 pixels long, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or show the values as points with px.scatter.
 rule:
   all:
+    - pattern: $R
+    - matches: cut-range
     - any:
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^layout_yaxis_range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { matches: go-bar-figure } }
-        - any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
-          all:
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside:
-                any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(dict|(\w+\.)+YAxis)$' } } }, { kind: dictionary }]
-                inside:
-                  stopBy: { kind: argument_list }
-                  any: [{ kind: keyword_argument, has: { field: name, regex: '^yaxis$' } }, { kind: pair, has: { field: key, regex: '^["'']yaxis["'']$' } }]
-            - inside:
-                stopBy: end
-                kind: keyword_argument
-                all:
-                  - has: { field: name, regex: '^layout$' }
-                  - inside: { kind: argument_list, inside: { matches: go-bar-figure } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^layout_yaxis_range$' }
+              - inside: { kind: argument_list, inside: { matches: go-bar-figure } }
+        - inside:
+            field: value
+            any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
+            all:
+              - inside:
+                  any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^(dict|(\w+\.)+YAxis)$' } } }, { kind: dictionary }]
+                  inside:
+                    stopBy: { kind: argument_list }
+                    any: [{ kind: keyword_argument, has: { field: name, regex: '^yaxis$' } }, { kind: pair, has: { field: key, regex: '^["'']yaxis["'']$' } }]
+              - inside:
+                  stopBy: end
+                  kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^layout$' }
+                    - inside: { kind: argument_list, inside: { matches: go-bar-figure } }
     - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
 utils:
   # A figure of upright bars: px.bar or px.histogram without orientation, log_y and base, or a
   # go.Figure whose own arguments hold a go.Bar without orientation and base.
@@ -321,4 +383,4 @@ utils:
     any:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+metadata: { holds: { FIG: { matches: figure-expr } }, fix: unsafe }

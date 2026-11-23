@@ -16,4 +16,4 @@ times faster.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `np.array([tree.query(q)[i] for q in queries])` to `tree.query(queries)[i]`. Other loop and comprehension forms remain manual.

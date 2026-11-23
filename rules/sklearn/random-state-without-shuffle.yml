@@ -12,7 +12,31 @@ rule:
   pattern: $K($$$A)
   all:
     - has: { field: function, regex: '(^|\.)(KFold|StratifiedKFold|StratifiedGroupKFold)$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^shuffle$' } }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } } }
+    - not: { all: [{ not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_splits$' } } } } }, { matches: old-cross-validation }] }
+fix: $K($$$A, shuffle=True)
+metadata: { fix: unsafe }
+utils:
+  old-cross-validation:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        any: [{ kind: import_from_statement }, { kind: import_statement }]
+        regex: '^(from\s+sklearn\.cross_validation\s+import|from\s+sklearn\s+import\b[^#]*\bcross_validation\b|import\s+sklearn\.cross_validation\b)'
+---
+id: random-state-without-shuffle
+language: python
+severity: error
+message: $K uses random_state only when it shuffles, so without shuffle=True it raises a ValueError. Pass shuffle=True, or drop random_state.
+rule:
+  pattern: $K($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)(KFold|StratifiedKFold|StratifiedGroupKFold)$' }
     - matches: random-state-alone
+    - has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { has: { field: value, kind: 'false' } }] }, { kind: comment }, { kind: line_continuation }] } }
     - not: { all: [{ not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_splits$' } } } } }, { matches: old-cross-validation }] }
 utils:
   random-state-alone:
@@ -36,7 +60,31 @@ rule:
   pattern: $K($$$A)
   all:
     - has: { field: function, regex: '(^|\.)GroupKFold$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^random_state$' } }, { not: { has: { field: value, kind: none } } }] } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^shuffle$' } }, { kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } } }
+    - not: { all: [{ not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_splits$' } } } } }, { matches: old-cross-validation }] }
+fix: $K($$$A, shuffle=True)
+utils:
+  old-cross-validation:
+    inside:
+      kind: module
+      stopBy: end
+      has:
+        stopBy: end
+        any: [{ kind: import_from_statement }, { kind: import_statement }]
+        regex: '^(from\s+sklearn\.cross_validation\s+import|from\s+sklearn\s+import\b[^#]*\bcross_validation\b|import\s+sklearn\.cross_validation\b)'
+metadata: { since: "1.6", fix: unsafe }
+---
+id: random-state-without-shuffle
+language: python
+severity: error
+message: GroupKFold uses random_state only when it shuffles, so without shuffle=True it raises a ValueError. Pass shuffle=True, or drop random_state.
+rule:
+  pattern: $K($$$A)
+  all:
+    - has: { field: function, regex: '(^|\.)GroupKFold$' }
     - matches: random-state-alone
+    - has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^shuffle$' } }, { has: { field: value, kind: 'false' } }] }, { kind: comment }, { kind: line_continuation }] } }
     - not: { all: [{ not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^n_splits$' } } } } }, { matches: old-cross-validation }] }
 utils:
   random-state-alone:

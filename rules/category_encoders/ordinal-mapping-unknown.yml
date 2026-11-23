@@ -17,4 +17,20 @@ rule:
     - has: { field: function, regex: '(^|\.)OrdinalEncoder$' }
     - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mapping$' } }, { not: { has: { field: value, kind: none } } }] } }
     - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^handle_unknown$' } } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } } }
+fix: $C($$$ARGS, handle_unknown="error")
+metadata: { fix: unsafe }
+---
+id: ordinal-mapping-unknown
+language: python
+severity: warning
+message: A category that the mapping does not name is coded -1 in silence, as c was when the mapping named only a and b. Pass handle_unknown="error" to raise on such a category, or state the handle_unknown you want.
+rule:
+  kind: call
+  pattern: $C($$$ARGS)
+  all:
+    - has: { field: function, regex: '(^|\.)OrdinalEncoder$' }
+    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^mapping$' } }, { not: { has: { field: value, kind: none } } }] } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^handle_unknown$' } } } }
     - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+    - has: { field: arguments, has: { any: [{ kind: list_splat }, { kind: comment }, { kind: line_continuation }] } }

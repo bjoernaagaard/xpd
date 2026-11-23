@@ -20,4 +20,4 @@ are left alone.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites single-argument `np.array([special.<ufunc>(x) for x in it])` and `np.array([stats.<dist>.<method>(x) for x in it])` comprehensions to a single array call with `np.asarray(it)`. Other comprehension and generator forms remain manual.

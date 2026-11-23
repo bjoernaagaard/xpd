@@ -9,11 +9,72 @@ language: python
 severity: warning
 message: This queries $T once per point. Pass all the points to $T.query in one call, as an array of shape (n, k), which ran 16 to 17 times faster on 1,000,000 points.
 rule:
+  pattern: $NP.array([$T.query($X)[$I] for $X in $Y])
+  all:
+    - not: { has: { stopBy: end, kind: if_clause } }
+    - inside:
+        stopBy: end
+        kind: function_definition
+        has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $T } }, { has: { field: right, matches: tree-call } }] }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  T: { kind: identifier }
+  X: { kind: identifier }
+fix: $T.query($Y)[$I]
+metadata: { fix: unsafe }
+utils:
+  tree-call:
+    kind: call
+    has:
+      field: function
+      any:
+        - { pattern: $M.$K, matches: spatial-module }
+        - { kind: identifier, pattern: $K, matches: from-spatial }
+      regex: '(^|\.)c?KDTree$'
+  spatial-module:
+    any:
+      - has: { field: object, regex: '^scipy\.spatial$' }
+      - all:
+          - has: { field: object, pattern: $S.spatial }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $M }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.spatial$' } }, { has: { field: alias, pattern: $M } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $M, regex: '^spatial$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^spatial$' } }, { has: { field: alias, pattern: $M } }] }
+  from-spatial:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        kind: import_from_statement
+        all: [{ has: { field: module_name, regex: '^scipy\.spatial$' } }, { has: { kind: dotted_name, pattern: $K } }]
+---
+id: query-per-point
+language: python
+severity: warning
+message: This queries $T once per point. Pass all the points to $T.query in one call, as an array of shape (n, k), which ran 16 to 17 times faster on 1,000,000 points.
+rule:
   kind: call
   all:
     - has: { field: function, pattern: $T.query }
     # The point is a name or one row of an array, $P[$X], and the loop takes $X as its name.
     - has: { field: arguments, has: { nthChild: 1, any: [{ kind: identifier, pattern: $X }, { kind: subscript, pattern: '$P[$X]' }] } }
+    - not:
+        inside:
+          stopBy: end
+          pattern: $NP.array([$T.query($X)[$I] for $X in $Y])
+          not: { has: { stopBy: end, kind: if_clause } }
     - any:
         - inside: { stopBy: { kind: function_definition }, matches: per-point-comprehension }
         - inside: { stopBy: { kind: function_definition }, kind: block, inside: { kind: for_statement, matches: per-point-loop } }
@@ -22,6 +83,7 @@ rule:
         kind: function_definition
         has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $T } }, { has: { field: right, matches: tree-call } }] }
 constraints:
+  NP: { regex: '^(np|numpy)$' }
   T: { kind: identifier }
   X: { kind: identifier }
 utils:

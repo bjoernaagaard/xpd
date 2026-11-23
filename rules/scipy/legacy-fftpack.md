@@ -15,4 +15,4 @@ claims only the preference.
 
 ## How to fix it
 
-xpd has no automatic fix. Because `rfft` packs its output differently and the pseudo differential operators have no `scipy.fft` form. Make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `from scipy.fftpack import ...` to `from scipy.fft import ...` when every imported name has a compatible `scipy.fft` equivalent (excluding `rfft`, `irfft`, `rfftfreq`, and pseudo-differential operators). Other imports remain manual.

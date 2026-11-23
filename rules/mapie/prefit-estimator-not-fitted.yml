@@ -50,6 +50,56 @@ severity: error
 message: This object has prefit=True, which is the default, and fit then raises ValueError. Pass prefit=False to let fit train the estimator, or drop this fit and call conformalize with an estimator that is already fitted.
 rule:
   kind: call
+  pattern: $C($$$ARGS).fit($$$FIT_ARGS)
+  all:
+    - has:
+        field: function
+        kind: attribute
+        all:
+          - has: { field: attribute, regex: '^fit$' }
+          - has:
+              field: object
+              all:
+                - matches: prefit-split
+                - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^prefit$' } }, { kind: comment }, { kind: line_continuation }, { kind: list_splat }, { kind: dictionary_splat }] } } }
+  not: { matches: expected-to-raise }
+fix: $C($$$ARGS, prefit=False).fit($$$FIT_ARGS)
+metadata: { fix: unsafe }
+utils:
+  prefit-split:
+    kind: call
+    all:
+      - has: { field: function, regex: '(^|\.)(Conditional)?SplitConformal(Regressor|Classifier)$' }
+      - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, all: [{ has: { field: name, regex: '^prefit$' } }, { not: { has: { field: value, regex: '^True$' } } }] }, { kind: dictionary_splat }] } } }
+      - not:
+          has:
+            field: arguments
+            has:
+              any:
+                - all: [{ nthChild: 1 }, { matches: new-estimator }, { inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)SplitConformal(Regressor|Classifier)$' } } } }]
+                - kind: keyword_argument
+                  all:
+                    - has: { field: name, regex: '^estimator$' }
+                    - has: { field: value, matches: new-estimator }
+  new-estimator:
+    kind: call
+    all:
+      - has:
+          field: function
+          any:
+            - kind: identifier
+              regex: '^([A-Z]\w*|make_pipeline)$'
+            - kind: attribute
+              has: { field: attribute, regex: '^([A-Z]\w*|make_pipeline)$' }
+      - not: { has: { field: function, regex: '(^|\.)FrozenEstimator$' } }
+      - not: { has: { field: arguments, has: { kind: call, not: { kind: keyword_argument }, has: { field: function, kind: attribute, has: { field: attribute, regex: '^fit$' } } } } }
+---
+id: prefit-estimator-not-fitted
+language: python
+severity: error
+message: This object has prefit=True, which is the default, and fit then raises ValueError. Pass prefit=False to let fit train the estimator, or drop this fit and call conformalize with an estimator that is already fitted.
+rule:
+  kind: call
   has:
     field: function
     kind: attribute
@@ -58,7 +108,9 @@ rule:
       - has:
           field: object
           any:
-            - matches: prefit-split
+            - all:
+                - matches: prefit-split
+                - has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^prefit$' } }, { kind: comment }, { kind: line_continuation }, { kind: list_splat }, { kind: dictionary_splat }] } }
             - pattern: $M
               kind: identifier
               all:

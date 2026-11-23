@@ -22,4 +22,4 @@ a matrix, are left alone, because such code builds the matrix on purpose.
 
 ## How to fix it
 
-xpd has no automatic fix. Because `*` and `**` work elementwise on a sparse array, a row slice of one is 1-D and `todense` gives an ndarray. Skipped on SciPy older than 1.8 for the classes and 1.12 for the builder functions. Make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites module-qualified sparse matrix constructors (`sparse.csr_matrix` -> `sparse.csr_array`, etc.). It is unsafe because `*` and `**` work elementwise on sparse arrays, row slices are 1-D, and `todense()` returns an `ndarray`. Bare imported names and builder functions remain manual. Skipped on SciPy older than 1.8 for the classes and 1.12 for the builder functions.

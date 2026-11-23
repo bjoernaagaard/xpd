@@ -20,4 +20,4 @@ The rule leaves alone a `Problem` class that passes `elementwise=` with any valu
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `x[:, i]` to `x[i]` inside `ElementwiseProblem._evaluate` and `x[i]` to `x[:, i]` inside `Problem._evaluate`. It is unsafe because changing the base class instead is also a valid fix.

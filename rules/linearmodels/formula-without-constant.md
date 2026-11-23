@@ -18,7 +18,7 @@ regression with an intercept in statsmodels.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` inserts `1 + ` right after the first `~` in literal formula strings. It is unsafe because a regression through the origin (`- 1`) may have been intended.
 
 On 7.1 and on 7.0, the models gave the following coefficient of `exper` on the wage panel, and of
 `educ` for `IV2SLS` on the mroz data:

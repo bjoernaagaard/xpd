@@ -12,7 +12,7 @@ The rule reports an area chart whose value axis is given a range that starts abo
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` resets the lower bound of the explicit range list to `0` (for example `[90, 101]` -> `[0, 101]`). It is unsafe because switching to `px.line` or dropping the range altogether may be preferred.
 
 An area chart shows its value by the height of the fill below the line. plotly starts the axis
 of `px.area` and of `go.Scatter(fill="tozeroy")` at zero by itself. It keeps an explicit range

@@ -3,34 +3,75 @@ language: python
 severity: warning
 message: GroupedArray offsets must start at zero. A first offset above zero leaves those observations outside any series. Prepend 0 if these offsets are cumulative series lengths.
 rule:
-  kind: call
+  kind: list
+  pattern: '[$FIRST, $$$REST]'
   all:
-    - has: { field: function, pattern: $CONSTRUCTOR }
-    - has:
-        field: arguments
-        all:
-          - not: { has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
-          - has:
-              any:
-                - kind: keyword_argument
-                  has: { field: name, regex: '^indptr$' }
-                  all: [{ has: { field: value, matches: bad-offsets } }]
-                - nthChild: { position: 2, ofRule: { not: { kind: comment } } }
-                  matches: bad-offsets
+    - has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, kind: integer, regex: '^[1-9][0-9_]*$' }
+    - not: { has: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    - inside: { matches: bad-offsets-args }
 utils:
-  bad-offsets:
-    kind: call
+  bad-offsets-args:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+        - has: { field: function, regex: '^(np|numpy)\.array$' }
+        - any:
+            - inside:
+                kind: keyword_argument
+                field: value
+                all:
+                  - has: { field: name, regex: '^indptr$' }
+                  - inside: { matches: grouped-array-args }
+            - all:
+                - nthChild: { position: 2, ofRule: { not: { kind: comment } } }
+                - inside: { matches: grouped-array-args }
+  grouped-array-args:
+    kind: argument_list
     all:
-      - has: { field: function, regex: '^(np|numpy)\.array$' }
-      - has:
-          field: arguments
-          has:
-            nthChild: { position: 1, ofRule: { not: { kind: comment } } }
-            any: [{ kind: list }, { kind: tuple }]
-            has:
-              nthChild: { position: 1, ofRule: { not: { kind: comment } } }
-              kind: integer
-              regex: '^[1-9][0-9_]*$'
+      - not: { has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+      - inside: { kind: call, has: { field: function, pattern: $CONSTRUCTOR } }
+fix: '[0, $FIRST, $$$REST]'
 metadata:
+  fix: unsafe
+  holds:
+    CONSTRUCTOR: { regex: '(^|\.)GroupedArray$' }
+---
+id: indptr-missing-zero
+language: python
+severity: warning
+message: GroupedArray offsets must start at zero. A first offset above zero leaves those observations outside any series. Prepend 0 if these offsets are cumulative series lengths.
+rule:
+  kind: tuple
+  pattern: '($FIRST, $$$REST)'
+  all:
+    - has: { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, kind: integer, regex: '^[1-9][0-9_]*$' }
+    - not: { has: { any: [{ kind: comment }, { kind: line_continuation }] } }
+    - inside: { matches: bad-offsets-args }
+utils:
+  bad-offsets-args:
+    kind: argument_list
+    inside:
+      kind: call
+      all:
+        - has: { field: function, regex: '^(np|numpy)\.array$' }
+        - any:
+            - inside:
+                kind: keyword_argument
+                field: value
+                all:
+                  - has: { field: name, regex: '^indptr$' }
+                  - inside: { matches: grouped-array-args }
+            - all:
+                - nthChild: { position: 2, ofRule: { not: { kind: comment } } }
+                - inside: { matches: grouped-array-args }
+  grouped-array-args:
+    kind: argument_list
+    all:
+      - not: { has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+      - inside: { kind: call, has: { field: function, pattern: $CONSTRUCTOR } }
+fix: '(0, $FIRST, $$$REST)'
+metadata:
+  fix: unsafe
   holds:
     CONSTRUCTOR: { regex: '(^|\.)GroupedArray$' }

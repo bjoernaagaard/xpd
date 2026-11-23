@@ -18,7 +18,7 @@ The rule reports an import of `tomli`, and `toml.load` and `toml.loads`. It leav
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `from tomli import ...` and `import tomli as ...` to `tomllib`. Bare `import tomli` and `toml.load`/`toml.loads` calls remain manual because `tomllib.load` requires a binary file.
 
 [`tomllib`](https://docs.python.org/3/library/tomllib.html) has been in the standard library
 since Python 3.11, and every Python that still gets fixes has it. `tomli` is the package that

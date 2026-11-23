@@ -15,10 +15,9 @@ such as a regex group, a split, a header or the environment.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` unwraps `float(value)` to `value` (or `(value)` for arithmetic expressions). It is unsafe because the file does not prove whether the value is text, an integer that needs conversion, or a `float32`.
 
 A number taken from a float64 array or a Series is an `np.float64`, and so is arithmetic on it.
 On NumPy 2.5.5 and pandas 3.1.1, `isinstance(value, float)` was True for `a[0]`, `a[0] * 3`,
 `s.iloc[0]`, `s.sum()` and `s.max()`. Keep the call in three cases: the value is text, the value is an int that has to become
-a float, or the array holds float32. The file does not show which case a call is, so the rule
-has no fix.
+a float, or the array holds float32.

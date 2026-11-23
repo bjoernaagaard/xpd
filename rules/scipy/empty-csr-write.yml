@@ -11,6 +11,83 @@ language: python
 severity: warning
 message: $A starts as an empty $N, and a later write into it adds a stored value, which emits SparseEfficiencyWarning, raises under python -W error, and copies the whole matrix each time. Build it as lil_array or dok_array, or collect the coordinates and pass them to coo_array, and call tocsr or tocsc once at the end.
 rule:
+  all:
+    - pattern: $M.$N
+    - matches: sparse-module
+    - inside:
+        kind: call
+        field: function
+        all:
+          - matches: empty-args
+          - inside:
+              kind: assignment
+              field: right
+              has: { field: left, pattern: $A }
+              inside:
+                kind: expression_statement
+                any:
+                  - precedes: { stopBy: end, has: { stopBy: end, matches: write-into-a } }
+                  - precedes: { stopBy: end, matches: write-into-a }
+          - not:
+              inside:
+                stopBy: { kind: function_definition }
+                kind: function_definition
+                has: { stopBy: end, kind: assignment, all: [{ has: { field: left, pattern: $A } }, { not: { has: { field: right, matches: empty-call } } }] }
+constraints:
+  A: { any: [{ kind: identifier }, { kind: attribute }] }
+  N: { regex: '^cs[rc]_(matrix|array)$' }
+transform:
+  LIL: { replace: { source: $N, replace: '^cs[rc]_', by: 'lil_' } }
+fix: $M.$LIL
+metadata: { fix: unsafe }
+utils:
+  write-into-a:
+    any: [{ kind: assignment }, { kind: augmented_assignment }]
+    has: { field: left, kind: subscript, has: { field: value, pattern: $A } }
+  empty-args:
+    all:
+      - has:
+          field: arguments
+          has:
+            nthChild: 1
+            any:
+              - kind: tuple
+                all:
+                  - has: { nthChild: 2 }
+                  - not: { has: { nthChild: 3 } }
+                  - not: { has: { any: [{ kind: tuple }, { kind: list }, { kind: call, not: { regex: '^len\(' } }, { kind: identifier, regex: '(?i)data|val|ij|coord' }] } }
+              - { kind: attribute, regex: '\.shape$' }
+      - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
+  empty-call:
+    kind: call
+    all:
+      - has: { field: function, pattern: $M.$N, matches: sparse-module }
+      - matches: empty-args
+  sparse-module:
+    any:
+      - has: { field: object, regex: '^scipy\.sparse$' }
+      - all:
+          - has: { field: object, pattern: $S.sparse }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - inside:
+          stopBy: end
+          kind: module
+          has:
+            any:
+              - kind: import_statement
+                has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $M } }] }
+              - kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^scipy$' }
+                  - any:
+                      - has: { kind: dotted_name, pattern: $M, regex: '^sparse$' }
+                      - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $M } }] }
+---
+id: empty-csr-write
+language: python
+severity: warning
+message: $A starts as an empty $N, and a later write into it adds a stored value, which emits SparseEfficiencyWarning, raises under python -W error, and copies the whole matrix each time. Build it as lil_array or dok_array, or collect the coordinates and pass them to coo_array, and call tocsr or tocsc once at the end.
+rule:
   # all keeps the order, so $A is bound before the not looks for another assignment to it.
   all:
     - matches: empty-call
@@ -41,11 +118,7 @@ utils:
   empty-call:
     kind: call
     all:
-      - has:
-          field: function
-          any:
-            - { pattern: $M.$N, matches: sparse-module }
-            - { kind: identifier, pattern: $N, matches: from-sparse }
+      - has: { field: function, kind: identifier, pattern: $N, matches: from-sparse }
       - has:
           field: arguments
           has:
@@ -58,25 +131,6 @@ utils:
                   - not: { has: { any: [{ kind: tuple }, { kind: list }, { kind: call, not: { regex: '^len\(' } }, { kind: identifier, regex: '(?i)data|val|ij|coord' }] } }
               - { kind: attribute, regex: '\.shape$' }
       - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
-  sparse-module:
-    any:
-      - has: { field: object, regex: '^scipy\.sparse$' }
-      - all:
-          - has: { field: object, pattern: $S.sparse }
-          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
-      - inside:
-          stopBy: end
-          kind: module
-          has:
-            any:
-              - kind: import_statement
-                has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.sparse$' } }, { has: { field: alias, pattern: $M } }] }
-              - kind: import_from_statement
-                all:
-                  - has: { field: module_name, regex: '^scipy$' }
-                  - any:
-                      - has: { kind: dotted_name, pattern: $M, regex: '^sparse$' }
-                      - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $M } }] }
   from-sparse:
     inside:
       stopBy: end

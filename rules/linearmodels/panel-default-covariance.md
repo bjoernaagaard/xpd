@@ -13,7 +13,7 @@ homoskedastic and unrelated over time, but the errors of one entity are usually 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `cov_type="clustered", cluster_entity=True` to `.fit()` calls that omit `cov_type` and clustering keywords. Calls that already pass clustering options remain manual.
 
 In two simulations with a true slope of 0, `PanelOLS` with entity effects gave p below 0.05 in
 the following shares of the draws:

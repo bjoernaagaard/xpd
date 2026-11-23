@@ -11,4 +11,4 @@ The rule reports `np.unpackbits(...).sum()`, `np.sum(np.unpackbits(...))` and `n
 
 ## How to fix it
 
-xpd has no automatic fix. Because the view, reshape and axis around unpackbits vary. Make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites whole-array `np.unpackbits(x.view(np.uint8)).sum()`, `np.unpackbits(x).sum()`, `np.sum(np.unpackbits(...))`, and `np.count_nonzero(np.unpackbits(...))` to `np.bitwise_count(x).sum()`. Forms with custom reshapes or axes remain manual.

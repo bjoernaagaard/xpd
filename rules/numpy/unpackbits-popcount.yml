@@ -8,9 +8,47 @@ severity: warning
 message: This unpacks every byte into eight before it counts the set bits. Write $NP.bitwise_count(x), summed as needed, which ran 37 times faster on 1,000,000 uint64 values.
 rule:
   any:
+    - pattern: $NP.unpackbits($X.view($NP.uint8)).sum()
+    - pattern: $NP.sum($NP.unpackbits($X.view($NP.uint8)))
+    - pattern: $NP.count_nonzero($NP.unpackbits($X.view($NP.uint8)))
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.bitwise_count($X).sum()
+metadata: { since: "2.0", fix: unsafe }
+---
+id: unpackbits-popcount
+language: python
+severity: warning
+message: This unpacks every byte into eight before it counts the set bits. Write $NP.bitwise_count(x), summed as needed, which ran 37 times faster on 1,000,000 uint64 values.
+rule:
+  any:
+    - pattern: $NP.unpackbits($X).sum()
+    - pattern: $NP.sum($NP.unpackbits($X))
+    - pattern: $NP.count_nonzero($NP.unpackbits($X))
+  not:
+    any:
+      - pattern: $NP.unpackbits($Y.view($NP.uint8)).sum()
+      - pattern: $NP.sum($NP.unpackbits($Y.view($NP.uint8)))
+      - pattern: $NP.count_nonzero($NP.unpackbits($Y.view($NP.uint8)))
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+fix: $NP.bitwise_count($X).sum()
+metadata: { since: "2.0", fix: unsafe }
+---
+id: unpackbits-popcount
+language: python
+severity: warning
+message: This unpacks every byte into eight before it counts the set bits. Write $NP.bitwise_count(x), summed as needed, which ran 37 times faster on 1,000,000 uint64 values.
+rule:
+  any:
     - pattern: $NP.unpackbits($$$ARGS).sum($$$REST)
     - pattern: $NP.sum($NP.unpackbits($$$ARGS) $$$REST)
     - pattern: $NP.count_nonzero($NP.unpackbits($$$ARGS) $$$REST)
+  not:
+    any:
+      - pattern: $NP.unpackbits($X).sum()
+      - pattern: $NP.sum($NP.unpackbits($X))
+      - pattern: $NP.count_nonzero($NP.unpackbits($X))
 constraints:
   NP: { regex: '^(np|numpy)$' }
 metadata: { since: "2.0" }

@@ -13,7 +13,7 @@ functions that take it, and the argument of `get_scorer` itself.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds the missing `neg_` prefix to known scikit-learn loss names (such as `"mean_squared_error"` -> `"neg_mean_squared_error"`) and rewrites metric function names (such as `"roc_auc_score"` -> `"roc_auc"` and `"brier_score_loss"` -> `"neg_brier_score"`). Other unknown strings remain manual.
 
 The rule checks each string against `sklearn.metrics.get_scorer_names()` on scikit-learn 1.9.1.
 `scoring="mean_squared_error"`, `scoring="log_loss"` and `scoring="auc"` raise

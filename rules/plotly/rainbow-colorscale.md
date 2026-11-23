@@ -17,7 +17,7 @@ colors, or without a reference to the color axis, does not show the scale.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` replaces Jet, Rainbow, Turbo, and HSV strings and `px.colors` attributes with `"Viridis"` (or `"Viridis_r"` / `px.colors.sequential.Viridis`). It is unsafe because the best monotonic or diverging scale depends on your data.
 
 The test of order is lightness. Each of the 94 named scales was resolved on a `go.Heatmap` and
 sampled at 21 even steps, and the CIELAB lightness of each step was computed, from 0 for black
@@ -37,5 +37,4 @@ to 100 for white. A scale that changes direction draws a low and a high value eq
 `update_layout(coloraxis_colorscale="Jet")` all resolved to the same six stops.
 `color_discrete_sequence` is left alone, because it colors groups and not quantities. Numbers
 that name groups, such as cluster numbers, are better colored as categories, and the message
-says so. The rule has no fix, because the scale to use depends on whether the data has a
-midpoint.
+says so.

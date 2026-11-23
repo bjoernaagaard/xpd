@@ -21,12 +21,29 @@ language: python
 severity: warning
 message: range_y=$R starts the axis of the area chart above zero, so the height of the fill no longer follows its value. With [90, 101], fills for 95 and 100 were drawn 163.6 and 327.3 pixels tall, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or draw the values as a line with px.line, which needs no zero.
 rule:
-  kind: call
-  all:
-    - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
-    - has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(range_y)$' } }, { has: { field: value, pattern: $R, matches: cut-range } }] } }
-    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|log_y)$' } } } }
-    - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+  pattern: $R
+  matches: cut-range
+  inside:
+    kind: keyword_argument
+    field: value
+    all:
+      - has: { field: name, regex: '^(range_y)$' }
+      - inside:
+          kind: argument_list
+          inside:
+            kind: call
+            all:
+              - has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^(area)$' } }, { has: { field: object, matches: { px: { ALIAS: { pattern: $PX } } } } }] }
+              - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(orientation|log_y)$' } } } }
+              - not: { has: { field: arguments, has: { kind: dictionary_splat } } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
+metadata: { fix: unsafe }
 ---
 # The same cut set on the figure afterwards: update_yaxes(range=...), update_layout with
 # yaxis_range=... or with yaxis=dict(range=...). The figure must be one of filled areas, by the
@@ -37,29 +54,40 @@ severity: warning
 message: The range $R starts the axis of the area chart above zero, so the height of the fill no longer follows its value. With [90, 101], fills for 95 and 100 were drawn 163.6 and 327.3 pixels tall, a Lie Factor of 19 by Tufte's measure. Let the axis start at 0, or draw the values as a line with px.line, which needs no zero.
 rule:
   all:
+    - pattern: $R
+    - matches: cut-range
     - any:
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: figure } }] } } }
-        - kind: keyword_argument
-          all:
-            - has: { field: name, regex: '^yaxis_range$' }
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
-        - any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
-          all:
-            - has: { field: value, pattern: $R, matches: cut-range }
-            - inside:
-                any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
-                inside:
-                  stopBy: { kind: argument_list }
-                  kind: keyword_argument
-                  all:
-                    - has: { field: name, regex: '^yaxis$' }
-                    - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^range$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_yaxes$' } }, { has: { field: object, matches: figure } }] } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^yaxis_range$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
+        - inside:
+            field: value
+            any: [{ kind: keyword_argument, has: { field: name, regex: '^range$' } }, { kind: pair, has: { field: key, regex: '^["'']range["'']$' } }]
+            inside:
+              any: [{ kind: argument_list, inside: { kind: call, has: { field: function, regex: '^dict$' } } }, { kind: dictionary }]
+              inside:
+                stopBy: { kind: argument_list }
+                kind: keyword_argument
+                all:
+                  - has: { field: name, regex: '^yaxis$' }
+                  - inside: { kind: argument_list, inside: { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^update_layout$' } }, { has: { field: object, matches: figure } }] } } }
     - not: { inside: { stopBy: end, kind: module, regex: '\blog(_y)?\b' } }
+transform:
+  FIXED:
+    replace:
+      source: $R
+      replace: '^\[\s*[^,]+,'
+      by: '[0,'
+fix: $FIXED
 utils:
   # A figure of filled areas: px.area without orientation and log_y, or a go.Figure whose own
   # arguments hold a go.Scatter with fill="tozeroy".
@@ -96,4 +124,4 @@ utils:
     any:
       - matches: figure-expr
       - { kind: identifier, pattern: $FIG }
-metadata: { holds: { FIG: { matches: figure-expr } } }
+metadata: { holds: { FIG: { matches: figure-expr } }, fix: unsafe }

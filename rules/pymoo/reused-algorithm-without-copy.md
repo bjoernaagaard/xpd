@@ -13,4 +13,4 @@ The rule reports a second `minimize` on the same algorithm when both calls pass 
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` changes `copy_algorithm=False` to `copy_algorithm=True` on the repeated `minimize` call so each run starts cleanly. It is unsafe because constructing a fresh algorithm object per run is also a valid fix.

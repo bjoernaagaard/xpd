@@ -13,4 +13,4 @@ or `cosine`, called inside a comprehension, a generator or a loop body. On 1,000
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites `np.array([[distance.<metric>(a, b) for b in Y] for a in X])` to `distance.cdist(X, Y, "<metric>")`. Other loop and generator forms remain manual.

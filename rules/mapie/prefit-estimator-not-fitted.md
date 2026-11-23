@@ -14,7 +14,7 @@ also reports `ConformalizedQuantileRegressor(prefit=True)` with one estimator.
 
 ## How to fix it
 
-xpd has no automatic fix. Each message names two rewrites, and the code does not show which one is meant. Make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `prefit=False` on inline chained `SplitConformalRegressor(...).fit(...)` and `SplitConformalClassifier(...).fit(...)` calls. Other forms remain manual because fitting the estimator beforehand is also a valid fix.
 
 `prefit` is `True` by default on the split classes, which says the estimator is already fitted.
 With an estimator built in the argument list, each call raised:

@@ -20,6 +20,30 @@ rule:
         - kind: subscript
         - kind: identifier
         - kind: attribute
+      not:
+        any:
+          - regex: (environ|argv|getenv|headers|match|group|split|strip|text|line|token|field|raw|\bargs\b)
+          - has: { stopBy: end, kind: string }
+  inside:
+    stopBy: end
+    kind: module
+    all:
+      - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(numpy|pandas)\b }
+      - not: { has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(torch|jax|tensorflow|xarray|cupy|dask|mlx|polars|sympy)\b } }
+fix: $VALUE
+metadata: { fix: unsafe }
+---
+id: float-around-number
+language: python
+severity: warning
+message: A number from a float64 array or a Series is a float already, and so is arithmetic on it. Drop this float(), and keep it only for text, for an int that has to become a float, or for a float32.
+rule:
+  pattern: float($VALUE)
+  has:
+    field: arguments
+    has:
+      pattern: $VALUE
+      any:
         - kind: binary_operator
           not: { has: { regex: ^/$ } }
         - kind: unary_operator
@@ -33,3 +57,5 @@ rule:
     all:
       - has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(numpy|pandas)\b }
       - not: { has: { any: [{ kind: import_statement }, { kind: import_from_statement }], regex: \b(torch|jax|tensorflow|xarray|cupy|dask|mlx|polars|sympy)\b } }
+fix: ($VALUE)
+metadata: { fix: unsafe }

@@ -13,7 +13,7 @@ a loop, a comprehension or a lambda over the rows.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites single-row comprehensions `[model.predict([row])[0] for row in X]` to `model.predict(X).tolist()`. Other loop and `DataFrame.apply` forms remain manual.
 
 The rule reports a call whose rows come from the loop variable, either the row itself or the data
 indexed by it. Each call checks the input and sets up the model again, so one call on all rows was
@@ -26,7 +26,7 @@ faster:
 | `LogisticRegression.predict_proba` | 104 times | 816 times |
 
 The labels were bit equal. The probabilities of `LogisticRegression` differed by up to 3.3e-16,
-so the rule has no fix. A loop that writes into the data it predicts from, as recursive
+so the fix is unsafe. A loop that writes into the data it predicts from, as recursive
 forecasting does, is left alone.
 
 Reader B called both held-back reports wrong advice, and reader A called neither wrong. Recall was

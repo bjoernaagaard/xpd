@@ -19,7 +19,7 @@ The rule reports a bar chart whose value axis is given a range that starts above
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` resets the lower bound of the explicit range list to `0` (for example `[90, 101]` -> `[0, 101]`). It is unsafe because switching to `px.scatter` or dropping the range altogether may be preferred.
 
 A bar shows its value by its length. plotly starts a bar axis at zero by itself and keeps an
 explicit range as written. With `[90, 101]` the data grows by 5.3 percent and the bar by 100

@@ -11,22 +11,19 @@ language: python
 severity: info
 message: $N builds a sparse matrix, and SciPy's docstring for it says the sparse matrix interface is expected to be deprecated. Write $ARR in new code, and check the code that uses it, because * and ** work elementwise on a sparse array and a row slice of one is 1-D.
 rule:
-  kind: call
-  has:
+  pattern: $M.$N
+  matches: sparse-module
+  inside:
+    kind: call
     field: function
-    any:
-      - { pattern: $M.$N, matches: sparse-module }
-      - { kind: identifier, pattern: $N, matches: from-sparse }
-  not: { matches: chose-matrix }
+    not: { matches: chose-matrix }
 constraints:
   N: { regex: '^(csr|csc|coo|lil|dok|bsr|dia)_matrix$' }
 transform:
   ARR: { replace: { source: $N, replace: '_matrix$', by: _array } }
-metadata: { since: "1.8" }
+fix: $M.$ARR
+metadata: { since: "1.8", fix: unsafe }
 utils:
-  # A function or a literal list, tuple or dict that also names a sparse array class, or a branch
-  # taken on a condition that names a matrix, builds the matrix on purpose, as code that supports
-  # both kinds does.
   chose-matrix:
     any:
       - inside:
@@ -56,6 +53,35 @@ utils:
                   - any:
                       - has: { kind: dotted_name, pattern: $M, regex: '^sparse$' }
                       - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^sparse$' } }, { has: { field: alias, pattern: $M } }] }
+---
+id: sparse-matrix-api
+language: python
+severity: info
+message: $N builds a sparse matrix, and SciPy's docstring for it says the sparse matrix interface is expected to be deprecated. Write $ARR in new code, and check the code that uses it, because * and ** work elementwise on a sparse array and a row slice of one is 1-D.
+rule:
+  kind: call
+  has:
+    field: function
+    kind: identifier
+    pattern: $N
+    matches: from-sparse
+  not: { matches: chose-matrix }
+constraints:
+  N: { regex: '^(csr|csc|coo|lil|dok|bsr|dia)_matrix$' }
+transform:
+  ARR: { replace: { source: $N, replace: '_matrix$', by: _array } }
+metadata: { since: "1.8" }
+utils:
+  chose-matrix:
+    any:
+      - inside:
+          stopBy: end
+          any: [{ kind: function_definition }, { kind: list }, { kind: tuple }, { kind: dictionary }]
+          has: { stopBy: end, kind: identifier, regex: '^((csr|csc|coo|lil|dok|bsr|dia)_array|sparray|eye_array|diags_array|random_array|block_array)$' }
+      - inside:
+          stopBy: end
+          any: [{ kind: if_statement }, { kind: elif_clause }]
+          has: { field: condition, regex: 'matrix' }
   from-sparse:
     inside:
       stopBy: end

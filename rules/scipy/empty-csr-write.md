@@ -19,4 +19,4 @@ whole matrix. On SciPy 1.18.1 a write emits `SparseEfficiencyWarning`, which rai
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites module-qualified empty `csr_matrix`/`csc_matrix` constructors to `lil_matrix` and `csr_array`/`csc_array` constructors to `lil_array`. Bare imported names remain manual, and you can convert back with `.tocsr()` or `.tocsc()` once writes finish.

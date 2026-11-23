@@ -16,6 +16,7 @@ severity: error
 message: An ElementwiseProblem gets one solution, an array with one value per variable, so $X has one dimension and this subscript raises IndexError, "too many indices for array". Write $X[0] for the first variable, or inherit from Problem to get the whole population.
 rule:
   kind: subscript
+  pattern: $SUB
   regex: '^\w+\[\s*:\s*,'
   all:
     - has: { field: value, kind: identifier, pattern: $X }
@@ -35,6 +36,14 @@ rule:
                     kind: module
                     stopBy: end
                     has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\bElementwiseProblem\b' }
+transform:
+  FIXED:
+    replace:
+      source: $SUB
+      replace: '\[\s*:\s*,\s*'
+      by: '['
+fix: $FIXED
+metadata: { fix: unsafe }
 ---
 # x[0] ** 2 + x[1] ** 2 in a Problem takes the first two solutions, not the first two variables,
 # and raised Exception, "Problem Error: F can not be set, expected shape (100, 1) but provided
@@ -78,4 +87,5 @@ rule:
                     kind: module
                     stopBy: end
                     has: { stopBy: end, kind: import_from_statement, regex: '^from\s+pymoo\.core\.problem\s+import\b[^#]*\bProblem\b' }
-metadata: { since: "0.6" }
+fix: '$X[:, $I]'
+metadata: { since: "0.6", fix: unsafe }

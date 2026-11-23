@@ -10,6 +10,60 @@ language: python
 severity: warning
 message: This calls $F once per pair of points. Stack the points into arrays and call cdist(XA, XB, '$F') once, or pdist(X, '$F') for the pairs within one array, which ran 960 to 2,100 times faster on 1,000,000 pairs.
 rule:
+  pattern: $NP.array([[$D.$F($A, $B) for $B in $Y] for $A in $X])
+  all:
+    - has: { stopBy: end, kind: attribute, pattern: $D.$F, matches: distance-module }
+    - not: { has: { stopBy: end, kind: if_clause } }
+constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { kind: identifier }
+  B: { kind: identifier }
+  F: { regex: '^(braycurtis|canberra|chebyshev|cityblock|correlation|cosine|dice|euclidean|hamming|jaccard|jensenshannon|mahalanobis|minkowski|rogerstanimoto|russellrao|seuclidean|sokalsneath|sqeuclidean|yule)$' }
+fix: $D.cdist($X, $Y, "$F")
+metadata: { fix: unsafe }
+utils:
+  distance-module:
+    any:
+      - has: { field: object, regex: '^scipy\.spatial\.distance$' }
+      - all:
+          - has: { field: object, pattern: $S.spatial.distance }
+          - inside: { stopBy: end, kind: module, has: { kind: import_statement, has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy$' } }, { has: { field: alias, pattern: $S } }] } } }
+      - all:
+          - has: { field: object, pattern: $P.distance }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.spatial$' } }, { has: { field: alias, pattern: $P } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $P, regex: '^spatial$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^spatial$' } }, { has: { field: alias, pattern: $P } }] }
+      - all:
+          - has: { field: object, pattern: $D }
+          - inside:
+              stopBy: end
+              kind: module
+              has:
+                any:
+                  - kind: import_statement
+                    has: { kind: aliased_import, all: [{ has: { field: name, regex: '^scipy\.spatial\.distance$' } }, { has: { field: alias, pattern: $D } }] }
+                  - kind: import_from_statement
+                    all:
+                      - has: { field: module_name, regex: '^scipy\.spatial$' }
+                      - any:
+                          - has: { kind: dotted_name, pattern: $D, regex: '^distance$' }
+                          - has: { kind: aliased_import, all: [{ has: { field: name, regex: '^distance$' } }, { has: { field: alias, pattern: $D } }] }
+---
+id: distance-per-pair
+language: python
+severity: warning
+message: This calls $F once per pair of points. Stack the points into arrays and call cdist(XA, XB, '$F') once, or pdist(X, '$F') for the pairs within one array, which ran 960 to 2,100 times faster on 1,000,000 pairs.
+rule:
   kind: call
   all:
     - has:
@@ -17,6 +71,11 @@ rule:
         any:
           - { pattern: $D.$F, matches: distance-module }
           - { kind: identifier, pattern: $F, matches: from-distance }
+    - not:
+        inside:
+          stopBy: end
+          pattern: $NP.array([[$D.$F($A, $B) for $B in $Y] for $A in $X])
+          not: { has: { stopBy: end, kind: if_clause } }
     - inside:
         stopBy: { kind: function_definition }
         any:
@@ -26,6 +85,9 @@ rule:
           - kind: dictionary_comprehension
           - { kind: block, inside: { any: [{ kind: for_statement }, { kind: while_statement }] } }
 constraints:
+  NP: { regex: '^(np|numpy)$' }
+  A: { kind: identifier }
+  B: { kind: identifier }
   F: { regex: '^(braycurtis|canberra|chebyshev|cityblock|correlation|cosine|dice|euclidean|hamming|jaccard|jensenshannon|mahalanobis|minkowski|rogerstanimoto|russellrao|seuclidean|sokalsneath|sqeuclidean|yule)$' }
 utils:
   distance-module:

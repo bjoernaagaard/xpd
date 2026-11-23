@@ -78,7 +78,11 @@ utils:
     any:
       - { kind: string, regex: '^[rRuU]?["''](?i:jet)(_r)?["'']$' }
       - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(Jet)(_r)?$' }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+transform:
+  T1: { replace: { source: $S, replace: '^([rRuU]?["''])(?i:jet)((_r)?["''])$', by: '${1}Viridis${2}' } }
+  FIXED: { replace: { source: $T1, replace: '(^|\.)(sequential|cyclical|plotlyjs)\.Jet((_r)?)$', by: '${1}sequential.Viridis${3}' } }
+fix: $FIXED
+metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } }, fix: unsafe }
 ---
 # The same test for Rainbow.
 id: rainbow-colorscale
@@ -141,7 +145,11 @@ utils:
     any:
       - { kind: string, regex: '^[rRuU]?["''](?i:rainbow)(_r)?["'']$' }
       - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(Rainbow)(_r)?$' }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+transform:
+  T1: { replace: { source: $S, replace: '^([rRuU]?["''])(?i:rainbow)((_r)?["''])$', by: '${1}Viridis${2}' } }
+  FIXED: { replace: { source: $T1, replace: '(^|\.)(sequential|cyclical|plotlyjs)\.Rainbow((_r)?)$', by: '${1}sequential.Viridis${3}' } }
+fix: $FIXED
+metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } }, fix: unsafe }
 ---
 # The same test for Turbo.
 id: rainbow-colorscale
@@ -204,7 +212,11 @@ utils:
     any:
       - { kind: string, regex: '^[rRuU]?["''](?i:turbo)(_r)?["'']$' }
       - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(Turbo)(_r)?$' }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+transform:
+  T1: { replace: { source: $S, replace: '^([rRuU]?["''])(?i:turbo)((_r)?["''])$', by: '${1}Viridis${2}' } }
+  FIXED: { replace: { source: $T1, replace: '(^|\.)(sequential|cyclical|plotlyjs)\.Turbo((_r)?)$', by: '${1}sequential.Viridis${3}' } }
+fix: $FIXED
+metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } }, fix: unsafe }
 ---
 # The same test for HSV.
 id: rainbow-colorscale
@@ -267,4 +279,8 @@ utils:
     any:
       - { kind: string, regex: '^[rRuU]?["''](?i:hsv)(_r)?["'']$' }
       - { kind: attribute, regex: '(^|\.)(sequential|cyclical|plotlyjs)\.(HSV)(_r)?$' }
-metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } } }
+transform:
+  T1: { replace: { source: $S, replace: '^([rRuU]?["''])(?i:hsv)((_r)?["''])$', by: '${1}Viridis${2}' } }
+  FIXED: { replace: { source: $T1, replace: '(^|\.)(sequential|cyclical|plotlyjs)\.HSV((_r)?)$', by: '${1}sequential.Viridis${3}' } }
+fix: $FIXED
+metadata: { holds: { FIG: { any: [{ matches: figure-expr }, { matches: figure-type }] } }, fix: unsafe }

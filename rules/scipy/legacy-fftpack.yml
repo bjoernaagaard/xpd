@@ -9,12 +9,53 @@ language: python
 severity: info
 message: scipy.fftpack is legacy, and its SciPy docstring says new code should use scipy.fft. Import from scipy.fft instead, and check rfft, whose output layout differs.
 rule:
+  kind: import_from_statement
+  pattern: $STMT
+  all:
+    - has: { field: module_name, regex: '^scipy\.fftpack$' }
+    - not: { has: { kind: wildcard_import } }
+    - not:
+        has:
+          any:
+            - kind: dotted_name
+              not: { regex: '^(scipy\.fftpack|fft|ifft|fft2|ifft2|fftn|ifftn|dct|idct|dst|idst|dctn|idctn|dstn|idstn|fftshift|ifftshift|fftfreq|next_fast_len)$' }
+            - kind: aliased_import
+              has:
+                field: name
+                not: { regex: '^(fft|ifft|fft2|ifft2|fftn|ifftn|dct|idct|dst|idst|dctn|idctn|dstn|idstn|fftshift|ifftshift|fftfreq|next_fast_len)$' }
+transform:
+  FIXED:
+    replace:
+      source: $STMT
+      replace: '^from(\s+)scipy\.fftpack\b'
+      by: 'from${1}scipy.fft'
+fix: $FIXED
+metadata: { fix: unsafe }
+---
+id: legacy-fftpack
+language: python
+severity: info
+message: scipy.fftpack is legacy, and its SciPy docstring says new code should use scipy.fft. Import from scipy.fft instead, and check rfft, whose output layout differs.
+rule:
   any:
     - kind: import_statement
       has: { any: [{ kind: dotted_name }, { kind: aliased_import }], regex: '^scipy\.fftpack\b' }
     - kind: import_from_statement
-      any:
-        - has: { field: module_name, regex: '^scipy\.fftpack\b' }
-        - all:
-            - has: { field: module_name, regex: '^scipy$' }
-            - has: { any: [{ kind: dotted_name }, { kind: aliased_import }], regex: '^fftpack\b' }
+      all:
+        - has: { field: module_name, regex: '^scipy\.fftpack$' }
+        - any:
+            - has: { kind: wildcard_import }
+            - has:
+                any:
+                  - kind: dotted_name
+                    not: { regex: '^(scipy\.fftpack|fft|ifft|fft2|ifft2|fftn|ifftn|dct|idct|dst|idst|dctn|idctn|dstn|idstn|fftshift|ifftshift|fftfreq|next_fast_len)$' }
+                  - kind: aliased_import
+                    has:
+                      field: name
+                      not: { regex: '^(fft|ifft|fft2|ifft2|fftn|ifftn|dct|idct|dst|idst|dctn|idctn|dstn|idstn|fftshift|ifftshift|fftfreq|next_fast_len)$' }
+    - kind: import_from_statement
+      has: { field: module_name, regex: '^scipy\.fftpack\.' }
+    - kind: import_from_statement
+      all:
+        - has: { field: module_name, regex: '^scipy$' }
+        - has: { any: [{ kind: dotted_name }, { kind: aliased_import }], regex: '^fftpack\b' }

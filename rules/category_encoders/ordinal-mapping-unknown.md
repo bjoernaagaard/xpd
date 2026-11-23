@@ -16,7 +16,7 @@ mapping doesn't name is then coded -1, with no error and no warning.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` adds `handle_unknown="error"` to `OrdinalEncoder(mapping=...)` calls so unseen categories raise instead of silently becoming `-1`. It is unsafe because another `handle_unknown` policy may be desired.
 
 | `{"a": 1, "b": 2}` on the column a, b, c | Result |
 | --- | --- |

@@ -13,7 +13,7 @@ pandas `shift(1)` goes the other way.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` negates positive literal integer lags (single integer or list/tuple of positive integers). It is unsafe because a positive lag is intentional when creating a forecast target, and mixed lists or `range(...)` calls remain manual.
 
 On a frame with sales 10 to 50, the two calls gave the following columns:
 

@@ -18,7 +18,7 @@ every other format alone, and a format that is held in a name.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+`xpd check --fix --unsafe-fixes` rewrites ISO 8601 `strptime` calls to `datetime.fromisoformat(...)`, and rewrites `.date()` calls on `"%Y-%m-%d"` to `date.fromisoformat(...)` when `date` or the `datetime` module is already in scope. The fix is unsafe because `strptime` and `fromisoformat` differ on single-digit months/days and compact ISO 8601 spellings.
 
 `strptime` turns the format into a regular expression and matches the text against it.
 [`date.fromisoformat`](https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)

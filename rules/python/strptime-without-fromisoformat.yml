@@ -11,8 +11,77 @@ language: python
 severity: warning
 message: This format is ISO 8601, which fromisoformat reads without a format. Write date.fromisoformat($TEXT) for a date and datetime.fromisoformat($TEXT) for a date with a time.
 rule:
-  any:
-    - pattern: datetime.strptime($TEXT, $FORMAT)
-    - pattern: $MODULE.datetime.strptime($TEXT, $FORMAT)
+  pattern: $MODULE.datetime.strptime($TEXT, $FORMAT).date()
+constraints:
+  FORMAT: { regex: "^[\"']%Y-%m-%d[\"']$" }
+fix: $MODULE.date.fromisoformat($TEXT)
+metadata: { fix: unsafe }
+---
+id: strptime-without-fromisoformat
+language: python
+severity: warning
+message: This format is ISO 8601, which fromisoformat reads without a format. Write date.fromisoformat($TEXT) for a date and datetime.fromisoformat($TEXT) for a date with a time.
+rule:
+  pattern: datetime.strptime($TEXT, $FORMAT).date()
+  inside:
+    stopBy: end
+    kind: module
+    has:
+      stopBy: end
+      kind: import_from_statement
+      all:
+        - has: { field: module_name, regex: '^datetime$' }
+        - has: { kind: dotted_name, regex: '^date$' }
+constraints:
+  FORMAT: { regex: "^[\"']%Y-%m-%d[\"']$" }
+fix: date.fromisoformat($TEXT)
+metadata: { fix: unsafe }
+---
+id: strptime-without-fromisoformat
+language: python
+severity: warning
+message: This format is ISO 8601, which fromisoformat reads without a format. Write date.fromisoformat($TEXT) for a date and datetime.fromisoformat($TEXT) for a date with a time.
+rule:
+  pattern: datetime.strptime($TEXT, $FORMAT)
+  not:
+    inside:
+      kind: attribute
+      field: object
+      all:
+        - has: { field: attribute, regex: '^date$' }
+        - inside:
+            kind: call
+            pattern: datetime.strptime($TEXT, $FORMAT).date()
+            inside:
+              stopBy: end
+              kind: module
+              has:
+                stopBy: end
+                kind: import_from_statement
+                all:
+                  - has: { field: module_name, regex: '^datetime$' }
+                  - has: { kind: dotted_name, regex: '^date$' }
 constraints:
   FORMAT: { regex: "^[\"']%Y-%m-%d([T ]%H:%M:%S(\\.%f)?(%z)?)?[\"']$" }
+fix: datetime.fromisoformat($TEXT)
+metadata: { fix: unsafe }
+---
+id: strptime-without-fromisoformat
+language: python
+severity: warning
+message: This format is ISO 8601, which fromisoformat reads without a format. Write date.fromisoformat($TEXT) for a date and datetime.fromisoformat($TEXT) for a date with a time.
+rule:
+  pattern: $MODULE.datetime.strptime($TEXT, $FORMAT)
+  not:
+    all:
+      - has: { field: arguments, has: { nthChild: 2, regex: "^[\"']%Y-%m-%d[\"']$" } }
+      - inside:
+          kind: attribute
+          field: object
+          all:
+            - has: { field: attribute, regex: '^date$' }
+            - inside: { kind: call, pattern: $MODULE.datetime.strptime($TEXT, $FORMAT).date() }
+constraints:
+  FORMAT: { regex: "^[\"']%Y-%m-%d([T ]%H:%M:%S(\\.%f)?(%z)?)?[\"']$" }
+fix: $MODULE.datetime.fromisoformat($TEXT)
+metadata: { fix: unsafe }

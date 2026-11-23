@@ -16,19 +16,60 @@ language: python
 severity: warning
 message: add_lags with a positive lag copies the value of a later row, so lag 1 is the next row and not the row before. On pure noise that column predicted the next row's sign with accuracy 0.996, where lag -1 scored 0.474. Use negative lags for features from the past.
 rule:
+  all:
+    - pattern: $LAGS
+    - any:
+        - kind: integer
+          regex: '^[1-9]\d*$'
+        - any: [{ kind: list }, { kind: tuple }]
+          all:
+            - has: { kind: integer, regex: '^[1-9]\d*$' }
+            - not: { has: { kind: unary_operator } }
+            - not: { has: { not: { any: [{ kind: integer }, { regex: '^[\[\]\(\),]$' }] } } }
+    - any:
+        - all:
+            - nthChild: 3
+            - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)add_lags$' } } }
+        - inside:
+            kind: keyword_argument
+            field: value
+            all:
+              - has: { field: name, regex: '^lags$' }
+              - inside: { kind: argument_list, inside: { kind: call, has: { field: function, regex: '(^|\.)add_lags$' } } }
+rewriters:
+  - id: negate-int
+    rule: { kind: integer, pattern: $N, regex: '^[1-9]\d*$' }
+    fix: -$N
+transform:
+  FIXED:
+    rewrite:
+      source: $LAGS
+      rewriters: [negate-int]
+fix: $FIXED
+metadata: { fix: unsafe }
+---
+id: add-lags-positive
+language: python
+severity: warning
+message: add_lags with a positive lag copies the value of a later row, so lag 1 is the next row and not the row before. On pure noise that column predicted the next row's sign with accuracy 0.996, where lag -1 scored 0.474. Use negative lags for features from the past.
+rule:
   pattern: $F($$$A)
   all:
     - has: { field: function, regex: '(^|\.)add_lags$' }
     - has:
         field: arguments
         any:
-          - has: { nthChild: 3, matches: later-rows }
-          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^lags$' } }, { has: { field: value, matches: later-rows } }] }
+          - has: { nthChild: 3, matches: later-rows-other }
+          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^lags$' } }, { has: { field: value, matches: later-rows-other } }] }
 utils:
-  later-rows:
+  later-rows-other:
     any:
-      - { kind: integer, regex: '^[1-9]' }
-      - { any: [{ kind: list }, { kind: tuple }], has: { kind: integer, regex: '^[1-9]' } }
+      - all:
+          - any: [{ kind: list }, { kind: tuple }]
+          - has: { kind: integer, regex: '^[1-9]' }
+          - any:
+              - has: { kind: unary_operator }
+              - has: { not: { any: [{ kind: integer }, { regex: '^[\[\]\(\),]$' }] } }
       - { matches: positive-range }
       - { kind: call, all: [{ has: { field: function, regex: '^(list|tuple)$' } }, { has: { field: arguments, has: { nthChild: 1, matches: positive-range } } }] }
   positive-range:

@@ -8,6 +8,22 @@ language: python
 severity: warning
 message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured at least 2.7 times faster on 500 and 5,000 rows.
 rule:
+  kind: list_comprehension
+  pattern: '[$M.$P([$R])[0] for $R in $X]'
+  all:
+    - not: { has: { kind: if_clause } }
+    - not: { has: { kind: for_in_clause, nthChild: 3 } }
+constraints:
+  P: { regex: '^(predict|predict_proba|predict_log_proba|decision_function)$' }
+  R: { kind: identifier }
+fix: $M.$P($X).tolist()
+metadata: { fix: unsafe }
+---
+id: predict-per-row
+language: python
+severity: warning
+message: $M.$P runs once per row here, and each call checks the input and sets up the model again. Call $M.$P once on all the rows, which measured at least 2.7 times faster on 500 and 5,000 rows.
+rule:
   kind: call
   pattern: $M.$P($$$A)
   # all reads the argument first, so the loop is read with $R bound.
@@ -24,6 +40,15 @@ rule:
             - pattern: np.array($R).reshape(1, -1)
             - pattern: $R.to_frame().T
             - pattern: $R.reshape(1, -1)
+    - not:
+        inside:
+          kind: subscript
+          inside:
+            kind: list_comprehension
+            pattern: '[$M.$P([$R])[0] for $R in $X]'
+            all:
+              - not: { has: { kind: if_clause } }
+              - not: { has: { kind: for_in_clause, nthChild: 3 } }
     - any:
       - inside:
           stopBy: end

@@ -15,20 +15,24 @@ language: python
 severity: error
 message: $ALG already ran in an earlier minimize with copy_algorithm=False, so this call does not set it up again and returns the earlier result. A second call with another problem, ("n_gen", 30) and another seed returned the F of the first call, still at generation 11. Build a new algorithm for this run, or drop copy_algorithm=False.
 rule:
-  kind: call
-  all:
-    - matches: run-in-place
-    - inside:
-        stopBy: end
-        kind: expression_statement
-        all:
-          - follows: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: run-in-place } }
-          - not:
-              follows:
-                stopBy: end
-                all:
-                  - has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
-                  - follows: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: run-in-place } }
+  kind: keyword_argument
+  regex: '^copy_algorithm\s*=\s*False$'
+  inside:
+    kind: argument_list
+    inside:
+      all:
+        - matches: run-in-place
+        - inside:
+            stopBy: end
+            kind: expression_statement
+            all:
+              - follows: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: run-in-place } }
+              - not:
+                  follows:
+                    stopBy: end
+                    all:
+                      - has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+                      - follows: { stopBy: end, kind: expression_statement, has: { stopBy: end, matches: run-in-place } }
 utils:
   run-in-place:
     kind: call
@@ -37,26 +41,30 @@ utils:
       - has: { field: arguments, has: { kind: keyword_argument, regex: '^copy_algorithm\s*=\s*False$' } }
       - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $ALG } }
       - matches: pymoo-minimize
-metadata: { since: "0.6" }
+fix: copy_algorithm=True
+metadata: { since: "0.6", fix: unsafe }
 ---
 id: reused-algorithm-without-copy
 language: python
 severity: error
 message: This loop runs $ALG again with copy_algorithm=False, so from the second pass on minimize does not set it up and returns the result of the first pass. A second call with another problem, ("n_gen", 30) and another seed returned the F of the first call, still at generation 11. Build the algorithm inside the loop, or drop copy_algorithm=False.
 rule:
-  kind: call
-  all:
-    - matches: run-in-place
-    - inside:
-        stopBy: end
-        any: [{ kind: for_statement }, { kind: while_statement }]
-        not:
-          any:
-            - has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
-            # A loop over the algorithms gives each pass another object, and so does a walrus.
-            - { kind: for_statement, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
-            - has: { stopBy: end, any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
-            - has: { stopBy: end, kind: named_expression, has: { field: name, pattern: $ALG } }
+  kind: keyword_argument
+  regex: '^copy_algorithm\s*=\s*False$'
+  inside:
+    kind: argument_list
+    inside:
+      all:
+        - matches: run-in-place
+        - inside:
+            stopBy: end
+            any: [{ kind: for_statement }, { kind: while_statement }]
+            not:
+              any:
+                - has: { stopBy: end, kind: assignment, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+                - { kind: for_statement, has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+                - has: { stopBy: end, any: [{ kind: for_statement }, { kind: for_in_clause }], has: { field: left, any: [{ pattern: $ALG }, { has: { stopBy: end, kind: identifier, pattern: $ALG } }] } }
+                - has: { stopBy: end, kind: named_expression, has: { field: name, pattern: $ALG } }
 utils:
   run-in-place:
     kind: call
@@ -65,4 +73,5 @@ utils:
       - has: { field: arguments, has: { kind: keyword_argument, regex: '^copy_algorithm\s*=\s*False$' } }
       - has: { field: arguments, has: { nthChild: { position: 2, ofRule: { not: { any: [{ kind: comment }, { kind: line_continuation }] } } }, kind: identifier, pattern: $ALG } }
       - matches: pymoo-minimize
-metadata: { since: "0.6" }
+fix: copy_algorithm=True
+metadata: { since: "0.6", fix: unsafe }

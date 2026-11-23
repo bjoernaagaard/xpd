@@ -17,10 +17,43 @@ severity: info
 message: In linearmodels, PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS default to unadjusted covariance, which takes the errors of one entity to be unrelated over time. In a simulation where they were related, it rejected a true coefficient of 0 in 17.3% of 1,000 draws at the 5% level, against 5.7% with cov_type="clustered", cluster_entity=True. Pass those two unless the errors are known to be independent.
 rule:
   kind: call
+  pattern: $M.fit()
   all:
     - matches: { lm-fit: { CLASS: { matches: lm-class } } }
-    - not: { has: { field: arguments, has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^(cov_type)$' } }] } } }
+utils:
+  lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|FirstDifferenceOLS)$' }] }
+fix: $M.fit(cov_type="clustered", cluster_entity=True)
+metadata: { fix: unsafe }
+---
+id: panel-default-covariance
+language: python
+severity: info
+message: In linearmodels, PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS default to unadjusted covariance, which takes the errors of one entity to be unrelated over time. In a simulation where they were related, it rejected a true coefficient of 0 in 17.3% of 1,000 draws at the 5% level, against 5.7% with cov_type="clustered", cluster_entity=True. Pass those two unless the errors are known to be independent.
+rule:
+  kind: call
+  pattern: $M.fit($$$ARGS)
+  all:
+    - not: { pattern: $M.fit() }
+    - matches: { lm-fit: { CLASS: { matches: lm-class } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^(cov_type|cluster_entity|cluster_time|clusters)$' } } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }, { kind: comment }, { kind: line_continuation }] } } }
+utils:
+  lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|FirstDifferenceOLS)$' }] }
+fix: $M.fit($$$ARGS, cov_type="clustered", cluster_entity=True)
+metadata: { fix: unsafe }
+---
+id: panel-default-covariance
+language: python
+severity: info
+message: In linearmodels, PanelOLS, PooledOLS, RandomEffects and FirstDifferenceOLS default to unadjusted covariance, which takes the errors of one entity to be unrelated over time. In a simulation where they were related, it rejected a true coefficient of 0 in 17.3% of 1,000 draws at the 5% level, against 5.7% with cov_type="clustered", cluster_entity=True. Pass those two unless the errors are known to be independent.
+rule:
+  kind: call
+  pattern: $M.fit($$$ARGS)
+  all:
+    - not: { pattern: $M.fit() }
+    - matches: { lm-fit: { CLASS: { matches: lm-class } } }
+    - not: { has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^cov_type$' } } } }
+    - has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(cluster_entity|cluster_time|clusters)$' } }, { kind: comment }, { kind: line_continuation }] } }
     - not: { has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } } }
 utils:
-  # The class names that another library also has count only with proof of the import.
   lm-class: { any: [{ regex: '(^|\.)(PanelOLS|PooledOLS|RandomEffects|FirstDifferenceOLS)$' }] }

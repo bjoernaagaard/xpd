@@ -9,14 +9,62 @@ language: python
 severity: warning
 message: The standard library reads TOML. Write import tomllib, and call tomllib.load on a file opened with "rb" or tomllib.loads on text.
 rule:
+  kind: import_from_statement
+  pattern: $STMT
+  all:
+    - has: { field: module_name, regex: '^tomli$' }
+    - not:
+        inside:
+          stopBy: end
+          any:
+            - kind: try_statement
+            - kind: if_statement
+transform:
+  FIXED:
+    replace:
+      source: $STMT
+      replace: '^from(\s+)tomli\b'
+      by: 'from${1}tomllib'
+fix: $FIXED
+metadata: { fix: unsafe }
+---
+id: toml-without-tomllib
+language: python
+severity: warning
+message: The standard library reads TOML. Write import tomllib, and call tomllib.load on a file opened with "rb" or tomllib.loads on text.
+rule:
+  kind: import_statement
+  pattern: import tomli as $ALIAS
+  not:
+    inside:
+      stopBy: end
+      any:
+        - kind: try_statement
+        - kind: if_statement
+fix: import tomllib as $ALIAS
+metadata: { fix: unsafe }
+---
+id: toml-without-tomllib
+language: python
+severity: warning
+message: The standard library reads TOML. Write import tomllib, and call tomllib.load on a file opened with "rb" or tomllib.loads on text.
+rule:
   any:
     - pattern: toml.load($$$ARGS)
     - pattern: toml.loads($$$ARGS)
     - all:
-        - any:
-            - kind: import_statement
-            - kind: import_from_statement
-        - regex: ^(import|from)\s+tomli\b
+        - kind: import_statement
+        - regex: ^import\s+tomli\b
+        - not: { pattern: import tomli as $ALIAS }
+        - not:
+            inside:
+              stopBy: end
+              any:
+                - kind: try_statement
+                - kind: if_statement
+    - all:
+        - kind: import_from_statement
+        - regex: ^from\s+tomli\.
         - not:
             inside:
               stopBy: end
