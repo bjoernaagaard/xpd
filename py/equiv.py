@@ -18,14 +18,13 @@ from typing import NoReturn
 # carries any result the old single process could compare, and this script reads only a file
 # that its own child wrote.
 RUNNER = """
-import os
+from pathlib import Path
 import pickle
 import runpy
 import sys
 
-script, left = sys.argv[1:]
-# The script's own folder comes first on the import path, as it does under `python script.py`.
-sys.path.insert(0, os.path.dirname(os.path.abspath(script)))
+script, output = sys.argv[1:]
+sys.path.insert(0, str(Path(script).resolve().parent))
 try:
     ns = runpy.run_path(script, run_name="__xpd_equiv__")
     found = ("result", ns["result"]) if "result" in ns else ("error", "defines no `result`")
@@ -35,8 +34,7 @@ try:
     data = pickle.dumps(found)
 except Exception as e:
     data = pickle.dumps(("error", f"leaves a `result` that pickle cannot save. {e}"))
-with open(left, "wb") as file:
-    file.write(data)
+Path(output).write_bytes(data)
 """
 
 
@@ -53,18 +51,27 @@ except ImportError as e:
     fail(f"xpd equiv needs pandas in the project's Python. {e}")
 
 
-def run(path: str, left: Path) -> object:
-    done = subprocess.run(  # noqa: S603  the user asked xpd to run this script
-        [sys.executable, "-c", RUNNER, path, str(left)],
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        check=False,
-    )
-    if not left.is_file():
-        fail(f"{path} exited with code {done.returncode} and left no `result`")
+def run(path: str, output: Path) -> object:
     try:
-        kind, value = pickle.loads(left.read_bytes())  # noqa: S301  written by the process above
-    except Exception as e:  # noqa: BLE001  a class that only the script's process can import
+        done = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", RUNNER, path, str(output)],
+            stdin=subprocess.DEVNULL,
+            stdout=sys.stderr,
+            check=False,
+        )
+    except OSError as e:
+        fail(f"cannot start Python for {path}. {e}")
+    if not output.is_file():
+        fail(f"{path} exited with code {done.returncode} and left no `result`")
+    if done.returncode != 0:
+        fail(f"{path} exited with code {done.returncode}")
+    try:
+        raw = output.read_bytes()
+    except OSError as e:
+        fail(f"cannot read result for {path}. {e}")
+    try:
+        kind, value = pickle.loads(raw)  # noqa: S301
+    except Exception as e:  # noqa: BLE001
         fail(f"{path} leaves a `result` that only its own process can load. {e}")
     if kind == "error":
         fail(f"{path} {value}")
@@ -72,9 +79,12 @@ def run(path: str, left: Path) -> object:
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="xpd-equiv-") as folder:
-        old = run(sys.argv[1], Path(folder, "old"))
-        new = run(sys.argv[2], Path(folder, "new"))
+    try:
+        with tempfile.TemporaryDirectory(prefix="xpd-equiv-") as folder:
+            old = run(sys.argv[1], Path(folder, "old"))
+            new = run(sys.argv[2], Path(folder, "new"))
+    except OSError as e:
+        fail(f"cannot prepare equivalence workspace. {e}")
     try:
         if isinstance(old, pd.DataFrame):
             pdt.assert_frame_equal(old, new)

@@ -10,7 +10,7 @@ from typing import NoReturn
 
 def fail(reason: str) -> NoReturn:
     """Exits with 2, the code of an xpd command that cannot run."""
-    print(reason, file=sys.stderr)
+    print(json.dumps({"error": reason}))
     sys.exit(2)
 
 

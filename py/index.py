@@ -493,6 +493,10 @@ def public_paths(
             continue
 
 
+def path_rank(path: str) -> tuple[int, int, str]:
+    return (path.count("."), len(path), path)
+
+
 def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
     """Name each definition once for each public name, by the path with the fewest parts."""
     names: dict[tuple[str, str], tuple[str, griffe.Object]] = {}
@@ -500,11 +504,7 @@ def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
     for path, target in public_paths(module, package, callables.imports, frozenset({module.path})):
         key = (target.path, path.rsplit(".", 1)[1])
         best = names.get(key)
-        if best is None or (path.count("."), len(path), path) < (
-            best[0].count("."),
-            len(best[0]),
-            best[0],
-        ):
+        if best is None or path_rank(path) < path_rank(best[0]):
             names[key] = (path, target)
     return [
         Entry(

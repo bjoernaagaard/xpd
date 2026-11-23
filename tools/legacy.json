@@ -13,7 +13,7 @@
   "lefthook.yml": "11,44",
   "mise.toml": "10,13-17,26-31",
   "pitchfork.toml": "3-5",
-  "py/equiv.py": "1-8,17-19,57,66-67,88",
+  "py/equiv.py": "1-8,17-19,88",
   "py/index.py": "37,152,190",
   "py/profile.py": "1-2,26,30-31,42-43,114,116",
   "py/refit.py": "131",

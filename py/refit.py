@@ -60,7 +60,11 @@ def refit(file: str) -> dict:
         ".json": pd.read_json,
         ".xlsx": pd.read_excel,
     }
-    rows = readers[data.suffix.lower()](data)
+    reader = readers.get(data.suffix.lower())
+    if reader is None:
+        msg = f"unsupported file type {data.suffix!r}"
+        raise ValueError(msg)
+    rows = reader(data)
     inputs = rows[[item["column"] for item in contract["inputs"]]]
     target = rows[contract["data"]["target"]]
     split = contract["split"]

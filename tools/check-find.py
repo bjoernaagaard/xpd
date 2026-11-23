@@ -20,26 +20,32 @@ type Questions = dict[str, list[Evidence]]
 
 
 def load_questions() -> tuple[Questions, dict[str, list[str]]]:
-    suites: dict[str, Questions] = json.loads(QUESTIONS.read_text())
+    raw_suites: dict[str, dict[str, list[list[str]]]] = json.loads(QUESTIONS.read_text())
+    overlap = raw_suites["questions"].keys() & raw_suites["upcoming"].keys()
+    if overlap:
+        message = f"Duplicate benchmark cases across suites: {sorted(overlap)}"
+        raise ValueError(message)
     packs = {path.parent.name for path in (ROOT / "rules").glob("*/pack.md")}
     questions: Questions = {}
     upcoming: dict[str, list[str]] = {}
     covered = set()
-    for case, evidence in (suites["questions"] | suites["upcoming"]).items():
-        libraries = {rule.split("/", 1)[0] for _, rule in evidence}
-        absent = libraries - packs
-        if absent and case in suites["upcoming"]:
-            upcoming[case] = sorted(absent)
-            continue
-        for _, rule in evidence:
-            if not (ROOT / "rules" / f"{rule}.md").is_file():
-                message = f"{case} refers to a missing rule: {rule}"
+    for suite_name in ("questions", "upcoming"):
+        for case, raw_evidence in raw_suites[suite_name].items():
+            evidence: list[Evidence] = [(prompt, rule) for prompt, rule in raw_evidence]
+            libraries = {rule.split("/", 1)[0] for _, rule in evidence}
+            absent = libraries - packs
+            if absent and suite_name == "upcoming":
+                upcoming[case] = sorted(absent)
+                continue
+            for _, rule in evidence:
+                if not (ROOT / "rules" / f"{rule}.md").is_file():
+                    message = f"{case} refers to a missing rule: {rule}"
+                    raise ValueError(message)
+            if len(evidence) != 1 and len(libraries - {"python", "xpd"}) < MIN_LIBRARIES:
+                message = f"{case} must cover three libraries"
                 raise ValueError(message)
-        if len(evidence) != 1 and len(libraries - {"python", "xpd"}) < MIN_LIBRARIES:
-            message = f"{case} must cover three libraries"
-            raise ValueError(message)
-        questions[case] = evidence
-        covered.update(libraries)
+            questions[case] = evidence
+            covered.update(libraries)
     if covered != packs:
         message = f"Pack coverage differs: {sorted(covered ^ packs)}"
         raise ValueError(message)
