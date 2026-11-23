@@ -293,7 +293,7 @@ pub(crate) fn imports_match(
 
 /// Whether an alias still comes from this import at a reference. Uncertain control flow ends
 /// the proof. Function locals shadow outer names throughout their scope, even before a write.
-fn imported_at(usage: &Node<'_>, alias: &Node<'_>) -> bool {
+pub(crate) fn imported_at(usage: &Node<'_>, alias: &Node<'_>) -> bool {
     let name = usage.text();
     let Some(mut statement) = statement_around(usage.clone()) else {
         return false;

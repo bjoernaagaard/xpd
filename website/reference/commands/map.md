@@ -23,6 +23,24 @@ Observed input columns: bill_depth_mm, bill_length_mm, body_mass_g, flipper_leng
 ...
 ```
 
+## Plan a skfolio migration
+
+Use `--from skfolio --to polars` to find skfolio imports and direct calls in a
+named entry function. For `prices_to_returns`, the report proposes Polars
+expressions over an explicit date key. It lists the options, downstream types,
+adapters and unresolved calls to check. The pandas `--contract` option applies
+only to the pandas pair.
+
+```sh
+xpd map examples/skfolio-migration/replay.py --entry main --from skfolio --to polars --format text
+uv run --no-project examples/skfolio-migration/replay.py
+```
+
+The example uses skfolio's packaged S&P 500 and factor data. Its walk-forward
+caller consumes the returns and compares dates, daily returns, wealth and ending
+weights with the original caller. The replay runs the migrated command in a
+separate Python environment and requires both skfolio and pandas to be absent.
+
 ## Exit status
 
 | Exit code | Meaning |
