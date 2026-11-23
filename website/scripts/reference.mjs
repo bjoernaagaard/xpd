@@ -48,6 +48,9 @@ function mcpListing(xpd, python) {
 // Why the page of a command or a tool runs no example of it.
 const NO_EXAMPLE = {
   'xpd lsp': 'It speaks the Language Server Protocol on stdin, which no shell line shows.',
+  animate_render: 'It needs the pinned Manim image and rootless Podman.',
+  animate_artifact: 'It needs an artifact from a completed local render.',
+  animate_source: 'It needs a saved source bundle from a completed local render.',
   gates: 'Its arguments are the full results of six other tools.',
   discovery_gate: 'Its arguments hold a discovery record, which is 28 kB for samples/pipeline.',
 };

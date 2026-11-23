@@ -102,7 +102,8 @@ xpd animate render cache_miss.py CacheMiss --profile final
 The render result includes a contact sheet, editable source, and saved settings for a revision.
 An agent connected over local MCP can use `animate_guide`, `animate_render`,
 `animate_artifact`, and `animate_source`. The
-[animation guide](skills/xpd-animate/SKILL.md) lists recipes and explains local assets.
+[animation guide](https://bjoernaagaard.github.io/xpd/guides/animate/) walks through setup,
+CLI and MCP rendering, and how to revise a saved scene.
 
 ## Rules
 
@@ -191,7 +192,9 @@ to compare results from the two scripts. Both scripts must read the same
 inputs and assign their tables to `result`. The Polars script returns a
 materialized DataFrame in the proof even if the production consumer takes
 a LazyFrame. The [equiv reference](https://bjoernaagaard.github.io/xpd/commands/equiv/)
-shows the contract fields and exit codes.
+shows the contract fields and exit codes. The [skfolio migration example](examples/skfolio-migration/)
+includes two manifests and a replay that verifies native Polars output without pandas
+or skfolio installed in the native runtime.
 
 ## Use xpd with an agent or an editor
 

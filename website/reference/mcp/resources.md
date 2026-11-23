@@ -49,3 +49,31 @@ One rule's documentation as Markdown, the same text as its [rule page](../../rul
 +df = df.dropna()
 ```
 ````
+
+## skill://xpd-animate/
+
+The offline animation workflow and its editable Manim recipes.
+
+## xpd://animation/{job_id}/video.mp4
+
+The video of a local preview or final render.
+
+## xpd://animation/{job_id}/still.png
+
+The last frame from a local still render.
+
+## xpd://animation/{job_id}/contact-sheet.png
+
+A set of sampled frames from a local video render.
+
+## xpd://animation/{job_id}/source.zip
+
+The editable scene and its saved inputs.
+
+## xpd://animation/{job_id}/manifest.json
+
+The settings and metadata of a local render job.
+
+## xpd://animation/{job_id}/render.log
+
+The saved log of a local render job.

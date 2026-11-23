@@ -44,6 +44,9 @@ For another client, add the server to the client's `mcpServers` setting.
 `uv tool install xpd` or `uvx xpd`. A binary that you build with `cargo` has no Python beside it,
 and its `xpd mcp` prints `Run it as: uvx xpd mcp` and exits with 2.
 
+For Manim recipes, local rendering, and revising a saved scene from MCP, see
+[Animate a concept with Manim](../animate/).
+
 ## Choose the project root
 
 Every path that a tool takes is relative to the project root, and the server refuses a path

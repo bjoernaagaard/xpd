@@ -1,0 +1,395 @@
+{
+  "file": "skfolio/preprocessing/_returns.py",
+  "entry": "prices_to_returns",
+  "line": 15,
+  "from": "pandas",
+  "to": "polars",
+  "status": "partial",
+  "input_columns_observed": [],
+  "contract": null,
+  "stages": [
+    {
+      "name": "prices_to_returns",
+      "line": 15,
+      "reads": [],
+      "writes": []
+    }
+  ],
+  "dependencies": [],
+  "observed": [
+    {
+      "line": 99,
+      "code": "copy",
+      "message": "The source explicitly copies before mutation."
+    }
+  ],
+  "proposed": [
+    {
+      "line": 118,
+      "code": "filter",
+      "message": "Use a native filter expression after checking mask alignment and missing-value behavior."
+    },
+    {
+      "line": 15,
+      "code": "output-contract",
+      "message": "Reuse intermediate expressions while preserving every output column and its declared type and position."
+    },
+    {
+      "line": 15,
+      "code": "verification",
+      "message": "Run xpd equiv with the same contract and the same inputs on both implementations. Inspect the native code and optimized plan."
+    }
+  ],
+  "unresolved": [
+    {
+      "line": 15,
+      "code": "extra-inputs",
+      "message": "Determine whether additional arguments are scalar values or carry data and alignment requirements."
+    },
+    {
+      "line": 15,
+      "code": "return-shape",
+      "message": "Show which returned value is the output table."
+    },
+    {
+      "line": 95,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 95,
+      "code": "unresolved-call",
+      "message": "Inspect isinstance and its effects at this call before mapping it."
+    },
+    {
+      "line": 96,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 96,
+      "code": "unresolved-call",
+      "message": "Inspect TypeError and its effects at this call before mapping it."
+    },
+    {
+      "line": 98,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 98,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 101,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 101,
+      "code": "unresolved-call",
+      "message": "Inspect isinstance and its effects at this call before mapping it."
+    },
+    {
+      "line": 102,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 102,
+      "code": "unresolved-call",
+      "message": "Inspect TypeError and its effects at this call before mapping it."
+    },
+    {
+      "line": 103,
+      "code": "index-or-join",
+      "message": "Establish key cardinality, alignment, null matching and required order before choosing a Polars join or replacing an index operation."
+    },
+    {
+      "line": 107,
+      "code": "unresolved-call",
+      "message": "Inspect df.dropna and its effects at this call before mapping it."
+    },
+    {
+      "line": 107,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 109,
+      "code": "unresolved-call",
+      "message": "Inspect sum and its effects at this call before mapping it."
+    },
+    {
+      "line": 109,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 109,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 109,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"x\"."
+    },
+    {
+      "line": 113,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 113,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 114,
+      "code": "unresolved-call",
+      "message": "Inspect float and its effects at this call before mapping it."
+    },
+    {
+      "line": 114,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"nan_threshold\"."
+    },
+    {
+      "line": 115,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 115,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 116,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 116,
+      "code": "unresolved-call",
+      "message": "Inspect ValueError and its effects at this call before mapping it."
+    },
+    {
+      "line": 117,
+      "code": "unresolved-call",
+      "message": "Inspect df.iloc[:, :n_assets].isna().sum and its effects at this call before mapping it."
+    },
+    {
+      "line": 117,
+      "code": "unresolved-call",
+      "message": "Inspect df.iloc[:, :n_assets].isna and its effects at this call before mapping it."
+    },
+    {
+      "line": 117,
+      "code": "index",
+      "message": "Establish row labels, alignment and cardinality before using positional Polars expressions."
+    },
+    {
+      "line": 117,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 118,
+      "code": "index",
+      "message": "Establish row labels, alignment and cardinality before using positional Polars expressions."
+    },
+    {
+      "line": 118,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 119,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 119,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 119,
+      "code": "unresolved-call",
+      "message": "Inspect len and its effects at this call before mapping it."
+    },
+    {
+      "line": 120,
+      "code": "unresolved-call",
+      "message": "Inspect df.drop and its effects at this call before mapping it."
+    },
+    {
+      "line": 120,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 122,
+      "code": "unresolved-call",
+      "message": "Inspect df.dropna and its effects at this call before mapping it."
+    },
+    {
+      "line": 122,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 125,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 126,
+      "code": "unresolved-call",
+      "message": "Inspect df.ffill and its effects at this call before mapping it."
+    },
+    {
+      "line": 126,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 129,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 130,
+      "code": "index",
+      "message": "Establish row labels, alignment and cardinality before using positional Polars expressions."
+    },
+    {
+      "line": 130,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 130,
+      "code": "unresolved-call",
+      "message": "Inspect df.notna().all(axis=1).cummax and its effects at this call before mapping it."
+    },
+    {
+      "line": 130,
+      "code": "unresolved-call",
+      "message": "Inspect df.notna().all and its effects at this call before mapping it."
+    },
+    {
+      "line": 130,
+      "code": "unresolved-call",
+      "message": "Inspect df.notna and its effects at this call before mapping it."
+    },
+    {
+      "line": 133,
+      "code": "unresolved-call",
+      "message": "Inspect df.dropna and its effects at this call before mapping it."
+    },
+    {
+      "line": 133,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"df\"."
+    },
+    {
+      "line": 136,
+      "code": "index",
+      "message": "Establish row labels, alignment and cardinality before using positional Polars expressions."
+    },
+    {
+      "line": 136,
+      "code": "unresolved-call",
+      "message": "Inspect df.pct_change and its effects at this call before mapping it."
+    },
+    {
+      "line": 137,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 138,
+      "code": "unresolved-call",
+      "message": "Inspect np.log1p and its effects at this call before mapping it."
+    },
+    {
+      "line": 138,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"np\"."
+    },
+    {
+      "line": 138,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"all_returns\"."
+    },
+    {
+      "line": 140,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 140,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 141,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"all_returns\"."
+    },
+    {
+      "line": 143,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"all_returns\"."
+    },
+    {
+      "line": 143,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 143,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"x\"."
+    },
+    {
+      "line": 143,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 144,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"all_returns\"."
+    },
+    {
+      "line": 144,
+      "code": "python-control-flow",
+      "message": "Determine how this Python construct affects inputs, outputs or side effects."
+    },
+    {
+      "line": 144,
+      "code": "external-value",
+      "message": "Establish the value and alignment behavior of \"x\"."
+    },
+    {
+      "line": 144,
+      "code": "comparison-missing-values",
+      "message": "Resolve null and NaN comparisons before translating the predicate. In Polars NaN can sort above finite values."
+    },
+    {
+      "line": 15,
+      "code": "computed-columns",
+      "message": "Identify the columns selected or assigned at runtime."
+    },
+    {
+      "line": 15,
+      "code": "contract",
+      "message": "Supply --contract with ordered input and output schemas, row identity and the caller's materialization boundary."
+    }
+  ]
+}

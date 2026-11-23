@@ -122,7 +122,7 @@ The MCP server also offers each skill as a resource, such as `skill://xpd/SKILL.
 ## Agent plugin
 
 The xpd repository is a plugin for Claude Code and for Codex. One install gives the agent the
-hook, the MCP server and the three skills, with no settings to write. The hook runs the `xpd` on
+hook, the MCP server and the bundled skills, with no settings to write. The hook runs the `xpd` on
 your `PATH`, so install xpd as [Get started](../../#install) shows. The plugin starts the MCP
 server with `uvx`, so the machine also needs [uv](https://docs.astral.sh/uv/).
 
@@ -154,7 +154,7 @@ xpd repository, loaded as a plugin
 ├── .agents/plugins/marketplace.json    lists the plugin for Codex
 ├── hooks/hooks.json                    runs xpd hook on four events, in both clients
 ├── mcp.json                            starts the server of the same version, with uvx xpd@<version> mcp
-└── skills/                             xpd, python-best-practices and python-review
+└── skills/                             xpd, xpd-animate, python-best-practices and python-review
 ```
 
 Codex 0.170.0 loads the hooks of a plugin only when the plugin has no `plugin.json` at its root,
@@ -166,7 +166,7 @@ describes each answer.
 | Event | What xpd does |
 | --- | --- |
 | `SessionStart` | Records the commit that is checked out, and prints a brief of the project for the agent |
-| `UserPromptSubmit` | Prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
+| `UserPromptSubmit` | Points the agent to the [animation guide](../animate/) for rendered animation requests. For Python projects it can also supply a matching playbook or report open issues |
 | `PostToolUse`, after an `Edit` or a `Write` | Lints the edited file, so the agent sees its issues |
 | `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning |
 

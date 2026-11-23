@@ -1,0 +1,40 @@
+{
+  "entry": "skfolio.model_selection.cross_val_predict",
+  "status": "verified_pandas_free_for_declared_scope",
+  "source": "https://skfolio.org/user_guide/model_selection.html",
+  "input": {
+    "from": "returns.manifest.json",
+    "assets": [
+      "AAPL",
+      "GE",
+      "JPM"
+    ],
+    "last_rows": 312
+  },
+  "contract": {
+    "train_observations": 252,
+    "test_observations": 5,
+    "transaction_cost_per_observation": 0.0002,
+    "weight_drift": true,
+    "compounded": true,
+    "output_portfolios": 12,
+    "output_observations": 60,
+    "float_atol": 1e-09,
+    "calendar": {
+      "frequency": "W-FRI",
+      "train_weeks": 5,
+      "test_weeks": 1,
+      "output_portfolios": 58,
+      "output_observations": 280
+    },
+    "risk_model": "Fully invested long-only minimum variance using empirical covariance and CLARABEL"
+  },
+  "verification": [
+    "Compare the actual persisted native paths, wealth and dated named ending weights",
+    "Differentially check all 32 weekly split configurations on the pinned dates",
+    "Require pandas and skfolio to be absent from the native environment"
+  ],
+  "open": [
+    "Frequencies other than W-FRI, timestamp offsets, variable asset universes, other risk objectives, turnover limits and non-positive-definite covariance"
+  ]
+}

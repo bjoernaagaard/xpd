@@ -1,0 +1,100 @@
+{
+  "entry": "skfolio.preprocessing.prices_to_returns",
+  "status": "verified_pandas_free_for_declared_scope",
+  "source": "https://skfolio.org/generated/skfolio.preprocessing.prices_to_returns.html",
+  "input": {
+    "package": "skfolio==1.14.4",
+    "resource": "skfolio/datasets/data/sp500_dataset.csv.gz",
+    "identity": "Date",
+    "order": "ascending Date",
+    "rows": 8313,
+    "sha256": "ee21cac28befb1d0a739a9ceb22184f995394726aa0cfde9a21941d1ac04ac0d",
+    "assets": [
+      "AAPL",
+      "AMD",
+      "BAC",
+      "BBY",
+      "CVX",
+      "GE",
+      "HD",
+      "JNJ",
+      "JPM",
+      "KO",
+      "LLY",
+      "MRK",
+      "MSFT",
+      "PEP",
+      "PFE",
+      "PG",
+      "RRC",
+      "UNH",
+      "WMT",
+      "XOM"
+    ]
+  },
+  "contract": {
+    "defaults": "One price table, linear returns, forward-fill and drop leading incomplete rows",
+    "precondition": "Unique non-null ascending daily dates, with disjoint asset and factor names",
+    "output": {
+      "format": "parquet",
+      "rows": 8312,
+      "date_dtype": "Date",
+      "ordered_columns": [
+        "Date",
+        "AAPL",
+        "AMD",
+        "BAC",
+        "BBY",
+        "CVX",
+        "GE",
+        "HD",
+        "JNJ",
+        "JPM",
+        "KO",
+        "LLY",
+        "MRK",
+        "MSFT",
+        "PEP",
+        "PFE",
+        "PG",
+        "RRC",
+        "UNH",
+        "WMT",
+        "XOM"
+      ]
+    },
+    "float_atol": 1e-12,
+    "factor_input": {
+      "resource": "skfolio/datasets/data/factors_dataset.csv.gz",
+      "sha256": "6eb089953db90c9a38d3283582751701a90db6f59965847fd64b0578de497161",
+      "rows": 2264,
+      "columns": [
+        "MTUM",
+        "QUAL",
+        "SIZE",
+        "USMV",
+        "VLUE"
+      ]
+    },
+    "factor_joins": [
+      "outer",
+      "inner",
+      "left",
+      "right"
+    ],
+    "options": [
+      "log_returns",
+      "nan_threshold",
+      "drop_inceptions_nan",
+      "fill_nan"
+    ]
+  },
+  "verification": [
+    "Run the pandas-free command and compare persisted Parquet to the pinned baseline",
+    "Compare all four factor join modes on packaged fixtures",
+    "Compare leading, internal and all-assets gaps plus an all-missing asset with 24 combinations of supported options"
+  ],
+  "open": [
+    "Duplicate or unsorted dates, alternate date keys, and join kinds outside the four declared modes"
+  ]
+}

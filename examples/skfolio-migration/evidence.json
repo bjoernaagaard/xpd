@@ -1,0 +1,53 @@
+{
+  "pandas_free_runtime": {
+    "pandas_present": false,
+    "skfolio_present": false,
+    "outputs": 7
+  },
+  "price_rows": 8313,
+  "factor_rows": 2264,
+  "returns_rows": 8312,
+  "max_return_delta": 0.0,
+  "preprocessing": {
+    "join_rows": {
+      "outer": [
+        2263,
+        2263
+      ],
+      "inner": [
+        2263,
+        2263
+      ],
+      "left": [
+        2263,
+        2263
+      ],
+      "right": [
+        2263,
+        2263
+      ]
+    },
+    "staggered_calendar_join_rows": {
+      "outer": 10,
+      "inner": 4,
+      "left": 7,
+      "right": 7
+    },
+    "missingness_cases": 24
+  },
+  "weekly_split_configurations": 32,
+  "observation_backtest": {
+    "observations": 60,
+    "portfolios": 12,
+    "max_return_delta": 1.975503094442388e-14,
+    "max_wealth_delta": 1.3100631690576847e-14,
+    "max_weight_delta": 1.2802814364221149e-12
+  },
+  "calendar_backtest": {
+    "observations": 280,
+    "portfolios": 58,
+    "max_return_delta": 6.003010588617741e-14,
+    "max_wealth_delta": 1.7130741269966165e-13,
+    "max_weight_delta": 3.0263569428257142e-12
+  }
+}
