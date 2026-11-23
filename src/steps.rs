@@ -90,11 +90,21 @@ pub(crate) struct Step {
     pub(crate) reads: Vec<String>,
     /// The columns the step adds by name.
     pub(crate) writes: Vec<String>,
+    pub(crate) column_writes: Vec<ColumnWrite>,
     /// The step also reads or adds columns whose names the file computes.
     pub(crate) computed: bool,
     pub(crate) mutates_input: bool,
     /// Names read as `frame.name`, which are columns when another step adds them.
     attributes: Vec<String>,
+}
+
+/// The expression inputs and source line of a named column write.
+#[derive(Debug)]
+pub(crate) struct ColumnWrite {
+    pub(crate) name: String,
+    pub(crate) line: usize,
+    pub(crate) reads: BTreeSet<String>,
+    pub(crate) reads_current_frame: bool,
 }
 
 impl Step {
@@ -189,6 +199,7 @@ enum Kind {
 struct Found {
     reads: BTreeSet<String>,
     writes: Vec<Write>,
+    column_writes: Vec<ColumnWrite>,
     formulas: Vec<Formula>,
     findings: Vec<Finding>,
     /// The step reads or adds columns whose names the file computes.
@@ -955,6 +966,7 @@ impl<'r, 'a> Reader<'r, 'a> {
                 line,
                 reads: found.reads.into_iter().collect(),
                 writes: names,
+                column_writes: found.column_writes,
                 computed: found.computed,
                 mutates_input: found.writes.iter().any(|write| write.way == Way::InPlace),
                 attributes: self.attributes(),
@@ -996,17 +1008,13 @@ impl<'r, 'a> Reader<'r, 'a> {
         let mut found = Found::default();
         let mut start_reads = Vec::new();
         for (name, value) in keywords(call) {
-            let value = lambda_body(&value);
-            self.column_reads(&value, &BTreeSet::new(), &mut found);
-            start_reads.extend(self.reads_from_start(&value));
+            let expression = lambda_body(&value);
+            self.column_reads(&expression, &BTreeSet::new(), &mut found);
+            start_reads.extend(self.reads_from_start(&expression));
             found
                 .formulas
-                .push(self.formula(&name, &value, Kind::Column));
-            found.writes.push(Write {
-                name,
-                line: Self::line(&value),
-                way: Way::Replace,
-            });
+                .push(self.formula(&name, &expression, Kind::Column));
+            self.record_write(name, Self::line(&value), &value, Way::Replace, &mut found);
         }
         // assign(**columns) adds columns whose names the file computes.
         found.computed |= call
@@ -1020,6 +1028,7 @@ impl<'r, 'a> Reader<'r, 'a> {
                 line,
                 reads: found.reads.into_iter().collect(),
                 writes: found.writes.iter().map(|w| w.name.clone()).collect(),
+                column_writes: found.column_writes,
                 computed: found.computed,
                 attributes: Vec::new(),
                 mutates_input: false,
@@ -1109,16 +1118,13 @@ impl<'r, 'a> Reader<'r, 'a> {
             for name in names {
                 if assignment.kind() == "augmented_assignment" {
                     found.reads.insert(name.clone());
+                    self.record_write(name, Self::line(&assignment), &assignment, way, found);
                 } else if let Some(value) = assignment.field("right") {
                     found
                         .formulas
                         .push(self.formula(&name, &value, Kind::Column));
+                    self.record_write(name, Self::line(&assignment), &value, way, found);
                 }
-                found.writes.push(Write {
-                    name,
-                    line: Self::line(&assignment),
-                    way,
-                });
             }
         }
         targets
@@ -1378,12 +1384,53 @@ impl<'r, 'a> Reader<'r, 'a> {
             found
                 .formulas
                 .push(self.formula(&name, &lambda_body(&value), Kind::Column));
-            found.writes.push(Write {
-                name,
-                line: Self::line(&value),
-                way,
-            });
+            self.record_write(name, Self::line(&value), &value, way, found);
         }
+    }
+
+    fn record_write(
+        &self,
+        name: String,
+        line: usize,
+        value: &Syntax<'r>,
+        way: Way,
+        found: &mut Found,
+    ) {
+        let mut expressions = vec![value.clone()];
+        let mut followed = BTreeSet::new();
+        let mut inputs = Found::default();
+        while let Some(expression) = expressions.pop() {
+            self.column_reads(&expression, &BTreeSet::new(), &mut inputs);
+            expressions.extend(
+                expression
+                    .dfs()
+                    .filter(|node| node.kind() == "identifier")
+                    .filter(|node| {
+                        !node.parent().is_some_and(|parent| {
+                            ["attribute", "name"].iter().any(|field| {
+                                parent
+                                    .field(field)
+                                    .is_some_and(|part| part.range() == node.range())
+                            })
+                        })
+                    })
+                    .filter_map(|node| self.locals.get_key_value(node.text().as_ref()))
+                    .filter(|(name, _)| followed.insert(*name))
+                    .map(|(_, value)| value.clone()),
+            );
+        }
+        found.column_writes.push(ColumnWrite {
+            name: name.clone(),
+            line,
+            reads: inputs.reads,
+            reads_current_frame: value.kind() == "lambda"
+                || (followed.is_empty()
+                    && (value.kind() == "augmented_assignment"
+                        || value
+                            .parent()
+                            .is_some_and(|parent| parent.kind() == "assignment"))),
+        });
+        found.writes.push(Write { name, line, way });
     }
 
     fn formula(&self, name: &str, value: &Syntax<'r>, kind: Kind) -> Formula {

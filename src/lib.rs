@@ -16,6 +16,7 @@ mod frames;
 mod graph;
 mod graph_diagnostic;
 mod hook;
+mod impact;
 mod imports;
 mod index;
 mod lsp;
