@@ -16,9 +16,12 @@ values before the first full window.
 
 ## How to fix it
 
-Use `xpd check --fix` to set `params_only=True`. Keep the full fit when you also
-need residuals or inference statistics. Check singular-window behavior separately
-if you use the `"lstsq"` or `"pinv"` solver.
+Use `xpd check --fix --unsafe-fixes` to set `params_only=True`. Skipping
+inference can change whether the fit raises. With two observations and two
+columns per window in statsmodels 0.15.0, the full fit raised
+`FloatingPointError` under `numpy.errstate(all="raise")` and the
+parameter-only fit returned coefficients. Keep the full fit when you need
+inference statistics or depend on its failure behavior.
 
 [Rolling regression fit options](https://www.statsmodels.org/stable/examples/notebooks/generated/rolling_ls.html#fit-options) ·
 [Rolling fit implementation](https://www.statsmodels.org/stable/_modules/statsmodels/regression/rolling.html)

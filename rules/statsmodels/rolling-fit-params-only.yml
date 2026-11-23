@@ -12,7 +12,7 @@ rule:
       - inside: {kind: attribute, has: {field: attribute, regex: '^params$'}}
 fix: (params_only=True)
 metadata:
-  fix: safe
+  fix: unsafe
   holds:
     MODEL:
       kind: call

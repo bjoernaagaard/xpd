@@ -33,17 +33,31 @@ metadata:
 id: removed-tsa-arguments
 language: python
 severity: error
-message: Statsmodels 0.15 rejects nlags=None in kpss. Use nlags="auto" for the automatic lag selection previously used for None.
+message: Statsmodels 0.15 rejects None for nlags in kpss. Use "auto" for the automatic lag selection previously used for None.
 rule:
-  kind: none
-  inside:
-    kind: keyword_argument
-    all:
-      - {has: {field: name, regex: '^nlags$'}}
-      - inside:
-          kind: argument_list
-          inside: {kind: call, has: {field: function, pattern: $F}}
-fix: '"auto"'
+  pattern: $LAGS
+  all:
+    - any:
+        - {kind: none}
+        - {kind: parenthesized_expression, regex: '^(?:\(\s*)+None(?:\s*\))+$'}
+    - any:
+        - inside:
+            kind: keyword_argument
+            all:
+              - {has: {field: name, regex: '^nlags$'}}
+              - inside:
+                  kind: argument_list
+                  inside: {kind: call, has: {field: function, pattern: $F}}
+        - all:
+            - nthChild: {position: 3, ofRule: {not: {any: [{kind: comment}, {kind: line_continuation}]}}}
+            - inside:
+                kind: argument_list
+                inside: {kind: call, has: {field: function, pattern: $F}}
+                not: {has: {kind: list_splat}}
+transform:
+  AUTO:
+    replace: {source: $LAGS, replace: 'None', by: '"auto"'}
+fix: $AUTO
 metadata:
   since: '0.15'
   fix: unsafe

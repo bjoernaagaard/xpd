@@ -11,7 +11,9 @@ twice and may produce nonfinite values.
 
 The rule checks a direct NumPy or math `log` call passed as `exposure` to
 `GLM`, `GLM.from_formula`, or the formula API's `glm` when the log import
-is established.
+is established. It checks the fifth positional argument of `GLM` as
+well as the keyword. For plain imports, the rule skips names with
+competing bindings in the file.
 
 ## How to fix it
 

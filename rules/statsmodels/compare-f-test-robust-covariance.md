@@ -9,9 +9,11 @@ p-value under the assumptions of homoskedasticity and no autocorrelation.
 
 ## What the rule reports
 
-The rule checks two statsmodels OLS fits when either call names a robust
-`cov_type` such as `"HC3"`, `"HAC"`, or `"cluster"`. It follows inline
-constructor and fit chains and local assignments of their results. In 0.15.0,
+The rule checks two statsmodels OLS results when either uses a literal
+robust `cov_type`, including `"cluster-jk"` and `"cluster-crv3"`. It reads
+the covariance passed to `fit` by position or keyword and follows
+`get_robustcov_results` chained directly after the fit. Both inline
+results and local assignments are supported. In 0.15.0,
 setting HC3 on either fit emitted `InvalidTestWarning` and returned the
 same p-value as the classical comparison.
 

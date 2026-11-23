@@ -1,6 +1,7 @@
 Statsmodels 0.15 removed `old_names` from `AutoReg` and `ar_select_order`
 and `verbose` from `grangercausalitytests`. These keywords now raise
-`TypeError`. A literal `nlags=None` in `kpss` now raises `ValueError`.
+`TypeError`. Passing literal `None` as the third positional argument or as `nlags` in
+`kpss` now raises `ValueError`. Parentheses around `None` have the same effect.
 
 ```diff
 -AutoReg(y, lags=2, old_names=True)

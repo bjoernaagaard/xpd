@@ -24,21 +24,57 @@ utils:
             field: object
             kind: call
             has: {field: function, regex: '(^|\.)(OLS(?:\.from_formula)?|ols)$'}
-  without-robust-keyword:
+  robust-covariance:
+    kind: string
+    regex: '(?i)^["''](?:hc[0-3]|hac|cluster(?:-jk|-crv3)?|hac-panel|hac-groupsum)["'']$'
+  cov-keyword:
+    kind: keyword_argument
+    all:
+      - {has: {field: name, regex: '^cov_type$'}}
+      - {has: {field: value, matches: robust-covariance}}
+  argument:
+    not: {any: [{kind: comment}, {kind: line_continuation}]}
+  robust-fit:
     all:
       - {matches: ols-fit}
-      - not:
-          has:
-            field: arguments
-            has:
-              kind: keyword_argument
-              all:
-                - {has: {field: name, regex: '^cov_type$'}}
-                - {has: {field: value, regex: '(?i)^["''](?:hc[0-3]|hac|cluster|hac-panel|hac-groupsum)["'']$'}}
+      - has:
+          field: arguments
+          any:
+            - {has: {matches: cov-keyword}}
+            - all:
+                - {not: {has: {kind: list_splat}}}
+                - has:
+                    matches: robust-covariance
+                    nthChild: {position: 2, ofRule: {matches: argument}}
+  robust-conversion:
+    kind: call
+    all:
+      - has:
+          field: function
+          kind: attribute
+          all:
+            - {has: {field: attribute, regex: '^get_robustcov_results$'}}
+            - {has: {field: object, matches: ols-fit}}
+      - has:
+          field: arguments
+          any:
+            - {regex: '^\(\s*\)$'}
+            - {has: {matches: cov-keyword}}
+            - has:
+                matches: robust-covariance
+                nthChild: {position: 1, ofRule: {matches: argument}}
+  ols-result:
+    any:
+      - {matches: ols-fit}
+      - {matches: robust-conversion}
+  without-robust-covariance:
+    all:
+      - {matches: ols-fit}
+      - {not: {matches: robust-fit}}
 metadata:
   holds:
-    FULL: {matches: ols-fit}
-    RESTRICTED: {matches: ols-fit}
+    FULL: {matches: ols-result}
+    RESTRICTED: {matches: ols-result}
   unlessHolds:
-    FULL: {matches: without-robust-keyword}
-    RESTRICTED: {matches: without-robust-keyword}
+    FULL: {matches: without-robust-covariance}
+    RESTRICTED: {matches: without-robust-covariance}

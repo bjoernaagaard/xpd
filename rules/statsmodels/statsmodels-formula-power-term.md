@@ -9,9 +9,11 @@ For a single predictor, `x**2` gives the same term as `x`. In both engines,
 
 ## What the rule reports
 
-The rule checks simple additive formula literals in `ols` and `OLS.from_formula`.
-It reports a predictor name raised to a literal integer of at least two.
-Interaction expansions such as `(x + z)**2` are valid.
+The rule checks additive formula literals in `ols` and `OLS.from_formula`,
+including raw strings and formulas with simple parenthesized terms. It
+reports a standalone predictor name raised to a literal integer of at least
+two. The edit preserves existing transforms such as `I(z**2)` and
+interaction expansions such as `(a + b)**2`.
 
 ## How to fix it
 
