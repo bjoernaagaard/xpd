@@ -1,0 +1,51 @@
+id: removed-gpu-hist
+language: python
+severity: error
+message: XGBoost 3.1 removed tree_method="gpu_hist". Use tree_method="hist" and set device to "cuda" or the intended CUDA device ordinal.
+rule:
+  all:
+    - { pattern: '$FN($$$ARGS)' }
+    - any:
+        - all:
+            - has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' }
+            - has:
+                field: arguments
+                all:
+                  - has: { kind: keyword_argument, has: { field: name, regex: '^tree_method$' }, matches: gpu-hist-value }
+                  - not: { has: { kind: keyword_argument, has: { field: name, regex: '^booster$' }, matches: gblinear-value } }
+        - all:
+            - has: { field: function, regex: '(^|\.)(train|cv)$' }
+            - has:
+                field: arguments
+                has:
+                  any:
+                    - { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, matches: gpu-hist-params }
+                    - { kind: keyword_argument, all: [{ has: { field: name, regex: '^params$' } }, { has: { field: value, matches: gpu-hist-params } }] }
+    - not:
+        inside:
+          stopBy: end
+          any:
+            - { kind: try_statement, has: { kind: except_clause } }
+            - { kind: with_statement, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
+            - { kind: if_statement, has: { field: condition, regex: '\b(__version__|hasattr)\b' } }
+metadata:
+  since: '3.1.0'
+  holds:
+    FN: { any: [{ kind: identifier }, { kind: attribute }] }
+utils:
+  gpu-hist-value:
+    has: { field: value, kind: string, regex: '^("gpu_hist"|''gpu_hist'')$' }
+  gblinear-value:
+    has: { field: value, kind: string, regex: '^("gblinear"|''gblinear'')$' }
+  gpu-hist-params:
+    kind: dictionary
+    all:
+      - has:
+          kind: pair
+          has: { field: key, kind: string, regex: '^("tree_method"|''tree_method'')$' }
+          matches: gpu-hist-value
+      - not:
+          has:
+            any:
+              - { kind: dictionary_splat }
+              - { kind: pair, has: { field: key, kind: string, regex: '^("booster"|''booster'')$' }, matches: gblinear-value }

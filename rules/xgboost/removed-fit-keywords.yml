@@ -1,0 +1,25 @@
+id: removed-fit-keywords
+language: python
+severity: error
+message: XGBoost 2.1 removed eval_metric, early_stopping_rounds and callbacks from estimator fit. Set them in the constructor or with set_params and pass eval_set to fit.
+rule:
+  all:
+    - { pattern: $MODEL.fit($$$ARGS) }
+    - has:
+        field: arguments
+        has: { kind: keyword_argument, has: { field: name, regex: '^(eval_metric|early_stopping_rounds|callbacks)$' } }
+    - not: { matches: compatibility-path }
+metadata:
+  since: '2.1.0'
+  holds:
+    MODEL:
+      kind: call
+      has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' }
+utils:
+  compatibility-path:
+    inside:
+      stopBy: end
+      any:
+        - { kind: try_statement, has: { kind: except_clause } }
+        - { kind: with_statement, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
+        - { kind: if_statement, has: { field: condition, regex: '\b(__version__|hasattr)\b' } }

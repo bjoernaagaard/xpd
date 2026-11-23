@@ -1,0 +1,79 @@
+id: quantile-eval-without-train-ref
+language: python
+severity: error
+message: XGBoost train requires a separate evaluation QuantileDMatrix to reference the training matrix. Construct it with ref set to the matrix passed as dtrain.
+rule:
+  all:
+    - { kind: tuple, pattern: '($EVAL, $LABEL)' }
+    - matches: watchlist-entry
+    - any:
+        - { has: { pattern: $EVAL, matches: unreferenced-quantile-matrix } }
+        - all:
+            - { has: { pattern: $EVAL, kind: identifier } }
+            - inside: { stopBy: { kind: call }, kind: call, matches: after-eval-construction }
+    - not:
+        inside:
+          stopBy: end
+          any:
+            - { kind: try_statement, has: { kind: except_clause } }
+            - { kind: with_statement, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
+metadata:
+  holds:
+    TRAIN: { regex: '(^|\.)train$' }
+    MATRIX: { regex: '(^|\.)QuantileDMatrix$' }
+utils:
+  unreferenced-quantile-matrix:
+    kind: call
+    all:
+      - { has: { field: function, pattern: $MATRIX } }
+      - has:
+          field: arguments
+          not:
+            has:
+              any:
+                - { kind: dictionary_splat }
+                - { kind: list_splat }
+                - nthChild:
+                    position: 3
+                    ofRule: { not: { any: [{ kind: keyword_argument }, { kind: comment }] } }
+                - kind: keyword_argument
+                  all:
+                    - { has: { field: name, regex: '^ref$' } }
+                    - { has: { field: value, not: { kind: none } } }
+  watchlist-entry:
+    inside:
+      any: [{ kind: list }, { kind: tuple }]
+      inside:
+        kind: keyword_argument
+        all:
+          - { has: { field: name, regex: '^evals$' } }
+          - inside:
+              kind: argument_list
+              all:
+                - not: { has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
+                - inside: { kind: call, has: { field: function, pattern: $TRAIN } }
+  after-eval-construction:
+    all:
+      - has:
+          field: arguments
+          has:
+            any:
+              - all:
+                  - { nthChild: { position: 2, ofRule: { not: { kind: comment } } } }
+                  - { kind: identifier }
+                  - { not: { pattern: $EVAL } }
+              - kind: keyword_argument
+                all:
+                  - { has: { field: name, regex: '^dtrain$' } }
+                  - { has: { field: value, kind: identifier, not: { pattern: $EVAL } } }
+      - inside:
+          stopBy: { not: { kind: assignment } }
+          any: [{ kind: expression_statement }, { kind: return_statement }]
+          follows:
+            stopBy: { not: { kind: comment } }
+            kind: expression_statement
+            has:
+              kind: assignment
+              all:
+                - { has: { field: left, pattern: $EVAL } }
+                - { has: { field: right, matches: unreferenced-quantile-matrix } }

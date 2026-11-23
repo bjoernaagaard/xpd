@@ -1,0 +1,23 @@
+XGBoost's `Booster.inplace_predict` can score supported batches without
+allocating a new `DMatrix` for each batch.
+
+```diff
+ for batch in batches:
+-    yield model.predict(xgb.DMatrix(batch))
++    yield model.inplace_predict(batch)
+```
+
+## What the rule reports
+
+The rule checks a native booster that calls `predict(DMatrix(batch))` in
+the loop that binds `batch`. It looks for a single positional argument in
+both calls.
+
+## How to fix it
+
+Use `inplace_predict` when the input type and device match what the booster
+supports and you only need ordinary predictions. Keep `DMatrix` for inputs
+or prediction features that require it. When scoring the same matrix
+repeatedly, you can reuse it and benefit from native prediction caching.
+
+[In-place and staged prediction](https://xgboost.readthedocs.io/en/stable/prediction.html#in-place-prediction)

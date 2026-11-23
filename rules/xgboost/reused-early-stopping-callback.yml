@@ -1,0 +1,35 @@
+id: reused-early-stopping-callback
+language: python
+severity: warning
+message: XGBoost EarlyStopping retains state from the previous fit when this loop reuses it. Create a fresh callback inside the loop before each train call.
+rule:
+  all:
+    - { pattern: '$TRAIN($$$ARGS)' }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - { has: { field: name, regex: '^callbacks$' } }
+            - { has: { field: value, pattern: '[$CALLBACK]' } }
+    - inside:
+        stopBy: { any: [{ kind: for_statement }, { kind: function_definition }, { kind: class_definition }, { kind: lambda }] }
+        kind: for_statement
+        all:
+          - follows:
+              stopBy: { not: { kind: comment } }
+              kind: expression_statement
+              has: { pattern: '$CALLBACK = $EARLY_STOPPING($$$OPTIONS)' }
+          - not:
+              has:
+                stopBy: end
+                any:
+                  - { kind: assignment, has: { field: left, pattern: $CALLBACK } }
+                  - { kind: augmented_assignment, has: { field: left, pattern: $CALLBACK } }
+                  - { kind: named_expression, has: { field: name, pattern: $CALLBACK } }
+constraints:
+  CALLBACK: { kind: identifier }
+metadata:
+  holds:
+    TRAIN: { regex: '(^|\.)train$' }
+    EARLY_STOPPING: { regex: '(^|\.)EarlyStopping$' }

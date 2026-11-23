@@ -1,0 +1,19 @@
+id: ineffective-max-quantile-batches
+language: python
+severity: warning
+message: XGBoost 3.3 deprecated max_quantile_batches. This setting no longer limits the number of GPU quantile batches.
+rule:
+  all:
+    - { pattern: '$MATRIX($$$ARGS)' }
+    - has:
+        field: arguments
+        has:
+          kind: keyword_argument
+          all:
+            - { has: { field: name, regex: '^max_quantile_batches$' } }
+            - { has: { field: value, not: { kind: none } } }
+    - not: { inside: { stopBy: end, kind: if_statement, has: { field: condition, regex: '\b(__version__|hasattr)\b' } } }
+metadata:
+  since: '3.3.0'
+  holds:
+    MATRIX: { regex: '(^|\.)(ExtMem)?QuantileDMatrix$' }

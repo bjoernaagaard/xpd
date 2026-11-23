@@ -1,0 +1,43 @@
+id: native-predict-after-early-stopping
+language: python
+severity: warning
+message: Native XGBoost prediction uses all retained rounds after early stopping. To predict at the best round, pass iteration_range=(0, $MODEL.best_iteration + 1).
+rule:
+  all:
+    - any:
+        - { pattern: '$MODEL.predict($$$ARGS)' }
+        - { pattern: '$MODEL.inplace_predict($$$ARGS)' }
+    - has:
+        field: arguments
+        not:
+          has:
+            any:
+              - { kind: dictionary_splat }
+              - { kind: list_splat }
+              - nthChild:
+                  position: 2
+                  ofRule: { not: { any: [{ kind: keyword_argument }, { kind: comment }] } }
+              - { kind: keyword_argument, has: { field: name, regex: '^iteration_range$' } }
+constraints:
+  MODEL: { kind: identifier }
+metadata:
+  holds:
+    MODEL:
+      kind: call
+      has: { field: function, regex: '(^|\.)train$' }
+      all:
+        - has:
+            field: arguments
+            has:
+              kind: keyword_argument
+              all:
+                - { has: { field: name, regex: '^early_stopping_rounds$' } }
+                - { has: { field: value, kind: integer, regex: '^[1-9][0-9_]*$' } }
+        - has:
+            field: arguments
+            not:
+              has:
+                any:
+                  - { kind: dictionary_splat }
+                  - { kind: list_splat }
+                  - { kind: keyword_argument, has: { field: name, regex: '^callbacks$' } }

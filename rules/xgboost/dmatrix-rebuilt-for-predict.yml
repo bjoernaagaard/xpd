@@ -1,0 +1,18 @@
+id: dmatrix-rebuilt-for-predict
+language: python
+severity: warning
+message: XGBoost builds a DMatrix for each batch in this loop. For supported inputs on a compatible device, use $MODEL.inplace_predict($BATCH) to avoid that conversion.
+rule:
+  all:
+    - { pattern: '$MODEL.predict($MATRIX($BATCH))' }
+    - inside:
+        stopBy: { any: [{ kind: for_statement }, { kind: function_definition }, { kind: class_definition }, { kind: lambda }] }
+        kind: for_statement
+        has: { field: left, pattern: $BATCH }
+constraints:
+  MODEL: { kind: identifier }
+  BATCH: { kind: identifier }
+metadata:
+  holds:
+    MODEL: { kind: call, has: { field: function, regex: '(^|\.)(train|Booster)$' } }
+    MATRIX: { regex: '(^|\.)DMatrix$' }

@@ -1,0 +1,14 @@
+defaultCategory: models
+categoryPrefixes:
+  xgboost.callback: workflow
+  xgboost.collective: workflow
+  xgboost.compat: workflow
+  xgboost.config: workflow
+  xgboost.dask: workflow
+  xgboost.data: data
+  xgboost.metrics: evaluation
+  xgboost.plotting: visualization
+  xgboost.testing: workflow
+
+aliases: {}
+packages: []
