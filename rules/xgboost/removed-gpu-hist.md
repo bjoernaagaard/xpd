@@ -9,11 +9,15 @@ that value raises an error.
 ## What the rule reports
 
 The rule checks literal `gpu_hist` values on XGBoost estimator constructors
-and in dictionaries passed directly as `params` to `train` or `cv`.
+and in dictionaries passed directly as `params` to `train` or `cv`. For
+duplicate keys, the last value takes effect. Raw and Unicode string prefixes
+are accepted on literal keys and values.
 
 ## How to fix it
 
-Use `tree_method="hist"` with `device="cuda"` for GPU training. If the old
+Use `xpd check --fix --unsafe-fixes` to migrate an estimator constructor
+whose only argument is `tree_method="gpu_hist"`. For other cases, edit the
+configuration by hand. Use `tree_method="hist"` with `device="cuda"` for GPU training. If the old
 configuration selected a specific GPU with `gpu_id`, use the corresponding
 device string, such as `device="cuda:1"`, in single-node training.
 

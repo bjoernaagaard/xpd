@@ -8,7 +8,7 @@ rule:
     - has:
         field: arguments
         has: { kind: keyword_argument, has: { field: name, regex: '^(eval_metric|early_stopping_rounds|callbacks)$' } }
-    - not: { matches: compatibility-path }
+    - not: { any: [{ matches: expected-failure }, { matches: xgboost-version-guard }] }
 metadata:
   since: '2.1.0'
   holds:
@@ -16,10 +16,31 @@ metadata:
       kind: call
       has: { field: function, regex: '(^|\.)XGB(Classifier|Regressor|Ranker|RFClassifier|RFRegressor|Model)$' }
 utils:
-  compatibility-path:
+  expected-failure:
+    any:
+      - inside:
+          stopBy: end
+          kind: block
+          inside:
+            field: body
+            kind: try_statement
+            has:
+              kind: except_clause
+              has:
+                field: value
+                any:
+                  - { regex: '^(TypeError)$' }
+                  - { kind: tuple, has: { regex: '^(TypeError)$' } }
+                  - { kind: as_pattern, has: { regex: '^(TypeError)$' } }
+      - inside:
+          stopBy: end
+          kind: with_statement
+          regex: '^with [^\n]*(?:pytest\.raises|assertRaises)\(\s*(?:TypeError)\s*[,)]'
+  xgboost-version-guard:
     inside:
       stopBy: end
-      any:
-        - { kind: try_statement, has: { kind: except_clause } }
-        - { kind: with_statement, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
-        - { kind: if_statement, has: { field: condition, regex: '\b(__version__|hasattr)\b' } }
+      kind: block
+      inside:
+        field: consequence
+        kind: if_statement
+        has: { field: condition, regex: '^\s*(?:[\w.]+\(\s*)?(?:xgboost|xgb)\s*\.\s*__version__\s*\)?\s*<\s*(?:[\w.]+\(\s*)?["'']2\.1(?:\.0)?["'']\s*\)?\s*$' }

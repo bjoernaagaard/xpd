@@ -11,8 +11,10 @@ and stop that fit sooner than intended.
 
 ## What the rule reports
 
-The rule checks `train` calls in a loop that pass an `EarlyStopping`
-instance created immediately before that loop as the only callback.
+The rule checks callback lists and tuples passed to `train` in the body of a
+loop. It reports any `EarlyStopping` instance created immediately before
+the loop that the loop reuses. A name rebound by the loop target can refer
+to a different callback on each pass.
 
 ## How to fix it
 

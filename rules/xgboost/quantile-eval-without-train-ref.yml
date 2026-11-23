@@ -1,28 +1,38 @@
 id: quantile-eval-without-train-ref
 language: python
 severity: error
-message: XGBoost train requires a separate evaluation QuantileDMatrix to reference the training matrix. Construct it with ref set to the matrix passed as dtrain.
+message: XGBoost train requires an evaluation QuantileDMatrix or ExtMemQuantileDMatrix to reference the training matrix. Construct it with ref set to the matrix passed as dtrain.
 rule:
   all:
     - { kind: tuple, pattern: '($EVAL, $LABEL)' }
     - matches: watchlist-entry
     - any:
-        - { has: { pattern: $EVAL, matches: unreferenced-quantile-matrix } }
+        - { has: { pattern: $EVAL, matches: matrix-without-ref } }
+        - all:
+            - { has: { pattern: $EVAL, matches: matrix-with-named-ref } }
+            - inside: { stopBy: { kind: call }, kind: call, matches: wrong-reference }
         - all:
             - { has: { pattern: $EVAL, kind: identifier } }
-            - inside: { stopBy: { kind: call }, kind: call, matches: after-eval-construction }
-    - not:
-        inside:
-          stopBy: end
-          any:
-            - { kind: try_statement, has: { kind: except_clause } }
-            - { kind: with_statement, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
+            - inside:
+                stopBy: { kind: call }
+                kind: call
+                all:
+                  - matches: distinct-validation
+                  - any:
+                      - matches: after-unreferenced-matrix
+                      - all:
+                          - matches: after-matrix-with-ref
+                          - matches: wrong-reference
+    - not: { matches: expected-failure }
 metadata:
   holds:
     TRAIN: { regex: '(^|\.)train$' }
-    MATRIX: { regex: '(^|\.)QuantileDMatrix$' }
+    MATRIX: { regex: '(^|\.)(ExtMem)?QuantileDMatrix$' }
+    INLINE_TRAIN_CTOR: { regex: '(^|\.)(DMatrix|(ExtMem)?QuantileDMatrix)$' }
+    NAMED_TRAIN_CTOR: { regex: '(^|\.)(DMatrix|(ExtMem)?QuantileDMatrix)$' }
+    REF_CTOR: { regex: '(^|\.)(DMatrix|(ExtMem)?QuantileDMatrix)$' }
 utils:
-  unreferenced-quantile-matrix:
+  quantile-matrix:
     kind: call
     all:
       - { has: { field: function, pattern: $MATRIX } }
@@ -36,10 +46,136 @@ utils:
                 - nthChild:
                     position: 3
                     ofRule: { not: { any: [{ kind: keyword_argument }, { kind: comment }] } }
-                - kind: keyword_argument
+  matrix-without-ref:
+    all:
+      - matches: quantile-matrix
+      - has:
+          field: arguments
+          not:
+            has:
+              kind: keyword_argument
+              all:
+                - { has: { field: name, regex: '^ref$' } }
+                - { has: { field: value, not: { regex: '^(?:\(\s*)*None(?:\s*\))*$' } } }
+  matrix-with-named-ref:
+    all:
+      - matches: quantile-matrix
+      - has:
+          field: arguments
+          has:
+            kind: keyword_argument
+            all:
+              - { has: { field: name, regex: '^ref$' } }
+              - { has: { field: value, kind: identifier, pattern: $REF } }
+  explicit-training-matrix:
+    any:
+      - { nthChild: { position: 2, ofRule: { not: { kind: comment } } }, not: { kind: keyword_argument } }
+      - { kind: keyword_argument, has: { field: name, regex: '^dtrain$' } }
+  inline-training-matrix:
+    has:
+      field: arguments
+      has:
+        all:
+          - matches: explicit-training-matrix
+          - any:
+              - { kind: call, has: { field: function, pattern: $INLINE_TRAIN_CTOR } }
+              - { has: { field: value, kind: call, has: { field: function, pattern: $INLINE_TRAIN_CTOR } } }
+  bound-training-matrix:
+    has:
+      field: arguments
+      has:
+        all:
+          - matches: explicit-training-matrix
+          - any:
+              - { kind: identifier, pattern: $DTRAIN }
+              - { has: { field: value, kind: identifier, pattern: $DTRAIN } }
+  distinct-validation:
+    any:
+      - matches: inline-training-matrix
+      - all:
+          - matches: bound-training-matrix
+          - not:
+              has:
+                field: arguments
+                has:
                   all:
-                    - { has: { field: name, regex: '^ref$' } }
-                    - { has: { field: value, not: { kind: none } } }
+                    - matches: explicit-training-matrix
+                    - any:
+                        - { pattern: $EVAL }
+                        - { has: { field: value, pattern: $EVAL } }
+  wrong-reference:
+    any:
+      - matches: inline-training-matrix
+      - all:
+          - matches: bound-training-matrix
+          - not:
+              has:
+                field: arguments
+                has:
+                  all:
+                    - matches: explicit-training-matrix
+                    - any:
+                        - { pattern: $REF }
+                        - { has: { field: value, pattern: $REF } }
+          - matches: separate-matrix-bindings
+  separate-matrix-bindings:
+    inside:
+      stopBy: { not: { kind: assignment } }
+      any: [{ kind: expression_statement }, { kind: return_statement }]
+      all:
+        - follows:
+            stopBy: { not: { matches: simple-binding-or-comment } }
+            kind: expression_statement
+            all:
+              - { has: { pattern: '$DTRAIN = $NAMED_TRAIN_CTOR($$$TRAIN_ARGS)' } }
+              - not:
+                  precedes:
+                    stopBy: { not: { matches: simple-binding-or-comment } }
+                    kind: expression_statement
+                    has: { kind: assignment, has: { field: left, pattern: $DTRAIN } }
+        - follows:
+            stopBy: { not: { matches: simple-binding-or-comment } }
+            kind: expression_statement
+            all:
+              - { has: { pattern: '$REF = $REF_CTOR($$$REF_ARGS)' } }
+              - not:
+                  precedes:
+                    stopBy: { not: { matches: simple-binding-or-comment } }
+                    kind: expression_statement
+                    has: { kind: assignment, has: { field: left, pattern: $REF } }
+  simple-binding-or-comment:
+    any:
+      - { kind: comment }
+      - kind: expression_statement
+        has:
+          kind: assignment
+          all:
+            - { has: { field: left, kind: identifier } }
+            - { not: { has: { stopBy: end, any: [{ kind: assignment }, { kind: named_expression }] } } }
+  after-unreferenced-matrix:
+    inside:
+      stopBy: { not: { kind: assignment } }
+      any: [{ kind: expression_statement }, { kind: return_statement }]
+      follows:
+        stopBy: { not: { kind: comment } }
+        kind: expression_statement
+        has:
+          kind: assignment
+          all:
+            - { has: { field: left, pattern: $EVAL } }
+            - { has: { field: right, matches: matrix-without-ref } }
+  after-matrix-with-ref:
+    inside:
+      stopBy: { not: { kind: assignment } }
+      any: [{ kind: expression_statement }, { kind: return_statement }]
+      follows:
+        stopBy: { not: { kind: comment } }
+        kind: expression_statement
+        has:
+          kind: assignment
+          all:
+            - { has: { field: left, pattern: $EVAL } }
+            - { has: { field: right, matches: matrix-with-named-ref } }
   watchlist-entry:
     inside:
       any: [{ kind: list }, { kind: tuple }]
@@ -52,28 +188,23 @@ utils:
               all:
                 - not: { has: { any: [{ kind: list_splat }, { kind: dictionary_splat }] } }
                 - inside: { kind: call, has: { field: function, pattern: $TRAIN } }
-  after-eval-construction:
-    all:
-      - has:
-          field: arguments
-          has:
-            any:
-              - all:
-                  - { nthChild: { position: 2, ofRule: { not: { kind: comment } } } }
-                  - { kind: identifier }
-                  - { not: { pattern: $EVAL } }
-              - kind: keyword_argument
-                all:
-                  - { has: { field: name, regex: '^dtrain$' } }
-                  - { has: { field: value, kind: identifier, not: { pattern: $EVAL } } }
+  expected-failure:
+    any:
       - inside:
-          stopBy: { not: { kind: assignment } }
-          any: [{ kind: expression_statement }, { kind: return_statement }]
-          follows:
-            stopBy: { not: { kind: comment } }
-            kind: expression_statement
+          stopBy: end
+          kind: block
+          inside:
+            field: body
+            kind: try_statement
             has:
-              kind: assignment
-              all:
-                - { has: { field: left, pattern: $EVAL } }
-                - { has: { field: right, matches: unreferenced-quantile-matrix } }
+              kind: except_clause
+              has:
+                field: value
+                any:
+                  - { regex: '^(ValueError)$' }
+                  - { kind: tuple, has: { regex: '^(ValueError)$' } }
+                  - { kind: as_pattern, has: { regex: '^(ValueError)$' } }
+      - inside:
+          stopBy: end
+          kind: with_statement
+          regex: '^with [^\n]*(?:pytest\.raises|assertRaises)\(\s*(?:ValueError)\s*[,)]'

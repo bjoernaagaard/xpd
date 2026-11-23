@@ -1,14 +1,17 @@
 id: dmatrix-rebuilt-for-predict
 language: python
 severity: warning
-message: XGBoost builds a DMatrix for each batch in this loop. For supported inputs on a compatible device, use $MODEL.inplace_predict($BATCH) to avoid that conversion.
+message: XGBoost builds a DMatrix for each batch in this loop. For tree boosters and supported inputs on a compatible device, use $MODEL.inplace_predict($BATCH) to avoid that conversion.
 rule:
   all:
     - { pattern: '$MODEL.predict($MATRIX($BATCH))' }
     - inside:
         stopBy: { any: [{ kind: for_statement }, { kind: function_definition }, { kind: class_definition }, { kind: lambda }] }
-        kind: for_statement
-        has: { field: left, pattern: $BATCH }
+        kind: block
+        inside:
+          field: body
+          kind: for_statement
+          has: { field: left, pattern: $BATCH }
 constraints:
   MODEL: { kind: identifier }
   BATCH: { kind: identifier }
@@ -16,3 +19,26 @@ metadata:
   holds:
     MODEL: { kind: call, has: { field: function, regex: '(^|\.)(train|Booster)$' } }
     MATRIX: { regex: '(^|\.)DMatrix$' }
+  unlessHolds:
+    MODEL:
+      kind: call
+      has:
+        field: arguments
+        has:
+          any:
+            - { nthChild: { position: 1, ofRule: { not: { kind: comment } } }, matches: linear-params }
+            - kind: keyword_argument
+              all:
+                - { has: { field: name, regex: '^params$' } }
+                - { has: { field: value, matches: linear-params } }
+utils:
+  booster-key:
+    has: { field: key, kind: string, regex: '^[rRuU]?(?:"{1,3}booster"{1,3}|''{1,3}booster''{1,3})$' }
+  linear-params:
+    kind: dictionary
+    has:
+      kind: pair
+      all:
+        - { matches: booster-key }
+        - { has: { field: value, kind: string, regex: '^[rRuU]?(?:"{1,3}gblinear"{1,3}|''{1,3}gblinear''{1,3})$' } }
+        - { not: { precedes: { stopBy: end, matches: booster-key } } }

@@ -3,33 +3,52 @@ language: python
 severity: warning
 message: XGBoost EarlyStopping retains state from the previous fit when this loop reuses it. Create a fresh callback inside the loop before each train call.
 rule:
+  kind: identifier
   all:
-    - { pattern: '$TRAIN($$$ARGS)' }
-    - has:
-        field: arguments
-        has:
+    - { pattern: $CALLBACK }
+    - inside:
+        any: [{ kind: list }, { kind: tuple }]
+        inside:
           kind: keyword_argument
           all:
             - { has: { field: name, regex: '^callbacks$' } }
-            - { has: { field: value, pattern: '[$CALLBACK]' } }
+            - inside:
+                kind: argument_list
+                inside:
+                  kind: call
+                  has: { field: function, pattern: $TRAIN }
     - inside:
         stopBy: { any: [{ kind: for_statement }, { kind: function_definition }, { kind: class_definition }, { kind: lambda }] }
-        kind: for_statement
-        all:
-          - follows:
-              stopBy: { not: { kind: comment } }
-              kind: expression_statement
-              has: { pattern: '$CALLBACK = $EARLY_STOPPING($$$OPTIONS)' }
-          - not:
-              has:
-                stopBy: end
-                any:
-                  - { kind: assignment, has: { field: left, pattern: $CALLBACK } }
-                  - { kind: augmented_assignment, has: { field: left, pattern: $CALLBACK } }
-                  - { kind: named_expression, has: { field: name, pattern: $CALLBACK } }
-constraints:
-  CALLBACK: { kind: identifier }
+        kind: block
+        inside:
+          field: body
+          kind: for_statement
+          all:
+            - follows:
+                stopBy: { not: { kind: comment } }
+                kind: expression_statement
+                has: { pattern: '$CALLBACK = $EARLY_STOPPING($$$OPTIONS)' }
+            - not:
+                has:
+                  field: left
+                  any:
+                    - { pattern: $CALLBACK }
+                    - { has: { stopBy: end, pattern: $CALLBACK } }
+            - not:
+                has:
+                  field: body
+                  stopBy: end
+                  any:
+                    - { kind: assignment, has: { field: left, matches: callback-target } }
+                    - { kind: augmented_assignment, has: { field: left, matches: callback-target } }
+                    - { kind: named_expression, has: { field: name, pattern: $CALLBACK } }
+                    - { kind: for_statement, has: { field: left, matches: callback-target } }
 metadata:
   holds:
     TRAIN: { regex: '(^|\.)train$' }
     EARLY_STOPPING: { regex: '(^|\.)EarlyStopping$' }
+utils:
+  callback-target:
+    any:
+      - { pattern: $CALLBACK }
+      - { has: { stopBy: end, pattern: $CALLBACK } }

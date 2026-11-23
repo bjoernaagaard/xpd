@@ -12,8 +12,10 @@ automatically.
 ## What the rule reports
 
 The rule follows a native booster from a `train` call with a positive integer
-literal for `early_stopping_rounds`. It checks prediction calls that omit
-`iteration_range`. Explicit training callbacks and unpacked arguments can
+literal for `early_stopping_rounds`, including hexadecimal, octal and binary
+integers. An empty callback list still lets XGBoost create the early stopping
+callback. The rule checks each prediction method's keyword and positional
+forms for `iteration_range`. Nonempty callbacks and unpacked arguments can
 change the behavior and are outside this check.
 
 ## How to fix it

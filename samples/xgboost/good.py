@@ -70,3 +70,78 @@ def legacy_fit(features, labels):
         return XGBRegressor().fit(features, labels, eval_metric="rmse")
     except TypeError:
         return XGBRegressor(eval_metric="rmse").fit(features, labels)
+
+
+def raw_overridden_option(data):
+    return xgb.train({r"tree_method": r"gpu_hist", "tree_method": "hist"}, data)
+
+
+def parentheses_around_default(features):
+    return QuantileDMatrix(features, max_quantile_batches=(None))
+
+
+def checked_gpu_error(data):
+    try:
+        return xgb.train({"tree_method": "gpu_hist"}, data)
+    except xgb.core.XGBoostError:
+        return xgb.train({"tree_method": "hist", "device": "cuda"}, data)
+
+
+def checked_quantile_error(data, features):
+    try:
+        return xgb.train({}, data, evals=[(QuantileDMatrix(features), "valid")])
+    except (ValueError, TypeError):
+        return xgb.train({}, data, evals=[(QuantileDMatrix(features, ref=data), "valid")])
+
+
+def equivalent_matrix_reference(features, labels):
+    train = DMatrix(features, labels)
+    alias = train
+    return xgb.train({}, train, evals=[(QuantileDMatrix(features, ref=alias), "valid")])
+
+
+def linear_predictions(train, batches):
+    model = xgb.train(params={"booster": "gblinear"}, dtrain=train)
+    for batch in batches:
+        yield model.predict(DMatrix(batch))
+
+
+def last_batch_prediction(train, batches):
+    model = xgb.train({}, train)
+    for batch in batches:
+        if len(batch) == 0:
+            break
+    else:
+        return model.predict(DMatrix(batch))
+
+
+def loop_binds_callback(train, evals, stops):
+    stop = EarlyStopping(rounds=3)
+    for stop in stops:
+        xgb.train({}, train, evals=evals, callbacks=[stop])
+
+
+def loop_else_trains_once(train, evals, grid):
+    stop = EarlyStopping(rounds=3)
+    for params in grid:
+        if params:
+            break
+    else:
+        xgb.train({}, train, evals=evals, callbacks=[stop])
+
+
+def legacy_positional_range(train, valid):
+    model = xgb.train({}, train, evals=[(valid, "valid")], early_stopping_rounds=3)
+    return model.predict(valid, True, False, False, False, False, True, False, (0, 1))
+
+
+def old_batch_limit(features):
+    if xgb.__version__ < "3.3":
+        return QuantileDMatrix(features, max_quantile_batches=2)
+
+
+def rebound_to_same_matrix(features, labels):
+    train = DMatrix(features, labels)
+    alias = DMatrix(features, labels)
+    alias = train
+    return xgb.train({}, train, evals=[(QuantileDMatrix(features, ref=alias), "valid")])

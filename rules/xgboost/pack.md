@@ -19,6 +19,15 @@ against the XGBoost 3.4.2 documentation.
 - native-predict-after-early-stopping
 - dmatrix-rebuilt-for-predict
 
+## Autofixes
+
+- `ineffective-max-quantile-batches` can remove a literal integer option.
+- `removed-gpu-hist` can migrate an estimator whose only option is the old
+  tree method. This fix is unsafe because it changes the device setup.
+- Other configurations, reference changes, callback lifetimes and prediction
+  choices require manual edits. Autofix verification checks that rewritten
+  cases clear and that expected manual diagnostics remain.
+
 ## Runtime evidence
 
 The examples ran with the XGBoost CPU wheel at version 3.4.1 on 20 rows with

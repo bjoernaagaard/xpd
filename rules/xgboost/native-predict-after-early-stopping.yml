@@ -5,8 +5,12 @@ message: Native XGBoost prediction uses all retained rounds after early stopping
 rule:
   all:
     - any:
-        - { pattern: '$MODEL.predict($$$ARGS)' }
-        - { pattern: '$MODEL.inplace_predict($$$ARGS)' }
+        - all:
+            - { pattern: '$MODEL.predict($$$ARGS)' }
+            - not: { has: { field: arguments, has: { matches: ninth-positional } } }
+        - all:
+            - { pattern: '$MODEL.inplace_predict($$$ARGS)' }
+            - not: { has: { field: arguments, has: { matches: second-positional } } }
     - has:
         field: arguments
         not:
@@ -14,9 +18,6 @@ rule:
             any:
               - { kind: dictionary_splat }
               - { kind: list_splat }
-              - nthChild:
-                  position: 2
-                  ofRule: { not: { any: [{ kind: keyword_argument }, { kind: comment }] } }
               - { kind: keyword_argument, has: { field: name, regex: '^iteration_range$' } }
 constraints:
   MODEL: { kind: identifier }
@@ -32,7 +33,7 @@ metadata:
               kind: keyword_argument
               all:
                 - { has: { field: name, regex: '^early_stopping_rounds$' } }
-                - { has: { field: value, kind: integer, regex: '^[1-9][0-9_]*$' } }
+                - { has: { field: value, kind: integer, regex: '^(?:[1-9][0-9_]*|0[xX][0-9a-fA-F_]*[1-9a-fA-F][0-9a-fA-F_]*|0[oO][0-7_]*[1-7][0-7_]*|0[bB][01_]*1[01_]*)$' } }
         - has:
             field: arguments
             not:
@@ -40,4 +41,20 @@ metadata:
                 any:
                   - { kind: dictionary_splat }
                   - { kind: list_splat }
-                  - { kind: keyword_argument, has: { field: name, regex: '^callbacks$' } }
+                  - kind: keyword_argument
+                    all:
+                      - { has: { field: name, regex: '^callbacks$' } }
+                      - { has: { field: value, not: { matches: empty-callbacks } } }
+utils:
+  ninth-positional:
+    nthChild:
+      position: 9
+      ofRule: { matches: positional }
+  second-positional:
+    nthChild:
+      position: 2
+      ofRule: { matches: positional }
+  positional:
+    not: { any: [{ kind: keyword_argument }, { kind: comment }] }
+  empty-callbacks:
+    regex: '^(?:\(\s*)*(?:None|\[(?:\s|#[^\n]*\n)*\]|\((?:\s|#[^\n]*\n)*\))(?:\s*\))*$'

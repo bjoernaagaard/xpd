@@ -1,5 +1,6 @@
-XGBoost `train` requires a separate evaluation `QuantileDMatrix` to use the
-training matrix as its reference. The reference makes the two matrices use
+XGBoost `train` requires a separate `QuantileDMatrix` or
+`ExtMemQuantileDMatrix` used for evaluation to reference the exact matrix
+passed as `dtrain`. The reference makes the two matrices use
 the same quantile cuts.
 
 ```diff
@@ -13,12 +14,14 @@ the same quantile cuts.
 
 The rule checks literal `evals` lists and tuples passed to `train`. It
 checks evaluation matrices constructed inline or directly before training
-with `ref` omitted or set to `None`. The training matrix itself can appear in
-the evaluation list.
+with `ref` omitted or set to `None`. It also reports a reference when
+separate constructor calls establish that `ref` and `dtrain` are different
+objects. The training matrix itself can appear in the evaluation list.
 
 ## How to fix it
 
 Pass the training matrix as `ref` when you construct the evaluation matrix.
-You can also use a regular `DMatrix` for evaluation.
+If you construct `dtrain` inside the call, assign it to a name first and
+reuse that name for both arguments. You can also use a regular `DMatrix` for evaluation.
 
-[QuantileDMatrix API](https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.QuantileDMatrix) · [XGBoost 3.4.2 train implementation](https://github.com/dmlc/xgboost/blob/v3.4.2/python-package/xgboost/training.py#L167-L181)
+[QuantileDMatrix API](https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.QuantileDMatrix) · [XGBoost 3.4.2 train implementation](https://github.com/dmlc/xgboost/blob/v3.4.2/python-package/xgboost/training.py#L158-L181)

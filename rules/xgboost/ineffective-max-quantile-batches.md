@@ -14,7 +14,10 @@ The rule reports explicit values other than literal `None` on
 
 ## How to fix it
 
-Remove the keyword from code that targets XGBoost 3.3 or later. If your
+Use `xpd check --fix` to remove an integer literal setting that follows
+another argument in a call without unpacked arguments or comments. Remove
+other settings by hand so you can preserve any evaluation of their values.
+If your
 workload depended on the old limit, recheck its peak memory use.
 
 [QuantileDMatrix API](https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.QuantileDMatrix) · [ExtMemQuantileDMatrix API](https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.ExtMemQuantileDMatrix)
