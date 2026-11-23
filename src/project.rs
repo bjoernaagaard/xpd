@@ -1,6 +1,8 @@
 //! The layout of a local rule project, before paths are resolved or files are compiled.
 
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use ast_grep_language::SupportLang;
@@ -9,6 +11,17 @@ use serde::{Deserialize, Serialize};
 pub(crate) const SGCONFIG: &str = "sgconfig.yml";
 pub(crate) const XPD_CONFIG: &str = "xpd.yml";
 pub(crate) const PROJECT_FILES: [&str; 2] = [SGCONFIG, "sgconfig.yaml"];
+pub(crate) const PROJECT_ROOT_ENV: &str = "XPD_PROJECT_ROOT";
+
+pub(crate) fn boundary() -> Option<PathBuf> {
+    let raw = env::var_os(PROJECT_ROOT_ENV).filter(|value| !value.is_empty())?;
+    let path = PathBuf::from(raw);
+    Some(
+        fs::canonicalize(&path)
+            .or_else(|_| std::path::absolute(&path))
+            .unwrap_or(path),
+    )
+}
 
 pub(crate) fn config_in(dir: &Path) -> Option<PathBuf> {
     PROJECT_FILES
@@ -17,15 +30,24 @@ pub(crate) fn config_in(dir: &Path) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-pub(crate) fn ancestors(from: &Path) -> impl Iterator<Item = ProjectFolder<'_>> {
-    from.ancestors().map(|root| ProjectFolder {
-        root,
-        config: config_in(root),
-    })
+pub(crate) fn ancestors_within<'a>(
+    from: &'a Path,
+    boundary: Option<&'a Path>,
+) -> impl Iterator<Item = ProjectFolder<'a>> {
+    from.ancestors()
+        .take_while(move |root| boundary.is_none_or(|bound| root.starts_with(bound)))
+        .map(|root| ProjectFolder {
+            root,
+            config: config_in(root),
+        })
 }
 
 pub(crate) fn nearest_config(from: &Path) -> Option<PathBuf> {
-    ancestors(from).find_map(|folder| folder.config)
+    let bound = boundary();
+    let canonical = fs::canonicalize(from)
+        .or_else(|_| std::path::absolute(from))
+        .unwrap_or_else(|_| from.to_path_buf());
+    ancestors_within(&canonical, bound.as_deref()).find_map(|folder| folder.config)
 }
 
 pub(crate) struct ProjectFolder<'a> {

@@ -2,9 +2,9 @@
 
 from collections.abc import Sequence
 
-import fastmcp
 from fastmcp import FastMCP
 from fastmcp.experimental.transforms.code_mode import CodeMode
+from fastmcp.server.auth import StaticTokenVerifier
 from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
@@ -14,6 +14,17 @@ from xpd.mcp.binary import BUILTIN_RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
+
+HTTP_RESTRICTED_TOOLS = frozenset(
+    {
+        ToolName.FIX,
+        ToolName.REWRITE,
+        ToolName.NEW,
+        ToolName.TEST,
+        ToolName.REFIT,
+        ToolName.EQUIV,
+    }
+)
 
 
 def instructions(skill_uris: dict[str, str]) -> str:
@@ -60,6 +71,14 @@ when it says `equivalent: true`.
 
 
 def build(settings: Settings) -> FastMCP:
+    transport, _ = settings.validate_transport()
+    auth = (
+        StaticTokenVerifier(
+            tokens={settings.auth_token: {"client_id": "xpd-client", "scopes": ["xpd"]}}
+        )
+        if transport != "stdio" and settings.auth_token
+        else None
+    )
     project = Project(Root.at(settings.root) if settings.root else None)
     xpd = Xpd(find_binary())
     fallback_rules = catalog.Catalog(tuple(xpd.run_now(BUILTIN_RULES)))
@@ -73,8 +92,8 @@ def build(settings: Settings) -> FastMCP:
         instructions=instructions(skill_uris),
         version=xpd.version(),
         website_url="https://bjoernaagaard.github.io/xpd/",
+        auth=auth,
         providers=[SkillCatalogProvider(skills)],
-        transforms=[CodeMode()] if settings.code_mode else [],
     )
     mcp.add_extension(TasksExtension())
     analysis = tools.register(mcp, xpd, project)
@@ -95,12 +114,20 @@ def build(settings: Settings) -> FastMCP:
         """The version of the xpd binary that this server runs."""
         return mcp.version or ""
 
+    if transport != "stdio" and not settings.allow_writes:
+        mcp.disable(names=set(HTTP_RESTRICTED_TOOLS), components={"tool"})
+    if settings.code_mode:
+        mcp.add_transform(CodeMode())
+
     return mcp
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     settings = Settings.from_args(argv)
+    try:
+        transport, _ = settings.validate_transport()
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     mcp = build(settings)
-    transport = settings.transport or fastmcp.settings.transport
     options = settings.transport_options() if transport != "stdio" else {}
     mcp.run(transport=transport, **options)

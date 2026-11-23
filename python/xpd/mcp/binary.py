@@ -99,15 +99,24 @@ def find_binary() -> Path:
 class Xpd:
     binary: Path
 
-    async def run[T](self, command: Command[T], cwd: Path, paths: Sequence[str], *flags: str) -> T:
+    async def run[T](
+        self,
+        command: Command[T],
+        cwd: Path,
+        paths: Sequence[str],
+        *flags: str,
+        project_root: Path | None = None,
+    ) -> T:
         """Runs in `cwd`, the project root, so the binary finds the project's venv as a user's
         run does."""
         args = argv(paths, flags)
+        env = {**os.environ, "XPD_PROJECT_ROOT": str(project_root)} if project_root else None
         process = await asyncio.create_subprocess_exec(
             self.binary,
             *command.args,
             *args,
             cwd=cwd,
+            env=env,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

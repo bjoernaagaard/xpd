@@ -59,7 +59,7 @@ async def run[T](
     shown = " ".join(["xpd", *command.args[:1], *flags, *paths])
     await ctx.report_progress(0, 1, shown)
     await ctx.info(f"running {shown}")
-    result = await xpd.run(command, root.path, paths, *flags)
+    result = await xpd.run(command, root.path, paths, *flags, project_root=root.path)
     await ctx.report_progress(1, 1, f"{shown} finished")
     return result
 

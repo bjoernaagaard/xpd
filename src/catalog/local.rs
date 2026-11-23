@@ -50,7 +50,7 @@ struct SgConfig {
 type RuntimeFolders = RuleFolders<Vec<PathBuf>, Option<Vec<PathBuf>>, Option<Vec<TestFolder>>>;
 
 impl SgConfig {
-    fn tests(&self, root: &Path) -> Result<Vec<TestConfig>> {
+    fn tests(&self, root: &Path, boundary: Option<&Path>) -> Result<Vec<TestConfig>> {
         (self.folders.test_configs.iter().flatten())
             .map(|test| {
                 let test_dir = absolute(&root.join(&test.test_dir));
@@ -59,9 +59,17 @@ impl SgConfig {
                         && !test
                             .test_dir
                             .components()
-                            .any(|part| matches!(part, std::path::Component::ParentDir)),
+                            .any(|part| matches!(part, std::path::Component::ParentDir))
+                        && boundary.is_none_or(|bound| test_dir.starts_with(bound)),
                     "testDir must stay inside the project root"
                 );
+                if let Some(snapshot_dir) = &test.snapshot_dir {
+                    let resolved_snapshot = absolute(&test_dir.join(snapshot_dir));
+                    ensure!(
+                        boundary.is_none_or(|bound| resolved_snapshot.starts_with(bound)),
+                        "snapshotDir must stay inside the project root"
+                    );
+                }
                 Ok(TestConfig {
                     test_dir,
                     snapshot_dir: test.snapshot_dir.clone(),
@@ -197,7 +205,13 @@ fn absolute(path: &Path) -> PathBuf {
 
 /// The folders that `key` of the file `source` names, each below `root`. Each must exist, so
 /// that a misspelled name is not a project without rules.
-fn folders(root: &Path, dirs: &[PathBuf], key: &str, source: &Path) -> Result<Vec<PathBuf>> {
+fn folders(
+    root: &Path,
+    dirs: &[PathBuf],
+    key: &str,
+    source: &Path,
+    boundary: Option<&Path>,
+) -> Result<Vec<PathBuf>> {
     dirs.iter()
         .map(|dir| {
             let path = root.join(dir);
@@ -207,14 +221,24 @@ fn folders(root: &Path, dirs: &[PathBuf], key: &str, source: &Path) -> Result<Ve
                 source.display(),
                 dir.display()
             );
-            fs::canonicalize(&path).with_context(|| cannot_read(&path))
+            let canonical = fs::canonicalize(&path).with_context(|| cannot_read(&path))?;
+            if let Some(bound) = boundary {
+                ensure!(
+                    canonical.starts_with(bound),
+                    "{}: {key} names {}, which escapes project root {}",
+                    source.display(),
+                    dir.display(),
+                    bound.display()
+                );
+            }
+            Ok(canonical)
         })
         .collect()
 }
 
 /// Every YAML file under `dirs`, each once, in path order. A folder that is named is read
 /// whatever an ignore file above it says, as ast-grep reads it.
-fn yaml_files(dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
+fn yaml_files(dirs: &[PathBuf], boundary: Option<&Path>) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for dir in dirs {
         let walk = ignore::WalkBuilder::new(dir)
@@ -224,7 +248,17 @@ fn yaml_files(dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
         for entry in walk {
             let entry = entry.with_context(|| cannot_read(dir))?;
             if entry.file_type().is_some_and(|kind| kind.is_file()) {
-                files.push(entry.into_path());
+                let path = entry.into_path();
+                if let Some(bound) = boundary {
+                    let canonical = fs::canonicalize(&path).with_context(|| cannot_read(&path))?;
+                    ensure!(
+                        canonical.starts_with(bound),
+                        "{}: escapes project root {}",
+                        path.display(),
+                        bound.display()
+                    );
+                }
+                files.push(path);
             }
         }
     }
@@ -250,12 +284,47 @@ impl XpdConfig {
     }
 }
 
+fn ensure_within(path: &Path, boundary: Option<&Path>) -> Result<PathBuf> {
+    let canonical = fs::canonicalize(path).with_context(|| cannot_read(path))?;
+    if let Some(bound) = boundary {
+        ensure!(
+            canonical.starts_with(bound),
+            "{}: escapes project root {}",
+            path.display(),
+            bound.display()
+        );
+    }
+    Ok(canonical)
+}
+
+fn load_manifest_packs(
+    root: &Path,
+    boundary: Option<&Path>,
+) -> Result<(Option<PathBuf>, Vec<PackEntry>)> {
+    let manifest = Some(root.join(XPD_CONFIG)).filter(|path| path.is_file());
+    let entries = match &manifest {
+        Some(path) => {
+            ensure_within(path, boundary)?;
+            let text = fs::read_to_string(path).with_context(|| cannot_read(path))?;
+            XpdConfig::parse(path, &text)?.packs
+        }
+        None => Vec::new(),
+    };
+    Ok((manifest, entries))
+}
+
 impl LocalProject {
     /// The project file of the project that `from` is in: the nearest `sgconfig.yml` in `from`
     /// or a folder above it, as ast-grep finds it. `None` when there is none.
     pub(crate) fn find(from: &Path) -> Result<Option<PathBuf>> {
+        let bound = project::boundary();
+        Self::find_within(from, bound.as_deref())
+    }
+
+    pub(crate) fn find_within(from: &Path, boundary: Option<&Path>) -> Result<Option<PathBuf>> {
         let from = absolute(from);
-        for folder in project::ancestors(&from) {
+        let bound = boundary.map(absolute);
+        for folder in project::ancestors_within(&from, bound.as_deref()) {
             if let Some(config) = folder.config {
                 return Ok(Some(config));
             }
@@ -273,14 +342,20 @@ impl LocalProject {
     /// the project with its packs: those of `xpd.yml` in the order of the file, then one for
     /// each package of the rules that no pack holds, in name order.
     pub(crate) fn read(config: &Path) -> Result<(Self, Vec<Pack>)> {
-        let (project, packs) = Self::layout(config)?;
-        project.load_rules(packs)
+        let bound = project::boundary();
+        Self::read_within(config, bound.as_deref())
+    }
+
+    pub(crate) fn read_within(config: &Path, boundary: Option<&Path>) -> Result<(Self, Vec<Pack>)> {
+        let bound = boundary.map(absolute);
+        let (project, packs) = Self::layout(config, bound.as_deref())?;
+        project.load_rules(packs, bound.as_deref())
     }
 
     /// Reads the project file `config`, `xpd.yml` and the utility rules: everything but the
     /// rule files. Each pending pack carries its manifest and resolved placement.
-    fn layout(config: &Path) -> Result<(Self, Vec<PendingPack>)> {
-        let config = fs::canonicalize(config).with_context(|| cannot_read(config))?;
+    fn layout(config: &Path, boundary: Option<&Path>) -> Result<(Self, Vec<PendingPack>)> {
+        let config = ensure_within(config, boundary)?;
         let root = config
             .parent()
             .context("a file is in a folder")?
@@ -300,27 +375,21 @@ impl LocalProject {
                     .collect()
             })
             .unwrap_or_default();
-        let manifest = Some(root.join(XPD_CONFIG)).filter(|path| path.is_file());
-        let entries = match &manifest {
-            Some(path) => {
-                let text = fs::read_to_string(path).with_context(|| cannot_read(path))?;
-                XpdConfig::parse(path, &text)?.packs
-            }
-            None => Vec::new(),
-        };
+        let (manifest, entries) = load_manifest_packs(&root, boundary)?;
 
-        let mut rule_dirs = folders(&root, &sg.folders.rule_dirs, "ruleDirs", &config)?;
+        let mut rule_dirs = folders(&root, &sg.folders.rule_dirs, "ruleDirs", &config, boundary)?;
         let util_dirs = folders(
             &root,
             sg.folders.util_dirs.as_deref().unwrap_or_default(),
             "utilDirs",
             &config,
+            boundary,
         )?;
-        let test_configs = sg.tests(&root)?;
+        let test_configs = sg.tests(&root, boundary)?;
         let mut packs: Vec<PendingPack> = Vec::new();
         for entry in entries {
             let source = manifest.as_deref().unwrap_or(&config);
-            let dirs = folders(&root, &entry.rule_dirs, "ruleDirs", source)?;
+            let dirs = folders(&root, &entry.rule_dirs, "ruleDirs", source, boundary)?;
             for dir in &dirs {
                 if let Some(other) = packs
                     .iter()
@@ -353,7 +422,7 @@ impl LocalProject {
             });
         }
 
-        let util_files = yaml_files(&util_dirs)?;
+        let util_files = yaml_files(&util_dirs, boundary)?;
         let util_texts = util_files
             .iter()
             .map(|path| {
@@ -384,9 +453,13 @@ impl LocalProject {
         Ok((project, packs))
     }
 
-    fn load_rules(mut self, mut packs: Vec<PendingPack>) -> Result<(Self, Vec<Pack>)> {
+    fn load_rules(
+        mut self,
+        mut packs: Vec<PendingPack>,
+        boundary: Option<&Path>,
+    ) -> Result<(Self, Vec<Pack>)> {
         let mut structural: BTreeMap<String, Vec<Rule>> = BTreeMap::new();
-        for path in yaml_files(&self.rule_dirs)? {
+        for path in yaml_files(&self.rule_dirs, boundary)? {
             if !self.is_rule_file(&path) {
                 continue;
             }
@@ -473,7 +546,7 @@ impl LocalProject {
             XpdConfig::parse(&path, text)?;
         } else if self.util_dirs.iter().any(|dir| path.starts_with(dir)) {
             let mut sources = vec![(path.clone(), supported_yaml(text, &self.custom_languages)?)];
-            for saved in yaml_files(&self.util_dirs)? {
+            for saved in yaml_files(&self.util_dirs, None)? {
                 if saved != path {
                     let text = fs::read_to_string(&saved).with_context(|| cannot_read(&saved))?;
                     sources.push((saved, supported_yaml(&text, &self.custom_languages)?));

@@ -133,12 +133,15 @@ variables of your shell.
 | --- | --- | --- | --- |
 | `--root PATH` | `XPD_MCP_ROOT` | The folder the server started in, or the client's first root for a plugin | The project root |
 | `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Lists FastMCP's `search`, `get_schema` and `execute` in place of xpd's tools, as [code mode](../code-mode/) shows |
+| `--allow-writes` | `XPD_MCP_ALLOW_WRITES=1` | Off over HTTP, on over stdio | Exposes file-writing and code-executing tools (`fix`, `rewrite`, `new`, `test`, `refit`, `equiv`) over HTTP |
+| — | `XPD_MCP_AUTH_TOKEN` | Unset | Bearer token for HTTP clients; required when binding HTTP to a non-loopback `--host` |
 | `--transport stdio\|http` | `FASTMCP_TRANSPORT` | `stdio` | How clients connect |
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to listen on for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
 
-`XPD_MCP_CODE_MODE` also takes `true`, `yes` and `on`, and `--no-code-mode` turns code mode off
-again. [`xpd mcp`](../../commands/mcp/) prints the same list with `xpd mcp -h`.
+`XPD_MCP_CODE_MODE` and `XPD_MCP_ALLOW_WRITES` also take `true`, `yes` and `on`, and
+`--no-code-mode` or `--no-allow-writes` turns each flag off again. [`xpd mcp`](../../commands/mcp/)
+prints the same list with `xpd mcp -h`.
 
 ## Serve several clients over HTTP
 
@@ -148,8 +151,10 @@ Start the server over HTTP to serve several clients, or a client on another mach
 uvx xpd mcp --transport http --port 8000
 ```
 
-Clients then connect to `http://127.0.0.1:8000/mcp`. The server has no authentication, so give
-`--host` another address only on a network you trust.
+Clients then connect to `http://127.0.0.1:8000/mcp`. Over HTTP, the server requires a
+server-selected project root (`--root`, `XPD_MCP_ROOT`, or the starting working directory) and
+exposes read-only tools unless `--allow-writes` or `XPD_MCP_ALLOW_WRITES=1` is set. Binding a
+non-loopback `--host` requires `XPD_MCP_AUTH_TOKEN` for bearer authentication.
 
 ## Call the server from a terminal
 

@@ -1,14 +1,27 @@
 """The server's settings, from flags or else from the environment, so no wrapper is needed."""
 
 import argparse
+import ipaddress
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import fastmcp
+
 Transport = Literal["stdio", "http"]
 TRUE = {"1", "true", "yes", "on"}
+
+
+def is_loopback_host(host: str) -> bool:
+    cleaned = host.strip().strip("[]").lower()
+    if cleaned == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(cleaned).is_loopback
+    except ValueError:
+        return False
 
 
 def default_root() -> Path | None:
@@ -30,12 +43,17 @@ class Settings:
     transport: Transport | None = None
     host: str | None = None
     port: int | None = None
+    allow_writes: bool = False
+    auth_token: str | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
+        token = os.environ.get("XPD_MCP_AUTH_TOKEN") or None
         return cls(
             root=default_root(),
             code_mode=os.environ.get("XPD_MCP_CODE_MODE", "").lower() in TRUE,
+            allow_writes=os.environ.get("XPD_MCP_ALLOW_WRITES", "").lower() in TRUE,
+            auth_token=token,
         )
 
     @classmethod
@@ -61,6 +79,13 @@ class Settings:
             "Default: XPD_MCP_CODE_MODE, else off.",
         )
         parser.add_argument(
+            "--allow-writes",
+            action=argparse.BooleanOptionalAction,
+            default=env.allow_writes,
+            help="Expose file-writing and code-executing tools over HTTP. "
+            "Default: XPD_MCP_ALLOW_WRITES, else off (stdio always allows them).",
+        )
+        parser.add_argument(
             "--transport",
             choices=["stdio", "http"],
             help="Default: FASTMCP_TRANSPORT, else stdio.",
@@ -78,7 +103,33 @@ class Settings:
             transport=args.transport,
             host=args.host,
             port=args.port,
+            allow_writes=args.allow_writes,
+            auth_token=env.auth_token,
         )
+
+    def effective_transport(self) -> str:
+        return self.transport or fastmcp.settings.transport
+
+    def effective_host(self) -> str:
+        return self.host or fastmcp.settings.host
+
+    def validate_transport(self) -> tuple[str, str]:
+        transport = self.effective_transport()
+        host = self.effective_host()
+        if transport != "stdio":
+            if self.root is None:
+                msg = (
+                    "HTTP transport requires a server-selected project root. "
+                    "Set --root or XPD_MCP_ROOT."
+                )
+                raise ValueError(msg)
+            if not is_loopback_host(host) and not self.auth_token:
+                msg = (
+                    f"HTTP transport on non-loopback host {host!r} requires "
+                    "XPD_MCP_AUTH_TOKEN to authenticate clients."
+                )
+                raise ValueError(msg)
+        return transport, host
 
     def transport_options(self) -> dict[str, str | int]:
         options = {"host": self.host, "port": self.port}

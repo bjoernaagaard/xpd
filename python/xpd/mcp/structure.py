@@ -100,7 +100,7 @@ def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         names = [item.name] if item.name is not None else []
         return await run(ctx, xpd, NEW, root, names, *item.flags(root))
 
-    @mcp.tool(name="test", tags={"rules", "authoring"}, annotations=WRITES, task=True)
+    @mcp.tool(name=ToolName.TEST, tags={"rules", "authoring"}, annotations=WRITES, task=True)
     @rooted
     async def test_rules(
         ctx: Context, options: CaseOptions | None = None

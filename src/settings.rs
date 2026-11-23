@@ -63,8 +63,12 @@ impl Settings {
 
 /// The closest `pyproject.toml` at or above `project` that has a `[tool.xpd]` table.
 fn project_table(project: &Path) -> Result<Option<(PathBuf, toml::Toml)>> {
-    let project = std::path::absolute(project)?;
-    for folder in project.ancestors() {
+    let bound = crate::project::boundary();
+    let project = std::fs::canonicalize(project).or_else(|_| std::path::absolute(project))?;
+    for folder in project
+        .ancestors()
+        .take_while(|dir| bound.as_deref().is_none_or(|root| dir.starts_with(root)))
+    {
         let file = folder.join(PROJECT_FILE);
         if let Some(doc) = toml::read(&file).map_err(|error| anyhow!(error))?
             && toml::get(&doc, &PROJECT_TABLE).is_some()

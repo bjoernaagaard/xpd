@@ -78,7 +78,7 @@ class Catalog:
         return [name for name in names if name.startswith(argument.value)]
 
 
-def folders(config: Path, key: str) -> list[Path]:
+def folders(config: Path, key: str, boundary: Path) -> list[Path]:
     """The folders that the YAML file `config` names under `key`, at the top or in each entry of
     `packs`, as the binary reads `sgconfig.yml` and `xpd.yml`. A file the binary would reject
     names none, since its own time and size already show when it changes."""
@@ -88,15 +88,24 @@ def folders(config: Path, key: str) -> list[Path]:
         return []
     if not isinstance(data, dict):
         return []
-    entries = [data, *(pack for pack in data.get("packs") or [] if isinstance(pack, dict))]
+    raw_packs = data.get("packs")
+    pack_entries = raw_packs if isinstance(raw_packs, list) else []
+    entries = [data, *(pack for pack in pack_entries if isinstance(pack, dict))]
     named = [entry.get(key) for entry in entries]
-    return [
-        config.parent / name
-        for names in named
-        if isinstance(names, list)
-        for name in names
-        if isinstance(name, str)
-    ]
+    found: list[Path] = []
+    for names in named:
+        if not isinstance(names, list):
+            continue
+        for name in names:
+            if not isinstance(name, str):
+                continue
+            try:
+                resolved = (config.parent / name).resolve()
+            except OSError:
+                continue
+            if resolved.is_relative_to(boundary):
+                found.append(resolved)
+    return found
 
 
 def stamp(path: Path) -> tuple[str, int, int] | None:
@@ -108,28 +117,30 @@ def stamp(path: Path) -> tuple[str, int, int] | None:
 
 
 def inputs(root: Path) -> Inputs:
-    """What the rules of `root` depend on: the project files in the root and each folder above
-    it up to the nearest `sgconfig.yml`, then each YAML file under the rule and utility folders
-    of that project."""
-    files: list[Path] = []
-    for folder in (root, *root.parents):
-        files.extend(folder / name for name in (*CONFIG_NAMES, MANIFEST_NAME))
-        config = next((folder / name for name in CONFIG_NAMES if (folder / name).is_file()), None)
-        if config is None:
-            continue
-        manifest = folder / MANIFEST_NAME
+    """What the rules of `root` depend on: the project files inside `root`, then each YAML file
+    under the rule and utility folders that stay inside `root`."""
+    boundary = root.resolve()
+    files: list[Path] = [boundary / name for name in (*CONFIG_NAMES, MANIFEST_NAME)]
+    config = next((boundary / name for name in CONFIG_NAMES if (boundary / name).is_file()), None)
+    if config is not None:
+        manifest = boundary / MANIFEST_NAME
         dirs = [
-            *folders(config, "ruleDirs"),
-            *folders(config, "utilDirs"),
-            *folders(manifest, "ruleDirs"),
+            *folders(config, "ruleDirs", boundary),
+            *folders(config, "utilDirs", boundary),
+            *folders(manifest, "ruleDirs", boundary),
         ]
-        files.extend(
-            path
-            for found in dirs
-            for path in sorted(found.rglob("*"))
-            if path.suffix in RULE_SUFFIXES and path.is_file()
-        )
-        break
+        for found in dirs:
+            if not found.is_dir():
+                continue
+            for path in sorted(found.rglob("*")):
+                if path.suffix not in RULE_SUFFIXES or not path.is_file():
+                    continue
+                try:
+                    resolved = path.resolve()
+                except OSError:
+                    continue
+                if resolved.is_relative_to(boundary):
+                    files.append(resolved)
     return tuple(found for path in dict.fromkeys(files) if (found := stamp(path)))
 
 
@@ -151,7 +162,7 @@ class Catalogs:
         cached = self.read.get(root.path)
         if cached is not None and cached[0] == stamps:
             return cached[1]
-        catalog = Catalog(tuple(await self.xpd.run(RULES, root.path, [])))
+        catalog = Catalog(tuple(await self.xpd.run(RULES, root.path, [], project_root=root.path)))
         self.read[root.path] = (stamps, catalog)
         return catalog
 

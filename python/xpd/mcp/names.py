@@ -14,6 +14,7 @@ class ToolName(StrEnum):
     REWRITE = auto()
     OUTLINE = auto()
     NEW = auto()
+    TEST = auto()
     RULE = auto()
     RULES = auto()
     GRAPH = auto()
