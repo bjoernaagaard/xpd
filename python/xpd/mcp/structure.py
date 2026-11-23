@@ -14,7 +14,23 @@ from xpd.mcp.root import Project
 
 def register(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
     register_queries(mcp, xpd, project)
-    register_outline(mcp, xpd, project)
+
+    @mcp.tool(name=ToolName.OUTLINE, tags={"structure"}, annotations=READS, task=True)
+    @rooted
+    async def outline(
+        ctx: Context, paths: list[str] | None = None, options: OutlineOptions | None = None
+    ) -> list[OutlineFile] | InputRequiredResult:
+        """Read symbols, signatures, imports, members and source ranges without execution.
+
+        Args:
+            paths: Files or folders inside the project root. Default: the whole root.
+            options: The language and items to read, and an extra outline rule file.
+        """
+        root = await project.required_root(ctx)
+        options = options or OutlineOptions()
+        flags = options.flags(root)
+        return await run(ctx, xpd, OUTLINE, root, root.all_inside(paths or ["."]), *flags)
+
     register_authoring(mcp, xpd, project)
 
 
@@ -64,27 +80,8 @@ def register_queries(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             return answer
         if not answer:
             return preview
-        output = await run(ctx, xpd, REWRITE, root, paths, *flags)
-        await ctx.info(output)
+        await run(ctx, xpd, REWRITE, root, paths, *flags)
         return preview
-
-
-def register_outline(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
-    @mcp.tool(name=ToolName.OUTLINE, tags={"structure"}, annotations=READS, task=True)
-    @rooted
-    async def outline(
-        ctx: Context, paths: list[str] | None = None, options: OutlineOptions | None = None
-    ) -> list[OutlineFile] | InputRequiredResult:
-        """Read symbols, signatures, imports, members and source ranges without execution.
-
-        Args:
-            paths: Files or folders inside the project root. Default: the whole root.
-            options: The language and items to read, and an extra outline rule file.
-        """
-        root = await project.required_root(ctx)
-        options = options or OutlineOptions()
-        flags = options.flags(root)
-        return await run(ctx, xpd, OUTLINE, root, root.all_inside(paths or ["."]), *flags)
 
 
 def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:

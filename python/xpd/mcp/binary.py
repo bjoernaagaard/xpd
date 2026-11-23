@@ -1,6 +1,7 @@
 """Runs the xpd binary, which owns every rule and result, and parses what it prints."""
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -121,7 +122,19 @@ class Xpd:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await process.communicate()
+        except asyncio.CancelledError:
+            if process.returncode is None:
+                with contextlib.suppress(ProcessLookupError):
+                    process.terminate()
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=2.0)
+                except TimeoutError:
+                    with contextlib.suppress(ProcessLookupError):
+                        process.kill()
+                    await process.wait()
+            raise
         return self._parse(command, args, process.returncode, stdout, stderr)
 
     def run_now[T](self, command: Command[T]) -> T:

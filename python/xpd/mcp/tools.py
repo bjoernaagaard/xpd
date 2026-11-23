@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
 from fastmcp import Context, FastMCP
 from mcp.types import (
@@ -10,11 +9,9 @@ from mcp.types import (
 )
 
 from xpd.mcp.base import READS, RUNS_CODE, WRITES, confirmed, rooted, run
-from xpd.mcp.binary import API, CHECK, EQUIV, FIND, GRAPH, PROFILE, REFIT, Xpd
+from xpd.mcp.binary import CHECK, EQUIV, GRAPH, PROFILE, REFIT, Xpd
 from xpd.mcp.models import (
     CheckReport,
-    DiscoveryEntry,
-    DiscoveryMatches,
     Equivalence,
     GraphReport,
     Profile,
@@ -115,7 +112,6 @@ class Analysis:
 
 def register(mcp: FastMCP, xpd: Xpd, project: Project) -> Analysis:
     analysis = Analysis(xpd, project)
-    register_discovery(mcp, xpd)
     register_lint(mcp, xpd, project, analysis)
     register_data(mcp, xpd, project, analysis)
     return analysis
@@ -189,45 +185,3 @@ def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) 
         """
         root = await project.required_root(ctx)
         return await run(ctx, xpd, EQUIV, root, [root.inside(old), root.inside(new)])
-
-
-def register_discovery(mcp: FastMCP, xpd: Xpd) -> None:
-    @mcp.tool(name=ToolName.FIND, tags={"discovery"}, annotations=READS)
-    async def find(
-        task: str, package: str | None = None, kind: str | None = None, limit: int | None = None
-    ) -> DiscoveryMatches:
-        """Find up to five symbols, three rules and three recipes, ranked within each kind.
-
-        Search before choosing a library, even when it is not installed. Describe the task in
-        your own words, because search ranks by meaning as well as by keywords.
-        Read the chosen symbol with api before writing code.
-
-        Args:
-            task: The task in your own words, such as "grouped regression".
-            package: Search only this library, by its Python import name, such as sklearn.
-            kind: Search only `symbol`, `rule` or `recipe` entries.
-            limit: The most entries of each kind. Default: 5 symbols, 3 rules and 3 recipes.
-        """
-        flags = []
-        if limit is not None:
-            flags.append(f"--limit={limit}")
-        if package:
-            flags.append(f"--package={package}")
-        if kind:
-            flags.append(f"--kind={kind}")
-        return await xpd.run(FIND, Path.cwd(), [task], *flags)
-
-    @mcp.tool(name=ToolName.API, tags={"discovery"}, annotations=READS)
-    async def api(name: str) -> DiscoveryEntry:
-        """Read a public dotted name's parameters, summary, own class members and rule links.
-
-        The name is a class or function that find returns, or a method or property of a class,
-        such as pandas.DataFrame.merge. parameters_written holds each parameter as the source
-        writes it, with its type annotation and default. A stub file writes ... for a default,
-        which says only that the parameter is optional.
-
-        Args:
-            name: A dotted name, such as pandas.DataFrame or pandas.DataFrame.merge.
-        """
-        entries = await xpd.run(API, Path.cwd(), [name])
-        return entries[0]

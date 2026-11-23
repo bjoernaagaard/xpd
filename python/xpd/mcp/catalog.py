@@ -1,6 +1,7 @@
 """The rule catalog: the `rules` and `rule` tools, the rule resources, and completion of the
 package and rule arguments of templates and prompts."""
 
+import asyncio
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -153,6 +154,7 @@ class Catalogs:
     project: Project
     fallback: Catalog
     read: dict[Path, tuple[Inputs, Catalog]] = field(default_factory=dict)
+    locks: dict[Path, asyncio.Lock] = field(default_factory=dict)
 
     async def load(self, ctx: Context) -> Catalog:
         root = await self.project.root(ctx)
@@ -162,9 +164,17 @@ class Catalogs:
         cached = self.read.get(root.path)
         if cached is not None and cached[0] == stamps:
             return cached[1]
-        catalog = Catalog(tuple(await self.xpd.run(RULES, root.path, [], project_root=root.path)))
-        self.read[root.path] = (stamps, catalog)
-        return catalog
+        lock = self.locks.setdefault(root.path, asyncio.Lock())
+        async with lock:
+            stamps = inputs(root.path)
+            cached = self.read.get(root.path)
+            if cached is not None and cached[0] == stamps:
+                return cached[1]
+            catalog = Catalog(
+                tuple(await self.xpd.run(RULES, root.path, [], project_root=root.path))
+            )
+            self.read[root.path] = (stamps, catalog)
+            return catalog
 
 
 def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
