@@ -1,4 +1,4 @@
-use crate::names::{import_binding, imported_at, statement_around};
+use crate::names::{import_binding, imported_at, is_bound, statement_around};
 use crate::outline;
 use crate::syntax::{Node, Root};
 
@@ -42,13 +42,19 @@ pub(super) fn observe(root: &Root, entry: &str) -> Option<(usize, Observations)>
             );
         }
     }
+    let writes: Vec<_> = root
+        .root()
+        .dfs()
+        .filter(|node| node.kind() == "attribute" && is_bound(node))
+        .filter_map(|target| source_path(&target, &imports))
+        .collect();
     for call in function
         .definition
         .dfs()
         .filter(|node| node.kind() == "call")
     {
         if let Some(target) = call.field("function") {
-            observe_call(&call, &target, &imports, &mut evidence);
+            observe_call(&call, &target, &imports, &writes, &mut evidence);
         }
     }
     evidence.block(
@@ -67,6 +73,7 @@ fn observe_call<'tree>(
     call: &Node<'tree>,
     target: &Node<'tree>,
     imports: &[(Node<'tree>, String)],
+    writes: &[String],
     evidence: &mut Observations,
 ) {
     let line = call.start_pos().line() + 1;
@@ -91,6 +98,17 @@ fn observe_call<'tree>(
         }
         return;
     };
+    if let Some(written) = writes.iter().find(|written| {
+        path.strip_prefix(written.as_str())
+            .is_some_and(|suffix| suffix.is_empty() || suffix.starts_with('.'))
+    }) {
+        evidence.block(
+            line,
+            "unresolved-call",
+            &format!("Check {path}: the file modifies {written}."),
+        );
+        return;
+    }
     evidence.note(line, "source-call", &format!("{path} via {}", call.text()));
     if path == "skfolio.preprocessing.prices_to_returns" {
         evidence.suggest(line, "native-returns", "Use an explicit, unique, ascending Date column. Apply the caller's missing-price policy, then compute price / price.shift(1) - 1 with Polars expressions and drop the first row. Apply log1p only for log returns.");
