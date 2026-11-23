@@ -38,17 +38,28 @@ Open the preview's `video` and `contact_sheet` paths before rendering the final.
 The contact sheet samples the start, middle, and end. Play the preview to check
 timing. Use `still` to render just the last frame.
 
-| Profile | Output | Size and frame rate |
-| --- | --- | --- |
-| `preview` | MP4 and contact sheet | 854 × 480 at 15 fps |
-| `final` | MP4 and contact sheet | 1280 × 720 at 30 fps |
-| `still` | PNG of the last frame | 1280 × 720 |
+| Profile | Manim preset | Output | Size and frame rate |
+| --- | --- | --- | --- |
+| `preview` | `-qh` | MP4 and contact sheet | 1920 × 1080 at 60 fps |
+| `final` | `-qk` | MP4 and contact sheet | 3840 × 2160 at 60 fps |
+| `still` | `-qm` | PNG of the last frame | 1280 × 720 |
 
 Jobs live under `.xpd-animate/jobs/<id>/`. The JSON result gives you the media
 paths, editable source archive, render settings, and log. To revise this
 example, change `CACHE_MISS_HOLD_SECONDS` from `1.0` to `3.0` in
 `cache_miss.py` and render another preview. For an exact repeat, xpd can reuse
 the verified result. Add `--no-cache` to render again from scratch.
+
+## Include a Manim configuration
+
+Pass `--asset manim.cfg` to bundle a project config, or
+`--asset scenes/manim.cfg` for a scene in `scenes/`. If you bundle both, xpd
+uses the config beside the scene. Settings such as `background_color` apply.
+xpd controls the renderer, profile, seed, and output paths.
+
+```sh
+xpd animate render cache_miss.py CacheMiss --asset manim.cfg --profile preview
+```
 
 ## Run a trusted scene directly
 
@@ -59,7 +70,7 @@ Direct Manim runs the scene with your account's permissions.
 ```sh
 manim checkhealth
 xpd animate guide sequence > cache_miss.py
-manim render --renderer cairo --format mp4 --resolution 854,480 --fps 15 --seed 0 cache_miss.py CacheMiss
+manim render --renderer cairo --format mp4 -qh --seed 0 cache_miss.py CacheMiss
 ```
 
 ## Use local MCP
@@ -96,7 +107,8 @@ recipe text in that map. This minimal scene shows the shape of the request.
 ```
 
 Pass existing project assets in `assets`, for example
-`["scenes/data/monthly.csv"]`.
+`["scenes/data/monthly.csv"]`. To bundle a `manim.cfg`, include it in
+`assets` or in an inline source's `files` map.
 
 Use the returned render ID as `job_id` in `animate_artifact`. The default
 artifact is the contact sheet. Choose `video`, `source`, `manifest`, or `log`
