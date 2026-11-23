@@ -240,7 +240,7 @@ enum Cmd {
         #[arg(long)]
         contract: Option<PathBuf>,
     },
-    /// Plan a pandas pipeline's native Polars reimplementation without running Python.
+    /// Plan a pandas-to-Polars or eager-to-lazy Polars rewrite without running Python.
     Map(MapArgs),
     /// Preview and render editable Manim animations.
     #[command(subcommand)]
