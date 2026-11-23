@@ -521,7 +521,7 @@
   "samples/scipy/speed.py": "127",
   "src/author.rs": "376",
   "src/cases.rs": "105",
-  "src/cli.rs": "508,536,538,692,741,805-806,815",
+  "src/cli.rs": "536,538,692,741,805-806,815",
   "src/commands.rs": "11",
   "src/doctor/advice.rs": "393-394",
   "src/doctor/evidence-utils.yml": "1",

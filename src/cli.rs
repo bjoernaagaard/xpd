@@ -505,19 +505,29 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
             stats.candidates, stats.clean, stats.fixed, stats.dropped, stats.capped, stats.retained
         );
         index.recipes = Some(stats);
-    } else if let Some(previous) = std::fs::read(&output)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<index::Index>(&bytes).ok())
-        .filter(|previous| previous.package == package && previous.version == version)
-    {
-        // A symbol rebuild keeps the recipes that an earlier run harvested for this version.
-        index.entries.extend(
-            previous
-                .entries
-                .into_iter()
-                .filter(|entry| entry.kind == index::Kind::Recipe),
-        );
-        index.recipes = previous.recipes;
+    } else {
+        let previous = match std::fs::read(&output) {
+            Ok(bytes) => Some(
+                serde_json::from_slice::<index::Index>(&bytes)
+                    .with_context(|| format!("cannot parse existing index {}", output.display()))?,
+            ),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("cannot read existing index {}", output.display()));
+            }
+        };
+        if let Some(previous) =
+            previous.filter(|previous| previous.package == package && previous.version == version)
+        {
+            index.entries.extend(
+                previous
+                    .entries
+                    .into_iter()
+                    .filter(|entry| entry.kind == index::Kind::Recipe),
+            );
+            index.recipes = previous.recipes;
+        }
     }
     std::fs::write(&output, serde_json::to_vec(&index)?)?;
     println!(
