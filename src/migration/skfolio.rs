@@ -1,4 +1,4 @@
-use crate::names::{import_binding, imported_at, is_bound, statement_around};
+use crate::names::{import_binding, imported_at, is_bound, is_parameter_name, statement_around};
 use crate::outline;
 use crate::syntax::{Node, Root};
 
@@ -42,11 +42,13 @@ pub(super) fn observe(root: &Root, entry: &str) -> Option<(usize, Observations)>
             );
         }
     }
-    let writes: Vec<_> = root
+    let uncertain_paths: Vec<_> = root
         .root()
         .dfs()
-        .filter(|node| node.kind() == "attribute" && is_bound(node))
-        .filter_map(|target| source_path(&target, &imports))
+        .filter_map(|node| {
+            let reason = provenance_loss(&node)?;
+            Some((source_path(&node, &imports)?, reason))
+        })
         .collect();
     for call in function
         .definition
@@ -54,7 +56,7 @@ pub(super) fn observe(root: &Root, entry: &str) -> Option<(usize, Observations)>
         .filter(|node| node.kind() == "call")
     {
         if let Some(target) = call.field("function") {
-            observe_call(&call, &target, &imports, &writes, &mut evidence);
+            observe_call(&call, &target, &imports, &uncertain_paths, &mut evidence);
         }
     }
     evidence.block(
@@ -69,11 +71,32 @@ fn is_skfolio(path: &str) -> bool {
     path == "skfolio" || path.starts_with("skfolio.")
 }
 
+fn provenance_loss(node: &Node<'_>) -> Option<&'static str> {
+    match node.kind().as_ref() {
+        "attribute" if is_bound(node) => return Some("is modified in this file"),
+        "identifier" if is_bound(node) || is_parameter_name(node) => return None,
+        "attribute" | "identifier" => {}
+        _ => return None,
+    }
+    let parent = node.parent()?;
+    let is_field = |field| {
+        parent
+            .field(field)
+            .is_some_and(|child| child.node_id() == node.node_id())
+    };
+    match parent.kind().as_ref() {
+        "attribute" | "dotted_name" | "aliased_import" => None,
+        "call" if is_field("function") => None,
+        "keyword_argument" if is_field("name") => None,
+        _ => Some("escapes as a value in this file"),
+    }
+}
+
 fn observe_call<'tree>(
     call: &Node<'tree>,
     target: &Node<'tree>,
     imports: &[(Node<'tree>, String)],
-    writes: &[String],
+    uncertain_paths: &[(String, &str)],
     evidence: &mut Observations,
 ) {
     let line = call.start_pos().line() + 1;
@@ -98,14 +121,14 @@ fn observe_call<'tree>(
         }
         return;
     };
-    if let Some(written) = writes.iter().find(|written| {
-        path.strip_prefix(written.as_str())
+    if let Some((uncertain, reason)) = uncertain_paths.iter().find(|(uncertain, _)| {
+        path.strip_prefix(uncertain.as_str())
             .is_some_and(|suffix| suffix.is_empty() || suffix.starts_with('.'))
     }) {
         evidence.block(
             line,
             "unresolved-call",
-            &format!("Check {path}: the file modifies {written}."),
+            &format!("Check {path}: {uncertain} {reason}."),
         );
         return;
     }
