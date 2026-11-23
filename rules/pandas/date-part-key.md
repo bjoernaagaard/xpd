@@ -11,6 +11,6 @@ The rule reports `df.groupby([df["d"].dt.year, df["d"].dt.month])`, and the same
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd uses a monthly grouper when the date column or index comes from the same frame. The grouping labels change from a year and month pair to a timestamp.
 
 The result has one timestamp per month in place of a year and a month, and it also holds the months without rows.

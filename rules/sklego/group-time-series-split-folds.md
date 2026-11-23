@@ -12,7 +12,7 @@ split points over the groups to find the most even folds, so each extra fold mul
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd sets a literal fold count above five to five.
 
 | Data | `split` at 4 splits | At 5 splits | At 6 splits |
 | --- | --- | --- | --- |

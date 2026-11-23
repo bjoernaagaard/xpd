@@ -15,7 +15,7 @@ returns `None` where every scikit-learn estimator returns itself.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd uses `fit_transform(X, y)` when the chained transform uses the same training data as fit.
 
 The old form raised `AttributeError: 'NoneType' object has no attribute 'transform'` on both
 wrappers. `fit_transform` returns the encoded frame on both and is left alone.

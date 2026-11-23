@@ -4,19 +4,25 @@
 # with 40 groups 0.10 s at 5 and 1.07 s at 6. The class warns itself above 30 groups at
 # n_splits above 5. With a few groups the search is short, so the rule is a warning.
 
-# No fix, because the number of folds is a choice that the file does not hold.
 id: group-time-series-split-folds
 language: python
 severity: warning
 message: GroupTimeSeriesSplit tries every combination of split points, so each extra fold multiplies the time. With 60 groups split took 1.08 s at n_splits=5 and 10.48 s at n_splits=6. Use 5 folds or fewer, or merge the groups into coarser periods first.
 rule:
-  pattern: $F($$$A)
+  kind: integer
+  regex: '^([6-9]|[1-9]\d+)$'
   all:
-    - has: { field: function, regex: '(^|\.)GroupTimeSeriesSplit$' }
-    - has:
-        field: arguments
-        any:
-          - has: { nthChild: 1, matches: many }
-          - has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^n_splits$' } }, { has: { field: value, matches: many } }] }
-utils:
-  many: { kind: integer, regex: '^([6-9]|[1-9]\d+)$' }
+    - any:
+        - nthChild: 1
+          inside: { kind: argument_list }
+        - inside:
+            kind: keyword_argument
+            field: value
+            has: { field: name, regex: '^n_splits$' }
+            inside: { kind: argument_list }
+    - inside:
+        stopBy: { not: { any: [{ kind: keyword_argument }, { kind: argument_list }] } }
+        kind: call
+        has: { field: function, regex: '(^|\.)GroupTimeSeriesSplit$' }
+fix: '5'
+metadata: { fix: unsafe }

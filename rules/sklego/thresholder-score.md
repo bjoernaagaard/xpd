@@ -17,7 +17,7 @@ model, so it doesn't change with `threshold`.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd adds `scoring="accuracy"` to matching search and cross validation calls.
 
 On 400 rows with 20 percent positives, from `make_classification(n_samples=400, weights=[0.8],
 random_state=0)` and `train_test_split(random_state=0)`, the grid search on the training rows gave

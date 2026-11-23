@@ -15,7 +15,7 @@ level INFO, which Python hides until logging is set up.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd uses a callback that prints the step type and elapsed time.
 
 Without the setup, fitting the pipeline printed 0 characters. After
 `logging.basicConfig(level=logging.INFO)` it logged one line for each step, such as

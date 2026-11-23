@@ -3,7 +3,6 @@
 # with 20 percent positives, a 5-fold grid search over the thresholds 0.1, 0.5 and 0.9 gave 0.887
 # three times, and 0.740, 0.887 and 0.847 with scoring="accuracy".
 
-# No fix, because the message names two rewrites, and the scoring is not in the file.
 id: thresholder-score
 language: python
 severity: error
@@ -12,9 +11,11 @@ rule:
   pattern: $F($$$A)
   all:
     - has: { field: arguments, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)Thresholder$' } } }
-    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^scoring$' } }, { kind: dictionary_splat }] } } }
+    - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^scoring$' } }, { kind: dictionary_splat }, { kind: list_splat }] } } }
 constraints:
   F: { regex: '(^|\.)(GridSearchCV|RandomizedSearchCV|HalvingGridSearchCV|HalvingRandomSearchCV|cross_val_score|cross_validate|learning_curve|validation_curve|permutation_importance)$' }
+fix: $F($$$A, scoring="accuracy")
+metadata: { fix: unsafe }
 ---
 # No fix, because the advice is another way to score.
 id: thresholder-score

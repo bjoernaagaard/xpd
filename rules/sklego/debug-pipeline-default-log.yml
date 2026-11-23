@@ -4,7 +4,6 @@
 # The rule reports the keyword in a file that neither imports logging nor uses pytest's caplog,
 # which captures the records. Logging may be set up in another module, so the rule is info.
 
-# No fix, because the message names two rewrites, and the logging setup is a statement outside the call.
 id: debug-pipeline-default-log
 language: python
 severity: info
@@ -28,3 +27,5 @@ rule:
               - { kind: import_statement, regex: '\blogging\b' }
               - { kind: import_from_statement, regex: '^from\s+logging\b' }
               - { kind: identifier, regex: '^caplog$' }
+fix: 'log_callback=lambda output, execution_time, **_: print(f"{type(output[1]).__name__}: {execution_time:.3f}s")'
+metadata: { fix: unsafe }

@@ -4,14 +4,33 @@
 # object has no attribute 'transform'", and so did the same chain on NestedCVWrapper. A name
 # assigned from the fit call holds None in the same way. Code inside assertRaises, pytest.raises
 # or a try block with an except clause expects the error and stays silent.
-# No fix, because the advice splits the statement in two.
+id: wrapper-fit-returns-none
+language: python
+severity: error
+message: fit of $W returns None on category_encoders 2.11.2, so transform on its result raises AttributeError. Use fit_transform for the training data.
+rule:
+  pattern: $W($$$A).fit($X, $Y).transform($X)
+  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+constraints:
+  W: { regex: '(^|\.)(PolynomialWrapper|NestedCVWrapper)$' }
+  X: { kind: identifier }
+fix: $W($$$A).fit_transform($X, $Y)
+metadata: { fix: unsafe }
+---
 id: wrapper-fit-returns-none
 language: python
 severity: error
 message: fit of $W returns None on category_encoders 2.11.2, so .$M on its result raises AttributeError. Call fit on one line and $M on the next, or call fit_transform.
 rule:
   pattern: $W($$$A).fit($$$B).$M
-  not: { any: [{ inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' } }, { inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } } }] }
+  not:
+    any:
+      - inside: { kind: with_statement, stopBy: end, regex: '^with [^\n]*(assertRaises|pytest\.raises)' }
+      - inside: { kind: try_statement, stopBy: end, has: { kind: except_clause } }
+      - inside:
+          kind: call
+          pattern: $W($$$A).fit($X, $Y).transform($X)
+          has: { field: arguments, has: { kind: identifier } }
 constraints:
   W: { regex: '(^|\.)(PolynomialWrapper|NestedCVWrapper)$' }
 ---

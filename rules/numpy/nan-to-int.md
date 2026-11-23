@@ -11,4 +11,4 @@ The rule reports `np.where(m, x, np.nan).astype(int)`, which turns each NaN into
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd removes a bare integer cast to keep the NaNs. If your code requires integers, decide how to represent the missing values.

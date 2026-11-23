@@ -996,7 +996,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: OneVsRestClassifier($C($REST))
-metadata: { fix: unsafe }
+metadata: { fix: unsafe, fixImports: [OneVsRestClassifier] }
 ---
 # No fix, because the value of multi_class is not in the file, or it is on a later line than the
 # call, and the fix rewrites the whole call.
@@ -1339,7 +1339,7 @@ transform:
   REST:
     replace: { source: $KEPT, replace: ", $", by: "" }
 fix: $C($REST)
-metadata: { fix: unsafe, since: "1.6" }
+metadata: { fix: unsafe, fixImports: [FrozenEstimator], since: "1.6" }
 ---
 # No fix, because the model is not passed in the call, or cv is on a later line than the call, and
 # the fix rewrites the whole call.
