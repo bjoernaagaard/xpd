@@ -280,13 +280,33 @@ fn return_shapes(
 }
 
 fn return_shape(body: &Node<'_>) -> Vec<ShapeAt> {
-    let mut returns = body.dfs().filter(|n| n.kind() == "return_statement");
-    let Some(mut value) = returns.next().and_then(|n| n.named_children().next()) else {
+    let returns: Vec<_> = body
+        .dfs()
+        .filter(|node| {
+            node.kind() == "return_statement"
+                && node
+                    .ancestors()
+                    .find(|owner| owner.kind() == "function_definition")
+                    .and_then(|owner| owner.field("body"))
+                    .is_some_and(|owner_body| owner_body.range() == body.range())
+        })
+        .collect();
+    let returned = match returns.as_slice() {
+        [] => return Vec::new(),
+        [returned] => returned,
+        [first, rest @ ..] => {
+            return vec![ShapeAt {
+                offset: body.range().end,
+                shape: agreeing_return_rename(first, rest).unwrap_or_else(|| Shape::Unresolved {
+                    line: line(first),
+                    expression: "each return branch".to_owned(),
+                }),
+            }];
+        }
+    };
+    let Some(mut value) = returned.named_children().next() else {
         return Vec::new();
     };
-    if returns.next().is_some() {
-        return Vec::new();
-    }
     let mut shapes = Vec::new();
     let binders = crate::names::Binders::default();
     loop {
@@ -358,6 +378,30 @@ fn return_shape(body: &Node<'_>) -> Vec<ShapeAt> {
     shapes
 }
 
+fn agreeing_return_rename(first: &Node<'_>, rest: &[Node<'_>]) -> Option<Shape> {
+    let rename = |returned: &Node<'_>| {
+        let value = returned.named_children().next()?;
+        let target = value.field("function")?;
+        let method = target.field("attribute")?;
+        let frame = target.field("object")?;
+        if method.text() != "rename" || frame.kind() != "identifier" {
+            return None;
+        }
+        let mut columns = literal_rename(&value)?;
+        columns.sort();
+        if columns.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+            return None;
+        }
+        Some((frame.text().into_owned(), columns, line(&method)))
+    };
+    let (frame, columns, line) = rename(first)?;
+    rest.iter()
+        .all(|returned| {
+            rename(returned).is_some_and(|(other, pairs, _)| other == frame && pairs == columns)
+        })
+        .then_some(Shape::Rename { line, columns })
+}
+
 fn unknown_shape(value: &Node<'_>, line: usize) -> Shape {
     Shape::Unresolved {
         line,
@@ -411,6 +455,7 @@ fn lineage<'a>(
         frame: pipeline
             .source
             .iter()
+            .chain(rename_inputs(shapes).filter(|name| is_source_column(name, pipeline, shapes)))
             .map(|name| (name.clone(), Column::source(name)))
             .collect(),
         producers: Vec::new(),
@@ -448,12 +493,13 @@ fn lineage<'a>(
     match change {
         Change::Column(name) => {
             ensure!(
-                !trace.producers.is_empty(),
+                !trace.producers.is_empty()
+                    || unresolved.iter().any(|item| item.code == "output-shape"),
                 "no column {name:?} resolved in {}",
                 pipeline.name
             );
             ensure!(
-                trace.producers.len() == 1,
+                trace.producers.len() <= 1,
                 "column {name:?} has multiple producers. Select a step with --transformation"
             );
         }
@@ -473,6 +519,18 @@ fn lineage<'a>(
         }
     }
     Ok(trace)
+}
+
+fn rename_inputs(shapes: &BTreeMap<String, Vec<ShapeAt>>) -> impl Iterator<Item = &String> {
+    shapes
+        .values()
+        .flatten()
+        .filter_map(|at| match &at.shape {
+            Shape::Rename { columns, .. } => Some(columns),
+            _ => None,
+        })
+        .flatten()
+        .map(|(from, _)| from)
 }
 
 fn is_source_column(

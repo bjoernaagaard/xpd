@@ -46,6 +46,33 @@ samples/graph/impact.py:43: uses share
 samples/graph/impact.py:34: unresolved [external-callers] Look for imports and callers outside this file.
 ```
 
+## Renames across return branches
+
+When both returns rename the same column on the same frame, the report traces
+the renamed output and suggests varying the original input column.
+
+```python title="branch_rename.py"
+def publish(orders, alternate=False):
+    if alternate:
+        return orders.rename(columns={"net_amount": "share"})
+    return orders.rename(columns={"net_amount": "share"})
+
+
+def dashboard(orders):
+    return publish(orders)[["share"]]
+```
+
+```console
+$ xpd impact branch_rename.py --entry publish --transformation publish --format text
+branch_rename.py:1: impact of transformation "publish" in publish()
+branch_rename.py:3: producer publish [share]
+Output "share": publish [share] (branch_rename.py:3)
+branch_rename.py:8: dashboard calls publish(orders)
+branch_rename.py:8: uses share
+  Verify: Inferred input candidates: "net_amount". Change one of these columns to a different valid value in one row of orders, keeping all other input values fixed. Run dashboard on both inputs and compare "share" at the listed reads, matching the same rows. Inferred: the caller can observe a change if the producer changes. Exact values and direction are unknown.
+branch_rename.py:1: unresolved [external-callers] Look for imports and callers outside this file.
+```
+
 ## Exit status
 
 | Exit code | Meaning |
