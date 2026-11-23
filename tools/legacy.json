@@ -559,7 +559,7 @@
   "website/scripts/generate.mjs": "1",
   "website/scripts/mcp_listing.py": "43",
   "website/scripts/mcp_server.py": "12-14",
-  "website/scripts/reference.mjs": "1-13,27-28,34-37,42,49,59-60,70,93,100,108,123,130-131,142,154,160,176,184,188,201,285,341,355,363,388,392,474,493-494,531,560,613,621-622",
+  "website/scripts/reference.mjs": "27-28,34-37,42,49,123",
   "website/scripts/rules.mjs": "1-6,20,34,60",
   "website/src/legacy.mjs": "1-7,13,35,118",
   "website/src/markdown.mjs": "1-2",
