@@ -8,7 +8,7 @@ Filtering rows right after `read_parquet` reads every row of the file first. Pas
 
 ## What the rule reports
 
-The rule reports `df = pd.read_parquet(path)` followed directly by `df = df[df["id"] >= value]`, with `>`, `>=`, `<`, `<=`, `==`, `!=` or `isin`. With `filters=`, pyarrow skips each row group that holds no matching row, and the values were equal. A row group is a block of rows that Parquet stores together. The rule has no fix, because the index can differ. A frame without a stored index came back numbered from 0, where the mask kept the old labels.
+The rule reports `df = pd.read_parquet(path)` followed directly by `df = df[df["id"] >= value]`, with `>`, `>=`, `<`, `<=`, `==`, `!=` or `isin`. With `filters=`, pyarrow skips each row group that holds no matching row, and the values were equal. A row group is a block of rows that Parquet stores together. A frame without a stored index came back numbered from 0, where the mask kept the old labels.
 
 | File, filtered to the last tenth of a sorted column | Faster by |
 | --- | --- |

@@ -43,7 +43,7 @@ rewriters:
     fix: '$DF[$COL]'
 transform:
   NEW: { rewrite: { source: $BODY, rewriters: [row-col] } }
-fix: $NEW
+fix: ($NEW)
 metadata: { fix: unsafe }
 ---
 id: apply-axis-1

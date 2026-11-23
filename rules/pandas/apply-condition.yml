@@ -106,8 +106,8 @@ rule:
                       kind: conditional_expression
                       all:
                         - has: { nthChild: 2, kind: comparison_operator, all: [{ has: { stopBy: end, kind: identifier, pattern: $X } }, { not: { has: { regex: '^(in|not in|is|is not)$' } } }] }
-                        - not: { has: { nthChild: 1, has: { stopBy: end, kind: identifier, pattern: $X } } }
-                        - not: { has: { nthChild: 3, has: { stopBy: end, kind: identifier, pattern: $X } } }
+                        - not: { has: { nthChild: 1, any: [{ kind: identifier, pattern: $X }, { has: { stopBy: end, kind: identifier, pattern: $X } }] } }
+                        - not: { has: { nthChild: 3, any: [{ kind: identifier, pattern: $X }, { has: { stopBy: end, kind: identifier, pattern: $X } }] } }
               - inside:
                   stopBy: end
                   kind: module

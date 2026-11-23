@@ -32,26 +32,21 @@ language: python
 severity: error
 message: $C with method="quantile" keeps the share threshold of the training rows as inliers, so a threshold below 0.5 flags more than half of them. 0.05 flagged 380 of 400 training rows, where 0.95 flagged 20. Pass 1 minus the share of outliers.
 rule:
-  pattern: $F($$$A)
-  all:
-    - has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
-    - has:
-        field: arguments
-        has: { kind: keyword_argument, all: [{ has: { field: name, regex: '^threshold$' } }, { has: { field: value, matches: small-share } }] }
-    - matches: quantile-method
+  matches: small-share
+  pattern: $V
+  inside:
+    kind: keyword_argument
+    field: value
+    has: { field: name, regex: '^threshold$' }
+    inside:
+      kind: argument_list
+      inside:
+        kind: call
+        has: { field: function, any: [{ kind: attribute, has: { field: attribute, pattern: $C } }, { pattern: $C }] }
+        matches: quantile-method
 constraints:
   C: { regex: '^(GMMOutlierDetector|BayesianGMMOutlierDetector)$' }
-rewriters:
-  - id: invert-threshold
-    rule:
-      kind: keyword_argument
-      all:
-        - has: { field: name, regex: '^threshold$' }
-        - has: { field: value, pattern: $V, matches: small-share }
-    fix: threshold=1 - $V
-transform:
-  FIXED: { rewrite: { source: $A, rewriters: [invert-threshold] } }
-fix: $F($FIXED)
+fix: 1 - $V
 metadata: { fix: unsafe }
 utils:
   small-share: { kind: float, regex: '^0?\.[0-4]\d*$' }

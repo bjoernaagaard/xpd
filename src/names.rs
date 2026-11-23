@@ -506,7 +506,11 @@ pub(crate) fn is_bound(identifier: &Node<'_>) -> bool {
         };
         let holds_targets = matches!(
             &*parent.kind(),
-            "pattern_list" | "tuple_pattern" | "list_pattern" | "list_splat_pattern"
+            "pattern_list"
+                | "tuple_pattern"
+                | "list_pattern"
+                | "list_splat_pattern"
+                | "dictionary_splat_pattern"
         );
         if !holds_targets {
             break parent;

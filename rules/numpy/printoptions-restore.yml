@@ -37,19 +37,21 @@ message: This restores print options that were changed for a while, and NumPy's 
 rule:
   pattern: $NP.set_printoptions(**$OLD)
   not:
-    inside:
-      kind: expression_statement
-      follows:
-        kind: expression_statement
-        has:
-          kind: assignment
-          has: { field: left, kind: identifier }
-          pattern: $TEXT = repr($VALUE)
-        follows:
+    all:
+      - has: { field: arguments, has: { kind: dictionary_splat, has: { kind: identifier, pattern: $OLD } } }
+      - inside:
           kind: expression_statement
-          has: { pattern: $NP.set_printoptions($$$OPTIONS) }
           follows:
             kind: expression_statement
-            has: { pattern: $OLD = $NP.get_printoptions() }
+            has:
+              kind: assignment
+              has: { field: left, kind: identifier }
+              pattern: $TEXT = repr($VALUE)
+            follows:
+              kind: expression_statement
+              has: { pattern: $NP.set_printoptions($$$OPTIONS) }
+              follows:
+                kind: expression_statement
+                has: { pattern: $OLD = $NP.get_printoptions() }
 constraints:
   NP: { regex: '^(np|numpy)$' }

@@ -13,27 +13,26 @@ language: python
 severity: warning
 message: DecayEstimator weights rows by position, the last row most, and train_test_split shuffles the rows. On data whose slope changed from 1 to 3, the model fitted on shuffled rows had the slope 1.62 as the mean of 30 shuffles, where the same rows in time order gave 3.03. Pass shuffle=False, or sort the training rows by time before the fit.
 rule:
-  pattern: $F($$$A)
+  kind: 'true'
   all:
-    - has: { field: function, regex: '(^|\.)train_test_split$' }
-    - has: { field: arguments, has: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' } }
-    - not:
-        has:
-          field: arguments
-          has:
-            any:
-              - kind: dictionary_splat
-              - kind: keyword_argument
-                has: { field: name, regex: '^stratify$' }
-                not: { has: { field: value, kind: none } }
+    - inside:
+        kind: keyword_argument
+        field: value
+        has: { field: name, regex: '^shuffle$' }
+        inside:
+          kind: argument_list
+          not:
+            has:
+              any:
+                - kind: dictionary_splat
+                - kind: keyword_argument
+                  has: { field: name, regex: '^stratify$' }
+                  not: { has: { field: value, kind: none } }
+          inside:
+            kind: call
+            has: { field: function, regex: '(^|\.)train_test_split$' }
     - inside: { stopBy: end, kind: module, has: { stopBy: end, kind: call, has: { field: function, regex: '(^|\.)DecayEstimator$' } } }
-rewriters:
-  - id: disable-shuffle
-    rule: { kind: keyword_argument, regex: '^shuffle\s*=\s*True$' }
-    fix: shuffle=False
-transform:
-  FIXED: { rewrite: { source: $A, rewriters: [disable-shuffle] } }
-fix: $F($FIXED)
+fix: 'False'
 metadata: { fix: unsafe }
 ---
 id: decay-on-shuffled-rows
