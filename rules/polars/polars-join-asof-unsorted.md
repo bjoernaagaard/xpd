@@ -11,4 +11,4 @@ Descending right keys raised InvalidOperationError with the default sortedness c
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+With `--unsafe-fixes`, xpd enables the sortedness check. Sort the inputs if their keys are out of order.

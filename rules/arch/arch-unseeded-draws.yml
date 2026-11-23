@@ -1,12 +1,3 @@
-# arch draws its random numbers from generators of its own, which start from a new seed in
-# every process, so a result that rests on them changes from run to run. Each form below gave
-# two different results in two runs on arch 9.0.0 and on 8.0.0, and the same result twice with
-# the seed that the message names. np.random.seed(0) before each run did not make them equal,
-# because arch does not draw from NumPy's global generator: that was run on 9.0.0 for each of
-# the six bootstraps, for SPA, StepM and MCS, for both forecast methods and for simulate. A seed
-# does not move what the method estimates, so the rule is info. No document has a fix, because
-# the seed is not in the file.
-#
 # seed is a keyword of the bootstraps, the tests and the distributions since arch 5.0: on 4.19
 # IIDBootstrap(x, seed=0) raised TypeError and on 5.0 it ran. Every document carries since.
 
@@ -19,7 +10,7 @@ language: python
 severity: info
 message: $C draws its samples from a new seed on every run, so the intervals and variances change from run to run, and np.random.seed does not reach it. Pass seed.
 rule:
-  kind: call
+  pattern: $C($$$ARGS)
   all:
     - has: { field: function, pattern: $C, regex: '(^|\.)(IIDBootstrap|IndependentSamplesBootstrap|StationaryBootstrap|CircularBlockBootstrap|MovingBlockBootstrap|LocalBlockBootstrap)$' }
     - not: { has: { field: arguments, has: { any: [{ kind: keyword_argument, has: { field: name, regex: '^(seed|random_state)$' } }, { kind: dictionary_splat }] } } }
@@ -39,7 +30,8 @@ utils:
               any:
                 - { kind: call, has: { field: function, kind: attribute, all: [{ has: { field: attribute, regex: '^seed$' } }, { has: { field: object, pattern: $B } }] } }
                 - { kind: assignment, has: { field: left, kind: attribute, all: [{ has: { field: attribute, regex: '^(state|generator)$' } }, { has: { field: object, pattern: $B } }] } }
-metadata: { since: "5.0" }
+fix: $C($$$ARGS, seed=0)
+metadata: { since: "5.0", fix: unsafe }
 ---
 # SPA, StepM, MCS and RealityCheck run a bootstrap of their own. The names are short, so the
 # file must import them from arch.bootstrap.

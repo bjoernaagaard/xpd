@@ -2,17 +2,13 @@
 # state. On pymoo 0.6.2 two runs of NSGA2 on ZDT1 without a seed returned different fronts, and
 # two runs with seed=1 returned the same front. A seed does not make a run better, so the rule
 # is info.
-#
-# The call must be the minimize that the file imports from pymoo.optimize. It is left alone when
-# it takes **kwargs, when the algorithm it gets was built with seed, and in a file that calls
-# np.random.seed, which numpy-seed-ignored reports. The rule has no fix, because the seed is a
-# value that the file does not hold.
 id: unseeded-run
 language: python
 severity: info
 message: minimize without seed starts from a new random state on every run, and two runs returned different fronts. Pass seed, such as seed=1, to get the same result again.
 rule:
   kind: call
+  pattern: minimize($$$ARGS)
   all:
     - matches: unseeded-minimize
     - not:
@@ -44,3 +40,5 @@ utils:
                   all:
                     - has: { field: left, pattern: $SEEDED }
                     - has: { field: right, has: { stopBy: end, kind: keyword_argument, has: { field: name, regex: '^seed$' } } }
+fix: minimize($$$ARGS, seed=1)
+metadata: { fix: unsafe }

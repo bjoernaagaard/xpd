@@ -27,7 +27,7 @@ and `RealityCheck` are read only when the file imports them from `arch.bootstrap
 
 ## How to fix it
 
-xpd has no automatic fix. The seed is not in the file. Make the change by hand.
+With `--unsafe-fixes`, xpd sets `seed=0` on bootstrap constructors.
 
 arch draws from generators of its own, which start from a new seed in every process. Each form
 was run twice without a seed and twice with one, on arch 9.0.0 and on 8.0.0. The two runs

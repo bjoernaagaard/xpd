@@ -30,6 +30,8 @@ rule:
               regex: ^(otherwise|when)$
         - kind: assignment
 metadata:
+  fix: unsafe
   holds:
     F:
       matches: polars-member-any
+fix: $F($$$PREDICATE).then($$$THEN).otherwise(None)

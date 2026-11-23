@@ -12,7 +12,7 @@ that shuffles its folds without it.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd supplies `random_state=0`. Choose a different seed if your project uses one.
 
 Two `fit_transform` calls on the same 400 rows gave codes that differed by the following largest
 gaps:

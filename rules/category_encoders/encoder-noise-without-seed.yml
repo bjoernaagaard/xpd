@@ -5,7 +5,6 @@
 # CatBoostEncoder(sigma=0.05). With random_state=0 the two calls were equal. A seed does not move
 # the expected score, so the rule is info, as missing-random-state of the scikit-learn pack is. A
 # file that calls np.random.seed is left alone, because the encoders then draw from that seed.
-# No document has a fix, because the seed is not in the file.
 id: encoder-noise-without-seed
 language: python
 severity: info
@@ -19,8 +18,16 @@ rule:
     - not:
         any:
           - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
-          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+          - has:
+              field: arguments
+              has:
+                nthChild:
+                  position: 7
+                  ofRule: { not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] } }
           - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
+fix: $C($$$ARGS, random_state=0)
+metadata: { fix: unsafe }
 ---
 # LeaveOneOutEncoder and CatBoostEncoder have no randomized keyword. A sigma that is not None
 # turns their noise on.
@@ -37,8 +44,16 @@ rule:
     - not:
         any:
           - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
-          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
+          - has:
+              field: arguments
+              has:
+                nthChild:
+                  position: 7
+                  ofRule: { not: { any: [{ kind: keyword_argument }, { kind: comment }, { kind: line_continuation }] } }
           - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
+fix: $C($$$ARGS, random_state=0)
+metadata: { fix: unsafe }
 ---
 # NestedCVWrapper builds StratifiedKFold(shuffle=True) from a whole-number cv, 5 by default, so
 # its folds change from run to run: two fit_transform calls differed by up to 0.10. With
@@ -60,5 +75,7 @@ rule:
           # cv is the second positional parameter.
           - has: { field: arguments, has: { nthChild: 2, not: { any: [{ kind: keyword_argument }, { kind: integer }] } } }
           - has: { field: arguments, has: { nthChild: 3, not: { kind: keyword_argument } } }
-          - has: { field: arguments, has: { kind: dictionary_splat } }
+          - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
           - inside: { kind: module, stopBy: end, has: { stopBy: end, pattern: '$NP.random.seed($$$S)' } }
+fix: $C($$$ARGS, random_state=0)
+metadata: { fix: unsafe }

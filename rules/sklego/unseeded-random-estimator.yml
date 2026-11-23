@@ -4,7 +4,6 @@
 # pairs were equal with random_state=0. No proof of a wrong number applies, so the rule is info.
 # A test that checks a shape or a type needs no seed, so test files are left alone.
 
-# No fix, because the seed is not in the file.
 id: unseeded-random-estimator
 language: python
 severity: info
@@ -18,3 +17,7 @@ rule:
     - not: { has: { field: arguments, has: { nthChild: 2, not: { kind: keyword_argument } } } }
 constraints:
   C: { regex: '^(RandomRegressor|RandomAdder)$' }
+transform:
+  PREFIX: { replace: { source: $$$A, replace: '(?s)^(.+)$', by: '$1, ' } }
+fix: $F($PREFIXrandom_state=0)
+metadata: { fix: unsafe }

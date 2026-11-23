@@ -11,4 +11,4 @@ The rule reports `minimize` without `seed`. Two runs of `NSGA2` on ZDT1 then ret
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd adds `seed=1`.

@@ -12,7 +12,7 @@ files. Each call then draws new numbers.
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd supplies `random_state=0`. Choose a different seed if your project uses one.
 
 Two `predict` calls of one fitted `RandomRegressor()` differed, and so did two `transform` calls of
 one `RandomAdder()` on its training rows. Both pairs were equal with `random_state=0`.

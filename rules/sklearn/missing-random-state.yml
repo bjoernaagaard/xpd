@@ -1,16 +1,3 @@
-# Without random_state these draw from a new seed on every run, so a result cannot be
-# reproduced. A seed does not move the expected score, so the rule is info. Each class listed gave
-# another output in five fresh runs on scikit-learn 1.9.1. LogisticRegression, PCA, TSNE with its
-# default init, GaussianMixture with one component, Perceptron and AdaBoostClassifier gave the same
-# output and are not listed. A file that seeds NumPy's global generator is left alone, because
-# scikit-learn then draws from that seed. That is a call to np.random.seed, or to a seed helper
-# such as set_seed or seed_everything that the file does not define, because such a helper
-# usually seeds NumPy. A helper the file defines is judged by np.random.seed alone. TensorFlow,
-# PyTorch and the random module have helpers with such names that leave NumPy unseeded, so a
-# helper imported from them does not count. A train_test_split statement whose
-# result is thrown away, and a constructor that only an isinstance call reads, change no result and
-# are left alone. No document in this file has a fix, because the seed is not in the file.
-#
 # The seed test reads the whole file, so a rule that starts from every call tests the class name
 # first in all, which keeps its order. ast-grep checks constraints only after the whole rule has
 # matched, so a name test there would come after the file test.
@@ -37,6 +24,8 @@ utils:
             - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
             - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
             - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }
+fix: train_test_split($$$ARGS, random_state=0)
+metadata: { fix: unsafe }
 ---
 id: missing-random-state
 language: python
@@ -77,6 +66,7 @@ rule:
     - not:
         any:
           - has: { field: arguments, has: { kind: keyword_argument, has: { field: name, regex: '^random_state$' } } }
+          - has: { field: arguments, has: { any: [{ kind: dictionary_splat }, { kind: list_splat }] } }
           - matches: seeded-file
 utils:
   seeded-file:
@@ -89,6 +79,8 @@ utils:
             - has: { stopBy: end, kind: call, has: { field: function, pattern: $HELPER, any: [{ kind: identifier, regex: '^(set_\w*seed|fix_\w*seed|seed_\w+)$' }, { kind: attribute, regex: '\.seed_everything$' }] } }
             - not: { has: { stopBy: end, kind: function_definition, has: { field: name, pattern: $HELPER } } }
             - not: { has: { stopBy: end, kind: import_from_statement, all: [{ has: { field: module_name, regex: '^(tensorflow|torch|random)(\.|$)' } }, { has: { kind: dotted_name, pattern: $HELPER } }] } }
+fix: $C($$$ARGS, random_state=0)
+metadata: { fix: unsafe }
 ---
 # These draw random numbers only with the argument shown: TSNE(init="random"),
 # SVC(probability=True), HistGradientBoosting with early_stopping=True, and a mixture with more

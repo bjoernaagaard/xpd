@@ -11,4 +11,4 @@ The unhandled row held None. The explicit branch returned 0.
 
 ## How to fix it
 
-Edit the code using the replacement in the example.
+With `--unsafe-fixes`, xpd adds `.otherwise(None)` to make the existing null result explicit. Supply a different value if unmatched rows need one.

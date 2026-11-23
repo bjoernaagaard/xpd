@@ -17,6 +17,6 @@ The rule reports `pivot_table` without `aggfunc`, which takes the mean of the ro
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd makes the mean explicit with `aggfunc="mean"`. Change it if you intended another aggregation.
 
 Write `aggfunc="mean"` when you want the mean.

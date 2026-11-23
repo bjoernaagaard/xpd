@@ -20,7 +20,7 @@ result is thrown away, and a constructor that only `isinstance` reads. Of 527 he
 
 ## How to fix it
 
-xpd has no automatic fix, so make the change by hand.
+With `--unsafe-fixes`, xpd supplies `random_state=0` for an unseeded split or for a fold splitter with `shuffle=True`.
 
 Any fixed number makes the run repeatable, and 0 is only the example.
 
