@@ -52,11 +52,16 @@ const AMBIGUOUS: u8 = 2;
 
 /// Runs doctor on the project in the working directory. Every line it prints, and the error it
 /// returns, has the credentials of each URL redacted.
+///
+/// The URLs of the packaged catalog, such as the source link of each record with its anchor,
+/// print whole, because they are xpd's own text. Every other URL, from the project or from a
+/// tool's message, is redacted, even on the same host.
 pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<ExitCode> {
     let mut out = String::new();
     let code = report(format, mode, kind, &mut out)
         .map_err(|error| anyhow!(redact(&format!("{error:#}"))));
-    print!("{}", redact(&out));
+    let own = crate::output::urls(catalog::DECISIONS);
+    print!("{}", crate::output::redact_except(&out, &own));
     code
 }
 

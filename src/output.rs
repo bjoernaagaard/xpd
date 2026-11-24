@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use clap::ValueEnum;
@@ -20,7 +21,24 @@ static URL: LazyLock<Regex> = LazyLock::new(|| {
 /// because a path cannot be told from a token, so doctor also hides the lines of tables it does
 /// not own.
 pub(crate) fn redact(text: &str) -> String {
+    redact_except(text, &HashSet::new())
+}
+
+/// Every URL in `text`, as [`redact`] finds them.
+pub(crate) fn urls(text: &str) -> HashSet<String> {
+    URL.find_iter(text)
+        .map(|found| found.as_str().to_owned())
+        .collect()
+}
+
+/// `text` as [`redact`] leaves it, except that a URL equal to one of `keep` stays whole. `keep`
+/// holds xpd's own constants, such as the source links of doctor's catalog, whose anchors make
+/// the links useful. A URL from a project matches only when it is one of those very strings.
+pub(crate) fn redact_except(text: &str, keep: &HashSet<String>) -> String {
     URL.replace_all(text, |captures: &regex::Captures<'_>| {
+        if keep.contains(&captures[0]) {
+            return captures[0].to_owned();
+        }
         let scheme = &captures[1];
         let rest = &captures[2];
         let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
