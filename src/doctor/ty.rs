@@ -48,8 +48,6 @@ pub(crate) struct Ty {
     pub(crate) notes: Vec<String>,
     /// The installed release's rules and their default levels, when ty runs here.
     pub(crate) installed: Option<BTreeMap<String, Level>>,
-    /// The `[project]` dependencies that the nearest `pyproject.toml` declares.
-    pub(crate) dependencies: Option<Location>,
 }
 
 impl Ty {
@@ -85,7 +83,6 @@ pub(crate) fn analyze(root: &Path, catalog: &Catalog, checker: Checker) -> Ty {
         Ok(doc) => Ok(state(catalog, &file, prefix, doc.as_ref())),
         Err(error) => Err(error.clone()),
     };
-    let dependencies = dependencies(root);
     if let Some(user) = user_config().filter(|path| path.is_file()) {
         notes.push(format!(
             "{} also applies on this machine; doctor judges the project's own settings",
@@ -104,7 +101,6 @@ pub(crate) fn analyze(root: &Path, catalog: &Catalog, checker: Checker) -> Ty {
         state,
         notes,
         installed,
-        dependencies,
     }
 }
 
@@ -269,22 +265,6 @@ fn levels(
     }
     by_alias.extend(by_name);
     (by_alias, all)
-}
-
-/// The `dependencies` of the `[project]` table in the nearest `pyproject.toml`, when it lists any.
-fn dependencies(root: &Path) -> Option<Location> {
-    let file = root
-        .ancestors()
-        .map(|dir| dir.join("pyproject.toml"))
-        .find(|path| path.is_file())?;
-    let doc = toml::read(&file).ok().flatten()?;
-    let path = ["project", "dependencies"];
-    let count = toml::get(&doc, &path)?.as_array()?.len();
-    (count > 0).then(|| Location {
-        line: toml::line(&doc, &path).unwrap_or(1),
-        file,
-        text: format!("[project] dependencies lists {count}"),
-    })
 }
 
 /// The installed release's rules with their default levels, and notes on how they differ from

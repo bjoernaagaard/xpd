@@ -2,8 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::evidence::Location;
-use super::placement::{Destination, Placement};
+use super::placement::Destination;
 use crate::toml::{self, Toml};
 use crate::venv::Venv;
 
@@ -31,13 +30,11 @@ pub(crate) enum Release {
 pub(crate) struct Pytest {
     pub(crate) installed: Option<(String, PathBuf)>,
     pub(crate) settings: Result<Option<Settings>, String>,
-    pub(crate) project: Option<Project>,
     pub(crate) notes: Vec<String>,
 }
 
 pub(crate) struct Settings {
     pub(crate) destination: Destination,
-    pub(crate) config: Option<PathBuf>,
     args: Vec<Argument>,
     release: Release,
 }
@@ -188,22 +185,9 @@ pub(crate) fn analyze(root: &Path) -> Pytest {
     let file = root.join("pyproject.toml");
     let pyproject = toml::read(&file);
     let settings = settings(root, release, &file, &pyproject, &mut notes);
-    if settings.is_ok()
-        && let Err(error) = &pyproject
-    {
-        notes.push(format!("cannot read pytest dependencies: {error}"));
-    }
-    let project = pyproject.ok().map(|doc| Project {
-        destination: Destination {
-            file,
-            prefix: &[],
-            doc,
-        },
-    });
     Pytest {
         installed: version.map(|(version, path)| (version.to_string(), path)),
         settings,
-        project,
         notes,
     }
 }
@@ -219,14 +203,12 @@ fn settings(
         for name in ["pytest.toml", ".pytest.toml"] {
             let file = root.join(name);
             if let Some(doc) = toml::read(&file)? {
-                let config = Some(file.clone());
                 return Settings::new(
                     Destination {
                         file,
                         prefix: STANDALONE,
                         doc: Some(doc),
                     },
-                    config,
                     release,
                 )
                 .map(Some);
@@ -278,7 +260,6 @@ pub(crate) fn in_pyproject(
             prefix,
             doc: doc.cloned(),
         },
-        None,
         release,
     )
 }
@@ -313,14 +294,12 @@ fn existing(release: Release, file: &Path, doc: Option<&Toml>) -> Result<Option<
             continue;
         }
         if setting.is_some_and(toml_edit::Item::is_table_like) {
-            let config = Some(file.clone());
             return Settings::new(
                 Destination {
                     file,
                     prefix,
                     doc: doc.cloned(),
                 },
-                config,
                 release,
             )
             .map(Some);
@@ -330,11 +309,7 @@ fn existing(release: Release, file: &Path, doc: Option<&Toml>) -> Result<Option<
 }
 
 impl Settings {
-    fn new(
-        destination: Destination,
-        config: Option<PathBuf>,
-        release: Release,
-    ) -> Result<Self, String> {
+    fn new(destination: Destination, release: Release) -> Result<Self, String> {
         let Destination { file, prefix, doc } = &destination;
         let args = if let Some(doc) = doc {
             let path: Vec<&str> = prefix.iter().copied().chain(["addopts"]).collect();
@@ -368,7 +343,6 @@ impl Settings {
         })?;
         Ok(Self {
             destination,
-            config,
             args,
             release,
         })
@@ -394,7 +368,81 @@ impl Settings {
                         .is_some_and(|chars| chars.contains(['a', 'A']))
                 }),
             "--import-mode=importlib" => self.arg_value("--import-mode", None) != Some("importlib"),
-            _ => false,
+            _ => match id.strip_prefix("-p ") {
+                Some(plugin) => !self.loads(plugin),
+                None => false,
+            },
+        }
+    }
+
+    /// Whether a `-p` of `addopts` passes `plugin`, such as `no:doctest`, in any of the spellings
+    /// pytest reads: `-p no:doctest` or `-pno:doctest`.
+    fn loads(&self, plugin: &str) -> bool {
+        let args = self.args();
+        args.iter().enumerate().any(|(index, arg)| {
+            let value = if *arg == "-p" {
+                args.get(index + 1).copied()
+            } else {
+                arg.strip_prefix("-p")
+            };
+            value.is_some_and(|value| value.trim() == plugin)
+        })
+    }
+
+    /// Whether the table lacks the profile's `value` for `key`: a boolean or a string it does
+    /// not hold, or an item of a list that its list lacks. A marker counts by its name, the text
+    /// before its colon. `strict` and `xfail_strict` count as [`Settings::missing`] tells.
+    pub(crate) fn lacks(&self, key: &str, value: &toml_edit::Value) -> bool {
+        if matches!(key, "strict" | "xfail_strict") {
+            return self.missing(key);
+        }
+        if let Some(wanted) = value.as_bool() {
+            return self.flag(key) != Some(wanted);
+        }
+        if let Some(wanted) = value.as_str() {
+            return self.text(key).as_deref() != Some(wanted);
+        }
+        let held = self.lines(key);
+        value
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(toml_edit::Value::as_str)
+            .any(|item| !held.iter().any(|line| same_line(key, line, item)))
+    }
+
+    /// The items of the list setting `key`, from a TOML array or, in the legacy table, from a
+    /// string with one item per line.
+    pub(crate) fn lines(&self, key: &str) -> Vec<String> {
+        match self.get(key) {
+            Some(item) if item.is_array() => item
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|value| value.as_str().map(str::to_owned))
+                .collect(),
+            Some(item) => item
+                .as_str()
+                .map(|text| {
+                    text.lines()
+                        .map(str::trim)
+                        .filter(|line| !line.is_empty())
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            None => Vec::new(),
+        }
+    }
+
+    /// The text of the setting `key`: a string, or a number written without quotes.
+    fn text(&self, key: &str) -> Option<String> {
+        let value = self.get(key)?.as_value()?;
+        match value {
+            toml_edit::Value::String(text) => Some(text.value().clone()),
+            toml_edit::Value::Integer(number) => Some(number.value().to_string()),
+            toml_edit::Value::Float(number) => Some(number.value().to_string()),
+            _ => None,
         }
     }
 
@@ -476,10 +524,6 @@ impl Settings {
         })
     }
 
-    pub(crate) fn needs_timeout(&self) -> bool {
-        self.get("timeout").is_none() && self.arg_value("--timeout", None).is_none()
-    }
-
     fn get(&self, key: &str) -> Option<&toml_edit::Item> {
         let doc = self.destination.doc.as_ref()?;
         let path: Vec<&str> = self
@@ -490,6 +534,17 @@ impl Settings {
             .chain([key])
             .collect();
         toml::get(doc, &path)
+    }
+}
+
+/// Whether the item `line` of the list setting `key` is the profile's `item`. Markers count by
+/// name, since a project describes its own marker.
+pub(crate) fn same_line(key: &str, line: &str, item: &str) -> bool {
+    let name = |text: &str| text.split(':').next().unwrap_or_default().trim().to_owned();
+    if key == "markers" {
+        name(line) == name(item)
+    } else {
+        line.trim() == item
     }
 }
 
@@ -533,18 +588,6 @@ impl Project {
         let path = vec!["project", "dependencies"];
         let array = toml::get(doc, &path)?.as_array()?;
         Some(Group { path, array })
-    }
-
-    pub(crate) fn place_group(&self, path: &[&str]) -> Placement {
-        let mut placement = self.destination.place_path(path);
-        if placement.table.is_empty() {
-            placement.table = path[..path.len() - 1].join(".");
-            path.last()
-                .copied()
-                .unwrap_or_default()
-                .clone_into(&mut placement.key);
-        }
-        placement
     }
 
     /// The groups that uv installs together with the list at `path`: the list itself and, for a
@@ -646,24 +689,6 @@ impl Group<'_> {
         self.array
             .iter()
             .filter(move |value| dependency(value).is_some_and(|dep| dep == name))
-    }
-
-    pub(crate) fn location(&self, project: &Project, entry: &toml_edit::Value) -> Option<Location> {
-        Some(Location {
-            file: project.destination.file.clone(),
-            line: self.place(project, entry).key_line?,
-            text: entry.as_str()?.to_owned(),
-        })
-    }
-
-    pub(crate) fn place(&self, project: &Project, entry: &toml_edit::Value) -> Placement {
-        let mut placement = project.place_group(&self.path);
-        if let Some(doc) = &project.destination.doc
-            && let Some(span) = entry.span()
-        {
-            placement.key_line = Some(toml::line_of(doc, span.start));
-        }
-        placement
     }
 }
 

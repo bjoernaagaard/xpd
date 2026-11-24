@@ -521,7 +521,6 @@
   "src/commands.rs": "11",
   "src/doctor/advice.rs": "393-394",
   "src/doctor/evidence-utils.yml": "1",
-  "src/doctor/evidence.yml": "1-3",
   "src/doctor/ruff.rs": "115,348",
   "src/embed.rs": "97-98,208",
   "src/frames.rs": "424-425,491",

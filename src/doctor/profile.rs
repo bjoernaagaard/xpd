@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 1
+//! revision = 2
 //! kind = "application"
 //!
 //! [[tool.xpd.profile.exceptions]]
@@ -14,8 +14,10 @@
 //! ```
 //!
 //! The profile names each value, and the record of the same id in `decisions.jsonl` explains
-//! it. A profile revision changes whenever a value changes, and the schema changes only when
-//! the shape of `profile.toml` or of the project's record changes.
+//! it. Ruff's `select` and `ignore` decide every rule of the pinned release, so each rule has a
+//! `profile` record, on or off, and a setting is explained by the record of the setting that
+//! holds it. A profile revision changes whenever a value changes, and the schema changes only
+//! when the shape of `profile.toml` or of the project's record changes.
 //!
 //! The base values apply to every kind of project, and a kind can add its own values in the
 //! same shape. A kind also states which of `[project]`, `[build-system]` and scripts with inline
@@ -33,14 +35,14 @@ use std::collections::BTreeSet;
 use anyhow::{Context, Result, bail, ensure};
 use toml_edit::{Item, TableLike};
 
-use super::catalog::{self, Catalog, Decision, Level, Tool};
+use super::catalog::{self, Catalog, Decision, Key, Kind, Level, Surface, Tool};
 use crate::toml::{self, Toml};
 
 /// The packaged profile.
 const PROFILE: &str = include_str!("profile.toml");
 
 /// The shape of `profile.toml` and of `[tool.xpd.profile]` that this xpd reads.
-pub(crate) const SCHEMA: i64 = 1;
+pub(crate) const SCHEMA: i64 = 2;
 
 /// Where a project's record of the profile lives in its `pyproject.toml`.
 pub(crate) const TABLE: [&str; 3] = ["tool", "xpd", "profile"];
@@ -105,17 +107,205 @@ pub(crate) struct Owned {
     pub(crate) text: &'static str,
 }
 
-/// The templates of owned files, each by its file name in `src/doctor/profiles/`. Revision 1
-/// owns no file.
+/// The templates of owned files, each by its file name in `src/doctor/profiles/`. No revision
+/// owns a file yet.
 const TEMPLATES: &[(&str, &str)] = &[];
+
+/// One setting of a tool table, by its path below the table, with the value the profile wants.
+#[derive(Debug, Clone)]
+pub(crate) struct Setting {
+    pub(crate) path: Vec<String>,
+    pub(crate) value: toml_edit::Value,
+}
+
+impl Setting {
+    /// The path joined with dots, as Ruff and ty name the setting.
+    pub(crate) fn dotted(&self) -> String {
+        self.path.join(".")
+    }
+}
+
+/// What the profile wants of Ruff.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct RuffWanted {
+    /// `lint.select`, which the profile owns.
+    pub(crate) select: Vec<String>,
+    /// Selectors that `lint.ignore` holds. Each turns off rules that a reason in the catalog
+    /// explains.
+    pub(crate) ignore: Vec<String>,
+    /// Patterns of `lint.per-file-ignores`, each with the selectors it holds.
+    pub(crate) per_file_ignores: Vec<(String, Vec<String>)>,
+    /// Entries of `lint.flake8-tidy-imports.banned-api`, each with the message it gets when doctor
+    /// adds it. An entry the project has keeps its own message.
+    pub(crate) banned_api: Vec<(String, String)>,
+    /// Settings below `[tool.ruff]` that hold exactly the profile's value.
+    pub(crate) settings: Vec<Setting>,
+    /// Settings below `[tool.ruff]` that must not be `true`.
+    pub(crate) off: Vec<Vec<String>>,
+    /// The rules that the profile's `lint.pydocstyle.convention` turns off in the pinned release,
+    /// as `ruff check --show-settings` lists them with and without the convention.
+    pub(crate) convention_off: Vec<String>,
+}
+
+impl RuffWanted {
+    /// Whether the profile turns Ruff's preview mode on for the linter.
+    pub(crate) fn preview(&self) -> bool {
+        ["lint.preview", "preview"].into_iter().any(|key| {
+            self.settings
+                .iter()
+                .find(|setting| setting.dotted() == key)
+                .is_some_and(|setting| setting.value.as_bool() == Some(true))
+        })
+    }
+
+    /// The rules of the pinned release that the profile turns on: those its selection selects
+    /// and no selector of its ignore list turns off.
+    pub(crate) fn required(&self, catalog: &Catalog) -> Vec<String> {
+        self.decided(catalog)
+            .into_iter()
+            .filter(|(_, on)| *on)
+            .map(|(code, _)| code)
+            .collect()
+    }
+
+    /// Each rule of the pinned release that the profile's selection reaches, with whether it
+    /// stays on. A preview rule counts only when the profile turns preview on.
+    pub(crate) fn decided(&self, catalog: &Catalog) -> Vec<(String, bool)> {
+        let preview = self.preview();
+        catalog
+            .ruff_rules()
+            .filter(|rule| !rule.is_removed() && (preview || !rule.is_preview()))
+            .filter(|rule| {
+                self.select
+                    .iter()
+                    .any(|selector| super::ruff::selects(selector, rule))
+            })
+            .map(|rule| {
+                let off = self.convention_off.contains(&rule.key.id)
+                    || self
+                        .ignore
+                        .iter()
+                        .any(|selector| super::ruff::selects(selector, rule));
+                (rule.key.id.clone(), !off)
+            })
+            .collect()
+    }
+
+    fn with(&mut self, extra: &Self) {
+        add(&mut self.select, &extra.select);
+        add(&mut self.ignore, &extra.ignore);
+        for (pattern, selectors) in &extra.per_file_ignores {
+            match self
+                .per_file_ignores
+                .iter_mut()
+                .find(|(known, _)| known == pattern)
+            {
+                Some((_, known)) => add(known, selectors),
+                None => self
+                    .per_file_ignores
+                    .push((pattern.clone(), selectors.clone())),
+            }
+        }
+        for (name, message) in &extra.banned_api {
+            self.banned_api.retain(|(known, _)| known != name);
+            self.banned_api.push((name.clone(), message.clone()));
+        }
+        replace(&mut self.settings, &extra.settings);
+        for path in &extra.off {
+            if !self.off.contains(path) {
+                self.off.push(path.clone());
+            }
+        }
+        add(&mut self.convention_off, &extra.convention_off);
+    }
+
+    fn read(table: &dyn TableLike) -> Result<Self> {
+        let per_file_ignores = optional(table, "per-file-ignores")?
+            .map(|patterns| {
+                patterns
+                    .iter()
+                    .map(|(pattern, _)| Ok((pattern.to_owned(), strings(patterns, pattern)?)))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let banned_api = optional(table, "banned-api")?
+            .map(|bans| {
+                bans.iter()
+                    .map(|(name, _)| Ok((name.to_owned(), string(bans, name)?)))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        Ok(Self {
+            select: optional_strings(table, "select")?,
+            ignore: optional_strings(table, "ignore")?,
+            per_file_ignores,
+            banned_api,
+            settings: optional(table, "settings")?
+                .map(settings)
+                .transpose()?
+                .unwrap_or_default(),
+            off: optional_strings(table, "off")?
+                .iter()
+                .map(|key| key.split('.').map(str::to_owned).collect())
+                .collect(),
+            convention_off: optional_strings(table, "convention-off")?,
+        })
+    }
+}
+
+/// Adds each item of `from` that `into` lacks.
+fn add(into: &mut Vec<String>, from: &[String]) {
+    for item in from {
+        if !into.contains(item) {
+            into.push(item.clone());
+        }
+    }
+}
+
+/// Replaces each setting of `into` that `from` sets, and adds the others.
+fn replace(into: &mut Vec<Setting>, from: &[Setting]) {
+    for setting in from {
+        into.retain(|known| known.path != setting.path);
+        into.push(setting.clone());
+    }
+}
+
+/// Every value below `table`, with its path. A table is a step of the path, so each setting is a
+/// value that is no table.
+fn settings(table: &dyn TableLike) -> Result<Vec<Setting>> {
+    let mut found = Vec::new();
+    collect_settings(table, &mut Vec::new(), &mut found);
+    ensure!(!found.is_empty(), "settings holds no value");
+    Ok(found)
+}
+
+fn collect_settings(table: &dyn TableLike, path: &mut Vec<String>, found: &mut Vec<Setting>) {
+    for (key, item) in table.iter() {
+        path.push(key.to_owned());
+        if let Some(child) = item.as_table_like() {
+            collect_settings(child, path, found);
+        } else if let Some(value) = item.as_value() {
+            let mut value = value.clone();
+            value.decor_mut().clear();
+            found.push(Setting {
+                path: path.clone(),
+                value,
+            });
+        }
+        path.pop();
+    }
+}
 
 /// What the profile wants of Ruff, ty and pytest, for every kind or added by one kind.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct Values {
-    /// Ruff rule codes that run on every file.
-    pub(crate) ruff_rules: Vec<String>,
+    pub(crate) ruff: RuffWanted,
     /// ty rules, each with the lowest level it may have.
     pub(crate) ty_rules: Vec<(String, Level)>,
+    /// Settings below `[tool.ty]` that hold exactly the profile's value.
+    pub(crate) ty_settings: Vec<Setting>,
     /// For pytest 9 and later.
     pub(crate) pytest: PytestWanted,
     /// For pytest before 9.
@@ -125,28 +315,22 @@ pub(crate) struct Values {
 }
 
 impl Values {
-    /// These values with `extra` added. A ty level in `extra` replaces the base level.
+    /// These values with `extra` added. A ty level or a setting in `extra` replaces the base one.
     fn with(&self, extra: &Self) -> Self {
         let mut values = self.clone();
-        let add = |into: &mut Vec<String>, from: &[String]| {
-            for item in from {
-                if !into.contains(item) {
-                    into.push(item.clone());
-                }
-            }
-        };
-        add(&mut values.ruff_rules, &extra.ruff_rules);
+        values.ruff.with(&extra.ruff);
         for (rule, level) in &extra.ty_rules {
             values.ty_rules.retain(|(name, _)| name != rule);
             values.ty_rules.push((rule.clone(), *level));
         }
+        replace(&mut values.ty_settings, &extra.ty_settings);
         for (into, from) in [
             (&mut values.pytest, &extra.pytest),
             (&mut values.pytest_before_nine, &extra.pytest_before_nine),
         ] {
             for (key, value) in &from.settings {
                 into.settings.retain(|(name, _)| name != key);
-                into.settings.push((key.clone(), *value));
+                into.settings.push((key.clone(), value.clone()));
             }
             add(&mut into.addopts, &from.addopts);
         }
@@ -157,14 +341,13 @@ impl Values {
     /// The values in `table`, a tool table of `profile.toml` or of a kind. A missing table holds
     /// no value.
     fn read(table: &dyn TableLike) -> Result<Self> {
-        let ruff_rules = optional(table, "ruff")?
-            .map(|ruff| strings(ruff, "rules"))
-            .transpose()?
+        let ruff = optional(table, "ruff")?
+            .map(RuffWanted::read)
+            .transpose()
+            .context("ruff")?
             .unwrap_or_default();
-        let ty_rules = match optional(table, "ty")?
-            .map(|ty| optional(ty, "rules"))
-            .transpose()?
-        {
+        let ty = optional(table, "ty")?;
+        let ty_rules = match ty.map(|ty| optional(ty, "rules")).transpose()? {
             Some(Some(rules)) => rules
                 .iter()
                 .map(|(name, item)| {
@@ -175,6 +358,10 @@ impl Values {
                     Ok((name.to_owned(), level))
                 })
                 .collect::<Result<Vec<_>>>()?,
+            _ => Vec::new(),
+        };
+        let ty_settings = match ty.map(|ty| optional(ty, "settings")).transpose()? {
+            Some(Some(table)) => settings(table).context("ty")?,
             _ => Vec::new(),
         };
         let (pytest, pytest_before_nine, plugins) = match optional(table, "pytest")? {
@@ -189,8 +376,9 @@ impl Values {
             ),
         };
         Ok(Self {
-            ruff_rules,
+            ruff,
             ty_rules,
+            ty_settings,
             pytest,
             pytest_before_nine,
             plugins,
@@ -201,17 +389,23 @@ impl Values {
 /// What the profile wants of pytest for one range of pytest releases.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct PytestWanted {
-    /// Settings of the pytest table, each with the boolean it must hold.
-    pub(crate) settings: Vec<(String, bool)>,
-    /// Arguments that `addopts` must hold.
+    /// Settings of the pytest table, each with the value it must hold. A list must hold each of
+    /// the profile's items and may hold more.
+    pub(crate) settings: Vec<(String, toml_edit::Value)>,
+    /// Arguments that `addopts` must hold. A `-p` and its plugin are one item, such as
+    /// `-p no:doctest`.
     pub(crate) addopts: Vec<String>,
 }
 
 /// What the profile removes from a project. No exception can keep it.
 #[derive(Debug, Default)]
 pub(crate) struct PytestForbid {
-    /// Flags of `addopts`, with the value that follows each.
+    /// Flags of `addopts` that take a value, removed with the value that follows each.
     pub(crate) addopts: Vec<String>,
+    /// Flags of `addopts` that take no value.
+    pub(crate) switches: Vec<String>,
+    /// Plugins that `-p no:<name>` in `addopts` must not turn off.
+    pub(crate) disabled: Vec<String>,
     /// Settings of the pytest table.
     pub(crate) settings: Vec<String>,
     /// Settings of the pytest table that must not be `false`.
@@ -224,6 +418,33 @@ pub(crate) struct PytestForbid {
 }
 
 impl PytestForbid {
+    /// What `[pytest.forbid]` and `[pytest.plugin-names]` in `pytest`, the pytest table of
+    /// `profile.toml`, remove.
+    fn read(pytest: &dyn TableLike) -> Result<Self> {
+        let forbid = table(pytest, "forbid")?;
+        let plugin_names = table(pytest, "plugin-names")?
+            .iter()
+            .map(|(plugin, item)| {
+                let names = item
+                    .as_array()
+                    .with_context(|| format!("pytest.plugin-names.{plugin} is no array"))?
+                    .iter()
+                    .filter_map(|value| value.as_str().map(str::to_owned))
+                    .collect();
+                Ok((plugin.to_owned(), names))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Self {
+            addopts: strings(forbid, "addopts")?,
+            switches: optional_strings(forbid, "switches")?,
+            disabled: optional_strings(forbid, "disabled")?,
+            settings: strings(forbid, "settings")?,
+            false_settings: strings(forbid, "false")?,
+            plugins: strings(forbid, "plugins")?,
+            plugin_names,
+        })
+    }
+
     /// The plugin that the profile removes which `-p <load>` loads, by one of its names or by a
     /// module inside one of them.
     pub(crate) fn loaded_by(&self, load: &str) -> Option<&str> {
@@ -240,13 +461,17 @@ impl PytestForbid {
             })
             .map(|(plugin, _)| plugin.as_str())
     }
-}
 
-impl PytestForbid {
+    /// The id of the `-p no:<plugin>` that the profile removes, as the catalog names it.
+    pub(crate) fn disable_id(plugin: &str) -> String {
+        format!("-p no:{plugin}")
+    }
+
     /// Whether the profile removes `id` of pytest without exception.
     pub(crate) fn forbids(&self, id: &str) -> bool {
         [
             &self.addopts,
+            &self.switches,
             &self.settings,
             &self.false_settings,
             &self.plugins,
@@ -254,6 +479,10 @@ impl PytestForbid {
         .into_iter()
         .flatten()
         .any(|forbidden| forbidden == id)
+            || self
+                .disabled
+                .iter()
+                .any(|plugin| Self::disable_id(plugin) == id)
     }
 }
 
@@ -357,39 +586,33 @@ impl Profile {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        let pytest = table(top, "pytest")?;
-        let forbid = table(pytest, "forbid")?;
-        let plugin_names = table(pytest, "plugin-names")?
-            .iter()
-            .map(|(plugin, item)| {
-                let names = item
-                    .as_array()
-                    .with_context(|| format!("pytest.plugin-names.{plugin} is no array"))?
-                    .iter()
-                    .filter_map(|value| value.as_str().map(str::to_owned))
-                    .collect();
-                Ok((plugin.to_owned(), names))
-            })
-            .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             revision: integer(top, "revision")?,
             dev_pins,
             kinds,
             base: Values::read(top)?,
-            forbid: PytestForbid {
-                addopts: strings(forbid, "addopts")?,
-                settings: strings(forbid, "settings")?,
-                false_settings: strings(forbid, "false")?,
-                plugins: strings(forbid, "plugins")?,
-                plugin_names,
-            },
+            forbid: PytestForbid::read(table(top, "pytest")?)?,
             files,
         })
     }
 
     /// Every value has a `profile` record in the catalog, and every such record a value.
     fn check(&self, catalog: &Catalog) -> Result<()> {
-        let named: BTreeSet<(Tool, String)> = self.ids().into_iter().collect();
+        let all = self
+            .kinds
+            .iter()
+            .fold(self.base.clone(), |values, kind| values.with(&kind.extra));
+        Self::check_ruff(catalog, &all.ruff)?;
+        for (rule, _) in &all.ty_rules {
+            ensure!(
+                catalog
+                    .ty_rule(rule)
+                    .is_some_and(|record| record.key.id == *rule),
+                "ty {} has no rule {rule}",
+                catalog::TY_RELEASE
+            );
+        }
+        let named: BTreeSet<(Tool, String)> = self.ids(catalog)?.into_iter().collect();
         for (tool, id) in &named {
             ensure!(
                 catalog.profiled(*tool, id).is_some(),
@@ -405,25 +628,6 @@ impl Profile {
                     record.key
                 );
             }
-        }
-        let all = self
-            .kinds
-            .iter()
-            .fold(self.base.clone(), |values, kind| values.with(&kind.extra));
-        for code in &all.ruff_rules {
-            let known = catalog
-                .ruff_rules()
-                .any(|rule| rule.key.id == *code && !rule.is_removed());
-            ensure!(known, "ruff {} has no rule {code}", catalog::RUFF_RELEASE);
-        }
-        for (rule, _) in &all.ty_rules {
-            ensure!(
-                catalog
-                    .ty_rule(rule)
-                    .is_some_and(|record| record.key.id == *rule),
-                "ty {} has no rule {rule}",
-                catalog::TY_RELEASE
-            );
         }
         ensure!(!self.kinds.is_empty(), "no kinds");
         for kind in &self.kinds {
@@ -459,20 +663,87 @@ impl Profile {
         Ok(())
     }
 
-    /// Each value as the tool and id of the catalog record that explains it.
-    fn ids(&self) -> Vec<(Tool, String)> {
+    /// Every selector of the Ruff values names rules of the pinned release, and the Ruff pin is
+    /// the release that `required-version` asks for.
+    fn check_ruff(catalog: &Catalog, ruff: &RuffWanted) -> Result<()> {
+        let selectors = ruff
+            .select
+            .iter()
+            .chain(&ruff.ignore)
+            .chain(ruff.per_file_ignores.iter().flat_map(|(_, codes)| codes))
+            .chain(&ruff.convention_off);
+        for selector in selectors {
+            let known = catalog
+                .ruff_rules()
+                .any(|rule| !rule.is_removed() && super::ruff::selects(selector, rule));
+            ensure!(
+                known && catalog.redirect(selector) == Some(selector.as_str()),
+                "ruff {} has no rule that {selector} selects",
+                catalog::RUFF_RELEASE
+            );
+        }
+        if let Some(setting) = ruff
+            .settings
+            .iter()
+            .find(|setting| setting.dotted() == "required-version")
+        {
+            let wanted = format!("=={}", catalog::RUFF_RELEASE);
+            ensure!(
+                setting.value.as_str() == Some(wanted.as_str()),
+                "ruff.settings.required-version is not {wanted:?}, the pinned release"
+            );
+        }
+        Ok(())
+    }
+
+    /// Each value as the tool and id of the catalog record that explains it. A Ruff rule that
+    /// the profile's selection reaches is a value, on or off. A setting is explained by the
+    /// record of the setting that holds it, such as `lint.flake8-tidy-imports.banned-api`.
+    fn ids(&self, catalog: &Catalog) -> Result<Vec<(Tool, String)>> {
         let values = self
             .kinds
             .iter()
             .fold(self.base.clone(), |values, kind| values.with(&kind.extra));
-        let ruff = values
-            .ruff_rules
+        let mut ids: Vec<(Tool, String)> = values
+            .ruff
+            .decided(catalog)
+            .into_iter()
+            .map(|(code, _)| (Tool::Ruff, code))
+            .collect();
+        let ruff = &values.ruff;
+        for (key, present) in [
+            ("lint.select", !ruff.select.is_empty()),
+            ("lint.ignore", !ruff.ignore.is_empty()),
+            ("lint.per-file-ignores", !ruff.per_file_ignores.is_empty()),
+            (
+                "lint.flake8-tidy-imports.banned-api",
+                !ruff.banned_api.is_empty(),
+            ),
+        ] {
+            if present {
+                ids.push((Tool::Ruff, key.to_owned()));
+            }
+        }
+        for path in ruff
+            .settings
             .iter()
-            .map(|code| (Tool::Ruff, code.clone()));
-        let ty = values
-            .ty_rules
-            .iter()
-            .map(|(rule, _)| (Tool::Ty, rule.clone()));
+            .map(|setting| setting.path.clone())
+            .chain(ruff.off.iter().cloned())
+        {
+            ids.push((Tool::Ruff, option(catalog, Tool::Ruff, "", &path)?));
+        }
+        ids.extend(
+            values
+                .ty_rules
+                .iter()
+                .map(|(rule, _)| (Tool::Ty, rule.clone())),
+        );
+        for setting in &values.ty_settings {
+            ids.push((
+                Tool::Ty,
+                option(catalog, Tool::Ty, "tool.ty.", &setting.path)?,
+            ));
+        }
         let wanted = [&values.pytest, &values.pytest_before_nine]
             .into_iter()
             .flat_map(|wanted| {
@@ -483,6 +754,13 @@ impl Profile {
         let pytest = wanted
             .chain(values.plugins.iter().cloned())
             .chain(forbid.addopts.iter().cloned())
+            .chain(forbid.switches.iter().cloned())
+            .chain(
+                forbid
+                    .disabled
+                    .iter()
+                    .map(|plugin| PytestForbid::disable_id(plugin)),
+            )
             .chain(forbid.settings.iter().cloned())
             .chain(
                 forbid
@@ -492,7 +770,8 @@ impl Profile {
             )
             .chain(forbid.plugins.iter().cloned())
             .map(|id| (Tool::Pytest, id));
-        ruff.chain(ty).chain(pytest).collect()
+        ids.extend(pytest);
+        Ok(ids)
     }
 
     pub(crate) fn kind(&self, name: &str) -> Option<&KindSpec> {
@@ -523,6 +802,33 @@ impl Profile {
     }
 }
 
+/// The id of the catalog record of the setting that holds the value at `path`, below the tool's
+/// table: the longest part of the path, from its start, that the catalog records as an option of
+/// `tool` once `prefix` is put before it.
+pub(crate) fn option(
+    catalog: &Catalog,
+    tool: Tool,
+    prefix: &str,
+    path: &[String],
+) -> Result<String> {
+    (1..=path.len())
+        .rev()
+        .map(|end| format!("{prefix}{}", path[..end].join(".")))
+        .find(|id| {
+            catalog
+                .get(&Key::pinned(tool, Surface::Project, Kind::Option, id))
+                .is_some()
+        })
+        .with_context(|| {
+            format!(
+                "{} {} has no setting {prefix}{}",
+                tool.name(),
+                tool.pinned(),
+                path.join(".")
+            )
+        })
+}
+
 /// The tools of `[dev]` `pins`, each with its release from `pins`, the `[pins]` table.
 fn dev_pins(top: &dyn TableLike, pins: &dyn TableLike) -> Result<Vec<(String, String)>> {
     strings(table(top, "dev")?, "pins")
@@ -537,21 +843,29 @@ fn dev_pins(top: &dyn TableLike, pins: &dyn TableLike) -> Result<Vec<(String, St
 }
 
 fn wanted(table: &dyn TableLike) -> Result<PytestWanted> {
-    let Some(settings) = optional(table, "settings")? else {
-        return Ok(PytestWanted {
-            settings: Vec::new(),
-            addopts: optional_strings(table, "addopts")?,
-        });
+    let settings = match optional(table, "settings")? {
+        None => Vec::new(),
+        Some(settings) => settings
+            .iter()
+            .map(|(key, item)| {
+                let value = item
+                    .as_value()
+                    .filter(|value| {
+                        value.is_bool()
+                            || value.is_str()
+                            || value
+                                .as_array()
+                                .is_some_and(|items| items.iter().all(toml_edit::Value::is_str))
+                    })
+                    .with_context(|| {
+                        format!("settings.{key} is no boolean, string or list of strings")
+                    })?;
+                let mut value = value.clone();
+                value.decor_mut().clear();
+                Ok((key.to_owned(), value))
+            })
+            .collect::<Result<Vec<_>>>()?,
     };
-    let settings = settings
-        .iter()
-        .map(|(key, item)| {
-            let value = item
-                .as_bool()
-                .with_context(|| format!("settings.{key} is no boolean"))?;
-            Ok((key.to_owned(), value))
-        })
-        .collect::<Result<Vec<_>>>()?;
     Ok(PytestWanted {
         settings,
         addopts: optional_strings(table, "addopts")?,

@@ -34,8 +34,6 @@ pub(crate) struct State {
     /// The rules `per-file-ignores` turns off for some files, each with the patterns.
     pub(crate) per_file_ignored: BTreeMap<String, Vec<Location>>,
     pub(crate) preview: bool,
-    /// The selector that selects a group of rules while preview mode is on.
-    pub(crate) broad_preview: Option<Location>,
     /// The value of each setting that a suggestion names.
     pub(crate) settings: BTreeMap<String, Observed>,
     /// The file Ruff resolved the settings for, when Ruff ran.
@@ -240,13 +238,15 @@ fn linter(prefix: &str) -> &str {
 }
 
 /// Whether `selector` selects `rule`, as a code, a prefix of codes in its linter, a legacy
-/// group or `ALL`.
+/// group, `ALL`, or the rule's name, which Ruff accepts in preview mode.
 pub(crate) fn selects(selector: &str, rule: &Record) -> bool {
+    if selector == "ALL" || rule.name.as_deref() == Some(selector) {
+        return true;
+    }
     let Some(prefix) = rule.prefix.as_deref() else {
         return selector == rule.key.id;
     };
     match selector {
-        "ALL" => true,
         "C" => matches!(prefix, "C4" | "C90"),
         "T" => matches!(prefix, "T10" | "T20"),
         _ => selector.starts_with(linter(prefix)) && rule.key.id.starts_with(selector),
@@ -395,19 +395,6 @@ fn state(
         Preview { mode, explicit },
         Baseline::Defaults,
     );
-    let broad_preview = preview
-        .then(|| {
-            layers.iter().rev().find_map(|layer| {
-                ["select", "extend-select"]
-                    .into_iter()
-                    .flat_map(|key| layer.selectors(key).into_iter().flatten())
-                    .find(|(selector, _)| {
-                        !catalog.ruff_rules().any(|rule| rule.key.id == *selector)
-                    })
-                    .map(|(_, location)| location)
-            })
-        })
-        .flatten();
     let mut settings = BTreeMap::new();
     for key in keys {
         let lint_key = key.strip_prefix("lint.").unwrap_or(key);
@@ -447,7 +434,6 @@ fn state(
         ignored,
         per_file_ignored,
         preview,
-        broad_preview,
         settings,
         verified_with,
     })

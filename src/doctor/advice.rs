@@ -13,7 +13,7 @@ use super::catalog::{Catalog, Record, Satisfied, Suggestion, Target, Tool, Trigg
 use super::evidence::{Evidence, Location};
 use super::placement::{Destination, Placement};
 use super::probe::Checker;
-use super::pytest::{self, Project, Pytest};
+use super::pytest::{self, Pytest};
 use super::ruff::{self, Ruff};
 use super::ty::{self, Ty};
 use crate::toml::Observed;
@@ -89,7 +89,6 @@ struct Context<'a> {
     evidence: &'a Evidence,
     ruff: &'a Ruff,
     ruff_state: Option<&'a ruff::State>,
-    ty: &'a Ty,
 }
 
 impl Context<'_> {
@@ -97,10 +96,6 @@ impl Context<'_> {
     fn found(&self, trigger: Trigger, requires: &[String]) -> Vec<Location> {
         let state = self.ruff_state;
         match trigger {
-            Trigger::PreviewBroadSelect => state
-                .and_then(|s| s.broad_preview.clone())
-                .into_iter()
-                .collect(),
             Trigger::RuleActive => state
                 .map(|s| {
                     requires
@@ -117,7 +112,6 @@ impl Context<'_> {
                 })
                 .into_iter()
                 .collect(),
-            Trigger::DeclaredDependencies => self.ty.dependencies.clone().into_iter().collect(),
             Trigger::RuffAvailable => state
                 .and_then(|s| s.verified_with.as_ref())
                 .map(|file| Location {
@@ -236,7 +230,6 @@ pub(crate) fn evaluate(
             evidence,
             ruff,
             ruff_state: Some(state),
-            ty,
         };
         let facts = Scope {
             destination: &scope.destination,
@@ -270,7 +263,6 @@ pub(crate) fn evaluate(
                 evidence,
                 ruff,
                 ruff_state: None,
-                ty,
             };
             let facts = Scope {
                 destination: &ty.destination,
@@ -297,7 +289,7 @@ pub(crate) fn evaluate(
         }
     }
     report.finish(unsupported, ruff, ty);
-    report.pytest(root, files.len(), catalog, &pytest::analyze(root));
+    report.pytest(&pytest::analyze(root));
     report
 }
 
@@ -466,57 +458,22 @@ fn shown(root: &Path, path: &Path) -> PathBuf {
 }
 
 impl Report {
-    fn pytest(&mut self, root: &Path, files: usize, catalog: &Catalog, pytest: &Pytest) {
+    /// The pytest release, and what doctor could not read of pytest's settings. The profile sets
+    /// every pytest value, so no pytest record is conditional.
+    fn pytest(&mut self, pytest: &Pytest) {
         let tool = Tool::Pytest;
         let (installed, path) = pytest.installed.clone().unzip();
-        let pinned = tool.pinned();
-        let status = installed.as_ref().map_or_else(
-            || format!("unverified locally (decisions for pytest {pinned})"),
-            |version| format!("pytest {version} installed (decisions reviewed for {pinned})"),
-        );
         self.tools.push(ToolStatus {
             tool: tool.name(),
-            pinned,
+            pinned: tool.pinned(),
             installed,
             path,
         });
         for note in &pytest.notes {
             self.note(tool, note.clone());
         }
-        let timeout = pytest.project.as_ref().and_then(timeout_plugin);
-        let settings = match &pytest.settings {
-            Ok(Some(settings)) => settings,
-            Ok(None) => return,
-            Err(error) => {
-                self.note(tool, format!("cannot read pytest's settings: {error}"));
-                return;
-            }
-        };
-        let facts = Scope {
-            destination: &settings.destination,
-            name: scope_name(root, settings.config.as_deref(), "pytest's defaults"),
-            files,
-            status,
-            representative: None,
-            placement: None,
-        };
-        for (record, suggestion) in catalog
-            .suggestions()
-            .filter(|(record, _)| record.key.tool == tool)
-        {
-            if suggestion.trigger == Trigger::TimeoutPlugin
-                && settings.needs_timeout()
-                && let Some(location) = &timeout
-            {
-                self.suggest(
-                    root,
-                    record,
-                    suggestion,
-                    None,
-                    vec![location.clone()],
-                    &facts,
-                );
-            }
+        if let Err(error) = &pytest.settings {
+            self.note(tool, format!("cannot read pytest's settings: {error}"));
         }
     }
 
@@ -832,17 +789,6 @@ impl Advice {
             let _ = writeln!(out, "    Evidence: {} more places", self.evidence.len() - 3);
         }
     }
-}
-
-/// Where the project declares the pytest-timeout plugin, in a dependency group, an extra or its
-/// runtime dependencies.
-fn timeout_plugin(project: &Project) -> Option<Location> {
-    let groups = project.groups();
-    let runtime = project.runtime_dependencies();
-    groups.iter().chain(runtime.iter()).find_map(|group| {
-        let entry = group.entries("pytest-timeout").next()?;
-        group.location(project, entry)
-    })
 }
 
 fn relative(root: &Path, evidence: Vec<Location>) -> Vec<Location> {

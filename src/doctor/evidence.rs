@@ -1,6 +1,7 @@
 //! Finds the code that makes a conditional decision relevant, with the evidence rules of
-//! `evidence.yml`. A match is a place in a file; what it means for the project stays the
-//! developer's decision, which the record's condition states.
+//! `evidence.yml`, whose ids are the triggers that the catalog's records name. A match is a place
+//! in a file; what it means for the project stays the developer's decision, which the record's
+//! condition states.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

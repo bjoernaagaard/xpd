@@ -23,7 +23,16 @@ use std::process::{Command, ExitCode};
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
-use xpd::doctor::catalog::{self, Catalog, Decision, Target};
+use xpd::doctor::catalog::{self, Catalog, Decision, Kind, Target};
+
+/// The Ruff settings of the profile whose changes name a rule or a selector instead of the
+/// setting: `lint.ignore` and `lint.per-file-ignores`, and `lint.explicit-preview-rules`, which
+/// the plan removes only where a project sets it.
+const PROFILE_SELECTORS: [&str; 3] = [
+    "lint.ignore",
+    "lint.per-file-ignores",
+    "lint.explicit-preview-rules",
+];
 
 fn main() -> ExitCode {
     match run() {
@@ -212,22 +221,37 @@ impl Runner {
                 "[project]\nname = 'example'\nversion = '0.1.0'\n",
                 &[
                     "pytest:--import-mode=importlib",
+                    "pytest:-p no:doctest",
                     "pytest:-ra",
+                    "pytest:filterwarnings",
+                    "pytest:markers",
                     "pytest:strict",
+                    "pytest:timeout",
                 ][..],
             ),
             (
                 "pytest-configured",
                 "[tool.pytest]\nstrict = true\naddopts = ['-rA']\n",
-                &["pytest:--import-mode=importlib"],
+                &[
+                    "pytest:--import-mode=importlib",
+                    "pytest:-p no:doctest",
+                    "pytest:filterwarnings",
+                    "pytest:markers",
+                    "pytest:timeout",
+                ],
             ),
             (
                 "pytest-ini-options",
                 "[tool.pytest.ini_options]\naddopts = '-q --strict-markers'\n",
                 &[
                     "pytest:--import-mode=importlib",
+                    "pytest:--strict-markers",
+                    "pytest:-p no:doctest",
                     "pytest:-ra",
+                    "pytest:filterwarnings",
+                    "pytest:markers",
                     "pytest:strict",
+                    "pytest:timeout",
                 ],
             ),
         ] {
@@ -242,9 +266,13 @@ impl Runner {
             );
             let text = self.doctor_text(&project, &[])?;
             let expected_edit = match name {
-                "pytest-fresh" => r#"+addopts = ["-ra", "--import-mode=importlib"]"#,
-                "pytest-configured" => r#"+addopts = ['-rA', "--import-mode=importlib"]"#,
-                _ => r#"+addopts = "-q --strict-markers -ra --import-mode=importlib""#,
+                "pytest-fresh" => {
+                    r#"+addopts = ["-ra", "--import-mode=importlib", "-p", "no:doctest"]"#
+                }
+                "pytest-configured" => {
+                    r#"+addopts = ['-rA', "--import-mode=importlib", "-p", "no:doctest"]"#
+                }
+                _ => r#"+addopts = "-q -ra --import-mode=importlib -p no:doctest""#,
             };
             self.check(
                 (!text.contains(expected_edit)).then(|| format!("{name}: missing {expected_edit}")),
@@ -330,11 +358,14 @@ impl Runner {
             "doctor text",
             &text,
             &[
-                r#"timeout = "<seconds>""#,
-                r#"+qa = ['pytest', 'pytest-timeout', "pytest-randomly"]"#,
-                "Evidence: pyproject.toml:2 pytest-timeout",
+                r#"pytest timeout: unset -> "60""#,
+                r#"+qa = ['pytest', 'pytest-timeout', "pytest-randomly==5.1.0"]"#,
             ],
-            &["uv add --dev", "pytest plugin pytest-timeout"],
+            &[
+                "uv add --dev",
+                "pytest plugin pytest-timeout",
+                r#"timeout = "<seconds>""#,
+            ],
         );
         Ok(())
     }
@@ -501,12 +532,19 @@ impl Runner {
     }
 
     /// The Ruff and ty records of the profile or the conditional suggestions, each as `tool:id`
-    /// with its record key and whether it suggests a command.
+    /// with its record key and whether it suggests a command. A Ruff rule of the profile is left
+    /// out, since `lint.select` and `lint.ignore` decide it and the plan names the selector it
+    /// changes, and so are the settings whose changes name a rule or a selector.
     fn actionable(&self, decision: Wanted) -> Vec<(String, String, bool)> {
         self.catalog
             .records()
             .iter()
             .filter(|record| record.key.tool != catalog::Tool::Pytest)
+            .filter(|record| {
+                !(record.key.tool == catalog::Tool::Ruff
+                    && (record.key.kind == Kind::Rule
+                        || PROFILE_SELECTORS.contains(&record.key.id.as_str())))
+            })
             .filter_map(|record| {
                 let (wanted, command) = match &record.decision {
                     Decision::Profile => (Wanted::Profile, false),
@@ -528,56 +566,62 @@ impl Runner {
     }
 
     /// The configuration of a project where every profile value and conditional record of the
-    /// catalog is in effect.
-    fn effective_config(&self) -> String {
-        let profiled = |tool| {
-            self.catalog
-                .records()
-                .iter()
-                .filter(move |record| {
-                    record.key.tool == tool && record.decision == Decision::Profile
-                })
-                .map(|record| record.key.id.clone())
-        };
-        let codes: Vec<String> = profiled(catalog::Tool::Ruff)
-            .chain(
-                self.catalog
-                    .suggestions()
-                    .filter_map(|(_, s)| match &s.target {
-                        Target::Select { code, .. } => Some(code.clone()),
-                        _ => None,
-                    }),
-            )
-            .map(|code| format!("\"{code}\""))
-            .collect();
-        let levels: Vec<String> = profiled(catalog::Tool::Ty)
-            .map(|rule| format!("{rule} = \"error\""))
-            .chain(
-                self.catalog
-                    .suggestions()
-                    .filter_map(|(_, s)| match &s.target {
-                        Target::Level { key, level } => Some(format!(
-                            "{} = \"{}\"",
-                            key.trim_start_matches("rules."),
-                            level.name()
-                        )),
-                        _ => None,
-                    }),
-            )
-            .collect();
-        format!(
-            "[project]\nname = \"effective\"\nversion = \"0.1.0\"\ndependencies = [\"pydantic\"]\n\n\
-             [tool.ruff.lint]\npreview = true\nexplicit-preview-rules = true\nselect = [\"E4\", \"TC\", {}]\n\n\
-             [tool.ruff.lint.flake8-tidy-imports]\nban-lazy = \"all\"\n\n\
-             [tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = {{ \"pydantic.BaseModel\" = \"required\" }}\nruntime-evaluated-decorators = {{ \"pydantic.validate_call\" = \"required\" }}\n\n\
-             [tool.ty.rules]\n{}\n\n\
-             [tool.ty.analysis]\nrespect-type-ignore-comments = false\nreturn-type-inference = \"always\"\nstrict-generic-narrowing = true\n\n\
-             [tool.ty.project-manager]\nscript = \"uv\"\n",
-            codes.join(", "),
-            levels.join("\n")
-        )
+    /// catalog is in effect: the `pyproject.toml` that `xpd doctor --apply` writes, with each
+    /// conditional setting added.
+    fn effective_config(&self) -> Result<String> {
+        let applied = self.project(
+            "effective-applied",
+            &[(
+                "pyproject.toml",
+                "[project]\nname = \"effective\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\ndependencies = [\"pydantic\"]\n",
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&applied, &[Bin::Uv], &["--apply", "--kind", "application"])?;
+        if code != 0 {
+            bail!("effective: --apply exits {code}: {err}");
+        }
+        let mut doc: toml_edit::DocumentMut =
+            fs::read_to_string(applied.join("pyproject.toml"))?.parse()?;
+        for (_, suggestion) in self.catalog.suggestions() {
+            let (path, value) = match &suggestion.target {
+                Target::Setting { key, value, .. } => {
+                    let prefix = if key.starts_with("lint.") || key.starts_with("format.") {
+                        "tool.ruff"
+                    } else {
+                        "tool.ty"
+                    };
+                    (
+                        format!("{prefix}.{key}"),
+                        value.parse::<toml_edit::Value>()?,
+                    )
+                }
+                Target::Level { key, level } => (
+                    format!("tool.ty.{key}"),
+                    toml_edit::Value::from(level.name()),
+                ),
+                Target::Select { .. } | Target::Command(_) => continue,
+            };
+            let parts: Vec<&str> = path.split('.').collect();
+            let (key, tables) = parts.split_last().context("a setting has a key")?;
+            let mut table: &mut dyn toml_edit::TableLike = doc.as_table_mut();
+            for part in tables {
+                if !table.contains_key(part) {
+                    table.insert(part, toml_edit::Item::Table(toml_edit::Table::new()));
+                }
+                table = table
+                    .get_mut(part)
+                    .and_then(toml_edit::Item::as_table_like_mut)
+                    .context("a table on the way to a setting")?;
+            }
+            table.insert(key, toml_edit::Item::Value(value));
+        }
+        Ok(doc.to_string())
     }
 
+    /// The profile's values and the conditional records in a project where each applies, one
+    /// where each is in effect, and one without evidence. The first project turns lint preview
+    /// on itself, which the conditional records need, so `lint.preview` is no change there.
     fn grouped(&mut self) -> Result<()> {
         let activation = self.project("activation", &[
             ("pyproject.toml", "[project]\nname = \"activation\"\nversion = \"0.1.0\"\ndependencies = [\"pydantic\"]\n\n[tool.ruff.lint]\npreview = true\nselect = [\"E4\", \"TC\"]\n"),
@@ -591,6 +635,7 @@ impl Runner {
         for (id, key, _) in self
             .actionable(Wanted::Profile)
             .into_iter()
+            .filter(|(id, _, _)| id != "ruff:lint.preview")
             .chain(self.actionable(Wanted::Conditional))
         {
             self.check(
@@ -598,7 +643,7 @@ impl Runner {
             );
         }
 
-        let effective_config = self.effective_config();
+        let effective_config = self.effective_config()?;
         let effective = self.project("effective", &[
             ("pyproject.toml", &effective_config),
             ("typed/ruff.toml", "extend = \"../pyproject.toml\"\n\n[lint]\nextend-select = [\"ANN401\", \"ANN001\"]\n\n[lint.flake8-annotations]\nallow-star-arg-any = false\nignore-fully-untyped = false\n"),
@@ -621,6 +666,8 @@ impl Runner {
             );
         }
 
+        self.enabled_rules(&effective)?;
+
         let quiet = self.project("quiet", &[
             ("pyproject.toml", "[project]\nname = \"quiet\"\nversion = \"0.1.0\"\n\n[tool.ruff.lint]\nselect = [\"E4\"]\n"),
             ("app.py", "def add(x: int, y: int) -> int:\n    return x + y\n"),
@@ -642,6 +689,44 @@ impl Runner {
         Ok(())
     }
 
+    /// The rules that Ruff runs in a project with the profile in effect are the rules whose
+    /// profile record says they are on, so the catalog's reasons describe what Ruff does.
+    fn enabled_rules(&mut self, project: &Path) -> Result<()> {
+        let shown = self
+            .command(&self.ruff, project, &[])?
+            .args(["check", "--show-settings", "app.py"])
+            .output()?;
+        let shown = String::from_utf8_lossy(&shown.stdout);
+        let enabled: BTreeSet<String> = shown
+            .lines()
+            .skip_while(|line| *line != "linter.rules.enabled = [")
+            .skip(1)
+            .take_while(|line| *line != "]")
+            .map(|line| {
+                let line = line.trim().trim_end_matches(',');
+                line.rsplit_once(" (")
+                    .map_or(line, |(_, code)| code.trim_end_matches(')'))
+                    .to_owned()
+            })
+            .collect();
+        let on: BTreeSet<String> = self
+            .catalog
+            .ruff_rules()
+            .filter(|rule| {
+                rule.decision == Decision::Profile && !rule.reason.starts_with("**Off**")
+            })
+            .map(|rule| rule.key.id.clone())
+            .collect();
+        let missing: Vec<&String> = on.difference(&enabled).collect();
+        let extra: Vec<&String> = enabled.difference(&on).collect();
+        self.check(
+            (enabled.is_empty() || !missing.is_empty() || !extra.is_empty()).then(|| {
+                format!("effective: Ruff runs {} rules; on in the catalog only: {missing:?}; run by Ruff only: {extra:?}", enabled.len())
+            }),
+        );
+        Ok(())
+    }
+
     fn named(&mut self) -> Result<()> {
         let both = [Bin::Ruff, Bin::Ty];
 
@@ -650,9 +735,9 @@ impl Runner {
         self.expect_output("performance", "ruff", &ruff, &["RUF017"], &[]);
         let report = self.doctor(&perf, &both)?;
         self.expect(
-            "performance on defaults, which the profile writes down",
+            "performance on defaults, which the profile selects with ALL",
             &report,
-            &["ruff:RUF017"],
+            &["ruff:lint.select"],
             &[],
         );
         fs::write(
@@ -663,7 +748,7 @@ impl Runner {
         self.expect(
             "performance with a narrow select",
             &report,
-            &["ruff:RUF017"],
+            &["ruff:lint.select"],
             &[],
         );
 
@@ -789,12 +874,12 @@ impl Runner {
         self.expect(
             "suppressions",
             &report,
-            &["ruff:PGH003", "ruff:PGH004", "ty:blanket-ignore-comment"],
-            &[],
+            &["ruff:lint.select", "ty:blanket-ignore-comment"],
+            &["ruff:PGH003", "ruff:PGH004"],
         );
         fs::write(
             suppressions.join("pyproject.toml"),
-            "[tool.ruff.lint]\nextend-select = [\"PGH003\", \"PGH004\"]\n\n[tool.ty.rules]\nblanket-ignore-comment = \"error\"\n",
+            "[tool.ruff.lint]\nselect = [\"ALL\"]\n\n[tool.ty.rules]\nblanket-ignore-comment = \"error\"\n",
         )?;
         let ruff = self.checker("ruff", &suppressions, &["."])?;
         self.expect_output("suppressions", "ruff", &ruff, &["PGH004", "PGH003"], &[]);
@@ -811,13 +896,14 @@ impl Runner {
             "suppressions after adoption",
             &report,
             &[],
-            &["ruff:PGH003", "ruff:PGH004", "ty:blanket-ignore-comment"],
+            &["ruff:lint.select", "ty:blanket-ignore-comment"],
         );
 
         Ok(())
     }
 
-    /// Choices that belong to the developer: formatting, and when imports must load.
+    /// Formatting, which the profile sets, and when imports must load, which the developer
+    /// chooses.
     fn policies(&mut self) -> Result<()> {
         let both = [Bin::Ruff, Bin::Ty];
         let format = self.project(
@@ -832,16 +918,18 @@ impl Runner {
         )?;
         let report = self.doctor(&format, &both)?;
         self.expect(
-            "formatting preference",
+            "formatting setting",
             &report,
-            &[],
             &["ruff:format.quote-style"],
+            &[],
         );
-        let advice = format!("{}{}", report["suggestions"], report["policies"]);
-        let changes = report["profile"]["changes"].to_string();
-        self.check(
-            (advice.contains("quote-style") || changes.contains("quote-style"))
-                .then(|| "formatting preference: doctor advises on quote-style".to_owned()),
+        let text = self.doctor_text(&format, &both)?;
+        self.expect_output(
+            "formatting setting",
+            "doctor text",
+            &text,
+            &["ruff format.quote-style: \"single\" -> \"double\", tool.ruff.format.quote-style at line 2"],
+            &[],
         );
 
         let lazy = self.project("lazy", &[("app.py", "__lazy_modules__ = [\"json\"]\nimport json\n\nprint(json.dumps(1))\n"), ("pyproject.toml", "[tool.ruff]\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nextend-select = [\"TID254\"]\n")])?;
@@ -924,17 +1012,22 @@ impl Runner {
             &[],
         );
         let report = self.doctor(&nested, &both)?;
-        self.expect("nested scope", &report, &["ruff:PGH003"], &["ruff:PTH118"]);
+        self.expect(
+            "nested scope",
+            &report,
+            &["ruff:lint.select"],
+            &["ruff:PTH118"],
+        );
         let paths: BTreeSet<&str> = report["profile"]["changes"]
             .as_array()
             .into_iter()
             .flatten()
-            .filter(|c| c["tool"] == "ruff" && c["id"] == "PGH003")
+            .filter(|c| c["tool"] == "ruff" && c["id"] == "lint.select")
             .filter_map(|c| c["path"].as_str())
             .collect();
         self.check(
-            (paths != BTreeSet::from(["tool.ruff.lint.extend-select"]))
-                .then(|| format!("nested scope: PGH003 goes to {paths:?}")),
+            (paths != BTreeSet::from(["tool.ruff.lint.select"]))
+                .then(|| format!("nested scope: the selection goes to {paths:?}")),
         );
         let conflicts = report["profile"]["conflicts"].to_string();
         self.check(
@@ -1051,7 +1144,12 @@ impl Runner {
                         .then(|| format!("{case}: {tool} found is {installed:?}")),
                 );
             }
-            self.expect(case, &report, &["ruff:PTH118", "ty:disjoint-cast"], &[]);
+            self.expect(
+                case,
+                &report,
+                &["ruff:lint.select", "ty:disjoint-cast"],
+                &[],
+            );
         }
         let text = self.doctor_text(&plain, &[])?;
         self.expect_output(
@@ -1091,7 +1189,7 @@ impl Runner {
             ],
             &[],
         );
-        self.expect("ruff 0.17.5", &report, &["ruff:PTH118"], &[]);
+        self.expect("ruff 0.17.5", &report, &["ruff:lint.select"], &[]);
         let statuses: BTreeSet<&str> = report["suggestions"]
             .as_array()
             .into_iter()
@@ -1112,7 +1210,10 @@ impl Runner {
 }
 
 impl Runner {
-    /// Drift, an apply, the empty plan after it, exceptions, and a revision from a newer xpd.
+    /// Drift, an apply, the empty plan after it, the rule names that `ruff check --fix` writes in
+    /// place of codes, exceptions, and a revision from a newer xpd. Ruff checks the scripts alone
+    /// after the apply, since with preview on `RUF201` reports each rule code that the profile's
+    /// selectors in `pyproject.toml` name.
     fn profile(&mut self) -> Result<()> {
         let bins = [Bin::Uv];
         let project = self.project(
@@ -1135,8 +1236,9 @@ impl Runner {
                 ),
                 (
                     "scripts/run.py",
-                    "import os\n\nPATH = os.path.join(\"a\", \"b\")\n",
+                    "\"\"\"Build a path.\"\"\"\n\nimport os\n\nPATH = os.path.join(\"a\", \"b\")\n",
                 ),
+                ("scripts/__init__.py", ""),
             ],
         )?;
         let (code, out, _) = self.doctor_run(&project, &bins, &["--check", "--format", "text"])?;
@@ -1146,8 +1248,8 @@ impl Runner {
             "doctor --check",
             &out,
             &[
-                "-ignore = [\"RUF100\"]\n+ignore = []",
-                "+extend-select = [\"PTH118\", \"PERF101\", \"PERF102\", \"PGH003\", \"PGH004\", \"RUF017\", \"RUF100\"]",
+                "-ignore = [\"RUF100\"]\n+ignore = [\"ANN401\", \"C901\",",
+                "+select = [\"ALL\"]",
                 "ruff RUF100 unused-noqa: off, by tool.ruff.lint.ignore = [\"RUF100\"] -> on",
                 "ruff PTH118 os-path-join: off for scripts/*.py -> on",
                 "uv.lock is missing. --apply runs uv lock.",
@@ -1180,7 +1282,7 @@ impl Runner {
             "doctor --apply",
             &out,
             &[
-                "Applied profile revision 1, kind application, to pyproject.toml.",
+                "Applied profile revision 2, kind application, to pyproject.toml.",
                 "Ran uv lock, which wrote uv.lock.",
             ],
             &["off for scripts/*.py -> on"],
@@ -1192,7 +1294,7 @@ impl Runner {
             &written,
             &[
                 "\"scripts/*.py\" = [\"PTH118\"]",
-                "[tool.xpd.profile]\nrevision = 1\nkind = \"application\"",
+                "[tool.xpd.profile]\nrevision = 2\nkind = \"application\"",
             ],
             &["ignore = [\"RUF100\"]"],
         );
@@ -1206,7 +1308,7 @@ impl Runner {
                 .exists()
                 .then(|| "profile: apply left its journal".to_owned()),
         );
-        let ruff = self.checker("ruff", &project, &["."])?;
+        let ruff = self.checker("ruff", &project, &["scripts"])?;
         self.expect_output(
             "profile apply",
             "ruff",
@@ -1224,7 +1326,7 @@ impl Runner {
             "doctor --check",
             &out,
             &[
-                "The project matches profile revision 1.",
+                "The project matches profile revision 2.",
                 "ruff PTH118 for scripts/*.py: valid",
             ],
             &["---"],
@@ -1233,6 +1335,21 @@ impl Runner {
         self.check(
             (!(code == 0 && out.contains("Nothing to apply")))
                 .then(|| format!("profile: second apply exits {code}:\n{out}")),
+        );
+        let fixed = self
+            .command(&self.ruff, &project, &[Bin::Ruff])?
+            .args(["check", "--fix", "--select", "RUF201", "pyproject.toml"])
+            .output()?;
+        let written = fs::read_to_string(&file)?;
+        self.check(
+            (!(fixed.status.success() && written.contains("\"any-type\"")))
+                .then(|| format!("profile: ruff check --fix left the codes\n{written}")),
+        );
+        let (code, out, _) = self.doctor_run(&project, &bins, &["--check", "--format", "text"])?;
+        self.check(
+            (code != 0).then(|| {
+                format!("profile: --check after Ruff named the rules exits {code}:\n{out}")
+            }),
         );
 
         let before = fs::read_to_string(&file)?;
@@ -1253,7 +1370,7 @@ impl Runner {
                 .then(|| format!("profile: apply with a forbidden exception exits {code}: {err}")),
         );
 
-        fs::write(&file, before.replace("revision = 1", "revision = 99"))?;
+        fs::write(&file, before.replace("revision = 2", "revision = 99"))?;
         let (code, _, err) = self.doctor_run(&project, &bins, &["--apply"])?;
         self.check(
             (!(code == 2 && err.contains("records profile revision 99")))
@@ -1331,11 +1448,24 @@ impl Runner {
             "doctor text",
             &text,
             &[
-                "+[tool.pytest.ini_options]",
-                "+xfail_strict = true",
-                "+addopts = \"-ra --import-mode=importlib --strict-markers --strict-config\"",
+                r#"pin pytest: "pytest==8.4.2" -> "pytest==9.2.0", dependency-groups.dev"#,
+                "+[tool.pytest]\n",
+                "+strict = true",
             ],
-            &["+strict = true", "+[tool.pytest]\n"],
+            &["+[tool.pytest.ini_options]", "+xfail_strict = true"],
+        );
+        let elsewhere = self.project(
+            "pytest-eight-extra",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[project.optional-dependencies]\ntest = [\"pytest==8.4.2\"]\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&elsewhere, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1
+                && out.contains("project.optional-dependencies.test requires \"pytest==8.4.2\", and the profile pins pytest==9.2.0")))
+            .then(|| format!("pytest 8 in an extra: --check exits {code}:\n{out}")),
         );
 
         Ok(())
@@ -1428,8 +1558,12 @@ impl Runner {
             .filter_map(|c| c["path"].as_str().map(str::to_owned))
             .collect();
         self.check(
-            (paths != BTreeSet::from(["project.dependencies".to_owned()]))
-                .then(|| format!("runtime-pytest: plugins go to {paths:?}")),
+            (paths
+                != BTreeSet::from([
+                    "dependency-groups.dev".to_owned(),
+                    "project.dependencies".to_owned(),
+                ]))
+            .then(|| format!("runtime-pytest: plugins go to {paths:?}")),
         );
 
         let comment = self.project(
@@ -1499,7 +1633,7 @@ impl Runner {
             r#"{{"hook_event_name":"Stop","session_id":"baseline","cwd":"{cwd}"}}"#
         ))?;
         self.check(
-            (!session.contains(r#""drift":{"revision":1"#))
+            (!session.contains(r#""drift":{"revision":2"#))
                 .then(|| format!("stop-baseline: the session file holds {session}")),
         );
         self.check(
@@ -1576,8 +1710,10 @@ impl Runner {
         self.check((code != 0).then(|| format!("stale-lock: --apply exits {code}: {err}")));
         let written = fs::read_to_string(&file)?;
         self.check(
-            (!written.contains("[tool.pytest.ini_options]\nxfail_strict = true"))
-                .then(|| format!("stale-lock: the file is\n{written}")),
+            (!(written.contains("\"pytest==9.2.0\"")
+                && written.contains("[tool.pytest]\nstrict = true")
+                && !written.contains("xfail_strict")))
+            .then(|| format!("stale-lock: the file is\n{written}")),
         );
 
         let autoload = self.project(
@@ -1627,11 +1763,12 @@ impl Runner {
         self.check((code != 0).then(|| format!("positional: --apply exits {code}: {err}")));
         let written = fs::read_to_string(positional.join("pyproject.toml"))?;
         self.check(
-            (!written.contains("addopts = \"-q -ra --import-mode=importlib -- tests\""))
-                .then(|| format!("positional: the file is\n{written}")),
+            (!written
+                .contains("addopts = \"-q -ra --import-mode=importlib -p no:doctest -- tests\""))
+            .then(|| format!("positional: the file is\n{written}")),
         );
 
-        let spaced = "addopts = \"  -ra    --import-mode=importlib  \"";
+        let spaced = "addopts = \"  -ra    --import-mode=importlib  -p  no:doctest \"";
         let compliant = self.project(
             "spaced",
             &[(

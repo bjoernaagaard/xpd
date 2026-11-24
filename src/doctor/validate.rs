@@ -272,6 +272,11 @@ fn check_array(
                     Some(format!(
                         "{shown} names {selector}, which is no rule selector of Ruff {release}, so Ruff stops with an error. Remove it, or name a code or prefix of Ruff {release}."
                     ))
+                } else if catalog.ruff_code(target) != target && !preview(doc) {
+                    Some(format!(
+                        "{shown} names the rule {selector} by its name, which Ruff {release} reads only in preview mode, so Ruff stops with an error. Name its code, {}, or turn preview on.",
+                        catalog.ruff_code(target)
+                    ))
                 } else if removed == Removed::Rejected
                     && rules
                         .iter()
@@ -289,6 +294,18 @@ fn check_array(
             found.push(Problem { line, message });
         }
     }
+}
+
+/// Whether `doc` turns Ruff's preview mode on for the linter, in `lint.preview` or else in the
+/// top-level `preview`.
+fn preview(doc: &Toml) -> bool {
+    [
+        &["tool", "ruff", "lint", "preview"][..],
+        &["tool", "ruff", "preview"],
+    ]
+    .into_iter()
+    .find_map(|path| toml::get(doc, path).and_then(Item::as_bool))
+    .unwrap_or(false)
 }
 
 /// Whether uv may fetch the pinned Ruff from the network when its cache lacks it.

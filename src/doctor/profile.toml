@@ -1,14 +1,16 @@
-schema = 1
-revision = 1
+schema = 2
+revision = 2
 summary = "The setup that xpd doctor holds a Python project to. Each value is explained by the record of the same id in decisions.jsonl."
 
 [pins]
 ruff = "0.17.4"
 ty = "0.0.106"
 pytest = "9.2.0"
+pytest-timeout = "2.4.0"
+pytest-randomly = "5.1.0"
 
 [dev]
-pins = ["ruff", "ty"]
+pins = ["pytest", "pytest-timeout", "pytest-randomly", "ruff", "ty"]
 
 [kinds.library]
 summary = "A package that others install. It keeps its build backend, and uv.lock locks its development environment."
@@ -49,27 +51,116 @@ files = []
 [files]
 
 [ruff]
-rules = ["PTH118", "PERF101", "PERF102", "PGH003", "PGH004", "RUF017", "RUF100"]
+select = ["ALL"]
+ignore = [
+    "ANN401",
+    "C901",
+    "COM812",
+    "COM819",
+    "CPY",
+    "D1",
+    "D203",
+    "D206",
+    "D300",
+    "E111",
+    "E114",
+    "E117",
+    "E501",
+    "EM",
+    "FBT003",
+    "ISC001",
+    "ISC002",
+    "PLR0912",
+    "PLR0913",
+    "PLR0917",
+    "PLR2004",
+    "Q",
+    "TC",
+    "TD",
+    "TRY003",
+    "W191",
+]
+off = ["lint.explicit-preview-rules"]
+convention-off = ["D212", "D213", "D214", "D215", "D404", "D405", "D406", "D407", "D408", "D409", "D410", "D411", "D413", "D415", "D416", "D417", "D420"]
+
+[ruff.per-file-ignores]
+"test_*.py" = ["S101"]
+"*_test.py" = ["S101"]
+"e2e/test_*.py" = ["S101", "INP001"]
+"py/*.py" = ["INP001", "T201"]
+
+[ruff.banned-api]
+flaky = "Fix the flaky test or remove it and record why."
+mock = "Exercise the real code with controlled input and real dependencies."
+"pytest.mark.flaky" = "Fix the flaky test or remove it and record why."
+"pytest.mark.repeat" = "Run the test once and fix the cause of any instability."
+"pytest.mark.skip" = "Fix or remove the test, or use a conditional skip for an unsupported platform or unavailable required resource."
+"pytest.skip" = "Fix or remove the test, or use a conditional skip for an unsupported platform or unavailable required resource."
+pytest_mock = "Exercise the real code with controlled input and real dependencies."
+pytest_socket = "Exercise the real configured service when the flow requires a network connection."
+toml = "Use tomllib for TOML reads and an approved writer for TOML writes."
+tomli = "Use the standard library tomllib to read TOML."
+"typing.cast" = "Fix the type at its source or narrow it with a runtime check."
+"typing_extensions.cast" = "Fix the type at its source or narrow it with a runtime check."
+unittest = "Use pytest for a real end-to-end, property, or differential test."
+"unittest.mock" = "Exercise the real code with controlled input and real dependencies."
+
+[ruff.settings]
+required-version = "==0.17.4"
+preview = true
+line-length = 100
+indent-width = 4
+fix = false
+unsafe-fixes = false
+force-exclude = true
+respect-gitignore = true
+
+[ruff.settings.lint]
+preview = true
+future-annotations = false
+flake8-implicit-str-concat.allow-multiline = true
+flake8-tidy-imports.ban-relative-imports = "all"
+flake8-type-checking.strict = false
+flake8-type-checking.quote-annotations = false
+pydocstyle.convention = "pep257"
+
+[ruff.settings.format]
+preview = true
+quote-style = "double"
+indent-style = "space"
+nested-string-quote-style = "alternating"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
 
 [ty.rules]
 blanket-ignore-comment = "error"
 disjoint-cast = "error"
+missing-direct-dependency = "error"
 missing-type-argument = "warn"
+unused-ignore-comment = "error"
+
+[ty.settings]
+analysis.respect-type-ignore-comments = false
+terminal.error-on-warning = false
 
 [pytest]
-settings = { strict = true }
-addopts = ["-ra", "--import-mode=importlib"]
+settings = { strict = true, timeout = "60", markers = ["e2e: drives a full user flow"], filterwarnings = ["error"] }
+addopts = ["-ra", "--import-mode=importlib", "-p no:doctest"]
 plugins = ["pytest-timeout", "pytest-randomly"]
 
 [pytest.before-9]
-settings = { xfail_strict = true }
-addopts = ["-ra", "--import-mode=importlib", "--strict-markers", "--strict-config"]
+settings = { xfail_strict = true, timeout = "60", markers = ["e2e: drives a full user flow"], filterwarnings = ["error"] }
+addopts = ["-ra", "--import-mode=importlib", "-p no:doctest", "--strict-markers", "--strict-config"]
 
 [pytest.forbid]
-addopts = ["--reruns", "--reruns-delay"]
+addopts = ["--reruns", "--reruns-delay", "--count", "--repeat-scope", "--allow-hosts", "--cov", "--cov-fail-under", "-n", "--dist", "--doctest-glob"]
+switches = ["--disable-socket", "--force-enable-socket", "--allow-unix-socket", "--disable-warnings", "--disable-pytest-warnings", "--strict-markers", "--strict-config", "--snapshot-update", "--doctest-modules"]
+disabled = ["warnings"]
 settings = ["reruns", "reruns_delay"]
 false = ["strict_config", "strict_markers", "strict_parametrization_ids", "strict_xfail", "xfail_strict"]
-plugins = ["pytest-rerunfailures", "flaky", "pytest-mock"]
+plugins = ["pytest-rerunfailures", "flaky", "pytest-mock", "pytest-repeat", "pytest-socket", "mock"]
 
 [pytest.plugin-names]
 pytest-timeout = ["timeout", "pytest_timeout"]
@@ -77,3 +168,6 @@ pytest-randomly = ["randomly", "pytest_randomly"]
 pytest-rerunfailures = ["rerunfailures", "pytest_rerunfailures"]
 flaky = ["flaky"]
 pytest-mock = ["pytest_mock"]
+pytest-repeat = ["repeat", "pytest_repeat"]
+pytest-socket = ["socket", "pytest_socket"]
+mock = ["mock"]

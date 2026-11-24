@@ -212,22 +212,7 @@ pub(crate) fn compute(
         .flatten()
         .unwrap_or_default();
     let suggestion = suggest_kind(original.as_ref(), root, files);
-    let (kind, kind_from) = match (request.kind, &record.kind) {
-        (Some(kind), _) => (Some(kind.to_owned()), Some("flag")),
-        (None, Some(kind)) => (Some(kind.clone()), Some("record")),
-        (None, None) => (
-            suggestion.as_ref().map(|(kind, _)| (*kind).to_owned()),
-            suggestion.as_ref().map(|_| "suggestion"),
-        ),
-    };
-    if let Some(kind) = &kind
-        && profile.kind(kind).is_none()
-    {
-        bail!(
-            "{kind} is no kind of the profile. The kinds are {}",
-            profile.kind_names().join(", ")
-        );
-    }
+    let (kind, kind_from) = choose_kind(request.kind, &record, suggestion.as_ref(), profile)?;
     let mut doc: DocumentMut = before
         .as_deref()
         .unwrap_or_default()
@@ -258,17 +243,23 @@ pub(crate) fn compute(
         owned: Vec::new(),
         rejected: false,
     };
-    let mut facts = pytest_facts(root, original.as_ref());
-    if let Some(kind) = plan.kind.as_deref().and_then(|kind| profile.kind(kind))
-        && kind.tool_only
-    {
-        facts.lists = false;
-    }
+    let facts = planned_facts(
+        pytest_facts(root, original.as_ref()),
+        profile,
+        plan.kind.as_deref(),
+    );
     let values = profile.values(plan.kind.as_deref());
     plan.locations(root, original.as_ref(), profile);
     plan.layout(original.as_ref(), profile, files);
     plan.reject(original.as_ref(), catalog);
-    let accepted = plan.judge(&values, &profile.forbid, facts, &record.exceptions);
+    let required = values.ruff.required(catalog);
+    let accepted = plan.judge(
+        &values,
+        &required,
+        &profile.forbid,
+        facts,
+        &record.exceptions,
+    );
     let mut edits = Edits {
         doc: &mut doc,
         original: original.as_ref(),
@@ -276,14 +267,14 @@ pub(crate) fn compute(
         catalog,
         plan: &mut plan,
     };
-    edits.ruff(&values, &accepted);
+    edits.ruff(&values, &required, &accepted);
     edits.ty(&values, &accepted);
-    let plugins = edits.pytest(&values, &profile.forbid, facts, &accepted);
-    let dependencies = plugins.or(edits.pins(&profile.dev_pins, facts));
+    let pins = edits.pins(&profile.dev_pins, facts);
+    let dependencies = pins.or(edits.pytest(&values, profile, facts, &accepted));
     if request.stamp {
         edits.stamp(profile, &record);
     }
-    edits.verify(&values, &accepted);
+    edits.verify(&required, &accepted);
     plan.after = doc.to_string();
     plan.owned_files(root, profile)?;
     plan.locks(root, profile, files, dependencies);
@@ -329,6 +320,55 @@ fn pytest_facts(root: &Path, doc: Option<&Toml>) -> PytestFacts {
         uses: !declared.is_empty() || installed.is_some(),
         lists: true,
     }
+}
+
+/// The kind of the project, and where it comes from: the command line, the project's record or
+/// doctor's suggestion.
+fn choose_kind(
+    flag: Option<&str>,
+    record: &profile::Record,
+    suggestion: Option<&(&'static str, String)>,
+    profile: &Profile,
+) -> Result<(Option<String>, Option<&'static str>)> {
+    let (kind, from) = match (flag, &record.kind) {
+        (Some(kind), _) => (Some(kind.to_owned()), Some("flag")),
+        (None, Some(kind)) => (Some(kind.clone()), Some("record")),
+        (None, None) => (
+            suggestion.map(|(kind, _)| (*kind).to_owned()),
+            suggestion.map(|_| "suggestion"),
+        ),
+    };
+    if let Some(kind) = &kind
+        && profile.kind(kind).is_none()
+    {
+        bail!(
+            "{kind} is no kind of the profile. The kinds are {}",
+            profile.kind_names().join(", ")
+        );
+    }
+    Ok((kind, from))
+}
+
+/// The pytest facts once the plan is written: a kind that keeps `pyproject.toml` to tool settings
+/// gets no dependency, and a kind that gets the profile's pin of pytest uses that release.
+fn planned_facts(mut facts: PytestFacts, profile: &Profile, kind: Option<&str>) -> PytestFacts {
+    if kind
+        .and_then(|kind| profile.kind(kind))
+        .is_some_and(|kind| kind.tool_only)
+    {
+        facts.lists = false;
+    }
+    if facts.lists
+        && let Some(pinned) = profile
+            .dev_pins
+            .iter()
+            .find(|(name, _)| name == "pytest")
+            .and_then(|(_, version)| version.parse::<crate::version::Version>().ok())
+    {
+        facts.release = pytest::release(Some(&pinned));
+        facts.uses = true;
+    }
+    facts
 }
 
 impl Plan {
@@ -683,19 +723,21 @@ impl Plan {
     fn judge(
         &mut self,
         values: &Values,
+        required: &[String],
         forbid: &profile::PytestForbid,
         facts: PytestFacts,
         exceptions: &[Exception],
     ) -> Vec<Exception> {
         let mut accepted: Vec<Exception> = Vec::new();
         for exception in exceptions {
-            let (status, message) = match verdict(values, forbid, facts, exception, &accepted) {
-                Ok(()) => {
-                    accepted.push(exception.clone());
-                    ("valid", None)
-                }
-                Err((status, message)) => (status, Some(message)),
-            };
+            let (status, message) =
+                match verdict(values, required, forbid, facts, exception, &accepted) {
+                    Ok(()) => {
+                        accepted.push(exception.clone());
+                        ("valid", None)
+                    }
+                    Err((status, message)) => (status, Some(message)),
+                };
             self.exceptions.push(ExceptionState {
                 tool: exception.tool.clone(),
                 id: exception.id.clone(),
@@ -1046,6 +1088,7 @@ impl Plan {
 /// release it gets, and the exceptions accepted before it.
 fn verdict(
     values: &Values,
+    required: &[String],
     forbid: &profile::PytestForbid,
     facts: PytestFacts,
     exception: &Exception,
@@ -1067,13 +1110,16 @@ fn verdict(
             ));
         }
     };
-    if tool == Tool::Pytest && forbid.forbids(id) {
+    let wanted = [&values.pytest, &values.pytest_before_nine]
+        .into_iter()
+        .any(|wanted| wanted.addopts.iter().any(|arg| arg == id));
+    if tool == Tool::Pytest && forbid.forbids(id) && !wanted {
         return invalid(format!(
             "the profile removes {id} from every project, and no exception keeps it"
         ));
     }
     match tool {
-        Tool::Ruff if !values.ruff_rules.iter().any(|code| code == id) => {
+        Tool::Ruff if !required.iter().any(|code| code == id) => {
             return Err(("orphaned", orphaned(&exception.tool, id)));
         }
         Tool::Ty if !values.ty_rules.iter().any(|(rule, _)| rule == id) => {
@@ -1555,55 +1601,26 @@ impl Edits<'_> {
         found
     }
 
-    /// Every rule of the profile runs, outside the files and rules that exceptions name.
-    fn ruff(&mut self, values: &Values, accepted: &[Exception]) {
+    /// The Ruff settings, selection, ignores and banned APIs of the profile. Every rule of the
+    /// profile runs, outside the files and rules that the profile's reasons and the project's
+    /// exceptions name.
+    fn ruff(&mut self, values: &Values, required: &[String], accepted: &[Exception]) {
+        let wanted = &values.ruff;
+        self.ruff_select(&wanted.select);
         let ruff_exceptions = || accepted.iter().filter(|exception| exception.tool == "ruff");
         let whole: BTreeSet<&str> = ruff_exceptions()
             .filter(|exception| exception.files.is_empty())
             .map(|exception| exception.id.as_str())
             .collect();
-        let required: Vec<&String> = values
-            .ruff_rules
+        let required: Vec<&String> = required
             .iter()
             .filter(|code| !whole.contains(code.as_str()))
             .collect();
-        let (enabled, ignored) = self.resolve();
-        let mut off = Vec::new();
-        for code in &required {
-            if enabled.contains(*code) {
-                continue;
-            }
-            let removed = self.unselect(code, &["ignore", "extend-ignore"]);
-            let old = ignored
-                .get(*code)
-                .map_or_else(|| "off".to_owned(), |at| format!("off, by {}", at.text));
-            off.push(((*code).clone(), old, removed));
-        }
-        let (enabled, _) = self.resolve();
-        for (code, old, removed) in off {
-            let path: Vec<String> = if enabled.contains(&code) {
-                removed.into_iter().next().unwrap_or_default()
-            } else {
-                if let Some(array) = edit::array(self.doc, RUFF_LINT, "extend-select") {
-                    edit::push(array, &code);
-                }
-                ["tool", "ruff", "lint", "extend-select"]
-                    .map(str::to_owned)
-                    .to_vec()
-            };
-            let path: Vec<&str> = path.iter().map(String::as_str).collect();
-            let item = self.rule_name(&code);
-            let explained = self.explain(Tool::Ruff, &code);
-            self.change(
-                ("ruff", &code),
-                item,
-                &path,
-                old,
-                "on".to_owned(),
-                explained,
-            );
-        }
-        self.per_file(&required, accepted);
+        self.ruff_ignore(wanted, &required);
+        self.settings(Tool::Ruff, &["tool", "ruff"], &wanted.settings);
+        self.ruff_off(&wanted.off);
+        self.per_file(wanted, &required, accepted);
+        self.banned_api(&wanted.banned_api);
         for exception in ruff_exceptions().filter(|exception| exception.files.is_empty()) {
             let (enabled, _) = self.resolve();
             if !enabled.contains(&exception.id) {
@@ -1635,9 +1652,268 @@ impl Edits<'_> {
         }
     }
 
-    /// Per-file ignores of the profile's rules go, except those that exceptions record, and each
-    /// exception for some files gets its per-file ignore.
-    fn per_file(&mut self, required: &[&String], accepted: &[Exception]) {
+    /// Each setting of `wanted` holds the profile's value in the table at `table`. A lint
+    /// setting of Ruff counts at its old place at the top of `[tool.ruff]` too, which the `lint`
+    /// table overrides.
+    fn settings(&mut self, tool: Tool, table: &[&str], wanted: &[profile::Setting]) {
+        let current = self.current();
+        let prefix = if tool == Tool::Ty { "tool.ty." } else { "" };
+        for setting in wanted {
+            let path: Vec<&str> = table
+                .iter()
+                .copied()
+                .chain(setting.path.iter().map(String::as_str))
+                .collect();
+            let mut places = vec![path.clone()];
+            if tool == Tool::Ruff && setting.path.first().is_some_and(|part| part == "lint") {
+                places.push(
+                    path.iter()
+                        .copied()
+                        .filter(|part| *part != "lint")
+                        .collect(),
+                );
+            }
+            let found = places
+                .iter()
+                .find_map(|place| toml::get(&current, place).map(|item| (place, item)));
+            let value = toml::Observed::of_value(&setting.value);
+            if found
+                .and_then(|(_, item)| toml::Observed::of_item(item))
+                .as_ref()
+                == Some(&value)
+            {
+                continue;
+            }
+            let old = found
+                .and_then(|(place, item)| {
+                    let span = item.span()?;
+                    let text = current.raw().get(span)?;
+                    Some(if place.len() == path.len() {
+                        text.to_owned()
+                    } else {
+                        format!("{text}, at {}", dotted(place))
+                    })
+                })
+                .unwrap_or_else(|| "unset".to_owned());
+            let Some((key, parent)) = path.split_last() else {
+                continue;
+            };
+            edit::set(self.doc, parent, key, setting.value.clone());
+            let id = profile::option(self.catalog, tool, prefix, &setting.path)
+                .unwrap_or_else(|_| setting.dotted());
+            let explained = self.explain(tool, &id);
+            self.change(
+                (tool.name(), &id),
+                format!("{} {}", tool.name(), setting.dotted()),
+                &path,
+                old,
+                setting.value.to_string().trim().to_owned(),
+                explained,
+            );
+        }
+    }
+
+    /// Removes each Ruff setting of `off` that the project sets to `true`.
+    fn ruff_off(&mut self, off: &[Vec<String>]) {
+        for path in off {
+            let canonical: Vec<&str> = ["tool", "ruff"]
+                .into_iter()
+                .chain(path.iter().map(String::as_str))
+                .collect();
+            let legacy: Vec<&str> = canonical
+                .iter()
+                .copied()
+                .filter(|part| *part != "lint")
+                .collect();
+            for place in [canonical, legacy] {
+                let on = toml::get(&self.current(), &place)
+                    .and_then(Item::as_bool)
+                    .unwrap_or(false);
+                let Some((key, parent)) = place.split_last() else {
+                    continue;
+                };
+                if !on || !edit::remove(self.doc, parent, key) {
+                    continue;
+                }
+                let id = profile::option(self.catalog, Tool::Ruff, "", path)
+                    .unwrap_or_else(|_| path.join("."));
+                let explained = self.explain(Tool::Ruff, &id);
+                self.change(
+                    ("ruff", &id),
+                    format!("ruff {}", path.join(".")),
+                    &place,
+                    "true".to_owned(),
+                    "removed".to_owned(),
+                    explained,
+                );
+            }
+        }
+    }
+
+    /// `lint.select` holds every selector of the profile's selection, or else becomes it. The
+    /// old `select` at the top of `[tool.ruff]` goes, so that one selection applies.
+    fn ruff_select(&mut self, select: &[String]) {
+        if select.is_empty() {
+            return;
+        }
+        let current = self.current();
+        let canonical = ["tool", "ruff", "lint", "select"];
+        let legacy = ["tool", "ruff", "select"];
+        let held = |path: &[&str]| -> Option<Vec<String>> {
+            let array = toml::get(&current, path)?.as_array()?;
+            Some(
+                array
+                    .iter()
+                    .filter_map(|value| value.as_str().map(str::to_owned))
+                    .collect(),
+            )
+        };
+        let (path, old): (&[&str], Option<Vec<String>>) = match held(&canonical) {
+            Some(old) => (&canonical, Some(old)),
+            None => match held(&legacy) {
+                Some(old) => (&legacy, Some(old)),
+                None => (&canonical, None),
+            },
+        };
+        if old
+            .as_ref()
+            .is_some_and(|old| select.iter().all(|selector| old.contains(selector)))
+        {
+            return;
+        }
+        if path == legacy {
+            edit::remove(self.doc, &legacy[..2], "select");
+        }
+        let value = Value::Array(select.iter().map(String::as_str).collect());
+        edit::set(self.doc, RUFF_LINT, "select", value);
+        let shown = |items: &[String]| {
+            format!(
+                "[{}]",
+                items
+                    .iter()
+                    .map(|item| format!("{item:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        let explained = self.explain(Tool::Ruff, "lint.select");
+        self.change(
+            ("ruff", "lint.select"),
+            "ruff lint.select".to_owned(),
+            path,
+            old.as_deref().map_or_else(|| "unset".to_owned(), shown),
+            shown(select),
+            explained,
+        );
+    }
+
+    /// The rules of `required` that `selector` turns off, in the preview mode of the edits so far.
+    fn turned_off(&self, selector: &str, required: &[&String]) -> Vec<String> {
+        let Some(selector) = self.catalog.redirect(selector) else {
+            return Vec::new();
+        };
+        self.catalog
+            .ruff_rules()
+            .filter(|rule| required.contains(&&rule.key.id))
+            .filter(|rule| ruff::selects(selector, rule))
+            .map(|rule| rule.key.id.clone())
+            .collect()
+    }
+
+    /// A selector of `ignore` or `extend-ignore` that turns off a rule of the profile goes, and
+    /// each selector of the profile's ignore list that the project lacks comes.
+    fn ruff_ignore(&mut self, wanted: &profile::RuffWanted, required: &[&String]) {
+        let mut held: BTreeSet<String> = BTreeSet::new();
+        for table in RUFF_TABLES {
+            for key in ["ignore", "extend-ignore"] {
+                let mut path: Vec<&str> = table.to_vec();
+                path.push(key);
+                let selectors: Vec<(usize, String)> = edit::existing(self.doc, table)
+                    .and_then(|table| table.get(key))
+                    .and_then(Item::as_array)
+                    .map(edit::strings)
+                    .unwrap_or_default();
+                let mut drop = Vec::new();
+                for (index, selector) in selectors {
+                    let off = self.turned_off(&selector, required);
+                    if off.is_empty() {
+                        held.insert(self.catalog.ruff_code(&selector).to_owned());
+                        continue;
+                    }
+                    drop.push(index);
+                    let shown = format!("{} = [\"{selector}\"]", dotted(&path));
+                    let exact = off.len() == 1 && off[0] == self.catalog.ruff_code(&selector);
+                    let (item, old, new, explained) = if exact {
+                        (
+                            self.rule_name(&off[0]),
+                            format!("off, by {shown}"),
+                            "on".to_owned(),
+                            self.explain(Tool::Ruff, &off[0]),
+                        )
+                    } else {
+                        (
+                            format!("ruff {selector}"),
+                            format!(
+                                "turns off {} rules of the profile, such as {}",
+                                off.len(),
+                                off[0]
+                            ),
+                            "removed".to_owned(),
+                            self.explain(Tool::Ruff, "lint.ignore"),
+                        )
+                    };
+                    self.change(("ruff", &selector), item, &path, old, new, explained);
+                }
+                if let Some(array) = edit::existing(self.doc, table)
+                    .and_then(|table| table.get_mut(key))
+                    .and_then(Item::as_array_mut)
+                {
+                    edit::remove_items(array, &drop);
+                }
+            }
+        }
+        let mut path: Vec<&str> = RUFF_LINT.to_vec();
+        path.push("ignore");
+        for selector in &wanted.ignore {
+            if held.contains(selector) {
+                continue;
+            }
+            if let Some(array) = edit::array(self.doc, RUFF_LINT, "ignore") {
+                edit::push(array, selector);
+            }
+            let explained = self.explain_ignore(selector);
+            self.change(
+                ("ruff", selector),
+                format!("ruff {selector}"),
+                &path,
+                "absent".to_owned(),
+                "present".to_owned(),
+                explained,
+            );
+        }
+    }
+
+    /// The reason and source of the rules that the profile's ignore selector `selector` turns
+    /// off, which share one reason.
+    fn explain_ignore(&self, selector: &str) -> (String, String) {
+        self.catalog
+            .ruff_rules()
+            .find(|rule| ruff::selects(selector, rule))
+            .map_or_else(
+                || self.explain(Tool::Ruff, "lint.ignore"),
+                |rule| self.explain(Tool::Ruff, &rule.key.id),
+            )
+    }
+
+    /// A per-file ignore that turns off a rule of the profile for a file pattern goes, unless the
+    /// profile or an exception keeps that rule off for that pattern. Then each per-file ignore of
+    /// the profile and of an exception comes.
+    fn per_file(
+        &mut self,
+        wanted: &profile::RuffWanted,
+        required: &[&String],
+        accepted: &[Exception],
+    ) {
         let scoped: BTreeSet<(&str, &str)> = accepted
             .iter()
             .filter(|exception| exception.tool == "ruff")
@@ -1647,7 +1923,22 @@ impl Edits<'_> {
                     .iter()
                     .map(|pattern| (exception.id.as_str(), pattern.as_str()))
             })
+            .chain(wanted.per_file_ignores.iter().flat_map(|(pattern, codes)| {
+                codes.iter().map(|code| (code.as_str(), pattern.as_str()))
+            }))
             .collect();
+        let covered = self.drop_per_file(required, &scoped);
+        self.add_per_file(wanted, accepted, covered);
+    }
+
+    /// Removes each selector of a per-file ignore that turns off a rule of `required` for its
+    /// pattern, unless `scoped` keeps that rule off for that pattern. Returns each selector and
+    /// pattern that stays.
+    fn drop_per_file(
+        &mut self,
+        required: &[&String],
+        scoped: &BTreeSet<(&str, &str)>,
+    ) -> BTreeSet<(String, String)> {
         let mut covered: BTreeSet<(String, String)> = BTreeSet::new();
         for table in RUFF_TABLES {
             for key in ["per-file-ignores", "extend-per-file-ignores"] {
@@ -1664,14 +1955,43 @@ impl Edits<'_> {
                     })
                     .unwrap_or_default();
                 for (pattern, selectors) in patterns {
-                    let drop = self.per_file_pattern(
-                        &path,
-                        &pattern,
-                        &selectors,
-                        required,
-                        &scoped,
-                        &mut covered,
-                    );
+                    let mut full = path.clone();
+                    full.push(&pattern);
+                    let mut drop = Vec::new();
+                    for (index, selector) in &selectors {
+                        let off: Vec<String> = self
+                            .turned_off(selector, required)
+                            .into_iter()
+                            .filter(|code| !scoped.contains(&(code.as_str(), pattern.as_str())))
+                            .collect();
+                        if off.is_empty() {
+                            let code = self.catalog.ruff_code(selector).to_owned();
+                            covered.insert((code, pattern.clone()));
+                            continue;
+                        }
+                        drop.push(*index);
+                        let exact = off.len() == 1 && off[0] == self.catalog.ruff_code(selector);
+                        let (item, old, new, explained) = if exact {
+                            (
+                                self.rule_name(&off[0]),
+                                format!("off for {pattern}"),
+                                "on".to_owned(),
+                                self.explain(Tool::Ruff, &off[0]),
+                            )
+                        } else {
+                            (
+                                format!("ruff {selector}"),
+                                format!(
+                                    "turns off {} rules of the profile for {pattern}, such as {}",
+                                    off.len(),
+                                    off[0]
+                                ),
+                                "removed".to_owned(),
+                                self.explain(Tool::Ruff, "lint.per-file-ignores"),
+                            )
+                        };
+                        self.change(("ruff", selector), item, &full, old, new, explained);
+                    }
                     if drop.is_empty() {
                         continue;
                     }
@@ -1691,94 +2011,97 @@ impl Edits<'_> {
                 }
             }
         }
-        for exception in accepted.iter().filter(|exception| exception.tool == "ruff") {
-            for pattern in &exception.files {
-                if covered.contains(&(exception.id.clone(), pattern.clone())) {
-                    continue;
-                }
-                let mut path: Vec<&str> = RUFF_LINT.to_vec();
-                path.push("per-file-ignores");
-                if let Some(array) = edit::array(self.doc, &path, pattern) {
-                    edit::push(array, &exception.id);
-                }
-                path.push(pattern);
-                let item = self.rule_name(&exception.id);
-                let explained = (exception.reason.clone(), DOCS.to_owned());
-                self.change(
-                    ("ruff", &exception.id),
-                    item,
-                    &path,
-                    "on".to_owned(),
-                    format!("off for {pattern}, by an exception"),
-                    explained,
-                );
+        covered
+    }
+
+    /// Adds each per-file ignore of the profile and of an exception that `covered` lacks.
+    fn add_per_file(
+        &mut self,
+        wanted: &profile::RuffWanted,
+        accepted: &[Exception],
+        mut covered: BTreeSet<(String, String)>,
+    ) {
+        let profile_ignores = wanted.per_file_ignores.iter().flat_map(|(pattern, codes)| {
+            codes
+                .iter()
+                .map(move |code| (code.clone(), pattern.clone(), None))
+        });
+        let exceptions = accepted
+            .iter()
+            .filter(|exception| exception.tool == "ruff")
+            .flat_map(|exception| {
+                exception.files.iter().map(move |pattern| {
+                    (
+                        exception.id.clone(),
+                        pattern.clone(),
+                        Some(exception.reason.clone()),
+                    )
+                })
+            });
+        let wanted: Vec<(String, String, Option<String>)> =
+            profile_ignores.chain(exceptions).collect();
+        for (code, pattern, reason) in wanted {
+            if !covered.insert((code.clone(), pattern.clone())) {
+                continue;
             }
+            let mut path: Vec<&str> = RUFF_LINT.to_vec();
+            path.push("per-file-ignores");
+            if let Some(array) = edit::array(self.doc, &path, &pattern) {
+                edit::push(array, &code);
+            }
+            path.push(&pattern);
+            let item = self.rule_name(&code);
+            let (new, explained) = match reason {
+                Some(reason) => (
+                    format!("off for {pattern}, by an exception"),
+                    (reason, DOCS.to_owned()),
+                ),
+                None => (
+                    format!("off for {pattern}"),
+                    self.explain(Tool::Ruff, "lint.per-file-ignores"),
+                ),
+            };
+            self.change(
+                ("ruff", &code),
+                item,
+                &path,
+                "on".to_owned(),
+                new,
+                explained,
+            );
         }
     }
 
-    /// What the per-file ignore `pattern` of the table at `path`, with its `selectors`, does to
-    /// the `required` rules. Returns the indexes of the selectors to drop, records a conflict for
-    /// a selector that turns a rule off as part of a group, and adds each pattern that an
-    /// exception keeps to `covered`.
-    fn per_file_pattern(
-        &mut self,
-        path: &[&str],
-        pattern: &str,
-        selectors: &[(usize, String)],
-        required: &[&String],
-        scoped: &BTreeSet<(&str, &str)>,
-        covered: &mut BTreeSet<(String, String)>,
-    ) -> Vec<usize> {
-        let mut drop = Vec::new();
-        let mut full = path.to_vec();
-        full.push(pattern);
-        for code in required {
-            let Some(rule) = self.catalog.ruff_rules().find(|rule| rule.key.id == **code) else {
-                continue;
-            };
-            let matching: Vec<&(usize, String)> = selectors
-                .iter()
-                .filter(|(_, selector)| {
-                    self.catalog
-                        .redirect(selector)
-                        .is_some_and(|selector| ruff::selects(selector, rule))
-                })
-                .collect();
-            if matching.is_empty() {
+    /// Each API of `bans` is an entry of `banned-api`. An entry the project has keeps its own
+    /// message, and a new entry gets the profile's.
+    fn banned_api(&mut self, bans: &[(String, String)]) {
+        let table = ["tool", "ruff", "lint", "flake8-tidy-imports", "banned-api"];
+        let legacy = ["tool", "ruff", "flake8-tidy-imports", "banned-api"];
+        let current = self.current();
+        let has = |path: &[&str], name: &str| {
+            toml::get(&current, path)
+                .and_then(Item::as_table_like)
+                .is_some_and(|table| table.contains_key(name))
+        };
+        let (_, source) = self.explain(Tool::Ruff, "lint.flake8-tidy-imports.banned-api");
+        for (name, message) in bans {
+            if has(&table, name) || has(&legacy, name) {
                 continue;
             }
-            if scoped.contains(&(code.as_str(), pattern)) {
-                covered.insert(((*code).clone(), pattern.to_owned()));
-                continue;
-            }
-            let mut exact = false;
-            for (index, selector) in matching {
-                if self.catalog.redirect(selector) == Some(code.as_str()) {
-                    drop.push(*index);
-                    exact = true;
-                } else {
-                    let line = self.line(&full);
-                    self.plan.conflict(
-                        PYPROJECT,
-                        line,
-                        format!("{} turns {code} off for {pattern} through {selector}. Record a Ruff exception for {code} and {pattern}, or name codes that leave {code} on.", dotted(path)),
-                    );
-                }
-            }
-            if exact {
-                let item = self.rule_name(code);
-                let explained = self.explain(Tool::Ruff, code);
-                self.change(
-                    ("ruff", code),
-                    item,
-                    &full,
-                    format!("off for {pattern}"),
-                    "on".to_owned(),
-                    explained,
-                );
-            }
+            let mut entry = toml_edit::InlineTable::new();
+            entry.insert("msg", Value::from(message.as_str()));
+            edit::set(self.doc, &table, name, Value::InlineTable(entry));
+            let mut path = table.to_vec();
+            path.push(name);
+            self.change(
+                ("ruff", "lint.flake8-tidy-imports.banned-api"),
+                format!("ruff banned API {name}"),
+                &path,
+                "allowed".to_owned(),
+                "banned".to_owned(),
+                (message.clone(), source.clone()),
+            );
         }
-        drop
     }
 
     /// Every ty rule of the profile has at least its level, or the level its exception keeps, in
@@ -1827,6 +2150,7 @@ impl Edits<'_> {
             }
             self.overrides(rule, target);
         }
+        self.settings(Tool::Ty, &prefix, &values.ty_settings);
     }
 
     /// Raises each level below `target` that ty's override tables give `rule`, by its name or by
@@ -1899,10 +2223,11 @@ impl Edits<'_> {
     fn pytest(
         &mut self,
         values: &Values,
-        forbid: &profile::PytestForbid,
+        profile: &Profile,
         facts: PytestFacts,
         accepted: &[Exception],
     ) -> Lists {
+        let forbid = &profile.forbid;
         let wanted = match facts.release {
             Release::NineOrLater => &values.pytest,
             Release::BeforeNine => &values.pytest_before_nine,
@@ -1921,64 +2246,9 @@ impl Edits<'_> {
             }
             Ok(settings) => {
                 self.overridden(&settings, values, forbid, &excepted, facts);
+                self.pytest_settings(&settings, wanted, &excepted);
+                self.pytest_addopts(&settings, wanted, forbid, &excepted);
                 let prefix = settings.prefix();
-                for (key, value) in &wanted.settings {
-                    if excepted(key) || !settings.missing(key) {
-                        continue;
-                    }
-                    let old = settings
-                        .flag(key)
-                        .map_or_else(|| "unset".to_owned(), |flag| flag.to_string());
-                    edit::set(self.doc, prefix, key, Value::from(*value));
-                    let mut path = prefix.to_vec();
-                    path.push(key);
-                    let explained = self.explain(Tool::Pytest, key);
-                    self.change(
-                        ("pytest", key),
-                        format!("pytest {key}"),
-                        &path,
-                        old,
-                        value.to_string(),
-                        explained,
-                    );
-                }
-                let add: Vec<&str> = wanted
-                    .addopts
-                    .iter()
-                    .filter(|arg| !excepted(arg) && settings.missing(arg))
-                    .map(String::as_str)
-                    .collect();
-                let forbidden: Vec<&str> = forbid.addopts.iter().map(String::as_str).collect();
-                let removed = addopts(self.doc, prefix, &add, &forbidden, forbid);
-                let mut path = prefix.to_vec();
-                path.push("addopts");
-                for (flag, text) in removed {
-                    let explained = self.explain(Tool::Pytest, &flag);
-                    let item = if forbid.plugins.contains(&flag) {
-                        format!("pytest plugin {flag}")
-                    } else {
-                        format!("pytest {flag}")
-                    };
-                    self.change(
-                        ("pytest", &flag),
-                        item,
-                        &path,
-                        text,
-                        "removed".to_owned(),
-                        explained,
-                    );
-                }
-                for arg in add {
-                    let explained = self.explain(Tool::Pytest, arg);
-                    self.change(
-                        ("pytest", arg),
-                        format!("pytest {arg}"),
-                        &path,
-                        "absent".to_owned(),
-                        "present".to_owned(),
-                        explained,
-                    );
-                }
                 for key in &forbid.settings {
                     if settings.has(key) {
                         self.forbid_key(&settings, prefix, key, key);
@@ -1992,7 +2262,115 @@ impl Edits<'_> {
                 }
             }
         }
-        self.plugins(values, forbid, facts, &excepted)
+        self.plugins(values, profile, facts, &excepted)
+    }
+
+    /// Each pytest setting of `wanted` that the table lacks, and no exception keeps out.
+    fn pytest_settings(
+        &mut self,
+        settings: &pytest::Settings,
+        wanted: &profile::PytestWanted,
+        excepted: &dyn Fn(&str) -> bool,
+    ) {
+        let prefix = settings.prefix();
+        for (key, value) in &wanted.settings {
+            if excepted(key) || !settings.lacks(key, value) {
+                continue;
+            }
+            let old = settings
+                .destination
+                .literal(key)
+                .unwrap_or_else(|| "unset".to_owned());
+            let new = pytest_value(settings, key, value);
+            let shown = toml::Observed::of_value(value).show();
+            edit::set(self.doc, prefix, key, new);
+            let mut path = prefix.to_vec();
+            path.push(key);
+            let explained = self.explain(Tool::Pytest, key);
+            self.change(
+                ("pytest", key),
+                format!("pytest {key}"),
+                &path,
+                old,
+                shown,
+                explained,
+            );
+        }
+    }
+
+    /// Each argument of `wanted` that `addopts` lacks, and no exception keeps out, and the
+    /// removal of each argument that `forbid` removes and `wanted` does not hold.
+    fn pytest_addopts(
+        &mut self,
+        settings: &pytest::Settings,
+        wanted: &profile::PytestWanted,
+        forbid: &profile::PytestForbid,
+        excepted: &dyn Fn(&str) -> bool,
+    ) {
+        let prefix = settings.prefix();
+        let add: Vec<&str> = wanted
+            .addopts
+            .iter()
+            .filter(|arg| !excepted(arg) && settings.missing(arg))
+            .map(String::as_str)
+            .collect();
+        let tokens: Vec<String> = add
+            .iter()
+            .flat_map(|arg| shlex::split(arg).unwrap_or_else(|| vec![(*arg).to_owned()]))
+            .collect();
+        let tokens: Vec<&str> = tokens.iter().map(String::as_str).collect();
+        let kept = |flag: &&String| !wanted.addopts.contains(flag);
+        let forbidden: Vec<&str> = forbid
+            .addopts
+            .iter()
+            .filter(kept)
+            .map(String::as_str)
+            .collect();
+        let switches: Vec<&str> = forbid
+            .switches
+            .iter()
+            .filter(kept)
+            .map(String::as_str)
+            .collect();
+        let removed = addopts(
+            self.doc,
+            prefix,
+            &tokens,
+            Forbidden {
+                flags: &forbidden,
+                switches: &switches,
+                forbid,
+            },
+        );
+        let mut path = prefix.to_vec();
+        path.push("addopts");
+        for (flag, text) in removed {
+            let explained = self.explain(Tool::Pytest, &flag);
+            let item = if forbid.plugins.contains(&flag) {
+                format!("pytest plugin {flag}")
+            } else {
+                format!("pytest {flag}")
+            };
+            self.change(
+                ("pytest", &flag),
+                item,
+                &path,
+                text,
+                "removed".to_owned(),
+                explained,
+            );
+        }
+        for arg in add {
+            let explained = self.explain(Tool::Pytest, arg);
+            self.change(
+                ("pytest", arg),
+                format!("pytest {arg}"),
+                &path,
+                "absent".to_owned(),
+                "present".to_owned(),
+                explained,
+            );
+        }
     }
 
     /// A conflict for each argument of `addopts` that overrides a setting the profile owns, with
@@ -2104,10 +2482,11 @@ impl Edits<'_> {
     fn plugins(
         &mut self,
         values: &Values,
-        forbid: &profile::PytestForbid,
+        profile: &Profile,
         facts: PytestFacts,
         excepted: &dyn Fn(&str) -> bool,
     ) -> Lists {
+        let forbid = &profile.forbid;
         let current = self.current();
         let project = pytest::Project {
             destination: Destination {
@@ -2184,8 +2563,13 @@ impl Edits<'_> {
         for (path, name) in additions {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();
             let (key, table) = path.split_last().expect("a dependency list has a key");
+            let requirement = profile
+                .dev_pins
+                .iter()
+                .find(|(pinned, _)| *pinned == name)
+                .map_or_else(|| name.clone(), |(_, version)| format!("{name}=={version}"));
             if let Some(array) = edit::array(self.doc, table, key) {
-                edit::push(array, &name);
+                edit::push(array, &requirement);
             }
             let explained = self.explain(Tool::Pytest, &name);
             self.change(
@@ -2193,7 +2577,7 @@ impl Edits<'_> {
                 format!("pytest plugin {name}"),
                 &path,
                 "absent".to_owned(),
-                format!("{name:?}"),
+                format!("{requirement:?}"),
                 explained,
             );
         }
@@ -2292,7 +2676,7 @@ impl Edits<'_> {
                     .join(", ")
             };
             let reason = format!(
-                "The profile's rules and levels were reviewed for {name} {version}, so the project runs that release with uv run, and uv.lock locks it."
+                "The profile was reviewed for {name} {version}, so the project runs that release with uv run, and uv.lock locks it."
             );
             self.change(
                 ("xpd", name),
@@ -2349,14 +2733,14 @@ impl Edits<'_> {
     }
 
     /// Checks that the edited file reaches the profile, and records a conflict where it does not.
-    fn verify(&mut self, values: &Values, accepted: &[Exception]) {
+    fn verify(&mut self, required: &[String], accepted: &[Exception]) {
         let (enabled, ignored) = self.resolve();
         let whole: BTreeSet<&str> = accepted
             .iter()
             .filter(|exception| exception.tool == "ruff" && exception.files.is_empty())
             .map(|exception| exception.id.as_str())
             .collect();
-        for code in &values.ruff_rules {
+        for code in required {
             let wanted = !whole.contains(code.as_str());
             if enabled.contains(code) != wanted {
                 let cause = ignored
@@ -2373,16 +2757,26 @@ impl Edits<'_> {
     }
 }
 
-/// Removes each flag of `remove`, with its value, and each `-p` that loads a plugin `forbid`
-/// removes, from `addopts` of the table at `prefix`, and adds `add` before a `--`, which ends
-/// pytest's options, or else at the end. An `addopts` that needs neither keeps its text. Returns
-/// each removed flag or plugin with the text it had.
+/// What the profile removes from `addopts`.
+#[derive(Clone, Copy)]
+struct Forbidden<'a> {
+    /// Flags that take a value.
+    flags: &'a [&'a str],
+    /// Flags that take none.
+    switches: &'a [&'a str],
+    forbid: &'a profile::PytestForbid,
+}
+
+/// Removes each forbidden flag, with its value, each `-p` that loads a plugin `forbid` removes
+/// and each `-p no:` that turns off a plugin it keeps on, from `addopts` of the table at `prefix`,
+/// and adds the arguments `add` before a `--`, which ends pytest's options, or else at the end.
+/// An `addopts` that needs neither keeps its text. Returns each removed flag or plugin with the
+/// text it had.
 fn addopts(
     doc: &mut DocumentMut,
     prefix: &[&str],
     add: &[&str],
-    remove: &[&str],
-    forbid: &profile::PytestForbid,
+    forbidden: Forbidden<'_>,
 ) -> Vec<(String, String)> {
     let legacy = prefix.last() == Some(&"ini_options");
     let Some(table) = edit::existing(doc, prefix) else {
@@ -2412,7 +2806,7 @@ fn addopts(
             .iter()
             .map(|value| value.as_str().unwrap_or_default().to_owned())
             .collect();
-        let (indexes, removed) = flags(&tokens, remove, forbid);
+        let (indexes, removed) = flags(&tokens, forbidden);
         edit::remove_items(array, &indexes);
         let at = edit::strings(array)
             .into_iter()
@@ -2429,7 +2823,7 @@ fn addopts(
     let Some(tokens) = shlex::split(text) else {
         return Vec::new();
     };
-    let (indexes, removed) = flags(&tokens, remove, forbid);
+    let (indexes, removed) = flags(&tokens, forbidden);
     if indexes.is_empty() && add.is_empty() {
         return removed;
     }
@@ -2457,29 +2851,41 @@ fn addopts(
     removed
 }
 
-/// The indexes of the `flags` in `tokens`, each with the value after it, and of each `-p` that
-/// loads a plugin that `forbid` removes, before a `--`. Each comes with the flag or plugin it
-/// removes and the text it had.
-fn flags(
-    tokens: &[String],
-    flags: &[&str],
-    forbid: &profile::PytestForbid,
-) -> (Vec<usize>, Vec<(String, String)>) {
+/// The indexes of the forbidden flags in `tokens`, each flag of `forbidden.flags` with the value
+/// after it or attached to it, of each `-p` that loads a plugin that `forbid` removes, and of each
+/// `-p no:` that turns off a plugin of `forbid.disabled`, before a `--`. Each comes with the flag
+/// or plugin it removes and the text it had.
+fn flags(tokens: &[String], forbidden: Forbidden<'_>) -> (Vec<usize>, Vec<(String, String)>) {
+    let Forbidden {
+        flags,
+        switches,
+        forbid,
+    } = forbidden;
     let mut indexes = Vec::new();
     let mut removed = Vec::new();
     let mut index = 0;
     while index < tokens.len() && tokens[index] != "--" {
         let token = &tokens[index];
-        let load = plugin_arg(tokens, index).and_then(|(value, used)| {
-            Some((forbid.loaded_by(value.trim_start_matches('='))?, used))
-        });
-        if let Some((plugin, used)) = load {
-            indexes.extend(index..index + used);
-            removed.push((plugin.to_owned(), tokens[index..index + used].join(" ")));
+        if let Some((value, used)) = plugin_arg(tokens, index) {
+            let value = value.trim_start_matches('=');
+            let id = match value.strip_prefix("no:") {
+                Some(name) if forbid.disabled.iter().any(|plugin| plugin == name) => {
+                    Some(profile::PytestForbid::disable_id(name))
+                }
+                Some(_) => None,
+                None => forbid.loaded_by(value).map(str::to_owned),
+            };
+            if let Some(id) = id {
+                indexes.extend(index..index + used);
+                removed.push((id, tokens[index..index + used].join(" ")));
+            }
             index += used;
             continue;
         }
-        if let Some(flag) = flags.iter().find(|flag| *token == **flag) {
+        if let Some(switch) = switches.iter().find(|switch| *token == **switch) {
+            indexes.push(index);
+            removed.push(((*switch).to_owned(), token.clone()));
+        } else if let Some(flag) = flags.iter().find(|flag| *token == **flag) {
             indexes.push(index);
             let value = tokens.get(index + 1).filter(|next| {
                 next.as_str() != "--" && (!next.starts_with('-') || next.parse::<f64>().is_ok())
@@ -2492,9 +2898,9 @@ fn flags(
                 removed.push(((*flag).to_owned(), (*flag).to_owned()));
             }
         } else if let Some(flag) = flags.iter().find(|flag| {
-            token
-                .strip_prefix(**flag)
-                .is_some_and(|rest| rest.starts_with('='))
+            token.strip_prefix(**flag).is_some_and(|rest| {
+                rest.starts_with('=') || (!flag.starts_with("--") && !rest.is_empty())
+            })
         }) {
             indexes.push(index);
             removed.push(((*flag).to_owned(), token.clone()));
@@ -2536,6 +2942,35 @@ fn plugin_conflict(
     }
     let broken = value.is_empty() || value.starts_with('=');
     broken.then(|| format!("addopts passes {shown}, so pytest tries to import the plugin {value:?} and stops with an error. Write -p and the plugin's name, without ="))
+}
+
+/// The value that the pytest setting `key` gets for the profile's `value`: the value itself, or
+/// for a list, the project's items with each of the profile's that it lacks. `filterwarnings`
+/// gets them first, since pytest applies its last matching filter, so the project's own filters
+/// keep their effect after them.
+fn pytest_value(settings: &pytest::Settings, key: &str, value: &Value) -> Value {
+    let Some(wanted) = value.as_array() else {
+        return value.clone();
+    };
+    let held = settings.lines(key);
+    let missing: Vec<&str> = wanted
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|item| !held.iter().any(|line| pytest::same_line(key, line, item)))
+        .collect();
+    let items: Vec<&str> = if key == "filterwarnings" {
+        missing
+            .iter()
+            .copied()
+            .chain(held.iter().map(String::as_str))
+            .collect()
+    } else {
+        held.iter()
+            .map(String::as_str)
+            .chain(missing.iter().copied())
+            .collect()
+    };
+    Value::Array(items.into_iter().collect())
 }
 
 /// `args` as one command line, each quoted only when it needs quotes to stay one argument.

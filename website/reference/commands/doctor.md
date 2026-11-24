@@ -1,6 +1,6 @@
 Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty and pytest that ships with xpd. Doctor prints a unified diff of `pyproject.toml` with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
-The plan reads files. It compares the effect of the project's own settings, so a selector such as `ALL` or `PERF` that turns a rule on needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings, and the installed Ruff and ty for the conditional advice.
+The plan reads files. It compares the effect of the project's own settings, so an extra selector in `lint.ignore` that turns off only rules the profile turns off, or a ty level above the profile's, needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each setting, rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings, and the installed Ruff and ty for the conditional advice.
 
 ## What doctor shows of the project
 
@@ -15,37 +15,116 @@ This holds for text and JSON, for `--check` and `--apply`, and for the Stop hook
 
 ## What the profile sets
 
-The profile sets seven Ruff rules. A code that no selector of the project turns on goes into `lint.extend-select`, which keeps the project's own selection, also when Ruff runs it by default. An exact code in `lint.ignore` or in a per-file ignore goes, unless an exception records it.
+The profile is strict: every Ruff rule runs unless a reason below turns it off, and preview is on, so the experimental rules and the formatter's preview style run too. Each value has a reviewed record with its reason and source. [Read the profile](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/profile.toml) and [the records that explain it](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/decisions.jsonl).
 
-| Code | What Ruff checks | What to do about a finding |
+### Ruff selection and preview
+
+The profile owns `lint.select` and holds it at `["ALL"]`. A project whose selection lacks `ALL` gets `select = ["ALL"]` in `[tool.ruff.lint]`, and an old `select` at the top of `[tool.ruff]` goes. `preview`, `lint.preview` and `format.preview` are `true`, and `lint.explicit-preview-rules = true` goes, because it keeps each preview rule off until a selector names its code. With Ruff 0.17.4 the project then runs 887 rules.
+
+`lint.ignore` holds the profile's list below. A selector in `lint.ignore` or `lint.extend-ignore` that turns off any other rule goes, whether it names one rule, such as `S101`, or a group, such as `D`, unless an exception records the rule. A selector that turns off only rules of the list, such as `D100`, stays.
+
+| Selector | Why it is off |
+| --- | --- |
+| `D1` | Missing docstrings stay allowed, and a docstring that exists follows PEP 257. |
+| `CPY` | The project's license covers each file, so no file repeats a notice. |
+| `W191`, `E111`, `E114`, `E117` | Ruff format chooses indentation, so these conflict with it. |
+| `E501` | Ruff format wraps lines as far as it can. The remaining long lines are left to judgment. |
+| `Q` | Ruff format chooses quotes and escapes. Covers `Q000` through `Q004`. |
+| `COM812`, `COM819` | Ruff format adds and keeps commas where its layout needs them. |
+| `ISC001` | Ruff format can collapse split literals onto one line. |
+| `ISC002` | Split literals may wrap across lines, and `allow-multiline` stays `true`. |
+| `D203`, `D206`, `D300` | Ruff format sets blank lines before class docstrings, docstring indentation and docstring quotes. |
+| `TC` | Annotation imports stay available for code that reads annotations at run time. |
+| `ANN401` | `Any` is allowed where a dynamic interface needs it. ty keeps checking the types. |
+| `EM`, `TRY003` | An exception may take its message directly, also on a standard exception class. |
+| `PLR2004` | A number that explains itself may stand in a calculation or an assertion. |
+| `PLR0913`, `PLR0917` | A clear signature may have several parameters, and positional ones are judged at the API boundary. |
+| `PLR0912`, `C901` | Branches and complexity are judged in context, since a cap can reward splitting flat code into helpers. |
+| `FBT003` | A positional boolean is allowed where the caller cannot change the API. |
+| `TD` | Work is tracked in issues. `FIX` still reports markers such as TODO. |
+
+With preview on, Ruff 0.17.4 also runs `RUF201`, which reports each rule code in the selectors of `pyproject.toml`, such as `ANN401` in `lint.ignore`, and asks for the rule's name. The profile writes the codes, so `ruff check` on `pyproject.toml` reports them, and `ruff check --fix` replaces each code with the rule's name, such as `any-type`. Doctor counts a rule's name as its code in every selector.
+
+`lint.pydocstyle.convention = "pep257"` also turns off the docstring checks that PEP 257 does not ask for: `D212`, `D213`, `D214`, `D215`, `D404` through `D411`, `D413`, `D415`, `D416`, `D417` and `D420`.
+
+`lint.per-file-ignores` holds these patterns. A per-file ignore that turns off another rule for a pattern goes, unless an exception records the rule for that pattern.
+
+| Pattern | Off | Why |
 | --- | --- | --- |
-| `PTH118` | Paths joined with `os.path.join` | Use a `Path` join where the caller accepts a path object. Preserve string or bytes contracts. |
-| `PERF101` | A list created just to iterate over it | Iterate over the original iterable when a snapshot is unnecessary. |
-| `PERF102` | A dictionary loop that discards the key or value | Iterate over the keys or values you actually use. |
-| `PGH003` | A blanket `type: ignore` | Name the diagnostic you intend to suppress. |
-| `PGH004` | A blanket `noqa` | Name the Ruff rule you intend to suppress. |
-| `RUF017` | Lists combined with repeated addition | Flatten the inputs in one pass to avoid copying earlier items repeatedly. |
-| `RUF100` | A `noqa` that no longer suppresses a finding | Remove the unused suppression. |
+| `test_*.py`, `*_test.py` | `S101` | pytest checks with `assert`. |
+| `e2e/test_*.py` | `S101`, `INP001` | Standalone end-to-end tests check with `assert` and need no package. |
+| `py/*.py` | `INP001`, `T201` | Standalone scripts print to stdout and need no package. |
 
-The profile sets three ty rules under `[tool.ty.rules]`. A higher level than the profile's needs no edit. When an override table gives a rule a lower level, by its name or through `all`, doctor sets the rule to the profile's level in that table. This holds for `[[tool.ty.overrides]]` tables and for an inline `overrides = [{ include = [...], rules = { ... } }]` array alike. ty applies a rule's own entry before `all`.
+### Banned APIs
 
-| Rule | Level | Why enable it |
+`lint.flake8-tidy-imports.banned-api` bans these APIs, so Ruff reports each use as `TID251`. An entry the project has keeps its own message, and the profile adds each entry it lacks.
+
+| API | Message |
+| --- | --- |
+| `unittest` | Use pytest for a real end-to-end, property, or differential test. |
+| `unittest.mock`, `mock`, `pytest_mock` | Exercise the real code with controlled input and real dependencies. |
+| `flaky`, `pytest.mark.flaky` | Fix the flaky test or remove it and record why. |
+| `pytest.mark.repeat` | Run the test once and fix the cause of any instability. |
+| `pytest.skip`, `pytest.mark.skip` | Fix or remove the test, or use a conditional skip for an unsupported platform or unavailable required resource. |
+| `pytest_socket` | Exercise the real configured service when the flow requires a network connection. |
+| `toml` | Use tomllib for TOML reads and an approved writer for TOML writes. |
+| `tomli` | Use the standard library tomllib to read TOML. |
+| `typing.cast`, `typing_extensions.cast` | Fix the type at its source or narrow it with a runtime check. |
+
+`pytest.mark.skipif` stays allowed for an unsupported platform or a missing resource.
+
+### Other Ruff settings
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `required-version` | `"==0.17.4"` | Ruff stops on another release, so every run uses the reviewed one. |
+| `line-length` | `100` | Code uses 100 columns. |
+| `indent-width` | `4` | The standard indentation. |
+| `fix`, `unsafe-fixes` | `false` | A check leaves the source alone until the developer asks for a fix. |
+| `force-exclude` | `true` | Excluded files stay excluded when a tool passes their paths. |
+| `respect-gitignore` | `true` | Files that Git ignores stay unchecked. |
+| `lint.future-annotations` | `false` | Type-only import moves stay conservative. |
+| `lint.flake8-tidy-imports.ban-relative-imports` | `"all"` | Every import names its module from the package root. |
+| `lint.flake8-type-checking.strict`, `lint.flake8-type-checking.quote-annotations` | `false` | Annotations stay as they are for code that reads them at run time. |
+| `format.quote-style`, `format.indent-style`, `format.nested-string-quote-style`, `format.line-ending` | `"double"`, `"space"`, `"alternating"`, `"auto"` | The formatter's defaults. |
+| `format.skip-magic-trailing-comma` | `false` | A trailing comma keeps a collection on several lines. |
+| `format.docstring-code-format`, `format.docstring-code-line-length` | `true`, `"dynamic"` | The runnable examples in docstrings are formatted to fit after their indentation. |
+
+Each setting holds exactly this value. Doctor reads a lint setting at its old place at the top of `[tool.ruff]` too, which the `lint` table overrides.
+
+### ty
+
+The profile sets five ty rules under `[tool.ty.rules]`. A higher level than the profile's needs no edit. When an override table gives a rule a lower level, by its name or through `all`, doctor sets the rule to the profile's level in that table. This holds for `[[tool.ty.overrides]]` tables and for an inline `overrides = [{ include = [...], rules = { ... } }]` array alike. ty applies a rule's own entry before `all`.
+
+| Rule | Level | Why |
 | --- | --- | --- |
 | `blanket-ignore-comment` | `error` | A suppression without a diagnostic name can hide a new error on the same line. |
+| `unused-ignore-comment` | `error` | A suppression that silences nothing hides the next error on its line. |
 | `disjoint-cast` | `error` | Casting between types that cannot overlap makes a promise the value cannot satisfy. |
+| `missing-direct-dependency` | `error` | An import that only another package's dependencies provide breaks when that package drops it. |
 | `missing-type-argument` | `warn` | A bare generic such as `list` leaves the element type unspecified. |
 
-The profile sets three pytest settings in the pytest table of `pyproject.toml`: `[tool.pytest]`, or `[tool.pytest.ini_options]` when the project already uses it.
+`analysis.respect-type-ignore-comments = false` makes a `ty: ignore` comment that names its rule the only suppression ty honors, and `terminal.error-on-warning = false` keeps a warning visible without failing the run.
+
+`missing-direct-dependency` is a preview rule that reads the project's declared dependencies through uv. ty 0.0.106 turns that on with the environment variable `TY_UV=1` and has no setting for it in `pyproject.toml`. `uv check --locked` sets it and runs the ty that `uv.lock` locks, so run ty with `uv check --locked`.
+
+### pytest
+
+The profile sets these values in the pytest table of `pyproject.toml`: `[tool.pytest]`, or `[tool.pytest.ini_options]` when the project already uses it.
 
 | Setting | Where | What it changes |
 | --- | --- | --- |
 | `strict = true` | The pytest table | An unknown marker, an invalid setting, a repeated parameter id and an `xfail` test that passes each fail the run. |
+| `timeout = "60"` | The pytest table | A test that runs longer than 60 seconds fails and prints where it stopped. Give an exceptionally slow test its own timeout marker. |
+| `markers` holds `"e2e: drives a full user flow"` | The pytest table | Strict mode accepts the `e2e` marker for tests that drive a whole user flow. A marker of the same name keeps the project's description. |
+| `filterwarnings` holds `"error"` | The pytest table, first | Every warning is an error. A filter after it may allow a dependency's warning by message, category and module. |
 | `pytest -ra` | `addopts`, before a `--` that ends the options | The summary lists each skipped test and each expected failure. |
 | `pytest --import-mode=importlib` | `addopts` | pytest imports a test file without adding its folder to `sys.path`. |
+| `pytest -p no:doctest` | `addopts` | Doctests stay out of the required suite. |
 
-`strict` needs pytest 9.0. For pytest 8, the profile sets `pytest -ra`, `pytest --import-mode=importlib`, `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in `[tool.pytest.ini_options]` instead. Doctor takes the pytest release that a fresh checkout gets: the one `uv.lock` locks when it meets every declared requirement, else pytest 8 when a declared requirement such as `pytest==8.4.2` admits no pytest 9, else pytest 9 when a list declares pytest, else the release in the project's virtual environment.
+A list such as `markers` must hold each of the profile's items and may hold more. The profile pins pytest 9, so a fresh checkout gets pytest 9, and `strict` replaces the flags that pytest 8 needed. A pytest 8 requirement in `dev` becomes the pin, and one in another list is a conflict. For a `script` kind with pytest 8 in its environment, the profile sets `pytest --strict-markers`, `pytest --strict-config` and `xfail_strict = true` in `[tool.pytest.ini_options]` instead.
 
-A project that declares pytest gets two plugins in each dependency list that holds pytest, whether that is a dependency group, an extra or `[project]` `dependencies`, and in `dev` of `[dependency-groups]` when only the virtual environment has pytest. A plugin counts only where uv installs it with pytest on every platform:
+A project gets two plugins in each dependency list that holds pytest, whether that is a dependency group, an extra or `[project]` `dependencies`, pinned at the release the profile was reviewed for. A plugin counts only where uv installs it with pytest on every platform:
 
 - in the same list, or in a group that the list includes with `{ include-group = "<name>" }`, and not in an unrelated list
 - in an entry without an environment marker, so `"pytest-timeout; python_version < '3.0'"` does not count
@@ -57,30 +136,36 @@ Doctor compares the names of dependency groups and extras as uv does, so `Test_P
 | `pytest-timeout` | A test that hangs fails and prints where it stopped. |
 | `pytest-randomly` | The tests run in a new order each time, so a test that depends on another test fails. |
 
-`pytest-timeout` stops no test until `timeout` is set. Doctor suggests the setting as conditional advice and leaves the number of seconds to you.
-
 The profile removes these from every project, and no exception keeps them.
 
 | In the project | Reason |
 | --- | --- |
-| `pytest-rerunfailures`, `flaky` | A rerun hides the run where the code was wrong. |
-| `pytest-mock` | A test with a mock checks the mock and not the code. |
+| `pytest-rerunfailures`, `flaky`, `pytest-repeat` | A rerun or a repeat hides the run where the code was wrong. |
+| `pytest-mock`, `mock` | A test with a mock checks the mock and not the code. |
+| `pytest-socket` | A test that needs the network uses the real configured service. |
 | A `-p` in `addopts` that loads one of these plugins, such as `-p pytest_mock`, `-pflaky`, `-p rerunfailures` or `-p=pytest_mock` | It runs the plugin without a dependency on it, or stops pytest with an import error. |
+| `pytest --reruns`, `pytest --reruns-delay`, `pytest --count` and `pytest --repeat-scope` in `addopts`, `reruns` and `reruns_delay` in the table | The same as a rerun plugin. |
+| `pytest --disable-socket`, `pytest --force-enable-socket`, `pytest --allow-hosts` and `pytest --allow-unix-socket` | The same as `pytest-socket`. |
+| `pytest --disable-warnings`, `pytest --disable-pytest-warnings` and `pytest -p no:warnings` | Warnings are errors, so hiding them hides failures. |
+| `pytest --cov`, `pytest --cov-fail-under`, `pytest -n`, `pytest --dist`, `pytest --snapshot-update`, `pytest --doctest-modules` and `pytest --doctest-glob` | Coverage, workers, snapshot updates and doctests stay out of the required suite, which runs serially. |
+| `pytest --strict-markers` and `pytest --strict-config` on pytest 9 | `strict` replaces them. |
+| `strict_config`, `strict_markers`, `strict_parametrization_ids`, `strict_xfail` or `xfail_strict` set to `false` | Each turns off part of `strict`, such as the failure on an unknown marker or on an `xfail` test that passes. |
 
 Doctor reads `-p` as pytest 9 does: `-p` takes the next argument, `-p<value>` takes the rest of its own, and spaces around the value go. So `-p=name` names the plugin `=name`, which pytest cannot import.
-| `pytest --reruns` and `pytest --reruns-delay` in `addopts`, `reruns` and `reruns_delay` in the table | The same as a rerun plugin. |
-| `strict_config`, `strict_markers`, `strict_parametrization_ids`, `strict_xfail` or `xfail_strict` set to `false` | Each turns off part of `strict`, such as the failure on an unknown marker or on an `xfail` test that passes. |
+
+### Pins
 
 The profile pins the tools that check the project, at the releases its rules and levels were reviewed for, as exact requirements in `[dependency-groups]` `dev`. Doctor replaces a looser requirement there, such as `"ruff"`, with the pin.
 
 | Tool | Requirement in `dev` |
 | --- | --- |
+| pytest | `pytest==9.2.0` |
+| pytest-timeout | `pytest-timeout==2.4.0` |
+| pytest-randomly | `pytest-randomly==5.1.0` |
 | Ruff | `ruff==0.17.4` |
 | ty | `ty==0.0.106` |
 
-`uv.lock` must lock these releases. A lock that holds another release of Ruff or ty, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for Ruff or ty in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the tools with `uv run ruff` and `uv run ty`.
-
-Each value has a reviewed record with its reason and source. [Read the profile](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/profile.toml) and [the records that explain it](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/decisions.jsonl).
+`uv.lock` must lock these releases. A lock that holds another release of one of them, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for one of them in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the checks with `uv run --locked ruff check`, `uv run --locked ruff format --check`, `uv check --locked` and `uv run --locked pytest`.
 
 ## Example
 
@@ -103,49 +188,66 @@ dev = [
 addopts = "--reruns 2 --strict-markers"
 ```
 
-Doctor prints the diff, then one entry for each change. The `...` lines stand for the entries left out here and for the conditional advice at the end.
+Doctor prints the diff, then one entry for each change. The `...` lines stand for the lines left out here and for the conditional advice at the end.
 
 ```console
 $ xpd doctor --format text
-Profile revision 1, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 2, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -6,9 +6,24 @@
+@@ -5,10 +5,94 @@
+
  [dependency-groups]
  dev = [
-     "pytest>=9.2.0",
+-    "pytest>=9.2.0",
 -    "pytest-rerunfailures",
-     "pytest-timeout",
-+    "pytest-randomly",
+-    "pytest-timeout",
++    "pytest==9.2.0",
++    "pytest-timeout==2.4.0",
++    "pytest-randomly==5.1.0",
 +    "ruff==0.17.4",
 +    "ty==0.0.106",
  ]
 
  [tool.pytest.ini_options]
 -addopts = "--reruns 2 --strict-markers"
-+addopts = "--strict-markers -ra --import-mode=importlib"
++addopts = "-ra --import-mode=importlib -p no:doctest"
 +strict = true
++timeout = "60"
++markers = ["e2e: drives a full user flow"]
++filterwarnings = ["error"]
 +
++[tool.ruff]
++required-version = "==0.17.4"
++preview = true
+...
 +[tool.ruff.lint]
-+extend-select = ["PTH118", "PERF101", "PERF102", "PGH003", "PGH004", "RUF017", "RUF100"]
-+
++select = ["ALL"]
++ignore = ["ANN401", "C901", "COM812", "COM819", "CPY", "D1", "D203", "D206", "D300", "E111", "E114", "E117", "E501", "EM", "FBT003", "ISC001", "ISC002", "PLR0912", "PLR0913", "PLR0917", "PLR2004", "Q", "TC", "TD", "TRY003", "W191"]
+...
 +[tool.ty.rules]
 +blanket-ignore-comment = "error"
 +disjoint-cast = "error"
++missing-direct-dependency = "error"
 +missing-type-argument = "warn"
-+
++unused-ignore-comment = "error"
+...
 +[tool.xpd.profile]
-+revision = 1
++revision = 2
 +kind = "application"
 
 Changes
+  ruff lint.select: unset -> ["ALL"], tool.ruff.lint.select
+    Profile ["ALL"]. Every Ruff rule runs unless a written reason in the ignore list turns it off.
+    Source: https://docs.astral.sh/ruff/linter/#rule-selection
 ...
   pytest --reruns: --reruns 2 -> removed, tool.pytest.ini_options.addopts at line 14
     Keep the first failure visible so you can find and fix its cause.
     Source: https://github.com/pytest-dev/pytest-rerunfailures/blob/master/README.rst
+  pytest --strict-markers: --strict-markers -> removed, tool.pytest.ini_options.addopts at line 14
 ...
 Locks
   uv.lock is missing. --apply runs uv lock.
@@ -154,7 +256,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. A second `xpd doctor --check` then prints `The project matches profile revision 1.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. A second `xpd doctor --check` then prints `The project matches profile revision 2.` and exits 0.
 
 ## Kinds of project
 
@@ -167,7 +269,7 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
 | `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
-A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 1 gives every kind the same values and owns no file.
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 2 gives every kind the same values and owns no file.
 
 ## One place for each tool
 
@@ -179,10 +281,9 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 - `pytest.toml`, `.pytest.toml`, `pytest.ini`, `.pytest.ini`, a `[pytest]` section in `tox.ini`, or a `[tool:pytest]` section in `setup.cfg`, at the root or below it, or a `pyproject.toml` below the root with a pytest table
 - a key that the pinned Ruff or ty does not know, such as `bogus` in `[tool.ruff.lint]`, because the tool stops with an error on it
 - a rule name in `[tool.ty.rules]` or in the `rules` of an override that ty 0.0.106 does not have or has removed, such as `unknown-review-rule`, because ty reports `unknown-rule` and its check fails
-- a Ruff rule selector that Ruff 0.17.4 does not know, such as `NOT_A_RULE` in `lint.select`, or a removed rule such as `ANN101` in an array that selects it
+- a Ruff rule selector that Ruff 0.17.4 does not know, such as `NOT_A_RULE` in `lint.select`, a removed rule such as `ANN101` in an array that selects it, or a rule's name, such as `assert`, while preview is off
 - a value that the pinned Ruff rejects, such as `line-length = "wide"`
 - a requirement for Ruff or ty in a dependency list other than `dev` that the profile's pin does not meet
-- a per-file ignore that turns a rule of the profile off through a group selector, such as `PERF`
 - an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly` or `-pno:timeout`, a `-p=<name>` that pytest cannot import, or `pytest --disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
 - a layout that the kind does not allow
 - a uv workspace, in the project or above it
@@ -197,7 +298,7 @@ A project records an exception in `pyproject.toml`, beside the revision and kind
 
 ```toml
 [tool.xpd.profile]
-revision = 1
+revision = 2
 kind = "application"
 
 [[tool.xpd.profile.exceptions]]
@@ -209,11 +310,11 @@ reason = "The scripts hand str paths to a tool that rejects Path objects."
 
 | `tool` | `id` | Scope and value | What doctor writes |
 | --- | --- | --- | --- |
-| `ruff` | A rule of the profile | `files` names file patterns that Ruff reads. Without `files`, the exception covers the whole project. | A per-file ignore for each pattern, or the code in `lint.ignore` |
+| `ruff` | A rule that the profile turns on | `files` names file patterns that Ruff reads. Without `files`, the exception covers the whole project. | A per-file ignore for each pattern, or the code in `lint.ignore` |
 | `ty` | A rule of the profile | `value` names a level below the profile's. It covers the whole project. | The rule at that level in `[tool.ty.rules]` |
 | `pytest` | A setting, argument or plugin that the profile adds | It covers the whole project. | Nothing. The profile stops requiring it. |
 
-Doctor marks each exception `valid`, `invalid`, `redundant` when it changes nothing for this project, such as one for a pytest 8 setting in a project on pytest 9, or `orphaned` when the profile no longer sets its `id`. Any other mark than `valid` fails `--check` and stops `--apply` until you fix or delete the exception. A setting that differs from the profile without an exception is a change in the plan.
+Doctor marks each exception `valid`, `invalid`, `redundant` when it changes nothing for this project, such as one for a pytest 8 setting in a project on pytest 9, or `orphaned` when the profile no longer sets its `id`. Any other mark than `valid` fails `--check` and stops `--apply` until you fix or delete the exception. A setting that differs from the profile without an exception is a change in the plan. Ruff settings, the banned APIs, the ty settings and the pins take no exception.
 
 ## Upgrades
 
@@ -237,22 +338,20 @@ In a project whose `pyproject.toml` has a `[tool.xpd.profile]` table, [`xpd hook
 
 Below the plan, doctor prints advice that depends on the project's code and choices, for Ruff 0.17.4, ty 0.0.106 and pytest 9.2.0. Doctor consults Ruff and ty in the project's environment or on `PATH`, and it gets the installed pytest version from the project's virtual environment. Advice for a missing tool is marked "unverified locally". Conditional advice names the decision you need to make and the evidence that raised it. For example, seeing scalar division is a reason to consider a ty warning. It does not establish that a particular divisor is zero.
 
-| Project decision | Ruff rules or settings Doctor considers |
+The profile turns every Ruff rule on or off itself, so Ruff's advice is about settings.
+
+| Project decision | Ruff settings Doctor considers |
 | --- | --- |
-| Enforce typed API boundaries | `ANN401`, plus `allow-star-arg-any` and `ignore-fully-untyped` in the annotation settings. |
-| Control when imports run | `PLC0415` for local imports, `TID254` and `TID255` for lazy imports, and `ban-lazy` for an explicit eager-import policy. |
-| Keep annotations needed at runtime | `runtime-evaluated-base-classes` and `runtime-evaluated-decorators`, including Pydantic's `BaseModel` and `validate_call`. |
-| Migrate numerical code | `NPY201` for NumPy 2 migrations and `PD011` for pandas code using `.values`. |
-| Simplify loops or avoid unnecessary work | `PERF402` and `PERF403` for loops that copy items, `FURB192` for sorting to find an extreme, `RUF015` for selecting the first item, and `RUF065` for logging. |
-| Maintain suppressions and preview policy | `RUF101` for obsolete rule codes, `RUF102` for unknown codes, and `lint.explicit-preview-rules` to opt into preview rules individually. |
+| Enforce typed API boundaries | `allow-star-arg-any` and `ignore-fully-untyped` in the annotation settings, where the annotation rules run. |
+| Control when imports run | `ban-lazy` for an explicit eager-import policy, where the code uses lazy imports. |
+| Keep annotations needed at runtime | `runtime-evaluated-base-classes` and `runtime-evaluated-decorators`, including Pydantic's `BaseModel` and `validate_call`, where the `TC` rules run. |
 | Diagnose an unexpected Ruff result | Doctor can suggest `ruff check --show-settings PATH` or `ruff check --show-files PATH` to inspect effective settings or included files. |
 
 | Project decision | Conditional ty advice |
 | --- | --- |
 | Check arithmetic, conditional bindings or optional values | Consider `warn` for `division-by-zero`, `possibly-unresolved-reference` or `truthiness-test-of-none-union`, according to the code. |
 | Protect typed boundaries | Consider `error` for `unsound-assignment`, `unsound-return` or `unsound-yield`. For decorators your project owns, consider `warn` for `dynamic-function-decorator-return`. |
-| Check package metadata | Consider `missing-direct-dependency = "warn"` for packaged projects with complete dependency metadata that accept preview checks. |
-| Change how ty analyzes the project | Consider disabling `respect-type-ignore-comments` when adopting ty-specific suppressions, enabling `strict-generic-narrowing` for generic container checks, or setting `return-type-inference` to `"always"` during gradual migration. |
+| Change how ty analyzes the project | Consider enabling `strict-generic-narrowing` for generic container checks, or setting `return-type-inference` to `"always"` during gradual migration. |
 | Run trusted standalone scripts with inline dependencies | Consider `project-manager.script = "uv"` with uv 0.12.3 or newer. |
 
 The catalog also records which upstream defaults to leave in place and which settings inherit another decision. Each record identifies its release, reason and upstream source.

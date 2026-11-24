@@ -174,17 +174,7 @@ impl fmt::Display for Key {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Trigger {
-    ExplicitAny,
     LazyImport,
-    NumpyImport,
-    PandasValues,
-    ManualListCopy,
-    ManualDictLoop,
-    LocalImport,
-    SortedExtreme,
-    FirstElementSlice,
-    LoggingEagerConversion,
-    NoqaComment,
     PydanticModel,
     PydanticValidateCall,
     Division,
@@ -194,37 +184,20 @@ pub enum Trigger {
     DynamicReturn,
     DynamicAssignment,
     DynamicYield,
-    TyIgnoreComment,
     UnannotatedReturn,
     ContainerIsinstance,
     InlineScriptMetadata,
-    /// Ruff's preview mode is on and a selector names a group of rules.
-    PreviewBroadSelect,
     /// One of the record's `requires` rules runs.
     RuleActive,
-    /// The project lists its dependencies in `[project]`.
-    DeclaredDependencies,
     /// Ruff runs on this machine.
     RuffAvailable,
     /// Ruff leaves out a Python file that xpd checks.
     RuffSkipsPythonFile,
-    /// The project declares the pytest-timeout plugin.
-    TimeoutPlugin,
 }
 
 impl Trigger {
-    pub const ALL: [Self; 30] = [
-        Self::ExplicitAny,
+    pub const ALL: [Self; 16] = [
         Self::LazyImport,
-        Self::NumpyImport,
-        Self::PandasValues,
-        Self::ManualListCopy,
-        Self::ManualDictLoop,
-        Self::LocalImport,
-        Self::SortedExtreme,
-        Self::FirstElementSlice,
-        Self::LoggingEagerConversion,
-        Self::NoqaComment,
         Self::PydanticModel,
         Self::PydanticValidateCall,
         Self::Division,
@@ -234,16 +207,12 @@ impl Trigger {
         Self::DynamicReturn,
         Self::DynamicAssignment,
         Self::DynamicYield,
-        Self::TyIgnoreComment,
         Self::UnannotatedReturn,
         Self::ContainerIsinstance,
         Self::InlineScriptMetadata,
-        Self::PreviewBroadSelect,
         Self::RuleActive,
-        Self::DeclaredDependencies,
         Self::RuffAvailable,
         Self::RuffSkipsPythonFile,
-        Self::TimeoutPlugin,
     ];
 
     /// The trigger's name in the catalog, which is also its evidence rule's id.
@@ -255,12 +224,7 @@ impl Trigger {
     pub fn in_code(self) -> bool {
         !matches!(
             self,
-            Self::PreviewBroadSelect
-                | Self::RuleActive
-                | Self::DeclaredDependencies
-                | Self::RuffAvailable
-                | Self::RuffSkipsPythonFile
-                | Self::TimeoutPlugin
+            Self::RuleActive | Self::RuffAvailable | Self::RuffSkipsPythonFile
         )
     }
 }
@@ -707,6 +671,14 @@ impl Catalog {
                 && record.key.release == RUFF_RELEASE
                 && record.key.kind == Kind::Rule
         })
+    }
+
+    /// The code of the Ruff rule whose name is `name`, which Ruff accepts as a selector in
+    /// preview mode, or `name` itself when no rule has that name.
+    pub fn ruff_code<'a>(&'a self, name: &'a str) -> &'a str {
+        self.ruff_rules()
+            .find(|rule| rule.name.as_deref() == Some(name))
+            .map_or(name, |rule| rule.key.id.as_str())
     }
 
     /// The selector a Ruff redirect maps `selector` to, `Some(selector)` when no redirect

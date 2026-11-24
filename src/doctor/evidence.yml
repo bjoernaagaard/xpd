@@ -1,16 +1,3 @@
-# The code that makes a conditional decision of the doctor catalog relevant. Each rule's id is
-# the trigger that the catalog's records name. A match is evidence, not a verdict: the condition
-# of the record says what the developer still decides.
-id: explicit-any
-language: python
-rule:
-  matches: any-type
-  inside:
-    any:
-      - kind: typed_parameter
-      - kind: typed_default_parameter
-      - kind: function_definition
----
 id: lazy-import
 language: python
 rule:
@@ -25,95 +12,6 @@ rule:
             any:
               - kind: import_statement
               - kind: import_from_statement
----
-id: numpy-import
-language: python
-rule:
-  any:
-    - kind: import_statement
-      has: { kind: dotted_name, stopBy: end, regex: ^numpy(\.|$) }
-    - kind: import_from_statement
-      has: { field: module_name, regex: ^numpy(\.|$) }
----
-id: pandas-values
-language: python
-rule:
-  kind: attribute
-  all:
-    - has: { field: attribute, regex: ^values$ }
-    - not: { inside: { kind: call } }
-    - inside:
-        stopBy: end
-        kind: module
-        has:
-          stopBy: end
-          any:
-            - kind: import_statement
-              has: { kind: dotted_name, stopBy: end, regex: ^pandas$ }
-            - kind: import_from_statement
-              has: { field: module_name, regex: ^pandas(\.|$) }
----
-id: manual-list-copy
-language: python
-rule:
-  pattern: |
-    for $X in $Y:
-        $Z.append($X)
----
-id: manual-dict-loop
-language: python
-rule:
-  any:
-    - pattern: |
-        for $K, $V in $I:
-            $D[$K] = $V
-    - pattern: |
-        for $K in $I:
-            $D[$K] = $V
----
-id: local-import
-language: python
-rule:
-  any:
-    - kind: import_statement
-    - kind: import_from_statement
-  inside: { stopBy: end, kind: function_definition }
----
-id: sorted-extreme
-language: python
-rule:
-  any:
-    - pattern: sorted($$$A)[0]
-    - pattern: sorted($$$A)[-1]
----
-id: first-element-slice
-language: python
-rule:
-  any:
-    - pattern: list($X)[0]
-    - pattern: tuple($X)[0]
-    - pattern: list($X)[:1]
-    - pattern: "[*$X][0]"
----
-id: logging-eager-conversion
-language: python
-rule:
-  kind: call
-  all:
-    - has:
-        field: function
-        regex: ^(logging|logger|log|LOGGER|LOG|_logger|_log|self\.logger|self\.log)\.(debug|info|warning|error|critical|exception|log)$
-    - has:
-        field: arguments
-        has:
-          kind: call
-          has: { field: function, regex: ^(str|repr|ascii|oct|hex)$ }
----
-id: noqa-comment
-language: python
-rule:
-  kind: comment
-  regex: (?i)#\s*noqa\b
 ---
 id: pydantic-model
 language: python
@@ -241,12 +139,6 @@ rule:
         stopBy: end
         kind: function_definition
         has: { field: return_type, matches: narrow-annotation }
----
-id: ty-ignore-comment
-language: python
-rule:
-  kind: comment
-  regex: \bty:\s*ignore\b
 ---
 id: unannotated-return
 language: python

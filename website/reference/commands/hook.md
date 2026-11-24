@@ -117,8 +117,8 @@ In a project that records the profile, xpd compares the project with the profile
 files and runs `uv lock --check --offline` for each lock file, which reads uv's cache and never the
 network. Each difference is named by its file, setting and value, without a line number, so an
 edit elsewhere in `pyproject.toml` does not make an old difference look new. A difference that was not there when the session began holds the turn, with one line
-for each, such as `pyproject.toml tool.ruff.lint.extend-select: ruff PTH118 os-path-join is off,
-and the profile wants on`, or `uv.lock: the lock is out of date. xpd doctor --apply runs uv
+for each, such as `pyproject.toml tool.ruff.lint.ignore: ruff PTH118 os-path-join is off, by
+tool.ruff.lint.ignore = ["PTH118"], and the profile wants on`, or `uv.lock: the lock is out of date. xpd doctor --apply runs uv
 lock.` after the session added a dependency without locking it. So does a `[tool.xpd.profile]`
 table that the session removed. The agent undoes the change, runs `xpd doctor --apply`, or
 records an exception with its reason, as the doctor page describes. A difference that was there

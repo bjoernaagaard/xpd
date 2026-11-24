@@ -139,9 +139,11 @@ pub(crate) fn insert(array: &mut Array, index: usize, text: &str) {
     array.insert_formatted(index, value);
 }
 
-/// Removes the items at `indexes`. A comment before a removed item goes with it, and every item
-/// that stays keeps its own comments. In an array on one line, the new first item takes the
-/// spacing of the old one.
+/// Removes the items at `indexes`. A comment on the lines before a removed item and the comment
+/// after it on its own line go with it, and every item that stays keeps its own comments, also
+/// the comment after it on its line. `toml_edit` keeps that comment in the prefix of the next
+/// item, before its first line break, so the text up to that break moves to the item after a
+/// removed one. In an array on one line, the new first item takes the spacing of the old one.
 pub(crate) fn remove_items(array: &mut Array, indexes: &[usize]) {
     let first = array
         .get(0)
@@ -153,7 +155,30 @@ pub(crate) fn remove_items(array: &mut Array, indexes: &[usize]) {
     sorted.dedup();
     for index in sorted.into_iter().rev() {
         if index < array.len() {
+            let removed = prefix(array.get(index));
             array.remove(index);
+            let kept = removed
+                .split_once('\n')
+                .map(|(head, _)| head)
+                .filter(|head| head.contains('#'));
+            let next = if index < array.len() {
+                prefix(array.get(index))
+            } else {
+                array.trailing().as_str().unwrap_or_default().to_owned()
+            };
+            let joined = match next.split_once('\n') {
+                Some((head, rest)) => {
+                    let head = kept.unwrap_or(if head.contains('#') { "" } else { head });
+                    Some(format!("{head}\n{rest}"))
+                }
+                None => kept.map(|kept| format!("{kept}\n{next}")),
+            };
+            if let Some(joined) = joined {
+                match array.get_mut(index) {
+                    Some(value) => value.decor_mut().set_prefix(joined),
+                    None => array.set_trailing(joined),
+                }
+            }
         }
     }
     if let (Some(first), Some(value)) = (first, array.get_mut(0)) {
@@ -170,6 +195,15 @@ pub(crate) fn remove_items(array: &mut Array, indexes: &[usize]) {
         array.set_trailing("");
         array.set_trailing_comma(false);
     }
+}
+
+/// The text before `value`, empty when it has none.
+fn prefix(value: Option<&Value>) -> String {
+    value
+        .and_then(|value| value.decor().prefix())
+        .and_then(|prefix| prefix.as_str())
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// The strings of `array`, each with its index. Items that are no string are left out.
