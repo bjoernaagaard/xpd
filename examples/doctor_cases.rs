@@ -1,17 +1,19 @@
-//! Runs the real `xpd doctor` on disposable projects and checks what it suggests, record by
-//! record, beside what Ruff, ty and `xpd check` report on the same code.
+//! Runs the real `xpd doctor` on disposable projects and checks what it plans and suggests,
+//! record by record, beside what Ruff, ty and `xpd check` report on the same code.
 //!
 //! ```text
 //! cargo build
 //! cargo run --example doctor_cases -- target/debug/xpd --ruff <ruff 0.17.4> --ty <ty 0.0.106> \
-//!     [--newer-ruff <ruff 0.17.5>]
+//!     --uv <uv> [--newer-ruff <ruff 0.17.5>]
 //! ```
 //!
 //! Each project lives in a new temporary folder. A case puts only the checkers it names on
 //! `PATH`, and points `XDG_CONFIG_HOME` at an empty folder so that no user configuration leaks
-//! in. Three grouped projects cover every recommended and conditional record of the catalog:
+//! in. Three grouped projects cover every profile value and conditional record of the catalog:
 //! one where each applies, one where each is already in effect, and one without the evidence
-//! that a conditional record needs. A failure names the case and the record.
+//! that a conditional record needs. The profile cases run `--check` and `--apply` with uv on
+//! `PATH`: drift, an apply, the empty plan after it, exceptions and a newer revision. A failure
+//! names the case and the record.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -21,7 +23,7 @@ use std::process::{Command, ExitCode};
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
-use xpd::doctor::catalog::{self, Catalog, Target, When};
+use xpd::doctor::catalog::{self, Catalog, Decision, Target};
 
 fn main() -> ExitCode {
     match run() {
@@ -34,10 +36,11 @@ fn main() -> ExitCode {
     }
 }
 
-/// Which suggestions of the catalog a grouped case expects.
+/// Which records of the catalog a grouped case expects: the profile's values, which the plan
+/// changes, or the conditional suggestions.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Wanted {
-    Recommended,
+    Profile,
     Conditional,
 }
 
@@ -47,12 +50,14 @@ enum Bin {
     Ruff,
     Ty,
     NewerRuff,
+    Uv,
 }
 
 struct Runner {
     xpd: PathBuf,
     ruff: PathBuf,
     ty: PathBuf,
+    uv: PathBuf,
     newer_ruff: Option<PathBuf>,
     scratch: PathBuf,
     catalog: Catalog,
@@ -63,7 +68,7 @@ struct Runner {
 fn run() -> Result<bool> {
     let mut args = std::env::args_os().skip(1);
     let mut xpd = None;
-    let (mut ruff, mut ty, mut newer_ruff) = (None, None, None);
+    let (mut ruff, mut ty, mut uv, mut newer_ruff) = (None, None, None, None);
     while let Some(arg) = args.next() {
         let mut value = || {
             args.next()
@@ -73,6 +78,7 @@ fn run() -> Result<bool> {
         match arg.to_str() {
             Some("--ruff") => ruff = Some(value()?),
             Some("--ty") => ty = Some(value()?),
+            Some("--uv") => uv = Some(value()?),
             Some("--newer-ruff") => newer_ruff = Some(value()?),
             _ => xpd = Some(PathBuf::from(arg)),
         }
@@ -84,10 +90,11 @@ fn run() -> Result<bool> {
     fs::create_dir_all(&scratch)?;
     let mut runner = Runner {
         xpd: absolute(xpd.context(
-            "usage: doctor_cases <xpd> --ruff <path> --ty <path> [--newer-ruff <path>]",
+            "usage: doctor_cases <xpd> --ruff <path> --ty <path> --uv <path> [--newer-ruff <path>]",
         )?)?,
         ruff: absolute(ruff.context("--ruff is required")?)?,
         ty: absolute(ty.context("--ty is required")?)?,
+        uv: absolute(uv.context("--uv is required")?)?,
         newer_ruff: newer_ruff.map(absolute).transpose()?,
         scratch: scratch.clone(),
         catalog: Catalog::packaged()?,
@@ -192,6 +199,9 @@ impl Runner {
         self.versions()?;
         self.pytest_settings()?;
         self.pytest_plugins()?;
+        self.profile()?;
+        self.reviewed()?;
+        self.reviewed_again()?;
         Ok(())
     }
 
@@ -227,24 +237,24 @@ impl Runner {
                 .into_iter()
                 .filter(|id| id.starts_with("pytest:"))
                 .collect();
-            self.check((found != expected).then(|| format!("{name}: pytest advice is {found:?}")));
+            self.check(
+                (found != expected).then(|| format!("{name}: pytest changes are {found:?}")),
+            );
             let text = self.doctor_text(&project, &[])?;
             let expected_edit = match name {
-                "pytest-fresh" => r#"addopts = ["-ra", "--import-mode=importlib"]"#,
-                "pytest-configured" => {
-                    r#"add "--import-mode=importlib" to the existing addopts array at line 3"#
-                }
-                _ => "append -ra --import-mode=importlib inside the addopts string at line 2",
+                "pytest-fresh" => r#"+addopts = ["-ra", "--import-mode=importlib"]"#,
+                "pytest-configured" => r#"+addopts = ['-rA', "--import-mode=importlib"]"#,
+                _ => r#"+addopts = "-q --strict-markers -ra --import-mode=importlib""#,
             };
             self.check(
                 (!text.contains(expected_edit)).then(|| format!("{name}: missing {expected_edit}")),
             );
             self.check(
                 (!text.contains(&format!(
-                    "unverified locally (decisions for pytest {})",
+                    "pytest not found; its advice is for pytest {} and unverified locally",
                     catalog::PYTEST_RELEASE
                 )))
-                .then(|| format!("{name}: pytest advice should say unverified locally")),
+                .then(|| format!("{name}: pytest should be unverified locally")),
             );
         }
         Ok(())
@@ -284,26 +294,26 @@ impl Runner {
             "doctor text",
             &text,
             &[
-                "remove --reruns 2 from addopts at line 10",
-                "remove --reruns-delay=0.5 from addopts at line 11",
-                "remove reruns = 2 at line 13",
-                "remove reruns_delay = 0.5 at line 14",
-                "remove strict_xfail = false at line 15",
-                "remove xfail_strict = 'false' at line 16",
-                r#"remove "Pytest_RerunFailures>=16" from dev at line 4"#,
-                r#"remove "pytest-mock" from test at line 7"#,
-                r#"remove "flaky" from test at line 7"#,
-                r#"add "pytest-timeout", "pytest-randomly" to the existing dev array at line 2"#,
-                "uv add --dev pytest-timeout",
+                "pytest --reruns: --reruns 2 -> removed, tool.pytest.ini_options.addopts at line 9",
+                "pytest --reruns-delay: --reruns-delay=0.5 -> removed, tool.pytest.ini_options.addopts at line 9",
+                "pytest reruns: 2 -> removed, tool.pytest.ini_options.reruns at line 13",
+                "pytest reruns_delay: 0.5 -> removed, tool.pytest.ini_options.reruns_delay at line 14",
+                "pytest strict_xfail: false -> removed, tool.pytest.ini_options.strict_xfail at line 15",
+                "pytest xfail_strict: 'false' -> removed, tool.pytest.ini_options.xfail_strict at line 16",
+                r#"pytest plugin pytest-rerunfailures: "Pytest_RerunFailures>=16" -> removed, dependency-groups.dev at line 2"#,
+                r#"pytest plugin pytest-mock: "pytest-mock" -> removed, project.optional-dependencies.test at line 7"#,
+                r#"pytest plugin flaky: "flaky" -> removed, project.optional-dependencies.test at line 7"#,
+                "-    '-q', '--reruns', '2',\n-    '--reruns-delay=0.5',\n+    '-q',",
+                "uv.lock is out of date. --apply runs uv lock.",
             ],
-            &[],
+            &["uv add --dev"],
         );
         let report = self.doctor(&remove, &[])?;
-        let removals = report["suggestions"]
+        let removals = report["profile"]["changes"]
             .as_array()
-            .context("doctor suggestions")?
+            .context("the plan's changes")?
             .iter()
-            .filter(|suggestion| suggestion["decision"] == "remove")
+            .filter(|change| change["new"] == "removed")
             .count();
         self.check((removals != 9).then(|| format!("pytest-remove: {removals} JSON removals")));
 
@@ -321,10 +331,10 @@ impl Runner {
             &text,
             &[
                 r#"timeout = "<seconds>""#,
-                r#"add "pytest-randomly" to the existing qa array at line 2"#,
+                r#"+qa = ['pytest', 'pytest-timeout', "pytest-randomly"]"#,
                 "Evidence: pyproject.toml:2 pytest-timeout",
             ],
-            &["uv add --dev", r#"add "pytest-timeout""#],
+            &["uv add --dev", "pytest plugin pytest-timeout"],
         );
         Ok(())
     }
@@ -357,6 +367,7 @@ impl Runner {
                 Bin::Ruff => 'r',
                 Bin::Ty => 't',
                 Bin::NewerRuff => 'n',
+                Bin::Uv => 'u',
             });
         }
         let dir = self.scratch.join(name);
@@ -372,6 +383,7 @@ impl Runner {
                     .newer_ruff
                     .as_ref()
                     .context("--newer-ruff is required")?,
+                Bin::Uv => &self.uv,
             };
             let target = dir.join(source.file_name().context("an executable has a name")?);
             if fs::hard_link(source, &target).is_err() {
@@ -405,6 +417,20 @@ impl Runner {
             );
         }
         Ok(serde_json::from_slice(&output.stdout)?)
+    }
+
+    /// The exit code, standard output and standard error of `xpd doctor` with `args` in `dir`.
+    fn doctor_run(&self, dir: &Path, bins: &[Bin], args: &[&str]) -> Result<(i32, String, String)> {
+        let output = self
+            .command(&self.xpd, dir, bins)?
+            .arg("doctor")
+            .args(args)
+            .output()?;
+        Ok((
+            output.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&output.stdout).into_owned(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ))
     }
 
     fn doctor_text(&self, dir: &Path, bins: &[Bin]) -> Result<String> {
@@ -474,25 +500,82 @@ impl Runner {
         }
     }
 
-    /// The Ruff and ty recommendations, each as `tool:id` with its record key.
+    /// The Ruff and ty records of the profile or the conditional suggestions, each as `tool:id`
+    /// with its record key and whether it suggests a command.
     fn actionable(&self, decision: Wanted) -> Vec<(String, String, bool)> {
         self.catalog
-            .suggestions()
-            .filter(|(record, suggestion)| {
-                if record.key.tool == catalog::Tool::Pytest {
-                    return false;
-                }
-                let conditional = matches!(suggestion.when, When::If { .. });
-                conditional == (decision == Wanted::Conditional)
-            })
-            .map(|(record, suggestion)| {
-                (
-                    format!("{}:{}", record.key.tool.name(), record.key.id),
-                    record.key.to_string(),
-                    matches!(suggestion.target, Target::Command(_)),
-                )
+            .records()
+            .iter()
+            .filter(|record| record.key.tool != catalog::Tool::Pytest)
+            .filter_map(|record| {
+                let (wanted, command) = match &record.decision {
+                    Decision::Profile => (Wanted::Profile, false),
+                    Decision::Suggest(suggestion) => (
+                        Wanted::Conditional,
+                        matches!(suggestion.target, Target::Command(_)),
+                    ),
+                    _ => return None,
+                };
+                (wanted == decision).then(|| {
+                    (
+                        format!("{}:{}", record.key.tool.name(), record.key.id),
+                        record.key.to_string(),
+                        command,
+                    )
+                })
             })
             .collect()
+    }
+
+    /// The configuration of a project where every profile value and conditional record of the
+    /// catalog is in effect.
+    fn effective_config(&self) -> String {
+        let profiled = |tool| {
+            self.catalog
+                .records()
+                .iter()
+                .filter(move |record| {
+                    record.key.tool == tool && record.decision == Decision::Profile
+                })
+                .map(|record| record.key.id.clone())
+        };
+        let codes: Vec<String> = profiled(catalog::Tool::Ruff)
+            .chain(
+                self.catalog
+                    .suggestions()
+                    .filter_map(|(_, s)| match &s.target {
+                        Target::Select { code, .. } => Some(code.clone()),
+                        _ => None,
+                    }),
+            )
+            .map(|code| format!("\"{code}\""))
+            .collect();
+        let levels: Vec<String> = profiled(catalog::Tool::Ty)
+            .map(|rule| format!("{rule} = \"error\""))
+            .chain(
+                self.catalog
+                    .suggestions()
+                    .filter_map(|(_, s)| match &s.target {
+                        Target::Level { key, level } => Some(format!(
+                            "{} = \"{}\"",
+                            key.trim_start_matches("rules."),
+                            level.name()
+                        )),
+                        _ => None,
+                    }),
+            )
+            .collect();
+        format!(
+            "[project]\nname = \"effective\"\nversion = \"0.1.0\"\ndependencies = [\"pydantic\"]\n\n\
+             [tool.ruff.lint]\npreview = true\nexplicit-preview-rules = true\nselect = [\"E4\", \"TC\", {}]\n\n\
+             [tool.ruff.lint.flake8-tidy-imports]\nban-lazy = \"all\"\n\n\
+             [tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = {{ \"pydantic.BaseModel\" = \"required\" }}\nruntime-evaluated-decorators = {{ \"pydantic.validate_call\" = \"required\" }}\n\n\
+             [tool.ty.rules]\n{}\n\n\
+             [tool.ty.analysis]\nrespect-type-ignore-comments = false\nreturn-type-inference = \"always\"\nstrict-generic-narrowing = true\n\n\
+             [tool.ty.project-manager]\nscript = \"uv\"\n",
+            codes.join(", "),
+            levels.join("\n")
+        )
     }
 
     fn grouped(&mut self) -> Result<()> {
@@ -506,7 +589,7 @@ impl Runner {
         let report = self.doctor(&activation, &[Bin::Ruff, Bin::Ty])?;
         let found = suggested(&report);
         for (id, key, _) in self
-            .actionable(Wanted::Recommended)
+            .actionable(Wanted::Profile)
             .into_iter()
             .chain(self.actionable(Wanted::Conditional))
         {
@@ -515,37 +598,7 @@ impl Runner {
             );
         }
 
-        let codes: Vec<String> = self
-            .catalog
-            .suggestions()
-            .filter_map(|(_, s)| match &s.target {
-                Target::Select { code, .. } => Some(format!("\"{code}\"")),
-                _ => None,
-            })
-            .collect();
-        let levels: Vec<String> = self
-            .catalog
-            .suggestions()
-            .filter_map(|(_, s)| match &s.target {
-                Target::Level { key, level } => Some(format!(
-                    "{} = \"{}\"",
-                    key.trim_start_matches("rules."),
-                    level.name()
-                )),
-                _ => None,
-            })
-            .collect();
-        let effective_config = format!(
-            "[project]\nname = \"effective\"\nversion = \"0.1.0\"\ndependencies = [\"pydantic\"]\n\n\
-             [tool.ruff.lint]\npreview = true\nexplicit-preview-rules = true\nselect = [\"E4\", \"TC\", {}]\n\n\
-             [tool.ruff.lint.flake8-tidy-imports]\nban-lazy = \"all\"\n\n\
-             [tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = {{ \"pydantic.BaseModel\" = \"required\" }}\nruntime-evaluated-decorators = {{ \"pydantic.validate_call\" = \"required\" }}\n\n\
-             [tool.ty.rules]\n{}\n\n\
-             [tool.ty.analysis]\nrespect-type-ignore-comments = false\nreturn-type-inference = \"always\"\nstrict-generic-narrowing = true\n\n\
-             [tool.ty.project-manager]\nscript = \"uv\"\n",
-            codes.join(", "),
-            levels.join("\n")
-        );
+        let effective_config = self.effective_config();
         let effective = self.project("effective", &[
             ("pyproject.toml", &effective_config),
             ("typed/ruff.toml", "extend = \"../pyproject.toml\"\n\n[lint]\nextend-select = [\"ANN401\", \"ANN001\"]\n\n[lint.flake8-annotations]\nallow-star-arg-any = false\nignore-fully-untyped = false\n"),
@@ -555,7 +608,7 @@ impl Runner {
         let report = self.doctor(&effective, &[Bin::Ruff, Bin::Ty])?;
         let found = suggested(&report);
         for (id, key, command) in self
-            .actionable(Wanted::Recommended)
+            .actionable(Wanted::Profile)
             .into_iter()
             .chain(self.actionable(Wanted::Conditional))
         {
@@ -574,7 +627,7 @@ impl Runner {
         ])?;
         let report = self.doctor(&quiet, &[Bin::Ty])?;
         let found = suggested(&report);
-        for (id, key, _) in self.actionable(Wanted::Recommended) {
+        for (id, key, _) in self.actionable(Wanted::Profile) {
             self.check(
                 (!(found.contains(&id)))
                     .then(|| format!("quiet: no suggestion for the recommended {key}")),
@@ -596,8 +649,16 @@ impl Runner {
         let ruff = self.checker("ruff", &perf, &["."])?;
         self.expect_output("performance", "ruff", &ruff, &["RUF017"], &[]);
         let report = self.doctor(&perf, &both)?;
-        self.expect("performance on defaults", &report, &[], &["ruff:RUF017"]);
-        fs::write(perf.join("ruff.toml"), "[lint]\nselect = [\"E4\"]\n")?;
+        self.expect(
+            "performance on defaults, which the profile writes down",
+            &report,
+            &["ruff:RUF017"],
+            &[],
+        );
+        fs::write(
+            perf.join("pyproject.toml"),
+            "[tool.ruff.lint]\nselect = [\"E4\"]\n",
+        )?;
         let report = self.doctor(&perf, &both)?;
         self.expect(
             "performance with a narrow select",
@@ -776,9 +837,11 @@ impl Runner {
             &[],
             &["ruff:format.quote-style"],
         );
+        let advice = format!("{}{}", report["suggestions"], report["policies"]);
+        let changes = report["profile"]["changes"].to_string();
         self.check(
-            (report.to_string().contains("quote-style"))
-                .then(|| "formatting preference: the report names quote-style".to_owned()),
+            (advice.contains("quote-style") || changes.contains("quote-style"))
+                .then(|| "formatting preference: doctor advises on quote-style".to_owned()),
         );
 
         let lazy = self.project("lazy", &[("app.py", "__lazy_modules__ = [\"json\"]\nimport json\n\nprint(json.dumps(1))\n"), ("pyproject.toml", "[tool.ruff]\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nextend-select = [\"TID254\"]\n")])?;
@@ -838,7 +901,8 @@ impl Runner {
         self.broken_and_missing()
     }
 
-    /// A nested `ruff.toml` that extends its parent and ignores one rule for one file.
+    /// A nested `ruff.toml` that extends its parent and ignores one rule for one file. The plan
+    /// edits the root and names the nested file as a conflict.
     fn nested(&mut self) -> Result<()> {
         let both = [Bin::Ruff, Bin::Ty];
         let nested = self.project("nested", &[
@@ -861,30 +925,21 @@ impl Runner {
         );
         let report = self.doctor(&nested, &both)?;
         self.expect("nested scope", &report, &["ruff:PGH003"], &["ruff:PTH118"]);
-        let destinations: BTreeSet<String> = report["suggestions"]
+        let paths: BTreeSet<&str> = report["profile"]["changes"]
             .as_array()
             .into_iter()
             .flatten()
-            .filter(|s| s["tool"] == "ruff" && s["id"] == "PGH003")
-            .map(|s| {
-                format!(
-                    "{} [{}] {}",
-                    s["file"].as_str().unwrap_or_default(),
-                    s["table"].as_str().unwrap_or_default(),
-                    s["scope"].as_str().unwrap_or_default()
-                )
-            })
+            .filter(|c| c["tool"] == "ruff" && c["id"] == "PGH003")
+            .filter_map(|c| c["path"].as_str())
             .collect();
         self.check(
-            (!(destinations.contains("pyproject.toml [tool.ruff.lint] pyproject.toml")
-                && destinations.contains("sub/ruff.toml [] sub/ruff.toml")))
-            .then(|| format!("nested scope: PGH003 destinations are {destinations:?}")),
+            (paths != BTreeSet::from(["tool.ruff.lint.extend-select"]))
+                .then(|| format!("nested scope: PGH003 goes to {paths:?}")),
         );
-        let policies = report["policies"].to_string();
+        let conflicts = report["profile"]["conflicts"].to_string();
         self.check(
-            (!(policies.contains("PTH118 runs, except where")
-                && policies.contains("sub/ruff.toml")))
-            .then(|| format!("nested scope: no per-file policy for PTH118 in {policies}")),
+            (!conflicts.contains("Ruff reads sub/ruff.toml for the files below it"))
+                .then(|| format!("nested scope: no conflict for sub/ruff.toml in {conflicts}")),
         );
         let ruff = self.checker("ruff", &nested, &["."])?;
         self.expect_output(
@@ -898,7 +953,8 @@ impl Runner {
         Ok(())
     }
 
-    /// A `ty.toml` beside a `pyproject.toml` with a `[tool.ty]` table, and an override.
+    /// A `ty.toml` beside a `pyproject.toml` with a `[tool.ty]` table, and an override. The
+    /// plan names `ty.toml` as a conflict, and the advice reads it as ty does.
     fn shadow(&mut self) -> Result<()> {
         let both = [Bin::Ruff, Bin::Ty];
         let shadow = self.project("shadow", &[
@@ -911,19 +967,13 @@ impl Runner {
         self.expect(
             "shadowing ty.toml",
             &report,
-            &["ty:disjoint-cast"],
-            &["ty:unsound-return"],
+            &["ty:missing-type-argument"],
+            &["ty:disjoint-cast", "ty:unsound-return"],
         );
-        let ty_files: BTreeSet<&str> = report["suggestions"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|s| s["tool"] == "ty")
-            .filter_map(|s| s["file"].as_str())
-            .collect();
+        let conflicts = report["profile"]["conflicts"].to_string();
         self.check(
-            (ty_files != BTreeSet::from(["ty.toml"]))
-                .then(|| format!("shadowing ty.toml: ty suggestions go to {ty_files:?}")),
+            (!conflicts.contains("ty reads ty.toml instead of pyproject.toml"))
+                .then(|| format!("shadowing ty.toml: no conflict for ty.toml in {conflicts}")),
         );
         let notes = report["notes"].to_string();
         self.check(
@@ -965,16 +1015,12 @@ impl Runner {
                 ("app.py", "x = 1\n"),
             ],
         )?;
-        let report = self.doctor(&broken, &both)?;
-        let notes = report["notes"].to_string();
+        let (code, _, stderr) = self.doctor_run(&broken, &both, &["--format", "json"])?;
         self.check(
-            (!(notes.contains("pyproject.toml")
-                && notes.contains("cannot resolve Ruff's settings")))
-            .then(|| format!("malformed TOML: Ruff's note is {notes}")),
-        );
-        self.check(
-            (!(notes.contains("cannot read ty's settings") && notes.contains("TOML parse error")))
-                .then(|| format!("malformed TOML: ty's note is {notes}")),
+            (!(code == 2
+                && stderr.contains("pyproject.toml")
+                && stderr.contains("TOML parse error")))
+            .then(|| format!("malformed TOML: exit {code}, {stderr}")),
         );
 
         let plain = self.project(
@@ -993,25 +1039,16 @@ impl Runner {
             ("only ty", &[Bin::Ty][..], false, true),
         ] {
             let report = self.doctor(&plain, bins)?;
-            for (tool, verified, pinned) in [
-                ("ruff", ruff_verified, catalog::RUFF_RELEASE),
-                ("ty", ty_verified, catalog::TY_RELEASE),
-            ] {
-                let statuses: BTreeSet<&str> = report["suggestions"]
+            for (tool, verified) in [("ruff", ruff_verified), ("ty", ty_verified)] {
+                let installed = report["tools"]
                     .as_array()
                     .into_iter()
                     .flatten()
-                    .filter(|s| s["tool"] == tool)
-                    .filter_map(|s| s["status"].as_str())
-                    .collect();
-                let expected = if verified {
-                    format!("verified with {tool} {pinned} (decisions reviewed for {pinned})")
-                } else {
-                    format!("unverified locally (decisions for {tool} {pinned})")
-                };
+                    .find(|status| status["tool"] == tool)
+                    .map(|status| !status["installed"].is_null());
                 self.check(
-                    (statuses != BTreeSet::from([expected.as_str()]))
-                        .then(|| format!("{case}: {tool} statuses are {statuses:?}")),
+                    (installed != Some(verified))
+                        .then(|| format!("{case}: {tool} found is {installed:?}")),
                 );
             }
             self.expect(case, &report, &["ruff:PTH118", "ty:disjoint-cast"], &[]);
@@ -1074,12 +1111,596 @@ impl Runner {
     }
 }
 
-/// Each suggestion of `report` as `tool:id`.
+impl Runner {
+    /// Drift, an apply, the empty plan after it, exceptions, and a revision from a newer xpd.
+    fn profile(&mut self) -> Result<()> {
+        let bins = [Bin::Uv];
+        let project = self.project(
+            "profile",
+            &[
+                (
+                    "pyproject.toml",
+                    concat!(
+                        "[project]\n",
+                        "name = \"profiled\"\n",
+                        "version = \"0.1.0\"\n",
+                        "requires-python = \">=3.12\"\n",
+                        "\n",
+                        "[tool.ruff.lint]\n",
+                        "ignore = [\"RUF100\"]\n",
+                        "\n",
+                        "[tool.ruff.lint.per-file-ignores]\n",
+                        "\"scripts/*.py\" = [\"PTH118\"]\n",
+                    ),
+                ),
+                (
+                    "scripts/run.py",
+                    "import os\n\nPATH = os.path.join(\"a\", \"b\")\n",
+                ),
+            ],
+        )?;
+        let (code, out, _) = self.doctor_run(&project, &bins, &["--check", "--format", "text"])?;
+        self.check((code != 1).then(|| format!("profile: --check on drift exits {code}:\n{out}")));
+        self.expect_output(
+            "profile drift",
+            "doctor --check",
+            &out,
+            &[
+                "-ignore = [\"RUF100\"]\n+ignore = []",
+                "+extend-select = [\"PTH118\", \"PERF101\", \"PERF102\", \"PGH003\", \"PGH004\", \"RUF017\", \"RUF100\"]",
+                "ruff RUF100 unused-noqa: off, by tool.ruff.lint.ignore = [\"RUF100\"] -> on",
+                "ruff PTH118 os-path-join: off for scripts/*.py -> on",
+                "uv.lock is missing. --apply runs uv lock.",
+                "kind application, suggested because [project] has no [build-system]",
+            ],
+            &[],
+        );
+        let (code, _, err) = self.doctor_run(&project, &bins, &["--apply"])?;
+        self.check(
+            (!(code == 2 && err.contains("--kind application")))
+                .then(|| format!("profile: apply without a kind exits {code}: {err}")),
+        );
+
+        let exception = concat!(
+            "\n[[tool.xpd.profile.exceptions]]\n",
+            "tool = \"ruff\"\n",
+            "id = \"PTH118\"\n",
+            "files = [\"scripts/*.py\"]\n",
+            "reason = \"The scripts hand str paths to a tool that rejects Path objects.\"\n",
+        );
+        let file = project.join("pyproject.toml");
+        let mut text = fs::read_to_string(&file)?;
+        text.push_str(exception);
+        fs::write(&file, &text)?;
+        let args = ["--apply", "--kind", "application", "--format", "text"];
+        let (code, out, err) = self.doctor_run(&project, &bins, &args)?;
+        self.check((code != 0).then(|| format!("profile: apply exits {code}: {err}")));
+        self.expect_output(
+            "profile apply",
+            "doctor --apply",
+            &out,
+            &[
+                "Applied profile revision 1, kind application, to pyproject.toml.",
+                "Ran uv lock, which wrote uv.lock.",
+            ],
+            &["off for scripts/*.py -> on"],
+        );
+        let written = fs::read_to_string(&file)?;
+        self.expect_output(
+            "profile apply",
+            "pyproject.toml",
+            &written,
+            &[
+                "\"scripts/*.py\" = [\"PTH118\"]",
+                "[tool.xpd.profile]\nrevision = 1\nkind = \"application\"",
+            ],
+            &["ignore = [\"RUF100\"]"],
+        );
+        self.check(
+            (!project.join("uv.lock").is_file())
+                .then(|| "profile: apply wrote no uv.lock".to_owned()),
+        );
+        self.check(
+            project
+                .join(".xpd-apply")
+                .exists()
+                .then(|| "profile: apply left its journal".to_owned()),
+        );
+        let ruff = self.checker("ruff", &project, &["."])?;
+        self.expect_output(
+            "profile apply",
+            "ruff",
+            &ruff,
+            &["All checks passed"],
+            &["PTH118"],
+        );
+
+        let (code, out, _) = self.doctor_run(&project, &bins, &["--check", "--format", "text"])?;
+        self.check(
+            (code != 0).then(|| format!("profile: --check after apply exits {code}:\n{out}")),
+        );
+        self.expect_output(
+            "profile second plan",
+            "doctor --check",
+            &out,
+            &[
+                "The project matches profile revision 1.",
+                "ruff PTH118 for scripts/*.py: valid",
+            ],
+            &["---"],
+        );
+        let (code, out, _) = self.doctor_run(&project, &bins, &["--apply", "--format", "text"])?;
+        self.check(
+            (!(code == 0 && out.contains("Nothing to apply")))
+                .then(|| format!("profile: second apply exits {code}:\n{out}")),
+        );
+
+        let before = fs::read_to_string(&file)?;
+        fs::write(
+            &file,
+            format!(
+                "{before}\n[[tool.xpd.profile.exceptions]]\ntool = \"pytest\"\nid = \"pytest-mock\"\nreason = \"Mocks are fast.\"\n"
+            ),
+        )?;
+        let (code, out, _) = self.doctor_run(&project, &bins, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest pytest-mock: invalid")))
+                .then(|| format!("profile: a forbidden exception exits {code}:\n{out}")),
+        );
+        let (code, _, err) = self.doctor_run(&project, &bins, &["--apply"])?;
+        self.check(
+            (!(code == 2 && err.contains("no exception keeps it")))
+                .then(|| format!("profile: apply with a forbidden exception exits {code}: {err}")),
+        );
+
+        fs::write(&file, before.replace("revision = 1", "revision = 99"))?;
+        let (code, _, err) = self.doctor_run(&project, &bins, &["--apply"])?;
+        self.check(
+            (!(code == 2 && err.contains("records profile revision 99")))
+                .then(|| format!("profile: apply on a newer revision exits {code}: {err}")),
+        );
+        Ok(())
+    }
+}
+
+impl Runner {
+    /// The faults an independent review found, each run the way it reported them: pytest strict
+    /// options turned off or overridden, a pytest 8 requirement, a ty override that lowers `all`,
+    /// a script kind without scripts, an invalid file pattern, an exception for another pytest
+    /// release, plugin placement, a comment in a dependency list, the Stop baseline, and an
+    /// ambiguous pytest layout.
+    fn reviewed(&mut self) -> Result<()> {
+        self.reviewed_pytest()?;
+        self.reviewed_layout()?;
+        self.reviewed_lists()?;
+        self.stop_baseline()
+    }
+
+    /// Strict options turned off or overridden, and a pytest 8 requirement.
+    fn reviewed_pytest(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"reviewed\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+
+        let strict = self.project(
+            "strict-off",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest>=9\"]\n\n[tool.pytest]\nstrict = true\nstrict_markers = false\naddopts = [\"-ra\", \"--import-mode=importlib\"]\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&strict, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest strict_markers: false -> removed")))
+                .then(|| format!("strict-off: --check exits {code}:\n{out}")),
+        );
+
+        let overridden = self.project(
+            "overridden",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest>=9\"]\n\n[tool.pytest]\nstrict = true\naddopts = [\"-ra\", \"--import-mode=importlib\", \"-o\", \"strict=false\", \"-p\", \"no:randomly\"]\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&overridden, &uv, &["--check", "--format", "text"])?;
+        self.expect_output(
+            "overridden",
+            "doctor --check",
+            &out,
+            &[
+                "addopts overrides strict with -o strict=false",
+                "addopts turns off the plugin randomly with -p no:randomly",
+            ],
+            &[],
+        );
+        self.check((code != 1).then(|| format!("overridden: --check exits {code}")));
+        let (code, _, _) =
+            self.doctor_run(&overridden, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 2).then(|| format!("overridden: --apply exits {code}")));
+
+        let eight = self.project(
+            "pytest-eight",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest==8.4.2\"]\n"),
+            )],
+        )?;
+        let text = self.doctor_text(&eight, &uv)?;
+        self.expect_output(
+            "pytest 8 declared",
+            "doctor text",
+            &text,
+            &[
+                "+[tool.pytest.ini_options]",
+                "+xfail_strict = true",
+                "+addopts = \"-ra --import-mode=importlib --strict-markers --strict-config\"",
+            ],
+            &["+strict = true", "+[tool.pytest]\n"],
+        );
+
+        Ok(())
+    }
+
+    /// A ty override that lowers `all`, a script kind without scripts, and an invalid pattern.
+    fn reviewed_layout(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"reviewed\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+        let lowered = self.project(
+            "ty-all",
+            &[
+                (
+                    "pyproject.toml",
+                    &format!("{head}\n[[tool.ty.overrides]]\ninclude = [\"sample.py\"]\n\n[tool.ty.overrides.rules]\nall = \"ignore\"\n"),
+                ),
+                ("sample.py", "x: int = \"a\"  # ty: ignore\n"),
+            ],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&lowered, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("ty-all: --apply exits {code}: {err}")));
+        let ty = self.checker("ty", &lowered, &["sample.py"])?;
+        self.expect_output("ty-all", "ty", &ty, &["error[blanket-ignore-comment]"], &[]);
+
+        let script = self.project(
+            "script-kind",
+            &[("pyproject.toml", head), ("tool.py", "print(1)\n")],
+        )?;
+        let (code, _, err) = self.doctor_run(&script, &uv, &["--apply", "--kind", "script"])?;
+        self.check(
+            (!(code == 2
+                && err.contains("keeps pyproject.toml to the [tool] table, and it has [project]")
+                && err.contains("needs Python files with inline script metadata")))
+            .then(|| format!("script-kind: --apply exits {code}: {err}")),
+        );
+
+        let glob = self.project(
+            "bad-glob",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[[tool.xpd.profile.exceptions]]\ntool = \"ruff\"\nid = \"PTH118\"\nfiles = [\"[\"]\nreason = \"The scripts take str paths.\"\n"),
+            )],
+        )?;
+        let (code, _, err) = self.doctor_run(&glob, &uv, &["--apply", "--kind", "application"])?;
+        self.check(
+            (!(code == 2 && err.contains("is no file pattern Ruff reads")))
+                .then(|| format!("bad-glob: --apply exits {code}: {err}")),
+        );
+
+        Ok(())
+    }
+
+    /// An exception for another pytest release, plugin placement, a comment in a dependency list,
+    /// and two pytest tables.
+    fn reviewed_lists(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"reviewed\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+        let inactive = self.project(
+            "inactive",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest>=9\"]\n\n[[tool.xpd.profile.exceptions]]\ntool = \"pytest\"\nid = \"--strict-config\"\nreason = \"The config has a plugin's keys.\"\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&inactive, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest --strict-config: redundant")))
+                .then(|| format!("inactive: --check exits {code}:\n{out}")),
+        );
+        let (code, _, _) =
+            self.doctor_run(&inactive, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 2).then(|| format!("inactive: --apply exits {code}")));
+
+        let runtime = self.project(
+            "runtime-pytest",
+            &[(
+                "pyproject.toml",
+                "[project]\nname = \"runtime\"\nversion = \"0.1.0\"\ndependencies = [\"pytest\"]\n",
+            )],
+        )?;
+        let report = self.doctor(&runtime, &uv)?;
+        let paths: BTreeSet<String> = report["profile"]["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| c["id"] == "pytest-timeout" || c["id"] == "pytest-randomly")
+            .filter_map(|c| c["path"].as_str().map(str::to_owned))
+            .collect();
+        self.check(
+            (paths != BTreeSet::from(["project.dependencies".to_owned()]))
+                .then(|| format!("runtime-pytest: plugins go to {paths:?}")),
+        );
+
+        let comment = self.project(
+            "comment",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\n    \"pytest-rerunfailures\",\n    # Keep pytest with the dev dependencies.\n    \"pytest>=9\",\n]\n"),
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&comment, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("comment: --apply exits {code}: {err}")));
+
+        let both = self.project(
+            "both-tables",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[tool.pytest]\nstrict = true\n\n[tool.pytest.ini_options]\naddopts = \"-q\"\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&both, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 2
+                && out.contains(
+                    "[tool.pytest] and [tool.pytest.ini_options] both contain settings",
+                )))
+            .then(|| format!("both-tables: --check exits {code}:\n{out}")),
+        );
+        Ok(())
+    }
+
+    /// A Stop after an edit that only moves an invalid exception down one line holds nothing,
+    /// and the session file records the profile revision of the baseline.
+    fn stop_baseline(&mut self) -> Result<()> {
+        let project = self.project(
+            "stop-baseline",
+            &[(
+                "pyproject.toml",
+                "[project]\nname = \"stop\"\nversion = \"0.1.0\"\n\n[tool.xpd.profile]\nrevision = 1\nkind = \"application\"\n\n[[tool.xpd.profile.exceptions]]\ntool = \"ruff\"\nid = \"PTH118\"\nreason = \"\"\n",
+            )],
+        )?;
+        let cache = self.scratch.join("hook-cache");
+        let hook = |event: &str| -> Result<String> {
+            let mut child = self
+                .command(&self.xpd, &project, &[])?
+                .arg("hook")
+                .env("XDG_CACHE_HOME", &cache)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()?;
+            std::io::Write::write_all(
+                child.stdin.as_mut().context("the hook takes stdin")?,
+                event.as_bytes(),
+            )?;
+            let output = child.wait_with_output()?;
+            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        };
+        let cwd = project.display().to_string();
+        hook(&format!(
+            r#"{{"hook_event_name":"SessionStart","session_id":"baseline","cwd":"{cwd}","source":"startup"}}"#
+        ))?;
+        let session = fs::read_to_string(cache.join("xpd").join("sessions").join("baseline"))?;
+        let file = project.join("pyproject.toml");
+        let text = fs::read_to_string(&file)?;
+        fs::write(&file, format!("# Project metadata\n{text}"))?;
+        let answer = hook(&format!(
+            r#"{{"hook_event_name":"Stop","session_id":"baseline","cwd":"{cwd}"}}"#
+        ))?;
+        self.check(
+            (!session.contains(r#""drift":{"revision":1"#))
+                .then(|| format!("stop-baseline: the session file holds {session}")),
+        );
+        self.check(
+            (answer.contains("\"block\"") || !answer.contains("did not make"))
+                .then(|| format!("stop-baseline: Stop answered {answer}")),
+        );
+        Ok(())
+    }
+}
+
+impl Runner {
+    /// The faults a second review found: a Ruff release whose defaults differ, a pytest lock that
+    /// the apply refreshes, plugin autoload turned off, a nested pytest file, positional
+    /// arguments in `addopts`, an `addopts` that already complies, a script kind with a
+    /// dependency table, and the permissions of `pyproject.toml`.
+    fn reviewed_again(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"again\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+
+        let old_ruff = self.project(
+            "old-ruff",
+            &[
+                (
+                    "pyproject.toml",
+                    &format!("{head}\n[dependency-groups]\ndev = [\"ruff==0.9.10\"]\n"),
+                ),
+                ("example.py", "x = 1\n"),
+            ],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&old_ruff, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("old-ruff: --apply exits {code}: {err}")));
+        let shown = self
+            .command(&self.uv, &old_ruff, &uv)?
+            .args([
+                "run",
+                "--quiet",
+                "--locked",
+                "ruff",
+                "check",
+                "--show-settings",
+                "example.py",
+            ])
+            .output()?;
+        let shown = String::from_utf8_lossy(&shown.stdout);
+        for code in [
+            "PTH118", "PERF101", "PERF102", "PGH003", "PGH004", "RUF017", "RUF100",
+        ] {
+            self.check(
+                (!shown.contains(&format!("({code})")))
+                    .then(|| format!("old-ruff: ruff 0.9.10 does not run {code}")),
+            );
+        }
+
+        let stale = self.project(
+            "stale-lock",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest==9.2.0\"]\n"),
+            )],
+        )?;
+        let locked = self
+            .command(&self.uv, &stale, &uv)?
+            .args(["lock", "--quiet"])
+            .status()?;
+        self.check((!locked.success()).then(|| "stale-lock: uv lock failed".to_owned()));
+        let file = stale.join("pyproject.toml");
+        fs::write(
+            &file,
+            fs::read_to_string(&file)?.replace("pytest==9.2.0", "pytest==8.4.2"),
+        )?;
+        let (code, _, err) = self.doctor_run(&stale, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("stale-lock: --apply exits {code}: {err}")));
+        let written = fs::read_to_string(&file)?;
+        self.check(
+            (!written.contains("[tool.pytest.ini_options]\nxfail_strict = true"))
+                .then(|| format!("stale-lock: the file is\n{written}")),
+        );
+
+        let autoload = self.project(
+            "autoload",
+            &[("pyproject.toml", &format!("{head}\n[dependency-groups]\ndev = [\"pytest==9.2.0\"]\n\n[tool.pytest]\naddopts = [\"--disable-plugin-autoload\"]\n"))],
+        )?;
+        let (code, out, _) = self.doctor_run(&autoload, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1
+                && out.contains(
+                    "--disable-plugin-autoload, so pytest-timeout and pytest-randomly do not run",
+                )))
+            .then(|| format!("autoload: --check exits {code}:\n{out}")),
+        );
+
+        let nested = self.project(
+            "nested-pytest",
+            &[
+                ("pyproject.toml", head),
+                (
+                    "tests/pytest.ini",
+                    "[pytest]\naddopts = --import-mode=prepend\n",
+                ),
+            ],
+        )?;
+        let (code, out, _) = self.doctor_run(&nested, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest reads tests/pytest.ini when it runs below it")))
+                .then(|| format!("nested-pytest: --check exits {code}:\n{out}")),
+        );
+        self.reviewed_addopts(head)
+    }
+
+    /// Positional arguments after `--`, a compliant `addopts` with extra spaces, a script kind with
+    /// a dependency table, and the permissions of `pyproject.toml`.
+    fn reviewed_addopts(&mut self, head: &str) -> Result<()> {
+        let uv = [Bin::Uv];
+        let positional = self.project(
+            "positional",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[tool.pytest.ini_options]\naddopts = \"-q -- tests\"\n"),
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&positional, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("positional: --apply exits {code}: {err}")));
+        let written = fs::read_to_string(positional.join("pyproject.toml"))?;
+        self.check(
+            (!written.contains("addopts = \"-q -ra --import-mode=importlib -- tests\""))
+                .then(|| format!("positional: the file is\n{written}")),
+        );
+
+        let spaced = "addopts = \"  -ra    --import-mode=importlib  \"";
+        let compliant = self.project(
+            "spaced",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[tool.pytest.ini_options]\n{spaced}\nstrict = true\n"),
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&compliant, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("spaced: --apply exits {code}: {err}")));
+        let (code, out, _) = self.doctor_run(&compliant, &uv, &["--check", "--format", "text"])?;
+        let written = fs::read_to_string(compliant.join("pyproject.toml"))?;
+        self.check(
+            (!(code == 0 && !out.contains("addopts") && written.contains(spaced)))
+                .then(|| format!("spaced: --check exits {code}:\n{out}\n{written}")),
+        );
+
+        let script = self.project(
+            "script-groups",
+            &[
+                ("pyproject.toml", "[dependency-groups]\ndev = [\"pytest==9.2.0\"]\n"),
+                ("tool.py", "# /// script\n# requires-python = \">=3.12\"\n# dependencies = []\n# ///\nprint(1)\n"),
+            ],
+        )?;
+        let (code, _, err) = self.doctor_run(&script, &uv, &["--apply", "--kind", "script"])?;
+        self.check(
+            (!(code == 2
+                && err.contains(
+                    "keeps pyproject.toml to the [tool] table, and it has [dependency-groups]",
+                )))
+            .then(|| format!("script-groups: --apply exits {code}: {err}")),
+        );
+        self.permissions(head)
+    }
+
+    /// Apply keeps the permissions of the `pyproject.toml` it replaces.
+    #[cfg(unix)]
+    fn permissions(&mut self, head: &str) -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        let private = self.project("private", &[("pyproject.toml", head)])?;
+        let file = private.join("pyproject.toml");
+        fs::set_permissions(&file, fs::Permissions::from_mode(0o600))?;
+        let (code, _, err) =
+            self.doctor_run(&private, &[Bin::Uv], &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("private: --apply exits {code}: {err}")));
+        let mode = fs::metadata(&file)?.permissions().mode() & 0o777;
+        self.check((mode != 0o600).then(|| format!("private: the mode is {mode:o}")));
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn permissions(&mut self, _head: &str) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// Each suggestion of `report`, and each change of its plan but the profile record, as
+/// `tool:id`.
 fn suggested(report: &Value) -> BTreeSet<String> {
+    let changes = report["profile"]["changes"]
+        .as_array()
+        .into_iter()
+        .flatten();
     report["suggestions"]
         .as_array()
         .into_iter()
         .flatten()
+        .chain(changes)
+        .filter(|s| s["tool"] != "xpd")
         .map(|s| {
             format!(
                 "{}:{}",

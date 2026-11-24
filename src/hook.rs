@@ -50,6 +50,9 @@ const MOST_CHARACTERS: usize = 2000;
 const MOST_NAMED: usize = 3;
 /// The rules with the most issues that a prompt answer names.
 const TOP_RULES: usize = 5;
+/// The most lines of drift from the profile that was there before the turn, which the Stop
+/// check names in its notice.
+const MOST_NOTICES: usize = 5;
 /// A prompt with one of these phrases asks what to make or what to improve.
 const OPEN_ASKS: [&str; 12] = [
     "what should i",
@@ -243,7 +246,7 @@ pub(crate) fn run() -> ExitCode {
         HookEvent::Stop { session, cwd, turn } => stop(&session, &cwd, turn),
     });
     answered.unwrap_or_else(|e| {
-        eprintln!("xpd hook: {e:#}");
+        eprintln!("xpd hook: {}", crate::output::redact(&format!("{e:#}")));
         ExitCode::from(FAILED)
     })
 }
@@ -259,14 +262,21 @@ fn session_start(session: &str, cwd: &Path, source: Source) -> Result<ExitCode> 
         (records.iter()).any(|record| matches!(record, Record::Start(_) | Record::Opened { .. }));
     // A resumed session begins again, because the files that changed while it was closed are
     // not its own. A compaction happens inside a session, so the first record stays.
+    let root = project_root(cwd)?;
     if source == Source::Opened || !began {
         let at = now();
         let git = repository(cwd)
             .map(|top| GitBaseline::capture(top, at))
             .transpose()?;
         session.append(&Record::Opened { at, git })?;
+        if let Some(baseline) = profile_drift(&root) {
+            session.append(&Record::Profile {
+                root: root.clone(),
+                baseline,
+            })?;
+        }
     }
-    let cwd = project_root(cwd)?;
+    let cwd = root;
     let files = project_files(&cwd, MOST_FILES);
     if !files.is_empty() {
         print_context(&brief(&cwd, &files)?);
@@ -654,11 +664,18 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
     let lines = |found: Vec<Finding>| -> Vec<String> {
         found.into_iter().map(|finding| finding.line).collect()
     };
-    let (held, advice) = (lines(held), lines(advice));
+    let (findings, advice) = (lines(held), lines(advice));
+    let profile = profile_turn(&cwd, &records);
+    let mut held = findings.clone();
+    held.extend(profile.added.iter().cloned());
     let last = (records.iter().rev())
         .find_map(|record| match record {
             Record::Held(lines) => Some(lines.as_slice()),
-            Record::Opened { .. } | Record::Start(_) | Record::Began(_) | Record::Edited(_) => None,
+            Record::Opened { .. }
+            | Record::Start(_)
+            | Record::Began(_)
+            | Record::Edited(_)
+            | Record::Profile { .. } => None,
         })
         .unwrap_or_default();
     // The agent saw this list when the hook held the turn, and it stopped again with the same
@@ -671,14 +688,26 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
     }
     let mut text = Vec::new();
     if holds {
-        text.push(
-            "xpd holds this turn, because the Python files that this session changed have \
-             errors or warnings. Fix each line below. When the code is right as it is, write \
-             `# ast-grep-ignore: <pack>/<rule>` on the line above it, with the reason after the \
-             rule."
-                .to_owned(),
-        );
-        text.extend(held);
+        if !findings.is_empty() {
+            text.push(
+                "xpd holds this turn, because the Python files that this session changed have \
+                 errors or warnings. Fix each line below. When the code is right as it is, write \
+                 `# ast-grep-ignore: <pack>/<rule>` on the line above it, with the reason after \
+                 the rule."
+                    .to_owned(),
+            );
+            text.extend(findings);
+        }
+        if !profile.added.is_empty() {
+            text.push(
+                "xpd holds this turn, because this session moved the project away from the \
+                 profile that its [tool.xpd.profile] table records. Undo each change below, \
+                 run `xpd doctor --apply`, or record an exception with its reason in \
+                 [tool.xpd.profile], and run `xpd doctor --check` to confirm."
+                    .to_owned(),
+            );
+            text.extend(profile.added);
+        }
         if !advice.is_empty() {
             text.push("The lines below are advice, and they do not hold the turn.".to_owned());
         }
@@ -693,6 +722,7 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
         text.push("xpd has advice on the Python files that this session changed.".to_owned());
     }
     text.extend(advice);
+    text.extend(profile.notices);
     let text = text.join("\n");
     if holds {
         println!("{}", json!({ "decision": "block", "reason": text }));
@@ -767,9 +797,11 @@ fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
         (records.iter())
             .filter_map(|record| match record {
                 Record::Edited(file) => Some(file.clone()),
-                Record::Opened { .. } | Record::Start(_) | Record::Began(_) | Record::Held(_) => {
-                    None
-                }
+                Record::Opened { .. }
+                | Record::Start(_)
+                | Record::Began(_)
+                | Record::Held(_)
+                | Record::Profile { .. } => None,
             })
             .collect()
     };
@@ -976,9 +1008,161 @@ enum Record {
     Began(u64),
     /// A Python file that a tool call changed.
     Edited(PathBuf),
-    /// The errors and warnings that the last Stop check held the turn on. Empty when it let
-    /// the turn end.
+    /// The errors and warnings that the last Stop check held the turn on, and the drift from
+    /// the profile that it held the turn on. Empty when it let the turn end.
     Held(Vec<String>),
+    /// The drift from `xpd doctor`'s profile when the session opened, in the project at `root`,
+    /// which records the profile.
+    Profile { root: PathBuf, baseline: Baseline },
+}
+
+/// What a project's drift from the profile was at one moment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Baseline {
+    /// One line for each difference, as `xpd doctor --check` names it, from the profile of
+    /// `revision`, and one line for each lock file that uv could not check offline.
+    Drift {
+        revision: i64,
+        lines: Vec<String>,
+        #[serde(default)]
+        unverified: Vec<String>,
+    },
+    /// Why xpd could not compare the project with the profile.
+    Unreadable(String),
+}
+
+/// The drift of the project at `root` from the profile it records. `None` when it records none.
+fn profile_drift(root: &Path) -> Option<Baseline> {
+    let files: Vec<PathBuf> = project_files(root, MOST_FILES)
+        .into_iter()
+        .map(|file| root.join(file))
+        .collect();
+    crate::doctor::drift(root, &files).map(|drift| match drift {
+        Ok(drift) => Baseline::Drift {
+            revision: drift.revision,
+            lines: drift.lines,
+            unverified: drift.unverified,
+        },
+        Err(error) => Baseline::Unreadable(format!("{error:#}")),
+    })
+}
+
+/// What the Stop check says about the profile: the drift this session added, which holds the
+/// turn, and notices about the rest, which do not.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ProfileTurn {
+    added: Vec<String>,
+    notices: Vec<String>,
+}
+
+/// Compares the project's drift from the profile now with the drift when the session opened.
+fn profile_turn(root: &Path, records: &[Record]) -> ProfileTurn {
+    let opened = records
+        .iter()
+        .rposition(|record| matches!(record, Record::Start(_) | Record::Opened { .. }));
+    let opening = records[opened.unwrap_or(0)..]
+        .iter()
+        .find_map(|record| match record {
+            Record::Profile {
+                root: recorded,
+                baseline,
+            } if recorded == root => Some(baseline),
+            _ => None,
+        });
+    compare_drift(opening, profile_drift(root))
+}
+
+/// The drift that is new since `opening`, and a notice for each lock file that uv cannot check
+/// now. Without an opening baseline that xpd could read, the drift now is a notice, because xpd
+/// cannot tell whether the session made it.
+fn compare_drift(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTurn {
+    let unverified = match &now {
+        Some(Baseline::Drift { unverified, .. }) => unverified.clone(),
+        _ => Vec::new(),
+    };
+    let mut turn = compare_lines(opening, now);
+    turn.notices.extend(unverified.into_iter().map(|line| {
+        format!("xpd cannot tell whether this session left a lock file out of date: {line}")
+    }));
+    turn
+}
+
+/// The difference lines that are new since `opening`. A line about a lock file that uv could not
+/// check when the session opened is a notice, because xpd cannot tell whether the session made it.
+fn compare_lines(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTurn {
+    let notice = |lines: Vec<String>| {
+        if lines.is_empty() {
+            return Vec::new();
+        }
+        let mut notices = vec![format!(
+            "The project has {} from its profile that this session did not make. `xpd doctor` shows them, and `xpd doctor --apply` fixes them.",
+            counted(lines.len(), "difference")
+        )];
+        notices.extend(lines.into_iter().take(MOST_NOTICES));
+        notices
+    };
+    match (opening, now) {
+        (_, None) | (None, Some(Baseline::Unreadable(_))) => match opening {
+            Some(_) => ProfileTurn {
+                added: vec![
+                    "pyproject.toml no longer records the profile in [tool.xpd.profile]."
+                        .to_owned(),
+                ],
+                notices: Vec::new(),
+            },
+            None => ProfileTurn::default(),
+        },
+        (Some(_), Some(Baseline::Unreadable(error))) => ProfileTurn {
+            added: Vec::new(),
+            notices: vec![format!(
+                "xpd cannot compare the project with its profile: {error}"
+            )],
+        },
+        (
+            Some(Baseline::Drift {
+                revision: opened, ..
+            }),
+            Some(Baseline::Drift {
+                revision: current,
+                lines: now,
+                ..
+            }),
+        ) if *opened != current => {
+            let mut notices = vec![format!(
+                "The profile moved from revision {opened} to revision {current} during this session, so xpd does not hold the turn for its differences."
+            )];
+            notices.extend(notice(now));
+            ProfileTurn {
+                added: Vec::new(),
+                notices,
+            }
+        }
+        (
+            Some(Baseline::Drift {
+                lines: before,
+                unverified: unchecked,
+                ..
+            }),
+            Some(Baseline::Drift { lines: now, .. }),
+        ) => {
+            let file = |line: &str| line.split_once(": ").map(|(file, _)| file.to_owned());
+            let unchecked: Vec<String> = unchecked.iter().filter_map(|line| file(line)).collect();
+            let (kept, added): (Vec<String>, Vec<String>) = now.into_iter().partition(|line| {
+                before.contains(line) || file(line).is_some_and(|file| unchecked.contains(&file))
+            });
+            ProfileTurn {
+                added,
+                notices: notice(kept),
+            }
+        }
+        (None | Some(Baseline::Unreadable(_)), Some(Baseline::Drift { lines: now, .. })) => {
+            ProfileTurn {
+                added: Vec::new(),
+                notices: notice(now),
+            }
+        }
+    }
 }
 
 /// The file that holds what xpd knows about one agent session, in the `sessions` folder of
@@ -1024,7 +1208,7 @@ impl Session {
         if let Some(folder) = self.file.parent() {
             fs::create_dir_all(folder).with_context(cannot_write)?;
         }
-        let mut file = fs::OpenOptions::new()
+        let mut file = crate::private::options()
             .create(true)
             .append(true)
             .open(&self.file)

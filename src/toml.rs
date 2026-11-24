@@ -14,9 +14,29 @@ pub(crate) fn read(path: &Path) -> Result<Option<Toml>, String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("{}: {error}", path.display())),
     };
-    Document::parse(text)
+    Document::parse(text.clone())
         .map(Some)
-        .map_err(|error| format!("{}: {}", path.display(), error.to_string().trim()))
+        .map_err(|error| format!("{}: {}", path.display(), parse_error(&text, &error)))
+}
+
+/// Where `text` fails to parse and why, without the snippet of the line that a parse error
+/// prints, since that line can hold a credential, such as an index URL with a token.
+pub(crate) fn parse_error(text: &str, error: &toml_edit::TomlError) -> String {
+    let message = error.message().trim();
+    match error.span() {
+        Some(span) => {
+            let before = text.get(..span.start).unwrap_or_default();
+            let line = before.matches('\n').count() + 1;
+            let column = before
+                .rsplit_once('\n')
+                .map_or(before, |(_, last)| last)
+                .chars()
+                .count()
+                + 1;
+            format!("TOML parse error at line {line}, column {column}: {message}")
+        }
+        None => format!("TOML parse error: {message}"),
+    }
 }
 
 /// The item at the dotted `path`, through tables, inline tables and dotted keys alike.
@@ -27,6 +47,31 @@ pub(crate) fn get<'a>(doc: &'a Toml, path: &[&str]) -> Option<&'a Item> {
         table = table.get(part)?.as_table_like()?;
     }
     table.get(last)
+}
+
+/// Each table of `item`, an array of tables in either spelling: `[[key]]` headers or an inline
+/// array of inline tables. Each comes with the byte offset where it starts, when it has one.
+pub(crate) fn tables(item: &Item) -> Vec<(&dyn toml_edit::TableLike, Option<usize>)> {
+    match item {
+        Item::ArrayOfTables(tables) => tables
+            .iter()
+            .map(|table| {
+                let start = table.span().map(|span| span.start);
+                let table: &dyn toml_edit::TableLike = table;
+                (table, start)
+            })
+            .collect(),
+        Item::Value(Value::Array(array)) => array
+            .iter()
+            .filter_map(|value| {
+                let table = value.as_inline_table()?;
+                let start = table.span().map(|span| span.start);
+                let table: &dyn toml_edit::TableLike = table;
+                Some((table, start))
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// The line, counted from 1, of the byte `offset` of `doc`.

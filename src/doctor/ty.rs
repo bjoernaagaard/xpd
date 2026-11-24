@@ -147,7 +147,8 @@ fn user_config() -> Option<PathBuf> {
     Some(base.join("ty").join("ty.toml"))
 }
 
-fn state(catalog: &Catalog, file: &Path, prefix: &[&str], doc: Option<&Toml>) -> State {
+/// The rule levels and settings that `doc`, the file `file` with ty's table at `prefix`, sets.
+pub(crate) fn state(catalog: &Catalog, file: &Path, prefix: &[&str], doc: Option<&Toml>) -> State {
     let mut state = State {
         rules: BTreeMap::new(),
         all: None,
@@ -206,15 +207,16 @@ fn settings(catalog: &Catalog, prefix: &[&str], doc: Option<&Toml>) -> BTreeMap<
     settings
 }
 
-/// The override tables that set rule levels, each with its `include` patterns.
+/// The override tables that set rule levels, each with its `include` patterns, in either
+/// spelling of an array of tables.
 fn overrides(catalog: &Catalog, file: &Path, prefix: &[&str], doc: &Toml) -> Vec<Override> {
     let path: Vec<&str> = prefix.iter().copied().chain(["overrides"]).collect();
-    let Some(tables) = toml::get(doc, &path).and_then(|item| item.as_array_of_tables()) else {
+    let Some(item) = toml::get(doc, &path) else {
         return Vec::new();
     };
-    tables
-        .iter()
-        .filter_map(|table| {
+    toml::tables(item)
+        .into_iter()
+        .filter_map(|(table, start)| {
             let include = table
                 .get("include")
                 .and_then(|item| item.as_array())
@@ -225,9 +227,7 @@ fn overrides(catalog: &Catalog, file: &Path, prefix: &[&str], doc: &Toml) -> Vec
                         .collect()
                 })
                 .unwrap_or_default();
-            let line = table
-                .span()
-                .map_or(1, |span| toml::line_of(doc, span.start));
+            let line = start.map_or(1, |start| toml::line_of(doc, start));
             let rules = table.get("rules").and_then(|item| item.as_table_like())?;
             let (rules, _) = levels(catalog, rules, |name, level| Set {
                 level,

@@ -4,10 +4,10 @@ stdin, and xpd reads the event's name from `hook_event_name`. The
 
 | Event | What xpd does |
 | --- | --- |
-| `SessionStart` | Records the commit that is checked out, and prints a brief of the project for the agent |
+| `SessionStart` | Records the commit that is checked out and the project's drift from its profile, and prints a brief of the project for the agent |
 | `UserPromptSubmit` | Prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
 | `PostToolUse` | Lints the files that the edit changed, so the agent sees their issues |
-| `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning |
+| `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning, or while the session moved the project away from its profile |
 
 The brief and the prompt answer are plain text on stdout, which Claude Code and Codex both add to
 what the agent reads. Each states what xpd found, and neither gives the agent an order. xpd prints
@@ -16,8 +16,9 @@ them only in a project with a Python file, and keeps each response short.
 ## When a session starts
 
 On `SessionStart`, xpd records the checked-out commit and the Git blob IDs of Python files
-with uncommitted changes, including untracked files. It then reads the Python files of the project
-and prints a brief.
+with uncommitted changes, including untracked files. In a project whose `pyproject.toml` has a
+`[tool.xpd.profile]` table, it also records each difference between the project and the profile
+of [`xpd doctor`](../doctor/). It then reads the Python files of the project and prints a brief.
 
 ```console
 $ mkdir -p brief && cp samples/graph/steps.py brief/
@@ -111,6 +112,20 @@ style are warnings, so they hold the turn too.
 
 The agent ends the turn in one of two ways. It fixes the code, or it writes
 `# ast-grep-ignore: pandas/row-loop` on the line above with the reason after the rule name.
+
+In a project that records the profile, xpd compares the project with the profile again. It reads
+files and runs `uv lock --check --offline` for each lock file, which reads uv's cache and never the
+network. Each difference is named by its file, setting and value, without a line number, so an
+edit elsewhere in `pyproject.toml` does not make an old difference look new. A difference that was not there when the session began holds the turn, with one line
+for each, such as `pyproject.toml tool.ruff.lint.extend-select: ruff PTH118 os-path-join is off,
+and the profile wants on`, or `uv.lock: the lock is out of date. xpd doctor --apply runs uv
+lock.` after the session added a dependency without locking it. So does a `[tool.xpd.profile]`
+table that the session removed. The agent undoes the change, runs `xpd doctor --apply`, or
+records an exception with its reason, as the doctor page describes. A difference that was there
+when the session began, or that xpd could not compare, reaches you as a notice and does not hold
+the turn. So does a lock file that uv could not check, such as when uv is missing. xpd records the profile revision with the opening list, and
+when an upgrade of xpd changes the revision during the session, every difference is a notice. The Stop check never writes the plan, installs a tool or refreshes a
+lock.
 
 xpd holds a turn once for the same list of issues. When the client sends `stop_hook_active` as
 true and the errors and warnings are the ones that xpd held the turn on last time, xpd lets the

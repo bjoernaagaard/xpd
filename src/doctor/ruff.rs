@@ -261,12 +261,22 @@ struct Preview {
     explicit: bool,
 }
 
+/// The rules that run before the first layer's selectors apply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Baseline {
+    /// The pinned release's default selection, which another release may change.
+    Defaults,
+    /// None, so that only the configuration's own selectors count.
+    Empty,
+}
+
 /// Resolves selection layer by layer: a `select` starts over, and within a layer the more
 /// specific selector wins, an ignore over a select of the same length.
 fn selection(
     catalog: &Catalog,
     layers: &[Layer],
     preview: Preview,
+    baseline: Baseline,
 ) -> (BTreeSet<String>, BTreeMap<String, Location>) {
     let rules: Vec<&Record> = catalog
         .ruff_rules()
@@ -274,7 +284,7 @@ fn selection(
         .collect();
     let mut enabled: BTreeSet<String> = rules
         .iter()
-        .filter(|rule| rule.ruff_default(preview.mode))
+        .filter(|rule| baseline == Baseline::Defaults && rule.ruff_default(preview.mode))
         .map(|rule| rule.key.id.clone())
         .collect();
     let mut ignored = BTreeMap::new();
@@ -319,6 +329,34 @@ fn selection(
     (enabled, ignored)
 }
 
+/// The rules that the selectors of `doc`, the configuration file `file`, turn on, and the
+/// selector that turns off each rule the file ignores. A rule that only a default selection
+/// runs does not count, because the defaults differ between Ruff releases.
+pub(crate) fn resolve(
+    catalog: &Catalog,
+    file: &Path,
+    doc: Toml,
+) -> (BTreeSet<String>, BTreeMap<String, Location>) {
+    let layers = [Layer {
+        file: file.to_path_buf(),
+        prefix: prefix(file),
+        doc,
+    }];
+    let flag = |key| matches!(lint_value(&layers, key), Some((Observed::Bool(true), _)));
+    let mode = if flag("preview") {
+        Mode::Preview
+    } else {
+        Mode::Stable
+    };
+    let explicit = flag("explicit-preview-rules");
+    selection(
+        catalog,
+        &layers,
+        Preview { mode, explicit },
+        Baseline::Empty,
+    )
+}
+
 fn specificity(selector: &str) -> usize {
     if selector == "ALL" { 0 } else { selector.len() }
 }
@@ -351,7 +389,12 @@ fn state(
     let preview = flag("preview");
     let mode = if preview { Mode::Preview } else { Mode::Stable };
     let explicit = flag("explicit-preview-rules");
-    let (mut enabled, ignored) = selection(catalog, &layers, Preview { mode, explicit });
+    let (mut enabled, ignored) = selection(
+        catalog,
+        &layers,
+        Preview { mode, explicit },
+        Baseline::Defaults,
+    );
     let broad_preview = preview
         .then(|| {
             layers.iter().rev().find_map(|layer| {

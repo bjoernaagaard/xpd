@@ -2,7 +2,6 @@
 
 use std::path::{Path, PathBuf};
 
-use super::catalog::{Record, Target, Tool};
 use super::evidence::Location;
 use super::placement::{Destination, Placement};
 use crate::toml::{self, Toml};
@@ -12,16 +11,21 @@ const STANDALONE: &[&str] = &["pytest"];
 const NATIVE: &[&str] = &["tool", "pytest"];
 const LEGACY: &[&str] = &["tool", "pytest", "ini_options"];
 
+/// The files besides `pyproject.toml` that pytest reads its settings from, in the order it looks
+/// for them, each with the line that marks a pytest section when the file has other sections too.
+pub(crate) const OTHER_FILES: [(&str, Option<&str>); 6] = [
+    ("pytest.toml", None),
+    (".pytest.toml", None),
+    ("pytest.ini", None),
+    (".pytest.ini", None),
+    ("tox.ini", Some("[pytest]")),
+    ("setup.cfg", Some("[tool:pytest]")),
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Release {
+pub(crate) enum Release {
     BeforeNine,
     NineOrLater,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum ArgumentStyle {
-    Native,
-    Ini,
 }
 
 pub(crate) struct Pytest {
@@ -40,21 +44,142 @@ pub(crate) struct Settings {
 
 struct Argument {
     text: String,
-    line: Option<usize>,
 }
 
-pub(crate) fn analyze(root: &Path) -> Pytest {
-    let version = Venv::find_from(root).and_then(|venv| {
+/// The pytest release in the project's virtual environment, with the environment's folder.
+pub(crate) fn installed(root: &Path) -> Option<(crate::version::Version, PathBuf)> {
+    Venv::find_from(root).and_then(|venv| {
         let distributions = venv.distributions();
         let version = distributions.version("pytest")?.clone();
         Some((version, venv.root().to_path_buf()))
-    });
+    })
+}
+
+/// The pytest release that the `uv.lock` at `root` locks.
+pub(crate) fn locked(root: &Path) -> Option<crate::version::Version> {
+    let doc = toml::read(&root.join("uv.lock")).ok()??;
+    toml::get(&doc, &["package"])?
+        .as_array_of_tables()?
+        .iter()
+        .find(|package| package.get("name").and_then(toml_edit::Item::as_str) == Some("pytest"))?
+        .get("version")?
+        .as_str()?
+        .parse()
+        .ok()
+}
+
+/// Each version of the distribution `name` that the `uv.lock` at `root` locks. Empty when the
+/// lock or the distribution is missing.
+pub(crate) fn locked_versions(root: &Path, name: &str) -> Vec<String> {
+    let Some(doc) = toml::read(&root.join("uv.lock")).ok().flatten() else {
+        return Vec::new();
+    };
+    toml::get(&doc, &["package"])
+        .and_then(toml_edit::Item::as_array_of_tables)
+        .into_iter()
+        .flatten()
+        .filter(|package| package.get("name").and_then(toml_edit::Item::as_str) == Some(name))
+        .filter_map(|package| package.get("version")?.as_str().map(str::to_owned))
+        .collect()
+}
+
+/// Whether the requirement `text` pins exactly `version`, on every platform: one `==` clause
+/// and no marker.
+pub(crate) fn pins_exactly(text: &str, version: &str) -> bool {
+    let clauses: Vec<&str> = clauses(text).collect();
+    !text.contains(';')
+        && matches!(clauses.as_slice(), [clause] if clause.strip_prefix("==").is_some_and(|pinned| pinned.trim() == version))
+}
+
+/// The version clauses of the requirement `text`, such as `>=8` and `<9` in `pytest>=8,<9`,
+/// without its name, extras and markers.
+fn clauses(text: &str) -> impl Iterator<Item = &str> {
+    let text = text.split(';').next().unwrap_or_default();
+    let spec = text
+        .trim_start()
+        .trim_start_matches(|c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    let spec = match spec.trim_start().strip_prefix('[') {
+        Some(extras) => extras.split_once(']').map_or("", |(_, rest)| rest),
+        None => spec,
+    };
+    spec.split(',')
+        .map(str::trim)
+        .filter(|clause| !clause.is_empty())
+}
+
+/// Whether `version` meets the clause `clause`, such as `>=8` or `==8.4.*`. A clause doctor
+/// cannot read is met.
+fn meets(clause: &str, version: &crate::version::Version) -> bool {
+    let Some(operator) = ["===", "==", "~=", "!=", "<=", ">=", "<", ">"]
+        .into_iter()
+        .find(|operator| clause.starts_with(operator))
+    else {
+        return true;
+    };
+    let text = clause[operator.len()..].trim();
+    let wildcard = text.ends_with(".*");
+    let Ok(bound) = text
+        .trim_end_matches(".*")
+        .parse::<crate::version::Version>()
+    else {
+        return true;
+    };
+    let prefix = |of: &crate::version::Version| version.starts_with(of);
+    match operator {
+        "==" | "===" if wildcard => prefix(&bound),
+        "==" | "===" => *version == bound,
+        "!=" if wildcard => !prefix(&bound),
+        "!=" => *version != bound,
+        "<=" => *version <= bound,
+        ">=" => *version >= bound,
+        "<" => *version < bound,
+        ">" => *version > bound,
+        _ => *version >= bound && prefix(&bound.without_last()),
+    }
+}
+
+/// Whether `version` meets every clause of the requirement `text`.
+pub(crate) fn satisfies(text: &str, version: &crate::version::Version) -> bool {
+    clauses(text).all(|clause| meets(clause, version))
+}
+
+/// Whether the requirement `text`, such as `pytest==8.4.2` or `pytest>=8,<9`, admits no
+/// pytest 9 or later.
+pub(crate) fn excludes_nine(text: &str) -> bool {
+    let nine: crate::version::Version = "9".parse().expect("9 is a release number");
+    clauses(text).any(|clause| {
+        let Some(operator) = ["===", "==", "~=", "<=", "<"]
+            .into_iter()
+            .find(|operator| clause.starts_with(operator))
+        else {
+            return false;
+        };
+        let Ok(version) = clause[operator.len()..]
+            .trim()
+            .parse::<crate::version::Version>()
+        else {
+            return false;
+        };
+        match operator {
+            "<" => version <= nine,
+            _ => version < nine,
+        }
+    })
+}
+
+/// The range of releases that `installed` falls in. Without pytest, the pinned release counts.
+pub(crate) fn release(installed: Option<&crate::version::Version>) -> Release {
     let nine = "9.0".parse().expect("9.0 is a release number");
-    let release = if version.as_ref().is_some_and(|(version, _)| *version < nine) {
+    if installed.is_some_and(|version| *version < nine) {
         Release::BeforeNine
     } else {
         Release::NineOrLater
-    };
+    }
+}
+
+pub(crate) fn analyze(root: &Path) -> Pytest {
+    let version = installed(root);
+    let release = release(version.as_ref().map(|(version, _)| version));
     let mut notes = ["pytest.ini", ".pytest.ini", "tox.ini", "setup.cfg"]
         .into_iter()
         .filter(|name| root.join(name).is_file())
@@ -74,7 +199,6 @@ pub(crate) fn analyze(root: &Path) -> Pytest {
             prefix: &[],
             doc,
         },
-        uv_lock: root.join("uv.lock").is_file(),
     });
     Pytest {
         installed: version.map(|(version, path)| (version.to_string(), path)),
@@ -115,11 +239,55 @@ fn settings(
     {
         return Ok(None);
     }
-    let file = pyproject.to_path_buf();
     let doc = doc.as_ref().map_err(Clone::clone)?;
+    if let Some(settings) = existing(release, pyproject, doc.as_ref())? {
+        return Ok(Some(settings));
+    }
+    if ["tox.ini", "setup.cfg"]
+        .into_iter()
+        .any(|name| root.join(name).is_file())
+    {
+        notes.push("Doctor cannot tell whether a new pytest table would replace an existing configuration.".to_owned());
+        return Ok(None);
+    }
+    in_pyproject(release, pyproject, doc.as_ref()).map(Some)
+}
+
+/// The pytest table of the `pyproject.toml` at `file`: the one that holds settings, or else a new
+/// one in the form that `release` reads.
+///
+/// # Errors
+///
+/// Returns an error if both pytest tables hold settings or `addopts` has the wrong type.
+pub(crate) fn in_pyproject(
+    release: Release,
+    file: &Path,
+    doc: Option<&Toml>,
+) -> Result<Settings, String> {
+    if let Some(settings) = existing(release, file, doc)? {
+        return Ok(settings);
+    }
+    let prefix = if release == Release::BeforeNine {
+        LEGACY
+    } else {
+        NATIVE
+    };
+    Settings::new(
+        Destination {
+            file: file.to_path_buf(),
+            prefix,
+            doc: doc.cloned(),
+        },
+        None,
+        release,
+    )
+}
+
+/// The pytest table of the `pyproject.toml` at `file` that holds settings, if one does.
+fn existing(release: Release, file: &Path, doc: Option<&Toml>) -> Result<Option<Settings>, String> {
+    let file = file.to_path_buf();
     if release == Release::NineOrLater
         && let Some(table) = doc
-            .as_ref()
             .and_then(|doc| toml::get(doc, NATIVE))
             .and_then(toml_edit::Item::as_table_like)
         && table.len() > 1
@@ -134,7 +302,7 @@ fn settings(
         ));
     }
     for prefix in [NATIVE, LEGACY] {
-        let setting = doc.as_ref().and_then(|doc| toml::get(doc, prefix));
+        let setting = doc.and_then(|doc| toml::get(doc, prefix));
         if prefix == NATIVE
             && (release == Release::BeforeNine
                 || setting.is_some_and(|item| {
@@ -150,7 +318,7 @@ fn settings(
                 Destination {
                     file,
                     prefix,
-                    doc: doc.clone(),
+                    doc: doc.cloned(),
                 },
                 config,
                 release,
@@ -158,28 +326,7 @@ fn settings(
             .map(Some);
         }
     }
-    if ["tox.ini", "setup.cfg"]
-        .into_iter()
-        .any(|name| root.join(name).is_file())
-    {
-        notes.push("Doctor cannot tell whether a new pytest table would replace an existing configuration.".to_owned());
-        return Ok(None);
-    }
-    let prefix = if release == Release::BeforeNine {
-        LEGACY
-    } else {
-        NATIVE
-    };
-    Settings::new(
-        Destination {
-            file,
-            prefix,
-            doc: doc.clone(),
-        },
-        None,
-        release,
-    )
-    .map(Some)
+    Ok(None)
 }
 
 impl Settings {
@@ -200,18 +347,13 @@ impl Settings {
                     .map(|arg| {
                         Some(Argument {
                             text: arg.as_str()?.to_owned(),
-                            line: arg.span().map(|span| toml::line_of(doc, span.start)),
                         })
                     })
                     .collect(),
-                Some(item) if *prefix == LEGACY => {
-                    item.as_str().and_then(shlex::split).map(|args| {
-                        let line = toml::line(doc, &path);
-                        args.into_iter()
-                            .map(|text| Argument { text, line })
-                            .collect()
-                    })
-                }
+                Some(item) if *prefix == LEGACY => item
+                    .as_str()
+                    .and_then(shlex::split)
+                    .map(|args| args.into_iter().map(|text| Argument { text }).collect()),
                 Some(_) => None,
             }
         } else {
@@ -271,6 +413,15 @@ impl Settings {
             .all(|enabled| enabled)
     }
 
+    /// The arguments of `addopts`, up to a `--`.
+    pub(crate) fn args(&self) -> Vec<&str> {
+        self.args
+            .iter()
+            .map(|arg| arg.text.as_str())
+            .take_while(|arg| *arg != "--")
+            .collect()
+    }
+
     fn has_arg(&self, flag: &str) -> bool {
         self.args
             .iter()
@@ -300,56 +451,18 @@ impl Settings {
         value
     }
 
-    pub(crate) fn removals(&self, record: &Record, key: &str) -> Vec<(Option<String>, Placement)> {
-        let placement = self.destination.place(key);
-        if key == "addopts" {
-            let mut removals = Vec::new();
-            let flag = record.key.id.as_str();
-            let mut arguments = self
-                .args
-                .iter()
-                .take_while(|arg| arg.text != "--")
-                .peekable();
-            while let Some(arg) = arguments.next() {
-                let item = if arg.text == flag {
-                    match arguments.next_if(|next| {
-                        !next.text.starts_with('-') || next.text.parse::<f64>().is_ok()
-                    }) {
-                        Some(value) => format!("{flag} {}", value.text),
-                        None => flag.to_owned(),
-                    }
-                } else if arg
-                    .text
-                    .strip_prefix(flag)
-                    .is_some_and(|rest| rest.starts_with('='))
-                {
-                    arg.text.clone()
-                } else {
-                    continue;
-                };
-                removals.push((
-                    Some(item),
-                    Placement {
-                        key_line: arg.line.or(placement.key_line),
-                        ..placement.clone()
-                    },
-                ));
-            }
-            return removals;
-        }
-        let remove = match key {
-            "strict_xfail" => self.flag(key) == Some(false),
-            "xfail_strict" => self.release == Release::NineOrLater && self.flag(key) == Some(false),
-            _ => self.get(key).is_some(),
-        };
-        if remove {
-            vec![(None, placement)]
-        } else {
-            Vec::new()
-        }
+    /// The path of the pytest table inside its file.
+    pub(crate) fn prefix(&self) -> &'static [&'static str] {
+        self.destination.prefix
     }
 
-    fn flag(&self, key: &str) -> Option<bool> {
+    /// Whether the table sets `key`.
+    pub(crate) fn has(&self, key: &str) -> bool {
+        self.get(key).is_some()
+    }
+
+    /// The boolean that `key` holds, also in the spellings of an ini file in the legacy table.
+    pub(crate) fn flag(&self, key: &str) -> Option<bool> {
         let item = self.get(key)?;
         item.as_bool().or_else(|| {
             if self.destination.prefix != LEGACY {
@@ -380,58 +493,13 @@ impl Settings {
     }
 }
 
-/// How to edit addopts while preserving any other arguments.
-pub(crate) fn add_arguments(
-    placement: &Placement,
-    values: &[&str],
-    style: ArgumentStyle,
-) -> String {
-    let joined = values.join(", ");
-    if let Some(line) = placement.key_line {
-        return if placement.array {
-            format!("add {joined} to the existing addopts array at line {line}")
-        } else {
-            format!(
-                "append {} inside the addopts string at line {line}",
-                command_line(values)
-            )
-        };
-    }
-    if matches!(style, ArgumentStyle::Ini) {
-        format!("addopts = {:?}", command_line(values))
-    } else {
-        format!("addopts = [{joined}]")
-    }
-}
-
-pub(crate) fn argument_style(destination: &Destination) -> ArgumentStyle {
-    if destination.prefix == LEGACY {
-        ArgumentStyle::Ini
-    } else {
-        ArgumentStyle::Native
-    }
-}
-
-pub(crate) fn is_addopts(tool: Tool, target: &Target) -> bool {
-    tool == Tool::Pytest && matches!(target, Target::Setting { key, .. } if key == "addopts")
-}
-
-fn command_line(values: &[&str]) -> String {
-    values
-        .iter()
-        .map(|value| value.trim_matches('"'))
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
 /// Dependency arrays from pyproject.toml. Each entry stays in the array that declares it.
 pub(crate) struct Project {
     pub(crate) destination: Destination,
-    pub(crate) uv_lock: bool,
 }
 
 pub(crate) struct Group<'a> {
-    path: Vec<&'a str>,
+    pub(crate) path: Vec<&'a str>,
     array: &'a toml_edit::Array,
 }
 
@@ -479,6 +547,28 @@ impl Project {
         placement
     }
 
+    /// The groups that uv installs together with the list at `path`: the list itself and, for a
+    /// dependency group, each group it includes, at any depth.
+    pub(crate) fn installed_with<'a>(lists: &[&'a Group<'a>], path: &[&str]) -> Vec<&'a Group<'a>> {
+        let mut found: Vec<&Group<'_>> = Vec::new();
+        let mut pending: Vec<Vec<&str>> = vec![path.to_vec()];
+        while let Some(path) = pending.pop() {
+            let Some(group) = lists.iter().copied().find(|group| group.is(&path)) else {
+                continue;
+            };
+            if found.iter().any(|seen| seen.path == group.path) {
+                continue;
+            }
+            found.push(group);
+            if group.path.first() == Some(&"dependency-groups") {
+                for name in group.includes() {
+                    pending.push(vec!["dependency-groups", name]);
+                }
+            }
+        }
+        found
+    }
+
     pub(crate) fn plugin_group<'a>(groups: &'a [Group<'a>]) -> &'a [&'a str] {
         groups
             .iter()
@@ -486,14 +576,13 @@ impl Project {
             .or_else(|| {
                 groups
                     .iter()
-                    .find(|group| group.path == ["dependency-groups", "dev"])
+                    .find(|group| group.is(&["dependency-groups", "dev"]))
             })
             .or_else(|| {
                 groups.iter().find(|group| {
-                    group
-                        .path
-                        .last()
-                        .is_some_and(|name| matches!(*name, "test" | "tests" | "testing"))
+                    group.path.last().is_some_and(|name| {
+                        matches!(normalize(name).as_str(), "test" | "tests" | "testing")
+                    })
                 })
             })
             .or_else(|| groups.first())
@@ -501,9 +590,53 @@ impl Project {
     }
 }
 
+/// The name of a dependency group or extra as uv compares it, PEP 503 style, as PEP 735 and
+/// PEP 685 require: lowercase, with each run of `-`, `_` and `.` as one `-`.
+pub(crate) fn normalize(name: &str) -> String {
+    name.split(['-', '_', '.'])
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+        .to_ascii_lowercase()
+}
+
 impl Group<'_> {
     pub(crate) fn has(&self, name: &str) -> bool {
         self.entries(name).next().is_some()
+    }
+
+    /// Whether the list installs `name` everywhere: an entry for it without an environment
+    /// marker, which could leave it out.
+    pub(crate) fn installs(&self, name: &str) -> bool {
+        self.entries(name)
+            .filter_map(toml_edit::Value::as_str)
+            .any(|text| !text.contains(';'))
+    }
+
+    /// Whether this list is the one at `path`, with the names of groups and extras compared
+    /// as uv compares them.
+    pub(crate) fn is(&self, path: &[&str]) -> bool {
+        self.path.len() == path.len()
+            && self
+                .path
+                .iter()
+                .zip(path)
+                .enumerate()
+                .all(|(index, (own, other))| {
+                    if index + 1 == path.len() {
+                        normalize(own) == normalize(other)
+                    } else {
+                        own == other
+                    }
+                })
+    }
+
+    /// The dependency groups that this group includes with `{ include-group = "<name>" }`.
+    pub(crate) fn includes(&self) -> Vec<&str> {
+        self.array
+            .iter()
+            .filter_map(|value| value.as_inline_table()?.get("include-group")?.as_str())
+            .collect()
     }
 
     pub(crate) fn entries<'a>(
@@ -534,7 +667,8 @@ impl Group<'_> {
     }
 }
 
-fn dependency(value: &toml_edit::Value) -> Option<String> {
+/// The normalized name of the distribution that the requirement `value` names.
+pub(crate) fn dependency(value: &toml_edit::Value) -> Option<String> {
     let name = value
         .as_str()?
         .trim_start()
