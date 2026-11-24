@@ -581,6 +581,16 @@ impl Plan {
             if before.as_deref() == Some(owned.text) {
                 continue;
             }
+            if let (Some(line), Some(text)) = (&owned.holds, &before) {
+                if !text.lines().any(|held| held.trim_end() == line) {
+                    self.conflict(
+                        owned.path.clone(),
+                        None,
+                        format!("{} lacks the line {line}, which the profile needs there. Add it with its import, as src/doctor/profiles/{} of xpd shows.", owned.path, owned.template),
+                    );
+                }
+                continue;
+            }
             self.changes.push(Change {
                 tool: "xpd",
                 id: owned.name.clone(),
@@ -589,7 +599,10 @@ impl Plan {
                 line: None,
                 old: if before.is_some() { "differs" } else { "missing" }.to_owned(),
                 new: "the profile's copy".to_owned(),
-                reason: "The profile owns this file, so the project keeps an exact copy of its template.".to_owned(),
+                reason: owned.holds.as_ref().map_or_else(
+                    || "The profile owns this file, so the project keeps an exact copy of its template.".to_owned(),
+                    |line| format!("The profile needs the line {line} in this file, so doctor writes its template where the project has none."),
+                ),
                 source: DOCS.to_owned(),
             });
             self.owned.push(OwnedFile {

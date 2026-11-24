@@ -8,9 +8,10 @@ ty = "0.0.106"
 pytest = "9.2.0"
 pytest-timeout = "2.4.0"
 pytest-randomly = "5.1.0"
+hypothesis = "6.170.17"
 
 [dev]
-pins = ["pytest", "pytest-timeout", "pytest-randomly", "ruff", "ty"]
+pins = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis", "ruff", "ty"]
 
 [kinds.library]
 summary = "A package that others install. It keeps its build backend, and uv.lock locks its development environment."
@@ -19,7 +20,7 @@ project = "required"
 build-system = "required"
 scripts = "allowed"
 tool-only = false
-files = []
+files = ["conftest"]
 
 [kinds.application]
 summary = "A program that runs from its checkout or as an installed command, locked in uv.lock."
@@ -28,7 +29,7 @@ project = "required"
 build-system = "allowed"
 scripts = "allowed"
 tool-only = false
-files = []
+files = ["conftest"]
 
 [kinds.pipeline]
 summary = "An application that turns data into results, locked in uv.lock like an application."
@@ -37,7 +38,7 @@ project = "required"
 build-system = "allowed"
 scripts = "allowed"
 tool-only = false
-files = []
+files = ["conftest"]
 
 [kinds.script]
 summary = "Standalone scripts with inline script metadata. Each script is locked in the lock file beside it, and pyproject.toml holds only tool settings."
@@ -48,7 +49,10 @@ scripts = "required"
 tool-only = true
 files = []
 
-[files]
+[files.conftest]
+path = "conftest.py"
+template = "conftest.py.template"
+holds = 'settings.register_profile("slow", deadline=None)'
 
 [ruff]
 select = ["ALL"]

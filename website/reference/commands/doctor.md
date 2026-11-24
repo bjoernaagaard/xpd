@@ -162,6 +162,7 @@ The profile pins the tools that check the project, at the releases its rules and
 | pytest | `pytest==9.2.0` |
 | pytest-timeout | `pytest-timeout==2.4.0` |
 | pytest-randomly | `pytest-randomly==5.1.0` |
+| Hypothesis | `hypothesis==6.170.17` |
 | Ruff | `ruff==0.17.4` |
 | ty | `ty==0.0.106` |
 
@@ -198,7 +199,7 @@ pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -5,10 +5,94 @@
+@@ -5,10 +5,95 @@
 
  [dependency-groups]
  dev = [
@@ -208,6 +209,7 @@ pyproject.toml records no profile yet.
 +    "pytest==9.2.0",
 +    "pytest-timeout==2.4.0",
 +    "pytest-randomly==5.1.0",
++    "hypothesis==6.170.17",
 +    "ruff==0.17.4",
 +    "ty==0.0.106",
  ]
@@ -238,7 +240,7 @@ pyproject.toml records no profile yet.
 +[tool.xpd.profile]
 +revision = 2
 +kind = "application"
-
+...
 Changes
   ruff lint.select: unset -> ["ALL"], tool.ruff.lint.select
     Profile ["ALL"]. Every Ruff rule runs unless a written reason in the ignore list turns it off.
@@ -269,7 +271,7 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
 | `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
-A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 2 gives every kind the same values and owns no file.
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 2 gives every kind the same values, and it owns `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
 
 ## One place for each tool
 

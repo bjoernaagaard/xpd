@@ -1,0 +1,5 @@
+"""Settings that pytest reads before it collects the tests."""
+
+from hypothesis import settings
+
+settings.register_profile("slow", deadline=None)

@@ -22,7 +22,9 @@
 //! The base values apply to every kind of project, and a kind can add its own values in the
 //! same shape. A kind also states which of `[project]`, `[build-system]` and scripts with inline
 //! metadata it needs, and which files the profile owns for it. An owned file is a native template
-//! in `src/doctor/profiles/`, listed in [`TEMPLATES`], that the project keeps as an exact copy.
+//! in `src/doctor/profiles/`, listed in [`TEMPLATES`], that the project keeps as an exact copy,
+//! or, with `holds`, a file the project also writes itself, which must hold that line and is the
+//! template when the project has none.
 //!
 //! `[dev]` `pins` names the tools a project runs with `uv run`. Each goes into
 //! `[dependency-groups] dev` as an exact pin at its release in `[pins]`, and `uv.lock` locks that
@@ -96,7 +98,8 @@ pub(crate) struct KindSpec {
 }
 
 /// A file that the profile owns for some kinds, which the project keeps as an exact copy of a
-/// template.
+/// template, or, for a file the project also writes itself, such as `conftest.py`, which holds
+/// one line of the template and is the template when the project has none.
 #[derive(Debug)]
 pub(crate) struct Owned {
     pub(crate) name: String,
@@ -105,11 +108,15 @@ pub(crate) struct Owned {
     /// The template's file name in `src/doctor/profiles/`.
     pub(crate) template: String,
     pub(crate) text: &'static str,
+    /// The line that a file the project writes itself must hold. `None` for an exact copy.
+    pub(crate) holds: Option<String>,
 }
 
-/// The templates of owned files, each by its file name in `src/doctor/profiles/`. No revision
-/// owns a file yet.
-const TEMPLATES: &[(&str, &str)] = &[];
+/// The templates of owned files, each by its file name in `src/doctor/profiles/`.
+const TEMPLATES: &[(&str, &str)] = &[(
+    "conftest.py.template",
+    include_str!("profiles/conftest.py.template"),
+)];
 
 /// One setting of a tool table, by its path below the table, with the value the profile wants.
 #[derive(Debug, Clone)]
@@ -578,11 +585,22 @@ impl Profile {
                     .find(|(known, _)| *known == template)
                     .map(|(_, text)| *text)
                     .with_context(|| format!("files.{name} names the template {template}, which src/doctor/profiles/ lacks"))?;
+                let holds = file
+                    .get("holds")
+                    .map(|_| string(file, "holds"))
+                    .transpose()?;
+                if let Some(line) = &holds {
+                    ensure!(
+                        text.lines().any(|known| known == line),
+                        "files.{name} holds a line that its template lacks"
+                    );
+                }
                 Ok(Owned {
                     name: name.to_owned(),
                     path: string(file, "path")?,
                     template,
                     text,
+                    holds,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
