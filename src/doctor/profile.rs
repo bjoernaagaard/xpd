@@ -78,6 +78,9 @@ pub(crate) struct KindSpec {
     pub(crate) build_system: Presence,
     /// Python files with inline script metadata.
     pub(crate) scripts: Presence,
+    /// Whether `pyproject.toml` holds the `[tool]` table and nothing else, so the profile adds
+    /// no dependency to it.
+    pub(crate) tool_only: bool,
     /// The names of the owned files, from `[files]`.
     pub(crate) files: Vec<String>,
     /// The values the kind adds to the base values.
@@ -295,6 +298,10 @@ impl Profile {
                     project: presence("project")?,
                     build_system: presence("build-system")?,
                     scripts: presence("scripts")?,
+                    tool_only: kind
+                        .get("tool-only")
+                        .and_then(Item::as_bool)
+                        .with_context(|| format!("kinds.{name}.tool-only is no boolean"))?,
                     files: strings(kind, "files")?,
                     extra: Values::read(kind).with_context(|| format!("kinds.{name}"))?,
                 })

@@ -38,6 +38,22 @@ impl FromStr for Version {
     }
 }
 
+impl Version {
+    /// Whether the parts of `prefix` start this version, as `8.4` starts `8.4.2`.
+    pub(crate) fn starts_with(&self, prefix: &Self) -> bool {
+        let mut parts = self.0.clone();
+        parts.resize(parts.len().max(prefix.0.len()), 0);
+        parts.starts_with(&prefix.0)
+    }
+
+    /// This version without its last part, as `8` for `8.4`, for the bound of `~=`.
+    pub(crate) fn without_last(&self) -> Self {
+        let mut parts = self.0.clone();
+        parts.pop();
+        Self(parts)
+    }
+}
+
 impl TryFrom<String> for Version {
     type Error = Error;
 

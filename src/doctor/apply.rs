@@ -269,7 +269,8 @@ fn read(file: &Path) -> Result<Option<String>> {
     }
 }
 
-/// Replaces `file` with `text` in one rename, so a reader sees the old or the new file.
+/// Replaces `file` with `text` in one rename, so a reader sees the old or the new file. The new
+/// file keeps the permissions of the old one.
 fn replace(file: &Path, text: &str) -> Result<()> {
     let name = file
         .file_name()
@@ -277,6 +278,10 @@ fn replace(file: &Path, text: &str) -> Result<()> {
         .to_string_lossy();
     let temporary = file.with_file_name(format!(".{name}.xpd-{}", std::process::id()));
     fs::write(&temporary, text).with_context(|| format!("cannot write {}", temporary.display()))?;
+    if let Ok(metadata) = fs::metadata(file) {
+        fs::set_permissions(&temporary, metadata.permissions())
+            .with_context(|| format!("cannot set the permissions of {}", temporary.display()))?;
+    }
     fs::rename(&temporary, file).with_context(|| format!("cannot replace {}", file.display()))
 }
 

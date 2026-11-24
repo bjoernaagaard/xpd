@@ -92,6 +92,32 @@ pub(crate) fn push(array: &mut Array, text: &str) {
     array.push_formatted(value);
 }
 
+/// Inserts the string `text` at `index`, spaced like the item that was there, which keeps its own
+/// comments. At the end, it appends as [`push`] does.
+pub(crate) fn insert(array: &mut Array, index: usize, text: &str) {
+    if index >= array.len() {
+        push(array, text);
+        return;
+    }
+    let prefix = array
+        .get(index)
+        .and_then(|value| value.decor().prefix())
+        .and_then(|prefix| prefix.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    let mut value = Value::from(text);
+    if let Some((_, indent)) = prefix.rsplit_once('\n') {
+        value.decor_mut().set_prefix(format!("\n{indent}"));
+    } else {
+        value.decor_mut().set_prefix(prefix);
+        if let Some(next) = array.get_mut(index) {
+            next.decor_mut().set_prefix(" ");
+        }
+    }
+    value.decor_mut().set_suffix("");
+    array.insert_formatted(index, value);
+}
+
 /// Removes the items at `indexes`. A comment before a removed item goes with it, and every item
 /// that stays keeps its own comments. In an array on one line, the new first item takes the
 /// spacing of the old one.

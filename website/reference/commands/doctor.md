@@ -1,10 +1,10 @@
 Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty and pytest that ships with xpd. Doctor prints a unified diff of `pyproject.toml` with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
-The plan reads files only. It compares the effect of each setting from the pinned releases' rules and defaults, so a rule that Ruff runs by default, or that a selector such as `ALL` turns on, needs no edit. Doctor runs the installed Ruff and ty only for the conditional advice, and uv only to check and write lock files.
+The plan reads files only. It compares the effect of the project's own settings, so a selector such as `ALL` or `PERF` that turns a rule on needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each rule and level itself. Doctor runs the installed Ruff and ty only for the conditional advice, and uv only to check and write lock files.
 
 ## What the profile sets
 
-The profile sets seven Ruff rules. A missing code goes into `lint.extend-select`, which keeps the project's own selection. An exact code in `lint.ignore` or in a per-file ignore goes, unless an exception records it.
+The profile sets seven Ruff rules. A code that no selector of the project turns on goes into `lint.extend-select`, which keeps the project's own selection, also when Ruff runs it by default. An exact code in `lint.ignore` or in a per-file ignore goes, unless an exception records it.
 
 | Code | What Ruff checks | What to do about a finding |
 | --- | --- | --- |
@@ -29,10 +29,10 @@ The profile sets three pytest settings in the pytest table of `pyproject.toml`: 
 | Setting | Where | What it changes |
 | --- | --- | --- |
 | `strict = true` | The pytest table | An unknown marker, an invalid setting, a repeated parameter id and an `xfail` test that passes each fail the run. |
-| `pytest -ra` | `addopts` | The summary lists each skipped test and each expected failure. |
+| `pytest -ra` | `addopts`, before a `--` that ends the options | The summary lists each skipped test and each expected failure. |
 | `pytest --import-mode=importlib` | `addopts` | pytest imports a test file without adding its folder to `sys.path`. |
 
-`strict` needs pytest 9.0. For pytest 8, the profile sets `pytest -ra`, `pytest --import-mode=importlib`, `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in `[tool.pytest.ini_options]` instead. Doctor takes the pytest release that a fresh checkout gets: the one `uv.lock` locks, else pytest 8 when a declared requirement such as `pytest==8.4.2` admits no pytest 9, else pytest 9 when a list declares pytest, else the release in the project's virtual environment.
+`strict` needs pytest 9.0. For pytest 8, the profile sets `pytest -ra`, `pytest --import-mode=importlib`, `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in `[tool.pytest.ini_options]` instead. Doctor takes the pytest release that a fresh checkout gets: the one `uv.lock` locks when it meets every declared requirement, else pytest 8 when a declared requirement such as `pytest==8.4.2` admits no pytest 9, else pytest 9 when a list declares pytest, else the release in the project's virtual environment.
 
 A project that declares pytest gets two plugins in the dependency list that holds pytest, whether that is a dependency group, an extra or `[project]` `dependencies`, and `dev` in `[dependency-groups]` when only the virtual environment has pytest.
 
@@ -100,7 +100,7 @@ pyproject.toml records no profile yet.
 +strict = true
 +
 +[tool.ruff.lint]
-+extend-select = ["PTH118", "PGH003", "PGH004"]
++extend-select = ["PTH118", "PERF101", "PERF102", "PGH003", "PGH004", "RUF017", "RUF100"]
 +
 +[tool.ty.rules]
 +blanket-ignore-comment = "error"
@@ -124,7 +124,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-Ruff 0.17.4 runs `PERF101`, `PERF102`, `RUF017` and `RUF100` by default, so the diff adds only the other three codes. `xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. A second `xpd doctor --check` then prints `The project matches profile revision 1.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. A second `xpd doctor --check` then prints `The project matches profile revision 1.` and exits 0.
 
 ## Kinds of project
 
@@ -135,7 +135,7 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `library` | A package that others install. | `[project]` and `[build-system]` | `uv.lock` |
 | `application` | A program that runs from its checkout or as an installed command. | `[project]` | `uv.lock` |
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
-| `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` with tool settings only, without `[project]` or `[build-system]` | `<script>.lock` beside each script, by `uv lock --script` |
+| `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
 A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 1 gives every kind the same values and owns no file.
 
@@ -145,10 +145,10 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 
 - a `ruff.toml` or `.ruff.toml` at the root or below it, or a `pyproject.toml` below the root with a `[tool.ruff]` table
 - an `extend` key in `[tool.ruff]`
-- a `ty.toml` at the root
-- `pytest.toml`, `.pytest.toml`, `pytest.ini`, `.pytest.ini`, a `[pytest]` section in `tox.ini`, or a `[tool:pytest]` section in `setup.cfg`
+- a `ty.toml` at the root or below it, or a `pyproject.toml` below the root with a `[tool.ty]` table
+- `pytest.toml`, `.pytest.toml`, `pytest.ini`, `.pytest.ini`, a `[pytest]` section in `tox.ini`, or a `[tool:pytest]` section in `setup.cfg`, at the root or below it, or a `pyproject.toml` below the root with a pytest table
 - a per-file ignore that turns a rule of the profile off through a group selector, such as `PERF`
-- an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly`
+- an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly`, or `--disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
 - a layout that the kind does not allow
 - a uv workspace, in the project or above it
 - both `[tool.pytest]` and `[tool.pytest.ini_options]` with settings
@@ -186,7 +186,7 @@ Each xpd release holds one revision of the profile. When a newer xpd brings a ne
 
 ## What `--apply` does
 
-Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, and records the revision and kind last. Apply keeps the comments of the items it keeps. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
+Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, and records the revision and kind last. Apply keeps the comments of the items it keeps, leaves a value that already complies as it is written, and keeps the permissions of each file it replaces. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
 
 Apply keeps the prior content of each file it touches in the folder `.xpd-apply` at the project root while it runs. When a lock refresh or the final check fails, apply puts every file back and exits 2. When an apply stops before it ends, the next one restores the files from that folder first.
 

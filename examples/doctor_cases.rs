@@ -201,6 +201,7 @@ impl Runner {
         self.pytest_plugins()?;
         self.profile()?;
         self.reviewed()?;
+        self.reviewed_again()?;
         Ok(())
     }
 
@@ -649,7 +650,12 @@ impl Runner {
         let ruff = self.checker("ruff", &perf, &["."])?;
         self.expect_output("performance", "ruff", &ruff, &["RUF017"], &[]);
         let report = self.doctor(&perf, &both)?;
-        self.expect("performance on defaults", &report, &[], &["ruff:RUF017"]);
+        self.expect(
+            "performance on defaults, which the profile writes down",
+            &report,
+            &["ruff:RUF017"],
+            &[],
+        );
         fs::write(
             perf.join("pyproject.toml"),
             "[tool.ruff.lint]\nselect = [\"E4\"]\n",
@@ -1142,7 +1148,7 @@ impl Runner {
             &out,
             &[
                 "-ignore = [\"RUF100\"]\n+ignore = []",
-                "+extend-select = [\"PTH118\", \"PGH003\", \"PGH004\"]",
+                "+extend-select = [\"PTH118\", \"PERF101\", \"PERF102\", \"PGH003\", \"PGH004\", \"RUF017\", \"RUF100\"]",
                 "ruff RUF100 unused-noqa: off, by tool.ruff.lint.ignore = [\"RUF100\"] -> on",
                 "ruff PTH118 os-path-join: off for scripts/*.py -> on",
                 "uv.lock is missing. --apply runs uv lock.",
@@ -1364,7 +1370,7 @@ impl Runner {
         let (code, _, err) = self.doctor_run(&script, &uv, &["--apply", "--kind", "script"])?;
         self.check(
             (!(code == 2
-                && err.contains("keeps pyproject.toml to tool settings")
+                && err.contains("keeps pyproject.toml to the [tool] table, and it has [project]")
                 && err.contains("needs Python files with inline script metadata")))
             .then(|| format!("script-kind: --apply exits {code}: {err}")),
         );
@@ -1506,6 +1512,184 @@ impl Runner {
             (answer.contains("\"block\"") || !answer.contains("did not make"))
                 .then(|| format!("stop-baseline: Stop answered {answer}")),
         );
+        Ok(())
+    }
+}
+
+impl Runner {
+    /// The faults a second review found: a Ruff release whose defaults differ, a pytest lock that
+    /// the apply refreshes, plugin autoload turned off, a nested pytest file, positional
+    /// arguments in `addopts`, an `addopts` that already complies, a script kind with a
+    /// dependency table, and the permissions of `pyproject.toml`.
+    fn reviewed_again(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"again\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+
+        let old_ruff = self.project(
+            "old-ruff",
+            &[
+                (
+                    "pyproject.toml",
+                    &format!("{head}\n[dependency-groups]\ndev = [\"ruff==0.9.10\"]\n"),
+                ),
+                ("example.py", "x = 1\n"),
+            ],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&old_ruff, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("old-ruff: --apply exits {code}: {err}")));
+        let shown = self
+            .command(&self.uv, &old_ruff, &uv)?
+            .args([
+                "run",
+                "--quiet",
+                "--locked",
+                "ruff",
+                "check",
+                "--show-settings",
+                "example.py",
+            ])
+            .output()?;
+        let shown = String::from_utf8_lossy(&shown.stdout);
+        for code in [
+            "PTH118", "PERF101", "PERF102", "PGH003", "PGH004", "RUF017", "RUF100",
+        ] {
+            self.check(
+                (!shown.contains(&format!("({code})")))
+                    .then(|| format!("old-ruff: ruff 0.9.10 does not run {code}")),
+            );
+        }
+
+        let stale = self.project(
+            "stale-lock",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest==9.2.0\"]\n"),
+            )],
+        )?;
+        let locked = self
+            .command(&self.uv, &stale, &uv)?
+            .args(["lock", "--quiet"])
+            .status()?;
+        self.check((!locked.success()).then(|| "stale-lock: uv lock failed".to_owned()));
+        let file = stale.join("pyproject.toml");
+        fs::write(
+            &file,
+            fs::read_to_string(&file)?.replace("pytest==9.2.0", "pytest==8.4.2"),
+        )?;
+        let (code, _, err) = self.doctor_run(&stale, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("stale-lock: --apply exits {code}: {err}")));
+        let written = fs::read_to_string(&file)?;
+        self.check(
+            (!written.contains("[tool.pytest.ini_options]\nxfail_strict = true"))
+                .then(|| format!("stale-lock: the file is\n{written}")),
+        );
+
+        let autoload = self.project(
+            "autoload",
+            &[("pyproject.toml", &format!("{head}\n[dependency-groups]\ndev = [\"pytest==9.2.0\"]\n\n[tool.pytest]\naddopts = [\"--disable-plugin-autoload\"]\n"))],
+        )?;
+        let (code, out, _) = self.doctor_run(&autoload, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1
+                && out.contains(
+                    "--disable-plugin-autoload, so pytest-timeout and pytest-randomly do not run",
+                )))
+            .then(|| format!("autoload: --check exits {code}:\n{out}")),
+        );
+
+        let nested = self.project(
+            "nested-pytest",
+            &[
+                ("pyproject.toml", head),
+                (
+                    "tests/pytest.ini",
+                    "[pytest]\naddopts = --import-mode=prepend\n",
+                ),
+            ],
+        )?;
+        let (code, out, _) = self.doctor_run(&nested, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest reads tests/pytest.ini when it runs below it")))
+                .then(|| format!("nested-pytest: --check exits {code}:\n{out}")),
+        );
+        self.reviewed_addopts(head)
+    }
+
+    /// Positional arguments after `--`, a compliant `addopts` with extra spaces, a script kind with
+    /// a dependency table, and the permissions of `pyproject.toml`.
+    fn reviewed_addopts(&mut self, head: &str) -> Result<()> {
+        let uv = [Bin::Uv];
+        let positional = self.project(
+            "positional",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[tool.pytest.ini_options]\naddopts = \"-q -- tests\"\n"),
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&positional, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("positional: --apply exits {code}: {err}")));
+        let written = fs::read_to_string(positional.join("pyproject.toml"))?;
+        self.check(
+            (!written.contains("addopts = \"-q -ra --import-mode=importlib -- tests\""))
+                .then(|| format!("positional: the file is\n{written}")),
+        );
+
+        let spaced = "addopts = \"  -ra    --import-mode=importlib  \"";
+        let compliant = self.project(
+            "spaced",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[tool.pytest.ini_options]\n{spaced}\nstrict = true\n"),
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&compliant, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("spaced: --apply exits {code}: {err}")));
+        let (code, out, _) = self.doctor_run(&compliant, &uv, &["--check", "--format", "text"])?;
+        let written = fs::read_to_string(compliant.join("pyproject.toml"))?;
+        self.check(
+            (!(code == 0 && !out.contains("addopts") && written.contains(spaced)))
+                .then(|| format!("spaced: --check exits {code}:\n{out}\n{written}")),
+        );
+
+        let script = self.project(
+            "script-groups",
+            &[
+                ("pyproject.toml", "[dependency-groups]\ndev = [\"pytest==9.2.0\"]\n"),
+                ("tool.py", "# /// script\n# requires-python = \">=3.12\"\n# dependencies = []\n# ///\nprint(1)\n"),
+            ],
+        )?;
+        let (code, _, err) = self.doctor_run(&script, &uv, &["--apply", "--kind", "script"])?;
+        self.check(
+            (!(code == 2
+                && err.contains(
+                    "keeps pyproject.toml to the [tool] table, and it has [dependency-groups]",
+                )))
+            .then(|| format!("script-groups: --apply exits {code}: {err}")),
+        );
+        self.permissions(head)
+    }
+
+    /// Apply keeps the permissions of the `pyproject.toml` it replaces.
+    #[cfg(unix)]
+    fn permissions(&mut self, head: &str) -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        let private = self.project("private", &[("pyproject.toml", head)])?;
+        let file = private.join("pyproject.toml");
+        fs::set_permissions(&file, fs::Permissions::from_mode(0o600))?;
+        let (code, _, err) =
+            self.doctor_run(&private, &[Bin::Uv], &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("private: --apply exits {code}: {err}")));
+        let mode = fs::metadata(&file)?.permissions().mode() & 0o777;
+        self.check((mode != 0o600).then(|| format!("private: the mode is {mode:o}")));
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn permissions(&mut self, _head: &str) -> Result<()> {
         Ok(())
     }
 }

@@ -68,9 +68,9 @@ pub(crate) fn locked(root: &Path) -> Option<crate::version::Version> {
         .ok()
 }
 
-/// Whether the requirement `text`, such as `pytest==8.4.2` or `pytest>=8,<9`, admits no
-/// pytest 9 or later.
-pub(crate) fn excludes_nine(text: &str) -> bool {
+/// The version clauses of the requirement `text`, such as `>=8` and `<9` in `pytest>=8,<9`,
+/// without its name, extras and markers.
+fn clauses(text: &str) -> impl Iterator<Item = &str> {
     let text = text.split(';').next().unwrap_or_default();
     let spec = text
         .trim_start()
@@ -79,9 +79,52 @@ pub(crate) fn excludes_nine(text: &str) -> bool {
         Some(extras) => extras.split_once(']').map_or("", |(_, rest)| rest),
         None => spec,
     };
+    spec.split(',')
+        .map(str::trim)
+        .filter(|clause| !clause.is_empty())
+}
+
+/// Whether `version` meets the clause `clause`, such as `>=8` or `==8.4.*`. A clause doctor
+/// cannot read is met.
+fn meets(clause: &str, version: &crate::version::Version) -> bool {
+    let Some(operator) = ["===", "==", "~=", "!=", "<=", ">=", "<", ">"]
+        .into_iter()
+        .find(|operator| clause.starts_with(operator))
+    else {
+        return true;
+    };
+    let text = clause[operator.len()..].trim();
+    let wildcard = text.ends_with(".*");
+    let Ok(bound) = text
+        .trim_end_matches(".*")
+        .parse::<crate::version::Version>()
+    else {
+        return true;
+    };
+    let prefix = |of: &crate::version::Version| version.starts_with(of);
+    match operator {
+        "==" | "===" if wildcard => prefix(&bound),
+        "==" | "===" => *version == bound,
+        "!=" if wildcard => !prefix(&bound),
+        "!=" => *version != bound,
+        "<=" => *version <= bound,
+        ">=" => *version >= bound,
+        "<" => *version < bound,
+        ">" => *version > bound,
+        _ => *version >= bound && prefix(&bound.without_last()),
+    }
+}
+
+/// Whether `version` meets every clause of the requirement `text`.
+pub(crate) fn satisfies(text: &str, version: &crate::version::Version) -> bool {
+    clauses(text).all(|clause| meets(clause, version))
+}
+
+/// Whether the requirement `text`, such as `pytest==8.4.2` or `pytest>=8,<9`, admits no
+/// pytest 9 or later.
+pub(crate) fn excludes_nine(text: &str) -> bool {
     let nine: crate::version::Version = "9".parse().expect("9 is a release number");
-    spec.split(',').any(|clause| {
-        let clause = clause.trim();
+    clauses(text).any(|clause| {
         let Some(operator) = ["===", "==", "~=", "<=", "<"]
             .into_iter()
             .find(|operator| clause.starts_with(operator))

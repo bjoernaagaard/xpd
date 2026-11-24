@@ -100,6 +100,8 @@ pub(crate) struct OwnedFile {
 struct PytestFacts {
     release: Release,
     uses: bool,
+    /// Whether the kind lets the profile add plugins to a dependency list of `pyproject.toml`.
+    lists: bool,
 }
 
 /// An exception the project records, and whether the profile accepts it.
@@ -232,7 +234,12 @@ pub(crate) fn compute(
         after: String::new(),
         owned: Vec::new(),
     };
-    let facts = pytest_facts(root, original.as_ref());
+    let mut facts = pytest_facts(root, original.as_ref());
+    if let Some(kind) = plan.kind.as_deref().and_then(|kind| profile.kind(kind))
+        && kind.tool_only
+    {
+        facts.lists = false;
+    }
     let values = profile.values(plan.kind.as_deref());
     plan.locations(root, original.as_ref(), profile);
     plan.layout(original.as_ref(), profile, files);
@@ -263,7 +270,8 @@ pub(crate) fn compute(
     Ok(plan)
 }
 
-/// The pytest release a fresh checkout of the project at `root` gets: the one `uv.lock` locks,
+/// The pytest release a fresh checkout of the project at `root` gets: the one `uv.lock` locks
+/// when it meets every declared requirement, so that a lock the apply refreshes does not count,
 /// else pytest 8 when a declared requirement admits no pytest 9, else the pinned release when a
 /// list declares pytest, else the release in the virtual environment.
 fn pytest_facts(root: &Path, doc: Option<&Toml>) -> PytestFacts {
@@ -283,7 +291,9 @@ fn pytest_facts(root: &Path, doc: Option<&Toml>) -> PytestFacts {
         .filter_map(|entry| entry.as_str().map(str::to_owned))
         .collect();
     let installed = pytest::installed(root).map(|(version, _)| version);
-    let release = if let Some(locked) = pytest::locked(root) {
+    let locked = pytest::locked(root)
+        .filter(|locked| declared.iter().all(|text| pytest::satisfies(text, locked)));
+    let release = if let Some(locked) = locked {
         pytest::release(Some(&locked))
     } else if declared.iter().any(|text| pytest::excludes_nine(text)) {
         Release::BeforeNine
@@ -295,6 +305,7 @@ fn pytest_facts(root: &Path, doc: Option<&Toml>) -> PytestFacts {
     PytestFacts {
         release,
         uses: !declared.is_empty() || installed.is_some(),
+        lists: true,
     }
 }
 
@@ -413,12 +424,31 @@ impl Plan {
                     None,
                     format!("The kind {name} needs {part} in {PYPROJECT}, and it has none. Add it, or name the kind that fits."),
                 ),
-                (Presence::Forbidden, true) => self.conflict(
+                (Presence::Forbidden, true) if !kind.tool_only => self.conflict(
                     PYPROJECT,
                     None,
                     format!("The kind {name} keeps {PYPROJECT} to tool settings, and it has {part}. Move the metadata into the inline metadata of the scripts, or name the kind that fits."),
                 ),
                 _ => {}
+            }
+        }
+        if kind.tool_only {
+            let other: Vec<String> = doc
+                .map(|doc| {
+                    doc.as_table()
+                        .iter()
+                        .map(|(key, _)| key)
+                        .filter(|key| *key != "tool")
+                        .map(|key| format!("[{key}]"))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !other.is_empty() {
+                self.conflict(
+                    PYPROJECT,
+                    None,
+                    format!("The kind {name} keeps {PYPROJECT} to the [tool] table, and it has {}. Move dependencies into the inline metadata of the scripts, or name the kind that fits.", other.join(", ")),
+                );
             }
         }
         let scripts = scripts(files);
@@ -470,6 +500,30 @@ impl Plan {
             });
         }
         Ok(())
+    }
+
+    /// A conflict for each configuration file below the root that a tool reads there.
+    fn nested_conflicts(&mut self, root: &Path) {
+        for (nested, tools) in nested(root) {
+            let shown = nested.strip_prefix(root).unwrap_or(&nested).to_path_buf();
+            for tool in tools {
+                let message = match tool {
+                    Tool::Ruff => format!(
+                        "Ruff reads {} for the files below it instead of {PYPROJECT} at the root. Move its settings into [tool.ruff] of the root {PYPROJECT}, with per-file-ignores for its files.",
+                        shown.display()
+                    ),
+                    Tool::Ty => format!(
+                        "ty reads {} when it runs below it, instead of {PYPROJECT} at the root. Move its settings into [tool.ty] of the root {PYPROJECT}, with an override for its files.",
+                        shown.display()
+                    ),
+                    Tool::Pytest => format!(
+                        "pytest reads {} when it runs below it, instead of {PYPROJECT} at the root. Move its settings into the pytest table of the root {PYPROJECT}.",
+                        shown.display()
+                    ),
+                };
+                self.conflict(shown.clone(), None, message);
+            }
+        }
     }
 
     /// The files that keep a tool's settings outside the tool's table in `pyproject.toml`.
@@ -553,14 +607,7 @@ impl Plan {
                 );
             }
         }
-        for nested in nested_ruff(root) {
-            let shown = nested.strip_prefix(root).unwrap_or(&nested).to_path_buf();
-            self.conflict(
-                shown.clone(),
-                None,
-                format!("Ruff reads {} for the files below it instead of {PYPROJECT} at the root. Move its settings into [tool.ruff] of the root {PYPROJECT}, with per-file-ignores for its files.", shown.display()),
-            );
-        }
+        self.nested_conflicts(root);
         if self.kind.is_none() {
             self.conflict(
                 PYPROJECT,
@@ -944,6 +991,11 @@ fn pytest_verdict(
             "the project declares no pytest, so the profile does not add {id}"
         ));
     }
+    if plugin && !facts.lists {
+        return redundant(format!(
+            "the kind keeps pyproject.toml to tool settings, so the profile does not add {id}"
+        ));
+    }
     if !plugin && !names(active) {
         if names(inactive) {
             let release = match facts.release {
@@ -1012,8 +1064,9 @@ fn scripts(files: &[PathBuf]) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The Ruff configuration files below the root, outside virtual environments.
-fn nested_ruff(root: &Path) -> Vec<PathBuf> {
+/// The configuration files below the root, outside virtual environments, each with the tools
+/// that read it there.
+fn nested(root: &Path) -> Vec<(PathBuf, Vec<Tool>)> {
     let walk = ignore::WalkBuilder::new(root)
         .hidden(false)
         .sort_by_file_name(Ord::cmp)
@@ -1026,16 +1079,41 @@ fn nested_ruff(root: &Path) -> Vec<PathBuf> {
         .flatten()
         .filter(|entry| entry.depth() > 1 && entry.file_type().is_some_and(|kind| kind.is_file()))
         .map(ignore::DirEntry::into_path)
-        .filter(
-            |path| match path.file_name().and_then(|name| name.to_str()) {
-                Some("ruff.toml" | ".ruff.toml") => true,
-                Some(PYPROJECT) => toml::read(path)
-                    .ok()
-                    .flatten()
-                    .is_some_and(|doc| toml::get(&doc, &["tool", "ruff"]).is_some()),
-                _ => false,
-            },
-        )
+        .filter_map(|path| {
+            let name = path.file_name()?.to_str()?;
+            let tools = match name {
+                "ruff.toml" | ".ruff.toml" => vec![Tool::Ruff],
+                "ty.toml" => vec![Tool::Ty],
+                "pytest.toml" | ".pytest.toml" | "pytest.ini" | ".pytest.ini" => vec![Tool::Pytest],
+                "tox.ini" | "setup.cfg" => {
+                    let marker = if name == "tox.ini" {
+                        "[pytest]"
+                    } else {
+                        "[tool:pytest]"
+                    };
+                    let text = fs::read_to_string(&path).ok()?;
+                    if text.lines().any(|line| line.trim() == marker) {
+                        vec![Tool::Pytest]
+                    } else {
+                        Vec::new()
+                    }
+                }
+                PYPROJECT => {
+                    let doc = toml::read(&path).ok().flatten()?;
+                    let has = |table: &[&str]| toml::get(&doc, table).is_some();
+                    [
+                        (Tool::Ruff, has(&["tool", "ruff"])),
+                        (Tool::Ty, has(&["tool", "ty"])),
+                        (Tool::Pytest, has(&["tool", "pytest"])),
+                    ]
+                    .into_iter()
+                    .filter_map(|(tool, present)| present.then_some(tool))
+                    .collect()
+                }
+                _ => Vec::new(),
+            };
+            (!tools.is_empty()).then_some((path, tools))
+        })
         .collect()
 }
 
@@ -1381,7 +1459,8 @@ impl Edits<'_> {
         drop
     }
 
-    /// Every ty rule of the profile has at least its level, or the level its exception keeps.
+    /// Every ty rule of the profile has at least its level, or the level its exception keeps, in
+    /// the project's own settings. A release default does not count, since it can change.
     fn ty(&mut self, values: &Values, accepted: &[Exception]) {
         let prefix = ["tool", "ty"];
         let state = ty::state(self.catalog, self.file, &prefix, Some(&self.current()));
@@ -1391,12 +1470,7 @@ impl Edits<'_> {
                 .find(|exception| exception.tool == "ty" && exception.id == *rule)
                 .and_then(|exception| exception.value.as_deref().and_then(Level::parse));
             let set = state.rules.get(rule).or(state.all.as_ref());
-            let effective = set.map(|set| set.level).or_else(|| {
-                self.catalog
-                    .ty_rule(rule)
-                    .and_then(|record| record.default.as_deref())
-                    .and_then(Level::parse)
-            });
+            let effective = set.map(|set| set.level);
             let satisfied = match (kept, effective) {
                 (Some(kept), Some(effective)) => effective == kept,
                 (None, Some(effective)) => effective >= *level,
@@ -1405,11 +1479,8 @@ impl Edits<'_> {
             let target = kept.unwrap_or(*level);
             if !satisfied {
                 edit::set(self.doc, TY_RULES, rule, Value::from(target.name()));
-                let old = match (effective, set) {
-                    (Some(effective), Some(_)) => effective.name().to_owned(),
-                    (Some(effective), None) => format!("{} by default", effective.name()),
-                    (None, _) => "unknown".to_owned(),
-                };
+                let old =
+                    effective.map_or_else(|| "unset".to_owned(), |level| level.name().to_owned());
                 let mut path = TY_RULES.to_vec();
                 path.push(rule);
                 let explained = match kept {
@@ -1527,7 +1598,7 @@ impl Edits<'_> {
                 self.plan.ambiguity(PYPROJECT, None, message);
             }
             Ok(settings) => {
-                self.overridden(&settings, values, forbid, &excepted);
+                self.overridden(&settings, values, forbid, &excepted, facts);
                 let prefix = settings.prefix();
                 for (key, value) in &wanted.settings {
                     if excepted(key) || !settings.missing(key) {
@@ -1598,13 +1669,15 @@ impl Edits<'_> {
     }
 
     /// A conflict for each argument of `addopts` that overrides a setting the profile owns, with
-    /// `-o` or `--override-ini`, or that turns off a plugin the profile adds, with `-p no:`.
+    /// `-o` or `--override-ini`, or that turns off a plugin the profile adds, with `-p no:` or
+    /// with `--disable-plugin-autoload` when no `-p` loads it again.
     fn overridden(
         &mut self,
         settings: &pytest::Settings,
         values: &Values,
         forbid: &profile::PytestForbid,
         excepted: &dyn Fn(&str) -> bool,
+        facts: PytestFacts,
     ) {
         let owned: BTreeSet<&str> = [&values.pytest, &values.pytest_before_nine]
             .into_iter()
@@ -1661,6 +1734,27 @@ impl Edits<'_> {
             }
             index += used;
         }
+        if facts.uses && args.contains(&"--disable-plugin-autoload") {
+            let loaded = |name: &str| {
+                args.windows(2)
+                    .any(|pair| pair[0] == "-p" && pair[1] == name)
+                    || args.iter().any(|arg| arg.strip_prefix("-p") == Some(name))
+            };
+            let unloaded: Vec<&str> = forbid
+                .plugin_names
+                .iter()
+                .filter(|(plugin, _)| values.plugins.contains(plugin) && !excepted(plugin))
+                .filter(|(_, names)| !names.iter().any(|name| loaded(name)))
+                .map(|(plugin, _)| plugin.as_str())
+                .collect();
+            if !unloaded.is_empty() {
+                self.plan.conflict(
+                    PYPROJECT,
+                    line,
+                    format!("addopts stops pytest from loading plugins with --disable-plugin-autoload, so {} do not run. Remove the flag, or load each with -p.", unloaded.join(" and ")),
+                );
+            }
+        }
     }
 
     fn forbid_key(&mut self, settings: &pytest::Settings, prefix: &[&str], key: &str, id: &str) {
@@ -1711,7 +1805,7 @@ impl Edits<'_> {
                 }
             }
         }
-        let additions: Vec<String> = if facts.uses {
+        let additions: Vec<String> = if facts.uses && facts.lists {
             values
                 .plugins
                 .iter()
@@ -1849,7 +1943,8 @@ impl Edits<'_> {
 }
 
 /// Removes each flag of `remove`, with its value, from `addopts` of the table at `prefix`, and
-/// appends `add`. Returns each removed flag with the text it had.
+/// adds `add` before a `--`, which ends pytest's options, or else at the end. An `addopts` that
+/// needs neither keeps its text. Returns each removed flag with the text it had.
 fn addopts(
     doc: &mut DocumentMut,
     prefix: &[&str],
@@ -1886,8 +1981,12 @@ fn addopts(
             .collect();
         let (indexes, removed) = flags(&tokens, remove);
         edit::remove_items(array, &indexes);
-        for arg in add {
-            edit::push(array, arg);
+        let at = edit::strings(array)
+            .into_iter()
+            .find(|(_, arg)| arg == "--")
+            .map_or(array.len(), |(index, _)| index);
+        for (offset, arg) in add.iter().enumerate() {
+            edit::insert(array, at + offset, arg);
         }
         return removed;
     }
@@ -1898,13 +1997,27 @@ fn addopts(
         return Vec::new();
     };
     let (indexes, removed) = flags(&tokens, remove);
-    let kept = tokens
+    if indexes.is_empty() && add.is_empty() {
+        return removed;
+    }
+    let kept: Vec<&str> = tokens
         .iter()
         .enumerate()
         .filter(|(index, _)| !indexes.contains(index))
         .map(|(_, token)| token.as_str())
-        .chain(add.iter().copied());
-    let joined = command_line(kept);
+        .collect();
+    let split = kept
+        .iter()
+        .position(|token| *token == "--")
+        .unwrap_or(kept.len());
+    let (options, positional) = kept.split_at(split);
+    let joined = command_line(
+        options
+            .iter()
+            .copied()
+            .chain(add.iter().copied())
+            .chain(positional.iter().copied()),
+    );
     let decor = value.decor().clone();
     *value = Value::from(joined);
     *value.decor_mut() = decor;
