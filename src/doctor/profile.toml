@@ -10,18 +10,36 @@ pytest = "9.2.0"
 [kinds.library]
 summary = "A package that others install. It keeps its build backend, and uv.lock locks its development environment."
 lock = "project"
+project = "required"
+build-system = "required"
+scripts = "allowed"
+files = []
 
 [kinds.application]
 summary = "A program that runs from its checkout or as an installed command, locked in uv.lock."
 lock = "project"
+project = "required"
+build-system = "allowed"
+scripts = "allowed"
+files = []
 
 [kinds.pipeline]
 summary = "An application that turns data into results, locked in uv.lock like an application."
 lock = "project"
+project = "required"
+build-system = "allowed"
+scripts = "allowed"
+files = []
 
 [kinds.script]
 summary = "Standalone scripts with inline script metadata. Each script is locked in the lock file beside it, and pyproject.toml holds only tool settings."
 lock = "script"
+project = "forbidden"
+build-system = "forbidden"
+scripts = "required"
+files = []
+
+[files]
 
 [ruff]
 rules = ["PTH118", "PERF101", "PERF102", "PGH003", "PGH004", "RUF017", "RUF100"]
@@ -38,10 +56,14 @@ plugins = ["pytest-timeout", "pytest-randomly"]
 
 [pytest.before-9]
 settings = { xfail_strict = true }
-addopts = ["--strict-markers", "--strict-config"]
+addopts = ["-ra", "--import-mode=importlib", "--strict-markers", "--strict-config"]
 
 [pytest.forbid]
 addopts = ["--reruns", "--reruns-delay"]
 settings = ["reruns", "reruns_delay"]
-false = ["strict_xfail", "xfail_strict"]
+false = ["strict_config", "strict_markers", "strict_parametrization_ids", "strict_xfail", "xfail_strict"]
 plugins = ["pytest-rerunfailures", "flaky", "pytest-mock"]
+
+[pytest.plugin-names]
+pytest-timeout = ["timeout", "pytest_timeout"]
+pytest-randomly = ["randomly", "pytest_randomly"]

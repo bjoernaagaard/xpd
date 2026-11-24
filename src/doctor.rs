@@ -42,6 +42,9 @@ pub(crate) enum Mode {
 
 /// The exit code of `--check` when the project drifts from the profile.
 const DRIFT: u8 = 1;
+/// The exit code of `--check` when doctor cannot tell which setup applies, or cannot hold the
+/// layout to the profile.
+const AMBIGUOUS: u8 = 2;
 
 /// Runs doctor on the project in the working directory.
 pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<ExitCode> {
@@ -67,7 +70,9 @@ pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<Exit
                 Format::Json => println!("{}", serde_json::to_string_pretty(&plan)?),
                 Format::Text => print!("{}", plan.to_text()),
             }
-            Ok(if plan.drifts() {
+            Ok(if plan.ambiguous() {
+                ExitCode::from(AMBIGUOUS)
+            } else if plan.drifts() {
                 ExitCode::from(DRIFT)
             } else {
                 ExitCode::SUCCESS
@@ -114,10 +119,20 @@ fn advise(root: &Path, files: &[PathBuf], catalog: &catalog::Catalog) -> Result<
     ))
 }
 
-/// One line for each difference between the project at `root`, whose Python files are `files`,
-/// and the profile. `None` when the project records no profile. It reads files only and runs no
-/// tool, so the Stop hook can call it on every turn.
-pub(crate) fn drift(root: &Path, files: &[PathBuf]) -> Option<Result<Vec<String>>> {
+/// The differences between a project and the profile of one revision.
+#[derive(Debug)]
+pub(crate) struct Drift {
+    /// The revision of the profile that this xpd holds.
+    pub(crate) revision: i64,
+    /// One line for each difference, without a line number, so that the same difference gives
+    /// the same line after an unrelated edit.
+    pub(crate) lines: Vec<String>,
+}
+
+/// The differences between the project at `root`, whose Python files are `files`, and the
+/// profile. `None` when the project records no profile. It reads files only and runs no tool, so
+/// the Stop hook can call it on every turn.
+pub(crate) fn drift(root: &Path, files: &[PathBuf]) -> Option<Result<Drift>> {
     let doc = match crate::toml::read(&root.join(plan::PYPROJECT)) {
         Ok(Some(doc)) => doc,
         Ok(None) => return None,
@@ -131,6 +146,10 @@ pub(crate) fn drift(root: &Path, files: &[PathBuf]) -> Option<Result<Vec<String>
             kind: None,
             stamp: true,
         };
-        Ok(plan::compute(root, &catalog, &profile, files, request)?.drift())
+        let plan = plan::compute(root, &catalog, &profile, files, request)?;
+        Ok(Drift {
+            revision: plan.revision,
+            lines: plan.drift(),
+        })
     })())
 }

@@ -141,6 +141,7 @@ pub(crate) fn run(
         uv_runs()?;
     }
     let mut touched = vec![PathBuf::from(PYPROJECT)];
+    touched.extend(settings.owned.iter().map(|owned| owned.path.clone()));
     touched.extend(locks.iter().map(|lock| lock.file.clone()));
     let journal = Journal::begin(root, &touched)?;
     let result = write(
@@ -187,8 +188,24 @@ fn write(
         now == full.before,
         "{PYPROJECT} changed while doctor planned. Run xpd doctor --apply again"
     );
+    for owned in &settings.owned {
+        let path = root.join(&owned.path);
+        ensure!(
+            read(&path)? == owned.before,
+            "{} changed while doctor planned. Run xpd doctor --apply again",
+            owned.path.display()
+        );
+    }
     if Some(&settings.after) != full.before.as_ref() {
         replace(&file, &settings.after)?;
+    }
+    for owned in &settings.owned {
+        let path = root.join(&owned.path);
+        if let Some(folder) = path.parent() {
+            fs::create_dir_all(folder)
+                .with_context(|| format!("cannot make {}", folder.display()))?;
+        }
+        replace(&path, &owned.after)?;
     }
     for lock in locks {
         let (program, args) = lock.command.split_first().context("a lock has a command")?;
@@ -206,19 +223,23 @@ fn write(
             );
         }
     }
-    let check = plan::compute(root, catalog, profile, files, Request { kind, stamp: true })?;
-    let left: Vec<String> = check
-        .drift()
-        .into_iter()
-        .filter(|line| !line.contains("profile record"))
-        .collect();
+    let mut check = plan::compute(
+        root,
+        catalog,
+        profile,
+        files,
+        Request { kind, stamp: false },
+    )?;
+    check.check_locks(root)?;
+    let left = check.drift();
     ensure!(
         left.is_empty(),
         "drift remains after the write:\n  {}",
         left.join("\n  ")
     );
-    if Some(&check.after) != check.before.as_ref() {
-        replace(&file, &check.after)?;
+    let stamped = plan::compute(root, catalog, profile, files, Request { kind, stamp: true })?;
+    if Some(&stamped.after) != stamped.before.as_ref() {
+        replace(&file, &stamped.after)?;
     }
     Ok(())
 }

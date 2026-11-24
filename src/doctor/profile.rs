@@ -16,6 +16,11 @@
 //! The profile names each value, and the record of the same id in `decisions.jsonl` explains
 //! it. A profile revision changes whenever a value changes, and the schema changes only when
 //! the shape of `profile.toml` or of the project's record changes.
+//!
+//! The base values apply to every kind of project, and a kind can add its own values in the
+//! same shape. A kind also states which of `[project]`, `[build-system]` and scripts with inline
+//! metadata it needs, and which files the profile owns for it. An owned file is a native template
+//! in `src/doctor/profiles/`, listed in [`TEMPLATES`], that the project keeps as an exact copy.
 
 use std::collections::BTreeSet;
 
@@ -43,15 +48,149 @@ pub(crate) enum LockStyle {
     Script,
 }
 
+/// Whether a kind of project needs a part of the layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Presence {
+    Required,
+    Forbidden,
+    Allowed,
+}
+
+impl Presence {
+    fn parse(text: &str) -> Option<Self> {
+        match text {
+            "required" => Some(Self::Required),
+            "forbidden" => Some(Self::Forbidden),
+            "allowed" => Some(Self::Allowed),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct KindSpec {
     pub(crate) name: String,
     pub(crate) summary: String,
     pub(crate) lock: LockStyle,
+    /// The `[project]` table of `pyproject.toml`.
+    pub(crate) project: Presence,
+    /// The `[build-system]` table of `pyproject.toml`.
+    pub(crate) build_system: Presence,
+    /// Python files with inline script metadata.
+    pub(crate) scripts: Presence,
+    /// The names of the owned files, from `[files]`.
+    pub(crate) files: Vec<String>,
+    /// The values the kind adds to the base values.
+    pub(crate) extra: Values,
+}
+
+/// A file that the profile owns for some kinds, which the project keeps as an exact copy of a
+/// template.
+#[derive(Debug)]
+pub(crate) struct Owned {
+    pub(crate) name: String,
+    /// The path relative to the project root.
+    pub(crate) path: String,
+    /// The template's file name in `src/doctor/profiles/`.
+    pub(crate) template: String,
+    pub(crate) text: &'static str,
+}
+
+/// The templates of owned files, each by its file name in `src/doctor/profiles/`. Revision 1
+/// owns no file.
+const TEMPLATES: &[(&str, &str)] = &[];
+
+/// What the profile wants of Ruff, ty and pytest, for every kind or added by one kind.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct Values {
+    /// Ruff rule codes that run on every file.
+    pub(crate) ruff_rules: Vec<String>,
+    /// ty rules, each with the lowest level it may have.
+    pub(crate) ty_rules: Vec<(String, Level)>,
+    /// For pytest 9 and later.
+    pub(crate) pytest: PytestWanted,
+    /// For pytest before 9.
+    pub(crate) pytest_before_nine: PytestWanted,
+    /// Plugins in the dependency list that holds pytest.
+    pub(crate) plugins: Vec<String>,
+}
+
+impl Values {
+    /// These values with `extra` added. A ty level in `extra` replaces the base level.
+    fn with(&self, extra: &Self) -> Self {
+        let mut values = self.clone();
+        let add = |into: &mut Vec<String>, from: &[String]| {
+            for item in from {
+                if !into.contains(item) {
+                    into.push(item.clone());
+                }
+            }
+        };
+        add(&mut values.ruff_rules, &extra.ruff_rules);
+        for (rule, level) in &extra.ty_rules {
+            values.ty_rules.retain(|(name, _)| name != rule);
+            values.ty_rules.push((rule.clone(), *level));
+        }
+        for (into, from) in [
+            (&mut values.pytest, &extra.pytest),
+            (&mut values.pytest_before_nine, &extra.pytest_before_nine),
+        ] {
+            for (key, value) in &from.settings {
+                into.settings.retain(|(name, _)| name != key);
+                into.settings.push((key.clone(), *value));
+            }
+            add(&mut into.addopts, &from.addopts);
+        }
+        add(&mut values.plugins, &extra.plugins);
+        values
+    }
+
+    /// The values in `table`, a tool table of `profile.toml` or of a kind. A missing table holds
+    /// no value.
+    fn read(table: &dyn TableLike) -> Result<Self> {
+        let ruff_rules = optional(table, "ruff")?
+            .map(|ruff| strings(ruff, "rules"))
+            .transpose()?
+            .unwrap_or_default();
+        let ty_rules = match optional(table, "ty")?
+            .map(|ty| optional(ty, "rules"))
+            .transpose()?
+        {
+            Some(Some(rules)) => rules
+                .iter()
+                .map(|(name, item)| {
+                    let level = item
+                        .as_str()
+                        .and_then(Level::parse)
+                        .with_context(|| format!("ty.rules.{name} is no level"))?;
+                    Ok((name.to_owned(), level))
+                })
+                .collect::<Result<Vec<_>>>()?,
+            _ => Vec::new(),
+        };
+        let (pytest, pytest_before_nine, plugins) = match optional(table, "pytest")? {
+            None => Default::default(),
+            Some(pytest) => (
+                wanted(pytest)?,
+                optional(pytest, "before-9")?
+                    .map(wanted)
+                    .transpose()?
+                    .unwrap_or_default(),
+                optional_strings(pytest, "plugins")?,
+            ),
+        };
+        Ok(Self {
+            ruff_rules,
+            ty_rules,
+            pytest,
+            pytest_before_nine,
+            plugins,
+        })
+    }
 }
 
 /// What the profile wants of pytest for one range of pytest releases.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct PytestWanted {
     /// Settings of the pytest table, each with the boolean it must hold.
     pub(crate) settings: Vec<(String, bool)>,
@@ -70,23 +209,33 @@ pub(crate) struct PytestForbid {
     pub(crate) false_settings: Vec<String>,
     /// Distributions in a dependency list.
     pub(crate) plugins: Vec<String>,
+    /// The names under which each plugin of the profile loads, which `-p no:<name>` turns off.
+    pub(crate) plugin_names: Vec<(String, Vec<String>)>,
+}
+
+impl PytestForbid {
+    /// Whether the profile removes `id` of pytest without exception.
+    pub(crate) fn forbids(&self, id: &str) -> bool {
+        [
+            &self.addopts,
+            &self.settings,
+            &self.false_settings,
+            &self.plugins,
+        ]
+        .into_iter()
+        .flatten()
+        .any(|forbidden| forbidden == id)
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct Profile {
     pub(crate) revision: i64,
     pub(crate) kinds: Vec<KindSpec>,
-    /// Ruff rule codes that run on every file.
-    pub(crate) ruff_rules: Vec<String>,
-    /// ty rules, each with the lowest level it may have.
-    pub(crate) ty_rules: Vec<(String, Level)>,
-    /// For pytest 9 and later.
-    pub(crate) pytest: PytestWanted,
-    /// For pytest before 9.
-    pub(crate) pytest_before_nine: PytestWanted,
-    /// Plugins in the dependency list that holds pytest.
-    pub(crate) plugins: Vec<String>,
+    /// The values for every kind.
+    pub(crate) base: Values,
     pub(crate) forbid: PytestForbid,
+    pub(crate) files: Vec<Owned>,
 }
 
 impl Profile {
@@ -131,46 +280,78 @@ impl Profile {
                     "script" => LockStyle::Script,
                     other => bail!("kinds.{name}.lock is {other:?}"),
                 };
+                let presence = |key: &str| {
+                    let text = string(kind, key)?;
+                    Presence::parse(&text).with_context(|| {
+                        format!(
+                            "kinds.{name}.{key} is {text:?}, not required, forbidden or allowed"
+                        )
+                    })
+                };
                 Ok(KindSpec {
                     name: name.to_owned(),
                     summary: string(kind, "summary")?,
                     lock,
+                    project: presence("project")?,
+                    build_system: presence("build-system")?,
+                    scripts: presence("scripts")?,
+                    files: strings(kind, "files")?,
+                    extra: Values::read(kind).with_context(|| format!("kinds.{name}"))?,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        let ruff_rules = strings(table(top, "ruff")?, "rules")?;
-        let ty_rules = table(table(top, "ty")?, "rules")?
+        let files = table(top, "files")?
             .iter()
             .map(|(name, item)| {
-                let level = item
-                    .as_str()
-                    .and_then(Level::parse)
-                    .with_context(|| format!("ty.rules.{name} is no level"))?;
-                Ok((name.to_owned(), level))
+                let file = item
+                    .as_table_like()
+                    .with_context(|| format!("files.{name} is no table"))?;
+                let template = string(file, "template")?;
+                let text = TEMPLATES
+                    .iter()
+                    .find(|(known, _)| *known == template)
+                    .map(|(_, text)| *text)
+                    .with_context(|| format!("files.{name} names the template {template}, which src/doctor/profiles/ lacks"))?;
+                Ok(Owned {
+                    name: name.to_owned(),
+                    path: string(file, "path")?,
+                    template,
+                    text,
+                })
             })
             .collect::<Result<Vec<_>>>()?;
         let pytest = table(top, "pytest")?;
         let forbid = table(pytest, "forbid")?;
+        let plugin_names = table(pytest, "plugin-names")?
+            .iter()
+            .map(|(plugin, item)| {
+                let names = item
+                    .as_array()
+                    .with_context(|| format!("pytest.plugin-names.{plugin} is no array"))?
+                    .iter()
+                    .filter_map(|value| value.as_str().map(str::to_owned))
+                    .collect();
+                Ok((plugin.to_owned(), names))
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             revision: integer(top, "revision")?,
             kinds,
-            ruff_rules,
-            ty_rules,
-            pytest: wanted(pytest)?,
-            pytest_before_nine: wanted(table(pytest, "before-9")?)?,
-            plugins: strings(pytest, "plugins")?,
+            base: Values::read(top)?,
             forbid: PytestForbid {
                 addopts: strings(forbid, "addopts")?,
                 settings: strings(forbid, "settings")?,
                 false_settings: strings(forbid, "false")?,
                 plugins: strings(forbid, "plugins")?,
+                plugin_names,
             },
+            files,
         })
     }
 
     /// Every value has a `profile` record in the catalog, and every such record a value.
     fn check(&self, catalog: &Catalog) -> Result<()> {
-        let named: BTreeSet<(Tool, String)> = self.ids().collect();
+        let named: BTreeSet<(Tool, String)> = self.ids().into_iter().collect();
         for (tool, id) in &named {
             ensure!(
                 catalog.profiled(*tool, id).is_some(),
@@ -187,13 +368,17 @@ impl Profile {
                 );
             }
         }
-        for code in &self.ruff_rules {
+        let all = self
+            .kinds
+            .iter()
+            .fold(self.base.clone(), |values, kind| values.with(&kind.extra));
+        for code in &all.ruff_rules {
             let known = catalog
                 .ruff_rules()
                 .any(|rule| rule.key.id == *code && !rule.is_removed());
             ensure!(known, "ruff {} has no rule {code}", catalog::RUFF_RELEASE);
         }
-        for (rule, _) in &self.ty_rules {
+        for (rule, _) in &all.ty_rules {
             ensure!(
                 catalog
                     .ty_rule(rule)
@@ -203,20 +388,45 @@ impl Profile {
             );
         }
         ensure!(!self.kinds.is_empty(), "no kinds");
+        for kind in &self.kinds {
+            for name in &kind.files {
+                ensure!(
+                    self.files.iter().any(|file| file.name == *name),
+                    "kinds.{} owns the file {name}, which [files] lacks",
+                    kind.name
+                );
+            }
+        }
+        for (template, _) in TEMPLATES {
+            ensure!(
+                self.files.iter().any(|file| file.template == *template),
+                "src/doctor/profiles/{template} is no file of the profile"
+            );
+        }
+        for (plugin, _) in &self.forbid.plugin_names {
+            ensure!(
+                all.plugins.contains(plugin),
+                "pytest.plugin-names names {plugin}, which no kind adds"
+            );
+        }
         Ok(())
     }
 
     /// Each value as the tool and id of the catalog record that explains it.
-    fn ids(&self) -> impl Iterator<Item = (Tool, String)> + '_ {
-        let ruff = self
+    fn ids(&self) -> Vec<(Tool, String)> {
+        let values = self
+            .kinds
+            .iter()
+            .fold(self.base.clone(), |values, kind| values.with(&kind.extra));
+        let ruff = values
             .ruff_rules
             .iter()
             .map(|code| (Tool::Ruff, code.clone()));
-        let ty = self
+        let ty = values
             .ty_rules
             .iter()
             .map(|(rule, _)| (Tool::Ty, rule.clone()));
-        let wanted = [&self.pytest, &self.pytest_before_nine]
+        let wanted = [&values.pytest, &values.pytest_before_nine]
             .into_iter()
             .flat_map(|wanted| {
                 let settings = wanted.settings.iter().map(|(key, _)| key.clone());
@@ -224,7 +434,7 @@ impl Profile {
             });
         let forbid = &self.forbid;
         let pytest = wanted
-            .chain(self.plugins.iter().cloned())
+            .chain(values.plugins.iter().cloned())
             .chain(forbid.addopts.iter().cloned())
             .chain(forbid.settings.iter().cloned())
             .chain(
@@ -235,7 +445,7 @@ impl Profile {
             )
             .chain(forbid.plugins.iter().cloned())
             .map(|id| (Tool::Pytest, id));
-        ruff.chain(ty).chain(pytest)
+        ruff.chain(ty).chain(pytest).collect()
     }
 
     pub(crate) fn kind(&self, name: &str) -> Option<&KindSpec> {
@@ -246,40 +456,34 @@ impl Profile {
         self.kinds.iter().map(|kind| kind.name.as_str()).collect()
     }
 
-    /// Whether the profile requires `id` of `tool`, so that an exception can apply to it.
-    pub(crate) fn requires(&self, tool: Tool, id: &str) -> bool {
-        match tool {
-            Tool::Ruff => self.ruff_rules.iter().any(|code| code == id),
-            Tool::Ty => self.ty_rules.iter().any(|(rule, _)| rule == id),
-            Tool::Pytest => {
-                [&self.pytest, &self.pytest_before_nine]
-                    .into_iter()
-                    .any(|wanted| {
-                        wanted.settings.iter().any(|(key, _)| key == id)
-                            || wanted.addopts.iter().any(|arg| arg == id)
-                    })
-                    || self.plugins.iter().any(|plugin| plugin == id)
-            }
+    /// The values for the kind `kind`, or the base values without a kind.
+    pub(crate) fn values(&self, kind: Option<&str>) -> Values {
+        match kind.and_then(|kind| self.kind(kind)) {
+            Some(kind) => self.base.with(&kind.extra),
+            None => self.base.clone(),
         }
     }
 
-    /// Whether the profile removes `id` of pytest without exception.
-    pub(crate) fn forbids(&self, id: &str) -> bool {
-        let forbid = &self.forbid;
-        [
-            &forbid.addopts,
-            &forbid.settings,
-            &forbid.false_settings,
-            &forbid.plugins,
-        ]
-        .into_iter()
-        .flatten()
-        .any(|forbidden| forbidden == id)
+    /// The files the profile owns for the kind `kind`.
+    pub(crate) fn owned(&self, kind: Option<&str>) -> Vec<&Owned> {
+        let Some(kind) = kind.and_then(|kind| self.kind(kind)) else {
+            return Vec::new();
+        };
+        self.files
+            .iter()
+            .filter(|file| kind.files.contains(&file.name))
+            .collect()
     }
 }
 
 fn wanted(table: &dyn TableLike) -> Result<PytestWanted> {
-    let settings = self::table(table, "settings")?
+    let Some(settings) = optional(table, "settings")? else {
+        return Ok(PytestWanted {
+            settings: Vec::new(),
+            addopts: optional_strings(table, "addopts")?,
+        });
+    };
+    let settings = settings
         .iter()
         .map(|(key, item)| {
             let value = item
@@ -290,8 +494,28 @@ fn wanted(table: &dyn TableLike) -> Result<PytestWanted> {
         .collect::<Result<Vec<_>>>()?;
     Ok(PytestWanted {
         settings,
-        addopts: strings(table, "addopts")?,
+        addopts: optional_strings(table, "addopts")?,
     })
+}
+
+/// The table at `key`, `None` when it is missing.
+fn optional<'a>(parent: &'a dyn TableLike, key: &str) -> Result<Option<&'a dyn TableLike>> {
+    parent
+        .get(key)
+        .map(|item| {
+            item.as_table_like()
+                .with_context(|| format!("{key} is no table"))
+        })
+        .transpose()
+}
+
+/// The strings at `key`, none when it is missing.
+fn optional_strings(parent: &dyn TableLike, key: &str) -> Result<Vec<String>> {
+    if parent.contains_key(key) {
+        strings(parent, key)
+    } else {
+        Ok(Vec::new())
+    }
 }
 
 fn table<'a>(parent: &'a dyn TableLike, key: &str) -> Result<&'a dyn TableLike> {

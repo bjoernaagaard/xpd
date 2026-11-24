@@ -200,6 +200,7 @@ impl Runner {
         self.pytest_settings()?;
         self.pytest_plugins()?;
         self.profile()?;
+        self.reviewed()?;
         Ok(())
     }
 
@@ -1252,6 +1253,258 @@ impl Runner {
         self.check(
             (!(code == 2 && err.contains("records profile revision 99")))
                 .then(|| format!("profile: apply on a newer revision exits {code}: {err}")),
+        );
+        Ok(())
+    }
+}
+
+impl Runner {
+    /// The faults an independent review found, each run the way it reported them: pytest strict
+    /// options turned off or overridden, a pytest 8 requirement, a ty override that lowers `all`,
+    /// a script kind without scripts, an invalid file pattern, an exception for another pytest
+    /// release, plugin placement, a comment in a dependency list, the Stop baseline, and an
+    /// ambiguous pytest layout.
+    fn reviewed(&mut self) -> Result<()> {
+        self.reviewed_pytest()?;
+        self.reviewed_layout()?;
+        self.reviewed_lists()?;
+        self.stop_baseline()
+    }
+
+    /// Strict options turned off or overridden, and a pytest 8 requirement.
+    fn reviewed_pytest(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"reviewed\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+
+        let strict = self.project(
+            "strict-off",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest>=9\"]\n\n[tool.pytest]\nstrict = true\nstrict_markers = false\naddopts = [\"-ra\", \"--import-mode=importlib\"]\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&strict, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest strict_markers: false -> removed")))
+                .then(|| format!("strict-off: --check exits {code}:\n{out}")),
+        );
+
+        let overridden = self.project(
+            "overridden",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest>=9\"]\n\n[tool.pytest]\nstrict = true\naddopts = [\"-ra\", \"--import-mode=importlib\", \"-o\", \"strict=false\", \"-p\", \"no:randomly\"]\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&overridden, &uv, &["--check", "--format", "text"])?;
+        self.expect_output(
+            "overridden",
+            "doctor --check",
+            &out,
+            &[
+                "addopts overrides strict with -o strict=false",
+                "addopts turns off the plugin randomly with -p no:randomly",
+            ],
+            &[],
+        );
+        self.check((code != 1).then(|| format!("overridden: --check exits {code}")));
+        let (code, _, _) =
+            self.doctor_run(&overridden, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 2).then(|| format!("overridden: --apply exits {code}")));
+
+        let eight = self.project(
+            "pytest-eight",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest==8.4.2\"]\n"),
+            )],
+        )?;
+        let text = self.doctor_text(&eight, &uv)?;
+        self.expect_output(
+            "pytest 8 declared",
+            "doctor text",
+            &text,
+            &[
+                "+[tool.pytest.ini_options]",
+                "+xfail_strict = true",
+                "+addopts = \"-ra --import-mode=importlib --strict-markers --strict-config\"",
+            ],
+            &["+strict = true", "+[tool.pytest]\n"],
+        );
+
+        Ok(())
+    }
+
+    /// A ty override that lowers `all`, a script kind without scripts, and an invalid pattern.
+    fn reviewed_layout(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"reviewed\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+        let lowered = self.project(
+            "ty-all",
+            &[
+                (
+                    "pyproject.toml",
+                    &format!("{head}\n[[tool.ty.overrides]]\ninclude = [\"sample.py\"]\n\n[tool.ty.overrides.rules]\nall = \"ignore\"\n"),
+                ),
+                ("sample.py", "x: int = \"a\"  # ty: ignore\n"),
+            ],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&lowered, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("ty-all: --apply exits {code}: {err}")));
+        let ty = self.checker("ty", &lowered, &["sample.py"])?;
+        self.expect_output("ty-all", "ty", &ty, &["error[blanket-ignore-comment]"], &[]);
+
+        let script = self.project(
+            "script-kind",
+            &[("pyproject.toml", head), ("tool.py", "print(1)\n")],
+        )?;
+        let (code, _, err) = self.doctor_run(&script, &uv, &["--apply", "--kind", "script"])?;
+        self.check(
+            (!(code == 2
+                && err.contains("keeps pyproject.toml to tool settings")
+                && err.contains("needs Python files with inline script metadata")))
+            .then(|| format!("script-kind: --apply exits {code}: {err}")),
+        );
+
+        let glob = self.project(
+            "bad-glob",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[[tool.xpd.profile.exceptions]]\ntool = \"ruff\"\nid = \"PTH118\"\nfiles = [\"[\"]\nreason = \"The scripts take str paths.\"\n"),
+            )],
+        )?;
+        let (code, _, err) = self.doctor_run(&glob, &uv, &["--apply", "--kind", "application"])?;
+        self.check(
+            (!(code == 2 && err.contains("is no file pattern Ruff reads")))
+                .then(|| format!("bad-glob: --apply exits {code}: {err}")),
+        );
+
+        Ok(())
+    }
+
+    /// An exception for another pytest release, plugin placement, a comment in a dependency list,
+    /// and two pytest tables.
+    fn reviewed_lists(&mut self) -> Result<()> {
+        let uv = [Bin::Uv];
+        let head =
+            "[project]\nname = \"reviewed\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n";
+        let inactive = self.project(
+            "inactive",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\"pytest>=9\"]\n\n[[tool.xpd.profile.exceptions]]\ntool = \"pytest\"\nid = \"--strict-config\"\nreason = \"The config has a plugin's keys.\"\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&inactive, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 1 && out.contains("pytest --strict-config: redundant")))
+                .then(|| format!("inactive: --check exits {code}:\n{out}")),
+        );
+        let (code, _, _) =
+            self.doctor_run(&inactive, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 2).then(|| format!("inactive: --apply exits {code}")));
+
+        let runtime = self.project(
+            "runtime-pytest",
+            &[(
+                "pyproject.toml",
+                "[project]\nname = \"runtime\"\nversion = \"0.1.0\"\ndependencies = [\"pytest\"]\n",
+            )],
+        )?;
+        let report = self.doctor(&runtime, &uv)?;
+        let paths: BTreeSet<String> = report["profile"]["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| c["id"] == "pytest-timeout" || c["id"] == "pytest-randomly")
+            .filter_map(|c| c["path"].as_str().map(str::to_owned))
+            .collect();
+        self.check(
+            (paths != BTreeSet::from(["project.dependencies".to_owned()]))
+                .then(|| format!("runtime-pytest: plugins go to {paths:?}")),
+        );
+
+        let comment = self.project(
+            "comment",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[dependency-groups]\ndev = [\n    \"pytest-rerunfailures\",\n    # Keep pytest with the dev dependencies.\n    \"pytest>=9\",\n]\n"),
+            )],
+        )?;
+        let (code, _, err) =
+            self.doctor_run(&comment, &uv, &["--apply", "--kind", "application"])?;
+        self.check((code != 0).then(|| format!("comment: --apply exits {code}: {err}")));
+        let written = fs::read_to_string(comment.join("pyproject.toml"))?;
+        self.check(
+            (!written.contains("dev = [\n    # Keep pytest with the dev dependencies.\n    \"pytest>=9\",\n    \"pytest-timeout\",\n    \"pytest-randomly\",\n]"))
+                .then(|| format!("comment: the dependency list is\n{written}")),
+        );
+
+        let both = self.project(
+            "both-tables",
+            &[(
+                "pyproject.toml",
+                &format!("{head}\n[tool.pytest]\nstrict = true\n\n[tool.pytest.ini_options]\naddopts = \"-q\"\n"),
+            )],
+        )?;
+        let (code, out, _) = self.doctor_run(&both, &uv, &["--check", "--format", "text"])?;
+        self.check(
+            (!(code == 2
+                && out.contains(
+                    "[tool.pytest] and [tool.pytest.ini_options] both contain settings",
+                )))
+            .then(|| format!("both-tables: --check exits {code}:\n{out}")),
+        );
+        Ok(())
+    }
+
+    /// A Stop after an edit that only moves an invalid exception down one line holds nothing,
+    /// and the session file records the profile revision of the baseline.
+    fn stop_baseline(&mut self) -> Result<()> {
+        let project = self.project(
+            "stop-baseline",
+            &[(
+                "pyproject.toml",
+                "[project]\nname = \"stop\"\nversion = \"0.1.0\"\n\n[tool.xpd.profile]\nrevision = 1\nkind = \"application\"\n\n[[tool.xpd.profile.exceptions]]\ntool = \"ruff\"\nid = \"PTH118\"\nreason = \"\"\n",
+            )],
+        )?;
+        let cache = self.scratch.join("hook-cache");
+        let hook = |event: &str| -> Result<String> {
+            let mut child = self
+                .command(&self.xpd, &project, &[])?
+                .arg("hook")
+                .env("XDG_CACHE_HOME", &cache)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()?;
+            std::io::Write::write_all(
+                child.stdin.as_mut().context("the hook takes stdin")?,
+                event.as_bytes(),
+            )?;
+            let output = child.wait_with_output()?;
+            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        };
+        let cwd = project.display().to_string();
+        hook(&format!(
+            r#"{{"hook_event_name":"SessionStart","session_id":"baseline","cwd":"{cwd}","source":"startup"}}"#
+        ))?;
+        let session = fs::read_to_string(cache.join("xpd").join("sessions").join("baseline"))?;
+        let file = project.join("pyproject.toml");
+        let text = fs::read_to_string(&file)?;
+        fs::write(&file, format!("# Project metadata\n{text}"))?;
+        let answer = hook(&format!(
+            r#"{{"hook_event_name":"Stop","session_id":"baseline","cwd":"{cwd}"}}"#
+        ))?;
+        self.check(
+            (!session.contains(r#""drift":{"revision":1"#))
+                .then(|| format!("stop-baseline: the session file holds {session}")),
+        );
+        self.check(
+            (answer.contains("\"block\"") || !answer.contains("did not make"))
+                .then(|| format!("stop-baseline: Stop answered {answer}")),
         );
         Ok(())
     }

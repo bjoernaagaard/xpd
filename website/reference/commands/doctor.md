@@ -16,7 +16,7 @@ The profile sets seven Ruff rules. A missing code goes into `lint.extend-select`
 | `RUF017` | Lists combined with repeated addition | Flatten the inputs in one pass to avoid copying earlier items repeatedly. |
 | `RUF100` | A `noqa` that no longer suppresses a finding | Remove the unused suppression. |
 
-The profile sets three ty rules under `[tool.ty.rules]`. A higher level than the profile's needs no edit. Doctor removes a lower level that an override table sets.
+The profile sets three ty rules under `[tool.ty.rules]`. A higher level than the profile's needs no edit. When an `[[tool.ty.overrides]]` table gives a rule a lower level, by its name or through `all`, doctor sets the rule to the profile's level in that table. ty applies a rule's own entry before `all`.
 
 | Rule | Level | Why enable it |
 | --- | --- | --- |
@@ -32,9 +32,9 @@ The profile sets three pytest settings in the pytest table of `pyproject.toml`: 
 | `pytest -ra` | `addopts` | The summary lists each skipped test and each expected failure. |
 | `pytest --import-mode=importlib` | `addopts` | pytest imports a test file without adding its folder to `sys.path`. |
 
-`strict` needs pytest 9.0. When the project's virtual environment has pytest 8, the profile sets `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in the table instead.
+`strict` needs pytest 9.0. For pytest 8, the profile sets `pytest -ra`, `pytest --import-mode=importlib`, `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in `[tool.pytest.ini_options]` instead. Doctor takes the pytest release that a fresh checkout gets: the one `uv.lock` locks, else pytest 8 when a declared requirement such as `pytest==8.4.2` admits no pytest 9, else pytest 9 when a list declares pytest, else the release in the project's virtual environment.
 
-A project that declares pytest gets two plugins in the dependency list that holds pytest, which is `dev` in `[dependency-groups]` when no list holds it.
+A project that declares pytest gets two plugins in the dependency list that holds pytest, whether that is a dependency group, an extra or `[project]` `dependencies`, and `dev` in `[dependency-groups]` when only the virtual environment has pytest.
 
 | Plugin | Reason |
 | --- | --- |
@@ -50,7 +50,7 @@ The profile removes these from every project, and no exception keeps them.
 | `pytest-rerunfailures`, `flaky` | A rerun hides the run where the code was wrong. |
 | `pytest-mock` | A test with a mock checks the mock and not the code. |
 | `pytest --reruns` and `pytest --reruns-delay` in `addopts`, `reruns` and `reruns_delay` in the table | The same as a rerun plugin. |
-| `strict_xfail = false` and `xfail_strict = false` | An `xfail` test that passes no longer fails the run. |
+| `strict_config`, `strict_markers`, `strict_parametrization_ids`, `strict_xfail` or `xfail_strict` set to `false` | Each turns off part of `strict`, such as the failure on an unknown marker or on an `xfail` test that passes. |
 
 Each value has a reviewed record with its reason and source. [Read the profile](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/profile.toml) and [the records that explain it](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/decisions.jsonl).
 
@@ -128,14 +128,16 @@ Ruff 0.17.4 runs `PERF101`, `PERF102`, `RUF017` and `RUF100` by default, so the 
 
 ## Kinds of project
 
-The first apply needs a kind, which `pyproject.toml` records. Doctor suggests one: `application` for a project with `[project.scripts]` or without `[build-system]`, `library` for one with `[build-system]`, and `script` when `pyproject.toml` has no `[project]` and a Python file has inline script metadata. Every kind gets the same Ruff, ty and pytest settings. The kinds differ in the lock files they need.
+The first apply needs a kind, which `pyproject.toml` records. Doctor suggests one: `application` for a project with `[project.scripts]` or without `[build-system]`, `library` for one with `[build-system]`, and `script` when `pyproject.toml` has no `[project]` and a Python file has inline script metadata. Each kind states the layout it needs, and a project that lacks it gets a conflict.
 
-| Kind | What it is | Lock |
-| --- | --- | --- |
-| `library` | A package that others install. It keeps its build backend. | `uv.lock` |
-| `application` | A program that runs from its checkout or as an installed command. | `uv.lock` |
-| `pipeline` | An application that turns data into results. | `uv.lock` |
-| `script` | Standalone scripts with inline script metadata. `pyproject.toml` holds only tool settings. | `<script>.lock` beside each script, by `uv lock --script` |
+| Kind | What it is | Layout | Lock |
+| --- | --- | --- | --- |
+| `library` | A package that others install. | `[project]` and `[build-system]` | `uv.lock` |
+| `application` | A program that runs from its checkout or as an installed command. | `[project]` | `uv.lock` |
+| `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
+| `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` with tool settings only, without `[project]` or `[build-system]` | `<script>.lock` beside each script, by `uv lock --script` |
+
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 1 gives every kind the same values and owns no file.
 
 ## One place for each tool
 
@@ -146,7 +148,10 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 - a `ty.toml` at the root
 - `pytest.toml`, `.pytest.toml`, `pytest.ini`, `.pytest.ini`, a `[pytest]` section in `tox.ini`, or a `[tool:pytest]` section in `setup.cfg`
 - a per-file ignore that turns a rule of the profile off through a group selector, such as `PERF`
+- an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly`
+- a layout that the kind does not allow
 - a uv workspace, in the project or above it
+- both `[tool.pytest]` and `[tool.pytest.ini_options]` with settings
 - a profile revision that a newer xpd recorded
 
 Move the settings into `pyproject.toml`, and run doctor again.
@@ -169,11 +174,11 @@ reason = "The scripts hand str paths to a tool that rejects Path objects."
 
 | `tool` | `id` | Scope and value | What doctor writes |
 | --- | --- | --- | --- |
-| `ruff` | A rule of the profile | `files` names file patterns. Without `files`, the exception covers the whole project. | A per-file ignore for each pattern, or the code in `lint.ignore` |
+| `ruff` | A rule of the profile | `files` names file patterns that Ruff reads. Without `files`, the exception covers the whole project. | A per-file ignore for each pattern, or the code in `lint.ignore` |
 | `ty` | A rule of the profile | `value` names a level below the profile's. It covers the whole project. | The rule at that level in `[tool.ty.rules]` |
 | `pytest` | A setting, argument or plugin that the profile adds | It covers the whole project. | Nothing. The profile stops requiring it. |
 
-Doctor marks each exception `valid`, `invalid`, `redundant` when it changes nothing, or `orphaned` when the profile no longer sets its `id`. Any other mark than `valid` fails `--check` and stops `--apply` until you fix or delete the exception. A setting that differs from the profile without an exception is a change in the plan.
+Doctor marks each exception `valid`, `invalid`, `redundant` when it changes nothing for this project, such as one for a pytest 8 setting in a project on pytest 9, or `orphaned` when the profile no longer sets its `id`. Any other mark than `valid` fails `--check` and stops `--apply` until you fix or delete the exception. A setting that differs from the profile without an exception is a change in the plan.
 
 ## Upgrades
 
@@ -181,7 +186,7 @@ Each xpd release holds one revision of the profile. When a newer xpd brings a ne
 
 ## What `--apply` does
 
-Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. It then writes `pyproject.toml`, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains, and records the revision and kind last. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
+Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, and records the revision and kind last. Apply keeps the comments of the items it keeps. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
 
 Apply keeps the prior content of each file it touches in the folder `.xpd-apply` at the project root while it runs. When a lock refresh or the final check fails, apply puts every file back and exits 2. When an apply stops before it ends, the next one restores the files from that folder first.
 
@@ -223,7 +228,7 @@ For a machine-readable report, run:
 xpd doctor --format json | jq '.profile.changes[] | {tool, id, path, old, new}'
 ```
 
-`profile` holds the plan: `revision`, `applied`, `kind`, `changes`, `conflicts`, `exceptions`, `locks` and the `diff`. Read `tools` for version information, `suggestions` for conditional advice, `policies` for deliberate choices Doctor keeps, and `notes` for limits it encountered. `xpd doctor --check --format json` prints the plan alone, and `xpd doctor --apply --format json` prints what it wrote.
+`profile` holds the plan: `revision`, `applied`, `kind`, `changes`, `conflicts` (each with `ambiguous`, which makes `--check` exit 2), `exceptions`, `locks` and the `diff`. Read `tools` for version information, `suggestions` for conditional advice, `policies` for deliberate choices Doctor keeps, and `notes` for limits it encountered. `xpd doctor --check --format json` prints the plan alone, and `xpd doctor --apply --format json` prints what it wrote.
 
 ## Exit status
 
@@ -231,4 +236,4 @@ xpd doctor --format json | jq '.profile.changes[] | {tool, id, path, old, new}'
 | --- | --- |
 | 0 | Doctor printed its report, `--check` found the project matches the profile, or `--apply` wrote the plan or had nothing to write. |
 | 1 | `--check` found a difference from the profile: a value, a missing or out-of-date lock, a conflict, or an exception that is not valid. |
-| 2 | Doctor could not read the project, or `--apply` wrote nothing because of a conflict, an exception that is not valid, a missing kind or a failed step. |
+| 2 | Doctor could not read the project, `--check` found a layout it cannot hold to one setup (a uv workspace, two pytest tables with settings, or a revision from a newer xpd), or `--apply` wrote nothing because of a conflict, an exception that is not valid, a missing kind or a failed step. |

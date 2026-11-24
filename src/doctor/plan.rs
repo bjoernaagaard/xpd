@@ -21,7 +21,7 @@ use toml_edit::{DocumentMut, Item, Value};
 use super::catalog::{Catalog, Level, Tool};
 use super::edit;
 use super::placement::Destination;
-use super::profile::{self, Exception, LockStyle, Profile};
+use super::profile::{self, Exception, LockStyle, Presence, Profile, Values};
 use super::pytest::{self, Release};
 use super::ruff;
 use super::ty;
@@ -63,7 +63,8 @@ pub(crate) struct Change {
     pub(crate) id: String,
     /// What the value is, such as `ruff PTH118 os-path-join`.
     pub(crate) item: String,
-    /// The dotted path of the key the edit changes in `pyproject.toml`.
+    /// The dotted path of the key the edit changes in `pyproject.toml`, or the path of an owned
+    /// file.
     pub(crate) path: String,
     /// The line of that key before the edit, when it exists.
     pub(crate) line: Option<usize>,
@@ -79,6 +80,26 @@ pub(crate) struct Conflict {
     pub(crate) file: PathBuf,
     pub(crate) line: Option<usize>,
     pub(crate) message: String,
+    /// Whether doctor cannot tell which setup applies, or cannot hold this layout to the
+    /// profile at all. `--check` exits 2 for such a conflict, and 1 for the others.
+    pub(crate) ambiguous: bool,
+}
+
+/// A file that the profile owns, and the text the plan writes to it.
+#[derive(Debug, Clone)]
+pub(crate) struct OwnedFile {
+    /// The path relative to the project root.
+    pub(crate) path: PathBuf,
+    pub(crate) before: Option<String>,
+    pub(crate) after: String,
+}
+
+/// What decides the pytest settings the profile wants: the release that a fresh checkout gets,
+/// and whether the project uses pytest at all.
+#[derive(Debug, Clone, Copy)]
+struct PytestFacts {
+    release: Release,
+    uses: bool,
 }
 
 /// An exception the project records, and whether the profile accepts it.
@@ -123,7 +144,7 @@ pub(crate) struct Plan {
     pub(crate) conflicts: Vec<Conflict>,
     pub(crate) exceptions: Vec<ExceptionState>,
     pub(crate) locks: Vec<Lock>,
-    /// The unified diff of `pyproject.toml`.
+    /// The unified diff of `pyproject.toml` and of each owned file that differs.
     pub(crate) diff: String,
     /// The text of `pyproject.toml` the plan was made from. `None` when it does not exist.
     #[serde(skip)]
@@ -131,6 +152,9 @@ pub(crate) struct Plan {
     /// The text the plan writes.
     #[serde(skip)]
     pub(crate) after: String,
+    /// The owned files that differ from their templates.
+    #[serde(skip)]
+    pub(crate) owned: Vec<OwnedFile>,
 }
 
 /// The plan for the project at `root`, whose Python files are `files`.
@@ -206,9 +230,13 @@ pub(crate) fn compute(
         diff: String::new(),
         before: before.clone(),
         after: String::new(),
+        owned: Vec::new(),
     };
+    let facts = pytest_facts(root, original.as_ref());
+    let values = profile.values(plan.kind.as_deref());
     plan.locations(root, original.as_ref(), profile);
-    let accepted = plan.judge(profile, &record.exceptions);
+    plan.layout(original.as_ref(), profile, files);
+    let accepted = plan.judge(&values, &profile.forbid, facts, &record.exceptions);
     let mut edits = Edits {
         doc: &mut doc,
         original: original.as_ref(),
@@ -216,17 +244,58 @@ pub(crate) fn compute(
         catalog,
         plan: &mut plan,
     };
-    edits.ruff(profile, &accepted);
-    edits.ty(profile, &accepted);
-    let dependencies = edits.pytest(root, profile, &accepted);
+    edits.ruff(&values, &accepted);
+    edits.ty(&values, &accepted);
+    let dependencies = edits.pytest(&values, &profile.forbid, facts, &accepted);
     if request.stamp {
         edits.stamp(profile, &record);
     }
-    edits.verify(profile, &accepted);
+    edits.verify(&values, &accepted);
     plan.after = doc.to_string();
+    plan.owned_files(root, profile)?;
     plan.locks(root, profile, files, dependencies);
-    plan.diff = diff(before.as_deref(), &plan.after);
+    let mut text = diff(PYPROJECT, before.as_deref(), &plan.after);
+    for owned in &plan.owned {
+        let name = owned.path.display().to_string();
+        text.push_str(&diff(&name, owned.before.as_deref(), &owned.after));
+    }
+    plan.diff = text;
     Ok(plan)
+}
+
+/// The pytest release a fresh checkout of the project at `root` gets: the one `uv.lock` locks,
+/// else pytest 8 when a declared requirement admits no pytest 9, else the pinned release when a
+/// list declares pytest, else the release in the virtual environment.
+fn pytest_facts(root: &Path, doc: Option<&Toml>) -> PytestFacts {
+    let project = pytest::Project {
+        destination: Destination {
+            file: root.join(PYPROJECT),
+            prefix: &[],
+            doc: doc.cloned(),
+        },
+    };
+    let groups = project.groups();
+    let runtime = project.runtime_dependencies();
+    let declared: Vec<String> = groups
+        .iter()
+        .chain(runtime.iter())
+        .flat_map(|group| group.entries("pytest"))
+        .filter_map(|entry| entry.as_str().map(str::to_owned))
+        .collect();
+    let installed = pytest::installed(root).map(|(version, _)| version);
+    let release = if let Some(locked) = pytest::locked(root) {
+        pytest::release(Some(&locked))
+    } else if declared.iter().any(|text| pytest::excludes_nine(text)) {
+        Release::BeforeNine
+    } else if !declared.is_empty() {
+        Release::NineOrLater
+    } else {
+        pytest::release(installed.as_ref())
+    };
+    PytestFacts {
+        release,
+        uses: !declared.is_empty() || installed.is_some(),
+    }
 }
 
 impl Plan {
@@ -254,9 +323,13 @@ impl Plan {
             .iter()
             .filter(|exception| exception.status != "valid")
             .map(|exception| {
+                let scope = if exception.files.is_empty() {
+                    String::new()
+                } else {
+                    format!(" for {}", exception.files.join(", "))
+                };
                 format!(
-                    "{PYPROJECT}:{} the exception for {} {} is {}: {}",
-                    exception.line,
+                    "{PYPROJECT} [tool.xpd.profile]: the exception for {} {}{scope} is {}: {}",
                     exception.tool,
                     exception.id,
                     exception.status,
@@ -298,12 +371,105 @@ impl Plan {
         conflicts.chain(exceptions).collect()
     }
 
+    /// Whether a conflict makes the layout ambiguous, so that `--check` cannot tell drift.
+    pub(crate) fn ambiguous(&self) -> bool {
+        self.conflicts.iter().any(|conflict| conflict.ambiguous)
+    }
+
     fn conflict(&mut self, file: impl Into<PathBuf>, line: Option<usize>, message: String) {
         self.conflicts.push(Conflict {
             file: file.into(),
             line,
             message,
+            ambiguous: false,
         });
+    }
+
+    /// A conflict for a layout that doctor cannot read as one setup, or cannot hold to the
+    /// profile at all.
+    fn ambiguity(&mut self, file: impl Into<PathBuf>, line: Option<usize>, message: String) {
+        self.conflicts.push(Conflict {
+            file: file.into(),
+            line,
+            message,
+            ambiguous: true,
+        });
+    }
+
+    /// The parts of the layout that the kind needs or forbids.
+    fn layout(&mut self, doc: Option<&Toml>, profile: &Profile, files: &[PathBuf]) {
+        let Some(kind) = self.kind.as_deref().and_then(|kind| profile.kind(kind)) else {
+            return;
+        };
+        let name = kind.name.clone();
+        let has = |path: &[&str]| doc.is_some_and(|doc| toml::get(doc, path).is_some());
+        for (part, present, presence) in [
+            ("[project]", has(&["project"]), kind.project),
+            ("[build-system]", has(&["build-system"]), kind.build_system),
+        ] {
+            match (presence, present) {
+                (Presence::Required, false) => self.conflict(
+                    PYPROJECT,
+                    None,
+                    format!("The kind {name} needs {part} in {PYPROJECT}, and it has none. Add it, or name the kind that fits."),
+                ),
+                (Presence::Forbidden, true) => self.conflict(
+                    PYPROJECT,
+                    None,
+                    format!("The kind {name} keeps {PYPROJECT} to tool settings, and it has {part}. Move the metadata into the inline metadata of the scripts, or name the kind that fits."),
+                ),
+                _ => {}
+            }
+        }
+        let scripts = scripts(files);
+        match (kind.scripts, scripts.is_empty()) {
+            (Presence::Required, true) => self.conflict(
+                PYPROJECT,
+                None,
+                format!("The kind {name} needs Python files with inline script metadata, a # /// script block, and the project has none."),
+            ),
+            (Presence::Forbidden, false) => self.conflict(
+                PYPROJECT,
+                None,
+                format!("The kind {name} has no scripts with inline script metadata, and the project has {}.", scripts.len()),
+            ),
+            _ => {}
+        }
+    }
+
+    /// The owned files of the kind that differ from their templates, each with a change.
+    fn owned_files(&mut self, root: &Path, profile: &Profile) -> Result<()> {
+        for owned in profile.owned(self.kind.as_deref()) {
+            let path = PathBuf::from(&owned.path);
+            let file = root.join(&path);
+            let before = match fs::read_to_string(&file) {
+                Ok(text) => Some(text),
+                Err(error) if error.kind() == ErrorKind::NotFound => None,
+                Err(error) => {
+                    return Err(error).with_context(|| format!("cannot read {}", file.display()));
+                }
+            };
+            if before.as_deref() == Some(owned.text) {
+                continue;
+            }
+            self.changes.push(Change {
+                tool: "xpd",
+                id: owned.name.clone(),
+                item: format!("owned file {}", owned.path),
+                path: owned.path.clone(),
+                line: None,
+                old: if before.is_some() { "differs" } else { "missing" }.to_owned(),
+                new: "the profile's copy".to_owned(),
+                reason: "The profile owns this file, so the project keeps an exact copy of its template.".to_owned(),
+                source: DOCS.to_owned(),
+            });
+            self.owned.push(OwnedFile {
+                path,
+                before,
+                after: owned.text.to_owned(),
+            });
+        }
+        Ok(())
     }
 
     /// The files that keep a tool's settings outside the tool's table in `pyproject.toml`.
@@ -350,7 +516,7 @@ impl Plan {
             }
             if toml::get(doc, &["tool", "uv", "workspace"]).is_some() {
                 let line = toml::line(doc, &["tool", "uv", "workspace"]);
-                self.conflict(
+                self.ambiguity(
                     PYPROJECT,
                     line,
                     "[tool.uv.workspace] makes this a uv workspace, and doctor holds a single project to the profile.".to_owned(),
@@ -368,7 +534,7 @@ impl Plan {
             .and_then(Item::as_integer)
             .filter(|applied| *applied > profile.revision)
             {
-                self.conflict(
+                self.ambiguity(
                     PYPROJECT,
                     toml::line(doc, &["tool", "xpd", "profile", "revision"]),
                     format!("{PYPROJECT} records profile revision {applied}, and this xpd holds revision {}. Use the xpd that wrote it, or a newer one.", profile.revision),
@@ -380,7 +546,7 @@ impl Plan {
             if let Ok(Some(doc)) = toml::read(&file)
                 && toml::get(&doc, &["tool", "uv", "workspace"]).is_some()
             {
-                self.conflict(
+                self.ambiguity(
                     PYPROJECT,
                     None,
                     format!("{} defines a uv workspace above this project, and doctor holds a single project to the profile.", file.display()),
@@ -408,10 +574,16 @@ impl Plan {
     }
 
     /// The state of each recorded exception, and the exceptions the profile accepts.
-    fn judge(&mut self, profile: &Profile, exceptions: &[Exception]) -> Vec<Exception> {
+    fn judge(
+        &mut self,
+        values: &Values,
+        forbid: &profile::PytestForbid,
+        facts: PytestFacts,
+        exceptions: &[Exception],
+    ) -> Vec<Exception> {
         let mut accepted: Vec<Exception> = Vec::new();
         for exception in exceptions {
-            let (status, message) = match verdict(profile, exception, &accepted) {
+            let (status, message) = match verdict(values, forbid, facts, exception, &accepted) {
                 Ok(()) => {
                     accepted.push(exception.clone());
                     ("valid", None)
@@ -655,16 +827,21 @@ impl Plan {
     }
 }
 
-/// Whether the profile accepts `exception`, given the exceptions it accepted before it.
+/// Whether the profile accepts `exception`, given the values for the project's kind, the pytest
+/// release it gets, and the exceptions accepted before it.
 fn verdict(
-    profile: &Profile,
+    values: &Values,
+    forbid: &profile::PytestForbid,
+    facts: PytestFacts,
     exception: &Exception,
     accepted: &[Exception],
 ) -> Result<(), (&'static str, String)> {
     let invalid = |message: String| Err(("invalid", message));
+    let redundant = |message: String| Err(("redundant", message));
     if !exception.problems.is_empty() {
         return invalid(exception.problems.join("; "));
     }
+    let id = exception.id.as_str();
     let tool = match exception.tool.as_str() {
         "ruff" => Tool::Ruff,
         "ty" => Tool::Ty,
@@ -675,23 +852,29 @@ fn verdict(
             ));
         }
     };
-    if tool == Tool::Pytest && profile.forbids(&exception.id) {
+    if tool == Tool::Pytest && forbid.forbids(id) {
         return invalid(format!(
-            "the profile removes {} from every project, and no exception keeps it",
-            exception.id
+            "the profile removes {id} from every project, and no exception keeps it"
         ));
     }
-    if !profile.requires(tool, &exception.id) {
-        return Err((
-            "orphaned",
-            format!(
-                "the profile sets nothing for {} {}, so the exception has nothing to change",
-                exception.tool, exception.id
-            ),
-        ));
+    match tool {
+        Tool::Ruff if !values.ruff_rules.iter().any(|code| code == id) => {
+            return Err(("orphaned", orphaned(&exception.tool, id)));
+        }
+        Tool::Ty if !values.ty_rules.iter().any(|(rule, _)| rule == id) => {
+            return Err(("orphaned", orphaned(&exception.tool, id)));
+        }
+        Tool::Pytest => pytest_verdict(values, facts, &exception.tool, id)?,
+        _ => {}
     }
     if !exception.files.is_empty() && tool != Tool::Ruff {
         return invalid("only an exception for a Ruff rule takes files".to_owned());
+    }
+    for pattern in &exception.files {
+        let glob = pattern.strip_prefix('!').unwrap_or(pattern);
+        if let Err(error) = globset::Glob::new(glob) {
+            return invalid(format!("{pattern} is no file pattern Ruff reads: {error}"));
+        }
     }
     match (tool, exception.value.as_deref()) {
         (Tool::Ty, None) => {
@@ -705,18 +888,15 @@ fn verdict(
                     "{value} is no ty level. The levels are ignore, warn and error"
                 ));
             };
-            let wanted = profile
+            let wanted = values
                 .ty_rules
                 .iter()
-                .find(|(rule, _)| *rule == exception.id)
+                .find(|(rule, _)| rule == id)
                 .map(|(_, level)| *level);
             if wanted.is_some_and(|wanted| level >= wanted) {
-                return Err((
-                    "redundant",
-                    format!(
-                        "{value} is no lower than the profile's {}, so the exception changes nothing",
-                        wanted.map(Level::name).unwrap_or_default()
-                    ),
+                return redundant(format!(
+                    "{value} is no lower than the profile's {}, so the exception changes nothing",
+                    wanted.map(Level::name).unwrap_or_default()
                 ));
             }
         }
@@ -732,10 +912,55 @@ fn verdict(
                 .iter()
                 .any(|file| exception.files.contains(file));
         if same && overlap {
-            return invalid(format!("it repeats the exception at line {}", earlier.line));
+            return invalid(format!(
+                "an earlier exception already covers {} {id} for these files",
+                exception.tool
+            ));
         }
     }
     Ok(())
+}
+
+/// Whether an exception for the pytest value `id` changes anything for a project on the release
+/// in `facts`.
+fn pytest_verdict(
+    values: &Values,
+    facts: PytestFacts,
+    tool: &str,
+    id: &str,
+) -> Result<(), (&'static str, String)> {
+    let redundant = |message: String| Err(("redundant", message));
+    let (active, inactive) = match facts.release {
+        Release::NineOrLater => (&values.pytest, &values.pytest_before_nine),
+        Release::BeforeNine => (&values.pytest_before_nine, &values.pytest),
+    };
+    let names = |wanted: &profile::PytestWanted| {
+        wanted.settings.iter().any(|(key, _)| key == id)
+            || wanted.addopts.iter().any(|arg| arg == id)
+    };
+    let plugin = values.plugins.iter().any(|plugin| plugin == id);
+    if plugin && !facts.uses {
+        return redundant(format!(
+            "the project declares no pytest, so the profile does not add {id}"
+        ));
+    }
+    if !plugin && !names(active) {
+        if names(inactive) {
+            let release = match facts.release {
+                Release::NineOrLater => "9 or later",
+                Release::BeforeNine => "before 9",
+            };
+            return redundant(format!(
+                "the profile sets {id} only for another pytest release, and the project gets pytest {release}"
+            ));
+        }
+        return Err(("orphaned", orphaned(tool, id)));
+    }
+    Ok(())
+}
+
+fn orphaned(tool: &str, id: &str) -> String {
+    format!("the profile sets nothing for {tool} {id}, so the exception has nothing to change")
 }
 
 /// The kind that the project's files point to, with the evidence.
@@ -814,21 +1039,17 @@ fn nested_ruff(root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The unified diff from `before` to `after`, empty when they are the same.
-fn diff(before: Option<&str>, after: &str) -> String {
+/// The unified diff of the file `name` from `before` to `after`, empty when they are the same.
+fn diff(name: &str, before: Option<&str>, after: &str) -> String {
     let old = before.unwrap_or_default();
-    if old == after {
+    if before.is_some() && old == after {
         return String::new();
     }
-    let old_name = if before.is_some() {
-        PYPROJECT
-    } else {
-        "/dev/null"
-    };
+    let old_name = if before.is_some() { name } else { "/dev/null" };
     similar::TextDiff::from_lines(old, after)
         .unified_diff()
         .context_radius(3)
-        .header(old_name, PYPROJECT)
+        .header(old_name, name)
         .to_string()
 }
 
@@ -935,13 +1156,13 @@ impl Edits<'_> {
     }
 
     /// Every rule of the profile runs, outside the files and rules that exceptions name.
-    fn ruff(&mut self, profile: &Profile, accepted: &[Exception]) {
+    fn ruff(&mut self, values: &Values, accepted: &[Exception]) {
         let ruff_exceptions = || accepted.iter().filter(|exception| exception.tool == "ruff");
         let whole: BTreeSet<&str> = ruff_exceptions()
             .filter(|exception| exception.files.is_empty())
             .map(|exception| exception.id.as_str())
             .collect();
-        let required: Vec<&String> = profile
+        let required: Vec<&String> = values
             .ruff_rules
             .iter()
             .filter(|code| !whole.contains(code.as_str()))
@@ -1161,10 +1382,10 @@ impl Edits<'_> {
     }
 
     /// Every ty rule of the profile has at least its level, or the level its exception keeps.
-    fn ty(&mut self, profile: &Profile, accepted: &[Exception]) {
+    fn ty(&mut self, values: &Values, accepted: &[Exception]) {
         let prefix = ["tool", "ty"];
         let state = ty::state(self.catalog, self.file, &prefix, Some(&self.current()));
-        for (rule, level) in &profile.ty_rules {
+        for (rule, level) in &values.ty_rules {
             let kept = accepted
                 .iter()
                 .find(|exception| exception.tool == "ty" && exception.id == *rule)
@@ -1215,10 +1436,12 @@ impl Edits<'_> {
         }
     }
 
-    /// Removes the levels below `target` that ty's override tables set for `rule`.
+    /// Raises each level below `target` that ty's override tables give `rule`, by its name or by
+    /// `all`. A rule's own entry wins over `all` in ty, so an override that lowers `all` gets an
+    /// entry for the rule at `target`.
     fn overrides(&mut self, rule: &str, target: Level) {
         let catalog = self.catalog;
-        let mut removed = Vec::new();
+        let mut raised = Vec::new();
         if let Some(tables) = edit::existing(self.doc, &["tool", "ty"])
             .and_then(|table| table.get_mut("overrides"))
             .and_then(Item::as_array_of_tables_mut)
@@ -1227,21 +1450,41 @@ impl Edits<'_> {
                 let Some(rules) = table.get_mut("rules").and_then(Item::as_table_like_mut) else {
                     continue;
                 };
-                let lower: Vec<(String, Level)> = rules
+                let named: Vec<(String, Level)> = rules
                     .iter()
                     .filter_map(|(name, item)| {
                         let level = item.as_str().and_then(Level::parse)?;
-                        let record = catalog.ty_rule(name)?;
-                        (record.key.id == rule && level < target).then(|| (name.to_owned(), level))
+                        (catalog.ty_rule(name)?.key.id == rule).then(|| (name.to_owned(), level))
                     })
                     .collect();
+                let all = rules
+                    .get("all")
+                    .and_then(|item| item.as_str())
+                    .and_then(Level::parse);
+                let lower: Vec<(String, Level)> = if named.is_empty() {
+                    all.filter(|all| *all < target)
+                        .map(|all| (rule.to_owned(), all))
+                        .into_iter()
+                        .collect()
+                } else {
+                    named
+                        .into_iter()
+                        .filter(|(_, level)| *level < target)
+                        .collect()
+                };
                 for (name, level) in lower {
-                    rules.remove(&name);
-                    removed.push((index, name, level));
+                    let value = toml_edit::value(target.name());
+                    match rules.get_mut(&name) {
+                        Some(item) => *item = value,
+                        None => {
+                            rules.insert(&name, value);
+                        }
+                    }
+                    raised.push((index, name, level));
                 }
             }
         }
-        for (index, name, level) in removed {
+        for (index, name, level) in raised {
             let path = format!("tool.ty.overrides[{index}].rules.{name}");
             let (reason, source) = self.explain(Tool::Ty, rule);
             self.plan.changes.push(Change {
@@ -1251,21 +1494,25 @@ impl Edits<'_> {
                 path,
                 line: None,
                 old: level.name().to_owned(),
-                new: format!("removed, so {} applies", target.name()),
+                new: target.name().to_owned(),
                 reason,
                 source,
             });
         }
     }
 
-    /// The pytest settings and plugins of the profile, and the removal of what it forbids.
-    /// Returns whether a dependency list changed.
-    fn pytest(&mut self, root: &Path, profile: &Profile, accepted: &[Exception]) -> Lists {
-        let installed = pytest::installed(root);
-        let release = pytest::release(installed.as_ref().map(|(version, _)| version));
-        let wanted = match release {
-            Release::NineOrLater => &profile.pytest,
-            Release::BeforeNine => &profile.pytest_before_nine,
+    /// The pytest settings and plugins of the profile, and the removal of what it forbids, for
+    /// the release in `facts`. Returns whether a dependency list changed.
+    fn pytest(
+        &mut self,
+        values: &Values,
+        forbid: &profile::PytestForbid,
+        facts: PytestFacts,
+        accepted: &[Exception],
+    ) -> Lists {
+        let wanted = match facts.release {
+            Release::NineOrLater => &values.pytest,
+            Release::BeforeNine => &values.pytest_before_nine,
         };
         let excepted = |id: &str| {
             accepted
@@ -1273,9 +1520,14 @@ impl Edits<'_> {
                 .any(|exception| exception.tool == "pytest" && exception.id == id)
         };
         let current = Some(self.current());
-        match pytest::in_pyproject(release, self.file, current.as_ref()) {
-            Err(error) => self.plan.conflict(PYPROJECT, None, error),
+        match pytest::in_pyproject(facts.release, self.file, current.as_ref()) {
+            Err(error) => {
+                let prefix = format!("{}: ", self.file.display());
+                let message = error.strip_prefix(&prefix).unwrap_or(&error).to_owned();
+                self.plan.ambiguity(PYPROJECT, None, message);
+            }
             Ok(settings) => {
+                self.overridden(&settings, values, forbid, &excepted);
                 let prefix = settings.prefix();
                 for (key, value) in &wanted.settings {
                     if excepted(key) || !settings.missing(key) {
@@ -1303,8 +1555,7 @@ impl Edits<'_> {
                     .filter(|arg| !excepted(arg) && settings.missing(arg))
                     .map(String::as_str)
                     .collect();
-                let forbidden: Vec<&str> =
-                    profile.forbid.addopts.iter().map(String::as_str).collect();
+                let forbidden: Vec<&str> = forbid.addopts.iter().map(String::as_str).collect();
                 let removed = addopts(self.doc, prefix, &add, &forbidden);
                 let mut path = prefix.to_vec();
                 path.push("addopts");
@@ -1330,12 +1581,12 @@ impl Edits<'_> {
                         explained,
                     );
                 }
-                for key in &profile.forbid.settings {
+                for key in &forbid.settings {
                     if settings.has(key) {
                         self.forbid_key(&settings, prefix, key, key);
                     }
                 }
-                for key in &profile.forbid.false_settings {
+                for key in &forbid.false_settings {
                     let set_by_profile = wanted.settings.iter().any(|(wanted, _)| wanted == key);
                     if settings.flag(key) == Some(false) && !set_by_profile {
                         self.forbid_key(&settings, prefix, key, &format!("{key} = false"));
@@ -1343,11 +1594,73 @@ impl Edits<'_> {
                 }
             }
         }
-        self.plugins(
-            profile,
-            installed.as_ref().map(|(version, _)| version),
-            &excepted,
-        )
+        self.plugins(values, forbid, facts, &excepted)
+    }
+
+    /// A conflict for each argument of `addopts` that overrides a setting the profile owns, with
+    /// `-o` or `--override-ini`, or that turns off a plugin the profile adds, with `-p no:`.
+    fn overridden(
+        &mut self,
+        settings: &pytest::Settings,
+        values: &Values,
+        forbid: &profile::PytestForbid,
+        excepted: &dyn Fn(&str) -> bool,
+    ) {
+        let owned: BTreeSet<&str> = [&values.pytest, &values.pytest_before_nine]
+            .into_iter()
+            .flat_map(|wanted| wanted.settings.iter().map(|(key, _)| key.as_str()))
+            .chain(forbid.settings.iter().map(String::as_str))
+            .chain(forbid.false_settings.iter().map(String::as_str))
+            .chain(["addopts"])
+            .collect();
+        let disabled: BTreeSet<&str> = forbid
+            .plugin_names
+            .iter()
+            .filter(|(plugin, _)| values.plugins.contains(plugin) && !excepted(plugin))
+            .flat_map(|(_, names)| names.iter().map(String::as_str))
+            .collect();
+        let args = settings.args();
+        let mut path = settings.prefix().to_vec();
+        path.push("addopts");
+        let line = self.line(&path);
+        let mut index = 0;
+        while index < args.len() {
+            let arg = args[index];
+            let attached = |short: &str, long: &str| {
+                arg.strip_prefix(long)
+                    .and_then(|rest| rest.strip_prefix('='))
+                    .or_else(|| arg.strip_prefix(short).filter(|rest| !rest.is_empty()))
+            };
+            let (value, used) = if matches!(arg, "-o" | "--override-ini" | "-p") {
+                (args.get(index + 1).copied(), 2)
+            } else {
+                (
+                    attached("-o", "--override-ini").or_else(|| attached("-p", "-p")),
+                    1,
+                )
+            };
+            let plugin_flag = arg == "-p" || (arg.starts_with("-p") && !arg.starts_with("--"));
+            if let Some(value) = value {
+                let shown = if used == 2 {
+                    format!("{arg} {value}")
+                } else {
+                    arg.to_owned()
+                };
+                let message = if plugin_flag {
+                    value
+                        .strip_prefix("no:")
+                        .filter(|name| disabled.contains(name))
+                        .map(|name| format!("addopts turns off the plugin {name} with {shown}, and the profile adds it. Remove {shown}, or record a pytest exception for the plugin."))
+                } else {
+                    let key = value.split_once('=').map_or(value, |(key, _)| key).trim();
+                    owned.contains(key).then(|| format!("addopts overrides {key} with {shown}, and the profile sets {key}. Remove {shown}, and record an exception where the profile takes one."))
+                };
+                if let Some(message) = message {
+                    self.plan.conflict(PYPROJECT, line, message);
+                }
+            }
+            index += used;
+        }
     }
 
     fn forbid_key(&mut self, settings: &pytest::Settings, prefix: &[&str], key: &str, id: &str) {
@@ -1370,8 +1683,9 @@ impl Edits<'_> {
     /// from every list. Returns whether a list changed.
     fn plugins(
         &mut self,
-        profile: &Profile,
-        installed: Option<&crate::version::Version>,
+        values: &Values,
+        forbid: &profile::PytestForbid,
+        facts: PytestFacts,
         excepted: &dyn Fn(&str) -> bool,
     ) -> Lists {
         let current = self.current();
@@ -1387,7 +1701,7 @@ impl Edits<'_> {
         let lists: Vec<&pytest::Group<'_>> = groups.iter().chain(runtime.iter()).collect();
         let has = |name: &str| lists.iter().any(|group| group.has(name));
         let mut removals: Vec<(Vec<String>, String, String)> = Vec::new();
-        for name in &profile.forbid.plugins {
+        for name in &forbid.plugins {
             for group in &lists {
                 for entry in group.entries(name) {
                     if let Some(text) = entry.as_str() {
@@ -1397,8 +1711,8 @@ impl Edits<'_> {
                 }
             }
         }
-        let additions: Vec<String> = if installed.is_some() || has("pytest") {
-            profile
+        let additions: Vec<String> = if facts.uses {
+            values
                 .plugins
                 .iter()
                 .filter(|name| !excepted(name) && !has(name))
@@ -1407,7 +1721,13 @@ impl Edits<'_> {
         } else {
             Vec::new()
         };
-        let target: Vec<String> = pytest::Project::plugin_group(&groups)
+        let holder = groups
+            .iter()
+            .chain(runtime.iter())
+            .find(|group| group.has("pytest"))
+            .map(|group| group.path.as_slice());
+        let target: Vec<String> = holder
+            .unwrap_or_else(|| pytest::Project::plugin_group(&groups))
             .iter()
             .map(|part| (*part).to_owned())
             .collect();
@@ -1504,14 +1824,14 @@ impl Edits<'_> {
     }
 
     /// Checks that the edited file reaches the profile, and records a conflict where it does not.
-    fn verify(&mut self, profile: &Profile, accepted: &[Exception]) {
+    fn verify(&mut self, values: &Values, accepted: &[Exception]) {
         let (enabled, ignored) = self.resolve();
         let whole: BTreeSet<&str> = accepted
             .iter()
             .filter(|exception| exception.tool == "ruff" && exception.files.is_empty())
             .map(|exception| exception.id.as_str())
             .collect();
-        for code in &profile.ruff_rules {
+        for code in &values.ruff_rules {
             let wanted = !whole.contains(code.as_str());
             if enabled.contains(code) != wanted {
                 let cause = ignored

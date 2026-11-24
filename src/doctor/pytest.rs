@@ -55,6 +55,52 @@ pub(crate) fn installed(root: &Path) -> Option<(crate::version::Version, PathBuf
     })
 }
 
+/// The pytest release that the `uv.lock` at `root` locks.
+pub(crate) fn locked(root: &Path) -> Option<crate::version::Version> {
+    let doc = toml::read(&root.join("uv.lock")).ok()??;
+    toml::get(&doc, &["package"])?
+        .as_array_of_tables()?
+        .iter()
+        .find(|package| package.get("name").and_then(toml_edit::Item::as_str) == Some("pytest"))?
+        .get("version")?
+        .as_str()?
+        .parse()
+        .ok()
+}
+
+/// Whether the requirement `text`, such as `pytest==8.4.2` or `pytest>=8,<9`, admits no
+/// pytest 9 or later.
+pub(crate) fn excludes_nine(text: &str) -> bool {
+    let text = text.split(';').next().unwrap_or_default();
+    let spec = text
+        .trim_start()
+        .trim_start_matches(|c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    let spec = match spec.trim_start().strip_prefix('[') {
+        Some(extras) => extras.split_once(']').map_or("", |(_, rest)| rest),
+        None => spec,
+    };
+    let nine: crate::version::Version = "9".parse().expect("9 is a release number");
+    spec.split(',').any(|clause| {
+        let clause = clause.trim();
+        let Some(operator) = ["===", "==", "~=", "<=", "<"]
+            .into_iter()
+            .find(|operator| clause.starts_with(operator))
+        else {
+            return false;
+        };
+        let Ok(version) = clause[operator.len()..]
+            .trim()
+            .parse::<crate::version::Version>()
+        else {
+            return false;
+        };
+        match operator {
+            "<" => version <= nine,
+            _ => version < nine,
+        }
+    })
+}
+
 /// The range of releases that `installed` falls in. Without pytest, the pinned release counts.
 pub(crate) fn release(installed: Option<&crate::version::Version>) -> Release {
     let nine = "9.0".parse().expect("9.0 is a release number");
@@ -299,6 +345,15 @@ impl Settings {
             ]
             .into_iter()
             .all(|enabled| enabled)
+    }
+
+    /// The arguments of `addopts`, up to a `--`.
+    pub(crate) fn args(&self) -> Vec<&str> {
+        self.args
+            .iter()
+            .map(|arg| arg.text.as_str())
+            .take_while(|arg| *arg != "--")
+            .collect()
     }
 
     fn has_arg(&self, flag: &str) -> bool {

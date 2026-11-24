@@ -73,8 +73,8 @@ pub(crate) fn remove(doc: &mut DocumentMut, path: &[&str], key: &str) -> bool {
     existing(doc, path).is_some_and(|table| table.remove(key).is_some())
 }
 
-/// Appends the string `text`: on its own line, indented like the item before it, in an array
-/// with one item per line, and after a space in an array on one line.
+/// Appends the string `text`: on its own line, indented like the item before it but without its
+/// comment, in an array with one item per line, and after a space in an array on one line.
 pub(crate) fn push(array: &mut Array, text: &str) {
     let Some(last) = array.iter().last() else {
         array.push(text);
@@ -84,16 +84,17 @@ pub(crate) fn push(array: &mut Array, text: &str) {
         .decor()
         .prefix()
         .and_then(|prefix| prefix.as_str())
-        .filter(|prefix| prefix.contains('\n'))
-        .unwrap_or(" ")
-        .to_owned();
+        .and_then(|prefix| prefix.rsplit_once('\n'))
+        .map_or_else(|| " ".to_owned(), |(_, indent)| format!("\n{indent}"));
     let mut value = Value::from(text);
     value.decor_mut().set_prefix(prefix);
     value.decor_mut().set_suffix("");
     array.push_formatted(value);
 }
 
-/// Removes the items at `indexes`, giving the new first item the spacing of the old one.
+/// Removes the items at `indexes`. A comment before a removed item goes with it, and every item
+/// that stays keeps its own comments. In an array on one line, the new first item takes the
+/// spacing of the old one.
 pub(crate) fn remove_items(array: &mut Array, indexes: &[usize]) {
     let first = array
         .get(0)
@@ -109,7 +110,14 @@ pub(crate) fn remove_items(array: &mut Array, indexes: &[usize]) {
         }
     }
     if let (Some(first), Some(value)) = (first, array.get_mut(0)) {
-        value.decor_mut().set_prefix(first);
+        let own = value
+            .decor()
+            .prefix()
+            .and_then(|prefix| prefix.as_str())
+            .unwrap_or_default();
+        if !own.contains(['\n', '#']) {
+            value.decor_mut().set_prefix(first);
+        }
     }
     if array.is_empty() {
         array.set_trailing("");

@@ -1020,8 +1020,9 @@ enum Record {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Baseline {
-    /// One line for each difference, as `xpd doctor --check` names it.
-    Drift(Vec<String>),
+    /// One line for each difference, as `xpd doctor --check` names it, from the profile of
+    /// `revision`.
+    Drift { revision: i64, lines: Vec<String> },
     /// Why xpd could not compare the project with the profile.
     Unreadable(String),
 }
@@ -1033,7 +1034,10 @@ fn profile_drift(root: &Path) -> Option<Baseline> {
         .map(|file| root.join(file))
         .collect();
     crate::doctor::drift(root, &files).map(|drift| match drift {
-        Ok(lines) => Baseline::Drift(lines),
+        Ok(drift) => Baseline::Drift {
+            revision: drift.revision,
+            lines: drift.lines,
+        },
         Err(error) => Baseline::Unreadable(format!("{error:#}")),
     })
 }
@@ -1094,7 +1098,25 @@ fn compare_drift(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTu
                 "xpd cannot compare the project with its profile: {error}"
             )],
         },
-        (Some(Baseline::Drift(before)), Some(Baseline::Drift(now))) => {
+        (
+            Some(Baseline::Drift {
+                revision: opened, ..
+            }),
+            Some(Baseline::Drift {
+                revision: current,
+                lines: now,
+            }),
+        ) if *opened != current => {
+            let mut notices = vec![format!(
+                "The profile moved from revision {opened} to revision {current} during this session, so xpd does not hold the turn for its differences."
+            )];
+            notices.extend(notice(now));
+            ProfileTurn {
+                added: Vec::new(),
+                notices,
+            }
+        }
+        (Some(Baseline::Drift { lines: before, .. }), Some(Baseline::Drift { lines: now, .. })) => {
             let (kept, added): (Vec<String>, Vec<String>) =
                 now.into_iter().partition(|line| before.contains(line));
             ProfileTurn {
@@ -1102,10 +1124,12 @@ fn compare_drift(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTu
                 notices: notice(kept),
             }
         }
-        (None | Some(Baseline::Unreadable(_)), Some(Baseline::Drift(now))) => ProfileTurn {
-            added: Vec::new(),
-            notices: notice(now),
-        },
+        (None | Some(Baseline::Unreadable(_)), Some(Baseline::Drift { lines: now, .. })) => {
+            ProfileTurn {
+                added: Vec::new(),
+                notices: notice(now),
+            }
+        }
     }
 }
 
