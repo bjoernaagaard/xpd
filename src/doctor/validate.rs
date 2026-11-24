@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use toml_edit::{Item, TableLike};
 
-use super::catalog::{self, Catalog, Kind, Surface, Tool};
+use super::catalog::{self, Catalog, Key, Kind, Surface, Tool};
 use super::plan::dotted;
 use super::probe::Checker;
 use super::ruff;
@@ -82,8 +82,53 @@ pub(crate) fn problems(doc: &Toml, catalog: &Catalog) -> Vec<Problem> {
             },
             &mut found,
         );
+        ty_rules(doc, catalog, &mut found);
     }
     found
+}
+
+/// Records a problem for each rule name in `[tool.ty.rules]` and in the `rules` of each
+/// override that the pinned ty does not have, which ty reports as `unknown-rule` and which
+/// fails its check.
+fn ty_rules(doc: &Toml, catalog: &Catalog, found: &mut Vec<Problem>) {
+    let release = catalog::TY_RELEASE;
+    let mut tables: Vec<(String, &dyn TableLike, Option<usize>)> = Vec::new();
+    if let Some(rules) = toml::get(doc, &["tool", "ty", "rules"]).and_then(Item::as_table_like) {
+        tables.push(("tool.ty.rules".to_owned(), rules, None));
+    }
+    if let Some(overrides) = toml::get(doc, &["tool", "ty", "overrides"]) {
+        for (index, (table, start)) in toml::tables(overrides).into_iter().enumerate() {
+            if let Some(rules) = table.get("rules").and_then(Item::as_table_like) {
+                let line = start.map(|start| toml::line_of(doc, start));
+                tables.push((format!("tool.ty.overrides[{index}].rules"), rules, line));
+            }
+        }
+    }
+    for (shown, rules, line) in tables {
+        for (name, item) in rules.iter() {
+            if name == "all" || catalog.ty_rule(name).is_some() {
+                continue;
+            }
+            let removed = Key::pinned(Tool::Ty, Surface::Rules, Kind::Removed, name);
+            let what = if catalog.get(&removed).is_some() {
+                format!("ty {release} removed the rule {name}")
+            } else {
+                format!("ty {release} has no rule {name}")
+            };
+            let line = rules
+                .key(name)
+                .and_then(toml_edit::Key::span)
+                .or_else(|| item.span())
+                .map(|span| toml::line_of(doc, span.start))
+                .or(line);
+            found.push(Problem {
+                line,
+                message: format!(
+                    "{shown} sets {name}, and {what}, so ty reports unknown-rule and its check fails. Remove it, or name a rule of ty {release}."
+                ),
+            });
+        }
+    }
 }
 
 /// The keys of the pinned release of `tool` in its project table, each split at its dots, with
@@ -247,46 +292,106 @@ fn check_array(
     }
 }
 
-/// What the pinned Ruff says against the `pyproject.toml` text `text`, when the project's
-/// environment or `PATH` has the pinned Ruff and it stops with an error on that file. `None`
-/// when it accepts the file or the pinned Ruff is not installed.
-pub(crate) fn ruff_rejects(root: &Path, text: &str) -> Option<String> {
+/// Whether uv may fetch the pinned Ruff from the network when its cache lacks it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Fetch {
+    /// From uv's cache only, as plain `xpd doctor` does.
+    Offline,
+    /// From the cache, and else from the index, as `--check` and `--apply` do.
+    Online,
+}
+
+/// What the pinned Ruff says about a `pyproject.toml`.
+#[derive(Debug)]
+pub(crate) enum Verdict {
+    Accepts,
+    /// It stops with this error.
+    Rejects(String),
+    /// No route to the pinned Ruff worked, for this reason.
+    Unverified(String),
+}
+
+/// What the pinned Ruff says about the `pyproject.toml` text `text` of the project at `root`.
+/// It runs the Ruff in the project's environment or on `PATH` when that is the pinned release,
+/// and else `uv tool run --from ruff==<pin>`, from uv's cache first. Either way the answer does
+/// not depend on whether the project's environment is synced.
+pub(crate) fn ruff_verdict(root: &Path, text: &str, fetch: Fetch) -> Verdict {
     static COUNT: AtomicUsize = AtomicUsize::new(0);
-    let checker = Checker::find(Tool::Ruff, root);
-    if !checker.is_pinned() {
-        return None;
-    }
     let folder = std::env::temp_dir().join(format!(
         "xpd-doctor-{}-{}",
         std::process::id(),
         COUNT.fetch_add(1, Ordering::Relaxed)
     ));
-    let result = (|| {
-        fs::create_dir_all(&folder).ok()?;
-        fs::write(folder.join("pyproject.toml"), text).ok()?;
-        fs::write(folder.join("check.py"), "").ok()?;
-        let path = checker.installed.as_ref()?.path.clone();
-        let output = Command::new(path)
-            .args(["check", "--no-cache", "--show-settings", "check.py"])
-            .current_dir(&folder)
-            .stdin(Stdio::null())
-            .output()
-            .ok()?;
-        if output.status.success() {
-            return None;
+    let verdict = (|| {
+        let written = fs::create_dir_all(&folder)
+            .and_then(|()| fs::write(folder.join("pyproject.toml"), text))
+            .and_then(|()| fs::write(folder.join("check.py"), ""));
+        if let Err(error) = written {
+            return Verdict::Unverified(format!("cannot write a copy of the settings: {error}"));
         }
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let shown = folder.display().to_string();
-        let cause: Vec<String> = stderr
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty() && *line != "ruff failed")
-            .filter(|line| !line.starts_with("warning:"))
-            .map(|line| line.strip_prefix("Cause:").map_or(line, str::trim))
-            .map(|line| line.replace(&format!("{shown}/"), "").replace(&shown, "."))
-            .collect();
-        Some(cause.join(" "))
+        let config = folder.join("pyproject.toml");
+        let file = folder.join("check.py");
+        let ruff_args = |command: &mut Command| {
+            command
+                .args(["check", "--no-cache", "--show-settings", "--config"])
+                .arg(&config)
+                .arg(&file);
+        };
+        let checker = Checker::find(Tool::Ruff, root);
+        if let Some(installed) = checker.installed.as_ref().filter(|_| checker.is_pinned()) {
+            let mut command = Command::new(&installed.path);
+            ruff_args(&mut command);
+            return run(&mut command, root, &folder);
+        }
+        let from = format!("ruff=={}", catalog::RUFF_RELEASE);
+        let uv = |offline: bool| {
+            let mut command = Command::new("uv");
+            if offline {
+                command.arg("--offline");
+            }
+            command.args(["--quiet", "tool", "run", "--from", &from, "ruff"]);
+            ruff_args(&mut command);
+            run(&mut command, root, &folder)
+        };
+        match (uv(true), fetch) {
+            (Verdict::Unverified(_), Fetch::Online) => uv(false),
+            (verdict, _) => verdict,
+        }
     })();
     let _ = fs::remove_dir_all(&folder);
-    result
+    verdict
+}
+
+/// Runs a command of the pinned Ruff in `root` on a copy of the settings in `folder`.
+fn run(command: &mut Command, root: &Path, folder: &Path) -> Verdict {
+    let output = match command.current_dir(root).stdin(Stdio::null()).output() {
+        Ok(output) => output,
+        Err(error) => return Verdict::Unverified(format!("cannot run uv: {error}")),
+    };
+    if output.status.success() {
+        return Verdict::Accepts;
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let shown = folder.display().to_string();
+    let lines: Vec<String> = stderr
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('|') && !line.starts_with("warning:"))
+        .filter(|line| {
+            line.split_once('|')
+                .is_none_or(|(number, _)| number.trim().parse::<usize>().is_err())
+        })
+        .map(|line| line.strip_prefix("Cause:").map_or(line, str::trim))
+        .map(|line| line.replace(&format!("{shown}/"), "").replace(&shown, "."))
+        .map(|line| crate::output::hosts_only(&line))
+        .collect();
+    if stderr.contains("ruff failed") {
+        let cause: Vec<String> = lines
+            .into_iter()
+            .filter(|line| line != "ruff failed")
+            .collect();
+        Verdict::Rejects(cause.join(" "))
+    } else {
+        Verdict::Unverified(lines.join(" "))
+    }
 }

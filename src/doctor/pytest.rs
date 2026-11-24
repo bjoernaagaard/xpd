@@ -553,7 +553,7 @@ impl Project {
         let mut found: Vec<&Group<'_>> = Vec::new();
         let mut pending: Vec<Vec<&str>> = vec![path.to_vec()];
         while let Some(path) = pending.pop() {
-            let Some(group) = lists.iter().copied().find(|group| group.path == path) else {
+            let Some(group) = lists.iter().copied().find(|group| group.is(&path)) else {
                 continue;
             };
             if found.iter().any(|seen| seen.path == group.path) {
@@ -576,14 +576,13 @@ impl Project {
             .or_else(|| {
                 groups
                     .iter()
-                    .find(|group| group.path == ["dependency-groups", "dev"])
+                    .find(|group| group.is(&["dependency-groups", "dev"]))
             })
             .or_else(|| {
                 groups.iter().find(|group| {
-                    group
-                        .path
-                        .last()
-                        .is_some_and(|name| matches!(*name, "test" | "tests" | "testing"))
+                    group.path.last().is_some_and(|name| {
+                        matches!(normalize(name).as_str(), "test" | "tests" | "testing")
+                    })
                 })
             })
             .or_else(|| groups.first())
@@ -591,9 +590,45 @@ impl Project {
     }
 }
 
+/// The name of a dependency group or extra as uv compares it, PEP 503 style, as PEP 735 and
+/// PEP 685 require: lowercase, with each run of `-`, `_` and `.` as one `-`.
+pub(crate) fn normalize(name: &str) -> String {
+    name.split(['-', '_', '.'])
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+        .to_ascii_lowercase()
+}
+
 impl Group<'_> {
     pub(crate) fn has(&self, name: &str) -> bool {
         self.entries(name).next().is_some()
+    }
+
+    /// Whether the list installs `name` everywhere: an entry for it without an environment
+    /// marker, which could leave it out.
+    pub(crate) fn installs(&self, name: &str) -> bool {
+        self.entries(name)
+            .filter_map(toml_edit::Value::as_str)
+            .any(|text| !text.contains(';'))
+    }
+
+    /// Whether this list is the one at `path`, with the names of groups and extras compared
+    /// as uv compares them.
+    pub(crate) fn is(&self, path: &[&str]) -> bool {
+        self.path.len() == path.len()
+            && self
+                .path
+                .iter()
+                .zip(path)
+                .enumerate()
+                .all(|(index, (own, other))| {
+                    if index + 1 == path.len() {
+                        normalize(own) == normalize(other)
+                    } else {
+                        own == other
+                    }
+                })
     }
 
     /// The dependency groups that this group includes with `{ include-group = "<name>" }`.

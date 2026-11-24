@@ -160,6 +160,8 @@ pub(crate) struct Plan {
     pub(crate) conflicts: Vec<Conflict>,
     pub(crate) exceptions: Vec<ExceptionState>,
     pub(crate) locks: Vec<Lock>,
+    /// What doctor could not verify, so that it cannot say the project matches.
+    pub(crate) unverified: Vec<String>,
     /// The unified diff of `pyproject.toml` and of each owned file that differs.
     pub(crate) diff: String,
     /// The text of `pyproject.toml` the plan was made from. `None` when it does not exist.
@@ -199,7 +201,10 @@ pub(crate) fn compute(
         .as_ref()
         .map(|text| toml_edit::Document::parse(text.clone()))
         .transpose()
-        .map_err(|error| anyhow::anyhow!("{PYPROJECT}: {}", error.to_string().trim()))?;
+        .map_err(|error| {
+            let text = before.as_deref().unwrap_or_default();
+            anyhow::anyhow!("{PYPROJECT}: {}", toml::parse_error(text, &error))
+        })?;
     let record = original
         .as_ref()
         .map(profile::record)
@@ -246,8 +251,9 @@ pub(crate) fn compute(
         conflicts: Vec::new(),
         exceptions: Vec::new(),
         locks: Vec::new(),
+        unverified: Vec::new(),
         diff: String::new(),
-        before: before.clone(),
+        before,
         after: String::new(),
         owned: Vec::new(),
         rejected: false,
@@ -282,12 +288,7 @@ pub(crate) fn compute(
     plan.owned_files(root, profile)?;
     plan.locks(root, profile, files, dependencies);
     plan.locked_pins(root, profile);
-    let mut text = diff(PYPROJECT, before.as_deref(), &plan.after);
-    for owned in &plan.owned {
-        let name = owned.path.display().to_string();
-        text.push_str(&diff(&name, owned.before.as_deref(), &owned.after));
-    }
-    plan.diff = text;
+    plan.diff = plan.diffs();
     Ok(plan)
 }
 
@@ -331,6 +332,17 @@ fn pytest_facts(root: &Path, doc: Option<&Toml>) -> PytestFacts {
 }
 
 impl Plan {
+    /// The diff of `pyproject.toml`, with the lines of tables doctor does not own hidden, and of
+    /// each owned file that differs.
+    fn diffs(&self) -> String {
+        let mut text = pyproject_diff(self.before.as_deref(), &self.after);
+        for owned in &self.owned {
+            let name = owned.path.display().to_string();
+            text.push_str(&diff(&name, owned.before.as_deref(), &owned.after));
+        }
+        text
+    }
+
     /// Whether the project differs from the profile in any way: a value, a lock, a conflict or
     /// an exception the profile does not accept.
     pub(crate) fn drifts(&self) -> bool {
@@ -786,23 +798,27 @@ impl Plan {
         }
     }
 
-    /// Runs the pinned Ruff, when the project's environment or `PATH` has it, on the settings
-    /// that the plan leaves in `pyproject.toml`, and records a conflict when it rejects them. A
-    /// setting that the catalog already rejects needs no run.
-    pub(crate) fn check_tools(&mut self, root: &Path) {
+    /// Runs the pinned Ruff on the settings that the plan leaves in `pyproject.toml`, and records
+    /// a conflict when it rejects them, or the reason it could not run. A setting that the catalog
+    /// already rejects needs no run.
+    pub(crate) fn check_tools(&mut self, root: &Path, fetch: validate::Fetch) {
         if self.rejected {
             return;
         }
-        if let Some(cause) = validate::ruff_rejects(root, &self.after) {
-            self.rejected = true;
-            self.conflict(
-                PYPROJECT,
-                None,
-                format!(
-                    "Ruff {} rejects the settings that the plan leaves in {PYPROJECT}: {cause}",
-                    super::catalog::RUFF_RELEASE
-                ),
-            );
+        let release = super::catalog::RUFF_RELEASE;
+        match validate::ruff_verdict(root, &self.after, fetch) {
+            validate::Verdict::Accepts => {}
+            validate::Verdict::Rejects(cause) => {
+                self.rejected = true;
+                self.conflict(
+                    PYPROJECT,
+                    None,
+                    format!("Ruff {release} rejects the settings that the plan leaves in {PYPROJECT}: {cause}"),
+                );
+            }
+            validate::Verdict::Unverified(reason) => self.unverified.push(format!(
+                "doctor could not run Ruff {release} to check the [tool.ruff] settings: {reason}"
+            )),
         }
     }
 
@@ -861,7 +877,7 @@ impl Plan {
                 problems.push(format!(
                     "{}: {shown} could not check it: {}",
                     lock.file.display(),
-                    stderr.trim()
+                    crate::output::hosts_only(stderr.trim())
                 ));
             }
         }
@@ -971,6 +987,12 @@ impl Plan {
                 let _ = writeln!(out, "    {detail}");
             }
         }
+        if !self.unverified.is_empty() {
+            out.push_str("\nUnverified\n");
+            for reason in &self.unverified {
+                let _ = writeln!(out, "  {reason}");
+            }
+        }
         if !self.conflicts.is_empty() {
             out.push_str("\nConflicts\n");
             for conflict in &self.conflicts {
@@ -991,7 +1013,13 @@ impl Plan {
     fn write_next(&self, out: &mut String) {
         out.push('\n');
         let blocked = !self.blockers().is_empty();
-        let _ = if !self.drifts() {
+        let _ = if !self.drifts() && !self.unverified.is_empty() {
+            writeln!(
+                out,
+                "Doctor could not verify every setting, so it cannot say that the project matches profile revision {}.",
+                self.revision
+            )
+        } else if !self.drifts() {
             writeln!(
                 out,
                 "The project matches profile revision {}.",
@@ -1255,6 +1283,147 @@ fn nested(root: &Path) -> Vec<(PathBuf, Vec<Tool>)> {
             (!tools.is_empty()).then_some((path, tools))
         })
         .collect()
+}
+
+/// The tables of `pyproject.toml` that doctor owns: it reads and edits their values, and the
+/// diff shows their lines.
+const OWNED: [&[&str]; 7] = [
+    &["tool", "ruff"],
+    &["tool", "ty"],
+    &["tool", "pytest"],
+    &["tool", "xpd"],
+    &["dependency-groups"],
+    &["project", "dependencies"],
+    &["project", "optional-dependencies"],
+];
+
+/// The line that stands for a line of a table that doctor does not own.
+const HIDDEN: &str = "<hidden>";
+
+/// Whether the key at `path` is in a table doctor owns, or holds one, as `tool` holds
+/// `tool.ruff` in an inline table.
+fn owns(path: &[&str]) -> bool {
+    OWNED.iter().any(|owned| {
+        let common = owned.len().min(path.len());
+        owned[..common] == path[..common]
+    })
+}
+
+/// `text`, a `pyproject.toml`, with each line outside the tables doctor owns replaced by
+/// [`HIDDEN`], so that no output of doctor shows a setting it does not change, such as an index
+/// URL with a token. Table headers and blank lines stay. Text that does not parse is all hidden.
+fn shown(text: &str) -> String {
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let Ok(doc) = toml_edit::Document::parse(text.to_owned()) else {
+        return lines.iter().map(|line| hide(line)).collect();
+    };
+    let line_of = |offset: usize| toml::line_of(&doc, offset) - 1;
+    let mut headers: Vec<(usize, Vec<String>)> = Vec::new();
+    let mut values: Vec<(usize, usize, bool)> = Vec::new();
+    collect(
+        doc.as_table(),
+        &mut Vec::new(),
+        &line_of,
+        &mut headers,
+        &mut values,
+    );
+    headers.sort();
+    let mut show: Vec<bool> = (0..lines.len())
+        .map(|index| {
+            let table = headers
+                .iter()
+                .rev()
+                .find(|(line, _)| *line <= index)
+                .map(|(_, path)| path.iter().map(String::as_str).collect::<Vec<_>>())
+                .unwrap_or_default();
+            !table.is_empty() && OWNED.iter().any(|owned| table.starts_with(owned))
+        })
+        .collect();
+    for (start, end, owned) in values {
+        for line in show.iter_mut().take(end + 1).skip(start) {
+            *line = owned;
+        }
+    }
+    for (line, _) in &headers {
+        if let Some(line) = show.get_mut(*line) {
+            *line = true;
+        }
+    }
+    lines
+        .iter()
+        .zip(show)
+        .map(|(line, show)| {
+            if show || line.trim().is_empty() {
+                (*line).to_owned()
+            } else {
+                hide(line)
+            }
+        })
+        .collect()
+}
+
+/// [`HIDDEN`] with the line ending of `line`.
+fn hide(line: &str) -> String {
+    if line.ends_with('\n') {
+        format!("{HIDDEN}\n")
+    } else {
+        HIDDEN.to_owned()
+    }
+}
+
+/// The line of each table header below `table`, at `path`, with the table's path, and the first
+/// and last line of each value with whether doctor owns it.
+fn collect(
+    table: &dyn toml_edit::TableLike,
+    path: &mut Vec<String>,
+    line_of: &dyn Fn(usize) -> usize,
+    headers: &mut Vec<(usize, Vec<String>)>,
+    values: &mut Vec<(usize, usize, bool)>,
+) {
+    for (key, item) in table.iter() {
+        path.push(key.to_owned());
+        let header = |table: &toml_edit::Table, path: &[String]| {
+            table
+                .span()
+                .map(|span| (line_of(span.start), path.to_vec()))
+        };
+        match item {
+            Item::Table(child) => {
+                headers.extend(header(child, path));
+                collect(child, path, line_of, headers, values);
+            }
+            Item::ArrayOfTables(tables) => {
+                for child in tables {
+                    headers.extend(header(child, path));
+                    collect(child, path, line_of, headers, values);
+                }
+            }
+            Item::Value(value) => {
+                let start = table
+                    .key(key)
+                    .and_then(toml_edit::Key::span)
+                    .into_iter()
+                    .chain(value.span())
+                    .map(|span| span.start)
+                    .min();
+                if let (Some(start), Some(span)) = (start, value.span()) {
+                    let parts: Vec<&str> = path.iter().map(String::as_str).collect();
+                    values.push((line_of(start), line_of(span.end), owns(&parts)));
+                }
+            }
+            Item::None => {}
+        }
+        path.pop();
+    }
+}
+
+/// The unified diff of `pyproject.toml` from `before` to `after`, with the lines of tables that
+/// doctor does not own hidden on both sides.
+fn pyproject_diff(before: Option<&str>, after: &str) -> String {
+    if before == Some(after) {
+        return String::new();
+    }
+    diff(PYPROJECT, before.map(shown).as_deref(), &shown(after))
 }
 
 /// The unified diff of the file `name` from `before` to `after`, empty when they are the same.
@@ -1853,32 +2022,30 @@ impl Edits<'_> {
         let mut index = 0;
         while index < args.len() {
             let arg = args[index];
-            let attached = |short: &str, long: &str| {
-                arg.strip_prefix(long)
-                    .and_then(|rest| rest.strip_prefix('='))
-                    .or_else(|| arg.strip_prefix(short).filter(|rest| !rest.is_empty()))
-            };
-            let (value, used) = if matches!(arg, "-o" | "--override-ini" | "-p") {
+            if let Some((value, used)) = plugin_arg(&args, index) {
+                let shown = args[index..index + used].join(" ");
+                if let Some(message) = plugin_conflict(&value, &shown, &disabled, forbid) {
+                    self.plan.conflict(PYPROJECT, line, message);
+                }
+                index += used;
+                continue;
+            }
+            let attached = arg
+                .strip_prefix("--override-ini")
+                .and_then(|rest| rest.strip_prefix('='))
+                .or_else(|| arg.strip_prefix("-o").filter(|rest| !rest.is_empty()));
+            let (value, used) = if matches!(arg, "-o" | "--override-ini") {
                 (args.get(index + 1).copied(), 2)
             } else {
-                (
-                    attached("-o", "--override-ini").or_else(|| attached("-p", "-p")),
-                    1,
-                )
+                (attached, 1)
             };
-            let plugin_flag = arg == "-p" || (arg.starts_with("-p") && !arg.starts_with("--"));
             if let Some(value) = value {
                 let shown = if used == 2 {
                     format!("{arg} {value}")
                 } else {
                     arg.to_owned()
                 };
-                let message = if plugin_flag {
-                    value
-                        .strip_prefix("no:")
-                        .filter(|name| disabled.contains(name))
-                        .map(|name| format!("addopts turns off the plugin {name} with {shown}, and the profile adds it. Remove {shown}, or record a pytest exception for the plugin."))
-                } else {
+                let message = {
                     let key = value.split_once('=').map_or(value, |(key, _)| key).trim();
                     owned.contains(key).then(|| format!("addopts overrides {key} with {shown}, and the profile sets {key}. Remove {shown}, and record an exception where the profile takes one."))
                 };
@@ -1890,9 +2057,8 @@ impl Edits<'_> {
         }
         if facts.uses && args.contains(&"--disable-plugin-autoload") {
             let loaded = |name: &str| {
-                args.windows(2)
-                    .any(|pair| pair[0] == "-p" && pair[1] == name)
-                    || args.iter().any(|arg| arg.strip_prefix("-p") == Some(name))
+                (0..args.len())
+                    .any(|index| plugin_arg(&args, index).is_some_and(|(value, _)| value == name))
             };
             let unloaded: Vec<&str> = forbid
                 .plugin_names
@@ -1949,18 +2115,14 @@ impl Edits<'_> {
         let groups = project.groups();
         let runtime = project.runtime_dependencies();
         let lists: Vec<&pytest::Group<'_>> = groups.iter().chain(runtime.iter()).collect();
-        let holder = lists
+        let mut holders: Vec<&[&str]> = lists
             .iter()
-            .find(|group| group.has("pytest"))
-            .map(|group| group.path.as_slice());
-        let target: Vec<String> = holder
-            .unwrap_or_else(|| pytest::Project::plugin_group(&groups))
-            .iter()
-            .map(|part| (*part).to_owned())
+            .filter(|group| group.has("pytest"))
+            .map(|group| group.path.as_slice())
             .collect();
-        let target_path: Vec<&str> = target.iter().map(String::as_str).collect();
-        let beside = pytest::Project::installed_with(&lists, &target_path);
-        let has = |name: &str| beside.iter().any(|group| group.has(name));
+        if holders.is_empty() {
+            holders.push(pytest::Project::plugin_group(&groups));
+        }
         let mut removals: Vec<(Vec<String>, String, String)> = Vec::new();
         for name in &forbid.plugins {
             for group in &lists {
@@ -1972,17 +2134,18 @@ impl Edits<'_> {
                 }
             }
         }
-        let additions: Vec<String> = if facts.uses && facts.lists {
-            values
-                .plugins
-                .iter()
-                .filter(|name| !excepted(name) && !has(name))
-                .cloned()
-                .collect()
-        } else {
-            Vec::new()
-        };
-        drop(beside);
+        let mut additions: Vec<(Vec<String>, String)> = Vec::new();
+        if facts.uses && facts.lists {
+            for holder in holders {
+                let beside = pytest::Project::installed_with(&lists, holder);
+                for name in &values.plugins {
+                    if !excepted(name) && !beside.iter().any(|group| group.installs(name)) {
+                        let path = holder.iter().map(|part| (*part).to_owned()).collect();
+                        additions.push((path, name.clone()));
+                    }
+                }
+            }
+        }
         drop(lists);
         drop(groups);
         let changed = if removals.is_empty() && additions.is_empty() {
@@ -2014,9 +2177,9 @@ impl Edits<'_> {
                 explained,
             );
         }
-        let path: Vec<&str> = target.iter().map(String::as_str).collect();
-        let (key, table) = path.split_last().expect("a dependency list has a key");
-        for name in additions {
+        for (path, name) in additions {
+            let path: Vec<&str> = path.iter().map(String::as_str).collect();
+            let (key, table) = path.split_last().expect("a dependency list has a key");
             if let Some(array) = edit::array(self.doc, table, key) {
                 edit::push(array, &name);
             }
@@ -2056,7 +2219,7 @@ impl Edits<'_> {
             let runtime = project.runtime_dependencies();
             let mut elsewhere = Vec::new();
             for group in groups.iter().chain(runtime.iter()) {
-                if group.path == DEV {
+                if group.is(&DEV) {
                     continue;
                 }
                 for entry in group.entries(name) {
@@ -2071,10 +2234,15 @@ impl Edits<'_> {
             }
             let in_dev: Vec<String> = groups
                 .iter()
-                .filter(|group| group.path == DEV)
+                .filter(|group| group.is(&DEV))
                 .flat_map(|group| group.entries(name))
                 .filter_map(|entry| entry.as_str().map(str::to_owned))
                 .collect();
+            let dev_key = groups
+                .iter()
+                .find(|group| group.is(&DEV))
+                .and_then(|group| group.path.last())
+                .map_or_else(|| DEV[1].to_owned(), |key| (*key).to_owned());
             drop(groups);
             drop(runtime);
             for (list, text) in elsewhere {
@@ -2090,7 +2258,7 @@ impl Edits<'_> {
             {
                 continue;
             }
-            let Some(array) = edit::array(self.doc, &DEV[..1], DEV[1]) else {
+            let Some(array) = edit::array(self.doc, &DEV[..1], &dev_key) else {
                 continue;
             };
             let indexes: Vec<usize> = edit::strings(array)
@@ -2125,7 +2293,7 @@ impl Edits<'_> {
             self.change(
                 ("xpd", name),
                 format!("pin {name}"),
-                &DEV,
+                &[DEV[0], dev_key.as_str()],
                 old,
                 format!("{wanted:?}"),
                 (reason, DOCS.to_owned()),
@@ -2298,16 +2466,9 @@ fn flags(
     let mut index = 0;
     while index < tokens.len() && tokens[index] != "--" {
         let token = &tokens[index];
-        let load = if token == "-p" {
-            tokens
-                .get(index + 1)
-                .and_then(|name| Some((forbid.loaded_by(name)?, 2)))
-        } else {
-            token
-                .strip_prefix("-p")
-                .filter(|_| !token.starts_with("--"))
-                .and_then(|name| Some((forbid.loaded_by(name)?, 1)))
-        };
+        let load = plugin_arg(tokens, index).and_then(|(value, used)| {
+            Some((forbid.loaded_by(value.trim_start_matches('='))?, used))
+        });
         if let Some((plugin, used)) = load {
             indexes.extend(index..index + used);
             removed.push((plugin.to_owned(), tokens[index..index + used].join(" ")));
@@ -2337,6 +2498,40 @@ fn flags(
         index += 1;
     }
     (indexes, removed)
+}
+
+/// The plugin argument of the `-p` at `index` of `args`, with the number of arguments it takes,
+/// as pytest 9 reads it in `PytestPluginManager.consider_preparse`: `-p` takes the next argument,
+/// and `-p<value>` the rest of its own, each with spaces stripped. So `-p=name` names the
+/// plugin `=name`, which pytest cannot import. `None` when the argument is no `-p`.
+fn plugin_arg<S: AsRef<str>>(args: &[S], index: usize) -> Option<(String, usize)> {
+    let arg = args.get(index)?.as_ref();
+    if arg == "-p" {
+        let value = args.get(index + 1)?.as_ref();
+        return Some((value.trim().to_owned(), 2));
+    }
+    arg.strip_prefix("-p")
+        .map(|value| (value.trim().to_owned(), 1))
+}
+
+/// Why the `-p` with the plugin argument `value`, written `shown`, keeps the project from the
+/// profile: it turns off a plugin of the profile, whose load names are `disabled`, or pytest
+/// cannot import what it names. A load of a plugin that `forbid` removes is no conflict,
+/// because the plan removes it.
+fn plugin_conflict(
+    value: &str,
+    shown: &str,
+    disabled: &BTreeSet<&str>,
+    forbid: &profile::PytestForbid,
+) -> Option<String> {
+    if let Some(name) = value.strip_prefix("no:") {
+        return disabled.contains(name).then(|| format!("addopts turns off the plugin {name} with {shown}, and the profile adds it. Remove {shown}, or record a pytest exception for the plugin."));
+    }
+    if forbid.loaded_by(value.trim_start_matches('=')).is_some() {
+        return None;
+    }
+    let broken = value.is_empty() || value.starts_with('=');
+    broken.then(|| format!("addopts passes {shown}, so pytest tries to import the plugin {value:?} and stops with an error. Write -p and the plugin's name, without ="))
 }
 
 /// `args` as one command line, each quoted only when it needs quotes to stay one argument.

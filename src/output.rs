@@ -10,15 +10,50 @@ pub(crate) enum Format {
     Json,
 }
 
-/// The credentials in a URL, the user and password between `://` and the last `@` of its
-/// authority, as in an index URL of `[[tool.uv.index]]` in `pyproject.toml`.
-static CREDENTIALS: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)\b([a-z][a-z0-9+.-]*://)[^/?#\s"'\\<>`]+@"#)
-        .expect("the credentials pattern parses")
+/// A URL: its scheme and the rest up to a space, a quote, a backslash or an angle bracket.
+static URL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\b([a-z][a-z0-9+.-]*://)([^\s"'\\<>`]*)"#).expect("the URL pattern parses")
 });
 
-/// `text` with the user and password of every URL replaced by `****`, so that no output shows a
-/// credential from a project file or from a tool's message about it.
+/// `text` with the parts of every URL that carry credentials replaced by `****`: the user and
+/// password before the host, the query and the fragment. A token in a path segment stays,
+/// because a path cannot be told from a token, so doctor also hides the lines of tables it does
+/// not own.
 pub(crate) fn redact(text: &str) -> String {
-    CREDENTIALS.replace_all(text, "${1}****@").into_owned()
+    URL.replace_all(text, |captures: &regex::Captures<'_>| {
+        let scheme = &captures[1];
+        let rest = &captures[2];
+        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        let (authority, tail) = rest.split_at(end);
+        let host = authority
+            .rsplit_once('@')
+            .map_or_else(|| authority.to_owned(), |(_, host)| format!("****@{host}"));
+        let (tail, fragment) = match tail.split_once('#') {
+            Some((tail, _)) => (tail, "#****"),
+            None => (tail, ""),
+        };
+        let tail = match tail.split_once('?') {
+            Some((path, _)) => format!("{path}?****"),
+            None => tail.to_owned(),
+        };
+        format!("{scheme}{host}{tail}{fragment}")
+    })
+    .into_owned()
+}
+
+/// `text`, a message of another tool, with every URL cut to its scheme and host, since a tool
+/// can quote an index URL whose path holds a token.
+pub(crate) fn hosts_only(text: &str) -> String {
+    URL.replace_all(text, |captures: &regex::Captures<'_>| {
+        let scheme = &captures[1];
+        let rest = &captures[2];
+        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        let (authority, tail) = rest.split_at(end);
+        let host = authority
+            .rsplit_once('@')
+            .map_or(authority, |(_, host)| host);
+        let tail = if tail.is_empty() { "" } else { "/****" };
+        format!("{scheme}{host}{tail}")
+    })
+    .into_owned()
 }

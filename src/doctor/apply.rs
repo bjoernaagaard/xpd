@@ -100,7 +100,13 @@ pub(crate) fn run(
 ) -> Result<Applied> {
     let recovered = Journal::recover(root)?;
     let mut full = plan::compute(root, catalog, profile, files, Request { kind, stamp: true })?;
-    full.check_tools(root);
+    full.check_tools(root, super::validate::Fetch::Online);
+    if !full.unverified.is_empty() {
+        bail!(
+            "doctor wrote nothing, because it could not check the settings it would write:\n  {}",
+            full.unverified.join("\n  ")
+        );
+    }
     if full.kind_from == Some("suggestion") {
         bail!(
             "{PYPROJECT} records no kind. Name it: xpd doctor --apply --kind {}, which doctor suggests because {}",
@@ -220,7 +226,7 @@ fn write(
             bail!(
                 "{} failed: {}",
                 lock.command.join(" "),
-                String::from_utf8_lossy(&output.stderr).trim()
+                crate::output::hosts_only(String::from_utf8_lossy(&output.stderr).trim())
             );
         }
     }

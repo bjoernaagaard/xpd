@@ -14,9 +14,29 @@ pub(crate) fn read(path: &Path) -> Result<Option<Toml>, String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("{}: {error}", path.display())),
     };
-    Document::parse(text)
+    Document::parse(text.clone())
         .map(Some)
-        .map_err(|error| format!("{}: {}", path.display(), error.to_string().trim()))
+        .map_err(|error| format!("{}: {}", path.display(), parse_error(&text, &error)))
+}
+
+/// Where `text` fails to parse and why, without the snippet of the line that a parse error
+/// prints, since that line can hold a credential, such as an index URL with a token.
+pub(crate) fn parse_error(text: &str, error: &toml_edit::TomlError) -> String {
+    let message = error.message().trim();
+    match error.span() {
+        Some(span) => {
+            let before = text.get(..span.start).unwrap_or_default();
+            let line = before.matches('\n').count() + 1;
+            let column = before
+                .rsplit_once('\n')
+                .map_or(before, |(_, last)| last)
+                .chars()
+                .count()
+                + 1;
+            format!("TOML parse error at line {line}, column {column}: {message}")
+        }
+        None => format!("TOML parse error: {message}"),
+    }
 }
 
 /// The item at the dotted `path`, through tables, inline tables and dotted keys alike.

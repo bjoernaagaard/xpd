@@ -79,7 +79,7 @@ fn report(format: Format, mode: Mode, kind: Option<&str>, out: &mut String) -> R
         }
         Mode::Check => {
             let mut plan = plan::compute(&root, &catalog, &profile, &files, request)?;
-            plan.check_tools(&root);
+            plan.check_tools(&root, validate::Fetch::Online);
             plan.check_locks(&root)?;
             match format {
                 Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&plan)?)?,
@@ -89,13 +89,15 @@ fn report(format: Format, mode: Mode, kind: Option<&str>, out: &mut String) -> R
                 ExitCode::from(AMBIGUOUS)
             } else if plan.drifts() {
                 ExitCode::from(DRIFT)
+            } else if !plan.unverified.is_empty() {
+                ExitCode::from(AMBIGUOUS)
             } else {
                 ExitCode::SUCCESS
             })
         }
         Mode::Report => {
             let mut plan = plan::compute(&root, &catalog, &profile, &files, request)?;
-            plan.check_tools(&root);
+            plan.check_tools(&root, validate::Fetch::Offline);
             let report = advise(&root, &files, &catalog)?;
             match format {
                 Format::Json => {
