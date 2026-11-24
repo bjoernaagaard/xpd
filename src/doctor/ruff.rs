@@ -319,6 +319,29 @@ fn selection(
     (enabled, ignored)
 }
 
+/// The rules that the Ruff settings of `doc`, the configuration file `file`, run on their own,
+/// from the pinned release's rules and defaults, and the selector that turns off each rule the
+/// file ignores.
+pub(crate) fn resolve(
+    catalog: &Catalog,
+    file: &Path,
+    doc: Toml,
+) -> (BTreeSet<String>, BTreeMap<String, Location>) {
+    let layers = [Layer {
+        file: file.to_path_buf(),
+        prefix: prefix(file),
+        doc,
+    }];
+    let flag = |key| matches!(lint_value(&layers, key), Some((Observed::Bool(true), _)));
+    let mode = if flag("preview") {
+        Mode::Preview
+    } else {
+        Mode::Stable
+    };
+    let explicit = flag("explicit-preview-rules");
+    selection(catalog, &layers, Preview { mode, explicit })
+}
+
 fn specificity(selector: &str) -> usize {
     if selector == "ALL" { 0 } else { selector.len() }
 }

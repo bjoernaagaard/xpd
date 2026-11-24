@@ -318,20 +318,35 @@ enum Cmd {
   xpd rules
   xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]
     Rules(RulesOptions),
-    /// Suggest Ruff, ty and pytest settings and pytest plugin changes for this project, each with its file, reason and evidence.
+    /// Compare this project with xpd's profile of Ruff, ty and pytest settings, show the edits, and apply them.
     ///
-    /// The suggestions come from a review of every rule and setting of Ruff 0.17.4 and ty
-    /// 0.0.106 and cover the pytest settings in the testing policy. A conditional suggestion
-    /// shows why it applies. Doctor consults an installed Ruff or ty for its settings and reads
-    /// the installed pytest version from the project's virtual environment. Advice for a missing
-    /// tool is unverified locally. Doctor prints advice and exits 0, or exits 2 if it can't run.
+    /// The profile is one complete target setup that ships with xpd: the Ruff rules, ty rule
+    /// levels, pytest settings and pytest plugins every project gets, and the lock files each
+    /// kind of project needs. Doctor prints a unified diff of pyproject.toml with the reason for
+    /// each change, then the conditional advice for Ruff 0.17.4, ty 0.0.106 and pytest 9.2.0
+    /// that the project's code points to. `--check` exits 1 when the project drifts from the
+    /// profile, and `--apply` writes the diff, runs uv lock, and records the profile revision in
+    /// [tool.xpd.profile]. A project records a deliberate exception there with its reason.
+    /// Doctor exits 2 when it cannot read the project, or when `--apply` finds a conflict.
     #[command(after_long_help = "Examples:
   xpd doctor
-  xpd doctor --format json | jq '.suggestions[] | {tool, key, value}'")]
+  xpd doctor --check
+  xpd doctor --apply --kind library
+  xpd doctor --format json | jq '.profile.changes[] | {item, path, old, new}'")]
     Doctor {
         /// Output format. Default: text on a terminal, json otherwise.
         #[arg(long, value_enum)]
         format: Option<Format>,
+        /// Exit 1 when the project drifts from the profile, including a missing or stale lock.
+        #[arg(long, conflicts_with = "apply")]
+        check: bool,
+        /// Write the plan to pyproject.toml, refresh the lock files, and record the profile.
+        #[arg(long)]
+        apply: bool,
+        /// The kind of project: library, application, pipeline or script. The first apply needs
+        /// it, and pyproject.toml records it.
+        #[arg(long)]
+        kind: Option<String>,
     },
     /// Print the agent skill (SKILL.md) for this xpd version.
     Skill {
@@ -410,7 +425,20 @@ pub fn run() -> ExitCode {
         Cmd::Impact(args) => unit_result(args.run(default_format)),
         Cmd::Animate(command) => command_result(command.run()),
         Cmd::Rules(options) => command_result(rules(options, default_format)),
-        Cmd::Doctor { format } => unit_result(crate::doctor::run(format.unwrap_or(default_format))),
+        Cmd::Doctor {
+            format,
+            check,
+            apply,
+            kind,
+        } => {
+            let mode = match (check, apply) {
+                (true, _) => crate::doctor::Mode::Check,
+                (_, true) => crate::doctor::Mode::Apply,
+                _ => crate::doctor::Mode::Report,
+            };
+            let format = format.unwrap_or(default_format);
+            command_result(crate::doctor::run(format, mode, kind.as_deref()))
+        }
         Cmd::Skill { json: false } => print_out(SKILL),
         Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),
         Cmd::Mcp { args } => mcp::run(&args),

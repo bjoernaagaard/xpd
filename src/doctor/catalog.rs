@@ -4,7 +4,8 @@
 //! Each line is one record, keyed by tool, surface and identifier. A rule, its key inside a
 //! settings table and its historical alias are different records, linked by `canonical`. Every
 //! record carries one decision: leave the project's choice alone, inherit the decision of the
-//! record it links to, or suggest a value, always or when a named trigger finds evidence.
+//! record it links to, hold the value that `profile.toml` sets, or suggest a value when a named
+//! trigger finds evidence.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -319,23 +320,15 @@ pub enum Target {
     },
     /// Run a command.
     Command(String),
-    /// Remove a key, an item of an array, or a dependency.
-    Remove { key: String, item: Option<String> },
 }
 
-/// When a suggestion applies.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum When {
-    /// Recommended for every project where it is not already effective.
-    Always,
-    /// Shown when the trigger finds evidence, with the condition the developer decides.
-    If { trigger: Trigger, condition: String },
-}
-
+/// A suggestion that doctor shows when its trigger finds evidence, with the condition that the
+/// developer decides.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggestion {
     pub target: Target,
-    pub when: When,
+    pub trigger: Trigger,
+    pub condition: String,
     /// Ruff rules of which one must run for the suggestion to have an effect.
     pub requires: Vec<String>,
 }
@@ -346,29 +339,22 @@ pub enum Decision {
     Leave,
     /// The decision of the linked record applies.
     Inherit(Key),
-    /// The table that the suggestions of individual rules are written to.
+    /// The table that the profile's values for individual rules are written to.
     Destination,
+    /// `profile.toml` sets the value, and this record explains it.
+    Profile,
     Suggest(Suggestion),
 }
 
 impl Decision {
-    /// The decision's word in the inventories.
+    /// The decision's word in `decisions.jsonl`.
     pub fn word(&self) -> &'static str {
         match self {
             Self::Leave => "leave",
             Self::Inherit(_) => "inherit",
-            Self::Suggest(Suggestion {
-                target: Target::Remove { .. },
-                ..
-            }) => "remove",
-            Self::Destination
-            | Self::Suggest(Suggestion {
-                when: When::Always, ..
-            }) => "recommend",
-            Self::Suggest(Suggestion {
-                when: When::If { .. },
-                ..
-            }) => "conditional",
+            Self::Destination => "recommend",
+            Self::Profile => "profile",
+            Self::Suggest(_) => "conditional",
         }
     }
 }
@@ -496,9 +482,8 @@ impl Line {
                     .with_context(|| format!("{key} inherits from no record"))?,
             ),
             ("recommend", Some("destination")) if proposal.is_empty() => Decision::Destination,
-            (word @ ("recommend" | "conditional" | "remove"), None) => {
-                Decision::Suggest(proposal.suggestion(&key, word)?)
-            }
+            ("profile", None) if proposal.is_empty() => Decision::Profile,
+            ("conditional", None) => Decision::Suggest(proposal.suggestion(&key)?),
             (word, role) => {
                 bail!("{key} has the decision {word} with the role {role:?} and {proposal:?}")
             }
@@ -557,39 +542,22 @@ impl Proposal {
             && self.requires.is_empty()
     }
 
-    /// The suggestion of a record whose decision is `word`: `recommend` for every project, or
-    /// `conditional` on a trigger with a stated condition.
-    fn suggestion(self, key: &Key, word: &str) -> Result<Suggestion> {
-        let when = match (word, self.trigger, self.condition) {
-            ("recommend" | "remove", None, None) => When::Always,
-            ("recommend" | "remove", _, _) => bail!("{key} is {word} but names a condition"),
-            (_, Some(trigger), Some(condition)) if !condition.trim().is_empty() => {
-                When::If { trigger, condition }
+    /// The suggestion of a conditional record: a trigger with a stated condition.
+    fn suggestion(self, key: &Key) -> Result<Suggestion> {
+        let (trigger, condition) = match (self.trigger, self.condition) {
+            (Some(trigger), Some(condition)) if !condition.trim().is_empty() => {
+                (trigger, condition)
             }
-            (_, None, _) => bail!("{key} is conditional without a trigger"),
-            (_, Some(_), _) => bail!("{key} is conditional without a condition"),
+            (None, _) => bail!("{key} is conditional without a trigger"),
+            (Some(_), _) => bail!("{key} is conditional without a condition"),
         };
         ensure!(
-            self.trigger != Some(Trigger::RuleActive) || !self.requires.is_empty(),
+            trigger != Trigger::RuleActive || !self.requires.is_empty(),
             "{key} is triggered by an active rule but requires none"
         );
         let destination = self
             .destination
             .with_context(|| format!("{key} has no destination"))?;
-        if word == "remove" {
-            ensure!(
-                self.requires.is_empty(),
-                "{key} removes a setting but requires a rule"
-            );
-            return Ok(Suggestion {
-                target: Target::Remove {
-                    key: destination,
-                    item: self.value,
-                },
-                when,
-                requires: self.requires,
-            });
-        }
         let value = self.value.with_context(|| format!("{key} has no value"))?;
         let target = match (key.tool, key.surface) {
             (_, Surface::Cli) => Target::Command(value),
@@ -610,7 +578,8 @@ impl Proposal {
         };
         Ok(Suggestion {
             target,
-            when,
+            trigger,
+            condition,
             requires: self.requires,
         })
     }
@@ -722,6 +691,13 @@ impl Catalog {
                 Decision::Suggest(suggestion) => Some((record, suggestion)),
                 _ => None,
             })
+    }
+
+    /// The record that explains the value `profile.toml` sets for `id` of `tool`, in any release.
+    pub fn profiled(&self, tool: Tool, id: &str) -> Option<&Record> {
+        self.records.iter().find(|record| {
+            record.key.tool == tool && record.key.id == id && record.decision == Decision::Profile
+        })
     }
 
     /// Ruff's rules of the pinned release, removed rules included.

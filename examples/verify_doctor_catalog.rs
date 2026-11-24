@@ -192,8 +192,7 @@ impl Report {
         }
         for record in records {
             if let Decision::Suggest(suggestion) = &record.decision
-                && let catalog::When::If { trigger, .. } = suggestion.when
-                && !catalog::Trigger::ALL.contains(&trigger)
+                && !catalog::Trigger::ALL.contains(&suggestion.trigger)
             {
                 self.problems
                     .push(format!("{} names an unknown trigger", record.key));
@@ -902,6 +901,7 @@ impl Report {
                 (Decision::Inherit(_), Some(catalog)) if row.word != "inherit" => catalog
                     .resolve(record)
                     .map_or("unresolved", |parent| parent.decision.word()),
+                (Decision::Profile, _) => "recommend",
                 _ => record.decision.word(),
             };
             if word != row.word {

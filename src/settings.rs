@@ -8,7 +8,8 @@
 //! ```
 //!
 //! The user's file holds the same keys at its top, as in `style = "strict"`. A key that the
-//! project file sets wins over the user's file.
+//! project file sets wins over the user's file. The project file also holds the record of
+//! `xpd doctor`'s profile, the `[tool.xpd.profile]` table, which doctor reads and checks.
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -25,6 +26,8 @@ const PROJECT_FILE: &str = "pyproject.toml";
 const PROJECT_TABLE: [&str; 2] = ["tool", "xpd"];
 /// The key of the house style.
 const STYLE: &str = "style";
+/// The key of the profile record, which only the project file holds.
+const PROFILE: &str = "profile";
 
 /// What the settings files say for one project.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -45,7 +48,7 @@ impl Settings {
             Some((file, doc)) => {
                 let table = toml::get(&doc, &PROJECT_TABLE).and_then(|item| item.as_table_like());
                 table
-                    .map(|table| style(table, &file))
+                    .map(|table| style(table, &file, &[STYLE, PROFILE]))
                     .transpose()?
                     .flatten()
             }
@@ -85,7 +88,7 @@ fn user_style(invocation_dir: &Path) -> Result<Option<Style>> {
         return Ok(None);
     };
     match toml::read(&invocation_dir.join(&file)).map_err(|error| anyhow!(error))? {
-        Some(doc) => style(doc.as_table(), &file),
+        Some(doc) => style(doc.as_table(), &file, &[STYLE]),
         None => Ok(None),
     }
 }
@@ -105,11 +108,15 @@ fn user_file() -> Option<PathBuf> {
     Some(config.join("xpd").join("config.toml"))
 }
 
-/// The style that `table`, the settings table of `file`, sets. `None` when it sets none.
-fn style(table: &dyn TableLike, file: &Path) -> Result<Option<Style>> {
+/// The style that `table`, the settings table of `file`, sets. `None` when it sets none. A key
+/// outside `keys` is an error.
+fn style(table: &dyn TableLike, file: &Path, keys: &[&str]) -> Result<Option<Style>> {
     let file = file.display();
-    if let Some((key, _)) = table.iter().find(|(key, _)| *key != STYLE) {
-        bail!("{file}: xpd has no setting named {key}. The setting it reads is {STYLE}");
+    if let Some((key, _)) = table.iter().find(|(key, _)| !keys.contains(key)) {
+        bail!(
+            "{file}: xpd has no setting named {key}. It reads {}",
+            keys.join(" and ")
+        );
     }
     let Some(item) = table.get(STYLE) else {
         return Ok(None);

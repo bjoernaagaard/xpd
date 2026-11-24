@@ -41,10 +41,12 @@ Use `xpd` whenever you write or change Python code.
   `xpd api <Class>.<method>` before you call it, instead of importing the library to inspect it.
 - `xpd rules --format json`: every rule with its documentation. Read a rule's
   `doc` before you change code it reports.
-- `xpd doctor --format json`: the Ruff, ty and pytest settings and pytest plugins to change in this
-  project, each with its file, table, key, value and reason. A conditional one
-  names the code that made it relevant and the condition the developer decides,
-  so ask before you adopt it.
+- `xpd doctor --format json`: how this project differs from xpd's profile of Ruff, ty and pytest
+  settings and pytest plugins. `profile.changes` lists each change with its path, old and new
+  value and reason, and `profile.diff` shows the edit to `pyproject.toml`. `suggestions` holds
+  conditional advice, which names the code that made it relevant and the condition the developer
+  decides, so ask before you adopt it. `xpd doctor --apply` writes the plan, so run it when the
+  user asks for it.
 - `xpd check <paths…> --fix`: apply safe fixes. Add `--unsafe-fixes` for fixes
   that may change behavior, then read the diff.
 - `xpd profile <data file>`: dtypes, nulls, cardinality, memory. Run it before

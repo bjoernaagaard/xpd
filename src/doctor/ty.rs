@@ -147,7 +147,8 @@ fn user_config() -> Option<PathBuf> {
     Some(base.join("ty").join("ty.toml"))
 }
 
-fn state(catalog: &Catalog, file: &Path, prefix: &[&str], doc: Option<&Toml>) -> State {
+/// The rule levels and settings that `doc`, the file `file` with ty's table at `prefix`, sets.
+pub(crate) fn state(catalog: &Catalog, file: &Path, prefix: &[&str], doc: Option<&Toml>) -> State {
     let mut state = State {
         rules: BTreeMap::new(),
         all: None,
