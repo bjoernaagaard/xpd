@@ -149,7 +149,7 @@ Changes
 ...
 Locks
   uv.lock is missing. --apply runs uv lock.
-
+...
 xpd doctor --apply --kind application writes these changes.
 ...
 ```
@@ -183,7 +183,7 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 - a value that the pinned Ruff rejects, such as `line-length = "wide"`
 - a requirement for Ruff or ty in a dependency list other than `dev` that the profile's pin does not meet
 - a per-file ignore that turns a rule of the profile off through a group selector, such as `PERF`
-- an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly` or `-pno:timeout`, a `-p=<name>` that pytest cannot import, or `--disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
+- an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly` or `-pno:timeout`, a `-p=<name>` that pytest cannot import, or `pytest --disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
 - a layout that the kind does not allow
 - a uv workspace, in the project or above it
 - both `[tool.pytest]` and `[tool.pytest.ini_options]` with settings
@@ -227,7 +227,7 @@ Apply keeps the prior content of each file it touches in the folder `.xpd-apply`
 
 `--check` runs `uv lock --check` for each lock that exists, so it needs uv.
 
-Doctor checks the Ruff settings it would leave with Ruff 0.17.4 itself, so the answer is the same before and after `uv sync`. It runs the Ruff of the project's environment or of `PATH` when that is Ruff 0.17.4, and else `uv tool run --from ruff==0.17.4 ruff`, from uv's cache first, with `--config` naming a copy of `[tool.ruff]` alone. `--check` and `--apply` fetch Ruff 0.17.4 from the index when the cache lacks it, and plain `xpd doctor` reads the cache only. When no route works, doctor lists the reason under `Unverified` and never says that the project matches. `--check` then exits 2, and `--apply` writes nothing.
+Doctor checks the Ruff settings it would leave with Ruff 0.17.4 itself, so the answer is the same before and after `uv sync`. It runs the Ruff of the project's environment or of `PATH` when that is Ruff 0.17.4, and else `uv tool run --from ruff==0.17.4 ruff`, from uv's cache first, with `ruff --config` naming a copy of `[tool.ruff]` alone. `--check` and `--apply` fetch Ruff 0.17.4 from the index when the cache lacks it, and plain `xpd doctor` reads the cache only. When no route works, doctor lists the reason under `Unverified` and never says that the project matches. `--check` then exits 2, and `--apply` writes nothing.
 
 ## Stop hook
 
