@@ -6,9 +6,10 @@ The plan reads files. It compares the effect of the project's own settings, so a
 
 Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, and `dependencies` and `optional-dependencies` of `[project]`.
 
-- **The diff.** Each line outside those tables, such as a line of `[tool.uv]`, `[[tool.uv.index]]`, `[tool.uv.sources]` or `[tool.uv.pip]`, shows as `<hidden>`. Table headers and blank lines stay, so the diff keeps its shape. Doctor never changes a hidden line.
+- **The diff.** Each line outside those tables, such as a line of `[tool.uv]`, `[[tool.uv.index]]`, `[tool.uv.sources]` or `[tool.uv.pip]`, shows as `<hidden>`. A line shows only when everything on it belongs to those tables, so a line that also holds another setting is hidden, such as `tool = { uv = { ... }, ruff = { ... } }` or `tool.uv.index-url = "..."` beside `tool.ruff.lint...` lines. Table headers and blank lines stay, so the diff keeps its shape. A change on a hidden line shows in the list of changes and not in the diff.
 - **URLs.** In every line doctor prints, a URL keeps its scheme, host and path, and its user and password, query and fragment become `****`, as in `https://****@example.com/simple?****`. In a message of uv or Ruff that doctor passes on, a URL keeps its scheme and host only.
 - **Parse errors.** When `pyproject.toml` does not parse, doctor names the line, the column and the reason, and leaves out the text of the line.
+- **Files.** To check the Ruff settings, doctor writes the `[tool.ruff]` table alone as a `ruff.toml` and no other part of `pyproject.toml`. It sits in a new folder of the system's temporary folder, with a name no other process can predict and mode 0700, the file mode 0600, and doctor removes the folder when Ruff ends, also after an error. The journal of `--apply` and the session files of the Stop hook are mode 0600 too, in a folder of mode 0700 for the journal.
 
 This holds for text and JSON, for `--check` and `--apply`, and for the Stop hook. A token in the path of a URL in a table that doctor owns, such as a dependency `pkg @ https://host/<token>/pkg.whl`, still shows, so keep such tokens in uv's settings or in the environment.
 
@@ -226,7 +227,7 @@ Apply keeps the prior content of each file it touches in the folder `.xpd-apply`
 
 `--check` runs `uv lock --check` for each lock that exists, so it needs uv.
 
-Doctor checks the Ruff settings it would leave with Ruff 0.17.4 itself, so the answer is the same before and after `uv sync`. It runs the Ruff of the project's environment or of `PATH` when that is Ruff 0.17.4, and else `uv tool run --from ruff==0.17.4 ruff`, from uv's cache first. `--check` and `--apply` fetch Ruff 0.17.4 from the index when the cache lacks it, and plain `xpd doctor` reads the cache only. When no route works, doctor lists the reason under `Unverified` and never says that the project matches. `--check` then exits 2, and `--apply` writes nothing.
+Doctor checks the Ruff settings it would leave with Ruff 0.17.4 itself, so the answer is the same before and after `uv sync`. It runs the Ruff of the project's environment or of `PATH` when that is Ruff 0.17.4, and else `uv tool run --from ruff==0.17.4 ruff`, from uv's cache first, with `--config` naming a copy of `[tool.ruff]` alone. `--check` and `--apply` fetch Ruff 0.17.4 from the index when the cache lacks it, and plain `xpd doctor` reads the cache only. When no route works, doctor lists the reason under `Unverified` and never says that the project matches. `--check` then exits 2, and `--apply` writes nothing.
 
 ## Stop hook
 

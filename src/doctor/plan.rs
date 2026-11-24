@@ -1300,18 +1300,11 @@ const OWNED: [&[&str]; 7] = [
 /// The line that stands for a line of a table that doctor does not own.
 const HIDDEN: &str = "<hidden>";
 
-/// Whether the key at `path` is in a table doctor owns, or holds one, as `tool` holds
-/// `tool.ruff` in an inline table.
-fn owns(path: &[&str]) -> bool {
-    OWNED.iter().any(|owned| {
-        let common = owned.len().min(path.len());
-        owned[..common] == path[..common]
-    })
-}
-
 /// `text`, a `pyproject.toml`, with each line outside the tables doctor owns replaced by
 /// [`HIDDEN`], so that no output of doctor shows a setting it does not change, such as an index
-/// URL with a token. Table headers and blank lines stay. Text that does not parse is all hidden.
+/// URL with a token. A line shows only when everything on it belongs to an owned table, so a line
+/// with a value of another table is hidden, also inside an inline or dotted `tool` table. Table
+/// headers and blank lines stay. Text that does not parse is all hidden.
 fn shown(text: &str) -> String {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let Ok(doc) = toml_edit::Document::parse(text.to_owned()) else {
@@ -1339,16 +1332,20 @@ fn shown(text: &str) -> String {
             !table.is_empty() && OWNED.iter().any(|owned| table.starts_with(owned))
         })
         .collect();
-    for (start, end, owned) in values {
-        for line in show.iter_mut().take(end + 1).skip(start) {
-            *line = owned;
+    let mark = |show: &mut Vec<bool>, owned: bool| {
+        for (start, end, _) in values.iter().filter(|(_, _, value)| *value == owned) {
+            for line in show.iter_mut().take(end + 1).skip(*start) {
+                *line = owned;
+            }
         }
-    }
+    };
+    mark(&mut show, true);
     for (line, _) in &headers {
         if let Some(line) = show.get_mut(*line) {
             *line = true;
         }
     }
+    mark(&mut show, false);
     lines
         .iter()
         .zip(show)
@@ -1372,7 +1369,8 @@ fn hide(line: &str) -> String {
 }
 
 /// The line of each table header below `table`, at `path`, with the table's path, and the first
-/// and last line of each value with whether doctor owns it.
+/// and last line of each value with whether doctor owns it. An inline table counts as the values
+/// inside it, so a line that holds values of an owned and of another table has both.
 fn collect(
     table: &dyn toml_edit::TableLike,
     path: &mut Vec<String>,
@@ -1389,7 +1387,9 @@ fn collect(
         };
         match item {
             Item::Table(child) => {
-                headers.extend(header(child, path));
+                if !child.is_dotted() {
+                    headers.extend(header(child, path));
+                }
                 collect(child, path, line_of, headers, values);
             }
             Item::ArrayOfTables(tables) => {
@@ -1397,6 +1397,9 @@ fn collect(
                     headers.extend(header(child, path));
                     collect(child, path, line_of, headers, values);
                 }
+            }
+            Item::Value(toml_edit::Value::InlineTable(child)) => {
+                collect(child, path, line_of, headers, values);
             }
             Item::Value(value) => {
                 let start = table
@@ -1408,7 +1411,8 @@ fn collect(
                     .min();
                 if let (Some(start), Some(span)) = (start, value.span()) {
                     let parts: Vec<&str> = path.iter().map(String::as_str).collect();
-                    values.push((line_of(start), line_of(span.end), owns(&parts)));
+                    let owned = OWNED.iter().any(|owned| parts.starts_with(owned));
+                    values.push((line_of(start), line_of(span.end), owned));
                 }
             }
             Item::None => {}

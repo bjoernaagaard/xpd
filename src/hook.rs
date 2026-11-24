@@ -1208,7 +1208,7 @@ impl Session {
         if let Some(folder) = self.file.parent() {
             fs::create_dir_all(folder).with_context(cannot_write)?;
         }
-        let mut file = fs::OpenOptions::new()
+        let mut file = crate::private::options()
             .create(true)
             .append(true)
             .open(&self.file)

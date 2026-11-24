@@ -30,6 +30,7 @@ mod output;
 mod pack;
 mod pack_names;
 mod package_check;
+mod private;
 mod project;
 mod query;
 mod recipe;

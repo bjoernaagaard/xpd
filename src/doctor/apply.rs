@@ -277,14 +277,17 @@ fn read(file: &Path) -> Result<Option<String>> {
 }
 
 /// Replaces `file` with `text` in one rename, so a reader sees the old or the new file. The new
-/// file keeps the permissions of the old one.
+/// file is written with mode 0600, so no other user reads it while it is written, and then takes
+/// the permissions of the old one.
 fn replace(file: &Path, text: &str) -> Result<()> {
     let name = file
         .file_name()
         .context("a file has a name")?
         .to_string_lossy();
     let temporary = file.with_file_name(format!(".{name}.xpd-{}", std::process::id()));
-    fs::write(&temporary, text).with_context(|| format!("cannot write {}", temporary.display()))?;
+    let _ = fs::remove_file(&temporary);
+    crate::private::write_new(&temporary, text)
+        .with_context(|| format!("cannot write {}", temporary.display()))?;
     if let Ok(metadata) = fs::metadata(file) {
         fs::set_permissions(&temporary, metadata.permissions())
             .with_context(|| format!("cannot set the permissions of {}", temporary.display()))?;
@@ -310,7 +313,7 @@ impl Journal {
     /// of `files`, each relative to `root`.
     fn begin(root: &Path, files: &[PathBuf]) -> Result<Self> {
         let folder = root.join(JOURNAL);
-        match fs::create_dir(&folder) {
+        match crate::private::create_dir(&folder) {
             Ok(()) => {}
             Err(error) if error.kind() == ErrorKind::AlreadyExists => bail!(
                 "{} exists, so another xpd doctor --apply is writing this project",
@@ -324,7 +327,7 @@ impl Journal {
             root: root.to_path_buf(),
             folder,
         };
-        fs::write(journal.folder.join(OWNER), std::process::id().to_string())?;
+        crate::private::write_new(&journal.folder.join(OWNER), &std::process::id().to_string())?;
         let mut manifest = Manifest {
             files: BTreeMap::new(),
         };

@@ -6,10 +6,8 @@
 //! [`ruff_rejects`] runs the pinned Ruff on a copy of the settings when it is installed, which
 //! also catches a value of the wrong type.
 
-use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use toml_edit::{Item, TableLike};
 
@@ -17,6 +15,7 @@ use super::catalog::{self, Catalog, Key, Kind, Surface, Tool};
 use super::plan::dotted;
 use super::probe::Checker;
 use super::ruff;
+use crate::private::{self, Scratch};
 use crate::toml::{self, Toml};
 
 /// The arrays of Ruff rule selectors in which a removed rule stops Ruff, because they select it.
@@ -315,51 +314,70 @@ pub(crate) enum Verdict {
 /// It runs the Ruff in the project's environment or on `PATH` when that is the pinned release,
 /// and else `uv tool run --from ruff==<pin>`, from uv's cache first. Either way the answer does
 /// not depend on whether the project's environment is synced.
+///
+/// Ruff gets the `[tool.ruff]` table alone, as a `ruff.toml` that `--config` names, so no other
+/// setting of `pyproject.toml`, such as an index URL with a token, is written anywhere. The file
+/// sits in a [`Scratch`] folder, mode 0700 with a name no other process can predict, which is
+/// removed on every way out.
 pub(crate) fn ruff_verdict(root: &Path, text: &str, fetch: Fetch) -> Verdict {
-    static COUNT: AtomicUsize = AtomicUsize::new(0);
-    let folder = std::env::temp_dir().join(format!(
-        "xpd-doctor-{}-{}",
-        std::process::id(),
-        COUNT.fetch_add(1, Ordering::Relaxed)
-    ));
-    let verdict = (|| {
-        let written = fs::create_dir_all(&folder)
-            .and_then(|()| fs::write(folder.join("pyproject.toml"), text))
-            .and_then(|()| fs::write(folder.join("check.py"), ""));
-        if let Err(error) = written {
-            return Verdict::Unverified(format!("cannot write a copy of the settings: {error}"));
+    let scratch = match Scratch::new("xpd-doctor") {
+        Ok(scratch) => scratch,
+        Err(error) => {
+            return Verdict::Unverified(format!("cannot make a private scratch folder: {error}"));
         }
-        let config = folder.join("pyproject.toml");
-        let file = folder.join("check.py");
-        let ruff_args = |command: &mut Command| {
-            command
-                .args(["check", "--no-cache", "--show-settings", "--config"])
-                .arg(&config)
-                .arg(&file);
-        };
-        let checker = Checker::find(Tool::Ruff, root);
-        if let Some(installed) = checker.installed.as_ref().filter(|_| checker.is_pinned()) {
-            let mut command = Command::new(&installed.path);
-            ruff_args(&mut command);
-            return run(&mut command, root, &folder);
+    };
+    let folder = scratch.path();
+    let config = folder.join("ruff.toml");
+    let file = folder.join("check.py");
+    let written =
+        private::write_new(&config, &ruff_table(text)).and_then(|()| private::write_new(&file, ""));
+    if let Err(error) = written {
+        return Verdict::Unverified(format!("cannot write the Ruff settings: {error}"));
+    }
+    let ruff_args = |command: &mut Command| {
+        command
+            .args(["check", "--no-cache", "--show-settings", "--config"])
+            .arg(&config)
+            .arg(&file);
+    };
+    let checker = Checker::find(Tool::Ruff, root);
+    if let Some(installed) = checker.installed.as_ref().filter(|_| checker.is_pinned()) {
+        let mut command = Command::new(&installed.path);
+        ruff_args(&mut command);
+        return run(&mut command, root, folder);
+    }
+    let from = format!("ruff=={}", catalog::RUFF_RELEASE);
+    let uv = |offline: bool| {
+        let mut command = Command::new("uv");
+        if offline {
+            command.arg("--offline");
         }
-        let from = format!("ruff=={}", catalog::RUFF_RELEASE);
-        let uv = |offline: bool| {
-            let mut command = Command::new("uv");
-            if offline {
-                command.arg("--offline");
-            }
-            command.args(["--quiet", "tool", "run", "--from", &from, "ruff"]);
-            ruff_args(&mut command);
-            run(&mut command, root, &folder)
-        };
-        match (uv(true), fetch) {
-            (Verdict::Unverified(_), Fetch::Online) => uv(false),
-            (verdict, _) => verdict,
-        }
-    })();
-    let _ = fs::remove_dir_all(&folder);
-    verdict
+        command.args(["--quiet", "tool", "run", "--from", &from, "ruff"]);
+        ruff_args(&mut command);
+        run(&mut command, root, folder)
+    };
+    match (uv(true), fetch) {
+        (Verdict::Unverified(_), Fetch::Online) => uv(false),
+        (verdict, _) => verdict,
+    }
+}
+
+/// The `[tool.ruff]` table of the `pyproject.toml` text `text` as the text of a `ruff.toml`,
+/// whose keys are those of `[tool.ruff]` at its top. Empty when the table is missing.
+fn ruff_table(text: &str) -> String {
+    let Ok(doc) = text.parse::<toml_edit::DocumentMut>() else {
+        return String::new();
+    };
+    let table = match doc.get("tool").and_then(|tool| tool.get("ruff")) {
+        Some(Item::Table(table)) => table.clone(),
+        Some(Item::Value(toml_edit::Value::InlineTable(table))) => table.clone().into_table(),
+        _ => return String::new(),
+    };
+    let mut ruff = toml_edit::DocumentMut::new();
+    for (key, item) in &table {
+        ruff.insert(key, item.clone());
+    }
+    ruff.to_string()
 }
 
 /// Runs a command of the pinned Ruff in `root` on a copy of the settings in `folder`.
