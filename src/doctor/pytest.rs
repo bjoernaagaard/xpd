@@ -68,6 +68,29 @@ pub(crate) fn locked(root: &Path) -> Option<crate::version::Version> {
         .ok()
 }
 
+/// Each version of the distribution `name` that the `uv.lock` at `root` locks. Empty when the
+/// lock or the distribution is missing.
+pub(crate) fn locked_versions(root: &Path, name: &str) -> Vec<String> {
+    let Some(doc) = toml::read(&root.join("uv.lock")).ok().flatten() else {
+        return Vec::new();
+    };
+    toml::get(&doc, &["package"])
+        .and_then(toml_edit::Item::as_array_of_tables)
+        .into_iter()
+        .flatten()
+        .filter(|package| package.get("name").and_then(toml_edit::Item::as_str) == Some(name))
+        .filter_map(|package| package.get("version")?.as_str().map(str::to_owned))
+        .collect()
+}
+
+/// Whether the requirement `text` pins exactly `version`, on every platform: one `==` clause
+/// and no marker.
+pub(crate) fn pins_exactly(text: &str, version: &str) -> bool {
+    let clauses: Vec<&str> = clauses(text).collect();
+    !text.contains(';')
+        && matches!(clauses.as_slice(), [clause] if clause.strip_prefix("==").is_some_and(|pinned| pinned.trim() == version))
+}
+
 /// The version clauses of the requirement `text`, such as `>=8` and `<9` in `pytest>=8,<9`,
 /// without its name, extras and markers.
 fn clauses(text: &str) -> impl Iterator<Item = &str> {
@@ -524,6 +547,28 @@ impl Project {
         placement
     }
 
+    /// The groups that uv installs together with the list at `path`: the list itself and, for a
+    /// dependency group, each group it includes, at any depth.
+    pub(crate) fn installed_with<'a>(lists: &[&'a Group<'a>], path: &[&str]) -> Vec<&'a Group<'a>> {
+        let mut found: Vec<&Group<'_>> = Vec::new();
+        let mut pending: Vec<Vec<&str>> = vec![path.to_vec()];
+        while let Some(path) = pending.pop() {
+            let Some(group) = lists.iter().copied().find(|group| group.path == path) else {
+                continue;
+            };
+            if found.iter().any(|seen| seen.path == group.path) {
+                continue;
+            }
+            found.push(group);
+            if group.path.first() == Some(&"dependency-groups") {
+                for name in group.includes() {
+                    pending.push(vec!["dependency-groups", name]);
+                }
+            }
+        }
+        found
+    }
+
     pub(crate) fn plugin_group<'a>(groups: &'a [Group<'a>]) -> &'a [&'a str] {
         groups
             .iter()
@@ -549,6 +594,14 @@ impl Project {
 impl Group<'_> {
     pub(crate) fn has(&self, name: &str) -> bool {
         self.entries(name).next().is_some()
+    }
+
+    /// The dependency groups that this group includes with `{ include-group = "<name>" }`.
+    pub(crate) fn includes(&self) -> Vec<&str> {
+        self.array
+            .iter()
+            .filter_map(|value| value.as_inline_table()?.get("include-group")?.as_str())
+            .collect()
     }
 
     pub(crate) fn entries<'a>(

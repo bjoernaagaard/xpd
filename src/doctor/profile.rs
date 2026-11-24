@@ -21,6 +21,12 @@
 //! same shape. A kind also states which of `[project]`, `[build-system]` and scripts with inline
 //! metadata it needs, and which files the profile owns for it. An owned file is a native template
 //! in `src/doctor/profiles/`, listed in [`TEMPLATES`], that the project keeps as an exact copy.
+//!
+//! `[dev]` `pins` names the tools a project runs with `uv run`. Each goes into
+//! `[dependency-groups] dev` as an exact pin at its release in `[pins]`, and `uv.lock` locks that
+//! release. `[pytest.plugin-names]` holds the names under which `-p` loads each plugin, by its
+//! `pytest11` entry point or its module: `-p no:<name>` turns off a plugin of the profile, and
+//! `-p <name>` loads a plugin that the profile removes.
 
 use std::collections::BTreeSet;
 
@@ -212,8 +218,28 @@ pub(crate) struct PytestForbid {
     pub(crate) false_settings: Vec<String>,
     /// Distributions in a dependency list.
     pub(crate) plugins: Vec<String>,
-    /// The names under which each plugin of the profile loads, which `-p no:<name>` turns off.
+    /// The names under which each plugin loads with `-p`: `-p no:<name>` turns off a plugin of
+    /// the profile, and `-p <name>` loads a plugin that the profile removes.
     pub(crate) plugin_names: Vec<(String, Vec<String>)>,
+}
+
+impl PytestForbid {
+    /// The plugin that the profile removes which `-p <load>` loads, by one of its names or by a
+    /// module inside one of them.
+    pub(crate) fn loaded_by(&self, load: &str) -> Option<&str> {
+        self.plugin_names
+            .iter()
+            .filter(|(plugin, _)| self.plugins.contains(plugin))
+            .find(|(_, names)| {
+                names.iter().any(|name| {
+                    load == name
+                        || load
+                            .strip_prefix(name.as_str())
+                            .is_some_and(|rest| rest.starts_with('.'))
+                })
+            })
+            .map(|(plugin, _)| plugin.as_str())
+    }
 }
 
 impl PytestForbid {
@@ -234,6 +260,9 @@ impl PytestForbid {
 #[derive(Debug)]
 pub(crate) struct Profile {
     pub(crate) revision: i64,
+    /// The tools pinned exactly in `[dependency-groups] dev`, each with its release from
+    /// `[pins]`, which `uv.lock` must lock.
+    pub(crate) dev_pins: Vec<(String, String)>,
     pub(crate) kinds: Vec<KindSpec>,
     /// The values for every kind.
     pub(crate) base: Values,
@@ -272,6 +301,7 @@ impl Profile {
                 tool.pinned()
             );
         }
+        let dev_pins = dev_pins(top, pins)?;
         let kinds = table(top, "kinds")?
             .iter()
             .map(|(name, item)| {
@@ -343,6 +373,7 @@ impl Profile {
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             revision: integer(top, "revision")?,
+            dev_pins,
             kinds,
             base: Values::read(top)?,
             forbid: PytestForbid {
@@ -412,8 +443,17 @@ impl Profile {
         }
         for (plugin, _) in &self.forbid.plugin_names {
             ensure!(
-                all.plugins.contains(plugin),
-                "pytest.plugin-names names {plugin}, which no kind adds"
+                all.plugins.contains(plugin) || self.forbid.plugins.contains(plugin),
+                "pytest.plugin-names names {plugin}, which no kind adds and the profile does not remove"
+            );
+        }
+        for plugin in &self.forbid.plugins {
+            ensure!(
+                self.forbid
+                    .plugin_names
+                    .iter()
+                    .any(|(name, _)| name == plugin),
+                "pytest.plugin-names lacks {plugin}, so doctor cannot find a -p that loads it"
             );
         }
         Ok(())
@@ -481,6 +521,19 @@ impl Profile {
             .filter(|file| kind.files.contains(&file.name))
             .collect()
     }
+}
+
+/// The tools of `[dev]` `pins`, each with its release from `pins`, the `[pins]` table.
+fn dev_pins(top: &dyn TableLike, pins: &dyn TableLike) -> Result<Vec<(String, String)>> {
+    strings(table(top, "dev")?, "pins")
+        .context("dev")?
+        .into_iter()
+        .map(|name| {
+            let version = string(pins, &name)
+                .with_context(|| format!("dev.pins names {name}, which [pins] lacks"))?;
+            Ok((name, version))
+        })
+        .collect()
 }
 
 fn wanted(table: &dyn TableLike) -> Result<PytestWanted> {

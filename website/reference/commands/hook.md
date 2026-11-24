@@ -113,16 +113,19 @@ style are warnings, so they hold the turn too.
 The agent ends the turn in one of two ways. It fixes the code, or it writes
 `# ast-grep-ignore: pandas/row-loop` on the line above with the reason after the rule name.
 
-In a project that records the profile, xpd compares the project with the profile again, reading
-files only. Each difference is named by its file, setting and value, without a line number, so an
+In a project that records the profile, xpd compares the project with the profile again. It reads
+files and runs `uv lock --check --offline` for each lock file, which reads uv's cache and never the
+network. Each difference is named by its file, setting and value, without a line number, so an
 edit elsewhere in `pyproject.toml` does not make an old difference look new. A difference that was not there when the session began holds the turn, with one line
 for each, such as `pyproject.toml tool.ruff.lint.extend-select: ruff PTH118 os-path-join is off,
-and the profile wants on`. So does a `[tool.xpd.profile]` table that the session removed. The
-agent undoes the change, or records an exception with its reason, as the doctor page describes.
-A difference that was there when the session began, or that xpd could not compare, reaches you as
-a notice and does not hold the turn. xpd records the profile revision with the opening list, and
-when an upgrade of xpd changes the revision during the session, every difference is a notice. The Stop check never writes the plan, installs a tool or runs
-`uv lock`.
+and the profile wants on`, or `uv.lock: the lock is out of date. xpd doctor --apply runs uv
+lock.` after the session added a dependency without locking it. So does a `[tool.xpd.profile]`
+table that the session removed. The agent undoes the change, runs `xpd doctor --apply`, or
+records an exception with its reason, as the doctor page describes. A difference that was there
+when the session began, or that xpd could not compare, reaches you as a notice and does not hold
+the turn. So does a lock file that uv could not check, such as when uv is missing. xpd records the profile revision with the opening list, and
+when an upgrade of xpd changes the revision during the session, every difference is a notice. The Stop check never writes the plan, installs a tool or refreshes a
+lock.
 
 xpd holds a turn once for the same list of issues. When the client sends `stop_hook_active` as
 true and the errors and warnings are the ones that xpd held the turn on last time, xpd lets the

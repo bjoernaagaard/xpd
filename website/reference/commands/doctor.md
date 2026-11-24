@@ -1,6 +1,8 @@
 Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty and pytest that ships with xpd. Doctor prints a unified diff of `pyproject.toml` with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
-The plan reads files only. It compares the effect of the project's own settings, so a selector such as `ALL` or `PERF` that turns a rule on needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each rule and level itself. Doctor runs the installed Ruff and ty only for the conditional advice, and uv only to check and write lock files.
+The plan reads files. It compares the effect of the project's own settings, so a selector such as `ALL` or `PERF` that turns a rule on needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings when the project's environment or `PATH` has that release, and the installed Ruff and ty for the conditional advice.
+
+Doctor replaces the user and password in every URL it prints with `****`, such as those of an index URL in `[[tool.uv.index]]`, in the diff, the JSON, the Stop hook and its error messages.
 
 ## What the profile sets
 
@@ -16,7 +18,7 @@ The profile sets seven Ruff rules. A code that no selector of the project turns 
 | `RUF017` | Lists combined with repeated addition | Flatten the inputs in one pass to avoid copying earlier items repeatedly. |
 | `RUF100` | A `noqa` that no longer suppresses a finding | Remove the unused suppression. |
 
-The profile sets three ty rules under `[tool.ty.rules]`. A higher level than the profile's needs no edit. When an `[[tool.ty.overrides]]` table gives a rule a lower level, by its name or through `all`, doctor sets the rule to the profile's level in that table. ty applies a rule's own entry before `all`.
+The profile sets three ty rules under `[tool.ty.rules]`. A higher level than the profile's needs no edit. When an override table gives a rule a lower level, by its name or through `all`, doctor sets the rule to the profile's level in that table. This holds for `[[tool.ty.overrides]]` tables and for an inline `overrides = [{ include = [...], rules = { ... } }]` array alike. ty applies a rule's own entry before `all`.
 
 | Rule | Level | Why enable it |
 | --- | --- | --- |
@@ -34,7 +36,7 @@ The profile sets three pytest settings in the pytest table of `pyproject.toml`: 
 
 `strict` needs pytest 9.0. For pytest 8, the profile sets `pytest -ra`, `pytest --import-mode=importlib`, `pytest --strict-markers` and `pytest --strict-config` in `addopts` and `xfail_strict = true` in `[tool.pytest.ini_options]` instead. Doctor takes the pytest release that a fresh checkout gets: the one `uv.lock` locks when it meets every declared requirement, else pytest 8 when a declared requirement such as `pytest==8.4.2` admits no pytest 9, else pytest 9 when a list declares pytest, else the release in the project's virtual environment.
 
-A project that declares pytest gets two plugins in the dependency list that holds pytest, whether that is a dependency group, an extra or `[project]` `dependencies`, and `dev` in `[dependency-groups]` when only the virtual environment has pytest.
+A project that declares pytest gets two plugins in the dependency list that holds pytest, whether that is a dependency group, an extra or `[project]` `dependencies`, and `dev` in `[dependency-groups]` when only the virtual environment has pytest. A plugin in another list does not count, because uv does not install it with pytest, unless the list that holds pytest includes that group with `{ include-group = "<name>" }`.
 
 | Plugin | Reason |
 | --- | --- |
@@ -49,8 +51,18 @@ The profile removes these from every project, and no exception keeps them.
 | --- | --- |
 | `pytest-rerunfailures`, `flaky` | A rerun hides the run where the code was wrong. |
 | `pytest-mock` | A test with a mock checks the mock and not the code. |
+| A `-p` in `addopts` that loads one of these plugins, such as `-p pytest_mock`, `-pflaky` or `-p rerunfailures` | It runs the plugin without a dependency on it. |
 | `pytest --reruns` and `pytest --reruns-delay` in `addopts`, `reruns` and `reruns_delay` in the table | The same as a rerun plugin. |
 | `strict_config`, `strict_markers`, `strict_parametrization_ids`, `strict_xfail` or `xfail_strict` set to `false` | Each turns off part of `strict`, such as the failure on an unknown marker or on an `xfail` test that passes. |
+
+The profile pins the tools that check the project, at the releases its rules and levels were reviewed for, as exact requirements in `[dependency-groups]` `dev`. Doctor replaces a looser requirement there, such as `"ruff"`, with the pin.
+
+| Tool | Requirement in `dev` |
+| --- | --- |
+| Ruff | `ruff==0.17.4` |
+| ty | `ty==0.0.106` |
+
+`uv.lock` must lock these releases. A lock that holds another release of Ruff or ty, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for Ruff or ty in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the tools with `uv run ruff` and `uv run ty`.
 
 Each value has a reviewed record with its reason and source. [Read the profile](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/profile.toml) and [the records that explain it](https://github.com/bjoernaagaard/xpd/blob/main/src/doctor/decisions.jsonl).
 
@@ -85,15 +97,17 @@ pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -6,9 +6,22 @@
+@@ -6,9 +6,24 @@
  [dependency-groups]
  dev = [
      "pytest>=9.2.0",
 -    "pytest-rerunfailures",
      "pytest-timeout",
 +    "pytest-randomly",
++    "ruff==0.17.4",
++    "ty==0.0.106",
  ]
- 
+
  [tool.pytest.ini_options]
 -addopts = "--reruns 2 --strict-markers"
 +addopts = "--strict-markers -ra --import-mode=importlib"
@@ -147,6 +161,10 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 - an `extend` key in `[tool.ruff]`
 - a `ty.toml` at the root or below it, or a `pyproject.toml` below the root with a `[tool.ty]` table
 - `pytest.toml`, `.pytest.toml`, `pytest.ini`, `.pytest.ini`, a `[pytest]` section in `tox.ini`, or a `[tool:pytest]` section in `setup.cfg`, at the root or below it, or a `pyproject.toml` below the root with a pytest table
+- a key that the pinned Ruff or ty does not know, such as `bogus` in `[tool.ruff.lint]`, because the tool stops with an error on it
+- a Ruff rule selector that Ruff 0.17.4 does not know, such as `NOT_A_RULE` in `lint.select`, or a removed rule such as `ANN101` in an array that selects it
+- a value that the pinned Ruff rejects, such as `line-length = "wide"`, when the project's environment or `PATH` has Ruff 0.17.4
+- a requirement for Ruff or ty in a dependency list other than `dev` that the profile's pin does not meet
 - a per-file ignore that turns a rule of the profile off through a group selector, such as `PERF`
 - an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly`, or `--disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
 - a layout that the kind does not allow
@@ -186,15 +204,15 @@ Each xpd release holds one revision of the profile. When a newer xpd brings a ne
 
 ## What `--apply` does
 
-Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, and records the revision and kind last. Apply keeps the comments of the items it keeps, leaves a value that already complies as it is written, and keeps the permissions of each file it replaces. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
+Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. A setting that the pinned Ruff or ty rejects is such a conflict, so apply checks the settings it would write before it writes them. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, and records the revision and kind last. Apply keeps the comments of the items it keeps, leaves a value that already complies as it is written, and keeps the permissions of each file it replaces. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
 
 Apply keeps the prior content of each file it touches in the folder `.xpd-apply` at the project root while it runs. When a lock refresh or the final check fails, apply puts every file back and exits 2. When an apply stops before it ends, the next one restores the files from that folder first.
 
-`--check` runs `uv lock --check` for each lock that exists, so it needs uv. Plain `xpd doctor` runs no uv.
+`--check` runs `uv lock --check` for each lock that exists, so it needs uv. Plain `xpd doctor` runs no uv. `--check`, `--apply` and plain `xpd doctor` run the pinned Ruff on the settings when the project's environment or `PATH` has Ruff 0.17.4, and without it they rely on the catalog of Ruff's settings and rules.
 
 ## Stop hook
 
-In a project whose `pyproject.toml` has a `[tool.xpd.profile]` table, [`xpd hook`](../hook/) compares the project with its profile when an agent session begins and when a turn ends. It holds the turn for a difference that the session made, and it notes the differences that were there before. See the hook page.
+In a project whose `pyproject.toml` has a `[tool.xpd.profile]` table, [`xpd hook`](../hook/) compares the project with its profile when an agent session begins and when a turn ends. The comparison includes each lock file, which the hook checks with `uv lock --check --offline` from uv's cache. It holds the turn for a difference that the session made, such as a new dependency without `uv lock`, and it notes the differences that were there before and each lock it could not check. See the hook page.
 
 ## Conditional advice
 
@@ -228,7 +246,7 @@ For a machine-readable report, run:
 xpd doctor --format json | jq '.profile.changes[] | {tool, id, path, old, new}'
 ```
 
-`profile` holds the plan: `revision`, `applied`, `kind`, `changes`, `conflicts` (each with `ambiguous`, which makes `--check` exit 2), `exceptions`, `locks` and the `diff`. Read `tools` for version information, `suggestions` for conditional advice, `policies` for deliberate choices Doctor keeps, and `notes` for limits it encountered. `xpd doctor --check --format json` prints the plan alone, and `xpd doctor --apply --format json` prints what it wrote.
+`profile` holds the plan: `revision`, `applied`, `kind`, `changes`, `conflicts` (each with `ambiguous`, which makes `--check` exit 2), `exceptions`, `locks` (each with its `state` and the `reason` it is out of date, when doctor can tell) and the `diff`. Read `tools` for version information, `suggestions` for conditional advice, `policies` for deliberate choices Doctor keeps, and `notes` for limits it encountered. `xpd doctor --check --format json` prints the plan alone, and `xpd doctor --apply --format json` prints what it wrote.
 
 ## Exit status
 

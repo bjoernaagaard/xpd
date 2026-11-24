@@ -7,6 +7,9 @@ ruff = "0.17.4"
 ty = "0.0.106"
 pytest = "9.2.0"
 
+[dev]
+pins = ["ruff", "ty"]
+
 [kinds.library]
 summary = "A package that others install. It keeps its build backend, and uv.lock locks its development environment."
 lock = "project"
@@ -71,3 +74,6 @@ plugins = ["pytest-rerunfailures", "flaky", "pytest-mock"]
 [pytest.plugin-names]
 pytest-timeout = ["timeout", "pytest_timeout"]
 pytest-randomly = ["randomly", "pytest_randomly"]
+pytest-rerunfailures = ["rerunfailures", "pytest_rerunfailures"]
+flaky = ["flaky"]
+pytest-mock = ["pytest_mock"]

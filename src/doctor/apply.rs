@@ -100,6 +100,7 @@ pub(crate) fn run(
 ) -> Result<Applied> {
     let recovered = Journal::recover(root)?;
     let mut full = plan::compute(root, catalog, profile, files, Request { kind, stamp: true })?;
+    full.check_tools(root);
     if full.kind_from == Some("suggestion") {
         bail!(
             "{PYPROJECT} records no kind. Name it: xpd doctor --apply --kind {}, which doctor suggests because {}",

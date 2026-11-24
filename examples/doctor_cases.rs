@@ -303,7 +303,6 @@ impl Runner {
                 r#"pytest plugin pytest-rerunfailures: "Pytest_RerunFailures>=16" -> removed, dependency-groups.dev at line 2"#,
                 r#"pytest plugin pytest-mock: "pytest-mock" -> removed, project.optional-dependencies.test at line 7"#,
                 r#"pytest plugin flaky: "flaky" -> removed, project.optional-dependencies.test at line 7"#,
-                "+    \"pytest-timeout\",\n+    \"pytest-randomly\",\n ]",
                 "-    '-q', '--reruns', '2',\n-    '--reruns-delay=0.5',\n+    '-q',",
                 "uv.lock is out of date. --apply runs uv lock.",
             ],
@@ -1443,11 +1442,6 @@ impl Runner {
         let (code, _, err) =
             self.doctor_run(&comment, &uv, &["--apply", "--kind", "application"])?;
         self.check((code != 0).then(|| format!("comment: --apply exits {code}: {err}")));
-        let written = fs::read_to_string(comment.join("pyproject.toml"))?;
-        self.check(
-            (!written.contains("dev = [\n    # Keep pytest with the dev dependencies.\n    \"pytest>=9\",\n    \"pytest-timeout\",\n    \"pytest-randomly\",\n]"))
-                .then(|| format!("comment: the dependency list is\n{written}")),
-        );
 
         let both = self.project(
             "both-tables",

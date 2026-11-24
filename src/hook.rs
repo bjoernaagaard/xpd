@@ -246,7 +246,7 @@ pub(crate) fn run() -> ExitCode {
         HookEvent::Stop { session, cwd, turn } => stop(&session, &cwd, turn),
     });
     answered.unwrap_or_else(|e| {
-        eprintln!("xpd hook: {e:#}");
+        eprintln!("xpd hook: {}", crate::output::redact(&format!("{e:#}")));
         ExitCode::from(FAILED)
     })
 }
@@ -701,9 +701,9 @@ fn stop(session: &str, cwd: &Path, turn: Turn) -> Result<ExitCode> {
         if !profile.added.is_empty() {
             text.push(
                 "xpd holds this turn, because this session moved the project away from the \
-                 profile that its [tool.xpd.profile] table records. Undo each change below, or \
-                 record an exception with its reason in [tool.xpd.profile], and run \
-                 `xpd doctor --check` to confirm."
+                 profile that its [tool.xpd.profile] table records. Undo each change below, \
+                 run `xpd doctor --apply`, or record an exception with its reason in \
+                 [tool.xpd.profile], and run `xpd doctor --check` to confirm."
                     .to_owned(),
             );
             text.extend(profile.added);
@@ -1021,8 +1021,13 @@ enum Record {
 #[serde(rename_all = "snake_case")]
 enum Baseline {
     /// One line for each difference, as `xpd doctor --check` names it, from the profile of
-    /// `revision`.
-    Drift { revision: i64, lines: Vec<String> },
+    /// `revision`, and one line for each lock file that uv could not check offline.
+    Drift {
+        revision: i64,
+        lines: Vec<String>,
+        #[serde(default)]
+        unverified: Vec<String>,
+    },
     /// Why xpd could not compare the project with the profile.
     Unreadable(String),
 }
@@ -1037,6 +1042,7 @@ fn profile_drift(root: &Path) -> Option<Baseline> {
         Ok(drift) => Baseline::Drift {
             revision: drift.revision,
             lines: drift.lines,
+            unverified: drift.unverified,
         },
         Err(error) => Baseline::Unreadable(format!("{error:#}")),
     })
@@ -1067,9 +1073,24 @@ fn profile_turn(root: &Path, records: &[Record]) -> ProfileTurn {
     compare_drift(opening, profile_drift(root))
 }
 
-/// The drift that is new since `opening`. Without an opening baseline that xpd could read, the
-/// drift now is a notice, because xpd cannot tell whether the session made it.
+/// The drift that is new since `opening`, and a notice for each lock file that uv cannot check
+/// now. Without an opening baseline that xpd could read, the drift now is a notice, because xpd
+/// cannot tell whether the session made it.
 fn compare_drift(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTurn {
+    let unverified = match &now {
+        Some(Baseline::Drift { unverified, .. }) => unverified.clone(),
+        _ => Vec::new(),
+    };
+    let mut turn = compare_lines(opening, now);
+    turn.notices.extend(unverified.into_iter().map(|line| {
+        format!("xpd cannot tell whether this session left a lock file out of date: {line}")
+    }));
+    turn
+}
+
+/// The difference lines that are new since `opening`. A line about a lock file that uv could not
+/// check when the session opened is a notice, because xpd cannot tell whether the session made it.
+fn compare_lines(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTurn {
     let notice = |lines: Vec<String>| {
         if lines.is_empty() {
             return Vec::new();
@@ -1105,6 +1126,7 @@ fn compare_drift(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTu
             Some(Baseline::Drift {
                 revision: current,
                 lines: now,
+                ..
             }),
         ) if *opened != current => {
             let mut notices = vec![format!(
@@ -1116,9 +1138,19 @@ fn compare_drift(opening: Option<&Baseline>, now: Option<Baseline>) -> ProfileTu
                 notices,
             }
         }
-        (Some(Baseline::Drift { lines: before, .. }), Some(Baseline::Drift { lines: now, .. })) => {
-            let (kept, added): (Vec<String>, Vec<String>) =
-                now.into_iter().partition(|line| before.contains(line));
+        (
+            Some(Baseline::Drift {
+                lines: before,
+                unverified: unchecked,
+                ..
+            }),
+            Some(Baseline::Drift { lines: now, .. }),
+        ) => {
+            let file = |line: &str| line.split_once(": ").map(|(file, _)| file.to_owned());
+            let unchecked: Vec<String> = unchecked.iter().filter_map(|line| file(line)).collect();
+            let (kept, added): (Vec<String>, Vec<String>) = now.into_iter().partition(|line| {
+                before.contains(line) || file(line).is_some_and(|file| unchecked.contains(&file))
+            });
             ProfileTurn {
                 added,
                 notices: notice(kept),

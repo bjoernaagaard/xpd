@@ -5,7 +5,8 @@
 //! Doctor keeps the whole setup in one place per tool, the tool's table of `pyproject.toml`
 //! at the project root. A file that a tool reads before that table, a nested Ruff
 //! configuration and an `extend` of another file are conflicts. Every value is compared by its
-//! effect, from the pinned releases' rules and defaults, without running a tool.
+//! effect, from the pinned releases' rules and defaults, without running a tool, and so is
+//! whether the pinned Ruff and ty accept each setting.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -25,6 +26,7 @@ use super::profile::{self, Exception, LockStyle, Presence, Profile, Values};
 use super::pytest::{self, Release};
 use super::ruff;
 use super::ty;
+use super::validate;
 use crate::toml::{self, Toml};
 
 /// The file that holds the profile's settings.
@@ -44,6 +46,16 @@ enum Lists {
     Changed,
     Unchanged,
 }
+
+impl Lists {
+    /// Changed when either is.
+    fn or(self, other: Self) -> Self {
+        if self == Self::Changed { self } else { other }
+    }
+}
+
+/// The dependency group that holds the exact pins of the profile's tools.
+const DEV: [&str; 2] = ["dependency-groups", "dev"];
 
 /// What the caller asks of the plan.
 #[derive(Debug, Clone, Copy)]
@@ -126,6 +138,8 @@ pub(crate) struct Lock {
     pub(crate) state: &'static str,
     /// The command that `--apply` runs to write it, from the project root.
     pub(crate) command: Vec<String>,
+    /// Why the lock is out of date, when doctor can tell.
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -157,6 +171,9 @@ pub(crate) struct Plan {
     /// The owned files that differ from their templates.
     #[serde(skip)]
     pub(crate) owned: Vec<OwnedFile>,
+    /// Whether the catalog already found a setting that the pinned Ruff or ty rejects.
+    #[serde(skip)]
+    rejected: bool,
 }
 
 /// The plan for the project at `root`, whose Python files are `files`.
@@ -233,6 +250,7 @@ pub(crate) fn compute(
         before: before.clone(),
         after: String::new(),
         owned: Vec::new(),
+        rejected: false,
     };
     let mut facts = pytest_facts(root, original.as_ref());
     if let Some(kind) = plan.kind.as_deref().and_then(|kind| profile.kind(kind))
@@ -243,6 +261,7 @@ pub(crate) fn compute(
     let values = profile.values(plan.kind.as_deref());
     plan.locations(root, original.as_ref(), profile);
     plan.layout(original.as_ref(), profile, files);
+    plan.reject(original.as_ref(), catalog);
     let accepted = plan.judge(&values, &profile.forbid, facts, &record.exceptions);
     let mut edits = Edits {
         doc: &mut doc,
@@ -253,7 +272,8 @@ pub(crate) fn compute(
     };
     edits.ruff(&values, &accepted);
     edits.ty(&values, &accepted);
-    let dependencies = edits.pytest(&values, &profile.forbid, facts, &accepted);
+    let plugins = edits.pytest(&values, &profile.forbid, facts, &accepted);
+    let dependencies = plugins.or(edits.pins(&profile.dev_pins, facts));
     if request.stamp {
         edits.stamp(profile, &record);
     }
@@ -261,6 +281,7 @@ pub(crate) fn compute(
     plan.after = doc.to_string();
     plan.owned_files(root, profile)?;
     plan.locks(root, profile, files, dependencies);
+    plan.locked_pins(root, profile);
     let mut text = diff(PYPROJECT, before.as_deref(), &plan.after);
     for owned in &plan.owned {
         let name = owned.path.display().to_string();
@@ -351,7 +372,22 @@ impl Plan {
             .locks
             .iter()
             .filter(|lock| lock.state != "present")
-            .map(|lock| format!("{}: {}", lock.file.display(), lock.state));
+            .map(|lock| {
+                let state = if lock.state == "missing" {
+                    "missing"
+                } else {
+                    "out of date"
+                };
+                let reason = lock
+                    .reason
+                    .as_deref()
+                    .map_or_else(String::new, |reason| format!(", because {reason}"));
+                format!(
+                    "{}: the lock is {state}{reason}. xpd doctor --apply runs {}.",
+                    lock.file.display(),
+                    lock.command.join(" ")
+                )
+            });
         changes
             .chain(conflicts)
             .chain(exceptions)
@@ -405,6 +441,17 @@ impl Plan {
             message,
             ambiguous: true,
         });
+    }
+
+    /// A conflict for each setting of `doc` that the pinned Ruff or ty rejects.
+    fn reject(&mut self, doc: Option<&Toml>, catalog: &Catalog) {
+        for problem in doc
+            .map(|doc| validate::problems(doc, catalog))
+            .unwrap_or_default()
+        {
+            self.rejected = true;
+            self.conflict(PYPROJECT, problem.line, problem.message);
+        }
     }
 
     /// The parts of the layout that the kind needs or forbids.
@@ -670,6 +717,7 @@ impl Plan {
                     file,
                     state,
                     command: vec!["uv".to_owned(), "lock".to_owned()],
+                    reason: None,
                 });
             }
             LockStyle::Script => {
@@ -692,43 +740,132 @@ impl Plan {
                             "--script".to_owned(),
                             shown.display().to_string(),
                         ],
+                        reason: None,
                     });
                 }
             }
         }
     }
 
-    /// Marks each present lock that `uv lock --check` finds out of date as one to refresh. The
-    /// rest of the plan reads files only, so this is the one step that runs a tool.
+    /// Marks `uv.lock` as one to refresh when it locks another release of a tool that the
+    /// profile pins in `[dependency-groups] dev`, or none. A plan that changes a dependency list
+    /// refreshes the lock anyway.
+    fn locked_pins(&mut self, root: &Path, profile: &Profile) {
+        let tool_only = self
+            .kind
+            .as_deref()
+            .and_then(|kind| profile.kind(kind))
+            .is_some_and(|kind| kind.tool_only);
+        if tool_only {
+            return;
+        }
+        let Some(lock) = self
+            .locks
+            .iter_mut()
+            .find(|lock| lock.state == "present" && lock.file == Path::new("uv.lock"))
+        else {
+            return;
+        };
+        let mut reasons = Vec::new();
+        for (name, version) in &profile.dev_pins {
+            let locked = pytest::locked_versions(root, name);
+            if locked.is_empty() {
+                reasons.push(format!(
+                    "it locks no {name}, and the profile pins {name} {version}"
+                ));
+            } else if locked.iter().any(|locked| locked != version) {
+                reasons.push(format!(
+                    "it locks {name} {}, and the profile pins {name} {version}",
+                    locked.join(" and ")
+                ));
+            }
+        }
+        if !reasons.is_empty() {
+            lock.state = "refresh";
+            lock.reason = Some(reasons.join("; "));
+        }
+    }
+
+    /// Runs the pinned Ruff, when the project's environment or `PATH` has it, on the settings
+    /// that the plan leaves in `pyproject.toml`, and records a conflict when it rejects them. A
+    /// setting that the catalog already rejects needs no run.
+    pub(crate) fn check_tools(&mut self, root: &Path) {
+        if self.rejected {
+            return;
+        }
+        if let Some(cause) = validate::ruff_rejects(root, &self.after) {
+            self.rejected = true;
+            self.conflict(
+                PYPROJECT,
+                None,
+                format!(
+                    "Ruff {} rejects the settings that the plan leaves in {PYPROJECT}: {cause}",
+                    super::catalog::RUFF_RELEASE
+                ),
+            );
+        }
+    }
+
+    /// Marks each present lock that `uv lock --check` finds out of date as one to refresh. Apart
+    /// from this step and [`Plan::check_tools`], the plan reads files only.
     ///
     /// # Errors
     ///
     /// Returns an error if uv cannot run or cannot tell whether a lock is up to date.
     pub(crate) fn check_locks(&mut self, root: &Path) -> Result<()> {
+        match self.run_lock_checks(root, &[]).into_iter().next() {
+            Some(problem) => bail!("{problem}"),
+            None => Ok(()),
+        }
+    }
+
+    /// Marks each present lock that `uv lock --check --offline` finds out of date as one to
+    /// refresh, from uv's cache and without the network, so that the Stop hook can run it on
+    /// every turn. Returns one line, which starts with the lock file, for each lock that uv
+    /// could not check.
+    pub(crate) fn check_locks_offline(&mut self, root: &Path) -> Vec<String> {
+        self.run_lock_checks(root, &["--offline"])
+    }
+
+    /// Runs the check of each present lock with `extra` arguments, marks each that is out of
+    /// date, and returns one line for each lock that uv could not check.
+    fn run_lock_checks(&mut self, root: &Path, extra: &[&str]) -> Vec<String> {
+        let mut problems = Vec::new();
         for lock in self.locks.iter_mut().filter(|lock| lock.state == "present") {
-            let command = lock.command.join(" ");
-            let (program, args) = lock.command.split_first().context("a lock has a command")?;
+            let mut command = lock.command.clone();
+            command.push("--check".to_owned());
+            command.extend(extra.iter().map(|arg| (*arg).to_owned()));
+            let shown = command.join(" ");
+            let Some((program, args)) = command.split_first() else {
+                continue;
+            };
             let output = Command::new(program)
                 .args(args)
-                .arg("--check")
                 .current_dir(root)
                 .stdin(Stdio::null())
-                .output()
-                .with_context(|| format!("cannot run {command} --check"))?;
-            if output.status.success() {
-                continue;
-            }
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            if !stderr.contains("needs to be updated") {
-                bail!(
-                    "{command} --check could not check {}: {}",
+                .output();
+            let stderr = match output {
+                Ok(output) if output.status.success() => continue,
+                Ok(output) => String::from_utf8_lossy(&output.stderr).into_owned(),
+                Err(error) => {
+                    problems.push(format!(
+                        "{}: cannot run {shown}: {error}",
+                        lock.file.display()
+                    ));
+                    continue;
+                }
+            };
+            if stderr.contains("needs to be updated") {
+                lock.state = "refresh";
+            } else {
+                problems.push(format!(
+                    "{}: {shown} could not check it: {}",
                     lock.file.display(),
                     stderr.trim()
-                );
+                ));
             }
-            lock.state = "refresh";
         }
-        Ok(())
+        problems
     }
 
     pub(crate) fn to_text(&self) -> String {
@@ -800,8 +937,11 @@ impl Plan {
                     ),
                     _ => writeln!(
                         out,
-                        "  {} is out of date. --apply runs {command}.",
-                        lock.file.display()
+                        "  {} is out of date{}. --apply runs {command}.",
+                        lock.file.display(),
+                        lock.reason
+                            .as_deref()
+                            .map_or_else(String::new, |reason| format!(", because {reason}"))
                     ),
                 };
             }
@@ -1118,17 +1258,26 @@ fn nested(root: &Path) -> Vec<(PathBuf, Vec<Tool>)> {
 }
 
 /// The unified diff of the file `name` from `before` to `after`, empty when they are the same.
+/// An empty context line is written empty, as GNU diff --suppress-blank-empty writes it and as
+/// git apply and patch read it, so the diff has no trailing whitespace.
 fn diff(name: &str, before: Option<&str>, after: &str) -> String {
     let old = before.unwrap_or_default();
     if before.is_some() && old == after {
         return String::new();
     }
     let old_name = if before.is_some() { name } else { "/dev/null" };
-    similar::TextDiff::from_lines(old, after)
+    let text = similar::TextDiff::from_lines(old, after)
         .unified_diff()
         .context_radius(3)
         .header(old_name, name)
-        .to_string()
+        .to_string();
+    text.split_inclusive('\n')
+        .map(|line| match line {
+            " \n" => "\n",
+            " " => "",
+            line => line,
+        })
+        .collect()
 }
 
 /// The edits to one `pyproject.toml`, and the plan they are recorded in.
@@ -1508,16 +1657,16 @@ impl Edits<'_> {
     }
 
     /// Raises each level below `target` that ty's override tables give `rule`, by its name or by
-    /// `all`. A rule's own entry wins over `all` in ty, so an override that lowers `all` gets an
-    /// entry for the rule at `target`.
+    /// `all`, in `[[tool.ty.overrides]]` tables and in an inline array of override tables alike.
+    /// A rule's own entry wins over `all` in ty, so an override that lowers `all` gets an entry
+    /// for the rule at `target`.
     fn overrides(&mut self, rule: &str, target: Level) {
         let catalog = self.catalog;
         let mut raised = Vec::new();
-        if let Some(tables) = edit::existing(self.doc, &["tool", "ty"])
-            .and_then(|table| table.get_mut("overrides"))
-            .and_then(Item::as_array_of_tables_mut)
+        if let Some(item) =
+            edit::existing(self.doc, &["tool", "ty"]).and_then(|table| table.get_mut("overrides"))
         {
-            for (index, table) in tables.iter_mut().enumerate() {
+            for (index, table) in edit::tables_mut(item) {
                 let Some(rules) = table.get_mut("rules").and_then(Item::as_table_like_mut) else {
                     continue;
                 };
@@ -1627,14 +1776,19 @@ impl Edits<'_> {
                     .map(String::as_str)
                     .collect();
                 let forbidden: Vec<&str> = forbid.addopts.iter().map(String::as_str).collect();
-                let removed = addopts(self.doc, prefix, &add, &forbidden);
+                let removed = addopts(self.doc, prefix, &add, &forbidden, forbid);
                 let mut path = prefix.to_vec();
                 path.push("addopts");
                 for (flag, text) in removed {
                     let explained = self.explain(Tool::Pytest, &flag);
+                    let item = if forbid.plugins.contains(&flag) {
+                        format!("pytest plugin {flag}")
+                    } else {
+                        format!("pytest {flag}")
+                    };
                     self.change(
                         ("pytest", &flag),
-                        format!("pytest {flag}"),
+                        item,
                         &path,
                         text,
                         "removed".to_owned(),
@@ -1774,7 +1928,9 @@ impl Edits<'_> {
     }
 
     /// Adds the profile's plugins to the list that holds pytest and removes the forbidden ones
-    /// from every list. Returns whether a list changed.
+    /// from every list. A plugin counts only where uv installs it with pytest: in the list that
+    /// holds pytest, or in a group that list includes, since a plugin in an unrelated group
+    /// never runs. Returns whether a list changed.
     fn plugins(
         &mut self,
         values: &Values,
@@ -1793,7 +1949,18 @@ impl Edits<'_> {
         let groups = project.groups();
         let runtime = project.runtime_dependencies();
         let lists: Vec<&pytest::Group<'_>> = groups.iter().chain(runtime.iter()).collect();
-        let has = |name: &str| lists.iter().any(|group| group.has(name));
+        let holder = lists
+            .iter()
+            .find(|group| group.has("pytest"))
+            .map(|group| group.path.as_slice());
+        let target: Vec<String> = holder
+            .unwrap_or_else(|| pytest::Project::plugin_group(&groups))
+            .iter()
+            .map(|part| (*part).to_owned())
+            .collect();
+        let target_path: Vec<&str> = target.iter().map(String::as_str).collect();
+        let beside = pytest::Project::installed_with(&lists, &target_path);
+        let has = |name: &str| beside.iter().any(|group| group.has(name));
         let mut removals: Vec<(Vec<String>, String, String)> = Vec::new();
         for name in &forbid.plugins {
             for group in &lists {
@@ -1815,16 +1982,7 @@ impl Edits<'_> {
         } else {
             Vec::new()
         };
-        let holder = groups
-            .iter()
-            .chain(runtime.iter())
-            .find(|group| group.has("pytest"))
-            .map(|group| group.path.as_slice());
-        let target: Vec<String> = holder
-            .unwrap_or_else(|| pytest::Project::plugin_group(&groups))
-            .iter()
-            .map(|part| (*part).to_owned())
-            .collect();
+        drop(beside);
         drop(lists);
         drop(groups);
         let changed = if removals.is_empty() && additions.is_empty() {
@@ -1870,6 +2028,107 @@ impl Edits<'_> {
                 "absent".to_owned(),
                 format!("{name:?}"),
                 explained,
+            );
+        }
+        changed
+    }
+
+    /// Pins each tool of `pins` exactly in `[dependency-groups] dev`, replacing a looser
+    /// requirement there, and records a conflict for a requirement in another list that the pin
+    /// does not meet, since uv locks one release for every list. A kind whose `pyproject.toml`
+    /// holds tool settings only gets no pin. Returns whether `dev` changed.
+    fn pins(&mut self, pins: &[(String, String)], facts: PytestFacts) -> Lists {
+        if !facts.lists {
+            return Lists::Unchanged;
+        }
+        let mut changed = Lists::Unchanged;
+        for (name, version) in pins {
+            let wanted = format!("{name}=={version}");
+            let current = self.current();
+            let project = pytest::Project {
+                destination: Destination {
+                    file: self.file.to_path_buf(),
+                    prefix: &[],
+                    doc: Some(current),
+                },
+            };
+            let groups = project.groups();
+            let runtime = project.runtime_dependencies();
+            let mut elsewhere = Vec::new();
+            for group in groups.iter().chain(runtime.iter()) {
+                if group.path == DEV {
+                    continue;
+                }
+                for entry in group.entries(name) {
+                    let Some(text) = entry.as_str() else { continue };
+                    let meets = version
+                        .parse::<crate::version::Version>()
+                        .is_ok_and(|pinned| pytest::satisfies(text, &pinned));
+                    if !meets {
+                        elsewhere.push((dotted(&group.path), text.to_owned()));
+                    }
+                }
+            }
+            let in_dev: Vec<String> = groups
+                .iter()
+                .filter(|group| group.path == DEV)
+                .flat_map(|group| group.entries(name))
+                .filter_map(|entry| entry.as_str().map(str::to_owned))
+                .collect();
+            drop(groups);
+            drop(runtime);
+            for (list, text) in elsewhere {
+                self.plan.conflict(
+                    PYPROJECT,
+                    None,
+                    format!("{list} requires {text:?}, and the profile pins {wanted} in dependency-groups.dev, which uv cannot lock together. Remove {name} from {list}, or let it allow {version}."),
+                );
+            }
+            if in_dev
+                .iter()
+                .any(|text| pytest::pins_exactly(text, version))
+            {
+                continue;
+            }
+            let Some(array) = edit::array(self.doc, &DEV[..1], DEV[1]) else {
+                continue;
+            };
+            let indexes: Vec<usize> = edit::strings(array)
+                .into_iter()
+                .filter(|(_, text)| in_dev.contains(text))
+                .map(|(index, _)| index)
+                .collect();
+            match indexes.first() {
+                Some(&first) => {
+                    if let Some(old) = array.get_mut(first) {
+                        let decor = old.decor().clone();
+                        *old = Value::from(wanted.as_str());
+                        *old.decor_mut() = decor;
+                    }
+                    edit::remove_items(array, &indexes[1..]);
+                }
+                None => edit::push(array, &wanted),
+            }
+            changed = Lists::Changed;
+            let old = if in_dev.is_empty() {
+                "absent".to_owned()
+            } else {
+                in_dev
+                    .iter()
+                    .map(|text| format!("{text:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let reason = format!(
+                "The profile's rules and levels were reviewed for {name} {version}, so the project runs that release with uv run, and uv.lock locks it."
+            );
+            self.change(
+                ("xpd", name),
+                format!("pin {name}"),
+                &DEV,
+                old,
+                format!("{wanted:?}"),
+                (reason, DOCS.to_owned()),
             );
         }
         changed
@@ -1942,14 +2201,16 @@ impl Edits<'_> {
     }
 }
 
-/// Removes each flag of `remove`, with its value, from `addopts` of the table at `prefix`, and
-/// adds `add` before a `--`, which ends pytest's options, or else at the end. An `addopts` that
-/// needs neither keeps its text. Returns each removed flag with the text it had.
+/// Removes each flag of `remove`, with its value, and each `-p` that loads a plugin `forbid`
+/// removes, from `addopts` of the table at `prefix`, and adds `add` before a `--`, which ends
+/// pytest's options, or else at the end. An `addopts` that needs neither keeps its text. Returns
+/// each removed flag or plugin with the text it had.
 fn addopts(
     doc: &mut DocumentMut,
     prefix: &[&str],
     add: &[&str],
     remove: &[&str],
+    forbid: &profile::PytestForbid,
 ) -> Vec<(String, String)> {
     let legacy = prefix.last() == Some(&"ini_options");
     let Some(table) = edit::existing(doc, prefix) else {
@@ -1979,7 +2240,7 @@ fn addopts(
             .iter()
             .map(|value| value.as_str().unwrap_or_default().to_owned())
             .collect();
-        let (indexes, removed) = flags(&tokens, remove);
+        let (indexes, removed) = flags(&tokens, remove, forbid);
         edit::remove_items(array, &indexes);
         let at = edit::strings(array)
             .into_iter()
@@ -1996,7 +2257,7 @@ fn addopts(
     let Some(tokens) = shlex::split(text) else {
         return Vec::new();
     };
-    let (indexes, removed) = flags(&tokens, remove);
+    let (indexes, removed) = flags(&tokens, remove, forbid);
     if indexes.is_empty() && add.is_empty() {
         return removed;
     }
@@ -2024,14 +2285,35 @@ fn addopts(
     removed
 }
 
-/// The indexes of the `flags` in `tokens`, each with the value after it, before a `--`, and each
-/// flag with the text it had.
-fn flags(tokens: &[String], flags: &[&str]) -> (Vec<usize>, Vec<(String, String)>) {
+/// The indexes of the `flags` in `tokens`, each with the value after it, and of each `-p` that
+/// loads a plugin that `forbid` removes, before a `--`. Each comes with the flag or plugin it
+/// removes and the text it had.
+fn flags(
+    tokens: &[String],
+    flags: &[&str],
+    forbid: &profile::PytestForbid,
+) -> (Vec<usize>, Vec<(String, String)>) {
     let mut indexes = Vec::new();
     let mut removed = Vec::new();
     let mut index = 0;
     while index < tokens.len() && tokens[index] != "--" {
         let token = &tokens[index];
+        let load = if token == "-p" {
+            tokens
+                .get(index + 1)
+                .and_then(|name| Some((forbid.loaded_by(name)?, 2)))
+        } else {
+            token
+                .strip_prefix("-p")
+                .filter(|_| !token.starts_with("--"))
+                .and_then(|name| Some((forbid.loaded_by(name)?, 1)))
+        };
+        if let Some((plugin, used)) = load {
+            indexes.extend(index..index + used);
+            removed.push((plugin.to_owned(), tokens[index..index + used].join(" ")));
+            index += used;
+            continue;
+        }
         if let Some(flag) = flags.iter().find(|flag| *token == **flag) {
             indexes.push(index);
             let value = tokens.get(index + 1).filter(|next| {
@@ -2074,7 +2356,7 @@ fn command_line<'a>(args: impl Iterator<Item = &'a str>) -> String {
     .join(" ")
 }
 
-fn dotted(path: &[&str]) -> String {
+pub(crate) fn dotted(path: &[&str]) -> String {
     path.iter()
         .map(|part| {
             if part

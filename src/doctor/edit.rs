@@ -36,6 +36,27 @@ pub(crate) fn existing<'a>(
     Some(table)
 }
 
+/// Each table of `item`, an array of tables in either spelling: `[[key]]` headers or an inline
+/// array of inline tables. Each comes with its index in the array.
+pub(crate) fn tables_mut(item: &mut Item) -> Vec<(usize, &mut dyn TableLike)> {
+    match item {
+        Item::ArrayOfTables(tables) => tables
+            .iter_mut()
+            .enumerate()
+            .map(|(index, table)| -> (usize, &mut dyn TableLike) { (index, table) })
+            .collect(),
+        Item::Value(Value::Array(array)) => array
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(index, value)| {
+                let table: &mut dyn TableLike = value.as_inline_table_mut()?;
+                Some((index, table))
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// The array at `key` of the table at `path`, made empty when it is missing.
 pub(crate) fn array<'a>(
     doc: &'a mut DocumentMut,

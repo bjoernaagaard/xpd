@@ -4,7 +4,9 @@
 //! The plan in `doctor/plan.rs` is the difference between the project and the profile. Plain
 //! doctor prints it with the conditional advice of `doctor/decisions.jsonl`, `--check` exits 1
 //! when the project drifts, and `--apply` writes the plan. Missing tools leave the conditional
-//! advice unverified locally. The plan itself runs no tool.
+//! advice unverified locally. Computing the plan runs no tool. `--check` then runs uv on the
+//! lock files, and every mode runs the pinned Ruff on the settings when it is installed. Every
+//! line doctor prints has the credentials of each URL redacted.
 
 mod advice;
 mod apply;
@@ -18,14 +20,16 @@ mod profile;
 mod pytest;
 mod ruff;
 mod ty;
+mod validate;
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
 use serde::Serialize;
 
-use crate::output::Format;
+use crate::output::{Format, redact};
 
 pub use evidence::evidence_rule_ids;
 
@@ -46,8 +50,18 @@ const DRIFT: u8 = 1;
 /// layout to the profile.
 const AMBIGUOUS: u8 = 2;
 
-/// Runs doctor on the project in the working directory.
+/// Runs doctor on the project in the working directory. Every line it prints, and the error it
+/// returns, has the credentials of each URL redacted.
 pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<ExitCode> {
+    let mut out = String::new();
+    let code = report(format, mode, kind, &mut out)
+        .map_err(|error| anyhow!(redact(&format!("{error:#}"))));
+    print!("{}", redact(&out));
+    code
+}
+
+/// Runs doctor, and writes what it prints to `out`.
+fn report(format: Format, mode: Mode, kind: Option<&str>, out: &mut String) -> Result<ExitCode> {
     let root = std::env::current_dir()?;
     let catalog = catalog::Catalog::packaged()?;
     let profile = profile::Profile::packaged(&catalog)?;
@@ -58,17 +72,18 @@ pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<Exit
         Mode::Apply => {
             let applied = apply::run(&root, &catalog, &profile, &files, kind)?;
             match format {
-                Format::Json => println!("{}", serde_json::to_string_pretty(&applied)?),
-                Format::Text => print!("{}", applied.to_text()),
+                Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&applied)?)?,
+                Format::Text => out.push_str(&applied.to_text()),
             }
             Ok(ExitCode::SUCCESS)
         }
         Mode::Check => {
             let mut plan = plan::compute(&root, &catalog, &profile, &files, request)?;
+            plan.check_tools(&root);
             plan.check_locks(&root)?;
             match format {
-                Format::Json => println!("{}", serde_json::to_string_pretty(&plan)?),
-                Format::Text => print!("{}", plan.to_text()),
+                Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&plan)?)?,
+                Format::Text => out.push_str(&plan.to_text()),
             }
             Ok(if plan.ambiguous() {
                 ExitCode::from(AMBIGUOUS)
@@ -79,7 +94,8 @@ pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<Exit
             })
         }
         Mode::Report => {
-            let plan = plan::compute(&root, &catalog, &profile, &files, request)?;
+            let mut plan = plan::compute(&root, &catalog, &profile, &files, request)?;
+            plan.check_tools(&root);
             let report = advise(&root, &files, &catalog)?;
             match format {
                 Format::Json => {
@@ -87,9 +103,9 @@ pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<Exit
                         profile: &plan,
                         report: &report,
                     };
-                    println!("{}", serde_json::to_string_pretty(&output)?);
+                    writeln!(out, "{}", serde_json::to_string_pretty(&output)?)?;
                 }
-                Format::Text => print!("{}\n{}", plan.to_text(), report.to_text()),
+                Format::Text => write!(out, "{}\n{}", plan.to_text(), report.to_text())?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -127,29 +143,35 @@ pub(crate) struct Drift {
     /// One line for each difference, without a line number, so that the same difference gives
     /// the same line after an unrelated edit.
     pub(crate) lines: Vec<String>,
+    /// One line for each lock that uv could not check offline, which starts with the lock file.
+    pub(crate) unverified: Vec<String>,
 }
 
 /// The differences between the project at `root`, whose Python files are `files`, and the
-/// profile. `None` when the project records no profile. It reads files only and runs no tool, so
-/// the Stop hook can call it on every turn.
+/// profile. `None` when the project records no profile. It reads files and runs only
+/// `uv lock --check --offline`, which reads uv's cache and never the network, so the Stop hook
+/// can call it on every turn. Every line has the credentials of each URL redacted.
 pub(crate) fn drift(root: &Path, files: &[PathBuf]) -> Option<Result<Drift>> {
     let doc = match crate::toml::read(&root.join(plan::PYPROJECT)) {
         Ok(Some(doc)) => doc,
         Ok(None) => return None,
-        Err(error) => return Some(Err(anyhow!(error))),
+        Err(error) => return Some(Err(anyhow!(redact(&error)))),
     };
     crate::toml::get(&doc, &profile::TABLE)?;
-    Some((|| {
+    let drift = (|| {
         let catalog = catalog::Catalog::packaged()?;
         let profile = profile::Profile::packaged(&catalog)?;
         let request = plan::Request {
             kind: None,
             stamp: true,
         };
-        let plan = plan::compute(root, &catalog, &profile, files, request)?;
+        let mut plan = plan::compute(root, &catalog, &profile, files, request)?;
+        let unverified = plan.check_locks_offline(root);
         Ok(Drift {
             revision: plan.revision,
-            lines: plan.drift(),
+            lines: plan.drift().iter().map(|line| redact(line)).collect(),
+            unverified: unverified.iter().map(|line| redact(line)).collect(),
         })
-    })())
+    })();
+    Some(drift.map_err(|error: anyhow::Error| anyhow!(redact(&format!("{error:#}")))))
 }

@@ -512,7 +512,7 @@ fn unit_result(result: Result<()>) -> ExitCode {
 /// The exit code of a command that chooses its own, or 2 when it fails.
 fn command_result(result: Result<ExitCode>) -> ExitCode {
     result.unwrap_or_else(|error| {
-        eprintln!("xpd: {error:#}");
+        eprintln!("xpd: {}", crate::output::redact(&format!("{error:#}")));
         ExitCode::from(CHECK_FAILED)
     })
 }
