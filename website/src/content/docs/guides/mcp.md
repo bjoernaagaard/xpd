@@ -146,9 +146,6 @@ variables of your shell.
 `--no-code-mode` or `--no-allow-writes` turns each flag off again. [`xpd mcp`](../../commands/mcp/)
 prints the same list with `xpd mcp -h`.
 
-Code mode is not available on Windows on Arm, because pydantic-monty, which runs it, has no
-wheel for that platform. There `xpd mcp --code-mode` stops with a message that says so.
-
 ## Serve several clients over HTTP
 
 Start the server over HTTP to serve several clients, or a client on another machine.
