@@ -575,6 +575,36 @@ pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
     Ok(entry(class)?.and_then(|class| class.member(member)))
 }
 
+/// A method of a class of the index: the name of the class with its package, and the
+/// parameters of the method as the source writes them.
+pub(crate) type Method = (String, Vec<String>);
+
+/// The methods of the classes of `packages`, by the name of the method.
+pub(crate) fn methods(
+    library: &Library,
+    packages: &BTreeSet<String>,
+) -> Result<HashMap<String, Vec<Method>>> {
+    let mut methods: HashMap<String, Vec<Method>> = HashMap::new();
+    let mut add = |class: Entry| {
+        for member in class.members.into_iter().filter(|member| !member.property) {
+            let method = (class.name.clone(), member.parameters_written);
+            methods.entry(member.name).or_default().push(method);
+        }
+    };
+    if let Some(entries) = &library.local {
+        for class in entries.iter().filter(|e| packages.contains(&e.package)) {
+            add(class.clone());
+        }
+        return Ok(methods);
+    }
+    for record in RECORDS {
+        if record.kind == Kind::Symbol && packages.contains(record.package) {
+            add(record.entry().context("embedded entry")?);
+        }
+    }
+    Ok(methods)
+}
+
 #[derive(Debug)]
 struct Stored {
     name: &'static str,

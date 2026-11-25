@@ -488,6 +488,18 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                 .to_owned(),
         );
     }
+    if optimize_prompt(prompt) {
+        text.push(
+            "Simplify or speed up task: `xpd optimize` reads the files and \
+             lists the work that no rule of `xpd check` reports, because each finding shows only \
+             when two places are read together: near copies, calls that a function computes \
+             twice or a loop repeats, arguments that pass a library default, and matrices that \
+             are built to be reduced, each with its evidence. Read the code of a finding before \
+             you change it. `xpd optimize --since <commit>` shows which findings are fixed. The \
+             `xpd-optimize` skill holds the steps."
+                .to_owned(),
+        );
+    }
     if !chart && !project_files(&cwd, 1).is_empty() {
         if refactor_prompt(prompt) {
             text.push(
@@ -637,6 +649,41 @@ fn untangle_prompt(prompt: &str) -> bool {
         || lowered.contains("dead code")
         || lowered.contains("technical debt")
         || lowered.contains("tech debt")
+}
+
+/// Whether `prompt` asks to make code simpler, shorter or faster, in English or Danish.
+fn optimize_prompt(prompt: &str) -> bool {
+    const WORDS: [&str; 22] = [
+        "optimize",
+        "optimise",
+        "optimizing",
+        "optimising",
+        "optimization",
+        "optimisation",
+        "simplify",
+        "simplifying",
+        "simpler",
+        "shorter",
+        "faster",
+        "speedup",
+        "performance",
+        "optimer",
+        "optimere",
+        "optimering",
+        "forenkl",
+        "forenkle",
+        "forenkling",
+        "simplere",
+        "kortere",
+        "hurtigere",
+    ];
+    let lowered = prompt.to_lowercase();
+    let mut words = lowered
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty());
+    words.any(|word| WORDS.contains(&word))
+        || lowered.contains("speed up")
+        || lowered.contains("less code")
 }
 
 /// Whether `prompt` asks to make, change or review a chart, in any chart library. A strong word,

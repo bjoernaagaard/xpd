@@ -95,6 +95,14 @@ Use `xpd` whenever you write or change Python code.
   add `--since <commit>` to see which findings are fixed and which are new since that
   commit. Copies and files that change together are found in every language, and the rest
   in Python. The `xpd-untangle` skill holds the steps, and a T3 Code workflow that runs them.
+- `xpd optimize <paths…> --format json`: the places where code does work that a shorter or
+  faster program would not do, read from the files without running anything. It lists what
+  no rule of `xpd check` reports, because each finding shows only when two places are read
+  together: near copies, calls that a function computes twice or a loop repeats, arguments
+  that pass a library default, and matrices that are built to be reduced, each with an `id`,
+  its places and evidence. Run it after `xpd check` is clean and after each round, and add
+  `--since <commit>` to see which findings are fixed. Near copies are found in every
+  language, and the rest in Python. The `xpd-optimize` skill holds the steps.
 - `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on its raw
   training rows and compare outputs and scores with the contract. Needs pandas
   and scikit-learn.

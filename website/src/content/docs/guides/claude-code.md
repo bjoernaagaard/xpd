@@ -114,6 +114,7 @@ npx skills add bjoernaagaard/xpd
 | --- | --- |
 | `xpd` | When to run each xpd command. `xpd skill` prints it for the installed version |
 | `xpd-untangle` | The steps of a refactor of a whole codebase, measured by `xpd untangle` |
+| `xpd-optimize` | The steps that make code shorter and faster where no rule reports anything, measured by `xpd optimize` |
 | `python-best-practices` | The rules to follow when it writes or changes Python |
 | `python-review` | How to review a file, package or diff, with a rule cited for each finding |
 
@@ -155,7 +156,7 @@ xpd repository, loaded as a plugin
 ├── .agents/plugins/marketplace.json    lists the plugin for Codex
 ├── hooks/hooks.json                    runs xpd hook on four events, in both clients
 ├── mcp.json                            starts the server of the same version, with uvx xpd@<version> mcp
-└── skills/                             xpd, xpd-animate, xpd-untangle, python-best-practices and python-review
+└── skills/                             xpd, xpd-animate, xpd-untangle, xpd-optimize, python-best-practices and python-review
 ```
 
 Codex 0.170.0 loads the hooks of a plugin only when the plugin has no `plugin.json` at its root,

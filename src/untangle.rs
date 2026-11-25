@@ -21,7 +21,7 @@ use clap::ValueEnum;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::ledger::{self, Ledger, Listed, Place, Tree};
+use crate::ledger::{self, Ledger, Place, Select, Tree};
 use crate::output::Format;
 use crate::source;
 use crate::style::Style;
@@ -159,53 +159,17 @@ struct Read {
   xpd untangle --kind copy,changes-together --limit 0
   xpd untangle --since main")]
 pub(crate) struct UntangleArgs {
-    /// Files or directories (directories respect .gitignore).
-    #[arg(default_value = ".")]
-    paths: Vec<PathBuf>,
-    /// List only the findings of these kinds, separated by commas.
-    #[arg(long, value_enum, value_delimiter = ',')]
-    kind: Vec<Kind>,
-    /// The most findings to list of each kind, strongest first. 0 lists every finding.
-    #[arg(long, default_value_t = 20)]
-    limit: usize,
-    /// Count the findings at this commit too, and print each count beside the count of today.
-    #[arg(long, value_name = "COMMIT")]
-    since: Option<String>,
-    /// Output format. Default: text on a terminal, json otherwise.
-    #[arg(long, value_enum)]
-    format: Option<Format>,
+    #[command(flatten)]
+    select: Select<Kind>,
 }
 
 impl UntangleArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let top = ledger::repository(&self.paths[0]);
-        let history =
-            (top.as_deref()).map_or_else(History::default, |top| History::read(top, "HEAD"));
-        let files = Tree {
-            top: top.as_deref(),
-            shown_from: None,
+        let survey = |paths: &[PathBuf], files: Tree<'_>, top: Option<&Path>, commit: &str| {
+            let history = top.map_or_else(History::default, |top| History::read(top, commit));
+            survey(paths, files, &history)
         };
-        let (read, findings) = survey(&self.paths, files, &history)?;
-        let before = match &self.since {
-            Some(commit) => {
-                let top = ledger::repository_for_since(top.as_deref(), &self.paths[0])?;
-                let then = ledger::at_commit(&self.paths, top, commit, |then, files, resolved| {
-                    Ok(survey(then, files, &History::read(top, resolved))?.1)
-                })?;
-                Some((commit.clone(), then.unwrap_or_default()))
-            }
-            None => None,
-        };
-        let listed = Listed {
-            kinds: &self.kind,
-            limit: self.limit,
-        };
-        let ledger = Ledger::new(read, findings, before, listed);
-        match self.format.unwrap_or(default) {
-            Format::Json => println!("{}", serde_json::to_string(&ledger)?),
-            Format::Text => print!("{}", ledger.text(&header(&ledger), listed)),
-        }
-        Ok(ExitCode::SUCCESS)
+        self.select.print(default, survey, header)
     }
 }
 

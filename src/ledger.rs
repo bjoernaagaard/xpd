@@ -8,6 +8,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use ast_grep_core::Language;
@@ -16,6 +17,7 @@ use clap::ValueEnum;
 use serde::Serialize;
 
 use crate::git;
+use crate::output::Format;
 
 /// How many places of a finding the text shows. The JSON holds every place.
 const PLACES_SHOWN: usize = 3;
@@ -241,11 +243,11 @@ fn summary<K: Kind>(findings: &[Entry<K>], before: Option<&[Entry<K>]>) -> Summa
 
 /// The findings a run lists: the kinds that were asked for, and the most of each kind.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Listed<'k, K> {
+struct Listed<'k, K> {
     /// Every kind when empty.
-    pub(crate) kinds: &'k [K],
+    kinds: &'k [K],
     /// 0 lists every finding.
-    pub(crate) limit: usize,
+    limit: usize,
 }
 
 impl<K: Kind> Listed<'_, K> {
@@ -263,6 +265,71 @@ impl<K: Kind> Listed<'_, K> {
                 self.limit == 0 || *count <= self.limit
             })
             .collect()
+    }
+}
+
+/// The arguments of a command of the ledger.
+#[derive(Debug, clap::Args)]
+pub(crate) struct Select<K: Kind> {
+    /// Files or directories (directories respect .gitignore).
+    #[arg(default_value = ".")]
+    paths: Vec<PathBuf>,
+    /// List only the findings of these kinds, separated by commas.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    kind: Vec<K>,
+    /// The most findings to list of each kind, strongest first. 0 lists every finding.
+    #[arg(long, default_value_t = 20)]
+    limit: usize,
+    /// Count the findings at this commit too, and print each count beside the count of today.
+    #[arg(long, value_name = "COMMIT")]
+    since: Option<String>,
+    /// Output format. Default: text on a terminal, json otherwise.
+    #[arg(long, value_enum)]
+    format: Option<Format>,
+}
+
+impl<K: Kind> Select<K> {
+    /// Prints the ledger of the paths. `survey` reads the files under the paths it gets, which
+    /// are in the folders of the tree, and returns what it read and the findings. It also gets
+    /// the top of the repository and the commit that the files are from, which is `HEAD` for
+    /// the files of today. `header` writes the first lines of the text.
+    pub(crate) fn print<R: Serialize>(
+        &self,
+        default: Format,
+        survey: impl Fn(&[PathBuf], Tree<'_>, Option<&Path>, &str) -> Result<(R, Vec<Entry<K>>)>,
+        header: impl FnOnce(&Ledger<K, R>) -> String,
+    ) -> Result<ExitCode> {
+        let top = repository(&self.paths[0]);
+        let files = Tree {
+            top: top.as_deref(),
+            shown_from: None,
+        };
+        let (read, findings) = survey(&self.paths, files, top.as_deref(), "HEAD")?;
+        let before = match &self.since {
+            Some(commit) => {
+                let top = top.as_deref().with_context(|| {
+                    format!(
+                        "{} is in no git repository, which --since needs",
+                        self.paths[0].display()
+                    )
+                })?;
+                let then = at_commit(&self.paths, top, commit, |then, files, resolved| {
+                    Ok(survey(then, files, Some(top), resolved)?.1)
+                })?;
+                Some((commit.clone(), then.unwrap_or_default()))
+            }
+            None => None,
+        };
+        let listed = Listed {
+            kinds: &self.kind,
+            limit: self.limit,
+        };
+        let ledger = Ledger::new(read, findings, before, listed);
+        match self.format.unwrap_or(default) {
+            Format::Json => println!("{}", serde_json::to_string(&ledger)?),
+            Format::Text => print!("{}", ledger.text(&header(&ledger), listed)),
+        }
+        Ok(ExitCode::SUCCESS)
     }
 }
 
@@ -285,7 +352,7 @@ pub(crate) struct Ledger<K: Kind, R> {
 impl<K: Kind, R> Ledger<K, R> {
     /// The ledger of `findings`. `since` holds the commit of `--since` and the findings the
     /// files had at it.
-    pub(crate) fn new(
+    fn new(
         read: R,
         mut findings: Vec<Entry<K>>,
         since: Option<(String, Vec<Entry<K>>)>,
@@ -339,7 +406,7 @@ impl<K: Kind, R> Ledger<K, R> {
     }
 
     /// The ledger as text, below the lines of `header`.
-    pub(crate) fn text(&self, header: &str, listed: Listed<'_, K>) -> String {
+    fn text(&self, header: &str, listed: Listed<'_, K>) -> String {
         let mut text = header.to_owned();
         let was = |was: Option<usize>| was.map_or_else(String::new, |was| format!(" (was {was})"));
         for group in &self.summary.groups {
@@ -392,7 +459,7 @@ impl<K: Kind, R> Ledger<K, R> {
 }
 
 /// The top folder of the git repository that holds `path`. `None` outside a repository.
-pub(crate) fn repository(path: &Path) -> Option<PathBuf> {
+fn repository(path: &Path) -> Option<PathBuf> {
     let folder = if path.is_dir() {
         path
     } else {
@@ -443,7 +510,7 @@ impl Drop for Scratch {
 /// `None` when the commit holds none of the paths. The files of the commit are written to a
 /// folder of their own through an index of their own, so the working tree and the index of the
 /// repository stay as they are.
-pub(crate) fn at_commit<T>(
+fn at_commit<T>(
     paths: &[PathBuf],
     top: &Path,
     commit: &str,
@@ -482,16 +549,6 @@ pub(crate) fn at_commit<T>(
         shown_from: Some(&shown_from),
     };
     survey(&then, files, resolved).map(Some)
-}
-
-/// The top of the repository that `--since` needs for the files under `path`.
-pub(crate) fn repository_for_since<'t>(top: Option<&'t Path>, path: &Path) -> Result<&'t Path> {
-    top.with_context(|| {
-        format!(
-            "{} is in no git repository, which --since needs",
-            path.display()
-        )
-    })
 }
 
 /// A language whose files hold code. A data or markup file repeats its structure by nature, so

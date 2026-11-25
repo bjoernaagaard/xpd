@@ -54,6 +54,11 @@ One rule's documentation as Markdown, the same text as its [rule page](../../rul
 
 The offline animation workflow and its editable Manim recipes.
 
+## skill://xpd-optimize/
+
+The steps from a finding of [`xpd optimize`](../../commands/optimize/) to a change with proof that
+the result is the same.
+
 ## skill://xpd-untangle/
 
 The steps of a refactor of a whole codebase, which [`xpd untangle`](../../commands/untangle/) measures.

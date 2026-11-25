@@ -167,6 +167,7 @@ xpd
 │   ├── outline [paths]        show imports, definitions and members with line numbers
 │   ├── graph <files>          print the dataflow of step code or Hamilton modules
 │   ├── untangle [paths]       list where the code gets wrong which pieces change together
+│   ├── optimize [paths]       list the work that a shorter or faster program would not do
 │   └── map <file>             plan a pandas pipeline reimplementation in native Polars
 ├── run the project's Python
 │   ├── profile <data file>    print dtypes, nulls, unique counts and memory per column
@@ -234,8 +235,9 @@ The plugin runs `xpd hook` at four points of a session.
 session starts        xpd prints which rule packs apply, the style setting,
                       and the pipelines and Hamilton nodes of the project
 user sends a prompt   xpd points a chart prompt, such as "improve my charts",
-                      to xpd chart-review, and a prompt such as "untangle this
-                      codebase" to xpd untangle, and otherwise prints the playbook
+                      to xpd chart-review, a prompt such as "untangle this
+                      codebase" to xpd untangle, and a prompt such as "make this
+                      simpler and faster" to xpd optimize, and otherwise prints the playbook
                       that answers the prompt, such as xpd/recipe/pandas-pipeline,
                       or the open issues when the prompt asks what to improve
 agent edits a file    xpd reports the issues of that file

@@ -28,6 +28,7 @@ mod mcp;
 mod migration;
 mod names;
 mod nodes;
+mod optimize;
 mod outline;
 mod output;
 mod pack;

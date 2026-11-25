@@ -60,6 +60,8 @@ on(UserPromptSubmit)
     print the data file line # names xpd profile with the path of the file
   if the prompt is about the structure of a codebase
     print the untangle line  # names xpd untangle and the xpd-untangle skill
+  if the prompt asks for simpler, shorter or faster code
+    print the optimize line  # names xpd optimize and the xpd-optimize skill
   if the prompt is about a chart, or the project has no Python file
     stop
   if the prompt asks for a refactor

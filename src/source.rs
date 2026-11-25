@@ -40,6 +40,18 @@ pub(crate) fn is_python(path: &Path) -> bool {
 }
 
 /// Whether the name of `path` tells its language.
+/// Whether `path` is a test file, by the names pytest collects.
+pub(crate) fn is_test(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    name == "conftest.py"
+        || name.starts_with("test_")
+        || name.ends_with("_test.py")
+        || path.components().any(|part| part.as_os_str() == "tests")
+}
+
 pub(crate) fn names_language(path: &Path) -> bool {
     SupportLang::from_path(path).is_some()
 }

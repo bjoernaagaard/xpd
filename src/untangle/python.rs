@@ -8,6 +8,7 @@ use crate::imports::{self, Import};
 use crate::syntax::{Node, Root};
 
 use super::{Finding, Kind, Place};
+use crate::source;
 
 /// The fewest commits of an imported module before its importer is compared with it. Below
 /// this, the history is too short to call the module volatile.
@@ -102,18 +103,6 @@ struct Call {
     splat: bool,
 }
 
-/// Whether `path` is a test file, by the names pytest collects.
-pub(super) fn is_test(path: &Path) -> bool {
-    let name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("");
-    name == "conftest.py"
-        || name.starts_with("test_")
-        || name.ends_with("_test.py")
-        || path.components().any(|part| part.as_os_str() == "tests")
-}
-
 fn private(name: &str) -> bool {
     name.starts_with('_') && !name.starts_with("__")
 }
@@ -155,7 +144,7 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
         .filter(|import| import.name.is_none())
         .map(|import| import.bound.as_str())
         .collect();
-    let in_test = is_test(path);
+    let in_test = source::is_test(path);
     let mut local = Vec::new();
     for node in root.root().dfs() {
         match node.kind().as_ref() {
@@ -562,7 +551,7 @@ impl<'m> Graph<'m> {
         let mut findings = Vec::new();
         for (importer, imports) in self.imports.iter().enumerate() {
             let file = &self.modules[importer].file;
-            if is_test(file) || file.file_name().is_some_and(|name| name == "__init__.py") {
+            if source::is_test(file) || file.file_name().is_some_and(|name| name == "__init__.py") {
                 continue;
             }
             for (&imported, &line) in imports {
@@ -741,7 +730,7 @@ impl<'m> Project<'m> {
     fn unreferenced(&self) -> Vec<Finding> {
         let mut findings = Vec::new();
         for module in self.modules {
-            let skipped = is_test(&module.file)
+            let skipped = source::is_test(&module.file)
                 || module
                     .file
                     .file_name()
