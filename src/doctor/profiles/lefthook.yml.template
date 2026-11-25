@@ -1,0 +1,50 @@
+pre-commit:
+  parallel: true
+  commands:
+    ruff-check:
+      glob: "*.{py,pyi,ipynb}"
+      run: uv run --locked ruff check {staged_files}
+    ruff-format:
+      glob: "*.{py,pyi,ipynb}"
+      run: uv run --locked ruff format --check {staged_files}
+    tombi-lint:
+      glob: "*.toml"
+      run: uv run --locked tombi lint {staged_files}
+    tombi-format:
+      glob: "*.toml"
+      run: uv run --locked tombi format --check {staged_files}
+    rumdl:
+      glob: "*.md"
+      run: uv run --locked rumdl check {staged_files}
+    yamllint:
+      glob: "*.{yml,yaml}"
+      run: uv run --locked yamllint --strict {staged_files}
+    jactionlint:
+      glob: ".github/**/*.{yml,yaml}"
+      run: uv run --locked jactionlint --no-online --strict-exit {staged_files}
+    typos:
+      run: uv run --locked typos {staged_files}
+    shellcheck:
+      file_types:
+        - text/x-shellscript
+        - text/x-sh
+      run: uv run --locked shellcheck {staged_files}
+    shfmt:
+      file_types:
+        - text/x-shellscript
+        - text/x-sh
+      run: uv run --locked shfmt --diff {staged_files}
+    nbstripout:
+      glob: "*.ipynb"
+      run: uv run --locked nbstripout --verify {staged_files}
+    gitleaks:
+      skip:
+        - run: "! command -v gitleaks"
+      run: gitleaks git --staged --redact --no-banner
+
+pre-push:
+  commands:
+    ty:
+      run: uv check --locked
+    pytest:
+      run: uv run --locked pytest

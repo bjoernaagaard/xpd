@@ -1,10 +1,10 @@
-Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest, packaging and the files that are not Python that ships with xpd. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
+Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest, packaging, the files that are not Python, and the hooks and CI that run them, that ships with xpd. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
 The plan reads files. It compares the effect of the project's own settings, so an extra selector in `lint.ignore` that turns off only rules the profile turns off, or a ty level above the profile's, needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each setting, rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings, and the installed Ruff and ty for the conditional advice.
 
 ## What doctor shows of the project
 
-Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, `dependencies`, `optional-dependencies` and `requires-python` of `[project]`, `exclude-newer` of `[tool.uv]`, and the files that [Files that are not Python](#files-that-are-not-python) lists.
+Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, `dependencies`, `optional-dependencies` and `requires-python` of `[project]`, `exclude-newer` of `[tool.uv]`, and the files that [Files that are not Python](#files-that-are-not-python) and [Hooks and CI](#hooks-and-ci) list.
 
 - **The diff.** Each line outside those tables, such as a line of `[tool.uv]`, `[[tool.uv.index]]`, `[tool.uv.sources]` or `[tool.uv.pip]`, shows as `<hidden>`. A line shows only when everything on it belongs to those tables, so a line that also holds another setting is hidden, such as `tool = { uv = { ... }, ruff = { ... } }` or `tool.uv.index-url = "..."` beside `tool.ruff.lint...` lines. Table headers and blank lines stay, so the diff keeps its shape. A change on a hidden line shows in the list of changes and not in the diff.
 - **URLs.** In every line doctor prints, a URL keeps its scheme, host and path, and its user and password, query and fragment become `****`, as in `https://****@example.com/simple?****`. In a message of uv or Ruff that doctor passes on, a URL keeps its scheme and host only. The source links of the profile's records, which ship with xpd, print whole with their anchors, and so does only a URL that is exactly one of those links.
@@ -173,6 +173,8 @@ The profile pins the tools that check the project, at the releases its rules and
 | shfmt, only with shell scripts | `shfmt-py==4.2.0` |
 | nbstripout, only with notebooks | `nbstripout==0.9.2` |
 | deptry | `deptry==0.25.1` |
+| lefthook | `lefthook==2.2.2` |
+| jactionlint | `jactionlint==2.6.0` |
 
 `uv.lock` must lock these releases. A lock that holds another release of one of them, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for one of them in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the checks with `uv run --locked ruff check`, `uv run --locked ruff format --check`, `uv check --locked` and `uv run --locked pytest`.
 
@@ -260,13 +262,13 @@ Doctor prints the diff, then one entry for each change. The `...` lines stand fo
 
 ```console
 $ xpd doctor --format text
-Profile revision 4, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 5, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -10,10 +10,103 @@
+@@ -10,10 +10,105 @@
 
  [dependency-groups]
  dev = [
@@ -284,6 +286,8 @@ pyproject.toml records no profile yet.
 +    "yamllint==1.38.0",
 +    "typos==1.52.2",
 +    "deptry==0.25.1",
++    "lefthook==2.2.2",
++    "jactionlint==2.6.0",
  ]
 
  [tool.pytest.ini_options]
@@ -313,10 +317,10 @@ pyproject.toml records no profile yet.
 +exclude-newer = "3 days"
 +
 +[tool.xpd.profile]
-+revision = 4
++revision = 5
 +kind = "application"
 ...
-+++ tombi.toml
++++ .github/workflows/ci.yml
 ...
 Changes
   ruff lint.select: unset -> ["ALL"], tool.ruff.lint.select
@@ -335,7 +339,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 4.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 5.` and exits 0.
 
 ## Kinds of project
 
@@ -348,7 +352,26 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
 | `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
-A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 4 gives every kind the same tool values. It owns the files that [Files that are not Python](#files-that-are-not-python) lists for every kind, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 5 gives every kind the same tool values. It owns the files that [Files that are not Python](#files-that-are-not-python) and [Hooks and CI](#hooks-and-ci) list, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
+
+## Hooks and CI
+
+The profile owns these files as exact copies of the templates in [src/doctor/profiles](https://github.com/bjoernaagaard/xpd/tree/main/src/doctor/profiles). Every command in them runs with uv alone, so a project needs no other tool manager.
+
+| File | Kinds | What it does |
+| --- | --- | --- |
+| `lefthook.yml` | Every kind | At commit, checks the staged files, each with the tool for its type: Ruff, Tombi, rumdl, yamllint, jactionlint on the files under `.github`, typos, ShellCheck and shfmt on shell scripts, which lefthook finds by their type also without a suffix, nbstripout on notebooks, and Gitleaks. At push, runs ty with `uv check --locked` and the tests with `uv run --locked pytest`. Every check reads and never writes, so a hook never stages an edit. |
+| `.github/workflows/ci.yml` | Every kind | On each pull request, each push to `main` and once a week, installs the locked environment, runs the commit checks on every file and the push checks, checks the workflows, the composite actions and Dependabot with jactionlint, audits `uv.lock` with `uv audit --locked`, and scans the whole history for secrets with Gitleaks 8.30.1, whose download it checks against its SHA-256. It reads the repository only, pins each action by its commit, and cancels an older run of the same pull request. |
+| `.github/dependabot.yml` | Every kind | One grouped pull request a week for the actions and one for `uv.lock`, each for releases at least 7 days old |
+| `.github/jactionlint.yaml` | Every kind | Runs jactionlint with its `pedantic` rules, and `jactionlint --strict-exit` makes a warning fail the check |
+| `.github/workflows/release.yml` | `library` that builds with `hatchling.build` | On a `v` tag, checks that the tag is on `main` and names the version in `pyproject.toml`, builds the sdist and the wheel with `uv build --no-sources`, installs the wheel with its dependencies, and publishes the files of that run from a separate job, the only one with an identity token, with `uv publish --trusted-publishing always` |
+| `.python-version` | `library`, `application`, `pipeline` | The Python that uv runs the project, its hooks and CI with. A project without one gets the lowest release that `requires-python` admits, and a release that `requires-python` does not admit is a conflict. |
+
+The `script` kind has no `dev` group, so its `lefthook.yml` and `ci.yml` run each tool at its pinned release with `uvx --exclude-newer=P3D`, such as `uvx --exclude-newer=P3D ruff@0.17.4 check`, audit each script's lock with `uv audit --locked --script`, and have no push checks. Its `dependabot.yml` updates the actions only.
+
+Gitleaks ships no package on PyPI, so the commit check runs the `gitleaks` on `PATH` and lefthook skips it when there is none. CI always scans the whole history with the pinned release, so a secret that a commit without the hook brings in still fails the run.
+
+Apply never installs Git hooks or publishes. After the first apply, run `uv run --locked lefthook install` once in each clone. To publish, register `.github/workflows/release.yml` with the environment `pypi` as a Trusted Publisher of the project on PyPI, and protect the `v` tags. A library that builds native code with maturin or scikit-build-core gets no release workflow, since it needs a wheel for each platform.
 
 ## One place for each tool
 
@@ -365,7 +388,7 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 - a requirement for Ruff or ty in a dependency list other than `dev` that the profile's pin does not meet
 - an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly` or `-pno:timeout`, a `-p=<name>` that pytest cannot import, or `pytest --disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
 - a layout that the kind does not allow
-- a second settings file of a tool whose file the profile owns: `.tombi.toml`, `.config/tombi.toml` or `[tool.tombi]` beside `tombi.toml`, `rumdl.toml`, `.config/rumdl.toml` or `[tool.rumdl]` beside `.rumdl.toml`, and `.yamllint` or `.yamllint.yaml` beside `.yamllint.yml`, because the tool would read it first or warn about both
+- a second settings file of a tool whose file the profile owns: `.tombi.toml`, `.config/tombi.toml` or `[tool.tombi]` beside `tombi.toml`, `rumdl.toml`, `.config/rumdl.toml` or `[tool.rumdl]` beside `.rumdl.toml`, `.yamllint` or `.yamllint.yaml` beside `.yamllint.yml`, `.lefthook.yml`, `lefthook.yaml`, `.lefthook.yaml`, `lefthook.toml`, `.lefthook.toml`, `lefthook.json` or `.lefthook.json` beside `lefthook.yml`, `.github/dependabot.yaml` beside `.github/dependabot.yml`, and `.github/jactionlint.yml` beside `.github/jactionlint.yaml`, because the tool would read it first or warn about both
 - a `.gitignore` that ignores a lock file the kind needs
 - a uv workspace, in the project or above it
 - both `[tool.pytest]` and `[tool.pytest.ini_options]` with settings
@@ -379,7 +402,7 @@ A project records an exception in `pyproject.toml`, beside the revision and kind
 
 ```toml
 [tool.xpd.profile]
-revision = 4
+revision = 5
 kind = "application"
 
 [[tool.xpd.profile.exceptions]]

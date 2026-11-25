@@ -34,6 +34,8 @@ use crate::toml::{self, Toml};
 pub(crate) const PYPROJECT: &str = "pyproject.toml";
 /// Git's list of files to leave untracked, at the project root.
 const GITIGNORE: &str = ".gitignore";
+/// The file that names the Python release uv runs the project with.
+const PYTHON_VERSION: &str = ".python-version";
 /// Where the profile and its record are documented.
 const DOCS: &str = "https://bjoernaagaard.github.io/xpd/reference/commands/doctor/";
 /// The most files and folders that the search for nested configuration looks at.
@@ -287,6 +289,7 @@ pub(crate) fn compute(
     edits.verify(&required, &accepted);
     plan.after = doc.to_string();
     plan.packaging(root, profile);
+    plan.python_version(root, profile)?;
     plan.owned_files(root, profile, original.as_ref())?;
     plan.locks(root, profile, files, dependencies);
     plan.ignored_locks(root);
@@ -581,7 +584,15 @@ impl Plan {
     /// The owned files of the kind that differ from their templates, each with a change, and a
     /// conflict for each other place where the tool of an owned file would read its settings.
     fn owned_files(&mut self, root: &Path, profile: &Profile, doc: Option<&Toml>) -> Result<()> {
+        let backend = profile.packaging.backend(root);
         for owned in profile.owned(self.kind.as_deref()) {
+            if owned
+                .backend
+                .as_deref()
+                .is_some_and(|wanted| Some(wanted) != backend)
+            {
+                continue;
+            }
             for rival in &owned.rivals {
                 if root.join(rival).exists() {
                     self.conflict(
@@ -682,6 +693,81 @@ impl Plan {
         for found in packaging::findings(root, doc.as_ref(), &profile.packaging, needs, &pinned) {
             self.conflict(found.file, None, found.message);
         }
+    }
+
+    /// `.python-version`, which names the Python that uv runs the project with. A project
+    /// without one gets the lowest release that `requires-python` admits, and one that names a
+    /// release outside `requires-python` gets a conflict.
+    fn python_version(&mut self, root: &Path, profile: &Profile) -> Result<()> {
+        let Some(kind) = self.kind.as_deref().and_then(|kind| profile.kind(kind)) else {
+            return Ok(());
+        };
+        if !kind.python_version {
+            return Ok(());
+        }
+        let Some(spec) = toml_edit::Document::parse(self.after.clone())
+            .ok()
+            .and_then(|doc| {
+                toml::get(&doc, &["project", "requires-python"])
+                    .and_then(Item::as_str)
+                    .map(str::to_owned)
+            })
+        else {
+            return Ok(());
+        };
+        let path = PathBuf::from(PYTHON_VERSION);
+        let file = root.join(&path);
+        let before = match fs::read_to_string(&file) {
+            Ok(text) => Some(text),
+            Err(error) if error.kind() == ErrorKind::NotFound => None,
+            Err(error) => {
+                return Err(error).with_context(|| format!("cannot read {}", file.display()));
+            }
+        };
+        if let Some(text) = &before {
+            let named = text.lines().next().unwrap_or_default().trim();
+            let admitted = named
+                .parse::<crate::version::Version>()
+                .is_ok_and(|version| pytest::satisfies(&format!("python{spec}"), &version));
+            if !admitted {
+                self.conflict(
+                    PYTHON_VERSION,
+                    None,
+                    format!("{PYTHON_VERSION} names Python {named:?}, which requires-python {spec:?} does not admit. Name a release that it admits, such as its lowest."),
+                );
+            }
+            return Ok(());
+        }
+        let Some(lowest) = pytest::clauses(&format!("python{spec}"))
+            .find_map(|clause| clause.strip_prefix(">="))
+            .map(str::trim)
+            .map(str::to_owned)
+        else {
+            self.conflict(
+                PYTHON_VERSION,
+                None,
+                format!("The project has no {PYTHON_VERSION}, and requires-python {spec:?} names no lowest release with >= for doctor to pin. Write the Python release to {PYTHON_VERSION}."),
+            );
+            return Ok(());
+        };
+        let after = format!("{lowest}\n");
+        self.changes.push(Change {
+            tool: "xpd",
+            id: "python-version".to_owned(),
+            item: format!("owned file {PYTHON_VERSION}"),
+            path: PYTHON_VERSION.to_owned(),
+            line: None,
+            old: "missing".to_owned(),
+            new: format!("Python {lowest}"),
+            reason: "uv runs the project, its hooks and its CI with the Python that .python-version names, so every checkout uses the same release. It starts at the lowest release that requires-python admits.".to_owned(),
+            source: DOCS.to_owned(),
+        });
+        self.owned.push(OwnedFile {
+            path,
+            before: None,
+            after,
+        });
+        Ok(())
     }
 
     /// A conflict for each lock file of the kind that the `.gitignore` the plan leaves ignores,

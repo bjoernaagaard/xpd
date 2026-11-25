@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 4
+//! revision = 5
 //! kind = "application"
 //!
 //! [[tool.xpd.profile.exceptions]]
@@ -27,7 +27,9 @@
 //! template when the project has none, or, with `insert`, a file of lines such as `.gitignore`,
 //! which must hold every line of the template and gets the missing ones at its top. `rivals` and
 //! `tables` name the other files and `pyproject.toml` tables where the same tool would read its
-//! settings, which the project must not have.
+//! settings, which the project must not have, and `backend` the build backend that a project
+//! needs for the profile to own the file. A kind with `python-version` pins its Python in
+//! `.python-version`.
 //!
 //! `[dev]` `pins` names the tools a project runs with `uv run`. Each goes into
 //! `[dependency-groups] dev` as an exact pin at its release in `[pins]`, and `uv.lock` locks that
@@ -51,7 +53,7 @@ use crate::toml::{self, Toml};
 const PROFILE: &str = include_str!("profile.toml");
 
 /// The shape of `profile.toml` and of `[tool.xpd.profile]` that this xpd reads.
-pub(crate) const SCHEMA: i64 = 4;
+pub(crate) const SCHEMA: i64 = 5;
 
 /// Where a project's record of the profile lives in its `pyproject.toml`.
 pub(crate) const TABLE: [&str; 3] = ["tool", "xpd", "profile"];
@@ -102,6 +104,8 @@ pub(crate) struct KindSpec {
     pub(crate) files: Vec<String>,
     /// The keys that `[project]` declares, or lists in `dynamic`.
     pub(crate) metadata: Vec<String>,
+    /// Whether the project pins its Python in `.python-version`.
+    pub(crate) python_version: bool,
     /// The values the kind adds to the base values.
     pub(crate) extra: Values,
 }
@@ -127,6 +131,10 @@ pub(crate) struct Owned {
     /// Tables of `pyproject.toml`, such as `tool.tombi`, from which the same tool would read its
     /// settings.
     pub(crate) tables: Vec<String>,
+    /// The build backend that the project must need for the profile to own the file, such as
+    /// `hatchling.build` for a release workflow that builds a pure Python package. `None` owns it
+    /// for every project of the kind.
+    pub(crate) backend: Option<String>,
 }
 
 /// Which files a project tracks that only some tools check.
@@ -168,6 +176,35 @@ const TEMPLATES: &[(&str, &str)] = &[
     (
         "yamllint.yml.template",
         include_str!("profiles/yamllint.yml.template"),
+    ),
+    (
+        "lefthook.yml.template",
+        include_str!("profiles/lefthook.yml.template"),
+    ),
+    (
+        "lefthook-script.yml.template",
+        include_str!("profiles/lefthook-script.yml.template"),
+    ),
+    ("ci.yml.template", include_str!("profiles/ci.yml.template")),
+    (
+        "ci-script.yml.template",
+        include_str!("profiles/ci-script.yml.template"),
+    ),
+    (
+        "dependabot.yml.template",
+        include_str!("profiles/dependabot.yml.template"),
+    ),
+    (
+        "dependabot-actions.yml.template",
+        include_str!("profiles/dependabot-actions.yml.template"),
+    ),
+    (
+        "jactionlint.yaml.template",
+        include_str!("profiles/jactionlint.yaml.template"),
+    ),
+    (
+        "release.yml.template",
+        include_str!("profiles/release.yml.template"),
     ),
 ];
 
@@ -630,6 +667,10 @@ impl Profile {
                         .with_context(|| format!("kinds.{name}.tool-only is no boolean"))?,
                     files: strings(kind, "files")?,
                     metadata: strings(kind, "metadata")?,
+                    python_version: kind
+                        .get("python-version")
+                        .and_then(Item::as_bool)
+                        .with_context(|| format!("kinds.{name}.python-version is no boolean"))?,
                     extra: Values::read(kind).with_context(|| format!("kinds.{name}"))?,
                 })
             })
@@ -695,11 +736,25 @@ impl Profile {
                 );
             }
         }
-        for (template, _) in TEMPLATES {
+        for (template, text) in TEMPLATES {
             ensure!(
                 self.files.iter().any(|file| file.template == *template),
                 "src/doctor/profiles/{template} is no file of the profile"
             );
+            for (name, release) in releases(text) {
+                let pinned = self
+                    .dev_pins
+                    .iter()
+                    .chain(&self.shell_pins)
+                    .chain(&self.notebook_pins)
+                    .find(|(pin, _)| *pin == name);
+                if let Some((_, pinned)) = pinned {
+                    ensure!(
+                        *pinned == release,
+                        "src/doctor/profiles/{template} runs {name} {release}, and [pins] pins {pinned}"
+                    );
+                }
+            }
         }
         for (plugin, _) in &self.forbid.plugin_names {
             ensure!(
@@ -913,6 +968,30 @@ pub(crate) fn option(
 }
 
 /// The tools of `[dev]` `pins`, each with its release from `pins`, the `[pins]` table.
+/// Each tool and release that the text of a template runs, from `<tool>@<release>`, as `uvx`
+/// takes it, and from `--from <tool>==<release>`.
+fn releases(text: &str) -> Vec<(String, String)> {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut found = Vec::new();
+    for (index, word) in words.iter().enumerate() {
+        let pair = if words.get(index.wrapping_sub(1)) == Some(&"--from") {
+            word.split_once("==")
+        } else if index > 0
+            && words[..index]
+                .last()
+                .is_some_and(|before| before.starts_with("--exclude-newer") || *before == "uvx")
+        {
+            word.split_once('@')
+        } else {
+            None
+        };
+        if let Some((name, release)) = pair {
+            found.push((name.to_owned(), release.to_owned()));
+        }
+    }
+    found
+}
+
 /// The owned file `name` of `[files]`.
 fn owned_file(name: &str, item: &Item) -> Result<Owned> {
     let file = item
@@ -955,6 +1034,10 @@ fn owned_file(name: &str, item: &Item) -> Result<Owned> {
         insert,
         rivals: optional_strings(file, "rivals")?,
         tables: optional_strings(file, "tables")?,
+        backend: file
+            .get("backend")
+            .map(|_| string(file, "backend"))
+            .transpose()?,
     })
 }
 
