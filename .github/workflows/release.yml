@@ -123,20 +123,8 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
-          - runner: windows-11-arm
-            target: aarch64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build llama.cpp with clang-cl and Ninja
-        if: matrix.platform.target == 'aarch64'
-        shell: bash
-        run: |
-          {
-            echo "CMAKE_GENERATOR=Ninja"
-            echo "CMAKE_C_COMPILER=clang-cl"
-            echo "CMAKE_CXX_COMPILER=clang-cl"
-            echo "CXXFLAGS_aarch64_pc_windows_msvc=/EHsc"
-          } >> "$GITHUB_ENV"
       - name: Build wheels
         # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
