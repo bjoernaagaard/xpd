@@ -255,14 +255,17 @@ def load_scene(root: Path, args: argparse.Namespace) -> Scene:
 def podman_status() -> str | None:
     if not shutil.which(PODMAN[0]):
         return "Install Podman and configure rootless mode with cgroups v2."
-    result = subprocess.run(  # noqa: S603
-        [*PODMAN, "info", "--format", "{{.Host.Security.Rootless}} {{.Host.CgroupsVersion}}"],
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603
+            [*PODMAN, "info", "--format", "{{.Host.Security.Rootless}} {{.Host.CgroupsVersion}}"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as error:
+        return f"Podman could not start: podman info gave no answer in {error.timeout:g} seconds."
     if result.returncode:
         return f"Podman could not start: {result.stderr.strip()}"
     if result.stdout.strip() != "true v2":
