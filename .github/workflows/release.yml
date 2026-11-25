@@ -135,6 +135,7 @@ jobs:
             echo "CMAKE_GENERATOR=Ninja"
             echo "CMAKE_C_COMPILER=clang-cl"
             echo "CMAKE_CXX_COMPILER=clang-cl"
+            echo "CXXFLAGS_aarch64_pc_windows_msvc=/EHsc"
           } >> "$GITHUB_ENV"
       - name: Build wheels
         # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
