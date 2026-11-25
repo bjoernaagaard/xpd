@@ -12,7 +12,8 @@ reads the files and the git history, and it runs no code.
 `copy` and `changes-together` are found in every programming language that ast-grep parses. The
 other kinds are read from Python. A finding is evidence, so judge it against the code before you
 change anything. The `xpd-untangle` skill, which [`xpd skill --json`](../skill/) prints, holds the
-steps of a refactor that the counts measure.
+steps of a refactor that the counts measure, and `untangle.workflow.ts`, which runs those steps as a
+durable workflow of T3 Code with a separate agent for each stage.
 
 ## Examples
 
@@ -69,28 +70,28 @@ No git history was read, so no finding rests on how the files changed.
 
 Hidden links: pieces that must change together, where the code does not show it: 1
   shared-state: 1
-    shop/orders.py:14  This writes RATE of the module pricing from outside it.
+    29ce6e4b  shop/orders.py:14  This writes RATE of the module pricing from outside it.
 
 Needless links: pieces tied together that change for different reasons: 1
   import-cycle: 1
-    shop/orders.py:3, shop/pricing.py:1  These 2 modules import one another in a circle, so none of them can change alone.
+    8de3d24b  shop/orders.py:3, shop/pricing.py:1  These 2 modules import one another in a circle, so none of them can change alone.
 
 Surplus: pieces with no reason of their own to change: 2
   unreferenced: 1
-    shop/pricing.py:10  No Python file that was read mentions report, apart from this definition.
+    c17ac665  shop/pricing.py:10  No Python file that was read mentions report, apart from this definition.
   constant-parameter: 1
-    shop/orders.py:6  None of the 2 calls of load passes strict, so it always has its default.
+    0bea3ced  shop/orders.py:6  None of the 2 calls of load passes strict, so it always has its default.
 
 Special cases: code for one situation, which the design did not account for: 3
   one-value-branch: 1
-    shop/orders.py:12  This branch runs for one value: kind == "wholesale".
+    ccd51d7f  shop/orders.py:12  This branch runs for one value: kind == "wholesale".
   swallowed-exception: 1
-    shop/orders.py:17  This catches an exception and does nothing with it.
+    ebae19e6  shop/orders.py:17  This catches an exception and does nothing with it.
   sleep-or-retry: 1
-    shop/orders.py:19  This waits a fixed time for something else to finish.
+    0c77beff  shop/orders.py:19  This waits a fixed time for something else to finish.
 ```
 
-Each finding names its places and what was measured. `--kind` keeps some kinds, and `--limit`
+Each finding has its id, its places and what was measured. `--kind` keeps some kinds, and `--limit`
 sets how many findings of each kind are listed, which is 20 without it and every one with 0.
 
 ```console
@@ -136,14 +137,26 @@ delete.
 
 ## Measure a refactor
 
-The count of each kind is the measure of a refactor. `--since <commit>` counts the findings at
-that commit too, and prints each count beside the count of today as `was`. xpd writes the files of
-the commit to a temporary folder, so the working tree and the index stay as they are. Without git,
-`changes-together` and `volatile-import` report nothing, and `--since` fails.
+The count of each kind is the measure of a refactor, and each finding has an `id` that it keeps
+from commit to commit. `--since <commit>` reads the files of that commit too and compares.
+
+| In the JSON | Meaning |
+| --- | --- |
+| `was` beside each `count` | The count at the commit |
+| `"new": true` on a finding | The commit had no finding of this id, so the change added it |
+| `fixed` | The findings of the commit that are gone today |
+| `summary.new` and `summary.fixed` | How many of each |
 
 ```sh
 xpd untangle --since main
 ```
+
+xpd writes the files of the commit to a temporary folder, so the working tree and the index stay
+as they are. An id is made from the kind and from what the finding is about, such as the file, the
+name or the value, and not from a line, so it stays the same when code moves within a file. It
+changes when the file is renamed. Of two findings that are alike in one file, the first in the
+file has the first id. Without git, `changes-together` and `volatile-import` report nothing, and
+`--since` fails.
 
 ## Exit status
 

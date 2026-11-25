@@ -121,7 +121,8 @@ class Analysis(NamedTuple):
             paths: Files or folders inside the project root. Default: the whole root.
             kinds: List only these kinds, such as `copy` or `import-cycle`.
             limit: The most findings to list of each kind. 0 lists every finding.
-            since: A commit whose counts are returned as `was` beside the counts of today.
+            since: A commit to compare with. Each count gets `was`, each finding that the
+                commit did not have gets `new`, and `fixed` lists the findings that are gone.
         """
         root = await self.project.required_root(ctx)
         flags = ["--limit", str(limit)]

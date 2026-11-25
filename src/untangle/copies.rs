@@ -16,7 +16,7 @@ const LINES: usize = 5;
 #[derive(Debug, Clone)]
 pub(super) struct Block {
     /// The same for two stretches with the same tokens.
-    hash: u64,
+    pub(super) hash: u64,
     /// The hash of the nearest stretch around this one.
     parent: Option<u64>,
     pub(super) tokens: usize,

@@ -29,6 +29,14 @@ pub(super) struct Module {
     pub(super) facts: Facts,
 }
 
+impl Module {
+    /// The path that names the module in the id of a finding: the one git tracks, so that the
+    /// id is the same at another commit.
+    pub(super) fn key(&self) -> &str {
+        self.tracked.as_deref().unwrap_or(&self.shown)
+    }
+}
+
 /// What one Python file holds, read without the other files.
 #[derive(Debug, Default)]
 pub(super) struct Facts {
@@ -487,6 +495,7 @@ fn branches(modules: &[Module]) -> Vec<Finding> {
             };
             Finding {
                 kind: Kind::OneValueBranch,
+                key: value,
                 places: (found.iter())
                     .map(|(module, branch)| Place::line(&module.shown, branch.line))
                     .collect(),
@@ -571,6 +580,11 @@ impl<'m> Graph<'m> {
                 if volatile >= VOLATILE_COMMITS && volatile >= stable * 2 {
                     findings.push(Finding {
                         kind: Kind::VolatileImport,
+                        key: format!(
+                            "{}\n{}",
+                            self.modules[importer].key(),
+                            self.modules[imported].key()
+                        ),
                         places: vec![self.place(importer, line)],
                         evidence: format!(
                             "{} changed in {stable} {} and imports {}, which changed in {volatile} commits in the same time.",
@@ -617,6 +631,9 @@ impl<'m> Graph<'m> {
                     .collect();
                 Finding {
                     kind: Kind::ImportCycle,
+                    key: (part.iter().map(|&module| self.modules[module].key()))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
                     places,
                     evidence: format!(
                         "These {} modules import one another in a circle, so none of them can change alone.",
@@ -741,6 +758,7 @@ impl<'m> Project<'m> {
                 if !known && self.mentions.get(name) == Some(&1) {
                     findings.push(Finding {
                         kind: Kind::Unreferenced,
+                        key: format!("{}\n{name}", module.key()),
                         places: vec![Place::line(&module.shown, definition.line)],
                         evidence: format!(
                             "No Python file that was read mentions {name}, apart from this definition."
@@ -779,9 +797,11 @@ impl<'m> Project<'m> {
                 for (parameter, values) in parameters.iter().zip(&passed) {
                     let count = calls.len();
                     let parameter_name = &parameter.name;
+                    let key = format!("{}\n{name}\n{parameter_name}", module.key());
                     if values.is_empty() && parameter.default {
                         findings.push(Finding {
                             kind: Kind::ConstantParameter,
+                            key: key.clone(),
                             places: vec![at.clone()],
                             evidence: format!(
                                 "None of the {count} calls of {name} passes {parameter_name}, so it always has its default."
@@ -796,6 +816,7 @@ impl<'m> Project<'m> {
                     {
                         findings.push(Finding {
                             kind: Kind::ConstantParameter,
+                            key: key.clone(),
                             places: vec![at.clone()],
                             evidence: format!(
                                 "Each of the {count} calls of {name} passes {parameter_name}={value}."
@@ -809,6 +830,7 @@ impl<'m> Project<'m> {
                         let (module, call) = calls[values[0].0];
                         findings.push(Finding {
                             kind: Kind::OneCallerParameter,
+                            key: key.clone(),
                             places: vec![at.clone(), Place::line(&module.shown, call.line)],
                             evidence: format!(
                                 "One of the {count} calls of {name} passes {parameter_name}, and the others leave it at its default."

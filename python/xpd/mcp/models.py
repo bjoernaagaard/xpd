@@ -108,6 +108,8 @@ class LedgerPlace(Output):
 class LedgerFinding(Output):
     """One place where the code gets wrong which pieces change together."""
 
+    id: str = Field(description="The name the finding keeps at another commit.")
+    new: bool | None = Field(default=None, description="With since: the commit did not have it.")
     kind: str
     places: list[LedgerPlace]
     evidence: str = Field(description="What was measured, as one sentence.")
@@ -131,6 +133,8 @@ class LedgerGroup(Output):
 class LedgerSummary(Output):
     count: int
     was: int | None = None
+    new: int | None = Field(default=None, description="With since: findings the commit lacked.")
+    fixed: int | None = Field(default=None, description="With since: findings that are gone.")
     groups: list[LedgerGroup]
 
 
@@ -147,6 +151,9 @@ class Ledger(Output):
     since: str | None = None
     summary: LedgerSummary
     findings: list[LedgerFinding]
+    fixed: list[LedgerFinding] | None = Field(
+        default=None, description="With since: the findings of the commit that are gone."
+    )
 
 
 class SourcePosition(Output):

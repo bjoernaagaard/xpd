@@ -90,11 +90,11 @@ Use `xpd` whenever you write or change Python code.
   `--update-all` to write every match.
 - `xpd untangle <paths…> --format json`: the ledger of a codebase refactor, read from the
   files and the git history without running anything. It counts copies, files that change
-  together, import cycles, unused definitions and special cases, each finding with its
-  places and evidence. Run it before a refactor of a codebase and after each round, and
-  add `--since <commit>` to see each count beside the count at that commit. Copies and files
-  that change together are found in every language, and the rest in Python. The
-  `xpd-untangle` skill holds the steps.
+  together, import cycles, unused definitions and special cases, each finding with an `id`,
+  its places and evidence. Run it before a refactor of a codebase and after each round, and
+  add `--since <commit>` to see which findings are fixed and which are new since that
+  commit. Copies and files that change together are found in every language, and the rest
+  in Python. The `xpd-untangle` skill holds the steps, and a T3 Code workflow that runs them.
 - `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on its raw
   training rows and compare outputs and scores with the contract. Needs pandas
   and scikit-learn.
