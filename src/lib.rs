@@ -6,6 +6,7 @@ mod author;
 mod cases;
 mod catalog;
 mod category;
+mod chart_review;
 mod check;
 mod cli;
 mod commands;

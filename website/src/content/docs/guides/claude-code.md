@@ -183,12 +183,14 @@ state what xpd found, and a prompt about other work gets no text.
 | Event | What xpd prints | Example |
 | --- | --- | --- |
 | `SessionStart` | A brief with the rule packs that apply, the style setting, the pipelines and Hamilton nodes that `xpd graph` reads, and three commands | `Rule packs that apply: python (13 files), numpy (9 files), scipy (6 files), pandas (4 files).` |
-| `UserPromptSubmit`, for a prompt that a playbook answers | The playbook with its name, its commands in order and its rules | `xpd has a playbook for this prompt: xpd/recipe/plotly-chart` |
+| `UserPromptSubmit`, for a prompt about a chart, in a project of any language | One line that names `xpd chart-review` and the MCP tool `chart_review` | ``Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file that draws the chart.`` |
+| `UserPromptSubmit`, for a prompt that a playbook answers | The playbook with its name, its commands in order and its rules | `xpd has a playbook for this prompt: xpd/recipe/pandas-pipeline` |
 | `UserPromptSubmit`, for a prompt that asks what to make or improve | The open issues of the project, counted by pack and severity | `plotly: 11 warnings` |
 
 A playbook is one of xpd's own recipes, which holds the house style for a kind of task.
 [`xpd find`](../../commands/find/#playbooks) lists the four of them. You type "improve my charts"
-and name no rule and no command, and the turn goes as follows.
+and name no rule and no command. A prompt about a chart gets the chart line in place of a
+playbook, and the turn goes as follows.
 
 ```mermaid
 sequenceDiagram
@@ -196,9 +198,12 @@ sequenceDiagram
     participant Client as Claude Code or Codex
     participant Hook as xpd hook
     participant Agent
+    participant Review as xpd chart-review
     You->>Client: improve my charts
     Client->>Hook: UserPromptSubmit with the prompt
-    Hook-->>Agent: the playbook xpd/recipe/plotly-chart and the open plotly issues
+    Hook-->>Agent: the chart line, which names xpd chart-review
+    Agent->>Review: report.py
+    Review-->>Agent: the charts, the plotly rules that fire and the questions of the book
     Agent->>Client: edits report.py
     Client->>Hook: PostToolUse
     Hook-->>Agent: the issues of report.py
@@ -207,7 +212,8 @@ sequenceDiagram
     Hook-->>Agent: 2 warnings remain in report.py, so the turn goes on
 ```
 
-[`xpd hook`](../../commands/hook/#on-each-prompt) describes when a prompt gets a playbook.
+[`xpd hook`](../../commands/hook/#on-each-prompt) describes when a prompt gets the chart line or
+a playbook, and the [chart review guide](../chart-review/) shows what the review prints.
 
 ### Hold a turn on the house style
 

@@ -17,6 +17,7 @@ from pydantic import TypeAdapter
 
 from xpd.mcp.models import (
     CaseReport,
+    ChartReview,
     CheckReport,
     CodeMatch,
     CreatedFiles,
@@ -48,6 +49,9 @@ class Command[T]:
 FIND = Command(("find", "--format", "json"), TypeAdapter(DiscoveryMatches).validate_json, SUCCESS)
 API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]).validate_json, SUCCESS)
 CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport).validate_json, FINDINGS)
+CHART_REVIEW = Command(
+    ("chart-review", "--format", "json"), TypeAdapter(ChartReview).validate_json, SUCCESS
+)
 QUERY = Command(("run", "--format", "json"), TypeAdapter(list[CodeMatch]).validate_json, FINDINGS)
 REWRITE = Command(("run", "--update-all", "--color=never"), bytes.decode, FINDINGS)
 OUTLINE = Command(

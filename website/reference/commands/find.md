@@ -41,7 +41,7 @@ searches.
 $ xpd find "improve my charts" --kind recipe
 Recipes
 xpd/recipe/plotly-chart [recipe]
-A plotly chart that passes the plotly pack. A chart in the house style follows the plotly rules, which apply Edward Tufte's book "The Visual Display of Quantitative Information" to plotly figures. The template is plain and set once, each line carries its own label in place of a legend, the axes carry words and a unit, and the value axis starts at zero.
+A plotly chart that passes the plotly pack and the chart review. A chart in the house style follows the plotly rules, which apply Edward Tufte's book "The Visual Display of Quantitative Information" to plotly figures, and answers the questions of the book that `xpd chart-review` asks for each chart. The template is plain and set once, each line carries its own label in place of a legend, the axes carry words and a unit, and the value axis starts at zero. A chart in matplotlib, seaborn or another library gets the same review, with the plotly call that draws it.
 Rules: plotly/default-template, plotly/legend-instead-of-labels, plotly/axis-title-column-name, plotly/bar-axis-without-zero, plotly/area-axis-without-zero, plotly/explicit-grid, plotly/boxed-axis-frame, plotly/redundant-color, plotly/rainbow-colorscale, plotly/pie-chart, plotly/rotated-tick-labels, plotly/all-caps-title
 plotly/recipe/scatter-line-area-and-bar-charts [recipe]
 Scatter, Line, Area and Bar Charts

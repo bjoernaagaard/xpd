@@ -1,0 +1,564 @@
+facts:
+  - id: canvas
+    text: "Drawn canvas width and height in pixels and the number of panels. A single panel taller than wide is named."
+  - id: values
+    text: "Number of values drawn per trace and in total, by mark (pie wedges, bars, line or scatter points), and values per square inch of canvas."
+  - id: colors
+    text: "Resolved color, line dash and marker of each trace, and whether direct labels exist. A pair told apart only by red against green is named."
+  - id: x-values
+    text: "The plotted x values of each trace, and the years they span when they are dates or years."
+  - id: text
+    text: "The title, the axis titles, the tick label angle and the annotations, and the text written in capitals."
+questions:
+  - id: show-the-data
+    page: 13
+    line: 108
+    chapter: "1 Graphical Excellence"
+    principle: "Show the data"
+    text: "Does the chart show the observations themselves, so a reader sees what a summary statistic or a fitted line would hide?"
+    look: "Whether points or values are drawn or only an aggregate, and whether a fitted line runs through the middle of the points as its own trace."
+    kinds: ["any"]
+    facts: []
+    plotly: "Draw the observations with px.scatter or px.line(markers=True) and add a fit as a separate trace."
+    rules: ["heatmap-smoothing", "spline-line"]
+    covers: [108, 118, 983]
+  - id: substance
+    page: 13
+    line: 109
+    chapter: "1 Graphical Excellence"
+    principle: "Substance over method"
+    text: "Does the design send the reader to the substance of the data rather than to the method, the graphic design or the software, and would someone who knows the subject and the statistics stand behind it?"
+    look: "Decoration and software defaults that draw the eye, and patterns that could be noise or an artifact of how the data were collected."
+    kinds: ["any"]
+    facts: []
+    plotly: "Start from template=\"simple_white\" and remove what does not serve the data."
+    rules: []
+    covers: [109, 514, 1346, 3212, 3268, 3658, 5238, 7982]
+  - id: compare
+    page: 13
+    line: 113
+    chapter: "1 Graphical Excellence"
+    principle: "Encourage comparison"
+    text: "Are the values the reader must compare placed side by side in one view, with marks of the same shape on a common scale?"
+    look: "Comparisons split over separate charts, tabs or pages, and different shapes or scales for the things compared."
+    kinds: ["any"]
+    facts: []
+    plotly: "Put the compared series in one figure or in facet_col panels with shared axes."
+    rules: []
+    covers: [113, 979, 5638, 6795, 7755]
+  - id: overview-and-detail
+    page: 13
+    line: 114
+    chapter: "1 Graphical Excellence"
+    principle: "Several levels of detail"
+    text: "Can a reader see the overall pattern at a glance and the fine structure up close, in one coherent display of a complex data set?"
+    look: "Whether the whole data set is shown and organized, or only a slice or an aggregate that loses the detail."
+    kinds: ["any"]
+    facts: []
+    plotly: "Show all rows in one figure, and order or group them with category_orders."
+    rules: []
+    covers: [106, 112, 114, 5355, 5958, 6793, 8210]
+  - id: purpose
+    page: 13
+    line: 115
+    chapter: "1 Graphical Excellence"
+    principle: "A clear purpose"
+    text: "What is the chart for, description, exploration, tabulation or decoration, and is a chart the right format for it, or would a sentence, a table or a combination serve better?"
+    look: "The question the reader brings, and whether the chart answers it or only decorates the page."
+    kinds: ["any"]
+    facts: []
+    plotly: "Choose the px function for the comparison the reader must make, or go.Table for lookup."
+    rules: []
+    covers: [80, 115, 7110, 7114]
+  - id: integrate-text
+    page: 13
+    line: 116
+    chapter: "1 Graphical Excellence"
+    principle: "Graphics integrated with text"
+    text: "Is the chart run into the text that discusses it, in the same typeface, without ruled lines that wall it off, repeated near later references, and with Figure spelled out?"
+    look: "The report, notebook or dashboard text around the chart, and the caption."
+    kinds: ["any"]
+    facts: []
+    plotly: "Set layout.font.family to the page's typeface and place the figure beside its paragraph."
+    rules: []
+    covers: [62, 116, 7124, 7892, 7895, 7897, 7901]
+  - id: map-area
+    page: 20
+    line: 427
+    chapter: "1 Graphical Excellence"
+    principle: "Area on maps"
+    text: "On a shaded map, does land area stand for importance where the quantity is people or counts, and could collection practice explain the pattern?"
+    look: "Large sparsely populated regions that dominate the map."
+    kinds: ["map"]
+    facts: []
+    plotly: "Use px.scatter_geo with size by count, or a sorted px.bar of the regions."
+    rules: []
+    covers: [427, 429]
+  - id: small-data-table
+    page: 33
+    line: 625
+    chapter: "1 Graphical Excellence"
+    principle: "Tables for small data sets"
+    text: "Does the chart show 20 or fewer numbers, exact values, or many labeled values that a table or a sentence shows better?"
+    look: "The count of values drawn, whether the reader needs exact values, and whether the values are written into the code."
+    kinds: ["any"]
+    facts: ["values"]
+    plotly: "Use go.Table(header=..., cells=...) or write the numbers in the text."
+    rules: ["table-for-small-data"]
+    covers: [556, 625, 4341, 4772, 7126, 7130, 7166, 7178, 7755]
+  - id: multivariate
+    page: 51
+    line: 1354
+    chapter: "1 Graphical Excellence"
+    principle: "Graphical excellence is nearly always multivariate"
+    text: "Does the chart show the variables that explain the pattern, a scatter for a relationship between two variables and added explanatory or spatial variables for a time series, rather than one variable alone?"
+    look: "Bivariate data forced into bars, and a time series shown as chronology with no explanatory variable."
+    kinds: ["any"]
+    facts: []
+    plotly: "Use px.scatter(x=, y=) for a relationship, and color, size or facet_col for a third variable."
+    rules: []
+    covers: [287, 766, 798, 850, 1007, 1354, 3270]
+  - id: zero-baseline
+    page: 54
+    line: 1391
+    chapter: "2 Graphical Integrity"
+    principle: "Bars start at zero"
+    text: "Do the bars and filled areas start at zero, so a negative value or a difference is not disguised, and is a removed zero shown as removed?"
+    look: "The value axis range, where the bars begin, and negative values."
+    kinds: ["bar", "histogram", "area"]
+    facts: []
+    plotly: "Leave the bar axis on autorange, which includes zero, and write no range_y that starts above it."
+    rules: ["area-axis-without-zero", "bar-axis-without-zero"]
+    covers: [1391]
+  - id: labels
+    page: 56
+    line: 1527
+    chapter: "2 Graphical Integrity"
+    principle: "Clear, detailed labeling"
+    text: "Are the scales, units, sources and important events labeled on the chart, so no reading is ambiguous, and does an exploratory chart say how to read it?"
+    look: "Axis titles with units, a source note, annotations at events and outliers, and the words that explain the design."
+    kinds: ["any"]
+    facts: ["text"]
+    plotly: "Set labels={...} with units and add fig.add_annotation at each event and outlier."
+    rules: []
+    covers: [1527, 4001, 4341, 5355, 7884, 7945, 7974]
+  - id: lie-factor
+    page: 57
+    line: 1533
+    chapter: "2 Graphical Integrity"
+    principle: "The Lie Factor"
+    text: "Is the size of each mark proportional to its number? Divide the size of an effect in the chart by its size in the data; a Lie Factor outside 0.95 to 1.05 is a distortion."
+    look: "Bubble and icon sizes, bar lengths, areas, cut axes, and type or arrows that stretch one value; printed numbers do not excuse a lying mark."
+    kinds: ["any"]
+    facts: []
+    plotly: "Use sizemode=\"area\" for marker sizes and bars from zero."
+    rules: ["area-axis-without-zero", "bar-axis-without-zero", "marker-size-diameter", "polar-bar-area"]
+    covers: [110, 1481, 1525, 1533, 1535, 1625, 2517, 2751, 3186]
+  - id: design-variation
+    page: 61
+    line: 1863
+    chapter: "2 Graphical Integrity"
+    principle: "Show data variation, not design variation"
+    text: "Do scales, time intervals, periods and design stay constant across the chart, so every visible change is a change in the data?"
+    look: "Uneven intervals on a time axis, partial periods next to full ones, a second y axis, and connector slopes set by spacing."
+    kinds: ["any"]
+    facts: []
+    plotly: "Plot dates on a date axis, normalize partial periods, and keep one y axis."
+    rules: ["dual-y-axis"]
+    covers: [977, 1436, 1563, 1685, 1863]
+  - id: deflate-money
+    page: 68
+    line: 2635
+    chapter: "2 Graphical Integrity"
+    principle: "Deflated money"
+    text: "If the chart shows money over time, is it in deflated and standardized units, such as constant euro per person, and does a label say whether it is nominal or real?"
+    look: "A currency in the axis title or data, the years plotted, and the word nominal, real or constant with a base year."
+    kinds: ["line", "bar", "area"]
+    facts: ["x-values", "text"]
+    plotly: "Divide by a price index (and population) before px.line and title the axis like \"Price, 2015 euro\"."
+    rules: []
+    covers: [2603, 2635]
+  - id: dimensions
+    page: 71
+    line: 2816
+    chapter: "2 Graphical Integrity"
+    principle: "No more dimensions than the data"
+    text: "Does the chart depict more varying dimensions than the data have, through 3D, perspective, areas or volumes for one-dimensional numbers?"
+    look: "3D traces, perspective, icons scaled in two dimensions, and marks that hide others."
+    kinds: ["any"]
+    facts: []
+    plotly: "Use px.bar or px.line in two dimensions."
+    rules: ["marker-size-diameter", "polar-bar-area", "three-d-for-two-d"]
+    covers: [1565, 1567, 2594, 2733, 2816, 2942, 4341]
+  - id: context
+    page: 74
+    line: 2968
+    chapter: "2 Graphical Integrity"
+    principle: "Context is essential"
+    text: "Does the chart show enough data around its point, the years before and after a change and comparison series, to answer compared with what?"
+    look: "The number of time points, whether the change is shown against the trend before it, and comparison groups."
+    kinds: ["line", "bar", "area", "scatter"]
+    facts: ["x-values"]
+    plotly: "Plot all years with px.line and add the comparison series in the same figure."
+    rules: []
+    covers: [824, 1623, 2968, 2995, 3054]
+  - id: right-numbers
+    page: 80
+    line: 3233
+    chapter: "3 Sources of Graphical Integrity and Sophistication"
+    principle: "The right numbers"
+    text: "Are these the right numbers for the question: a sound model, enough data, and a statistic worth showing, rather than a thin or simple series dressed up?"
+    look: "A simple linear change that one or two numbers would summarize, a puny data set, a model the chart is asked to rescue."
+    kinds: ["any"]
+    facts: []
+    plotly: "Report a simple change as a number in the text and keep the figure for varied data."
+    rules: []
+    covers: [295, 3233]
+  - id: data-ink
+    page: 96
+    line: 3819
+    chapter: "4 Data-Ink and Graphical Redesign"
+    principle: "Maximize the data-ink ratio"
+    text: "Which ink shows no data? Could the background tint, frame, ticks, debris or uniform notes be erased or moved to the caption without loss, after a revision that compares versions?"
+    look: "Background fills, boxes, tick marks, heavy axes, and notes that apply to every mark."
+    kinds: ["any"]
+    facts: []
+    plotly: "Use template=\"simple_white\" and remove what carries no data."
+    rules: ["boxed-axis-frame", "default-template"]
+    covers: [86, 3819, 3821, 3829, 3881, 3949, 3955, 3973, 3987, 4078, 6807, 7102]
+  - id: repeat-cycle
+    page: 98
+    line: 3859
+    chapter: "4 Data-Ink and Graphical Redesign"
+    principle: "Repeat a cycle"
+    text: "For a cyclical series such as hours, seasons or longitude, does the chart repeat part of the cycle or overlay its phases, so the eye can follow across the seam?"
+    look: "Where the series wraps, and whether both phases of an annual cycle are shown."
+    kinds: ["line", "heatmap", "map"]
+    facts: []
+    plotly: "Append the first part of the cycle to the end of the data before px.line."
+    rules: []
+    covers: [3859, 3863, 3869, 6832, 6834]
+  - id: redundant-ink
+    page: 100
+    line: 3877
+    chapter: "4 Data-Ink and Graphical Redesign"
+    principle: "Erase redundant data-ink"
+    text: "Does any number appear more than once, as a bar with its label and its own color, or as two symmetric halves, without a reason such as context or easier comparison?"
+    look: "Color that repeats an axis, labels that repeat a scale, mirrored halves."
+    kinds: ["any"]
+    facts: []
+    plotly: "Drop color= when it repeats x or y."
+    rules: ["redundant-color"]
+    covers: [3845, 3859, 3877]
+  - id: vibration
+    page: 108
+    line: 4092
+    chapter: "5 Chartjunk: Vibrations, Grids, and Ducks"
+    principle: "Moire vibration"
+    text: "Do hatching, stripes, patterned fills, fields of ticks or doubled lines shimmer? Use flat gray tints or labels in words."
+    look: "Pattern fills, dense ticks and doubled grid lines."
+    kinds: ["any"]
+    facts: []
+    plotly: "Remove pattern_shape and use flat gray fills."
+    rules: ["pattern-fill"]
+    covers: [3993, 4092, 4430]
+  - id: grid
+    page: 112
+    line: 4531
+    chapter: "5 Chartjunk: Vibrations, Grids, and Ducks"
+    principle: "Mute the grid"
+    text: "Is the grid muted or gone, fainter than the data, kept only where the chart is used to look up values, and drawn at meaningful values such as events?"
+    look: "Grid color and weight against the data, and whether the grid hides peaks."
+    kinds: ["any"]
+    facts: []
+    plotly: "Use template=\"simple_white\", or a faint gridcolor where the grid is needed."
+    rules: ["explicit-grid"]
+    covers: [798, 3799, 4531, 4535, 4547, 4555, 4576, 4582, 4584]
+  - id: duck
+    page: 116
+    line: 4588
+    chapter: "5 Chartjunk: Vibrations, Grids, and Ducks"
+    principle: "The duck"
+    text: "Has decoration taken over the chart, so that its structure is a style rather than data?"
+    look: "Gauges, icons, pictures, ornamental shapes and effects that carry no number."
+    kinds: ["any"]
+    facts: []
+    plotly: "Replace the decorative form with a plain px chart or a number."
+    rules: ["explicit-grid", "gauge-indicator", "pattern-fill"]
+    covers: [4588, 4839]
+  - id: quartile-plot
+    page: 124
+    line: 4877
+    chapter: "6 Data-Ink Maximization and Graphical Design"
+    principle: "The quartile plot"
+    text: "Would an offset quartile plot, a line with a gap for the middle half, show the five numbers with less ink than the box?"
+    look: "Box outlines and whiskers when only the five-number summary is needed."
+    kinds: ["box"]
+    facts: []
+    plotly: "Draw the minimum, quartiles, median and maximum with go.Scatter lines."
+    rules: ["box-plot-ink"]
+    covers: [4877, 4883, 4901]
+  - id: bar-erase
+    page: 127
+    line: 4954
+    chapter: "6 Data-Ink Maximization and Graphical Design"
+    principle: "Redesign the bar chart"
+    text: "Could the bar chart drop its box, its vertical axis line and its ticks, with white grid lines cut through the bars and a thin baseline?"
+    look: "The frame, axis line, ticks and baseline around the bars."
+    kinds: ["bar", "histogram", "box"]
+    facts: []
+    plotly: "Use template=\"simple_white\" with showline=False on the value axis."
+    rules: ["boxed-axis-frame"]
+    covers: [4954, 4983, 5012, 5043, 5072, 5101, 5132]
+  - id: range-frame
+    page: 130
+    line: 5156
+    chapter: "6 Data-Ink Maximization and Graphical Design"
+    principle: "The range-frame"
+    text: "Could the axis lines end at the data's minimum and maximum, labeled with those values, so the frame itself reports the range?"
+    look: "Axis lines that run to round numbers beyond the data."
+    kinds: ["scatter", "line"]
+    facts: []
+    plotly: "Set the axis range and tickvals to the data minimum and maximum, with showline=True."
+    rules: []
+    covers: [5156, 5186, 5751]
+  - id: marginal
+    page: 133
+    line: 5192
+    chapter: "6 Data-Ink Maximization and Graphical Design"
+    principle: "The dot-dash-plot"
+    text: "Would the marginal distribution of each variable, as a rug or a quartile plot on the frame, show what the scatter hides?"
+    look: "Distributions of x and of y that the scatter alone does not show."
+    kinds: ["scatter"]
+    facts: []
+    plotly: "Add marginal_x=\"rug\" and marginal_y=\"rug\" to px.scatter where the marginals matter."
+    rules: []
+    covers: [4877, 5180, 5192, 5200, 5216]
+  - id: multifunction
+    page: 139
+    line: 5258
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Multifunctioning graphical elements"
+    text: "Could a label, a tick, a grid line or an identifier also carry data, such as exact values as ticks, grid lines at events, identifiers in a meaningful order, or digits as marks?"
+    look: "Round-number ticks, arbitrary grid spacing, alphabetical identifiers."
+    kinds: ["any"]
+    facts: []
+    plotly: "Set tickvals and ticktext to data values, and add_vline at events."
+    rules: []
+    covers: [550, 5258, 5264, 5270, 5411, 5667, 5758, 5768, 5774, 5805, 5840]
+  - id: puzzle
+    page: 139
+    line: 5260
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Graphical puzzles"
+    text: "Can the reader see the pattern directly, without translating color codes, symbols or abbreviations into words through a key?"
+    look: "Legends with many codes, shading or symbol keys, abbreviations."
+    kinds: ["any"]
+    facts: []
+    plotly: "Label marks with text= or annotations instead of a coded legend."
+    rules: []
+    covers: [5260, 5895, 7978]
+  - id: zero-and-missing
+    page: 145
+    line: 5483
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Zero and missing"
+    text: "Are zero values and missing values drawn differently, so an absent bar or a blank cell is not read as zero?"
+    look: "Blank cells, absent bars and gaps in a series."
+    kinds: ["bar", "heatmap", "map", "line"]
+    facts: []
+    plotly: "Keep NaN as a gap and mark a true zero with a visible mark or text."
+    rules: []
+    covers: [664, 5483]
+  - id: color-use
+    page: 154
+    line: 5939
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Color with a natural order"
+    text: "Does color show quantity with an ordered lightness scale and a natural metaphor, in light or transparent tones that keep labels readable?"
+    look: "Spectrum colorscales, garish tones, and colors that hide type beneath them."
+    kinds: ["heatmap", "map"]
+    facts: []
+    plotly: "Use a sequential scale such as color_continuous_scale=\"Greys\" or \"Blues\"."
+    rules: ["rainbow-colorscale"]
+    covers: [5939, 6546, 7098]
+  - id: lines-of-sight
+    page: 155
+    line: 5960
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Lines of sight"
+    text: "Is the display ordered so the eye reads it in a clear hierarchy, with steady horizontal or vertical lines of sight and aligned values?"
+    look: "Panels and labels that make the eye jump, values out of alignment."
+    kinds: ["any"]
+    facts: []
+    plotly: "Align panels with make_subplots(shared_xaxes=True) or facet_row."
+    rules: []
+    covers: [5950, 5960, 6072, 6076]
+  - id: many-numbers
+    page: 168
+    line: 6793
+    chapter: "8 Data Density and Small Multiples"
+    principle: "Data density and the shrink principle"
+    text: "How many numbers does the chart show for its area, and could it show more data, or the same data in less space, while it stays legible?"
+    look: "The count of values drawn against the canvas area, and crowding that averaging, smaller dots or thinner lines would fix."
+    kinds: ["any"]
+    facts: ["values", "canvas"]
+    plotly: "Set width and height with fig.update_layout, and add data or panels with facet_col."
+    rules: ["gauge-indicator"]
+    covers: [111, 6427, 6793, 6811]
+  - id: scale-choice
+    page: 169
+    line: 6822
+    chapter: "8 Data Density and Small Multiples"
+    principle: "Scales for time series"
+    text: "Is the vertical scale chosen for what the curve must show, neither so steep nor so flat that change is hidden, with zero removed only where the reader sees it removed and a log scale for relative change?"
+    look: "The steepness of the curve, the start of the value axis, and the span of the values."
+    kinds: ["line", "area"]
+    facts: []
+    plotly: "Set the y range deliberately, or log_y=True for relative change."
+    rules: []
+    covers: [6822, 6823, 6825, 6827]
+  - id: small-multiples
+    page: 170
+    line: 6842
+    chapter: "8 Data Density and Small Multiples"
+    principle: "Small multiples"
+    text: "For a series of charts indexed by time or a category, are the panels side by side with the same design and the same scales, in a meaningful order?"
+    look: "Animation frames, tabs or separate figures for the index, and free scales across panels."
+    kinds: ["panels"]
+    facts: []
+    plotly: "Use facet_col with shared axes in place of animation_frame."
+    rules: ["animation-frame", "free-facet-scales"]
+    covers: [904, 6842, 7047]
+  - id: craft
+    page: 177
+    line: 7115
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Careful production"
+    text: "Is the chart drawn with care in its technical details: no repeated or mistyped scale values, no clipped or overlapping text, one typeface?"
+    look: "Tick labels, overlapping annotations, clipped margins, mixed fonts."
+    kinds: ["any"]
+    facts: []
+    plotly: "Check the rendered figure with fig.write_image and fix margins with update_layout(margin=...)."
+    rules: []
+    covers: [664, 7115]
+  - id: order
+    page: 178
+    line: 7149
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Order by content"
+    text: "Are categories ordered by content or by value rather than alphabetically?"
+    look: "The order of bars, rows, slices and panels."
+    kinds: ["bar", "pie", "heatmap", "box", "panels"]
+    facts: []
+    plotly: "Set category_orders or sort the frame before px.bar."
+    rules: []
+    covers: [7149]
+  - id: pie
+    page: 178
+    line: 7166
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Pie charts"
+    text: "Is this a pie? A table, or bars sorted along a common scale, shows the numbers better, and several pies are worse still."
+    look: "Pie, donut and sunburst marks and how many slices they hold."
+    kinds: ["pie"]
+    facts: ["values"]
+    plotly: "Use go.Table, or px.bar sorted by value."
+    rules: ["pie-chart", "sunburst-as-pie"]
+    covers: [7166]
+  - id: words-spelled-out
+    page: 183
+    line: 7966
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Words spelled out"
+    text: "Are words spelled out on the chart, with no column names, codes or abbreviations?"
+    look: "Axis titles, legends and labels that are column names or abbreviations."
+    kinds: ["any"]
+    facts: ["text"]
+    plotly: "Pass labels={\"col_name\": \"Words with units\"} to the px call."
+    rules: ["axis-title-column-name"]
+    covers: [4772, 7966]
+  - id: horizontal-type
+    page: 183
+    line: 7970
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Words run left to right"
+    text: "Do all words, tick labels and the y axis title read from left to right?"
+    look: "Rotated tick labels and a vertical y axis title."
+    kinds: ["any"]
+    facts: ["text"]
+    plotly: "Keep tickangle=0 and put the y axis title in an annotation above the axis."
+    rules: ["rotated-tick-labels"]
+    covers: [4001, 7970]
+  - id: labels-on-graphic
+    page: 183
+    line: 7978
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Labels on the graphic"
+    text: "Are series and areas labeled on the chart itself, so no legend is needed?"
+    look: "A legend that the reader must match to lines or areas by color."
+    kinds: ["any"]
+    facts: ["colors", "text"]
+    plotly: "Add the series name at the end of each line with fig.add_annotation and set showlegend=False."
+    rules: ["legend-instead-of-labels"]
+    covers: [4430, 7884, 7978]
+  - id: color-deficient
+    page: 183
+    line: 7986
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Color-deficient readers"
+    text: "Can a reader who cannot tell red from green still tell the series apart, through labels, line style, position or a blue contrast?"
+    look: "Series told apart only by red and green, and colors that carry an essential contrast."
+    kinds: ["any"]
+    facts: ["colors"]
+    plotly: "Label lines directly and use line_dash or a blue against orange pair."
+    rules: []
+    covers: [7986]
+  - id: type-case
+    page: 183
+    line: 7994
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Type"
+    text: "Is the type clear, precise and modest, small for short labels, and in upper and lower case rather than capitals?"
+    look: "Titles and labels in capitals, heavy or crowded type."
+    kinds: ["any"]
+    facts: ["text"]
+    plotly: "Write titles in sentence case and keep font sizes modest."
+    rules: ["all-caps-title"]
+    covers: [7888, 7990, 7994]
+  - id: lines
+    page: 185
+    line: 8068
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Thin lines"
+    text: "Are lines thin, thinner as the data get dense, with the data line the heaviest where lines meet, and would calm shading under a series show its departures better?"
+    look: "Line widths, marker sizes in dense data, and reference lines heavier than data."
+    kinds: ["line", "area", "scatter"]
+    facts: []
+    plotly: "Set line_width=1 to 2 for data and thinner, lighter reference lines."
+    rules: []
+    covers: [6799, 8068, 8082, 8106]
+  - id: horizontal-shape
+    page: 186
+    line: 8090
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Proportion and shape"
+    text: "Is the chart wider than tall, about half again as wide as tall when the data do not suggest another shape, and wider still for a wiggly curve?"
+    look: "Width and height of the canvas and the number of panels."
+    kinds: ["any"]
+    facts: ["canvas"]
+    plotly: "Set fig.update_layout(width=900, height=600) or a 3 to 2 container."
+    rules: []
+    covers: [2377, 7112, 8090, 8122, 8146, 8197, 8198]
+  - id: judgment
+    page: 191
+    line: 8208
+    chapter: "Epilogue: Designs for the Display of Information"
+    principle: "Judgment"
+    text: "Where the chart breaks one of these principles, does the exception show the data better?"
+    look: "Each place where a question above was answered no on purpose."
+    kinds: ["any"]
+    facts: []
+    plotly: "Keep the exception and say why in the text."
+    rules: []
+    covers: [4893, 8208]

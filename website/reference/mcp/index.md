@@ -42,6 +42,6 @@ a dataflow and failed gates are results, not errors.
 
 ## Background tasks
 
-A client can run `check`, `fix`, `query`, `rewrite`, `outline`, `new`, `test`, `profile`,
+A client can run `check`, `chart_review`, `fix`, `query`, `rewrite`, `outline`, `new`, `test`, `profile`,
 `refit` and `equiv` as background tasks, so it gets a task at once and fetches the result when
 the tool is done. Each of them reports progress and logs the xpd command it runs.

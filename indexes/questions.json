@@ -279,6 +279,14 @@
     "expected": "xpd/recipe/plotly-chart"
   },
   {
+    "query": "review the charts of my dashboard against Tufte's book",
+    "expected": "xpd/recipe/plotly-chart"
+  },
+  {
+    "query": "review a matplotlib figure and redraw it in plotly",
+    "expected": "xpd/recipe/plotly-chart"
+  },
+  {
     "query": "reconcile a Nixtla hierarchy and score the forecasts",
     "expected": "xpd/recipe/nixtla-forecasting"
   },

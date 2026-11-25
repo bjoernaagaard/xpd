@@ -9,6 +9,7 @@ class ToolName(StrEnum):
     DISCOVERY_GATE = auto()
     EQUIV = auto()
     CHECK = auto()
+    CHART_REVIEW = auto()
     FIX = auto()
     QUERY = auto()
     REWRITE = auto()

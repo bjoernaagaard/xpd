@@ -5,13 +5,14 @@ stdin, and xpd reads the event's name from `hook_event_name`. The
 | Event | What xpd does |
 | --- | --- |
 | `SessionStart` | Records the commit that is checked out and the project's drift from its profile, and prints a brief of the project for the agent |
-| `UserPromptSubmit` | Prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
+| `UserPromptSubmit` | Points a chart prompt to [`xpd chart-review`](../chart-review/), and otherwise prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
 | `PostToolUse` | Lints the files that the edit changed, so the agent sees their issues |
 | `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning, or while the session moved the project away from its profile |
 
 The brief and the prompt answer are plain text on stdout, which Claude Code and Codex both add to
 what the agent reads. Each states what xpd found, and neither gives the agent an order. xpd prints
-them only in a project with a Python file, and keeps each response short.
+them only in a project with a Python file, except the line for a chart prompt, which a project in
+any language gets. Each response is short.
 
 ## When a session starts
 
@@ -53,6 +54,8 @@ to print as follows.
 
 ```text
 on(UserPromptSubmit)
+  if the prompt is about a chart
+    print the chart line     # names xpd chart-review and the MCP tool chart_review, and stops
   if the project has no Python file
     print nothing
   if the first recipe that find gives for the prompt is a playbook and clears the keyword threshold
@@ -63,18 +66,26 @@ on(UserPromptSubmit)
     print nothing
 ```
 
+A prompt is about a chart when it holds a word such as chart, graph, figure, visualization,
+heatmap, pie, histogram, chartjunk or Tufte, or the Danish graf or figur, or two words such as
+plot, plotly, matplotlib, seaborn, dash, axis and legend. Graph after a word such as dataflow,
+dependency or Hamilton, and figure in "figure out", are not about a chart, and plot alone is not,
+so "plot twist: the deploy failed" gets no chart line.
+
 A [playbook](../find/#playbooks) is one of xpd's own recipes, which holds the house style for a
 kind of task. A prompt asks what to make or improve when it asks what to do next or asks to
 improve, optimize or make the code better.
 
 | Prompt | What xpd prints |
 | --- | --- |
-| "improve my charts" | The playbook `xpd/recipe/plotly-chart` and the open issues |
+| "improve my charts" | The chart line |
+| "gennemgå graferne i mit dashboard" | The chart line |
 | "build a robust pandas pipeline for feature engineering" | The playbook `xpd/recipe/pandas-pipeline` |
 | "make this linear" | The playbook `xpd/recipe/linear-script` |
 | "what should I make?" | The open issues |
 | "rename this variable" | Nothing |
 | "why does the merge duplicate rows?" | Nothing |
+| "plot twist: the deploy failed, read the log" | Nothing |
 
 The hook searches by meaning only when the search model of `xpd find` is already on the machine,
 and it never downloads the model. The playbook threshold comes from the keywords alone, so the
@@ -144,21 +155,26 @@ samples/bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for ev
 samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
 ```
 
-A `UserPromptSubmit` event whose prompt fits a playbook gives this answer, in a copy of the
-repository's `samples/` folder. The `...` stands for the lines after the playbook, which count the
-open issues of the project.
+A `UserPromptSubmit` event whose prompt is about a chart gives this answer.
 
 ```console
 $ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"improve my charts"}' | xpd hook
-xpd has a playbook for this prompt: xpd/recipe/plotly-chart, "A plotly chart that passes the plotly pack".
-`xpd api xpd/recipe/plotly-chart` prints its code in the house style.
+Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file that draws the chart. It lists the plotly rules that fire and the questions from Tufte's book for each chart, in plotly or any other library, with the plotly route. Add `--run <adapter.py>` to measure the drawn figure. For a new chart, `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the same command.
+```
+
+A `UserPromptSubmit` event whose prompt fits a playbook gives this answer, in a copy of the
+repository's `samples/` folder.
+
+```console
+$ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"build a robust pandas pipeline for feature engineering"}' | xpd hook
+xpd has a playbook for this prompt: xpd/recipe/pandas-pipeline, "A pandas pipeline of step functions".
+`xpd api xpd/recipe/pandas-pipeline` prints its code in the house style.
 Its commands, in order:
-1. `xpd check <file> --format json` reports each form of the figure that the plotly pack argues against.
-2. `xpd rules --rule plotly --format json` gives the documentation of each plotly rule, with the page of the book and the plotly code to write.
-3. `xpd find "<chart form>" --kind rule` names the rule for a form, such as "small multiples" or "pie chart".
-4. `xpd check <file> --format json` after the change, and the chart is done when it reports 0 issues.
-The rules that its code satisfies: plotly/default-template, plotly/legend-instead-of-labels, plotly/axis-title-column-name, plotly/bar-axis-without-zero, plotly/area-axis-without-zero, plotly/explicit-grid, plotly/boxed-axis-frame, plotly/redundant-color, plotly/rainbow-colorscale, plotly/pie-chart, plotly/rotated-tick-labels, plotly/all-caps-title.
-...
+1. `xpd profile <data file>` prints the dtype, the nulls and the unique values of each column, so each step is written for the real data.
+2. `xpd graph <file> --format json` lists the steps and the columns each one reads. `pipelines[].source` is the `columns=` list for the read.
+3. `xpd check <file> --format json` reports what is left of the old style, and the code is done when it reports 0 issues.
+4. `xpd equiv old.py new.py` proves that a rewrite gives the same `result` as the code it replaces.
+The rules that its code satisfies: pandas/frame-column-write, pandas/filter-ladder, pandas/reassign-ladder, pandas/nested-step-calls, pandas/script-steps, pandas/lambda-in-assign, pandas/no-inplace, pandas/read-parquet-all-columns.
 ```
 
 A `Stop` event after the session edited `samples/bad.py` gives this answer.

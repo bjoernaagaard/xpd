@@ -129,6 +129,12 @@ instead and whether xpd can fix it, such as
 `xpd rules` lists every rule, and the
 [rules overview](https://bjoernaagaard.github.io/xpd/rules/) lists the packs with their counts.
 
+The plotly rules apply Edward Tufte's book "The Visual Display of Quantitative Information" to
+plotly code. `xpd chart-review <file>` applies the rest of the book to each chart of a file, in
+plotly, Dash, matplotlib, seaborn or pandas, as questions with their page of the book and the
+plotly call that draws the chart. The
+[chart review guide](https://bjoernaagaard.github.io/xpd/guides/chart-review/) shows a run.
+
 Some `info` rules state a preference of the house style, such as one method chain where the code
 builds a frame in separate steps. Set `style` to make xpd report them as warnings, in
 `[tool.xpd]` of the project's `pyproject.toml` or at the top of `~/.config/xpd/config.toml`.
@@ -150,6 +156,7 @@ xpd
 ├── lint
 │   ├── check [paths]          lint files and folders, and rewrite with --fix
 │   ├── rules                  list every rule with its documentation
+│   ├── chart-review <file>    ask the questions of Tufte's book for each chart, in any library
 │   └── hook                   answer an agent's session: lint each edit, and hold a turn that leaves errors or warnings
 ├── look up a library
 │   ├── find "<task>"          find library symbols, rules and worked examples for a task
@@ -225,8 +232,9 @@ The plugin runs `xpd hook` at four points of a session.
 ```text
 session starts        xpd prints which rule packs apply, the style setting,
                       and the pipelines and Hamilton nodes of the project
-user sends a prompt   xpd prints the playbook that answers the prompt, such as
-                      xpd/recipe/plotly-chart for "improve my charts",
+user sends a prompt   xpd points a chart prompt, such as "improve my charts",
+                      to xpd chart-review, and otherwise prints the playbook
+                      that answers the prompt, such as xpd/recipe/pandas-pipeline,
                       or the open issues when the prompt asks what to improve
 agent edits a file    xpd reports the issues of that file
 agent wants to stop   xpd lints every Python file the session changed,
@@ -245,7 +253,7 @@ module, with the commands to run in order and the rules that the code satisfies.
 | `xpd/recipe/pandas-pipeline` | Step functions that each return `frame.assign(...)`, joined with `pipe` |
 | `xpd/recipe/feature-module` | One typed function for each feature, named for the column it returns |
 | `xpd/recipe/linear-script` | A script that changed a frame line by line, as one chain that `xpd equiv` proves equal |
-| `xpd/recipe/plotly-chart` | A line chart that reports no issue of the plotly pack |
+| `xpd/recipe/plotly-chart` | A line chart that reports no issue of the plotly pack and answers the questions of `xpd chart-review` |
 
 ## License
 

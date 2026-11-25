@@ -303,6 +303,22 @@ enum Cmd {
         #[arg(long, value_enum)]
         format: Option<Format>,
     },
+    /// Review the charts of a file against Edward Tufte's book "The Visual Display of
+    /// Quantitative Information", in plotly, Dash, matplotlib, seaborn or pandas.
+    ///
+    /// It finds each chart call of the file and gives it a kind, such as pie, bar or line, and the
+    /// plotly call that draws it. It prints the plotly rules that fire on the file, and each
+    /// question of the book that applies to a chart it found, with the page of the book, what to
+    /// look at and the plotly code to write. Without a path, or for a file that is not Python, it
+    /// prints every question. `--run <adapter.py>` draws the figures that the adapter's
+    /// `figures()` returns in the project's Python, and prints each measured fact under the
+    /// questions it answers. A failed run leaves the questions in place. Exit 0 when it printed a
+    /// review, 2 if xpd can't run.
+    #[command(after_long_help = "Examples:
+  xpd chart-review report.py
+  xpd chart-review app.py --run chart_figures.py --format json
+  xpd chart-review --questions")]
+    ChartReview(crate::chart_review::ChartReviewArgs),
     /// Search code by syntax, in any language ast-grep parses, and preview or apply a rewrite.
     #[command(visible_alias = "query")]
     Run(RunArgs),
@@ -412,6 +428,7 @@ pub fn run() -> ExitCode {
         Cmd::Graph { paths, format } => {
             command_result(graph(&paths, format.unwrap_or(default_format)))
         }
+        Cmd::ChartReview(args) => command_result(args.run(default_format)),
         Cmd::Run(args) => command_result(args.run()),
         Cmd::Outline(args) => command_result(args.run()),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
@@ -656,6 +673,7 @@ fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
         .then(|| Categories::load(project))
         .transpose()?;
     let entries = catalog.entries();
+    let review = crate::chart_review::inventory()?;
     let selected = entries.iter().filter_map(|entry| {
         let labels = policy.as_ref().map(|policy| entry.categories(policy));
         category
@@ -671,6 +689,9 @@ fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
             let rules = selected
                 .map(|(entry, labels)| {
                     let mut value = entry.to_json();
+                    if value["package"] == "plotly" {
+                        value["questions"] = review_questions(&review, &value["rule"]);
+                    }
                     if let Some(labels) = labels {
                         value["categories"] = serde_json::json!(labels);
                     }
@@ -776,6 +797,26 @@ fn check(args: CheckArgs, default_format: Format) -> Result<ExitCode> {
     } else {
         Ok(ExitCode::SUCCESS)
     }
+}
+
+/// The questions of `xpd chart-review` that a plotly rule reports in code, as `xpd rules` and the
+/// rule pages show them.
+fn review_questions(review: &crate::chart_review::Inventory, rule: &Value) -> Value {
+    let questions: Vec<Value> = (review.questions.iter())
+        .filter(|question| {
+            rule.as_str()
+                .is_some_and(|rule| question.rules.iter().any(|named| named == rule))
+        })
+        .map(|question| {
+            serde_json::json!({
+                "id": question.id,
+                "page": question.page,
+                "principle": question.principle,
+                "text": question.text,
+            })
+        })
+        .collect();
+    Value::Array(questions)
 }
 
 /// Prints the dataflow of the files under `paths`.

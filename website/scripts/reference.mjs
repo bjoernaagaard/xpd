@@ -27,11 +27,12 @@ const run = (command, args, options = {}) => exec(command, args, { cwd: reposito
 const SAMPLE_LIBRARIES = ['pandas==3.1.1', 'pyarrow==26.0.1', 'scikit-learn==1.9.1', 'joblib==1.6.0', 'numpy==2.5.5'].map((pin) =>
   process.env.XPD_NEWEST_LIBRARIES ? pin.split('==')[0] : pin,
 );
+const CHART_LIBRARIES = ['matplotlib==3.11.2', 'seaborn==0.13.2', 'plotly==7.1.0'].map((pin) => (process.env.XPD_NEWEST_LIBRARIES ? pin.split('==')[0] : pin));
 
 /** The Python of an environment with the MCP server's dependencies and the samples' libraries. */
 function serverPython() {
   run('uv', ['venv', '--quiet', '--allow-existing', '--python', PYTHON_VERSION, venv]);
-  run('uv', ['pip', 'install', '--quiet', '--upgrade', '--python', venv, '-r', join(repository, 'pyproject.toml'), ...SAMPLE_LIBRARIES]);
+  run('uv', ['pip', 'install', '--quiet', '--upgrade', '--python', venv, '-r', join(repository, 'pyproject.toml'), ...SAMPLE_LIBRARIES, ...CHART_LIBRARIES]);
   return join(venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 }
 

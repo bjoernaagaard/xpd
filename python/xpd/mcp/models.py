@@ -47,6 +47,56 @@ class CheckReport(Output):
     issues: list[Issue]
 
 
+class Chart(Output):
+    """One chart call of a file, with the plotly call that draws its kind."""
+
+    line: int
+    call: str = Field(description="The call as the file writes it, such as px.pie or ax.bar.")
+    kind: str = Field(
+        description="pie, bar, histogram, line, area, scatter, box, heatmap, map or panels."
+    )
+    library: str = Field(description="plotly, matplotlib, seaborn or pandas.")
+    plotly: str = Field(description="The plotly call that draws a chart of this kind.")
+
+
+class MeasuredFact(Output):
+    """A fact that `run` measured on a drawn figure, under the question it answers."""
+
+    figure: str
+    fact: str
+    summary: str
+    findings: list[str] = Field(description="What the fact names as a fault, if anything.")
+
+
+class ReviewQuestion(Output):
+    """A question of Tufte's book that applies to a chart of the file."""
+
+    id: str
+    page: int = Field(description="The printed page of the second edition.")
+    principle: str
+    text: str
+    look: str = Field(description="What to look at in the chart to answer it.")
+    plotly: str = Field(description="The plotly code that follows the principle.")
+    rules: list[str] = Field(description="The plotly rules that report it in code.")
+    reported: list[str] = Field(description="Those of the rules that fire on the file.")
+    charts: list[int] = Field(description="The lines of the charts it applies to.")
+    measured: list[MeasuredFact]
+
+
+class ChartReview(Output):
+    """What `xpd chart-review` found for one file: its charts, the plotly rules that fire and
+    the questions of the book for each chart."""
+
+    file: str | None
+    libraries: list[str]
+    charts: list[Chart]
+    issues: list[Issue]
+    questions: list[ReviewQuestion]
+    facts: JsonValue = Field(
+        description="With run: the measured figures, or the error that stopped the run."
+    )
+
+
 class SourcePosition(Output):
     line: int
     column: int

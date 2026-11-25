@@ -54,6 +54,9 @@ you call it.\
 unless you can \
 say why the code is right. `{ToolName.FIX}` writes xpd's fixes, and asks the user before \
 unsafe ones.
+- When you make, change or review a chart, in plotly or any other library, call \
+`{ToolName.CHART_REVIEW}` on its file. Answer each question of Tufte's book that it returns, and \
+draw a chart of another library with its plotly route.
 - Use `{ToolName.QUERY}` to find code patterns and preview replacements, and \
 `{ToolName.REWRITE}` to apply them after \
 confirmation. Use `{ToolName.OUTLINE}` to browse project symbols, imports and members in \

@@ -1,6 +1,6 @@
-# A plotly chart that passes the plotly pack
+# A plotly chart that passes the plotly pack and the chart review
 
-A chart in the house style follows the plotly rules, which apply Edward Tufte's book "The Visual Display of Quantitative Information" to plotly figures. The template is plain and set once, each line carries its own label in place of a legend, the axes carry words and a unit, and the value axis starts at zero.
+A chart in the house style follows the plotly rules, which apply Edward Tufte's book "The Visual Display of Quantitative Information" to plotly figures, and answers the questions of the book that `xpd chart-review` asks for each chart. The template is plain and set once, each line carries its own label in place of a legend, the axes carry words and a unit, and the value axis starts at zero. A chart in matplotlib, seaborn or another library gets the same review, with the plotly call that draws it.
 
 ## Asks
 
@@ -9,6 +9,8 @@ A chart in the house style follows the plotly rules, which apply Edward Tufte's 
 - make my plotly figure better
 - implement a plotly chart from scratch based on our ruleset derived from the book
 - make a chart, a plot or a graph that follows the plotly rules
+- review the charts of my dashboard against Tufte's book
+- review a matplotlib or seaborn figure and redraw it in plotly
 
 ## Code
 
@@ -52,10 +54,11 @@ def revenue_chart(revenue: pd.DataFrame) -> go.Figure:
 
 ## Commands
 
-1. `xpd check <file> --format json` reports each form of the figure that the plotly pack argues against.
-2. `xpd rules --rule plotly --format json` gives the documentation of each plotly rule, with the page of the book and the plotly code to write.
-3. `xpd find "<chart form>" --kind rule` names the rule for a form, such as "small multiples" or "pie chart".
-4. `xpd check <file> --format json` after the change, and the chart is done when it reports 0 issues.
+1. `xpd chart-review <file> --format json` lists each chart of the file with its kind and the plotly call that draws it, the plotly rules that fire, and each question of the book that applies to a chart, with its page.
+2. `xpd chart-review <file> --run <adapter.py> --format json` draws the figures that the adapter's `figures()` returns in the project's Python, and puts the measured canvas, values, colors, x values and text under the questions they answer.
+3. `xpd rules --rule plotly --format json` gives the documentation of each plotly rule, with the page of the book, the plotly code to write and the questions of the review that the rule reports.
+4. `xpd find "<chart form>" --kind rule` names the rule for a form, such as "small multiples" or "pie chart".
+5. `xpd chart-review <file> --format json` after the change, and the chart is done when no plotly rule fires and each question has an answer from the chart and its data.
 
 ## Rules
 

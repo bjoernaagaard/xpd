@@ -9,8 +9,10 @@ from mcp.types import (
 )
 
 from xpd.mcp.base import READS, RUNS_CODE, WRITES, confirmed, rooted, run
-from xpd.mcp.binary import CHECK, EQUIV, GRAPH, PROFILE, REFIT, Xpd
+from xpd.mcp.base import run as xpd_run
+from xpd.mcp.binary import CHART_REVIEW, CHECK, EQUIV, GRAPH, PROFILE, REFIT, Xpd
 from xpd.mcp.models import (
+    ChartReview,
     CheckReport,
     Equivalence,
     GraphReport,
@@ -150,6 +152,45 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) 
             unsafe = answer
         flags.extend(["--fix", "--unsafe-fixes"] if unsafe else ["--fix"])
         return await run(ctx, xpd, CHECK, root, args, *flags)
+
+    @mcp.tool(name=ToolName.CHART_REVIEW, tags={"lint", "chart"}, annotations=RUNS_CODE, task=True)
+    @rooted
+    async def chart_review(
+        ctx: Context, path: str, run: str | None = None
+    ) -> ChartReview | InputRequiredResult:
+        """Review the charts of a file against Edward Tufte's book "The Visual Display of
+        Quantitative Information", for a chart in plotly, Dash, matplotlib, seaborn or pandas.
+        Call it when you make, change or review a chart. Changes no file.
+
+        It returns each chart call with its kind and the plotly call that draws it, the plotly
+        rules that fire on the file, and each question of the book that applies to a chart,
+        with its page, what to look at and the plotly code to write. Answer each question from
+        the chart and its data, and redraw a chart in another library with its plotly route.
+
+        Args:
+            path: The Python file that draws the charts, inside the project root.
+            run: A Python file inside the project root that defines `figures()`, which returns
+                a dict of name to figure. It runs project code in the project's Python, after
+                the user confirms, and each measured fact goes under the questions it answers.
+        """
+        root = await project.required_root(ctx)
+        args = [root.inside(path)]
+        if run is None:
+            return await xpd_run(ctx, xpd, CHART_REVIEW, root, args)
+        answer = await confirmed(
+            ctx,
+            project,
+            f"Run {run} with the project's Python to measure the figures it returns? "
+            "It runs project code.",
+            key="confirm_chart_run",
+            title="Run the adapter",
+        )
+        if isinstance(answer, InputRequiredResult):
+            return answer
+        if not answer:
+            await ctx.info("the run was declined, so the review has no measured facts")
+            return await xpd_run(ctx, xpd, CHART_REVIEW, root, args)
+        return await xpd_run(ctx, xpd, CHART_REVIEW, root, args, "--run", root.inside(run))
 
 
 def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) -> None:

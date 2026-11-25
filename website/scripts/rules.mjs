@@ -38,6 +38,20 @@ function severityText(rule) {
   return `${rule.severities.default}${strict}. A rule of the [house style](../../../commands/check/#house-style)`;
 }
 
+function reviewQuestions(rule) {
+  if (!rule.questions?.length) return [];
+  return [
+    '## Questions of the chart review',
+    '',
+    'The rule reports in code what these questions of the [chart review](../../../guides/chart-review/) ask of the drawn chart. `xpd chart-review` asks them for each chart, in plotly or in any other library.',
+    '',
+    '| Question | Page | Principle | What it asks |',
+    '| --- | --- | --- | --- |',
+    ...rule.questions.map((question) => `| ${question.id} | ${question.page} | ${question.principle} | ${question.text.replaceAll('|', '\\|')} |`),
+    '',
+  ];
+}
+
 export function generateRules(xpd) {
   const catalog = JSON.parse(
     run(xpd, ['rules', '--builtin', '--format', 'json'], { cwd: repository }),
@@ -95,6 +109,7 @@ export function generateRules(xpd) {
         '',
         siteLinks(rule.doc, pack, 2),
         '',
+        ...reviewQuestions(rule),
         '## Message',
         '',
         'xpd prints this message with the issue. A name that starts with `$` stands for code from your file.',

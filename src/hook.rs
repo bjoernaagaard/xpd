@@ -451,6 +451,17 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
         );
         return Ok(ExitCode::SUCCESS);
     }
+    if chart_prompt(prompt) {
+        print_context(
+            "Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file \
+             that draws the chart. It lists the plotly rules that fire and the questions from \
+             Tufte's book for each chart, in plotly or any other library, with the plotly route. \
+             Add `--run <adapter.py>` to measure the drawn figure. For a new chart, \
+             `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the \
+             same command.",
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
     let cwd = project_root(cwd)?;
     if project_files(&cwd, 1).is_empty() {
         return Ok(ExitCode::SUCCESS);
@@ -468,6 +479,96 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
         print_context(&text.join("\n"));
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Whether `prompt` asks to make, change or review a chart, in any chart library. A strong word,
+/// such as chart, figure or the Danish graf, routes alone. A weak word, such as plot or a library
+/// name, routes only beside a second one, so "plot twist" stays out. Graph after a word such as
+/// dataflow, and figure in "figure out", have another sense.
+fn chart_prompt(prompt: &str) -> bool {
+    const STRONG: [&str; 29] = [
+        "chart",
+        "charts",
+        "chartjunk",
+        "graph",
+        "graphs",
+        "figure",
+        "figures",
+        "visualization",
+        "visualizations",
+        "visualisation",
+        "visualisations",
+        "visualize",
+        "visualise",
+        "heatmap",
+        "heatmaps",
+        "pie",
+        "pies",
+        "histogram",
+        "histograms",
+        "scatterplot",
+        "scatterplots",
+        "tufte",
+        "graf",
+        "grafer",
+        "grafen",
+        "graferne",
+        "figur",
+        "figuren",
+        "figurer",
+    ];
+    const WEAK: [&str; 17] = [
+        "plot",
+        "plots",
+        "plotting",
+        "plotly",
+        "matplotlib",
+        "pyplot",
+        "seaborn",
+        "bokeh",
+        "altair",
+        "ggplot",
+        "ggplot2",
+        "echarts",
+        "recharts",
+        "dash",
+        "axis",
+        "axes",
+        "legend",
+    ];
+    const OTHER_GRAPHS: [&str; 11] = [
+        "dataflow",
+        "call",
+        "dependency",
+        "knowledge",
+        "task",
+        "commit",
+        "hamilton",
+        "xpd",
+        "step",
+        "computation",
+        "import",
+    ];
+    let lowered = prompt.to_lowercase();
+    let words: Vec<&str> = lowered
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let strong = words.iter().enumerate().any(|(at, word)| {
+        let before = at.checked_sub(1).and_then(|at| words.get(at));
+        let after = words.get(at + 1);
+        match *word {
+            "graph" | "graphs" => before.is_none_or(|before| !OTHER_GRAPHS.contains(before)),
+            "figure" => after != Some(&"out"),
+            word => STRONG.contains(&word),
+        }
+    });
+    let weak: HashSet<&str> = words
+        .iter()
+        .copied()
+        .filter(|word| WEAK.contains(word))
+        .collect();
+    strong || weak.len() >= 2
 }
 
 fn animation_prompt(prompt: &str) -> bool {

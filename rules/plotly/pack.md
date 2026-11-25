@@ -186,16 +186,20 @@ nothing for the pack, and `--fix --unsafe-fixes` writes four rewrites:
 +zsmooth=False
 ```
 
-## What the pack does not check
+## What the chart review checks beyond the rules
 
 The book states principles that the code of a figure does not show, so no rule covers them.
+`xpd chart-review <file>` asks each of them as a question with its page of the book, for a
+chart in plotly or in any other library, and `--run <adapter.py>` measures the drawn figure for
+the facts that answer it. The questions live in `rules/xpd/chart-review.yml`, and
+`xpd chart-review --questions` prints all of them.
 
-| Principle | Page | What the code does not show |
+| Principle | Page | What the chart review does |
 | --- | --- | --- |
-| "In time-series displays of money, deflated and standardized units of monetary measurement are nearly always better than nominal units" | 68 | whether a column is money |
-| "Graphics must not quote data out of context" | 74 | the rows that were left out |
-| The range-frame and the dot-dash-plot | 130, 133 | plotly has no axis line that ends at the lowest and highest value, and xpd cannot ask for `marginal_x="rug"` from a missing argument |
-| The Shrink Principle | 169 | how many values the figure shows, which sets its right size |
+| "In time-series displays of money, deflated and standardized units of monetary measurement are nearly always better than nominal units" | 68 | asks `deflate-money` for each line, bar and area chart. With `--run`, the text fact names money in a title with no word that says nominal, real or constant, and the x-values fact names the years it spans |
+| "Graphics must not quote data out of context" | 74 | asks `context` for each line, bar, area and scatter chart. With `--run`, the x-values fact names a trace with only two x values and nothing before or after them |
+| The range-frame and the dot-dash-plot | 130, 133 | asks `range-frame` for each scatter and line chart and `marginal` for each scatter, with the plotly code: axis lines and tick values at the data's minimum and maximum, and `marginal_x="rug"` |
+| The Shrink Principle | 168 | asks `many-numbers` for every chart. With `--run`, the values fact counts the values drawn and the values per square inch, and the canvas fact gives the size and the panels |
 
 ## Sizes that do not follow the numbers
 
